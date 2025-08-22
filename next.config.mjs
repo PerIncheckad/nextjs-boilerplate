@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // lägg till eventuella inställningar här om du hade något i .ts-filen
+  // Lägg till inställningar här vid behov
 };
 
 export default nextConfig;
