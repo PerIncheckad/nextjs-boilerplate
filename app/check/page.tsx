@@ -1,67 +1,154 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import supabase from '@/lib/supabaseClient';
 
+type NewCheckin = {
+  regnr: string;
+  reservation: string;
+  email: string;
+  notes: string;
+};
+
 export default function CheckPage() {
-  const [form, setForm] = useState({
+  // ---------- Form ----------
+  const [form, setForm] = useState<NewCheckin>({
     regnr: '',
     reservation: '',
     email: '',
     notes: '',
   });
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ id: string } | null>(null);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkinId, setCheckinId] = useState<string | null>(null);
 
+  // ---------- Auth (anonymt) för Storage-policy ----------
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) {
+        await supabase.auth.signInAnonymously(); // får rollen "authenticated"
+      }
+    })();
+  }, []);
+
+  // ---------- Skapa incheckning ----------
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
-    setResult(null);
+    setCreating(true);
     setError(null);
-
     try {
       const { data, error } = await supabase
         .from('checkins')
-        .insert([{
-          regnr: form.regnr.trim(),
-          reservation: form.reservation.trim() || null,
-          email: form.email.trim() || null,
-          notes: form.notes.trim() || null,
-        }])
+        .insert([
+          {
+            regnr: form.regnr.trim(),
+            reservation: form.reservation.trim() || null,
+            email: form.email.trim() || null,
+            notes: form.notes.trim() || null,
+          },
+        ])
         .select()
-        .single(); // <-- Ger tillbaka raden (inkl. id)
+        .single();
 
       if (error) throw error;
-
-      // visa id + nollställ formuläret
-      setResult({ id: data.id as string });
+      setCheckinId(data.id as string);
       setForm({ regnr: '', reservation: '', email: '', notes: '' });
     } catch (err: any) {
       setError(err.message ?? 'Kunde inte spara incheckningen.');
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   }
 
+  // ---------- Uppladdning ----------
+  const [files, setFiles] = useState<FileList | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+
+  async function uploadSelectedFiles() {
+    if (!checkinId || !files?.length) return;
+    setUploading(true);
+    setUploadMsg(null);
+    try {
+      for (const file of Array.from(files)) {
+        const ext = file.name.split('.').pop();
+        const safeName = file.name.replace(/\s+/g, '_');
+        const random = Math.random().toString(36).slice(2);
+        const path = `${checkinId}/${Date.now()}-${random}-${safeName}`;
+
+        const { error } = await supabase
+          .storage
+          .from('damage-photos')
+          .upload(path, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type || `image/${ext || 'jpeg'}`,
+          });
+
+        if (error) throw error;
+      }
+      setUploadMsg('Uppladdning klar ✅');
+      await refreshList(); // uppdatera listan nedan
+      setFiles(null);
+    } catch (err: any) {
+      setUploadMsg(err.message ?? 'Uppladdningen misslyckades.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // ---------- Lista uppladdade bilder (signerade URL:er) ----------
+  const [items, setItems] = useState<{ name: string; url: string }[]>([]);
+  const canList = useMemo(() => Boolean(checkinId), [checkinId]);
+
+  async function refreshList() {
+    if (!checkinId) return;
+    const { data: list, error } = await supabase
+      .storage
+      .from('damage-photos')
+      .list(checkinId, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
+
+    if (error) return; // håll det enkelt i MVP
+    const paths = (list ?? []).map((f) => `${checkinId}/${f.name}`);
+    if (!paths.length) {
+      setItems([]);
+      return;
+    }
+
+    const { data: signed, error: signErr } = await supabase
+      .storage
+      .from('damage-photos')
+      .createSignedUrls(paths, 60 * 10); // 10 min åtkomst
+
+    if (signErr) return;
+    setItems(signed!.map((s) => ({ name: s.path.split('/').pop() || s.path, url: s.signedUrl })));
+  }
+
+  useEffect(() => {
+    refreshList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkinId]);
+
   return (
     <main className="min-h-screen grid place-items-start p-8">
-      <div className="max-w-xl w-full space-y-6">
+      <div className="max-w-2xl w-full space-y-8">
         <h1 className="text-3xl font-semibold">Ny incheckning</h1>
 
-        {result && (
+        {/* Statusrutor */}
+        {checkinId && (
           <div className="rounded-lg border p-4">
-            <p className="font-medium">Incheckning skapad!</p>
-            <p className="text-sm opacity-80">ID: <code>{result.id}</code></p>
+            <p className="font-medium">Incheckning skapad</p>
+            <p className="text-sm opacity-80">ID: <code>{checkinId}</code></p>
           </div>
         )}
-
         {error && (
           <div className="rounded-lg border border-red-500/40 p-4">
             <p className="text-red-400">{error}</p>
           </div>
         )}
 
+        {/* Formulär */}
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block text-sm mb-1">Registreringsnummer *</label>
@@ -108,12 +195,64 @@ export default function CheckPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={creating}
             className="rounded-md border px-4 py-2 disabled:opacity-60"
           >
-            {loading ? 'Sparar…' : 'Spara incheckning'}
+            {creating ? 'Sparar…' : 'Spara incheckning'}
           </button>
         </form>
+
+        {/* Uppladdning visas först när vi har ett ID */}
+        {checkinId && (
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold">Ladda upp skadefoton</h2>
+
+            <div className="space-y-3">
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={(e) => setFiles(e.target.files)}
+              />
+              <button
+                onClick={uploadSelectedFiles}
+                disabled={uploading || !files?.length}
+                className="rounded-md border px-4 py-2 disabled:opacity-60"
+                type="button"
+              >
+                {uploading ? 'Laddar upp…' : 'Ladda upp valda filer'}
+              </button>
+              {uploadMsg && <p className="text-sm opacity-80">{uploadMsg}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium">Bilder för denna incheckning</h3>
+                <button
+                  type="button"
+                  onClick={refreshList}
+                  className="text-sm underline"
+                >
+                  Uppdatera lista
+                </button>
+              </div>
+
+              {canList && items.length === 0 && (
+                <p className="text-sm opacity-70">Inga bilder än.</p>
+              )}
+
+              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {items.map((it) => (
+                  <li key={it.url} className="space-y-1">
+                    {/* Enkel förhandsvisning via signerad URL */}
+                    <img src={it.url} alt={it.name} className="w-full rounded-md border" />
+                    <p className="text-xs break-all opacity-80">{it.name}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
