@@ -22,12 +22,19 @@ export default function CheckPage() {
   const [error, setError] = useState<string | null>(null);
   const [checkinId, setCheckinId] = useState<string | null>(null);
 
-  // ---------- Auth (anonymt) för Storage-policy ----------
+  // ---------- Auth (anonymt om möjligt) för Storage-policy ----------
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        await supabase.auth.signInAnonymously(); // får rollen "authenticated"
+      try {
+        const anyAuth = supabase.auth as any;
+        // För projekt där Anonymous provider är AV: gör inget.
+        // Är den PÅ och metoden finns: logga in anonymt => role "authenticated".
+        if (!data.session && typeof anyAuth.signInAnonymously === 'function') {
+          await anyAuth.signInAnonymously();
+        }
+      } catch {
+        // Ignorera – uppladdning kan ändå fungera om bucketen släpper in anon.
       }
     })();
   }, []);
@@ -89,7 +96,7 @@ export default function CheckPage() {
         if (error) throw error;
       }
       setUploadMsg('Uppladdning klar ✅');
-      await refreshList(); // uppdatera listan nedan
+      await refreshList();
       setFiles(null);
     } catch (err: any) {
       setUploadMsg(err.message ?? 'Uppladdningen misslyckades.');
@@ -98,7 +105,7 @@ export default function CheckPage() {
     }
   }
 
-  // ---------- Lista uppladdade bilder (signerade URL:er) ----------
+  // ---------- Lista uppladdade bilder ----------
   const [items, setItems] = useState<{ name: string; url: string }[]>([]);
   const canList = useMemo(() => Boolean(checkinId), [checkinId]);
 
@@ -109,7 +116,7 @@ export default function CheckPage() {
       .from('damage-photos')
       .list(checkinId, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
 
-    if (error) return; // håll det enkelt i MVP
+    if (error) return;
     const paths = (list ?? []).map((f) => `${checkinId}/${f.name}`);
     if (!paths.length) {
       setItems([]);
@@ -119,7 +126,7 @@ export default function CheckPage() {
     const { data: signed, error: signErr } = await supabase
       .storage
       .from('damage-photos')
-      .createSignedUrls(paths, 60 * 10); // 10 min åtkomst
+      .createSignedUrls(paths, 60 * 10);
 
     if (signErr) return;
     setItems(signed!.map((s) => ({ name: s.path.split('/').pop() || s.path, url: s.signedUrl })));
@@ -135,7 +142,6 @@ export default function CheckPage() {
       <div className="max-w-2xl w-full space-y-8">
         <h1 className="text-3xl font-semibold">Ny incheckning</h1>
 
-        {/* Statusrutor */}
         {checkinId && (
           <div className="rounded-lg border p-4">
             <p className="font-medium">Incheckning skapad</p>
@@ -148,7 +154,6 @@ export default function CheckPage() {
           </div>
         )}
 
-        {/* Formulär */}
         <form onSubmit={onSubmit} className="space-y-4">
           <div>
             <label className="block text-sm mb-1">Registreringsnummer *</label>
@@ -202,7 +207,6 @@ export default function CheckPage() {
           </button>
         </form>
 
-        {/* Uppladdning visas först när vi har ett ID */}
         {checkinId && (
           <section className="space-y-4">
             <h2 className="text-xl font-semibold">Ladda upp skadefoton</h2>
@@ -244,7 +248,6 @@ export default function CheckPage() {
               <ul className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {items.map((it) => (
                   <li key={it.url} className="space-y-1">
-                    {/* Enkel förhandsvisning via signerad URL */}
                     <img src={it.url} alt={it.name} className="w-full rounded-md border" />
                     <p className="text-xs break-all opacity-80">{it.name}</p>
                   </li>
