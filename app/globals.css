@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* valfri enkel färgtema-setup */
 :root {
   --background: #ffffff;
   --foreground: #171717;
