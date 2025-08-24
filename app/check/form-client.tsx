@@ -1,143 +1,142 @@
 'use client';
 
 import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabaseClient';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+type UploadState = 'idle' | 'saving' | 'done' | 'error';
 
-type FormState = {
-  regnr: string;
-  reservation: string;
-  email: string;
-  notes: string;
-  file: File | null;
-};
+export default function FormClient() {
+  const [regnr, setRegnr] = useState('');
+  const [reservation, setReservation] = useState('');
+  const [email, setEmail] = useState('');
+  const [notes, setNotes] = useState('');
+  const [files, setFiles] = useState<FileList | null>(null);
+  const [status, setStatus] = useState<UploadState>('idle');
+  const [message, setMessage] = useState<string>('');
 
-export default function CheckInForm() {
-  const [state, setState] = useState<FormState>({
-    regnr: '',
-    reservation: '',
-    email: '',
-    notes: '',
-    file: null,
-  });
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
-    setMsg(null);
+    setStatus('saving');
+    setMessage('');
 
-    // 1) Spara check-in
-    const { data: row, error } = await supabase
-      .from('checkins')
-      .insert([
-        {
-          regnr: state.regnr,
-          reservation: state.reservation,
-          email: state.email,
-          notes: state.notes,
-        },
-      ])
-      .select('id')
-      .single();
+    try {
+      // 1) Skapa checkin-raden
+      const { data, error } = await supabase
+        .from('checkins')
+        .insert([{ regnr, reservation, email, notes }])
+        .select('id')
+        .single();
 
-    if (error) {
-      setMsg(`Kunde inte spara incheckningen: ${error.message}`);
-      setLoading(false);
-      return;
-    }
+      if (error) throw error;
+      const checkinId = data.id as string;
 
-    // 2) Ladda upp ev. bild
-    if (state.file) {
-      const filePath = `checkins/${row.id}/${Date.now()}-${state.file.name}`;
-      const { error: upErr } = await supabase
-        .storage
-        .from('damage-photos')
-        .upload(filePath, state.file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
+      // 2) Ladda upp ev. bilder till bucket "damage-photos"/<checkinId>/
+      if (files && files.length > 0) {
+        const uploadPromises: Promise<any>[] = [];
+        for (const file of Array.from(files)) {
+          const path = `${checkinId}/${Date.now()}-${file.name}`;
+          uploadPromises.push(
+            supabase.storage
+              .from('damage-photos')
+              .upload(path, file, {
+                cacheControl: '3600',
+                upsert: false,
+              })
+          );
+        }
 
-      if (upErr) {
-        setMsg(`Uppladdning misslyckades: ${upErr.message}`);
-        setLoading(false);
-        return;
+        const results = await Promise.allSettled(uploadPromises);
+        const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && 'error' in (r as any).value && (r as any).value.error));
+        if (failed.length > 0) {
+          throw new Error('Vissa bilder kunde inte laddas upp.');
+        }
       }
-    }
 
-    setMsg('Incheckning skickad!');
-    setState({ regnr: '', reservation: '', email: '', notes: '', file: null });
-    setLoading(false);
+      setStatus('done');
+      setMessage('Incheckningen sparades!');
+
+      // 3) Töm formuläret
+      setRegnr('');
+      setReservation('');
+      setEmail('');
+      setNotes('');
+      (e.currentTarget as HTMLFormElement).reset();
+      setFiles(null);
+    } catch (err: any) {
+      setStatus('error');
+      setMessage(err?.message ?? 'Något gick fel.');
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md space-y-4">
-      <div>
-        <label className="block text-sm mb-1">Registreringsnummer</label>
+    <form onSubmit={onSubmit} className="space-y-6">
+      <div className="space-y-2">
+        <label className="block text-sm">Registreringsnummer *</label>
         <input
-          className="w-full rounded border px-3 py-2 bg-black/20"
-          value={state.regnr}
-          onChange={(e) => setState({ ...state, regnr: e.target.value })}
           required
+          value={regnr}
+          onChange={(e) => setRegnr(e.target.value)}
+          className="w-full rounded-md border bg-transparent p-3"
+          placeholder="ABC123"
         />
       </div>
 
-      <div>
-        <label className="block text-sm mb-1">Reservationsnummer</label>
+      <div className="space-y-2">
+        <label className="block text-sm">Reservationsnummer</label>
         <input
-          className="w-full rounded border px-3 py-2 bg-black/20"
-          value={state.reservation}
-          onChange={(e) => setState({ ...state, reservation: e.target.value })}
-          required
+          value={reservation}
+          onChange={(e) => setReservation(e.target.value)}
+          className="w-full rounded-md border bg-transparent p-3"
+          placeholder="t.ex. 12345"
         />
       </div>
 
-      <div>
-        <label className="block text-sm mb-1">E-post</label>
+      <div className="space-y-2">
+        <label className="block text-sm">E-post</label>
         <input
           type="email"
-          className="w-full rounded border px-3 py-2 bg-black/20"
-          value={state.email}
-          onChange={(e) => setState({ ...state, email: e.target.value })}
-          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full rounded-md border bg-transparent p-3"
+          placeholder="namn@exempel.se"
         />
       </div>
 
-      <div>
-        <label className="block text-sm mb-1">Meddelande / anteckningar</label>
+      <div className="space-y-2">
+        <label className="block text-sm">Anteckningar</label>
         <textarea
-          className="w-full rounded border px-3 py-2 bg-black/20"
-          rows={3}
-          value={state.notes}
-          onChange={(e) => setState({ ...state, notes: e.target.value })}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full min-h-[140px] rounded-md border bg-transparent p-3"
+          placeholder="Övrig info…"
         />
       </div>
 
-      <div>
-        <label className="block text-sm mb-1">Skadefoto (valfritt)</label>
+      <div className="space-y-2">
+        <label className="block text-sm">Skador – bifoga foton (valfritt)</label>
         <input
           type="file"
           accept="image/*"
-          onChange={(e) =>
-            setState({ ...state, file: e.target.files?.[0] ?? null })
-          }
+          multiple
+          onChange={(e) => setFiles(e.currentTarget.files)}
+          className="w-full rounded-md border bg-transparent p-3"
         />
+        <p className="text-xs opacity-70">Du kan välja flera bilder samtidigt.</p>
       </div>
 
       <button
         type="submit"
-        disabled={loading}
-        className="rounded px-4 py-2 bg-white/10 hover:bg-white/20 disabled:opacity-50"
+        disabled={status === 'saving'}
+        className="rounded-md border px-4 py-2"
       >
-        {loading ? 'Skickar…' : 'Checka in'}
+        {status === 'saving' ? 'Sparar…' : 'Spara incheckning'}
       </button>
 
-      {msg && <p className="text-sm opacity-80">{msg}</p>}
+      {message && (
+        <p className={status === 'error' ? 'text-red-500' : 'text-green-500'}>
+          {message}
+        </p>
+      )}
     </form>
   );
 }
