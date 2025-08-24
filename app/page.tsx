@@ -1,43 +1,16 @@
-export default function Home() {
-  return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif'
-      }}
-    >
-      <div
-        style={{
-          maxWidth: 420,
-          width: '100%',
-          border: '1px solid #e5e7eb',
-          borderRadius: 16,
-          padding: 20,
-          boxShadow: '0 2px 12px rgba(0,0,0,0.05)'
-        }}
-      >
-        <h1 style={{ fontSize: 24, margin: '0 0 8px' }}>Incheckad</h1>
-        <p style={{ margin: '0 0 16px', color: '#374151' }}>
-          Prototypen är igång. Domän & backend kopplas härnäst.
-        </p>
+import type { Metadata } from 'next';
+import FormClient from './form-client';
 
-        <a
-          href="#"
-          style={{
-            display: 'inline-block',
-            padding: '10px 14px',
-            borderRadius: 12,
-            background: '#111827',
-            color: '#fff',
-            textDecoration: 'none'
-          }}
-        >
-          Ny incheckning
-        </a>
+export const metadata: Metadata = {
+  title: 'Ny incheckning',
+};
+
+export default function CheckPage() {
+  return (
+    <main className="min-h-screen grid place-items-start p-8">
+      <div className="max-w-2xl w-full space-y-8">
+        <h1 className="text-3xl font-semibold text-center">Ny incheckning</h1>
+        <FormClient />
       </div>
     </main>
   );
