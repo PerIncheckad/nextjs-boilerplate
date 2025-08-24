@@ -1,16 +1,24 @@
 import type { Metadata } from 'next';
-import FormClient from './form-client';
 
 export const metadata: Metadata = {
-  title: 'Ny incheckning',
+  title: 'Incheckad',
+  description: 'Startsida',
 };
 
-export default function CheckPage() {
+export default function HomePage() {
   return (
-    <main className="min-h-screen grid place-items-start p-8">
-      <div className="max-w-2xl w-full space-y-8">
-        <h1 className="text-3xl font-semibold text-center">Ny incheckning</h1>
-        <FormClient />
+    <main className="min-h-screen grid place-items-center p-8">
+      <div className="max-w-xl w-full text-center space-y-6">
+        <h1 className="text-3xl font-semibold">Välkommen</h1>
+        <p className="opacity-80">
+          Använd knappen nedan för att göra en ny incheckning.
+        </p>
+        <a
+          href="/check"
+          className="inline-block rounded-md border px-4 py-2"
+        >
+          Ny incheckning
+        </a>
       </div>
     </main>
   );
