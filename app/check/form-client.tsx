@@ -1,68 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
-type UploadState = 'idle' | 'saving' | 'done' | 'error';
+type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
 
 export default function FormClient() {
   const [regnr, setRegnr] = useState('');
   const [reservation, setReservation] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
-  const [files, setFiles] = useState<FileList | null>(null);
-  const [status, setStatus] = useState<UploadState>('idle');
-  const [message, setMessage] = useState<string>('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [status, setStatus] = useState<SaveStatus>('idle');
+  const [message, setMessage] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  // Lägg till nya filer utan att ersätta tidigare val
+  function onPickFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files || []);
+    if (picked.length) {
+      setFiles(prev => [...prev, ...picked]);
+    }
+    // tömmer inputen så att man kan välja samma fil igen om man vill
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function removeFile(index: number) {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  }
+
+  const cleanFileName = (name: string) =>
+    name.toLowerCase().replace(/[^a-z0-9.\-]+/g, '-').replace(/-+/g, '-').slice(0, 80);
+
+  async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setStatus('saving');
     setMessage('');
 
     try {
-      // 1) Skapa checkin-raden
-      const { data, error } = await supabase
-        .from('checkins')
-        .insert([{ regnr, reservation, email, notes }])
-        .select('id')
-        .single();
+      // 1) Skapa ett id på klienten så vi kan använda det i filvägar och INSERT
+      const checkinId = crypto.randomUUID();
 
-      if (error) throw error;
-      const checkinId = data.id as string;
+      // 2) Ladda upp ev. bilder först och samla publika URL:er
+      const photoUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const path = `${checkinId}/${Date.now()}-${i}-${cleanFileName(f.name)}`;
 
-      // 2) Ladda upp ev. bilder till bucket "damage-photos"/<checkinId>/
-      if (files && files.length > 0) {
-        const uploadPromises: Promise<any>[] = [];
-        for (const file of Array.from(files)) {
-          const path = `${checkinId}/${Date.now()}-${file.name}`;
-          uploadPromises.push(
-            supabase.storage
-              .from('damage-photos')
-              .upload(path, file, {
-                cacheControl: '3600',
-                upsert: false,
-              })
-          );
-        }
+        const { error: upErr } = await supabase.storage
+          .from('damage-photos')
+          .upload(path, f, { upsert: false });
 
-        const results = await Promise.allSettled(uploadPromises);
-        const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && 'error' in (r as any).value && (r as any).value.error));
-        if (failed.length > 0) {
-          throw new Error('Vissa bilder kunde inte laddas upp.');
-        }
+        if (upErr) throw upErr;
+
+        const { data } = supabase.storage.from('damage-photos').getPublicUrl(path);
+        photoUrls.push(data.publicUrl);
       }
 
-      setStatus('done');
-      setMessage('Incheckningen sparades!');
+      // 3) Spara själva incheckningen (inklusive id + photo_urls)
+      const { error: insErr } = await supabase.from('checkins').insert([
+        { id: checkinId, regnr, reservation, email, notes, photo_urls: photoUrls },
+      ]);
 
-      // 3) Töm formuläret
+      if (insErr) throw insErr;
+
+      setStatus('done');
+      setMessage('Klart! Incheckningen är sparad.');
       setRegnr('');
       setReservation('');
       setEmail('');
       setNotes('');
-      (e.currentTarget as HTMLFormElement).reset();
-      setFiles(null);
+      setFiles([]);
     } catch (err: any) {
+      console.error(err);
       setStatus('error');
       setMessage(err?.message ?? 'Något gick fel.');
     }
@@ -70,70 +80,83 @@ export default function FormClient() {
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
-      <div className="space-y-2">
-        <label className="block text-sm">Registreringsnummer *</label>
+      <div>
+        <label className="block mb-2">Registreringsnummer *</label>
         <input
-          required
+          className="w-full rounded-md bg-black/20 p-3 border border-white/20"
           value={regnr}
           onChange={(e) => setRegnr(e.target.value)}
-          className="w-full rounded-md border bg-transparent p-3"
-          placeholder="ABC123"
+          required
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-sm">Reservationsnummer</label>
+      <div>
+        <label className="block mb-2">Reservationsnummer</label>
         <input
+          className="w-full rounded-md bg-black/20 p-3 border border-white/20"
           value={reservation}
           onChange={(e) => setReservation(e.target.value)}
-          className="w-full rounded-md border bg-transparent p-3"
-          placeholder="t.ex. 12345"
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-sm">E-post</label>
+      <div>
+        <label className="block mb-2">E-post</label>
         <input
           type="email"
+          className="w-full rounded-md bg-black/20 p-3 border border-white/20"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full rounded-md border bg-transparent p-3"
-          placeholder="namn@exempel.se"
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-sm">Anteckningar</label>
+      <div>
+        <label className="block mb-2">Anteckningar</label>
         <textarea
+          className="w-full rounded-md bg-black/20 p-3 border border-white/20 min-h-[160px]"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="w-full min-h-[140px] rounded-md border bg-transparent p-3"
-          placeholder="Övrig info…"
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-sm">Skador – bifoga foton (valfritt)</label>
+      <div>
+        <label className="block mb-2">Skador – bifoga foton (valfritt)</label>
         <input
+          ref={fileInputRef}
           type="file"
-          accept="image/*"
           multiple
-          onChange={(e) => setFiles(e.currentTarget.files)}
-          className="w-full rounded-md border bg-transparent p-3"
+          accept="image/*"
+          onChange={onPickFiles}
+          className="block"
         />
-        <p className="text-xs opacity-70">Du kan välja flera bilder samtidigt.</p>
+        {files.length > 0 && (
+          <ul className="mt-3 space-y-1 text-sm opacity-80">
+            {files.map((f, i) => (
+              <li key={`${f.name}-${i}`} className="flex items-center gap-3">
+                <span className="truncate">{f.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  className="underline text-red-400"
+                >
+                  Ta bort
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-2 text-sm opacity-70">Du kan välja flera bilder flera gånger.</p>
       </div>
 
       <button
         type="submit"
         disabled={status === 'saving'}
-        className="rounded-md border px-4 py-2"
+        className="inline-block rounded-md border border-white/30 px-4 py-2"
       >
         {status === 'saving' ? 'Sparar…' : 'Spara incheckning'}
       </button>
 
       {message && (
-        <p className={status === 'error' ? 'text-red-500' : 'text-green-500'}>
+        <p className={`mt-2 text-sm ${status === 'error' ? 'text-red-400' : 'text-green-400'}`}>
           {message}
         </p>
       )}
