@@ -1,35 +1,37 @@
 'use client';
 
-import { FormEvent, useEffect, useRef, useState, ChangeEvent } from 'react';
-import supabase from '@/lib/supabaseclient';
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+  ChangeEvent,
+} from 'react';
+
+// ✅ RELATIV import – funkar utan alias
+import supabase from '../../lib/supabaseclient';
 
 type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
 
 type Station = { id: string; name: string; email?: string | null };
 type Employee = { id: string; name: string; email?: string | null };
 
-type DamageEntry = {
-  skadennr: string | null;
-  skadetyp: string | null;
-  åtgärdad: string | null;
-};
-
 const BUCKET = 'damage-photos';
 
-// Gör ett säkert filnamn
+// Hjälpmetod: gör ett säkert filnamn
 function cleanFileName(name: string) {
   return name
     .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9\-_.]/g, '')
-    .slice(-100);
+    .replace(/\s+/g, '-')         // mellanrum -> -
+    .replace(/[^a-z0-9\-._]/g, '') // ta bort konstiga tecken
+    .slice(0, 100);
 }
 
 export default function FormClient() {
   // --- fält ---
   const [regnr, setRegnr] = useState('');
   const [stationId, setStationId] = useState<string>('');
-  const [stationOther, setStationOther] = useState('');
+  const [stationOther, setStationOther] = useState<string>('');
   const [employeeId, setEmployeeId] = useState<string>('');
   const [notes, setNotes] = useState('');
 
@@ -50,27 +52,35 @@ export default function FormClient() {
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [message, setMessage] = useState('');
 
+  // Ladda dropdown-data + (om möjligt) välj inloggad som default "utförd av"
   useEffect(() => {
     (async () => {
-      const { data: s } = await supabase
-        .from('stations')
-        .select('id,name,email')
-        .order('name', { ascending: true });
+      // stationer
+      const { data: s } = await supabase.from('stations').select('id, name, email').order('name');
       setStations(s ?? []);
 
-      const { data: e } = await supabase
-        .from('employees')
-        .select('id,name,email')
-        .order('name', { ascending: true });
+      // anställda
+      const { data: e } = await supabase.from('employees').select('id, name, email').order('name');
       setEmployees(e ?? []);
+
+      // Förbered: om auth är på plats i framtiden – välj aktuell användare som default
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const userEmail = auth.user?.email?.toLowerCase();
+        if (userEmail && (e ?? []).length) {
+          const me = (e ?? []).find(x => (x.email ?? '').toLowerCase() === userEmail);
+          if (me) setEmployeeId(me.id);
+        }
+      } catch {
+        // inget auth – ignorera
+      }
     })();
   }, []);
 
-  // Lägg till nya filer utan att ersätta tidigare val
-  function onPickFiles(e: ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files || []);
+  // Lägg till nya bilder utan att nollställa tidigare val
+  function onPickFiles(ev: ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(ev.target.files || []);
     if (picked.length) setFiles(prev => [...prev, ...picked]);
-    // tömmer inputen så att man kan välja samma fil igen om man vill
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -78,103 +88,112 @@ export default function FormClient() {
     setFiles(prev => prev.filter((_, i) => i !== index));
   }
 
-  const UPPER = (s: string) => s.trim().toUpperCase();
+  // Liten hjälpare för att kolla om regnr är godkänt (mot allowed_plates)
+  async function isPlateAllowed(plate: string): Promise<boolean> {
+    const upper = plate.trim().toUpperCase();
+    if (!upper) return false;
+    const { data } = await supabase
+      .from('allowed_plates')
+      .select('regnr')
+      .eq('regnr', upper)
+      .maybeSingle();
+    return !!data;
+  }
+
+  // Ladda upp EN fil till Storage och returnera public URL
+  async function uploadOne(file: File, folder: string): Promise<string> {
+    const safe = cleanFileName(file.name);
+    const path = `${folder}/${Date.now()}-${safe}`;
+    const up = await supabase.storage.from(BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
+    if (up.error) throw up.error;
+
+    const pub = supabase.storage.from(BUCKET).getPublicUrl(path);
+    return pub.data.publicUrl;
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setStatus('saving');
     setMessage('');
 
-    const reg = UPPER(regnr);
-    const odometer =
-      odometerKm === '' || Number.isNaN(Number(odometerKm))
-        ? null
-        : Number(odometerKm);
-
     try {
-      // 1) Skapa en checkin-rad först (utan bilder)
+      const upper = regnr.trim().toUpperCase();
+      if (!upper) throw new Error('Ange registreringsnummer.');
+
+      // Validera station
+      if (!stationId && !stationOther.trim()) {
+        throw new Error('Välj station eller ange egen (”Annan”).');
+      }
+      // Validera ”Utförd av”
+      if (!employeeId) {
+        throw new Error('Välj vem som utfört incheckningen.');
+      }
+
+      // Kolla regnr i listan
+      const plateOk = await isPlateAllowed(upper);
+
+      // 1) skapa checkin-rad (få id tillbaka)
       const insertPayload: any = {
-        regnr: reg,
-        notes,
+        regnr: upper,
+        notes: notes.trim(),
         station_id: stationId || null,
-        station_other: stationId ? null : stationOther || null,
-        employee_id: employeeId || null,
-        odometer_km: odometer,
+        station_other: stationId ? null : stationOther.trim() || null,
+        employee_id: employeeId,
+        regnr_valid: plateOk,
+        // frivilliga fält:
+        odometer_km: odometerKm === '' ? null : Number(odometerKm),
         fuel_full: fuelFull,
+        no_damage: noDamage,
         photo_urls: [], // fylls efter upload
       };
 
-      const { data: inserted, error: insertErr } = await supabase
+      // Se till att kolumnerna finns i DB (om du inte redan lagt till dem):
+      // alter table public.checkins add column if not exists odometer_km int;
+      // alter table public.checkins add column if not exists fuel_full boolean;
+      // alter table public.checkins add column if not exists no_damage boolean;
+
+      const { data: created, error: insErr } = await supabase
         .from('checkins')
         .insert(insertPayload)
         .select('id')
         .single();
 
-      if (insertErr || !inserted?.id) throw insertErr || new Error('Insert failed');
-      const checkinId = inserted.id as string;
+      if (insErr) throw insErr;
+      const checkinId = created!.id as string;
 
-      // 2) Ladda upp bilder (om några)
-      let photoUrls: string[] = [];
-      if (!noDamage && files.length > 0) {
-        const uploads = await Promise.all(
-          files.map(async file => {
-            const path = `${checkinId}/${Date.now()}-${cleanFileName(file.name)}`;
-            const { data: up, error: upErr } = await supabase.storage
-              .from(BUCKET)
-              .upload(path, file, {
-                cacheControl: '3600',
-                upsert: false,
-              });
-            if (upErr) throw upErr;
-            const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(up.path);
-            return pub.publicUrl;
-          })
-        );
-        photoUrls = uploads;
+      // 2) ladda upp ev. bilder
+      let urls: string[] = [];
+      if (files.length) {
+        const folder = `${checkinId}`;
+        const results = await Promise.all(files.map(f => uploadOne(f, folder)));
+        urls = results;
       }
 
-      // 3) Uppdatera raden med photo_urls
-      {
-        const { error: upErr } = await supabase
+      // 3) uppdatera raden med photo_urls
+      if (urls.length) {
+        const { error: updErr } = await supabase
           .from('checkins')
-          .update({ photo_urls: photoUrls })
+          .update({ photo_urls: urls })
           .eq('id', checkinId);
-        if (upErr) throw upErr;
+        if (updErr) throw updErr;
       }
 
-      // 4) Validera regnr mot allowed_plates
-      const { data: allowed, error: allowErr } = await supabase
-        .from('allowed_plates')
-        .select('regnr')
-        .eq('regnr', reg)
-        .limit(1);
-
-      if (allowErr) throw allowErr;
-
-      const isValid = (allowed?.length ?? 0) > 0;
-
-      // 5) Spara flagga regnr_valid på checkin
-      {
-        const { error: vErr } = await supabase
-          .from('checkins')
-          .update({ regnr_valid: isValid })
-          .eq('id', checkinId);
-        if (vErr) throw vErr;
-      }
-
-      // 6) Klart – ge feedback
+      // Snygg feedback
       setStatus('done');
-      setMessage(
-        isValid
-          ? 'Incheckning sparad.'
-          : 'Incheckning sparad, men registreringsnumret finns inte i listan.'
-      );
+      if (plateOk) {
+        setMessage('Incheckning sparad.');
+      } else {
+        setMessage('Incheckning sparad, men registreringsnumret finns inte i listan.');
+      }
 
-      // återställ formulär
+      // Rensa formuläret
       setRegnr('');
       setStationId('');
       setStationOther('');
-      setEmployeeId('');
+      setEmployeeId(prev => prev); // behåll vald person
       setNotes('');
       setNoDamage(false);
       setOdometerKm('');
@@ -182,191 +201,151 @@ export default function FormClient() {
       setFiles([]);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: any) {
-      console.error(err);
       setStatus('error');
-      setMessage('Något gick fel. Försök igen.');
+      setMessage(err?.message || 'Något gick fel.');
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-3xl font-semibold">Ny incheckning</h1>
-
-      {/* Registreringsnummer */}
-      <div className="space-y-2">
-        <label className="block text-sm">Registreringsnummer *</label>
+    <form onSubmit={onSubmit} className="space-y-6 max-w-2xl">
+      <div>
+        <label className="block text-sm mb-1">Registreringsnummer *</label>
         <input
-          type="text"
           value={regnr}
-          onChange={(e) => setRegnr(e.target.value)}
+          onChange={e => setRegnr(e.target.value)}
           placeholder="t.ex. ABC123"
-          className="w-full rounded-md border border-white/20 bg-black/30 p-3 outline-none"
-          required
+          className="w-full rounded-md border px-3 py-2 bg-black/20"
         />
       </div>
 
-      {/* Station / Depå */}
-      <div className="space-y-2">
-        <label className="block text-sm">Station / Depå *</label>
+      <div>
+        <label className="block text-sm mb-1">Station / Depå *</label>
         <select
           value={stationId}
-          onChange={(e) => setStationId(e.target.value)}
-          className="w-full rounded-md border border-white/20 bg-black/30 p-3 outline-none"
-          required={!stationOther}
+          onChange={e => setStationId(e.target.value)}
+          className="w-full rounded-md border px-3 py-2 bg-black/20"
         >
           <option value="">Välj station …</option>
-          {stations.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
+          {stations.map(s => (
+            <option key={s.id} value={s.id}>{s.name}</option>
           ))}
-          <option value="">— Annan / fritext nedan —</option>
+          <option value="">— Annan —</option>
         </select>
 
-        {/* Fritext om “annan” */}
-        <input
-          type="text"
-          value={stationOther}
-          onChange={(e) => setStationOther(e.target.value)}
-          placeholder="Annan station (fritext)…"
-          className="w-full rounded-md border border-white/20 bg-black/30 p-3 outline-none"
-          // Kräv detta om ingen station valts
-          required={!stationId}
-        />
+        {!stationId && (
+          <input
+            value={stationOther}
+            onChange={e => setStationOther(e.target.value)}
+            placeholder="Skriv station om du valde ”Annan”"
+            className="mt-2 w-full rounded-md border px-3 py-2 bg-black/20"
+          />
+        )}
       </div>
 
-      {/* Utförd av */}
-      <div className="space-y-2">
-        <label className="block text-sm">Utförd av *</label>
+      <div>
+        <label className="block text-sm mb-1">Utförd av *</label>
         <select
           value={employeeId}
-          onChange={(e) => setEmployeeId(e.target.value)}
-          className="w-full rounded-md border border-white/20 bg-black/30 p-3 outline-none"
-          required
+          onChange={e => setEmployeeId(e.target.value)}
+          className="w-full rounded-md border px-3 py-2 bg-black/20"
         >
           <option value="">Välj person …</option>
-          {employees.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
+          {employees.map(p => (
+            <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <p className="text-xs opacity-70">
+        <p className="text-xs opacity-70 mt-1">
           (E-post för vald person används senare för notifieringar.)
         </p>
       </div>
 
-      {/* Mätarställning + bränsle */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <label className="block text-sm">Mätarställning</label>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={noDamage}
+            onChange={e => setNoDamage(e.target.checked)}
+          />
+          Inga nya skador
+        </label>
+
+        <label className="block">
+          <span className="block text-sm mb-1">Mätarställning</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
               inputMode="numeric"
-              value={odometerKm}
-              onChange={(e) => {
-                const v = e.target.value;
-                setOdometerKm(v === '' ? '' : Number(v));
-              }}
-              placeholder="0"
-              className="w-full rounded-md border border-white/20 bg-black/30 p-3 outline-none"
               min={0}
+              value={odometerKm}
+              onChange={e => setOdometerKm(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-full rounded-md border px-3 py-2 bg-black/20"
             />
-            <span className="whitespace-nowrap text-sm opacity-80">km</span>
+            <span className="whitespace-nowrap">km</span>
           </div>
-        </div>
+        </label>
 
-        <div className="space-y-2">
-          <label className="block text-sm">Bränsle</label>
-          <div className="flex gap-4">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="fuel"
-                checked={fuelFull === true}
-                onChange={() => setFuelFull(true)}
-              />
-              Fulltankad
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="fuel"
-                checked={fuelFull === false}
-                onChange={() => setFuelFull(false)}
-              />
-              Ej fulltankad
-            </label>
-          </div>
-        </div>
+        <label className="block">
+          <span className="block text-sm mb-1">Tanknivå</span>
+          <select
+            value={fuelFull === null ? '' : fuelFull ? 'full' : 'notfull'}
+            onChange={e =>
+              setFuelFull(e.target.value === '' ? null : e.target.value === 'full')
+            }
+            className="w-full rounded-md border px-3 py-2 bg-black/20"
+          >
+            <option value="">Välj …</option>
+            <option value="full">Fulltankad</option>
+            <option value="notfull">Ej fulltankad</option>
+          </select>
+        </label>
       </div>
 
-      {/* Anteckningar */}
-      <div className="space-y-2">
-        <label className="block text-sm">Anteckningar</label>
+      <div>
+        <label className="block text-sm mb-1">Anteckningar</label>
         <textarea
           value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          onChange={e => setNotes(e.target.value)}
           placeholder="Övrig info…"
-          rows={6}
-          className="w-full rounded-md border border-white/20 bg-black/30 p-3 outline-none"
+          rows={5}
+          className="w-full rounded-md border px-3 py-2 bg-black/20"
         />
       </div>
 
-      {/* Inga nya skador */}
-      <div className="space-y-2">
-        <label className="inline-flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={noDamage}
-            onChange={(e) => setNoDamage(e.target.checked)}
-          />
-          Inga nya skador
-        </label>
-      </div>
+      <div>
+        <label className="block text-sm mb-1">Skador – bifoga foton (valfritt)</label>
 
-      {/* Bilder */}
-      <div className="space-y-2">
-        <label className="block text-sm">
-          Skador – bifoga bilder (valfritt)
-        </label>
-
-        {/* På mobil öppnar detta kameran (capture="environment") */}
+        {/* Viktigt för mobil: accept + capture="environment" öppnar kameran */}
         <input
           ref={fileInputRef}
           type="file"
+          multiple
           accept="image/*"
           capture="environment"
-          multiple
           onChange={onPickFiles}
           className="block"
         />
-        <p className="text-xs opacity-70">
-          Du kan välja fler bilder flera gånger.
+        <p className="text-xs opacity-70 mt-1">
+          (Knappen öppnar kameran på mobil. Du kan välja flera bilder flera gånger.)
         </p>
 
         {files.length > 0 && (
-          <div className="mt-2 rounded-md border border-white/10">
-            <ul className="divide-y divide-white/10">
-              {files.map((f, i) => (
-                <li key={`${f.name}-${i}`} className="flex items-center justify-between p-2">
-                  <span className="truncate pr-4">{f.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(i)}
-                    className="underline text-red-400"
-                  >
-                    Ta bort
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+          <ul className="mt-3 space-y-1 text-sm">
+            {files.map((f, i) => (
+              <li key={`${f.name}-${i}`} className="flex items-center gap-3">
+                <span className="truncate">{f.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  className="underline text-red-400"
+                >
+                  Ta bort
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
-      {/* Submit */}
       <button
         type="submit"
         disabled={status === 'saving'}
@@ -376,13 +355,7 @@ export default function FormClient() {
       </button>
 
       {message && (
-        <p
-          className={`mt-3 text-sm ${
-            status === 'error'
-              ? 'text-red-400'
-              : 'text-green-400'
-          }`}
-        >
+        <p className={`mt-3 text-sm ${status === 'error' ? 'text-red-400' : 'text-green-400'}`}>
           {message}
         </p>
       )}
