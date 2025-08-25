@@ -1,7 +1,6 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState, ChangeEvent } from 'react';
-// ❗ Viktigt: vi använder RELATIV import (robust mot alias-strul)
 import supabase from '../../lib/supabase';
 
 type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
@@ -13,8 +12,8 @@ type Employee = { id: string; name: string; email?: string | null };
 type DamageSummary = { brand_model: string | null; damages: string[] | null };
 
 const BUCKET = 'damage-photos';
+const DRAFT_KEY = 'check-form-draft-v1';
 
-// Enkel, säker filnamns-normalisering
 function cleanFileName(name: string) {
   return name
     .toLowerCase()
@@ -23,22 +22,65 @@ function cleanFileName(name: string) {
     .slice(-100);
 }
 
+type Draft = {
+  regnr: string;
+  stationId: string;
+  stationOther: string;
+  employeeId: string;
+  notes: string;
+
+  odometerKm: number | '';
+  fuelFull: boolean | null;
+
+  // Nya frågor:
+  adblueOk: boolean | null;
+  washerOk: boolean | null;
+  cargoCoverOk: boolean | null;
+  chargeCables: 0 | 1 | 2;
+
+  noDamage: boolean;
+};
+
+function loadDraft(): Partial<Draft> {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDraft(d: Partial<Draft>) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+  } catch {
+    // no-op
+  }
+}
+
 export default function FormClient() {
   // --- fält ---
-  const [regnr, setRegnr] = useState('');
-  const [stationId, setStationId] = useState<string>('');
-  const [stationOther, setStationOther] = useState<string>('');
-  const [employeeId, setEmployeeId] = useState<string>('');
-  const [notes, setNotes] = useState('');
+  const [regnr, setRegnr] = useState(loadDraft().regnr ?? '');
+  const [stationId, setStationId] = useState<string>(loadDraft().stationId ?? '');
+  const [stationOther, setStationOther] = useState<string>(loadDraft().stationOther ?? '');
+  const [employeeId, setEmployeeId] = useState<string>(loadDraft().employeeId ?? '');
+  const [notes, setNotes] = useState(loadDraft().notes ?? '');
 
   // --- ny logik ---
-  const [noDamage, setNoDamage] = useState(false);
-  const [odometerKm, setOdometerKm] = useState<number | ''>('');
-  const [fuelFull, setFuelFull] = useState<boolean | null>(null);
+  const [noDamage, setNoDamage] = useState<boolean>(loadDraft().noDamage ?? false);
+  const [odometerKm, setOdometerKm] = useState<number | ''>(loadDraft().odometerKm ?? '');
+  const [fuelFull, setFuelFull] = useState<boolean | null>(loadDraft().fuelFull ?? null);
+
+  // nya frågor
+  const [adblueOk, setAdblueOk] = useState<boolean | null>(loadDraft().adblueOk ?? null);
+  const [washerOk, setWasherOk] = useState<boolean | null>(loadDraft().washerOk ?? null);
+  const [cargoCoverOk, setCargoCoverOk] = useState<boolean | null>(loadDraft().cargoCoverOk ?? null);
+  const [chargeCables, setChargeCables] = useState<0 | 1 | 2>((loadDraft().chargeCables as any) ?? 0);
 
   // --- filer ---
   const [files, setFiles] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // --- metadata / listor ---
   const [stations, setStations] = useState<Station[]>([]);
@@ -52,6 +94,7 @@ export default function FormClient() {
   const [brandModel, setBrandModel] = useState<string>('');
   const [existingDamages, setExistingDamages] = useState<string[]>([]);
   const [isFetchingDamage, setIsFetchingDamage] = useState(false);
+  const [damageInfoMsg, setDamageInfoMsg] = useState<string>('');
 
   // Hämta dropdown-data
   useEffect(() => {
@@ -64,17 +107,16 @@ export default function FormClient() {
     })();
   }, []);
 
-  // När regnr ändras: auto-hämta märke/modell + befintliga skador
+  // Debounce på regnr
   useEffect(() => {
-    const run = async () => {
+    const t = setTimeout(async () => {
       const raw = regnr.trim();
+      setDamageInfoMsg('');
       if (!raw) {
         setBrandModel('');
         setExistingDamages([]);
         return;
       }
-
-      // Låt oss slå när det ser ut som ett rimligt regnr (minst 5 tecken)
       if (raw.length < 5) return;
 
       setIsFetchingDamage(true);
@@ -87,34 +129,103 @@ export default function FormClient() {
         .maybeSingle<DamageSummary>();
 
       if (error) {
-        // Vi faller tyst – formuläret ska fungera ändå
         setBrandModel('');
         setExistingDamages([]);
+        setDamageInfoMsg('Kunde inte hämta uppgifter just nu.');
+      } else if (!data) {
+        setBrandModel('');
+        setExistingDamages([]);
+        setDamageInfoMsg('Hittade inga uppgifter för detta reg.nr.');
       } else {
-        setBrandModel((data?.brand_model ?? '').trim());
-        setExistingDamages((data?.damages ?? []).filter(Boolean));
+        setBrandModel((data.brand_model ?? '').trim());
+        setExistingDamages((data.damages ?? []).filter(Boolean));
+        setDamageInfoMsg('');
       }
       setIsFetchingDamage(false);
-    };
+    }, 300);
 
-    run();
+    return () => clearTimeout(t);
   }, [regnr]);
 
-  // Hantera filval
+  // Spara utkast vid fältändring (text/radio/checkbox)
+  useEffect(() => {
+    saveDraft({
+      regnr,
+      stationId,
+      stationOther,
+      employeeId,
+      notes,
+      odometerKm,
+      fuelFull,
+      adblueOk,
+      washerOk,
+      cargoCoverOk,
+      chargeCables,
+      noDamage,
+    });
+  }, [
+    regnr,
+    stationId,
+    stationOther,
+    employeeId,
+    notes,
+    odometerKm,
+    fuelFull,
+    adblueOk,
+    washerOk,
+    cargoCoverOk,
+    chargeCables,
+    noDamage,
+  ]);
+
+  // filval
   function onPickFiles(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files?.length) return;
     setFiles((prev) => [...prev, ...Array.from(e.target.files!)]);
-    // nollställ så man kan välja samma fil igen om man vill
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    e.currentTarget.value = ''; // tillåt samma fil igen
   }
-
   function removeFile(idx: number) {
     setFiles((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  function openCamera() {
+    // Spara utkast innan vi öppnar kamera
+    saveDraft({
+      regnr,
+      stationId,
+      stationOther,
+      employeeId,
+      notes,
+      odometerKm,
+      fuelFull,
+      adblueOk,
+      washerOk,
+      cargoCoverOk,
+      chargeCables,
+      noDamage,
+    });
+    cameraInputRef.current?.click();
+  }
+  function openGallery() {
+    saveDraft({
+      regnr,
+      stationId,
+      stationOther,
+      employeeId,
+      notes,
+      odometerKm,
+      fuelFull,
+      adblueOk,
+      washerOk,
+      cargoCoverOk,
+      chargeCables,
+      noDamage,
+    });
+    galleryInputRef.current?.click();
+  }
+
   async function uploadAllFiles(folder: string) {
     if (files.length === 0) return [] as string[];
-
     const client = supabase.storage.from(BUCKET);
     const urls: string[] = [];
 
@@ -122,7 +233,6 @@ export default function FormClient() {
       const key = `${folder}/${Date.now()}-${cleanFileName(f.name)}`;
       const up = await client.upload(key, f, { upsert: false });
       if (up.error) throw up.error;
-
       const pub = client.getPublicUrl(key);
       if (pub.data?.publicUrl) urls.push(pub.data.publicUrl);
     }
@@ -155,20 +265,16 @@ export default function FormClient() {
     setMessage('');
 
     try {
-      // Skapa en mapp-nyckel för bildernas paths
       const folder = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const photoUrls = await uploadAllFiles(folder);
 
-      // Kolla om regnr finns i allowed_plates för att kunna sätta budskap efter insert
       const { data: allowed } = await supabase
         .from('allowed_plates')
         .select('regnr')
         .eq('regnr', upper)
         .limit(1);
-
       const regnrOk = (allowed?.length ?? 0) > 0;
 
-      // Spara incheckningen
       const { error: insErr } = await supabase.from('checkins').insert({
         regnr: upper,
         notes: notes || null,
@@ -176,10 +282,16 @@ export default function FormClient() {
         station_id: stationId || null,
         station_other: stationOther?.trim() || null,
         employee_id: employeeId,
-        // nya fält
+
         odometer_km: odometerKm === '' ? null : Number(odometerKm),
-        fuel_full: fuelFull, // true/false/null
-        no_new_damage: noDamage, // valfritt fält i DB om du lagt till det
+        fuel_full: fuelFull,
+
+        adblue_ok: adblueOk,
+        washer_ok: washerOk,
+        cargo_cover_ok: cargoCoverOk,
+        charge_cables_count: chargeCables,
+
+        no_new_damage: noDamage,
       });
 
       if (insErr) throw insErr;
@@ -191,8 +303,8 @@ export default function FormClient() {
           : 'Incheckning sparad, men registreringsnumret finns inte i listan.'
       );
 
-      // Rensa bara bildernas lista – eller allt om du vill
       setFiles([]);
+      sessionStorage.removeItem(DRAFT_KEY);
     } catch (err: any) {
       setStatus('error');
       setMessage(err?.message ?? 'Något gick fel.');
@@ -212,15 +324,16 @@ export default function FormClient() {
           value={regnr}
           onChange={(e) => setRegnr(e.target.value.toUpperCase())}
         />
-        {/* Auto-hämtad info */}
         <div className="text-sm text-white/70">
           {isFetchingDamage ? (
             <span>Hämtar uppgifter…</span>
           ) : (
             <>
-              {brandModel ? <div><b>Bil:</b> {brandModel}</div> : <div><b>Bil:</b> –</div>}
+              <div>
+                <b>Bil:</b> {brandModel || '–'}
+              </div>
               <div className="mt-1">
-                <b>Befintliga skador:</b>
+                <b>Befintliga skador:</b>{' '}
                 {existingDamages.length ? (
                   <ul className="list-disc ml-6">
                     {existingDamages.map((d, i) => (
@@ -228,9 +341,10 @@ export default function FormClient() {
                     ))}
                   </ul>
                 ) : (
-                  <span> –</span>
+                  '–'
                 )}
               </div>
+              {damageInfoMsg && <div className="mt-1 text-amber-300">{damageInfoMsg}</div>}
             </>
           )}
         </div>
@@ -301,22 +415,80 @@ export default function FormClient() {
           <label className="block">Tanknivå</label>
           <div className="flex items-center gap-6">
             <label className="inline-flex items-center gap-2">
+              <input type="radio" checked={fuelFull === true} onChange={() => setFuelFull(true)} />
+              Fulltankad
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="radio" checked={fuelFull === false} onChange={() => setFuelFull(false)} />
+              Ej fulltankad
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Extra frågor */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-2">
+          <label className="block">AdBlue OK?</label>
+          <div className="flex items-center gap-6">
+            <label className="inline-flex items-center gap-2">
+              <input type="radio" checked={adblueOk === true} onChange={() => setAdblueOk(true)} />
+              Ja
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="radio" checked={adblueOk === false} onChange={() => setAdblueOk(false)} />
+              Nej
+            </label>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block">Spolarvätska OK?</label>
+          <div className="flex items-center gap-6">
+            <label className="inline-flex items-center gap-2">
+              <input type="radio" checked={washerOk === true} onChange={() => setWasherOk(true)} />
+              Ja
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input type="radio" checked={washerOk === false} onChange={() => setWasherOk(false)} />
+              Nej
+            </label>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block">Finns insynsskydd?</label>
+          <div className="flex items-center gap-6">
+            <label className="inline-flex items-center gap-2">
               <input
                 type="radio"
-                checked={fuelFull === true}
-                onChange={() => setFuelFull(true)}
+                checked={cargoCoverOk === true}
+                onChange={() => setCargoCoverOk(true)}
               />
-              Fulltankad
+              Ja
             </label>
             <label className="inline-flex items-center gap-2">
               <input
                 type="radio"
-                checked={fuelFull === false}
-                onChange={() => setFuelFull(false)}
+                checked={cargoCoverOk === false}
+                onChange={() => setCargoCoverOk(false)}
               />
-              Ej fulltankad
+              Nej
             </label>
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="block">Antal laddsladdar</label>
+          <select
+            className="w-full rounded bg-black/20 border border-white/10 p-3"
+            value={chargeCables}
+            onChange={(e) => setChargeCables(Number(e.target.value) as 0 | 1 | 2)}
+          >
+            <option value={0}>0</option>
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+          </select>
         </div>
       </div>
 
@@ -346,17 +518,43 @@ export default function FormClient() {
       {/* Filer */}
       <div className="space-y-2">
         <label className="block">Skador – bifoga foton (valfritt)</label>
+
+        {/* Dolda inputs */}
         <input
-          ref={fileInputRef}
+          ref={cameraInputRef}
           type="file"
-          // Öppna kamera i mobil: 
           accept="image/*"
           capture="environment"
           multiple
           onChange={onPickFiles}
-          className="block"
-          aria-label="Välj bilder"
+          className="hidden"
         />
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={onPickFiles}
+          className="hidden"
+        />
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="px-4 py-2 rounded bg-white/10 border border-white/20"
+            onClick={openCamera}
+          >
+            Ta bilder
+          </button>
+          <button
+            type="button"
+            className="px-4 py-2 rounded bg-white/10 border border-white/20"
+            onClick={openGallery}
+          >
+            Välj från galleri
+          </button>
+        </div>
+
         {files.length > 0 && (
           <div className="text-sm">
             {files.map((f, i) => (
@@ -371,7 +569,7 @@ export default function FormClient() {
                 </button>
               </div>
             ))}
-            <div className="text-xs text-white/50">Du kan välja fler bilder flera gånger.</div>
+            <div className="text-xs text-white/50">Du kan lägga till fler bilder flera gånger.</div>
           </div>
         )}
       </div>
