@@ -8,6 +8,7 @@ type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
 type Station = { id: string; name: string; email?: string | null };
 type Employee = { id: string; name: string; email?: string | null };
 type DamageSummary = { brand_model: string | null; damages: string[] | null };
+type TiresType = 'sommar' | 'vinter';
 
 type Draft = {
   regnr: string;
@@ -23,9 +24,10 @@ type Draft = {
   washerOk: boolean | null;
   cargoCoverOk: boolean | null;
   chargeCables: 0 | 1 | 2;
+  tiresType: TiresType | null;
 
   hasNewDamage: boolean | null;
-  damagesMeta: { description: string }[]; // endast texter sparas i utkastet
+  damagesMeta: { description: string }[]; // endast texter i utkast
 };
 
 const BUCKET = 'damage-photos';
@@ -70,19 +72,20 @@ export default function FormClient() {
   const [washerOk, setWasherOk] = useState<boolean | null>(loadDraft().washerOk ?? null);
   const [cargoCoverOk, setCargoCoverOk] = useState<boolean | null>(loadDraft().cargoCoverOk ?? null);
   const [chargeCables, setChargeCables] = useState<0 | 1 | 2>((loadDraft().chargeCables as any) ?? 0);
+  const [tiresType, setTiresType] = useState<TiresType | null>((loadDraft().tiresType as any) ?? null);
 
   // --- nya skador? ---
   const [hasNewDamage, setHasNewDamage] = useState<boolean | null>(
     loadDraft().hasNewDamage ?? null
   );
 
-  // skade-rader (med filer per rad)
+  // skade-rader (text + filer)
   type DamageRow = { description: string; files: File[] };
   const initialDamageRows: DamageRow[] =
     (loadDraft().damagesMeta ?? []).map((m) => ({ description: m.description, files: [] })) || [];
   const [damageRows, setDamageRows] = useState<DamageRow[]>(initialDamageRows);
 
-  // fil-pickers (en dold kamera + en dold galleri, vi styr vilken rad som är aktiv)
+  // fil-pickers
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const [activeDamageIndex, setActiveDamageIndex] = useState<number | null>(null);
@@ -164,6 +167,7 @@ export default function FormClient() {
       washerOk,
       cargoCoverOk,
       chargeCables,
+      tiresType,
       hasNewDamage,
       damagesMeta: damageRows.map((d) => ({ description: d.description })),
     });
@@ -179,6 +183,7 @@ export default function FormClient() {
     washerOk,
     cargoCoverOk,
     chargeCables,
+    tiresType,
     hasNewDamage,
     damageRows,
   ]);
@@ -208,7 +213,6 @@ export default function FormClient() {
   }
   function openCamera(idx: number) {
     setActiveDamageIndex(idx);
-    // spara utkast innan vi öppnar kamera
     saveDraft({
       regnr,
       stationId,
@@ -221,6 +225,7 @@ export default function FormClient() {
       washerOk,
       cargoCoverOk,
       chargeCables,
+      tiresType,
       hasNewDamage,
       damagesMeta: damageRows.map((d) => ({ description: d.description })),
     });
@@ -240,6 +245,7 @@ export default function FormClient() {
       washerOk,
       cargoCoverOk,
       chargeCables,
+      tiresType,
       hasNewDamage,
       damagesMeta: damageRows.map((d) => ({ description: d.description })),
     });
@@ -273,9 +279,8 @@ export default function FormClient() {
     if (fuelFull === null) return fail('Välj tanknivå.');
     if (adblueOk === null) return fail('Svara på AdBlue OK?');
     if (washerOk === null) return fail('Svara på Spolarvätska OK?');
-    if (cargoCoverOk === null) return fail('Svara på Insynsskydd?');
-
-    // Nya skador? måste vara besvarad
+    if (cargoCoverOk === null) return fail('Svara på Insynsskydd OK?');
+    if (!['sommar', 'vinter'].includes(String(tiresType))) return fail('Välj sommar- eller vinterhjul.');
     if (hasNewDamage === null) return fail('Svara på "Nya skador på bilen?"');
 
     // Om Ja – kräver minst en skade-rad med text och minst en bild
@@ -316,6 +321,7 @@ export default function FormClient() {
           washer_ok: washerOk,
           cargo_cover_ok: cargoCoverOk,
           charge_cables_count: chargeCables,
+          tires_type: tiresType, // 'sommar' | 'vinter'
 
           no_new_damage: !hasNewDamage,
         })
@@ -362,9 +368,11 @@ export default function FormClient() {
     }
   }
 
+  const addDamageLabel = damageRows.length ? 'Lägg till ytterligare skada' : 'Lägg till skada';
+
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl mx-auto p-4 space-y-6">
-      <h1 className="text-3xl font-semibold">Ny incheckning</h1>
+      {/* OBS: ingen <h1> här – rubriken visas i app/check/page.tsx */}
 
       {/* Regnr */}
       <div className="space-y-2">
@@ -489,7 +497,7 @@ export default function FormClient() {
         </div>
 
         <div className="space-y-2">
-          <label className="block">Finns insynsskydd? *</label>
+          <label className="block">Insynsskydd OK? *</label>
           <div className="flex items-center gap-6">
             <label className="inline-flex items-center gap-2">
               <input type="radio" checked={cargoCoverOk === true} onChange={() => setCargoCoverOk(true)} /> Ja
@@ -512,6 +520,28 @@ export default function FormClient() {
             <option value={2}>2</option>
           </select>
         </div>
+
+        <div className="space-y-2">
+          <label className="block">Hjul som sitter på *</label>
+          <div className="flex items-center gap-6">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                checked={tiresType === 'sommar'}
+                onChange={() => setTiresType('sommar')}
+              />
+              Sommarhjul
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                checked={tiresType === 'vinter'}
+                onChange={() => setTiresType('vinter')}
+              />
+              Vinterhjul
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* Nya skador? */}
@@ -530,9 +560,16 @@ export default function FormClient() {
       {/* Skade-rader (visas endast vid Ja) */}
       {hasNewDamage && (
         <div className="space-y-4 border border-white/10 rounded p-4">
-          <div className="font-semibold">Beskriv nya skador</div>
+          {/* Add-knapp först */}
+          <button
+            type="button"
+            className="px-4 py-2 rounded bg-white/10 border border-white/20"
+            onClick={addDamageRow}
+          >
+            {addDamageLabel}
+          </button>
 
-          {/* dolda inputs för alla rader */}
+          {/* dolda inputs för kamera/galleri */}
           <input
             ref={cameraInputRef}
             type="file"
@@ -550,6 +587,8 @@ export default function FormClient() {
             onChange={onPickFiles}
             className="hidden"
           />
+
+          <div className="font-semibold">Beskriv nya skador</div>
 
           {damageRows.map((row, idx) => (
             <div key={idx} className="space-y-2 rounded bg-black/10 p-3 border border-white/5">
@@ -611,20 +650,12 @@ export default function FormClient() {
               )}
             </div>
           ))}
-
-          <button
-            type="button"
-            className="px-4 py-2 rounded bg-white/10 border border-white/20"
-            onClick={addDamageRow}
-          >
-            Lägg till ytterligare skada
-          </button>
         </div>
       )}
 
-      {/* Anteckningar */}
+      {/* Övriga anteckningar */}
       <div className="space-y-2">
-        <label className="block">Anteckningar</label>
+        <label className="block">Övriga anteckningar</label>
         <textarea
           className="w-full min-h-[140px] rounded bg-black/20 border border-white/10 p-3"
           placeholder="Övrig info…"
