@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState, ChangeEvent } from 'react';
-import { supabase } from '../../lib/supabaseclient';
+import { supabase } from '../../lib/supabaseClient';
 
 type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
 
