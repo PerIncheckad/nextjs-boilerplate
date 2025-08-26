@@ -386,7 +386,7 @@ export default function FormClient() {
             value={stationOther}
             onChange={(e) => setStationOther(e.target.value)}
             className="mt-2 w-full rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2"
-            placeholder="Ange specifik plats ifall bilen INTE lämnats på angiven station."
+            placeholder="Ev. annan inlämningsplats."
           />
         </div>
 
