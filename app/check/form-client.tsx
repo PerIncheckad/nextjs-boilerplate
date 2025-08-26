@@ -681,7 +681,7 @@ export default function FormClient() {
           </button>
           {invalidRequired && (
             <div className="text-xs text-gray-400">
-              Fyll i alla markerade fält först.
+              Fyll i alla *markerade fält först.
             </div>
           )}
         </div>
