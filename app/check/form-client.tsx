@@ -309,7 +309,7 @@ export default function FormClient() {
       console.error(err);
       setStatus('error');
       setMessage(
-        'Kunde inte spara. Kontrollera uppgifterna eller försök igen.',
+        'Kunde inte spara. Kontrollera uppgifterna och försök igen.',
       );
     }
   }
@@ -336,7 +336,7 @@ export default function FormClient() {
             onChange={(e) => setRegnr(e.target.value.toUpperCase())}
             onBlur={(e) => lookupVehicle(e.target.value)}
             className="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2 tracking-widest uppercase"
-            placeholder="t.ex. ABC123"
+            placeholder="ABC123"
           />
 
           {/* bilinfo */}
