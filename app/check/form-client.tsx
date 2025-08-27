@@ -1,3 +1,8 @@
+'use client';
+
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Camera, Send, LogIn } from 'lucide-react';
+// (resten av din kod)
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, Send, LogIn } from "lucide-react";
 
