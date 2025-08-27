@@ -1,26 +1,29 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState, ChangeEvent, FormEvent } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  ChangeEvent,
+  FormEvent,
+} from 'react';
 import supabase from '../../lib/supabase';
 
-// === Typer ===
 type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
+
 type Station = { id: string; name: string; email?: string | null };
 type Employee = { id: string; name: string; email?: string | null };
 
 type DamageEntry = {
-  text: string;              // måste fyllas i
-  files: File[];             // ett eller flera foton
-  previews: string[];        // lokala previews
+  text: string;
+  files: File[];
+  previews: string[]; // för UI
 };
 
-// === Konstanter ===
 const BUCKET = 'damage-photos';
 
-// Extra stationer att visa i listan (läggs ovanpå ev. databasinnehåll)
-const EXTRA_STATIONS = ['Sturup', 'Ängelholm', 'Mechanum', 'Falkenberg', 'Hedbergs Malmö'];
-
-// Säker filnamn
+// små hjälp-funktioner
 function cleanFileName(name: string) {
   return name
     .toLowerCase()
@@ -29,289 +32,332 @@ function cleanFileName(name: string) {
     .slice(0, 100);
 }
 
-// === Komponent ===
 export default function FormClient() {
-  // header / “inloggad”
-  const [username] = useState('Bob'); // temporärt visningsnamn
-  const [thanksTo, setThanksTo] = useState('');
+  // top / header …
+  const [username] = useState<string>('Bob'); // temporär “inloggad”
+  const [thanksTo, setThanksTo] = useState<string>('Bob');
 
-  // fält
+  // reg mm …
   const [regnr, setRegnr] = useState('');
-  const [stationId, setStationId] = useState('');
-  const [stationOther, setStationOther] = useState('');
-  const [notes, setNotes] = useState('');
-
-  // bilinfo + auto-hämt
+  const [regKnown, setRegKnown] = useState<boolean | null>(null);
   const [brandModel, setBrandModel] = useState<string | null>(null);
   const [existingDamages, setExistingDamages] = useState<string[]>([]);
-  const [tireStorage, setTireStorage] = useState<string | null>(null);
+  const [wheelStorage, setWheelStorage] = useState<string>('--'); // fylls på senare från rätt fil/källa
 
-  // mätare + kontroller
-  const [odometer, setOdometer] = useState('');
-  const [fuelFull, setFuelFull] = useState<boolean | null>(true);
+  // station
+  const [stationId, setStationId] = useState<string>('');
+  const [stationOther, setStationOther] = useState<string>('');
 
-  const [adblueOk, setAdblueOk] = useState<boolean | null>(null);
-  const [washerOk, setWasherOk] = useState<boolean | null>(null);
-  const [privacyCoverOk, setPrivacyCoverOk] = useState<boolean | null>(null);
+  // krav & frågor …
+  const [odometerKm, setOdometerKm] = useState<string>(''); // "12345"
+  const [fuelFull, setFuelFull] = useState<boolean | null>(null); // ❗️ingen default
+  const [adblueOK, setAdblueOK] = useState<boolean | null>(null);
+  const [washerOK, setWasherOK] = useState<boolean | null>(null);
+  const [privacyCoverOK, setPrivacyCoverOK] = useState<boolean | null>(null);
 
-  const [chargeCableCount, setChargeCableCount] = useState<0 | 1 | 2 | null>(null);
-
-  // hjul (som sitter på nu) + typ
+  const [chargeCableCount, setChargeCableCount] = useState<0 | 1 | 2 | null>(
+    null
+  );
   const [wheelsOn, setWheelsOn] = useState<'sommar' | 'vinter' | null>(null);
-  const [wheelTypeReported, setWheelTypeReported] = useState<'sommar' | 'vinter' | null>(null);
 
-  // nya skador?
+  // nya skador
   const [hasNewDamage, setHasNewDamage] = useState<boolean | null>(null);
   const [damages, setDamages] = useState<DamageEntry[]>([]);
 
-  // UI / data
-  const [stations, setStations] = useState<Station[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  // notes
+  const [notes, setNotes] = useState('');
+
+  // status
   const [status, setStatus] = useState<SaveStatus>('idle');
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState<string>('');
 
-  const filePickerRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const fileInputs = useRef<Array<HTMLInputElement | null>>([]);
 
-  // === Hjälp: färgsäkra inputs på iOS / dark mode ===
-  const inputBase =
-    'mt-1 w-full rounded-lg border border-zinc-300 bg-white text-black placeholder:text-zinc-400 px-3 py-2 outline-none';
+  // stationer – enkel statisk lista tills vidare
+  const stations: Station[] = useMemo(
+    () => [
+      { id: 'MAL', name: 'Malmö', email: 'malmo@mabi.se' },
+      { id: 'HEL', name: 'Helsingborg', email: 'helsingborg@mabi.se' },
+      { id: 'HAL', name: 'Halmstad', email: 'halmstad@mabi.se' },
+      { id: 'VAR', name: 'Varberg', email: 'varberg@mabi.se' },
+      { id: 'TRE', name: 'Trelleborg', email: 'trelleborg@mabi.se' },
+      { id: 'LUN', name: 'Lund', email: 'lund@mabi.se' },
+    ],
+    []
+  );
 
-  // === 1) Ladda stationer + medarbetare ===
-  useEffect(() => {
-    (async () => {
-      // Försök hämta från DB
-      const { data: dbStations } = await supabase
-        .from('stations')
-        .select('id, name, email')
-        .order('name', { ascending: true });
-
-      let merged: Station[] = (dbStations ?? []).map(s => ({
-        id: s.id,
-        name: s.name,
-        email: s.email ?? null,
-      }));
-
-      // Lägg till extra stationer om de inte redan finns
-      const existingNames = new Set(merged.map(s => s.name.toLowerCase()));
-      EXTRA_STATIONS.forEach(n => {
-        if (!existingNames.has(n.toLowerCase())) {
-          merged.push({ id: `extra:${n}`, name: n, email: null });
-        }
-      });
-
-      // Lägg in en "Välj station..."-dummy överst
-      merged = [{ id: '', name: '— Välj station / depå —', email: null }, ...merged];
-
-      setStations(merged);
-
-      // (valfritt) hämta användare/”Utförd av” om du använder det fältet
-      const { data: dbEmployees } = await supabase
-        .from('employees')
-        .select('id, name, email')
-        .order('name', { ascending: true });
-
-      setEmployees(dbEmployees ?? []);
-    })();
-  }, []);
-
-  // === 2) Hämta bilmodell + befintliga skador när regnr finns ===
-  async function lookupVehicle(reg: string) {
-    const r = (reg || '').trim().toUpperCase();
+  // --------------------------------------------------------------------------
+  // 1) Hämtar modell + bef skador när regnr lämnas (blur) eller via Enter
+  //    Försöker läsa från view: vehicle_damage_summary (regnr, brand_model, damages[])
+  // --------------------------------------------------------------------------
+  async function lookupVehicle(raw?: string) {
+    const r = (raw ?? regnr).trim().toUpperCase();
     if (r.length < 3) return;
 
-    // View skapad tidigare: vehicle_damage_summary (regnr, brand_model, damages[])
-    const { data, error } = await supabase
-      .from('vehicle_damage_summary')
-      .select('brand_model, damages')
-      .eq('regnr', r)
-      .maybeSingle();
+    try {
+      // försök hämta modell + skador
+      const { data, error } = await supabase
+        .from('vehicle_damage_summary') // <-- finns i din DB (skapad tidigare)
+        .select('regnr, brand_model, damages')
+        .eq('regnr', r)
+        .maybeSingle();
 
-    if (!error && data) {
-      setBrandModel(data.brand_model ?? null);
-      setExistingDamages(Array.isArray(data.damages) ? data.damages : []);
-    } else {
+      if (error) {
+        // Om vyn saknas eller annat fel – nollställ men låt formen funka
+        setRegKnown(null);
+        setBrandModel(null);
+        setExistingDamages([]);
+      } else if (data) {
+        setRegKnown(true);
+        setBrandModel(data.brand_model ?? null);
+        setExistingDamages(Array.isArray(data.damages) ? data.damages : []);
+      } else {
+        // ej hittad – varning
+        setRegKnown(false);
+        setBrandModel(null);
+        setExistingDamages([]);
+      }
+
+      // Hjulförvaring – placeholder tills vi kopplar på
+      setWheelStorage('--');
+    } catch {
+      setRegKnown(null);
       setBrandModel(null);
       setExistingDamages([]);
+      setWheelStorage('--');
     }
-
-    // (placeholder) “Hjulförvaring” – fylls när vi får källfilen
-    setTireStorage(null);
   }
 
-  // === 3) Hantera “Lägg till skada” ===
-  function addDamage() {
-    setDamages(d => [...d, { text: '', files: [], previews: [] }]);
+  // --------------------------------------------------------------------------
+  // 2) Hantera filer (per skaderad)
+  // --------------------------------------------------------------------------
+  function pickPhotos(i: number) {
+    fileInputs.current[i]?.click();
   }
-  function updateDamageText(idx: number, text: string) {
-    setDamages(d => d.map((it, i) => (i === idx ? { ...it, text } : it)));
-  }
-  function pickDamageFiles(idx: number, e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
+
+  function onPickFiles(i: number, e: ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files ? Array.from(e.target.files) : [];
     if (!files.length) return;
-    const previews = files.map(f => URL.createObjectURL(f));
-    setDamages(d =>
-      d.map((it, i) =>
-        i === idx ? { ...it, files: [...it.files, ...files], previews: [...it.previews, ...previews] } : it,
-      ),
-    );
-  }
-  function removeDamagePhoto(dIdx: number, pIdx: number) {
-    setDamages(d =>
-      d.map((it, i) => {
-        if (i !== dIdx) return it;
-        const newFiles = it.files.filter((_, j) => j !== pIdx);
-        const newPrev = it.previews.filter((_, j) => j !== pIdx);
-        return { ...it, files: newFiles, previews: newPrev };
-      }),
-    );
-  }
-  function removeDamageRow(dIdx: number) {
-    setDamages(d => d.filter((_, i) => i !== dIdx));
+    const previews = files.map((f) => URL.createObjectURL(f));
+
+    setDamages((prev) => {
+      const clone = [...prev];
+      clone[i] = {
+        ...clone[i],
+        files: [...clone[i].files, ...files].slice(0, 12),
+        previews: [...clone[i].previews, ...previews].slice(0, 12),
+      };
+      return clone;
+    });
   }
 
-  // === 4) Spara ===
-  const canSave =
+  function removePhoto(i: number, pIndex: number) {
+    setDamages((prev) => {
+      const d = { ...prev[i] };
+      d.files.splice(pIndex, 1);
+      d.previews.splice(pIndex, 1);
+      const clone = [...prev];
+      clone[i] = d;
+      return clone;
+    });
+  }
+
+  function addDamageRow() {
+    setDamages((prev) => [...prev, { text: '', files: [], previews: [] }]);
+  }
+
+  function removeDamageRow(i: number) {
+    setDamages((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  // --------------------------------------------------------------------------
+  // 3) Validering & Submit
+  // --------------------------------------------------------------------------
+  const requiredPicked =
     regnr.trim().length >= 3 &&
-    stationId !== '' &&
-    odometer.trim().length > 0 &&
+    stationId.trim().length > 0 &&
+    odometerKm.trim().length > 0 &&
     fuelFull !== null &&
-    adblueOk !== null &&
-    washerOk !== null &&
-    privacyCoverOk !== null &&
+    adblueOK !== null &&
+    washerOK !== null &&
+    privacyCoverOK !== null &&
     chargeCableCount !== null &&
     wheelsOn !== null &&
-    wheelTypeReported !== null &&
+    hasNewDamage !== null &&
+    // om “nya skador: ja” kräver vi minst en rad + text
     (hasNewDamage === false ||
-      (hasNewDamage === true && damages.length > 0 && damages.every(d => d.text.trim().length > 0)));
+      (damages.length > 0 && damages.every((d) => d.text.trim().length > 0)));
 
-  async function onSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSave) return;
+    if (!requiredPicked) return;
+
+    setStatus('saving');
+    setMessage('');
+
+    // 1) ladda upp ev. foton
+    const photoUrls: string[] = [];
 
     try {
-      setStatus('saving');
-      setMessage('');
-
-      // 1) Ladda upp foton om nya skador finns
-      const photoUrls: string[] = [];
-      if (hasNewDamage) {
-        for (let di = 0; di < damages.length; di++) {
-          const d = damages[di];
-          for (let fi = 0; fi < d.files.length; fi++) {
-            const f = d.files[fi];
-            const filename = `${cleanFileName(regnr)}-${Date.now()}-${fi}-${cleanFileName(f.name)}`;
-            const path = `${cleanFileName(regnr)}/${filename}`;
-
-            const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, f, {
-              upsert: false,
-              cacheControl: '3600',
-              contentType: f.type || 'image/jpeg',
-            });
-            if (upErr) throw upErr;
-
-            const {
-              data: { publicUrl },
-            } = supabase.storage.from(BUCKET).getPublicUrl(path);
-
-            photoUrls.push(publicUrl);
-          }
+      for (let di = 0; di < damages.length; di++) {
+        const d = damages[di];
+        for (let fi = 0; fi < d.files.length; fi++) {
+          const f = d.files[fi];
+          const key = `${regnr}/${Date.now()}-${di}-${fi}-${cleanFileName(
+            f.name || `skada-${di + 1}-${fi + 1}.jpg`
+          )}`;
+          const up = await supabase.storage.from(BUCKET).upload(key, f, {
+            cacheControl: '3600',
+            upsert: false,
+          });
+          if (up.error) throw up.error;
+          const pub = supabase.storage.from(BUCKET).getPublicUrl(key);
+          const url = pub.data.publicUrl;
+          photoUrls.push(url);
         }
       }
 
-      // 2) Sätt upp insert-objekt till checkins
-      const insertObj: Record<string, any> = {
+      // 2) skriv till checkins
+      const station = stations.find((s) => s.id === stationId);
+      const insertObj: any = {
         regnr: regnr.trim().toUpperCase(),
-        brand_model: brandModel,
-        notes: notes.trim() || null,
-        photo_urls: photoUrls.length ? photoUrls : null,
-
+        notes,
+        photo_urls: photoUrls,
         station_id: stationId || null,
-        station_other: stationOther.trim() || null,
+        station_other: stationOther || null,
 
-        odometer_km: odometer ? parseInt(odometer, 10) : null,
+        odometer_km: odometerKm ? parseInt(odometerKm, 10) : null,
         fuel_full: fuelFull,
+        adblue_ok: adblueOK,
+        washer_ok: washerOK,
+        privacy_cover_ok: privacyCoverOK,
+        charge_cables_count: chargeCableCount,
+        wheels_on: wheelsOn,
 
-        adblue_ok: adblueOk,
-        washer_ok: washerOk,
-        privacy_cover_ok: privacyCoverOk,
-
-        charge_cable_count: chargeCableCount,
+        // metadata
+        regnr_valid: regKnown === true, // bara info
         no_new_damage: hasNewDamage === false,
-
-        wheels_on: wheelsOn,               // 'sommar' | 'vinter'
-        wheel_type: wheelTypeReported,     // vad incheckaren anger
+        created_at: new Date().toISOString(),
       };
 
-      // 3) Insert
-      const { error: insErr } = await supabase.from('checkins').insert(insertObj);
-      if (insErr) throw insErr;
+      const { error: insertErr } = await supabase
+        .from('checkins')
+        .insert([insertObj]);
 
-      // 4) Klart
+      if (insertErr) throw insertErr;
+
       setStatus('done');
       setThanksTo(username);
-      setMessage('Sparat!');
-
-      // Nollställ
+      setMessage('Incheckningen är sparad.');
+      // rensa form
       setRegnr('');
+      setRegKnown(null);
       setBrandModel(null);
       setExistingDamages([]);
-      setTireStorage(null);
+      setWheelStorage('--');
       setStationId('');
       setStationOther('');
-      setOdometer('');
-      setFuelFull(true);
-      setAdblueOk(null);
-      setWasherOk(null);
-      setPrivacyCoverOk(null);
+      setOdometerKm('');
+      setFuelFull(null);
+      setAdblueOK(null);
+      setWasherOK(null);
+      setPrivacyCoverOK(null);
       setChargeCableCount(null);
       setWheelsOn(null);
-      setWheelTypeReported(null);
       setHasNewDamage(null);
       setDamages([]);
       setNotes('');
     } catch (err: any) {
+      console.error(err);
       setStatus('error');
-      setMessage(err?.message ?? 'Kunde inte spara.');
+      setMessage('Kunde inte spara, försök igen.');
     }
   }
 
-  // Warn om hjul-typ mismatch
-  const showWheelsConfirm =
-    wheelsOn && wheelTypeReported && wheelsOn !== wheelTypeReported ? true : false;
+  // --------------------------------------------------------------------------
+  // UI helpers
+  // --------------------------------------------------------------------------
+  function radioBtn(
+    active: boolean,
+    label: string,
+    onClick: () => void,
+    extra?: string
+  ) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`rounded-lg border px-4 py-3 ${
+          active ? 'bg-green-100 border-green-400' : 'bg-white'
+        } ${extra || ''}`}
+      >
+        {label}
+      </button>
+    );
+  }
 
-  // ====================== UI ======================
+  // --------------------------------------------------------------------------
+  // RENDER
+  // --------------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-white text-black">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b">
-        <div className="mx-auto max-w-xl px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Ny incheckning</h1>
-          <span className="text-sm text-zinc-600">Inloggad: <b>{username}</b></span>
-        </div>
+    <div className="mx-auto max-w-xl px-4 py-6">
+      {/* header */}
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Ny incheckning</h1>
+        <div className="text-sm text-zinc-500">Inloggad: {username}</div>
       </div>
 
-      <form onSubmit={onSubmit} className="mx-auto max-w-xl px-4 py-5">
-        {/* Registreringsnummer */}
+      <form onSubmit={handleSubmit}>
+        {/* REGNR */}
         <label className="block text-sm font-medium">Registreringsnummer *</label>
         <input
           value={regnr}
           onChange={(e) => setRegnr(e.target.value.toUpperCase())}
-          onBlur={(e) => lookupVehicle(e.target.value)}
-          className={`${inputBase} tracking-widest uppercase`}
+          onBlur={() => lookupVehicle()}
+          className="mt-1 w-full rounded-lg border bg-white px-3 py-3 tracking-widest uppercase"
           placeholder="ABC123"
           autoCapitalize="characters"
-          autoCorrect="off"
-          spellCheck={false}
         />
+        {regKnown === false && (
+          <div className="mt-1 text-sm font-medium text-rose-600">
+            Fel reg.nr
+          </div>
+        )}
 
-        {/* Station / Depå */}
-        <div className="mt-4">
+        {/* BILINFO (direkt under regnr) */}
+        {(brandModel || existingDamages.length > 0) && (
+          <div className="mt-3 rounded-lg border bg-white p-3 text-sm">
+            {brandModel && (
+              <div className="mb-1">
+                <span className="font-medium">Bil:</span> {brandModel}
+              </div>
+            )}
+            <div className="mb-1">
+              <span className="font-medium">Hjulförvaring:</span> {wheelStorage}
+            </div>
+
+            {existingDamages.length > 0 && (
+              <>
+                <div className="font-medium">Befintliga skador:</div>
+                <ul className="ml-5 list-disc">
+                  {existingDamages.map((d, i) => (
+                    <li key={i}>{d}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* STATION */}
+        <div className="mt-5">
           <label className="block text-sm font-medium">Station / Depå *</label>
           <select
             value={stationId}
             onChange={(e) => setStationId(e.target.value)}
-            className={`${inputBase}`}
+            className="mt-1 w-full rounded-lg border bg-white px-3 py-3"
           >
+            <option value="">— Välj station / depå —</option>
             {stations.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -322,89 +368,87 @@ export default function FormClient() {
           <input
             value={stationOther}
             onChange={(e) => setStationOther(e.target.value)}
-            className={`${inputBase} mt-2`}
+            className="mt-2 w-full rounded-lg border bg-white px-3 py-3"
             placeholder="Ev. annan inlämningsplats"
           />
         </div>
 
-        {/* Bilinfo (automatisk) */}
-        {(brandModel || existingDamages.length > 0 || tireStorage) && (
-          <div className="mt-4 rounded-lg border p-3 text-sm">
-            {brandModel && (
-              <div className="mb-1">
-                <span className="font-medium">Bil:</span> {brandModel}
-              </div>
-            )}
-            {tireStorage && (
-              <div className="mb-1">
-                <span className="font-medium">Hjulförvaring:</span> {tireStorage}
-              </div>
-            )}
-            {existingDamages.length > 0 && (
-              <div className="mt-1">
-                <div className="font-medium">Befintliga skador:</div>
-                <ul className="list-disc pl-5">
-                  {existingDamages.map((d, i) => (
-                    <li key={i}>{d}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Mätarställning */}
-        <div className="mt-4">
+        {/* MÄTARSTÄLLNING */}
+        <div className="mt-5">
           <label className="block text-sm font-medium">Mätarställning *</label>
           <div className="flex items-center gap-2">
             <input
-              value={odometer}
-              onChange={(e) => setOdometer(e.target.value.replace(/\D+/g, ''))}
-              className={`${inputBase}`}
+              value={odometerKm}
+              onChange={(e) =>
+                setOdometerKm(e.target.value.replace(/[^0-9]/g, ''))
+              }
               inputMode="numeric"
+              className="mt-1 w-full rounded-lg border bg-white px-3 py-3"
               placeholder="ex. 42 180"
             />
-            <span className="text-sm text-zinc-600">km</span>
+            <span className="text-sm text-zinc-500">km</span>
           </div>
         </div>
 
-        {/* Tanknivå */}
+        {/* TANKNIVÅ */}
         <div className="mt-5">
-          <div className="text-sm font-medium">Tanknivå *</div>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              className={`rounded-lg border px-3 py-2 ${fuelFull === true ? 'bg-green-100 border-green-400' : ''}`}
-              onClick={() => setFuelFull(true)}
-            >
-              Fulltankad
-            </button>
-            <button
-              type="button"
-              className={`rounded-lg border px-3 py-2 ${fuelFull === false ? 'bg-red-100 border-red-400' : ''}`}
-              onClick={() => setFuelFull(false)}
-            >
-              Ej fulltankad
-            </button>
+          <label className="block text-sm font-medium">Tanknivå *</label>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            {radioBtn(fuelFull === true, 'Fulltankad', () => setFuelFull(true))}
+            {radioBtn(
+              fuelFull === false,
+              'Ej fulltankad',
+              () => setFuelFull(false)
+            )}
           </div>
         </div>
 
-        {/* AdBlue / Spolarvätska / Insynsskydd */}
+        {/* ADBLUE / SPOLARVÄTSKA / INSYNSSKYDD */}
         <div className="mt-5 space-y-4">
-          <YesNo label="AdBlue OK? *" value={adblueOk} onYes={() => setAdblueOk(true)} onNo={() => setAdblueOk(false)} />
-          <YesNo label="Spolarvätska OK? *" value={washerOk} onYes={() => setWasherOk(true)} onNo={() => setWasherOk(false)} />
-          <YesNo label="Insynsskydd OK? *" value={privacyCoverOk} onYes={() => setPrivacyCoverOk(true)} onNo={() => setPrivacyCoverOk(false)} />
+          <div>
+            <div className="text-sm font-medium">AdBlue OK? *</div>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {radioBtn(adblueOK === true, 'Ja', () => setAdblueOK(true))}
+              {radioBtn(adblueOK === false, 'Nej', () => setAdblueOK(false))}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm font-medium">Spolarvätska OK? *</div>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {radioBtn(washerOK === true, 'Ja', () => setWasherOK(true))}
+              {radioBtn(washerOK === false, 'Nej', () => setWasherOK(false))}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-sm font-medium">Insynsskydd OK? *</div>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {radioBtn(
+                privacyCoverOK === true,
+                'Ja',
+                () => setPrivacyCoverOK(true)
+              )}
+              {radioBtn(
+                privacyCoverOK === false,
+                'Nej',
+                () => setPrivacyCoverOK(false)
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Antal laddsladdar (0/1/2-knappar) */}
-        <div className="mt-6">
+        {/* LADDKABLAR */}
+        <div className="mt-5">
           <div className="text-sm font-medium">Antal laddsladdar *</div>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex gap-3">
             {[0, 1, 2].map((n) => (
               <button
-                type="button"
                 key={n}
-                className={`rounded-lg border px-4 py-2 ${chargeCableCount === n ? 'bg-blue-600 text-white' : ''}`}
+                type="button"
+                className={`rounded-lg border px-4 py-3 ${
+                  chargeCableCount === n ? 'bg-blue-100 border-blue-400' : ''
+                }`}
                 onClick={() => setChargeCableCount(n as 0 | 1 | 2)}
               >
                 {n}
@@ -413,197 +457,157 @@ export default function FormClient() {
           </div>
         </div>
 
-        {/* Hjul som sitter på + typ som uppges */}
-        <div className="mt-6">
+        {/* HJUL SOM SITTER PÅ */}
+        <div className="mt-5">
           <div className="text-sm font-medium">Hjul som sitter på *</div>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              className={`rounded-lg border px-4 py-2 ${wheelsOn === 'sommar' ? 'bg-blue-600 text-white' : ''}`}
-              onClick={() => setWheelsOn('sommar')}
-            >
-              Sommarhjul
-            </button>
-            <button
-              type="button"
-              className={`rounded-lg border px-4 py-2 ${wheelsOn === 'vinter' ? 'bg-blue-600 text-white' : ''}`}
-              onClick={() => setWheelsOn('vinter')}
-            >
-              Vinterhjul
-            </button>
-          </div>
-
-          <div className="mt-4 text-sm font-medium">Uppfattad hjultyp av incheckaren *</div>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              className={`rounded-lg border px-4 py-2 ${wheelTypeReported === 'sommar' ? 'bg-blue-600 text-white' : ''}`}
-              onClick={() => setWheelTypeReported('sommar')}
-            >
-              Sommarhjul
-            </button>
-            <button
-              type="button"
-              className={`rounded-lg border px-4 py-2 ${wheelTypeReported === 'vinter' ? 'bg-blue-600 text-white' : ''}`}
-              onClick={() => setWheelTypeReported('vinter')}
-            >
-              Vinterhjul
-            </button>
-          </div>
-
-          {showWheelsConfirm && (
-            <div className="mt-3 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm">
-              <b>Är du säker?</b> Systemet tycker “{wheelsOn}”, men du angav “{wheelTypeReported}”.
-            </div>
-          )}
-        </div>
-
-        {/* Nya skador? (gater fotosektionen) */}
-        <div className="mt-6">
-          <YesNo
-            label="Nya skador på bilen? *"
-            value={hasNewDamage}
-            onYes={() => setHasNewDamage(true)}
-            onNo={() => setHasNewDamage(false)}
-          />
-        </div>
-
-        {/* Fotosektion — visas bara vid “Ja” */}
-        {hasNewDamage && (
-          <div className="mt-4 rounded-lg border p-3">
-            <div className="text-sm font-medium">Beskriv nya skador</div>
-
-            {damages.length === 0 ? (
-              <button type="button" className="mt-3 rounded-lg border px-4 py-2" onClick={addDamage}>
-                Lägg till skada
-              </button>
-            ) : (
-              <button type="button" className="mt-3 rounded-lg border px-4 py-2" onClick={addDamage}>
-                Lägg till ytterligare skada
-              </button>
+          <div className="mt-2 flex gap-3">
+            {radioBtn(
+              wheelsOn === 'sommar',
+              'Sommarhjul',
+              () => setWheelsOn('sommar')
             )}
+            {radioBtn(
+              wheelsOn === 'vinter',
+              'Vinterhjul',
+              () => setWheelsOn('vinter')
+            )}
+          </div>
+        </div>
 
-            <div className="mt-3 space-y-6">
-              {damages.map((dmg, i) => (
-                <div key={i} className="rounded-md border p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">Skada {i + 1}</div>
-                    <button type="button" className="text-sm text-zinc-600 underline" onClick={() => removeDamageRow(i)}>
-                      Ta bort
-                    </button>
-                  </div>
+        {/* NYA SKADOR? */}
+        <div className="mt-6">
+          <div className="text-sm font-medium">Nya skador på bilen? *</div>
+          <div className="mt-2 grid grid-cols-2 gap-3">
+            {radioBtn(hasNewDamage === true, 'Ja', () => {
+              setHasNewDamage(true);
+              if (damages.length === 0) addDamageRow();
+            })}
+            {radioBtn(hasNewDamage === false, 'Nej', () => {
+              setHasNewDamage(false);
+              setDamages([]);
+            })}
+          </div>
+        </div>
 
-                  <label className="mt-2 block text-sm">Text (obligatorisk)</label>
-                  <input
-                    value={dmg.text}
-                    onChange={(e) => updateDamageText(i, e.target.value)}
-                    className={`${inputBase}`}
-                    placeholder="t.ex. Buckla vänster framdörr"
-                  />
-
-                  <div className="mt-3">
-                    <input
-                      ref={(el) => (filePickerRefs.current[i] = el)}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => pickDamageFiles(i, e)}
-                    />
-                    <button
-                      type="button"
-                      className="rounded-lg border px-4 py-2"
-                      onClick={() => filePickerRefs.current[i]?.click()}
-                    >
-                      Välj / Ta bilder
-                    </button>
-
-                    {dmg.previews.length > 0 && (
-                      <div className="mt-3 grid grid-cols-4 gap-2">
-                        {dmg.previews.map((src, pIdx) => (
-                          <div key={pIdx} className="relative">
-                            <img src={src} className="h-20 w-full rounded-md object-cover border" alt={`Skada ${i + 1}`} />
-                            <button
-                              type="button"
-                              className="absolute -top-2 -right-2 rounded-full bg-white px-2 text-xs shadow"
-                              onClick={() => removeDamagePhoto(i, pIdx)}
-                            >
-                              ✕
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+        {/* SKADEBLOCK – avvikande bakgrund, visas endast om Ja */}
+        {hasNewDamage === true && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+            {/* ingen rubrik längre */}
+            <div className="mb-2">
+              <button
+                type="button"
+                onClick={addDamageRow}
+                className="rounded-lg border bg-white px-3 py-2 text-sm"
+              >
+                {damages.length ? 'Lägg till ytterligare skada' : 'Lägg till skada'}
+              </button>
             </div>
+
+            {damages.map((dmg, i) => (
+              <div key={i} className="mb-4 rounded-lg border bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="font-medium">Skada {i + 1}</div>
+                  <button
+                    type="button"
+                    className="text-sm text-zinc-600 underline"
+                    onClick={() => removeDamageRow(i)}
+                  >
+                    Ta bort
+                  </button>
+                </div>
+
+                <label className="block text-sm">Text (obligatorisk)</label>
+                <input
+                  className="mt-1 w-full rounded-lg border bg-white px-3 py-2"
+                  placeholder="Beskriv skadan kort"
+                  value={dmg.text}
+                  onChange={(e) =>
+                    setDamages((prev) => {
+                      const clone = [...prev];
+                      clone[i] = { ...clone[i], text: e.target.value };
+                      return clone;
+                    })
+                  }
+                />
+
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    className="rounded-lg border bg-white px-3 py-2 text-sm"
+                    onClick={() => pickPhotos(i)}
+                  >
+                    Välj / Ta bilder
+                  </button>
+                  <input
+                    ref={(el) => (fileInputs.current[i] = el)}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => onPickFiles(i, e)}
+                  />
+                </div>
+
+                {dmg.previews.length > 0 && (
+                  <div className="mt-3 grid grid-cols-4 gap-2">
+                    {dmg.previews.map((src, p) => (
+                      <div key={p} className="relative">
+                        <img
+                          src={src}
+                          className="h-20 w-full rounded-md border object-cover"
+                          alt=""
+                        />
+                        <button
+                          type="button"
+                          className="absolute -right-2 -top-2 rounded-full border bg-white px-2 text-xs"
+                          onClick={() => removePhoto(i, p)}
+                          aria-label="Ta bort foto"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Övriga anteckningar */}
+        {/* ÖVRIGA ANTECKNINGAR – vanlig bakgrund */}
         <div className="mt-6">
           <label className="block text-sm font-medium">Övriga anteckningar</label>
           <textarea
             rows={4}
-            className={`${inputBase}`}
+            className="mt-1 w-full rounded-lg border bg-white px-3 py-3"
             placeholder="Övrig info…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
         </div>
 
-        {/* Status */}
-        {status === 'error' && <div className="mt-3 text-sm text-red-600">{message}</div>}
-        {status === 'done' && <div className="mt-3 text-sm text-green-600">Tack {thanksTo}!</div>}
+        {/* status */}
+        {status === 'error' && (
+          <div className="mt-3 text-sm text-red-600">{message}</div>
+        )}
+        {status === 'done' && (
+          <div className="mt-3 text-sm text-green-600">Tack {thanksTo}!</div>
+        )}
 
-        {/* Spara */}
+        {/* submit */}
         <button
-            type="submit"
-            disabled={!canSave || status === 'saving'}
-            className="mt-6 w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white disabled:opacity-50"
+          type="submit"
+          disabled={!requiredPicked || status === 'saving'}
+          className="mt-6 w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white disabled:opacity-50"
         >
           {status === 'saving' ? 'Sparar…' : 'Spara incheckning'}
         </button>
 
-        <div className="mt-4 text-center text-[11px] text-zinc-500">© Albarone AB 2025</div>
+        <div className="mt-6 text-center text-xs text-zinc-500">
+          © Albarone AB 2025
+        </div>
       </form>
-    </div>
-  );
-}
-
-// === Små UI-hjälpare ===
-function YesNo({
-  label,
-  value,
-  onYes,
-  onNo,
-}: {
-  label: string;
-  value: boolean | null;
-  onYes: () => void;
-  onNo: () => void;
-}) {
-  return (
-    <div>
-      <div className="text-sm font-medium">{label}</div>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          className={`rounded-lg border px-3 py-2 ${value === true ? 'bg-green-100 border-green-400' : ''}`}
-          onClick={onYes}
-        >
-          Ja
-        </button>
-        <button
-          type="button"
-          className={`rounded-lg border px-3 py-2 ${value === false ? 'bg-red-100 border-red-400' : ''}`}
-          onClick={onNo}
-        >
-          Nej
-        </button>
-      </div>
     </div>
   );
 }
