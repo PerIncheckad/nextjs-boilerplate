@@ -3,22 +3,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import supabase from '../../lib/supabase';
 
-// ===============================
-// Hjälptyper
-// ===============================
+// ===== Typer =====
 type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
-
 type Station = { id: string; name: string };
-type DamageEntry = {
-  text: string;
-  files: File[];
-  previews: string[];
-};
+type DamageEntry = { text: string; files: File[]; previews: string[] };
 
-// ===============================
-// Tvåstegs-stationer: Ort -> Station/depå
-// Fyll på/ändra fritt (id är det som sparas i databasen)
-// ===============================
+// ===== Stationsträd (Ort -> Station/depå) =====
+// Säg bara till om du vill lägga till/ta bort – jag fixar!
 const STATIONS: Record<string, Station[]> = {
   'Ängelholm': [
     { id: 'angelholm-hedin-ford', name: 'Hedin Automotive Ford' },
@@ -53,7 +44,7 @@ const STATIONS: Record<string, Station[]> = {
     { id: 'lund-p7-revingehed', name: 'P7 Revingehed' },
   ],
   'Malmö': [
-    { id: 'malmo-automer', name: 'Automerna' },
+    { id: 'malmo-automerna', name: 'Automerna' },
     { id: 'malmo-hedin-ford', name: 'Hedin Automotive Ford' },
     { id: 'malmo-hedin-jagersro', name: 'Hedin Automotive Jägersro' },
     { id: 'malmo-hedin-mercedes', name: 'Hedin Automotive Mercedes' },
@@ -73,39 +64,33 @@ const STATIONS: Record<string, Station[]> = {
     { id: 'varberg-hedin', name: 'Hedin Automotive' },
     { id: 'varberg-sallstorps-plat-lack', name: 'Sällstorps Plåt & Lack' },
   ],
+  'X (Old)': [{ id: 'x-old-helsingborg-holmgrens', name: 'HELSINGBORG (Holmgrens Bil)' }],
 };
 
-// ===============================
-// UI helpers
-// ===============================
-const yesNoBtn = (active: boolean | null) =>
-  `w-full rounded-lg border px-4 py-3 text-center ${active === true
-    ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-    : active === false
-      ? 'bg-white text-zinc-900 border-zinc-600'
-      : 'bg-white text-zinc-900 border-zinc-600'}`;
+// ===== Färghelpers (inline styles så dark mode inte “äter upp” dem) =====
+const yesNoClass = 'w-full rounded-lg border px-4 py-3 text-center';
+const chipClass = 'rounded-md border px-4 py-2';
+const choiceClass = 'rounded-lg border px-4 py-2';
 
-const choiceBtn = (active: boolean) =>
-  `rounded-lg border px-4 py-2 ${active
-    ? 'bg-blue-600 text-white border-blue-600'
-    : 'bg-white text-zinc-900 border-zinc-600'}`;
+const yesNoStyle = (sel: boolean | null) =>
+  sel === true
+    ? { backgroundColor: '#D1FAE5', color: '#065F46', borderColor: '#6EE7B7' } // grön
+    : { backgroundColor: '#FFFFFF', color: '#111827', borderColor: '#52525B' };
 
-const chipBtn = (active: boolean) =>
-  `rounded-md border px-4 py-2 ${active
-    ? 'bg-blue-100 text-blue-900 border-blue-300'
-    : 'bg-white text-zinc-900 border-zinc-600'}`;
+const chipStyle = (on: boolean) =>
+  on
+    ? { backgroundColor: '#DBEAFE', color: '#1E3A8A', borderColor: '#93C5FD' } // blå ljus
+    : { backgroundColor: '#FFFFFF', color: '#111827', borderColor: '#52525B' };
 
-// ===============================
-// Utils
-// ===============================
+const choiceStyle = (on: boolean) =>
+  on
+    ? { backgroundColor: '#2563EB', color: '#FFFFFF', borderColor: '#2563EB' } // blå mörk
+    : { backgroundColor: '#FFFFFF', color: '#111827', borderColor: '#52525B' };
+
+// ===== Utils =====
 function cleanFileName(name: string) {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9\-_.]/g, '')
-    .slice(0, 100);
+  return name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-_.]/g, '').slice(0, 100);
 }
-
 function nowStamp() {
   const d = new Date();
   return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(
@@ -115,70 +100,62 @@ function nowStamp() {
   ).padStart(2, '0')}${String(d.getSeconds()).padStart(2, '0')}`;
 }
 
-// ===============================
-// Komponent
-// ===============================
+// ===== Komponent =====
 export default function CheckinFormClient() {
-  // --- header / mock user ---
   const [username] = useState('Bob');
 
-  // --- regnr & bilinfo ---
+  // Regnr + bilinfo
   const [regnr, setRegnr] = useState('');
   const [regnrValid, setRegnrValid] = useState<boolean | null>(null);
   const [vehicleInfo, setVehicleInfo] = useState<string | null>(null);
   const [existingDamages, setExistingDamages] = useState<string[]>([]);
   const [tireStorage, setTireStorage] = useState<string | null>(null);
 
-  // --- stationer ---
+  // Stationer
   const [city, setCity] = useState('');
   const [stationId, setStationId] = useState('');
   const [stationOther, setStationOther] = useState('');
 
-  // --- mätarställning ---
-  const [odometer, setOdometer] = useState<string>('');
+  // Mätarställning
+  const [odometer, setOdometer] = useState('');
 
-  // --- ja/nej ---
+  // Ja/nej
   const [fuelFull, setFuelFull] = useState<boolean | null>(null);
   const [adblueOk, setAdblueOk] = useState<boolean | null>(null);
   const [washerOk, setWasherOk] = useState<boolean | null>(null);
   const [privacyCoverOk, setPrivacyOk] = useState<boolean | null>(null);
 
-  // --- laddsladdar 0/1/2 ---
+  // Laddsladdar
   const [chargeCableCount, setChargeCableCount] = useState<number | null>(null);
 
-  // --- hjultyp (obligatorisk) ---
+  // Hjul
   const [wheelsOn, setWheelsOn] = useState<'sommar' | 'vinter' | null>(null);
 
-  // --- nya skador ---
+  // Skador
   const [hasNewDamage, setHasNewDamage] = useState<boolean | null>(null);
   const [damages, setDamages] = useState<DamageEntry[]>([]);
   const fileInputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
-  // --- anteckningar ---
+  // Anteckningar + status
   const [notes, setNotes] = useState('');
-
-  // --- status ---
   const [status, setStatus] = useState<SaveStatus>('idle');
-  const [message, setMessage] = useState<string>('');
+  const [message, setMessage] = useState('');
 
-  // ===============================
-  // Regnr-uppslag: modell + befintliga skador + “Fel reg.nr”
-  // ===============================
-  async function lookupVehicle(plate: string) {
-    const p = plate.trim().toUpperCase();
-    if (!p) return;
+  // ===== Regnr-uppslag (tillåter submit även vid “Fel reg.nr”) =====
+  async function lookupVehicle(plateRaw: string) {
+    const plate = (plateRaw || '').trim().toUpperCase();
+    if (!plate) return;
+
     try {
-      // 1) Försök i "allowed_plates"
       const ap = await supabase
         .from('allowed_plates')
         .select('*')
-        .eq('regnr', p)
+        .eq('regnr', plate)
         .maybeSingle();
 
       if (ap?.data) {
         setRegnrValid(true);
-        // Försök hitta modellnamn i tänkbara fält
-        const row = ap.data as any;
+        const row: any = ap.data;
         const model =
           row.model ||
           row.car_model ||
@@ -188,8 +165,6 @@ export default function CheckinFormClient() {
           [row.make, row.model].filter(Boolean).join(' ') ||
           null;
         setVehicleInfo(model ? String(model) : '—');
-
-        // “hjulförvaring” finns inte än – placeholder
         setTireStorage('—');
       } else {
         setRegnrValid(false);
@@ -197,63 +172,43 @@ export default function CheckinFormClient() {
         setExistingDamages([]);
       }
 
-      // 2) Befintliga skador i ev. tabell
-      const ad = await supabase
-        .from('active_damages')
-        .select('text')
-        .eq('regnr', p);
-
-      if (ad?.data) {
-        const texts = (ad.data as any[]).map((r) => r.text).filter(Boolean);
-        setExistingDamages(texts.length ? texts : []);
-      } else {
-        setExistingDamages([]);
-      }
+      const ad = await supabase.from('active_damages').select('text').eq('regnr', plate);
+      if (ad?.data) setExistingDamages((ad.data as any[]).map((r) => r.text).filter(Boolean));
+      else setExistingDamages([]);
     } catch (e) {
-      console.error('lookupVehicle error', e);
+      console.error(e);
       setRegnrValid(false);
       setVehicleInfo(null);
       setExistingDamages([]);
     }
   }
 
-  // ===============================
-  // Skade-hanterare
-  // ===============================
+  // ===== Skade-hanterare =====
   function addDamage() {
     setDamages((d) => [...d, { text: '', files: [], previews: [] }]);
   }
-  function removeDamage(index: number) {
-    setDamages((d) => d.filter((_, i) => i !== index));
+  function removeDamage(i: number) {
+    setDamages((d) => d.filter((_, idx) => idx !== i));
   }
-  function updateDamageText(index: number, text: string) {
+  function updateDamageText(i: number, text: string) {
     setDamages((d) => {
       const copy = [...d];
-      copy[index] = { ...copy[index], text };
+      copy[i] = { ...copy[i], text };
       return copy;
     });
   }
-  function handleDamageFiles(index: number, e: React.ChangeEvent<HTMLInputElement>) {
+  function handleDamageFiles(i: number, e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     if (!files.length) return;
-
     const previews = files.map((f) => URL.createObjectURL(f));
-
-    setDamages((prev) => {
-      const copy = [...prev];
-      const old = copy[index];
-      copy[index] = {
-        ...old,
-        files: [...(old.files || []), ...files],
-        previews: [...(old.previews || []), ...previews],
-      };
+    setDamages((d) => {
+      const copy = [...d];
+      const old = copy[i];
+      copy[i] = { ...old, files: [...old.files, ...files], previews: [...old.previews, ...previews] };
       return copy;
     });
   }
 
-  // ===============================
-  // Upload av alla skadefoton
-  // ===============================
   async function uploadAllDamagePhotos(): Promise<string[][]> {
     const results: string[][] = [];
     const plate = regnr.trim().toUpperCase() || 'NO-PLATE';
@@ -267,10 +222,7 @@ export default function CheckinFormClient() {
           upsert: false,
           contentType: f.type || 'image/jpeg',
         });
-        if (error) {
-          console.error('upload error', error);
-          throw error;
-        }
+        if (error) throw error;
         const { data } = supabase.storage.from('damage-photos').getPublicUrl(path);
         if (data?.publicUrl) urls.push(data.publicUrl);
       }
@@ -279,17 +231,14 @@ export default function CheckinFormClient() {
     return results;
   }
 
-  // ===============================
-  // Submit
-  // ===============================
+  // ===== Submit (tillåter “Fel reg.nr”) =====
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus('saving');
     setMessage('');
 
-    // Validering
+    // Grundvalidering (tillåter regnrValid === false)
     if (!regnr.trim()) return setStatus('error'), setMessage('Ange registreringsnummer.');
-    if (!regnrValid) return setStatus('error'), setMessage('Fel reg.nr');
     if (!city) return setStatus('error'), setMessage('Välj ort.');
     if (!stationId) return setStatus('error'), setMessage('Välj station / depå.');
     if (!odometer.trim() || Number.isNaN(Number(odometer.replace(/\s/g, ''))))
@@ -305,70 +254,50 @@ export default function CheckinFormClient() {
       return setStatus('error'), setMessage('Text krävs för varje ny skada.');
 
     try {
-      // Ladda upp foton om nya skador
       let photoGroups: string[][] = [];
-      if (hasNewDamage && damages.length) {
-        photoGroups = await uploadAllDamagePhotos();
-      }
+      if (hasNewDamage && damages.length) photoGroups = await uploadAllDamagePhotos();
 
-      // Bygg insert-objekt – anpassa kolumnnamn vid behov
+      // OBS: Byt kolumnnamn här om din checkins-tabell heter lite annorlunda.
       const insertObj: any = {
         regnr: regnr.trim().toUpperCase(),
         notes: notes || null,
         station_id: stationId || null,
         station_other: stationOther || null,
-
         odometer_km: Number(odometer.replace(/\s/g, '')),
-
         fuel_full: fuelFull,
         adblue_ok: adblueOk,
         washer_ok: washerOk,
         privacy_cover_ok: privacyCoverOk,
-
-        charge_cable_count: chargeCableCount, // ev. "charging_cables" i din tabell
-
-        wheels_on: wheelsOn, // text 'sommar'/'vinter' – ändra om din kolumn heter 'tires_type' eller 'wheel_type'
-
+        charge_cable_count: chargeCableCount,
+        wheels_on: wheelsOn, // 'sommar' | 'vinter'
         no_new_damage: !hasNewDamage,
-        // photo_urls: lägga som "platta" lista eller gruppvis. Här sparar vi platt:
-        photo_urls: photoGroups.flat(), // kolumnen bör vara text[] i Supabase
+        photo_urls: photoGroups.flat(), // text[] i Supabase
       };
 
-      // Spara
       const { error } = await supabase.from('checkins').insert(insertObj).select().single();
-      if (error) {
-        console.error('DB insert error:', error);
-        setStatus('error');
-        setMessage(error.message ?? 'Kunde inte spara. Försök igen.');
-        return;
-      }
+      if (error) throw error;
 
       setStatus('done');
-      setMessage(`Tack ${username}! Incheckning sparad.`);
-      // Nollställ rimliga fält
+      setMessage(`Tack ${username}! Incheckning sparad.${regnrValid === false ? ' (Dubbelkolla reg.nr.)' : ''}`);
       setDamages([]);
       setHasNewDamage(null);
     } catch (err: any) {
-      console.error('submit error', err);
+      console.error(err);
       setStatus('error');
       setMessage(err?.message ?? 'Kunde inte spara. Försök igen.');
     }
   }
 
-  // ===============================
-  // UI
-  // ===============================
-  const stationOptions = useMemo<Station[]>(
-    () => (city ? STATIONS[city] ?? [] : []),
-    [city],
-  );
+  // ===== UI-data =====
+  const stationOptions = useMemo(() => (city ? STATIONS[city] ?? [] : []), [city]);
 
+  // ===== Render =====
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8 text-zinc-100">
+    <div className="mx-auto w-full max-w-2xl px-4 py-8">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-white">Ny incheckning</h1>
-        <div className="text-sm text-zinc-300">Inloggad: <span className="font-medium">{username}</span></div>
+        <h1 className="text-3xl font-bold">Ny incheckning</h1>
+        <div className="text-sm">Inloggad: <span className="font-medium">Bob</span></div>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-6">
@@ -379,16 +308,15 @@ export default function CheckinFormClient() {
             value={regnr}
             onChange={(e) => setRegnr(e.target.value.toUpperCase())}
             onBlur={(e) => lookupVehicle(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-white px-3 py-2 text-zinc-900 tracking-widest uppercase"
+            className="mt-1 w-full rounded-lg border border-zinc-600 bg-white px-3 py-2 text-zinc-900 tracking-widest uppercase"
             placeholder="ABC123"
           />
           {regnr && regnrValid === false && (
-            <div className="mt-1 text-sm text-red-400">Fel reg.nr</div>
+            <div className="mt-1 text-sm text-red-600">Fel reg.nr</div>
           )}
 
-          {/* Bilinfo */}
           {(vehicleInfo || existingDamages.length > 0 || tireStorage) && (
-            <div className="mt-4 rounded-lg border border-zinc-700 bg-zinc-900/40 p-4 text-zinc-200">
+            <div className="mt-4 rounded-lg border border-zinc-300 bg-zinc-50 p-4">
               {vehicleInfo && (
                 <div className="mb-2">
                   <span className="font-semibold">Bil:</span> {vehicleInfo}
@@ -403,9 +331,7 @@ export default function CheckinFormClient() {
                 <div>
                   <div className="font-semibold">Befintliga skador:</div>
                   <ul className="list-disc pl-5">
-                    {existingDamages.map((t, i) => (
-                      <li key={i}>{t}</li>
-                    ))}
+                    {existingDamages.map((t, i) => <li key={i}>{t}</li>)}
                   </ul>
                 </div>
               )}
@@ -413,13 +339,13 @@ export default function CheckinFormClient() {
           )}
         </div>
 
-        {/* STATION / DEPO */}
+        {/* ORT */}
         <div>
           <label className="block text-sm font-medium">Ort *</label>
           <select
             value={city}
             onChange={(e) => { setCity(e.target.value); setStationId(''); }}
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-white px-3 py-2 text-zinc-900"
+            className="mt-1 w-full rounded-lg border border-zinc-600 bg-white px-3 py-2 text-zinc-900"
           >
             <option value="">— Välj ort —</option>
             {Object.keys(STATIONS).map((c) => (
@@ -428,13 +354,14 @@ export default function CheckinFormClient() {
           </select>
         </div>
 
+        {/* STATION */}
         <div>
           <label className="block text-sm font-medium">Station / Depå *</label>
           <select
             value={stationId}
             onChange={(e) => setStationId(e.target.value)}
             disabled={!city}
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-white px-3 py-2 text-zinc-900 disabled:opacity-60"
+            className="mt-1 w-full rounded-lg border border-zinc-600 bg-white px-3 py-2 text-zinc-900 disabled:opacity-60"
           >
             <option value="">{city ? '— Välj station / depå —' : 'Välj ort först'}</option>
             {stationOptions.map((s) => (
@@ -445,7 +372,7 @@ export default function CheckinFormClient() {
           <input
             value={stationOther}
             onChange={(e) => setStationOther(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-zinc-700 bg-white px-3 py-2 text-zinc-900"
+            className="mt-2 w-full rounded-lg border border-zinc-600 bg-white px-3 py-2 text-zinc-900"
             placeholder="Ev. annan inlämningsplats"
           />
         </div>
@@ -458,10 +385,10 @@ export default function CheckinFormClient() {
               value={odometer}
               onChange={(e) => setOdometer(e.target.value.replace(/[^\d\s]/g, ''))}
               inputMode="numeric"
-              className="w-full rounded-lg border border-zinc-700 bg-white px-3 py-2 text-zinc-900"
+              className="w-full rounded-lg border border-zinc-600 bg-white px-3 py-2 text-zinc-900"
               placeholder="ex. 42 180"
             />
-            <span className="text-zinc-300">km</span>
+            <span>km</span>
           </div>
         </div>
 
@@ -469,8 +396,8 @@ export default function CheckinFormClient() {
         <div>
           <label className="block text-sm font-medium">Tanknivå *</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <button type="button" className={yesNoBtn(fuelFull === true)} onClick={() => setFuelFull(true)}>Fulltankad</button>
-            <button type="button" className={yesNoBtn(fuelFull === false)} onClick={() => setFuelFull(false)}>Ej fulltankad</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(fuelFull === true)} onClick={() => setFuelFull(true)}>Fulltankad</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(fuelFull === false)} onClick={() => setFuelFull(false)}>Ej fulltankad</button>
           </div>
         </div>
 
@@ -478,8 +405,8 @@ export default function CheckinFormClient() {
         <div>
           <label className="block text-sm font-medium">AdBlue OK? *</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <button type="button" className={yesNoBtn(adblueOk === true)} onClick={() => setAdblueOk(true)}>Ja</button>
-            <button type="button" className={yesNoBtn(adblueOk === false)} onClick={() => setAdblueOk(false)}>Nej</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(adblueOk === true)} onClick={() => setAdblueOk(true)}>Ja</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(adblueOk === false)} onClick={() => setAdblueOk(false)}>Nej</button>
           </div>
         </div>
 
@@ -487,8 +414,8 @@ export default function CheckinFormClient() {
         <div>
           <label className="block text-sm font-medium">Spolarvätska OK? *</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <button type="button" className={yesNoBtn(washerOk === true)} onClick={() => setWasherOk(true)}>Ja</button>
-            <button type="button" className={yesNoBtn(washerOk === false)} onClick={() => setWasherOk(false)}>Nej</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(washerOk === true)} onClick={() => setWasherOk(true)}>Ja</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(washerOk === false)} onClick={() => setWasherOk(false)}>Nej</button>
           </div>
         </div>
 
@@ -496,8 +423,8 @@ export default function CheckinFormClient() {
         <div>
           <label className="block text-sm font-medium">Insynsskydd OK? *</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <button type="button" className={yesNoBtn(privacyCoverOk === true)} onClick={() => setPrivacyOk(true)}>Ja</button>
-            <button type="button" className={yesNoBtn(privacyCoverOk === false)} onClick={() => setPrivacyOk(false)}>Nej</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(privacyCoverOk === true)} onClick={() => setPrivacyOk(true)}>Ja</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(privacyCoverOk === false)} onClick={() => setPrivacyOk(false)}>Nej</button>
           </div>
         </div>
 
@@ -506,14 +433,7 @@ export default function CheckinFormClient() {
           <label className="block text-sm font-medium">Antal laddsladdar *</label>
           <div className="mt-2 flex gap-2">
             {[0, 1, 2].map((n) => (
-              <button
-                key={n}
-                type="button"
-                className={chipBtn(chargeCableCount === n)}
-                onClick={() => setChargeCableCount(n)}
-              >
-                {n}
-              </button>
+              <button key={n} type="button" className={chipClass} style={chipStyle(chargeCableCount === n)} onClick={() => setChargeCableCount(n)}>{n}</button>
             ))}
           </div>
         </div>
@@ -522,8 +442,8 @@ export default function CheckinFormClient() {
         <div>
           <label className="block text-sm font-medium">Hjul som sitter på *</label>
           <div className="mt-2 flex gap-3">
-            <button type="button" className={choiceBtn(wheelsOn === 'sommar')} onClick={() => setWheelsOn('sommar')}>Sommarhjul</button>
-            <button type="button" className={choiceBtn(wheelsOn === 'vinter')} onClick={() => setWheelsOn('vinter')}>Vinterhjul</button>
+            <button type="button" className={choiceClass} style={choiceStyle(wheelsOn === 'sommar')} onClick={() => setWheelsOn('sommar')}>Sommarhjul</button>
+            <button type="button" className={choiceClass} style={choiceStyle(wheelsOn === 'vinter')} onClick={() => setWheelsOn('vinter')}>Vinterhjul</button>
           </div>
         </div>
 
@@ -531,31 +451,21 @@ export default function CheckinFormClient() {
         <div>
           <label className="block text-sm font-medium">Nya skador på bilen? *</label>
           <div className="mt-2 grid grid-cols-2 gap-2">
-            <button type="button" className={yesNoBtn(hasNewDamage === true)} onClick={() => { setHasNewDamage(true); if (damages.length === 0) addDamage(); }}>Ja</button>
-            <button type="button" className={yesNoBtn(hasNewDamage === false)} onClick={() => { setHasNewDamage(false); setDamages([]); }}>Nej</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(hasNewDamage === true)} onClick={() => { setHasNewDamage(true); if (damages.length === 0) addDamage(); }}>Ja</button>
+            <button type="button" className={yesNoClass} style={yesNoStyle(hasNewDamage === false)} onClick={() => { setHasNewDamage(false); setDamages([]); }}>Nej</button>
           </div>
 
           {hasNewDamage === true && (
-            <div className="mt-4 rounded-lg border border-amber-400 bg-amber-50/70 p-4 text-amber-900">
-              {/* Skador */}
+            <div className="mt-4 rounded-lg border border-amber-400 bg-amber-50 p-4">
               <div className="space-y-6">
                 {damages.map((dmg, i) => (
-                  <div key={i} className="rounded-md border border-amber-300 bg-white/80 p-3">
+                  <div key={i} className="rounded-md border border-amber-300 bg-white p-3">
                     <div className="flex items-center justify-between">
                       <div className="font-semibold text-amber-900">Skada {i + 1}</div>
-                      <button
-                        type="button"
-                        onClick={() => removeDamage(i)}
-                        className="text-sm underline decoration-amber-400 underline-offset-4"
-                      >
-                        Ta bort
-                      </button>
+                      <button type="button" onClick={() => removeDamage(i)} className="text-sm underline decoration-amber-400 underline-offset-4">Ta bort</button>
                     </div>
 
-                    {/* Text obligatorisk */}
-                    <label className="mt-3 block text-sm font-medium text-amber-900">
-                      Text (obligatorisk)
-                    </label>
+                    <label className="mt-3 block text-sm font-medium text-amber-900">Text (obligatorisk)</label>
                     <input
                       value={dmg.text}
                       onChange={(e) => updateDamageText(i, e.target.value)}
@@ -563,7 +473,6 @@ export default function CheckinFormClient() {
                       placeholder="Beskriv skadan kort…"
                     />
 
-                    {/* FOTO-knapp + gömd input */}
                     <div className="mt-3">
                       <input
                         ref={(el) => (fileInputsRef.current[i] = el)}
@@ -585,12 +494,7 @@ export default function CheckinFormClient() {
                       {dmg.previews?.length > 0 && (
                         <div className="mt-3 grid grid-cols-4 gap-2">
                           {dmg.previews.map((src, j) => (
-                            <img
-                              key={j}
-                              src={src}
-                              alt={`Skadefoto ${j + 1}`}
-                              className="h-20 w-full rounded-md object-cover border border-zinc-300"
-                            />
+                            <img key={j} src={src} alt={`Skadefoto ${j + 1}`} className="h-20 w-full rounded-md border border-zinc-300 object-cover" />
                           ))}
                         </div>
                       )}
@@ -599,12 +503,7 @@ export default function CheckinFormClient() {
                 ))}
               </div>
 
-              {/* Primär knappen längst NER i skadeområdet */}
-              <button
-                type="button"
-                onClick={addDamage}
-                className="mt-4 w-full rounded-lg border border-amber-400 bg-amber-100 px-4 py-3 text-amber-900"
-              >
+              <button type="button" onClick={addDamage} className="mt-4 w-full rounded-lg border border-amber-400 bg-amber-100 px-4 py-3 text-amber-900">
                 {damages.length === 0 ? 'Lägg till skada' : 'Lägg till ytterligare skada'}
               </button>
             </div>
@@ -618,34 +517,27 @@ export default function CheckinFormClient() {
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             rows={4}
-            className="mt-1 w-full rounded-lg border border-zinc-700 bg-white px-3 py-2 text-zinc-900"
+            className="mt-1 w-full rounded-lg border border-zinc-600 bg-white px-3 py-2 text-zinc-900"
             placeholder="Övrig info…"
           />
         </div>
 
         {/* Status */}
-        {status === 'error' && (
-          <div className="text-sm text-red-400">{message}</div>
+        {(status === 'error' || regnrValid === false) && (
+          <div className="text-sm text-red-600">
+            {status === 'error' ? message : 'Dubbelkolla reg.nr'}
+          </div>
         )}
-        {status === 'done' && (
-          <div className="text-sm text-emerald-400">{message}</div>
-        )}
+        {status === 'done' && <div className="text-sm text-emerald-600">{message}</div>}
 
         <div>
-          <button
-            type="submit"
-            disabled={status === 'saving'}
-            className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white disabled:opacity-60"
-          >
+          <button type="submit" disabled={status === 'saving'} className="w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white disabled:opacity-60">
             {status === 'saving' ? 'Sparar…' : 'Spara incheckning'}
           </button>
         </div>
       </form>
 
-      {/* Footer */}
-      <footer className="mt-12 text-center text-sm text-zinc-400">
-        © Albarone AB 2025
-      </footer>
+      <footer className="mt-12 text-center text-sm text-zinc-500">© Albarone AB 2025</footer>
     </div>
   );
 }
