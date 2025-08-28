@@ -2,101 +2,41 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import supabase from '../../lib/supabase';
+import { STATIONS, Station } from '../../lib/stations';
 
-/* =========================
-     Typer
-========================= */
+/* ============ Typer ============ */
 type SaveStatus = 'idle' | 'saving' | 'done' | 'error';
-
-type Station = { id: string; name: string };
 type DamageEntry = { text: string; files: File[]; previews: string[] };
 
-/* =========================
-     Stationsträd (Ort -> station/depå)
-     – lätt att ändra/utöka framöver
-========================= */
-const STATIONS: Record<string, Station[]> = {
-  'Ängelholm': [
-    { id: 'angelholm-hedin-ford', name: 'Hedin Automotive Ford' },
-    { id: 'angelholm-hedin', name: 'Hedin Automotive' },
-    { id: 'angelholm-airport', name: 'Ängelholm Airport' },
-  ],
-  'Falkenberg': [{ id: 'falkenberg', name: 'Falkenberg' }],
-  'Halmstad': [
-    { id: 'halmstad-hedin-ford', name: 'Hedin Automotive Ford' },
-    { id: 'halmstad-hedin-kia', name: 'Hedin Automotive Kia' },
-    { id: 'halmstad-hedin-mercedes', name: 'Hedin Automotive Mercedes' },
-    { id: 'halmstad-hedin', name: 'Hedin Automotive' },
-    { id: 'halmstad-city-airport', name: 'Halmstad City Airport' },
-  ],
-  'Helsingborg': [
-    { id: 'helsingborg-bilskadeservice', name: 'Bil & Skadeservice' },
-    { id: 'helsingborg-floretten', name: 'Floretten' },
-    { id: 'helsingborg-forenade-bil', name: 'Förenade Bil' },
-    { id: 'helsingborg-hedin-ford', name: 'Hedin Automotive Ford' },
-    { id: 'helsingborg-hedin-kia', name: 'Hedin Automotive Kia' },
-    { id: 'helsingborg-hedin', name: 'Hedin Automotive' },
-    { id: 'helsingborg-hedin-transport', name: 'Hedin Bil Transport' },
-    { id: 'helsingborg-sjonsson', name: 'S.Jönsson Bil' },
-    { id: 'helsingborg-verkstad', name: 'Verkstad' },
-    { id: 'helsingborg-hbsc', name: 'HBSC' },
-  ],
-  'Lund': [
-    { id: 'lund-bilskadeservice', name: 'Bil & Skadeservice' },
-    { id: 'lund-hedin-ford', name: 'Hedin Automotive Ford' },
-    { id: 'lund-hedin', name: 'Hedin Automotive' },
-    { id: 'lund-hedin-bil', name: 'Hedin Bil' },
-    { id: 'lund-p7-revingehed', name: 'P7 Revingehed' },
-  ],
-  'Malmö': [
-    { id: 'malmo-automerna', name: 'Automerna' },
-    { id: 'malmo-hedin-ford', name: 'Hedin Automotive Ford' },
-    { id: 'malmo-hedin-jagersro', name: 'Hedin Automotive Jägersro' },
-    { id: 'malmo-hedin-mercedes', name: 'Hedin Automotive Mercedes' },
-    { id: 'malmo-mechanum', name: 'Mechanum' },
-    { id: 'malmo-airport', name: 'Malmö Airport' },
-    { id: 'malmo-bernstorp-verkstad', name: 'BERNSTORP (Verkstad)' },
-    { id: 'malmo-burlov-hedin', name: 'BURLÖV (Hedin Automotive)' },
-    { id: 'malmo-fosie-hedbergs', name: 'FOSIE (Hedbergs Bil)' },
-    { id: 'malmo-hamn-verkstad', name: 'HAMN (Verkstad)' },
-    { id: 'malmo-langtid', name: 'LÅNGTID' },
-  ],
-  'Trelleborg': [{ id: 'trelleborg', name: 'Trelleborg' }],
-  'Varberg': [
-    { id: 'varberg-finnvedens-skadecenter', name: 'Finnvedens Bil Skadecenter' },
-    { id: 'varberg-hedin-ford', name: 'Hedin Automotive Ford' },
-    { id: 'varberg-hedin-holmgarde', name: 'Hedin Automotive Holmgärde' },
-    { id: 'varberg-hedin', name: 'Hedin Automotive' },
-    { id: 'varberg-sallstorps-plat-lack', name: 'Sällstorps Plåt & Lack' },
-  ],
-  'X (Old)': [{ id: 'x-old-helsingborg-holmgrens', name: 'HELSINGBORG (Holmgrens Bil)' }],
+/* ============ Färger (inline, oberoende av tema) ============ */
+type BtnCSS = React.CSSProperties;
+const BASE_RESET: BtnCSS = { appearance: 'none', WebkitAppearance: 'none' };
+
+const COLORS = {
+  neutral: { bg: '#FFFFFF', text: '#111827', border: '#52525B' },
+  yes: { bg: '#D1FAE5', text: '#065F46', border: '#6EE7B7' },
+  no: { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' },
+  chipOn: { bg: '#DBEAFE', text: '#1E3A8A', border: '#93C5FD' },
+  primary: { bg: '#2563EB', text: '#FFFFFF', border: '#2563EB' },
+  primaryOff: { bg: '#FFFFFF', text: '#111827', border: '#52525B' },
 };
 
-/* =========================
-     Färg-hjälpare (inline styles)
-========================= */
-const yesNoBase = 'w-full rounded-lg border px-4 py-3 text-center';
-const chipBase = 'rounded-md border px-4 py-2';
-const bigChoiceBase = 'rounded-lg border px-4 py-2';
+const style = (c: { bg: string; text: string; border: string }): BtnCSS => ({
+  ...BASE_RESET,
+  backgroundColor: c.bg,
+  color: c.text,
+  borderColor: c.border,
+});
 
-const yesNoStyle = (on: boolean | null) =>
-  on === true
-    ? { backgroundColor: '#D1FAE5', color: '#065F46', borderColor: '#6EE7B7' } // vald grön
-    : { backgroundColor: '#FFFFFF', color: '#111827', borderColor: '#52525B' };
+const yesStyle = (sel: boolean): BtnCSS => (sel ? style(COLORS.yes) : style(COLORS.neutral));
+const noStyle = (sel: boolean): BtnCSS => (sel ? style(COLORS.no) : style(COLORS.neutral));
+const chipStyle = (sel: boolean): BtnCSS => (sel ? style(COLORS.chipOn) : style(COLORS.neutral));
+const primaryStyle = (sel: boolean): BtnCSS => (sel ? style(COLORS.primary) : style(COLORS.primaryOff));
 
-const chipStyle = (on: boolean) =>
-  on
-    ? { backgroundColor: '#DBEAFE', color: '#1E3A8A', borderColor: '#93C5FD' } // vald blå
-    : { backgroundColor: '#FFFFFF', color: '#111827', borderColor: '#52525B' };
+const yesNoBase = 'w-full rounded-lg border px-4 py-3 text-center select-none';
+const chipBase = 'rounded-md border px-4 py-2 select-none';
 
-const bigChoiceStyle = (on: boolean) =>
-  on
-    ? { backgroundColor: '#2563EB', color: '#FFFFFF', borderColor: '#2563EB' } // fylld blå
-    : { backgroundColor: '#FFFFFF', color: '#111827', borderColor: '#52525B' };
-
-/* =========================
-     Utils
-========================= */
+/* ============ Utils ============ */
 const cleanFileName = (name: string) =>
   name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-_.]/g, '').slice(0, 100);
 
@@ -122,25 +62,23 @@ function extractModel(row: any): string | null {
   return (candidates[0] ? String(candidates[0]) : null) || null;
 }
 
-/* =========================
-     Komponent
-========================= */
+/* ============ Komponent ============ */
 export default function CheckinFormClient() {
   const [username] = useState('Bob');
 
-  // reg.nr + uppslag
+  // reg.nr + lookup
   const [regnr, setRegnr] = useState('');
   const [regnrValid, setRegnrValid] = useState<boolean | null>(null);
   const [vehicleInfo, setVehicleInfo] = useState<string | null>(null);
   const [existingDamages, setExistingDamages] = useState<string[]>([]);
-  const [tireStorage, setTireStorage] = useState<string | null>(null); // placeholder tills vi kopplar Excel
+  const [tireStorage, setTireStorage] = useState<string | null>(null); // placeholder
 
-  // station
+  // station (två-steg)
   const [city, setCity] = useState('');
   const [stationId, setStationId] = useState('');
   const [stationOther, setStationOther] = useState('');
 
-  // mätare
+  // mätarställning
   const [odometer, setOdometer] = useState('');
 
   // ja/nej
@@ -165,12 +103,13 @@ export default function CheckinFormClient() {
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [message, setMessage] = useState('');
 
-  // slå upp bilinfo/befintliga skador vid reg.nr (debounce 300ms)
+  // Lookup model/skador vid regnr
   useEffect(() => {
     if (!regnr || regnr.trim().length < 5) {
       setRegnrValid(null);
       setVehicleInfo(null);
       setExistingDamages([]);
+      setTireStorage(null);
       return;
     }
     const plate = regnr.trim().toUpperCase();
@@ -185,7 +124,7 @@ export default function CheckinFormClient() {
         if (ap?.data) {
           setRegnrValid(true);
           setVehicleInfo(extractModel(ap.data) || '—');
-          setTireStorage('—'); // tills vidare
+          setTireStorage('—'); // tills Excel-källa kopplas
         } else {
           setRegnrValid(false);
           setVehicleInfo(null);
@@ -193,22 +132,17 @@ export default function CheckinFormClient() {
         }
 
         const ad = await supabase.from('active_damages').select('text').eq('regnr', plate);
-        if (ad?.data) {
-          setExistingDamages(ad.data.map((r: any) => String(r.text)).filter(Boolean));
-        } else {
-          setExistingDamages([]);
-        }
+        setExistingDamages(ad?.data ? ad.data.map((r: any) => String(r.text)).filter(Boolean) : []);
       } catch {
         setRegnrValid(false);
         setVehicleInfo(null);
         setExistingDamages([]);
       }
     }, 300);
-
     return () => clearTimeout(t);
   }, [regnr]);
 
-  // skador – helpers
+  // Skade-hjälpare
   const addDamage = () => setDamages((d) => [...d, { text: '', files: [], previews: [] }]);
   const removeDamage = (i: number) => setDamages((d) => d.filter((_, idx) => idx !== i));
   const updateDamageText = (i: number, text: string) =>
@@ -248,7 +182,7 @@ export default function CheckinFormClient() {
     return out;
   }
 
-  // submit – OBS: tillåter “Fel reg.nr”
+  // Submit – OBS: tillåter "Fel reg.nr"
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatus('saving');
@@ -268,14 +202,12 @@ export default function CheckinFormClient() {
     if (hasNewDamage === null) return setStatus('error'), setMessage('Svara om nya skador.');
 
     try {
-      // ladda ev. foton
       const uploaded = hasNewDamage ? await uploadDamagePhotos() : [];
       const allPhotoUrls = uploaded.flat();
 
-      // bygg insert – håll den smal för kompatibilitet
       const insertObj: any = {
         regnr: regnr.trim().toUpperCase(),
-        regnr_valid: regnrValid, // ok om null/false – vi tillåter ändå
+        regnr_valid: regnrValid,
         station_id: stationId || null,
         station_other: stationOther || null,
         odometer_km: Number(odometer.replace(/\s/g, '')),
@@ -283,10 +215,10 @@ export default function CheckinFormClient() {
         adblue_ok: adblueOk,
         washer_ok: washerOk,
         privacy_cover_ok: privacyOk,
-        charge_cable_count: cableCount, // kolumnnamn kan variera – funkar om den finns
-        wheels_on: wheelsOn, // 'sommar' | 'vinter'
+        charge_cable_count: cableCount,
+        wheels_on: wheelsOn,
         notes: notes || null,
-        photo_urls: allPhotoUrls.length ? allPhotoUrls : null, // om tabellen har text[]/jsonb
+        photo_urls: allPhotoUrls.length ? allPhotoUrls : null,
       };
 
       const { data: checkinsIns, error: checkinsErr } = await supabase
@@ -294,10 +226,8 @@ export default function CheckinFormClient() {
         .insert(insertObj)
         .select('id')
         .single();
-
       if (checkinsErr) throw checkinsErr;
 
-      // lägg skador (om tabell finns)
       if (hasNewDamage && damages.length && checkinsIns?.id) {
         try {
           const rows = damages.map((d, idx) => ({
@@ -307,7 +237,6 @@ export default function CheckinFormClient() {
           }));
           await supabase.from('checkin_damages').insert(rows);
 
-          // ev. fotolänkar per skada – mjuk hantering
           for (let i = 0; i < uploaded.length; i++) {
             const urls = uploaded[i];
             if (!urls.length) continue;
@@ -320,18 +249,13 @@ export default function CheckinFormClient() {
                   order: j + 1,
                 })),
               );
-            } catch {
-              /* ignorera om tabellen saknas */
-            }
+            } catch {/* fototabell saknas – ignorera */}
           }
-        } catch {
-          /* ignorera – primär checkin är lagrad */
-        }
+        } catch {/* skadetabell saknas – ignorera */}
       }
 
       setStatus('done');
       setMessage(`Tack ${username}! Incheckningen är sparad.`);
-      // nollställ rimligt mycket
       setDamages([]);
       setHasNewDamage(null);
     } catch (err: any) {
@@ -343,9 +267,7 @@ export default function CheckinFormClient() {
   const cityList = useMemo(() => Object.keys(STATIONS), []);
   const stationsInCity = useMemo<Station[]>(() => (city ? STATIONS[city] ?? [] : []), [city]);
 
-  /* =========================
-       UI
-  ========================= */
+  /* ============ UI ============ */
   return (
     <form className="max-w-2xl mx-auto px-4 py-6 space-y-6" onSubmit={onSubmit}>
       <div className="flex items-center justify-between">
@@ -368,25 +290,17 @@ export default function CheckinFormClient() {
         )}
       </div>
 
-      {/* Ort / station */}
+      {/* Ort / Station */}
       <div>
         <label className="block text-sm font-medium">Station / Depå *</label>
-
         <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <select
             value={city}
-            onChange={(e) => {
-              setCity(e.target.value);
-              setStationId('');
-            }}
+            onChange={(e) => { setCity(e.target.value); setStationId(''); }}
             className="w-full rounded-lg border px-3 py-2"
           >
             <option value="">— Välj ort —</option>
-            {cityList.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            {cityList.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
 
           <select
@@ -396,11 +310,7 @@ export default function CheckinFormClient() {
             className="w-full rounded-lg border px-3 py-2 disabled:opacity-50"
           >
             <option value="">{city ? '— Välj station / depå —' : 'Välj ort först'}</option>
-            {stationsInCity.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
+            {stationsInCity.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
 
@@ -412,22 +322,16 @@ export default function CheckinFormClient() {
         />
       </div>
 
-      {/* Vehicle info (efter reg.nr) */}
+      {/* Bilinfo */}
       {(vehicleInfo || existingDamages.length > 0 || tireStorage) && (
         <div className="rounded-lg border px-4 py-3 bg-white">
-          {vehicleInfo && (
-            <div className="text-sm"><span className="font-medium">Bil:</span> {vehicleInfo}</div>
-          )}
-          {tireStorage && (
-            <div className="text-sm"><span className="font-medium">Hjulförvaring:</span> {tireStorage}</div>
-          )}
+          {vehicleInfo && <div className="text-sm"><span className="font-medium">Bil:</span> {vehicleInfo}</div>}
+          {tireStorage && <div className="text-sm"><span className="font-medium">Hjulförvaring:</span> {tireStorage}</div>}
           {existingDamages.length > 0 && (
             <div className="text-sm mt-2">
               <div className="font-medium">Befintliga skador:</div>
               <ul className="list-disc pl-5">
-                {existingDamages.map((d, i) => (
-                  <li key={i}>{d}</li>
-                ))}
+                {existingDamages.map((d, i) => <li key={i}>{d}</li>)}
               </ul>
             </div>
           )}
@@ -453,134 +357,75 @@ export default function CheckinFormClient() {
       <div>
         <div className="text-sm font-medium">Tanknivå *</div>
         <div className="mt-2 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            className={yesNoBase}
-            style={bigChoiceStyle(fuelFull === true)}
-            onClick={() => setFuelFull(true)}
-          >
-            Fulltankad
-          </button>
-          <button
-            type="button"
-            className={yesNoBase}
-            style={bigChoiceStyle(fuelFull === false)}
-            onClick={() => setFuelFull(false)}
-          >
-            Ej fulltankad
-          </button>
+          <button type="button" className={yesNoBase} style={primaryStyle(fuelFull === true)} onClick={() => setFuelFull(true)}>Fulltankad</button>
+          <button type="button" className={yesNoBase} style={primaryStyle(fuelFull === false)} onClick={() => setFuelFull(false)}>Ej fulltankad</button>
         </div>
       </div>
 
-      {/* Ja/Nej-grupper */}
+      {/* AdBlue */}
       <div>
         <div className="text-sm font-medium">AdBlue OK? *</div>
         <div className="mt-2 grid grid-cols-2 gap-3">
-          <button type="button" className={yesNoBase} style={yesNoStyle(adblueOk)} onClick={() => setAdblueOk(true)}>Ja</button>
-          <button type="button" className={yesNoBase} style={yesNoStyle(adblueOk === false ? true : null)} onClick={() => setAdblueOk(false)}>Nej</button>
+          <button type="button" className={yesNoBase} style={yesStyle(adblueOk === true)} onClick={() => setAdblueOk(true)}>Ja</button>
+          <button type="button" className={yesNoBase} style={noStyle(adblueOk === false)} onClick={() => setAdblueOk(false)}>Nej</button>
         </div>
       </div>
 
+      {/* Spolarvätska */}
       <div>
         <div className="text-sm font-medium">Spolarvätska OK? *</div>
         <div className="mt-2 grid grid-cols-2 gap-3">
-          <button type="button" className={yesNoBase} style={yesNoStyle(washerOk)} onClick={() => setWasherOk(true)}>Ja</button>
-          <button type="button" className={yesNoBase} style={yesNoStyle(washerOk === false ? true : null)} onClick={() => setWasherOk(false)}>Nej</button>
+          <button type="button" className={yesNoBase} style={yesStyle(washerOk === true)} onClick={() => setWasherOk(true)}>Ja</button>
+          <button type="button" className={yesNoBase} style={noStyle(washerOk === false)} onClick={() => setWasherOk(false)}>Nej</button>
         </div>
       </div>
 
+      {/* Insynsskydd */}
       <div>
         <div className="text-sm font-medium">Insynsskydd OK? *</div>
         <div className="mt-2 grid grid-cols-2 gap-3">
-          <button type="button" className={yesNoBase} style={yesNoStyle(privacyOk)} onClick={() => setPrivacyOk(true)}>Ja</button>
-          <button type="button" className={yesNoBase} style={yesNoStyle(privacyOk === false ? true : null)} onClick={() => setPrivacyOk(false)}>Nej</button>
+          <button type="button" className={yesNoBase} style={yesStyle(privacyOk === true)} onClick={() => setPrivacyOk(true)}>Ja</button>
+          <button type="button" className={yesNoBase} style={noStyle(privacyOk === false)} onClick={() => setPrivacyOk(false)}>Nej</button>
         </div>
       </div>
 
-      {/* laddsladdar */}
+      {/* Laddsladdar */}
       <div>
         <div className="text-sm font-medium">Antal laddsladdar *</div>
         <div className="mt-2 flex gap-2">
           {[0, 1, 2].map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={chipBase}
-              style={chipStyle(cableCount === n)}
-              onClick={() => setCableCount(n)}
-            >
-              {n}
-            </button>
+            <button key={n} type="button" className={chipBase} style={chipStyle(cableCount === n)} onClick={() => setCableCount(n)}>{n}</button>
           ))}
         </div>
       </div>
 
-      {/* hjul */}
+      {/* Hjul */}
       <div>
         <div className="text-sm font-medium">Hjul som sitter på *</div>
         <div className="mt-2 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            className={yesNoBase}
-            style={bigChoiceStyle(wheelsOn === 'sommar')}
-            onClick={() => setWheelsOn('sommar')}
-          >
-            Sommarhjul
-          </button>
-          <button
-            type="button"
-            className={yesNoBase}
-            style={bigChoiceStyle(wheelsOn === 'vinter')}
-            onClick={() => setWheelsOn('vinter')}
-          >
-            Vinterhjul
-          </button>
+          <button type="button" className={yesNoBase} style={primaryStyle(wheelsOn === 'sommar')} onClick={() => setWheelsOn('sommar')}>Sommarhjul</button>
+          <button type="button" className={yesNoBase} style={primaryStyle(wheelsOn === 'vinter')} onClick={() => setWheelsOn('vinter')}>Vinterhjul</button>
         </div>
       </div>
 
-      {/* Nya skador? */}
+      {/* Nya skador */}
       <div>
         <div className="text-sm font-medium">Nya skador på bilen? *</div>
         <div className="mt-2 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            className={yesNoBase}
-            style={yesNoStyle(hasNewDamage)}
-            onClick={() => {
-              setHasNewDamage(true);
-              if (damages.length === 0) addDamage();
-            }}
-          >
-            Ja
-          </button>
-          <button
-            type="button"
-            className={yesNoBase}
-            style={yesNoStyle(hasNewDamage === false ? true : null)}
-            onClick={() => {
-              setHasNewDamage(false);
-              setDamages([]);
-            }}
-          >
-            Nej
-          </button>
+          <button type="button" className={yesNoBase} style={yesStyle(hasNewDamage === true)} onClick={() => { setHasNewDamage(true); if (!damages.length) addDamage(); }}>Ja</button>
+          <button type="button" className={yesNoBase} style={noStyle(hasNewDamage === false)} onClick={() => { setHasNewDamage(false); setDamages([]); }}>Nej</button>
         </div>
       </div>
 
-      {/* Skadefärg-block */}
+      {/* Skadeområde med avvikande bakgrund */}
       {hasNewDamage === true && (
-        <div className="rounded-xl border px-4 py-4" style={{ backgroundColor: '#FFF7ED', borderColor: '#FDBA74' }}>
+        <div className="rounded-xl border px-4 py-4"
+             style={{ backgroundColor: '#FFF7ED', borderColor: '#FDBA74' }}>
           {damages.map((dmg, i) => (
             <div key={i} className="mb-6 last:mb-0">
               <div className="flex items-center justify-between">
                 <div className="font-medium">Skada {i + 1}</div>
-                <button
-                  type="button"
-                  className="text-sm underline"
-                  onClick={() => removeDamage(i)}
-                >
-                  Ta bort
-                </button>
+                <button type="button" className="text-sm underline" onClick={() => removeDamage(i)}>Ta bort</button>
               </div>
 
               {/* Text först */}
@@ -594,7 +439,7 @@ export default function CheckinFormClient() {
                 />
               </div>
 
-              {/* Bilder */}
+              {/* Bilduppladdning (öppnar filväljare, inte kamera direkt) */}
               <div className="mt-3">
                 <input
                   ref={(el) => (fileInputsRef.current[i] = el)}
@@ -604,23 +449,16 @@ export default function CheckinFormClient() {
                   className="hidden"
                   onChange={(e) => handleDamageFiles(i, e)}
                 />
-                <button
-                  type="button"
-                  className="w-full rounded-lg border px-4 py-2 bg-white"
-                  onClick={() => fileInputsRef.current[i]?.click()}
-                >
+                <button type="button" className="w-full rounded-lg border px-4 py-2 bg-white"
+                        onClick={() => fileInputsRef.current[i]?.click()}>
                   {dmg.files.length ? 'Lägg till fler foton' : 'Lägg till foto'}
                 </button>
 
                 {dmg.previews?.length > 0 && (
                   <div className="mt-3 grid grid-cols-4 gap-2">
                     {dmg.previews.map((src, k) => (
-                      <img
-                        key={k}
-                        src={src}
-                        alt={`Skadefoto ${k + 1}`}
-                        className="h-20 w-full object-cover rounded-md border"
-                      />
+                      <img key={k} src={src} alt={`Skadefoto ${k + 1}`}
+                           className="h-20 w-full object-cover rounded-md border" />
                     ))}
                   </div>
                 )}
@@ -628,17 +466,13 @@ export default function CheckinFormClient() {
             </div>
           ))}
 
-          <button
-            type="button"
-            className="mt-1 w-full rounded-lg border px-4 py-2 bg-white"
-            onClick={addDamage}
-          >
+          <button type="button" className="mt-1 w-full rounded-lg border px-4 py-2 bg-white" onClick={addDamage}>
             {damages.length ? 'Lägg till ytterligare skada' : 'Lägg till skada'}
           </button>
         </div>
       )}
 
-      {/* övrigt */}
+      {/* Övrigt */}
       <div>
         <label className="block text-sm font-medium">Övriga anteckningar</label>
         <textarea
@@ -650,17 +484,15 @@ export default function CheckinFormClient() {
         />
       </div>
 
-      {/* status */}
-      {status === 'error' && <div className="text-red-500 text-sm">{message}</div>}
+      {/* Status */}
+      {status === 'error' && <div className="text-red-500 text-sm">{message || 'Dubbelkolla reg.nr och fälten ovan.'}</div>}
       {status === 'done' && <div className="text-green-600 text-sm">{message}</div>}
 
-      {/* spara */}
-      <button
-        type="submit"
-        className="w-full rounded-xl px-6 py-3 text-white font-medium"
-        style={{ backgroundColor: '#1D4ED8' }}
-        disabled={status === 'saving'}
-      >
+      {/* Spara */}
+      <button type="submit"
+              className="w-full rounded-xl px-6 py-3 text-white font-medium"
+              style={{ ...BASE_RESET, backgroundColor: '#1D4ED8' }}
+              disabled={status === 'saving'}>
         {status === 'saving' ? 'Sparar…' : 'Spara incheckning'}
       </button>
 
