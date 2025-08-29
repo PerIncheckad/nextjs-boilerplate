@@ -1,11 +1,17 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, ChangeEvent, FormEvent } from 'react';
+import React, { useMemo, useState, ChangeEvent, FormEvent } from 'react';
+import { createClient } from '@supabase/supabase-js';
 
 /* ===================== Typer ===================== */
 type RegNr = string;
 type DamageEntry = { id: string; plats: string; typ: string; beskrivning?: string };
 type CanonicalCar = { regnr: RegNr; model: string; wheelStorage: string; skador: DamageEntry[] };
+
+/* =============== Supabase client (public) =============== */
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
+const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+const supabase = createClient(supabaseUrl, supabaseAnon);
 
 /* =============== Normalisering av reg.nr =============== */
 function normalizeReg(input: string): string {
@@ -17,33 +23,32 @@ function normalizeReg(input: string): string {
     .trim();
 }
 
-/* =========== Mappa råpost → CanonicalCar (utan påhitt) =========== */
-function toCanonicalCar(raw: any): CanonicalCar | null {
+/* =========== Mappa rådata → CanonicalCar (utan påhitt) =========== */
+function toCanonicalCar(raw: any, damagesRaw: any[] | null): CanonicalCar | null {
   if (!raw) return null;
 
-  // regnr
+  // reg
   const reg =
-    raw.regnr ?? raw.reg ?? raw.registration ?? raw.registrationNumber ??
-    raw.licensePlate ?? raw.plate ?? raw.regNo ?? raw.reg_no;
+    raw.regnr ?? raw.reg ?? raw.registration ?? raw.registrationnumber ??
+    raw.licenseplate ?? raw.plate ?? raw.regno ?? raw.reg_no ?? raw.RegNr;
   if (!reg || typeof reg !== 'string') return null;
 
-  // modell
+  // model
   const modelRaw =
-    raw.model ?? raw.modell ?? raw.bilmodell ?? raw.vehicleModel ?? raw.vehicle_model ?? '';
+    raw.model ?? raw.modell ?? raw.bilmodell ?? raw.vehicleModel ?? raw.vehicle_model ?? raw.Model;
   const model = (modelRaw && String(modelRaw).trim()) || '--';
 
-  // hjulförvaring
+  // wheels / hjulförvaring
   const wheelRaw =
     raw.wheelStorage ?? raw.tyreStorage ?? raw.tireStorage ??
     raw['hjulförvaring'] ?? raw.hjulforvaring ?? raw.hjulforvaring_plats ??
-    raw['däckhotell'] ?? raw.dackhotell ?? raw.wheels_location ?? '';
+    raw['däckhotell'] ?? raw.dackhotell ?? raw.wheels_location ?? raw.hjulplats;
   const wheelStorage = (wheelRaw && String(wheelRaw).trim()) || '--';
 
-  // skador
-  const damagesArr: any[] =
-    raw.skador ?? raw.damages ?? raw.damageList ?? raw.existingDamages ?? [];
-  const skador: DamageEntry[] = Array.isArray(damagesArr)
-    ? damagesArr.map((d: any, i: number) => ({
+  // damages
+  const list = Array.isArray(damagesRaw) ? damagesRaw : (raw.skador ?? raw.damages ?? []);
+  const skador: DamageEntry[] = Array.isArray(list)
+    ? list.map((d: any, i: number) => ({
         id: String(d?.id ?? `d${i + 1}`),
         plats: String(d?.plats ?? d?.place ?? d?.position ?? '--'),
         typ: String(d?.typ ?? d?.type ?? '--'),
@@ -54,68 +59,139 @@ function toCanonicalCar(raw: any): CanonicalCar | null {
   return { regnr: String(reg), model, wheelStorage, skador };
 }
 
-/* ================ Komponent ================= */
-export default function FormClient() {
-  // 1) Läs in cars.json från /public (filer, ej API)
-  const [rawCars, setRawCars] = useState<any[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+/* =========== Supabase – uppslag av bil & skador =========== */
+/** Vi provar i denna ordning (så som 99%-lösningen brukade göra):
+ *  1) cars_view (om du har en vy med normaliserad kolumn "regnr_norm")
+ *  2) cars där regnr_norm = normalizeReg(input)
+ *  3) cars där regnr = input (exakt) eller ilike på input utan mellanslag/bindestreck
+ *  Skador hämtas från:
+ *   - damages där car_id = bil.id (om id finns)
+ *   - annars damages där regnr matchar (normaliserat eller exakt)
+ */
+async function fetchCarAndDamages(regInput: string): Promise<CanonicalCar | null> {
+  const norm = normalizeReg(regInput);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/data/cars.json', { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!cancelled) setRawCars(Array.isArray(data) ? data : []);
-      } catch (e: any) {
-        if (!cancelled) {
-          setRawCars([]); // inga påhitt – tom lista om fil saknas
-          setLoadError('Kunde inte läsa /data/cars.json');
-        }
+  // Helper: plocka första raden
+  const pick = (rows: any[] | null | undefined) => (Array.isArray(rows) && rows.length > 0 ? rows[0] : null);
+
+  // 1) cars_view (om den finns)
+  try {
+    const { data, error } = await supabase
+      .from('cars_view')
+      .select('*')
+      .eq('regnr_norm', norm)
+      .limit(1);
+    if (!error && data && data.length) {
+      const carRow = pick(data);
+      // damages via car_id
+      let damages: any[] | null = null;
+      if (carRow?.id) {
+        const { data: dlist } = await supabase.from('damages').select('*').eq('car_id', carRow.id).order('id', { ascending: true });
+        damages = dlist ?? null;
+      } else {
+        const { data: dlist } = await supabase
+          .from('damages')
+          .select('*')
+          .or(`regnr.eq.${carRow?.regnr},regnr_norm.eq.${norm}`)
+          .order('id', { ascending: true });
+        damages = dlist ?? null;
       }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  // 2) Indexera (normaliserad nyckel)
-  const CAR_MAP = useMemo(() => {
-    const map: Record<string, CanonicalCar> = {};
-    for (const item of rawCars ?? []) {
-      const car = toCanonicalCar(item);
-      if (!car) continue;
-      map[normalizeReg(car.regnr)] = car;
+      return toCanonicalCar(carRow, damages);
     }
-    return map;
-  }, [rawCars]);
+  } catch { /* ignorera – går vidare */ }
 
-  // 3) Formstate
+  // 2) cars med regnr_norm
+  try {
+    const { data, error } = await supabase
+      .from('cars')
+      .select('*')
+      .eq('regnr_norm', norm)
+      .limit(1);
+    if (!error && data && data.length) {
+      const carRow = pick(data);
+      let damages: any[] | null = null;
+      if (carRow?.id) {
+        const { data: dlist } = await supabase.from('damages').select('*').eq('car_id', carRow.id).order('id', { ascending: true });
+        damages = dlist ?? null;
+      } else {
+        const { data: dlist } = await supabase
+          .from('damages')
+          .select('*')
+          .or(`regnr.eq.${carRow?.regnr},regnr_norm.eq.${norm}`)
+          .order('id', { ascending: true });
+        damages = dlist ?? null;
+      }
+      return toCanonicalCar(carRow, damages);
+    }
+  } catch {}
+
+  // 3) cars med regnr-exakt eller "ilike" utan mellanrum/bindestreck
+  try {
+    const { data, error } = await supabase
+      .from('cars')
+      .select('*')
+      .or(
+        [
+          `regnr.eq.${regInput}`,
+          `registration.eq.${regInput}`,
+          `licensePlate.eq.${regInput}`,
+          `regnr.ilike.%${regInput}%`,
+          `registration.ilike.%${regInput}%`,
+          `licensePlate.ilike.%${regInput}%`,
+        ].join(',')
+      )
+      .limit(10);
+    if (!error && data && data.length) {
+      // välj den rad vars normaliserade regnr matchar bäst
+      const best = data.find((r: any) => normalizeReg(r?.regnr ?? r?.registration ?? r?.licensePlate ?? '') === norm) ?? data[0];
+      let damages: any[] | null = null;
+      if (best?.id) {
+        const { data: dlist } = await supabase.from('damages').select('*').eq('car_id', best.id).order('id', { ascending: true });
+        damages = dlist ?? null;
+      } else {
+        const { data: dlist } = await supabase
+          .from('damages')
+          .select('*')
+          .or(`regnr.eq.${best?.regnr},regnr_norm.eq.${norm}`)
+          .order('id', { ascending: true });
+        damages = dlist ?? null;
+      }
+      return toCanonicalCar(best, damages);
+    }
+  } catch {}
+
+  // Ingen träff
+  return null;
+}
+
+/* ===================== Komponent ===================== */
+export default function FormClient() {
   const [regInput, setRegInput] = useState('');
   const [car, setCar] = useState<CanonicalCar | null>(null);
   const [tried, setTried] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const find = (reg: string) => CAR_MAP[normalizeReg(reg)] ?? null;
+  async function lookupNow() {
+    const value = regInput.trim();
+    if (!value) return;
+    setLoading(true);
+    const found = await fetchCarAndDamages(value);
+    setCar(found);
+    setTried(true);
+    setLoading(false);
+  }
 
-  // 4) Händelser
   function onChangeReg(e: ChangeEvent<HTMLInputElement>) {
     setRegInput(e.target.value);
     setTried(false);
     setCar(null);
   }
 
-  function lookupNow() {
-    if (!regInput.trim()) return;
-    const found = find(regInput);
-    setCar(found ?? null);
-    setTried(true);
-  }
-
   function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    lookupNow(); // Enter i fältet
+    e.preventDefault(); // Enter i fältet
+    lookupNow();
   }
 
-  // 5) Visningsregler
   const showError = tried && !car && regInput.trim().length > 0;
 
   return (
@@ -127,7 +203,7 @@ export default function FormClient() {
 
           {/* Huvudkort */}
           <div className="card stack-lg">
-            {/* Reg.nr (Enter/blur triggar lookup) */}
+            {/* Reg.nr */}
             <div className="stack-sm">
               <label htmlFor="regnr" className="label">Registreringsnummer *</label>
               <form onSubmit={onSubmit}>
@@ -143,8 +219,8 @@ export default function FormClient() {
                   className="input"
                 />
               </form>
+              {loading && <p className="muted">Hämtar…</p>}
               {showError && <p className="error" role="alert">Okänt reg.nr</p>}
-              {loadError && <p className="muted" aria-live="polite">{loadError}</p>}
             </div>
 
             {/* Bilinfo + skador – bara när vi har träff */}
@@ -180,10 +256,9 @@ export default function FormClient() {
                 </div>
               </>
             )}
-            {/* Om ingen träff: vi visar ingenting av bilinfo/skador. */}
           </div>
 
-          {/* Övriga fält (oförändrade) */}
+          {/* Övriga fält (lämnade orörda) */}
           <div className="mt grid-2">
             <div>
               <label className="label">Ort *</label>
