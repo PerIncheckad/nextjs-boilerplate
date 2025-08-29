@@ -83,7 +83,7 @@ export default function FormClient() {
 
   function onChangeReg(e: ChangeEvent<HTMLInputElement>) {
     setRegInput(e.target.value);
-    setTried(false);   // <-- FIX: korrekt stavning utan mellanslag
+    setTried(false);
     setCar(null);
   }
 
@@ -108,7 +108,7 @@ export default function FormClient() {
           <h1 className="h1">Ny incheckning</h1>
           <p className="p">Inloggad: <strong>Bob</strong></p>
 
-          {/* Huvudkort: Reg.nr → Bilinfo → Skador → Knapp */}
+          {/* Huvudkort: Reg.nr → (Bilinfo) → (Skador) → Knapp */}
           <div className="card stack-lg">
             {/* Reg.nr */}
             <div className="stack-sm">
@@ -129,7 +129,7 @@ export default function FormClient() {
               {showError && <p className="error" role="alert">Okänt reg.nr</p>}
             </div>
 
-            {/* Bilinfo (direkt under reg.nr) */}
+            {/* Bilinfo – visas först när bil finns */}
             {car && (
               <div className="info">
                 <div>
@@ -143,28 +143,25 @@ export default function FormClient() {
               </div>
             )}
 
-            {/* Skador */}
-            <div className="stack-sm">
-              <div className="label">Befintliga skador:</div>
-              <div className={`panel ${car ? '' : 'panel-disabled'}`}>
-                {car ? (
-                  car.skador.length === 0 ? (
+            {/* Befintliga skador – visas ENDAST när bil finns */}
+            {car && (
+              <div className="stack-sm">
+                <div className="label">Befintliga skador:</div>
+                <div className="panel">
+                  {car.skador.length === 0 ? (
                     <p>Inga skador registrerade.</p>
                   ) : (
                     <ul className="ul">
                       {car.skador.map(s => (
-                        <li key={s.id}><strong>{s.plats}</strong> – {s.typ}{s.beskrivning ? ` (${s.beskrivning})` : ''}</li>
+                        <li key={s.id}>
+                          <strong>{s.plats}</strong> – {s.typ}{s.beskrivning ? ` (${s.beskrivning})` : ''}
+                        </li>
                       ))}
                     </ul>
-                  )
-                ) : (
-                  <ul className="ul dim">
-                    <li>Repa</li>
-                    <li>Lackskada</li>
-                  </ul>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Knapp */}
             <div>
@@ -218,9 +215,7 @@ export default function FormClient() {
         .incheckad-scope .value { font-weight:600; color:#111 !important; }
 
         .incheckad-scope .panel { background:#F9FAFB !important; border:1px solid #E5E7EB !important; border-radius:12px !important; padding:12px !important; }
-        .incheckad-scope .panel-disabled { border-style:dashed !important; opacity:.7 !important; }
         .incheckad-scope .ul { margin:0; padding-left:22px; }
-        .incheckad-scope .dim { opacity:.6 !important; }
 
         .incheckad-scope .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px !important; border-radius:12px !important; background:#111 !important; color:#fff !important; border:1px solid #111 !important; font-weight:700 !important; }
         .incheckad-scope .btn:hover { filter:brightness(0.95); }
