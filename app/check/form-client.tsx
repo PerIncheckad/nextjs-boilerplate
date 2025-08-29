@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, ChangeEvent, FormEvent } from 'react';
+import React, { useState, ChangeEvent, FormEvent } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 /* ===================== Typer ===================== */
@@ -8,10 +8,20 @@ type RegNr = string;
 type DamageEntry = { id: string; plats: string; typ: string; beskrivning?: string };
 type CanonicalCar = { regnr: RegNr; model: string; wheelStorage: string; skador: DamageEntry[] };
 
+type DebugLog = {
+  envOk: boolean;
+  supabaseUrl?: string;
+  step: Array<{ name: string; error?: string; rows?: number; picked?: any | null }>;
+  normalizedInput: string;
+  rawInput: string;
+};
+
 /* =============== Supabase client (public) =============== */
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-const supabase = createClient(supabaseUrl, supabaseAnon);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
+const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
+const supabase = (supabaseUrl && supabaseAnon)
+  ? createClient(supabaseUrl, supabaseAnon)
+  : null;
 
 /* =============== Normalisering av reg.nr =============== */
 function normalizeReg(input: string): string {
@@ -26,26 +36,21 @@ function normalizeReg(input: string): string {
 /* =========== Mappa rådata → CanonicalCar (utan påhitt) =========== */
 function toCanonicalCar(raw: any, damagesRaw: any[] | null): CanonicalCar | null {
   if (!raw) return null;
-
-  // reg
   const reg =
     raw.regnr ?? raw.reg ?? raw.registration ?? raw.registrationnumber ??
     raw.licenseplate ?? raw.plate ?? raw.regno ?? raw.reg_no ?? raw.RegNr;
   if (!reg || typeof reg !== 'string') return null;
 
-  // model
   const modelRaw =
     raw.model ?? raw.modell ?? raw.bilmodell ?? raw.vehicleModel ?? raw.vehicle_model ?? raw.Model;
   const model = (modelRaw && String(modelRaw).trim()) || '--';
 
-  // wheels / hjulförvaring
   const wheelRaw =
     raw.wheelStorage ?? raw.tyreStorage ?? raw.tireStorage ??
     raw['hjulförvaring'] ?? raw.hjulforvaring ?? raw.hjulforvaring_plats ??
     raw['däckhotell'] ?? raw.dackhotell ?? raw.wheels_location ?? raw.hjulplats;
   const wheelStorage = (wheelRaw && String(wheelRaw).trim()) || '--';
 
-  // damages
   const list = Array.isArray(damagesRaw) ? damagesRaw : (raw.skador ?? raw.damages ?? []);
   const skador: DamageEntry[] = Array.isArray(list)
     ? list.map((d: any, i: number) => ({
@@ -59,109 +64,125 @@ function toCanonicalCar(raw: any, damagesRaw: any[] | null): CanonicalCar | null
   return { regnr: String(reg), model, wheelStorage, skador };
 }
 
-/* =========== Supabase – uppslag av bil & skador =========== */
-/** Vi provar i denna ordning (så som 99%-lösningen brukade göra):
- *  1) cars_view (om du har en vy med normaliserad kolumn "regnr_norm")
- *  2) cars där regnr_norm = normalizeReg(input)
- *  3) cars där regnr = input (exakt) eller ilike på input utan mellanslag/bindestreck
- *  Skador hämtas från:
- *   - damages där car_id = bil.id (om id finns)
- *   - annars damages där regnr matchar (normaliserat eller exakt)
- */
-async function fetchCarAndDamages(regInput: string): Promise<CanonicalCar | null> {
+/* ======= Hjälp: välj bästa raden utifrån normaliserat reg ======= */
+function tryPickBest(rows: any[] | null | undefined, norm: string): any | null {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const getReg = (r: any) =>
+    r?.regnr ?? r?.registration ?? r?.licensePlate ?? r?.reg ?? r?.reg_no ?? r?.RegNr ?? '';
+  const exact = rows.find((r) => normalizeReg(getReg(r)) === norm);
+  return exact ?? rows[0];
+}
+
+/* =========== Supabase – uppslag av bil & skador (med logg) =========== */
+async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar | null; log: DebugLog }> {
   const norm = normalizeReg(regInput);
+  const log: DebugLog = {
+    envOk: Boolean(supabase),
+    supabaseUrl: supabaseUrl,
+    step: [],
+    normalizedInput: norm,
+    rawInput: regInput,
+  };
 
-  // Helper: plocka första raden
-  const pick = (rows: any[] | null | undefined) => (Array.isArray(rows) && rows.length > 0 ? rows[0] : null);
+  if (!supabase) {
+    log.step.push({ name: 'init', error: 'Saknar NEXT_PUBLIC_SUPABASE_URL eller NEXT_PUBLIC_SUPABASE_ANON_KEY' });
+    return { car: null, log };
+  }
 
-  // 1) cars_view (om den finns)
-  try {
+  // En helper för bred sökning mot en tabell/vy
+  async function queryTable(table: string) {
+    // Vi testar flera kolumner med ILIKE. Begränsa antalet för performance.
     const { data, error } = await supabase
-      .from('cars_view')
-      .select('*')
-      .eq('regnr_norm', norm)
-      .limit(1);
-    if (!error && data && data.length) {
-      const carRow = pick(data);
-      // damages via car_id
-      let damages: any[] | null = null;
-      if (carRow?.id) {
-        const { data: dlist } = await supabase.from('damages').select('*').eq('car_id', carRow.id).order('id', { ascending: true });
-        damages = dlist ?? null;
-      } else {
-        const { data: dlist } = await supabase
-          .from('damages')
-          .select('*')
-          .or(`regnr.eq.${carRow?.regnr},regnr_norm.eq.${norm}`)
-          .order('id', { ascending: true });
-        damages = dlist ?? null;
-      }
-      return toCanonicalCar(carRow, damages);
-    }
-  } catch { /* ignorera – går vidare */ }
-
-  // 2) cars med regnr_norm
-  try {
-    const { data, error } = await supabase
-      .from('cars')
-      .select('*')
-      .eq('regnr_norm', norm)
-      .limit(1);
-    if (!error && data && data.length) {
-      const carRow = pick(data);
-      let damages: any[] | null = null;
-      if (carRow?.id) {
-        const { data: dlist } = await supabase.from('damages').select('*').eq('car_id', carRow.id).order('id', { ascending: true });
-        damages = dlist ?? null;
-      } else {
-        const { data: dlist } = await supabase
-          .from('damages')
-          .select('*')
-          .or(`regnr.eq.${carRow?.regnr},regnr_norm.eq.${norm}`)
-          .order('id', { ascending: true });
-        damages = dlist ?? null;
-      }
-      return toCanonicalCar(carRow, damages);
-    }
-  } catch {}
-
-  // 3) cars med regnr-exakt eller "ilike" utan mellanrum/bindestreck
-  try {
-    const { data, error } = await supabase
-      .from('cars')
+      .from(table)
       .select('*')
       .or(
         [
-          `regnr.eq.${regInput}`,
-          `registration.eq.${regInput}`,
-          `licensePlate.eq.${regInput}`,
           `regnr.ilike.%${regInput}%`,
           `registration.ilike.%${regInput}%`,
           `licensePlate.ilike.%${regInput}%`,
+          `regnr.eq.${regInput}`,
+          `registration.eq.${regInput}`,
+          `licensePlate.eq.${regInput}`,
+          `regnr_norm.eq.${norm}`, // om kolumnen finns
         ].join(',')
       )
-      .limit(10);
-    if (!error && data && data.length) {
-      // välj den rad vars normaliserade regnr matchar bäst
-      const best = data.find((r: any) => normalizeReg(r?.regnr ?? r?.registration ?? r?.licensePlate ?? '') === norm) ?? data[0];
-      let damages: any[] | null = null;
-      if (best?.id) {
-        const { data: dlist } = await supabase.from('damages').select('*').eq('car_id', best.id).order('id', { ascending: true });
-        damages = dlist ?? null;
-      } else {
-        const { data: dlist } = await supabase
-          .from('damages')
-          .select('*')
-          .or(`regnr.eq.${best?.regnr},regnr_norm.eq.${norm}`)
-          .order('id', { ascending: true });
-        damages = dlist ?? null;
-      }
-      return toCanonicalCar(best, damages);
-    }
-  } catch {}
+      .limit(25);
+    return { data, error };
+  }
 
-  // Ingen träff
-  return null;
+  // 1) cars_view
+  try {
+    const { data, error } = await queryTable('cars_view');
+    if (error) {
+      log.step.push({ name: 'cars_view', error: error.message });
+    } else {
+      log.step.push({ name: 'cars_view', rows: data?.length ?? 0 });
+      const picked = tryPickBest(data ?? [], norm);
+      if (picked) {
+        // hämta skador
+        let damages: any[] | null = null;
+        if (picked?.id) {
+          const { data: dlist, error: derr } = await supabase
+            .from('damages')
+            .select('*')
+            .eq('car_id', picked.id)
+            .order('id', { ascending: true });
+          if (!derr) damages = dlist ?? null;
+          else log.step.push({ name: 'damages(car_id)', error: derr.message });
+        } else {
+          const { data: dlist, error: derr } = await supabase
+            .from('damages')
+            .select('*')
+            .or(`regnr_norm.eq.${norm},regnr.eq.${picked?.regnr}`)
+            .order('id', { ascending: true });
+          if (!derr) damages = dlist ?? null;
+          else log.step.push({ name: 'damages(regnr)', error: derr.message });
+        }
+        log.step.push({ name: 'pick(cars_view)', picked });
+        return { car: toCanonicalCar(picked, damages), log };
+      }
+    }
+  } catch (e: any) {
+    log.step.push({ name: 'cars_view', error: String(e?.message ?? e) });
+  }
+
+  // 2) cars
+  try {
+    const { data, error } = await queryTable('cars');
+    if (error) {
+      log.step.push({ name: 'cars', error: error.message });
+    } else {
+      log.step.push({ name: 'cars', rows: data?.length ?? 0 });
+      const picked = tryPickBest(data ?? [], norm);
+      if (picked) {
+        let damages: any[] | null = null;
+        if (picked?.id) {
+          const { data: dlist, error: derr } = await supabase
+            .from('damages')
+            .select('*')
+            .eq('car_id', picked.id)
+            .order('id', { ascending: true });
+          if (!derr) damages = dlist ?? null;
+          else log.step.push({ name: 'damages(car_id)', error: derr.message });
+        } else {
+          const { data: dlist, error: derr } = await supabase
+            .from('damages')
+            .select('*')
+            .or(`regnr_norm.eq.${norm},regnr.eq.${picked?.regnr}`)
+            .order('id', { ascending: true });
+          if (!derr) damages = dlist ?? null;
+          else log.step.push({ name: 'damages(regnr)', error: derr.message });
+        }
+        log.step.push({ name: 'pick(cars)', picked });
+        return { car: toCanonicalCar(picked, damages), log };
+      }
+    }
+  } catch (e: any) {
+    log.step.push({ name: 'cars', error: String(e?.message ?? e) });
+  }
+
+  // 3) ingen träff
+  return { car: null, log };
 }
 
 /* ===================== Komponent ===================== */
@@ -170,12 +191,14 @@ export default function FormClient() {
   const [car, setCar] = useState<CanonicalCar | null>(null);
   const [tried, setTried] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [debug, setDebug] = useState<DebugLog | null>(null);
 
   async function lookupNow() {
     const value = regInput.trim();
     if (!value) return;
     setLoading(true);
-    const found = await fetchCarAndDamages(value);
+    const { car: found, log } = await fetchCarAndDamages(value);
+    setDebug(log);
     setCar(found);
     setTried(true);
     setLoading(false);
@@ -221,6 +244,11 @@ export default function FormClient() {
               </form>
               {loading && <p className="muted">Hämtar…</p>}
               {showError && <p className="error" role="alert">Okänt reg.nr</p>}
+              {!supabase && (
+                <p className="error" role="alert">
+                  Supabase ej konfigurerat (saknar NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY).
+                </p>
+              )}
             </div>
 
             {/* Bilinfo + skador – bara när vi har träff */}
@@ -258,7 +286,7 @@ export default function FormClient() {
             )}
           </div>
 
-          {/* Övriga fält (lämnade orörda) */}
+          {/* Övriga fält (oförändrade) */}
           <div className="mt grid-2">
             <div>
               <label className="label">Ort *</label>
@@ -275,16 +303,27 @@ export default function FormClient() {
               </select>
             </div>
           </div>
+
+          {/* Diagnostik – hjälp oss se varför en träff uteblir */}
+          {debug && (
+            <div className="card mt">
+              <h2 className="h2">Diagnostik</h2>
+              <pre className="pre">
+{JSON.stringify(debug, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ---------- Skopad ljus stil (som tidigare) ---------- */}
+      {/* ---------- Skopad ljus stil ---------- */}
       <style jsx global>{`
         .incheckad-scope { all: initial; display:block; }
         .incheckad-scope, .incheckad-scope * { box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important; }
         .incheckad-scope .page { min-height: 100dvh; background:#ffffff !important; color:#111111 !important; }
         .incheckad-scope .container { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
         .incheckad-scope .h1 { font-size: 28px; line-height:1.2; margin:0 0 4px; font-weight:700; color:#111 !important; }
+        .incheckad-scope .h2 { font-size: 18px; margin:0 0 8px; font-weight:700; color:#111 !important; }
         .incheckad-scope .p { margin:0 0 16px; color:#111 !important; }
 
         .incheckad-scope .card { background:#fff !important; border:1px solid #E5E7EB !important; border-radius:16px !important; padding:16px !important; box-shadow:0 1px 2px rgba(0,0,0,.04) !important; }
@@ -309,6 +348,8 @@ export default function FormClient() {
 
         .incheckad-scope .error { margin-top:6px; font-size:14px; color:#C00000 !important; }
         .incheckad-scope .mt { margin-top:24px !important; }
+
+        .incheckad-scope .pre { white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; background:#F9FAFB; border:1px solid #E5E7EB; padding:12px; border-radius:12px; }
       `}</style>
     </section>
   );
