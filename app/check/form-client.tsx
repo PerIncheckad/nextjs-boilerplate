@@ -48,8 +48,7 @@ function toCanonicalCar(raw: any): CanonicalCar | null {
   return { regnr: String(reg), model: String(model ?? ''), wheelStorage: String(wheelStorage ?? ''), skador };
 }
 
-/* ---------------- Exempelpost ------------------ */
-/* Behåll tills vi kopplar riktig källa. */
+/* ---------------- Exempelpost (till test) ---------------- */
 const RAW_CARS_FALLBACK: any[] = [
   {
     regnr: 'DGF14H',
@@ -90,6 +89,13 @@ export default function FormClient() {
     setCar(null);
   }
 
+  function onBlurReg() {
+    if (!regInput.trim()) return;
+    const found = find(regInput);
+    setCar(found ?? null);
+    setTried(true);
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const found = find(regInput);
@@ -114,8 +120,11 @@ export default function FormClient() {
           <h1 className="h1">Ny incheckning</h1>
           <p className="p">Inloggad: <strong>Bob</strong></p>
 
+          {/* Kort: Reg.nr + Bilinfo + Skador */}
           <div className="card">
             <form onSubmit={onSubmit} className="stack">
+
+              {/* Rad: reg.nr + snabbval */}
               <div className="grid">
                 <div>
                   <label htmlFor="regnr" className="label">Registreringsnummer *</label>
@@ -124,6 +133,7 @@ export default function FormClient() {
                     type="text"
                     value={regInput}
                     onChange={onChangeReg}
+                    onBlur={onBlurReg}
                     placeholder="Skriv reg.nr (t.ex. DGF14H)"
                     autoComplete="off"
                     inputMode="text"
@@ -143,6 +153,21 @@ export default function FormClient() {
                 </div>
               </div>
 
+              {/* Bilinfo – visas direkt under reg.nr när bilen finns */}
+              {car && (
+                <div className="info-grid">
+                  <div>
+                    <div className="muted">Bilmodell</div>
+                    <div className="value">{car.model || '—'}</div>
+                  </div>
+                  <div>
+                    <div className="muted">Hjulförvaring</div>
+                    <div className="value">{car.wheelStorage || '—'}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Befintliga skador */}
               <fieldset disabled={!car}>
                 <legend className="label">Befintliga skador:</legend>
                 <div className={`panel ${car ? '' : 'panel-disabled'}`}>
@@ -169,17 +194,7 @@ export default function FormClient() {
             </form>
           </div>
 
-          {car && (
-            <section className="card mt">
-              <h2 className="h2">Fordonsinformation</h2>
-              <dl className="dl">
-                <div><dt className="muted">Reg.nr</dt><dd className="value">{car.regnr}</dd></div>
-                <div><dt className="muted">Bilmodell</dt><dd className="value">{car.model || '—'}</dd></div>
-                <div><dt className="muted">Hjulförvaring</dt><dd className="value">{car.wheelStorage || '—'}</dd></div>
-              </dl>
-            </section>
-          )}
-
+          {/* Övriga fält – som tidigare */}
           <div className="mt grid-2">
             <div>
               <label className="label">Ort *</label>
@@ -199,21 +214,20 @@ export default function FormClient() {
         </div>
       </div>
 
-      {/* ----------------- HÅRT SKOPAD LJUS STIL -----------------
-         Allt här inne kör ljus bakgrund, mörk text – oberoende av dark mode.
-         !important används medvetet för att slå ut globala overrides. */}
+      {/* ---------- Skopad ljus stil (som funkar hos dig) ---------- */}
       <style jsx global>{`
         .incheckad-scope { all: initial; display:block; }
         .incheckad-scope, .incheckad-scope * { box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important; }
         .incheckad-scope .page { min-height: 100dvh; background:#ffffff !important; color:#111111 !important; }
         .incheckad-scope .container { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
         .incheckad-scope .h1 { font-size: 28px; line-height:1.2; margin:0 0 4px; font-weight:700; color:#111 !important; }
-        .incheckad-scope .h2 { font-size: 20px; margin:0 0 12px; font-weight:700; color:#111 !important; }
         .incheckad-scope .p { margin:0 0 16px; color:#111 !important; }
         .incheckad-scope .card { background:#ffffff !important; border:1px solid #E5E7EB !important; border-radius:16px !important; padding:16px !important; box-shadow:0 1px 2px rgba(0,0,0,.04) !important; }
         .incheckad-scope .stack > * + * { margin-top:12px; }
         .incheckad-scope .grid { display:grid; grid-template-columns: 1fr minmax(200px,260px); gap:12px; align-items:end; }
         @media (max-width:640px){ .incheckad-scope .grid { grid-template-columns:1fr; } }
+        .incheckad-scope .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        @media (max-width:640px){ .incheckad-scope .info-grid { grid-template-columns:1fr; } }
         .incheckad-scope .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
         @media (max-width:640px){ .incheckad-scope .grid-2 { grid-template-columns:1fr; } }
         .incheckad-scope .mt { margin-top:24px !important; }
@@ -230,7 +244,6 @@ export default function FormClient() {
         .incheckad-scope .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px !important; border-radius:12px !important; background:#ffffff !important; color:#111 !important; border:1px solid #D1D5DB !important; font-weight:700 !important; }
         .incheckad-scope .btn:hover { background:#F9FAFB !important; }
         .incheckad-scope .error { margin-top:6px; font-size:14px; color:#C00000 !important; }
-        .incheckad-scope .dl { display:grid; grid-template-columns:1fr; gap:10px; }
         .incheckad-scope .muted { font-size:14px; color:#6B7280 !important; }
         .incheckad-scope .value { font-weight:600 !important; color:#111 !important; }
       `}</style>
