@@ -83,7 +83,7 @@ export default function FormClient() {
 
   function onChangeReg(e: ChangeEvent<HTMLInputElement>) {
     setRegInput(e.target.value);
-    setTr ied(false);
+    setTried(false);   // <-- FIX: korrekt stavning utan mellanslag
     setCar(null);
   }
 
