@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useMemo, useState, ChangeEvent, FormEvent } from 'react';
+import React, { useMemo, useState, ChangeEvent, FormEvent, useEffect } from 'react';
 
 /* =========================================================
-   1) Typer
+   Typer
    ========================================================= */
 type RegNr = string;
 
@@ -15,50 +15,47 @@ type DamageEntry = {
 };
 
 type CanonicalCar = {
-  regnr: RegNr;          // original-format
-  model: string;         // normaliserat fältnamn (bilmodell)
-  wheelStorage: string;  // normaliserat fältnamn (hjulförvaring)
-  skador: DamageEntry[]; // befintliga skador
+  regnr: RegNr;          // originalt reg.nr (oförändrat)
+  model: string;         // bilmodell (normaliserat fältnamn)
+  wheelStorage: string;  // hjulförvaring (normaliserat fältnamn)
+  skador: DamageEntry[];
 };
 
 /* =========================================================
-   2) Normalisering – MÅSTE användas på både input och lista
+   Normalisering av reg.nr
    ========================================================= */
 function normalizeReg(input: string): string {
   return (input ?? '')
     .toUpperCase()
     .normalize('NFKC')
     .replace(/[\u200B-\u200D\uFEFF]/g, '') // zero-width
-    .replace(/[\s\-_.]/g, '')              // mellanslag, -, _, .
+    .replace(/[\s\-_.]/g, '')              // mellanslag, bindestreck, underscore, punkt
     .trim();
 }
 
 /* =========================================================
-   3) Mappning från "godtyckligt råformat" → CanonicalCar
-      (täcker vanliga varianter på fältnamn)
+   Mappa godtycklig källdata → CanonicalCar
+   (fångar vanliga varianter på fältnamn)
    ========================================================= */
 function toCanonicalCar(raw: any): CanonicalCar | null {
   if (!raw) return null;
 
-  // --- regnr ---
   const reg =
     raw.regnr ?? raw.reg ?? raw.registration ?? raw.registrationNumber ??
     raw.license ?? raw.licensePlate ?? raw.plate ?? raw.regNo ?? raw.reg_no;
   if (!reg || typeof reg !== 'string') return null;
 
-  // --- modell ---
   const model =
     raw.model ?? raw.modell ?? raw.bilmodell ?? raw.vehicleModel ?? raw.vehicle_model ?? '';
 
-  // --- hjulförvaring ---
   const wheelStorage =
     raw.wheelStorage ?? raw.tyreStorage ?? raw.tireStorage ??
     raw['hjulförvaring'] ?? raw.hjulforvaring ?? raw.hjulforvaring_plats ??
     raw['däckhotell'] ?? raw.dackhotell ?? raw.wheels_location ?? '';
 
-  // --- skador ---
   const damagesArr: any[] =
     raw.skador ?? raw.damages ?? raw.damageList ?? raw.existingDamages ?? [];
+
   const skador: DamageEntry[] = Array.isArray(damagesArr)
     ? damagesArr.map((d: any, i: number) => ({
         id: String(d?.id ?? `d${i + 1}`),
@@ -77,15 +74,10 @@ function toCanonicalCar(raw: any): CanonicalCar | null {
 }
 
 /* =========================================================
-   4) Din fordonslista
-   ---------------------------------------------------------
-   VIKTIGT:
-   - Om du redan har en lista i projektet: lägg in den här
-     (som array med dina poster), så mappar koden upp den.
-   - Exempel nedan innehåller DGF14H (från din skärmdump).
-   - Du kan fylla på, eller ersätta helt med din riktiga lista.
+   Exempeldata (du kan ersätta med din riktiga lista senare)
+   Jag lägger in DGF14H så att din skärmdump fungerar direkt.
    ========================================================= */
-const RAW_CARS: any[] = [
+const RAW_CARS_FALLBACK: any[] = [
   {
     regnr: 'DGF14H',
     modell: 'Volvo V60 B4',
@@ -95,11 +87,10 @@ const RAW_CARS: any[] = [
       { id: 'k2', plats: 'Motorhuv', typ: 'Lackskada', beskrivning: 'Litet stenskott' },
     ],
   },
-  // --- Lägg till fler bilar här (eller byt till din lista) ---
 ];
 
 /* =========================================================
-   5) Indexera listan på normaliserat reg.nr
+   Bygg index (normaliserad nyckel)
    ========================================================= */
 function buildIndex(rawList: any[]): Record<string, CanonicalCar> {
   const map: Record<string, CanonicalCar> = {};
@@ -112,21 +103,20 @@ function buildIndex(rawList: any[]): Record<string, CanonicalCar> {
 }
 
 /* =========================================================
-   6) Själva FORMULÄRET (klientkomponent)
-   - Inga färger sätts här. All styling ärver från din CSS.
+   FORM-KOMPONENT (återställd layout med neutrala Tailwind-klasser)
    ========================================================= */
 export default function FormClient() {
-  const CAR_MAP = useMemo(() => buildIndex(RAW_CARS), []);
+  // Här kan du koppla in ”äkta källor” senare. För nu använder vi fallback.
+  const CAR_MAP = useMemo(() => buildIndex(RAW_CARS_FALLBACK), []);
   const knownKeys = useMemo(() => Object.keys(CAR_MAP).sort(), [CAR_MAP]);
 
   const [regInput, setRegInput] = useState('');
   const [car, setCar] = useState<CanonicalCar | null>(null);
   const [tried, setTried] = useState(false);
 
+  // Hjälpfunktion
   function find(reg: string): CanonicalCar | null {
     return CAR_MAP[normalizeReg(reg)] ?? null;
-    // OBS: Om du vill byta till fetch/API senare är det bara
-    // att ersätta raden ovan med ett anrop som returnerar samma struktur.
   }
 
   function onChangeReg(e: ChangeEvent<HTMLInputElement>) {
@@ -153,110 +143,155 @@ export default function FormClient() {
   const showError = tried && !car && regInput.trim().length > 0;
 
   return (
-    <div>
-      <h1>Ny incheckning</h1>
-      <p>Inloggad: <strong>Bob</strong></p>
+    <div className="w-full max-w-3xl mx-auto px-4 py-6">
+      {/* Titel / Inloggad */}
+      <h1 className="text-2xl font-semibold tracking-tight mb-1">Ny incheckning</h1>
+      <p className="mb-4">Inloggad: <span className="font-medium">Bob</span></p>
 
-      {/* ===== Reg.nr och snabbval ===== */}
-      <form onSubmit={onSubmit}>
-        <div>
-          <label htmlFor="regnr">Registreringsnummer *</label>
-          <input
-            id="regnr"
-            type="text"
-            value={regInput}
-            onChange={onChangeReg}
-            placeholder="Skriv reg.nr (t.ex. DGF14H)"
-            autoComplete="off"
-            inputMode="text"
-          />
-          {showError && <p role="alert">Okänt reg.nr</p>}
-        </div>
+      {/* KORT: Reg.nr & Skador */}
+      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+        <form onSubmit={onSubmit} className="space-y-4">
+          {/* Rad: reg.nr + kända reg.nr */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_minmax(180px,240px)] items-end">
+            <div>
+              <label htmlFor="regnr" className="block text-sm font-medium text-gray-700">
+                Registreringsnummer *
+              </label>
+              <input
+                id="regnr"
+                type="text"
+                value={regInput}
+                onChange={onChangeReg}
+                placeholder="Skriv reg.nr (t.ex. DGF14H)"
+                autoComplete="off"
+                inputMode="text"
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-gray-400"
+              />
+              {showError && (
+                <p className="mt-1 text-sm text-red-600" role="alert">Okänt reg.nr</p>
+              )}
+            </div>
 
-        <div>
-          <label htmlFor="known">Kända reg.nr (test)</label>
-          <select id="known" onChange={onSelectKnown} defaultValue="">
-            <option value="">— Välj —</option>
-            {knownKeys.map((k) => (
-              <option key={k} value={CAR_MAP[k].regnr}>
-                {CAR_MAP[k].regnr}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <button type="submit">Hämta fordonsdata</button>
-        </div>
-
-        {/* ===== Befintliga skador (låst tills bil vald) ===== */}
-        <fieldset disabled={!car}>
-          <legend>Befintliga skador:</legend>
-          <div>
-            {car ? (
-              car.skador.length === 0 ? (
-                <p>Inga skador registrerade.</p>
-              ) : (
-                <ul>
-                  {car.skador.map((s) => (
-                    <li key={s.id}>
-                      <strong>{s.plats}</strong> – {s.typ}
-                      {s.beskrivning ? ` (${s.beskrivning})` : ''}
-                    </li>
-                  ))}
-                </ul>
-              )
-            ) : (
-              <ul>
-                <li>Repa</li>
-                <li>Lackskada</li>
-              </ul>
-            )}
+            <div>
+              <label htmlFor="known" className="block text-sm font-medium text-gray-700">
+                Kända reg.nr (test)
+              </label>
+              <select
+                id="known"
+                onChange={onSelectKnown}
+                defaultValue=""
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-gray-400"
+              >
+                <option value="">— Välj —</option>
+                {knownKeys.map((k) => (
+                  <option key={k} value={CAR_MAP[k].regnr}>
+                    {CAR_MAP[k].regnr}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
-        </fieldset>
-      </form>
 
-      {/* ===== Fordonsinformation – visas när bilen hittas ===== */}
+          {/* Befintliga skador */}
+          <fieldset disabled={!car} className="mt-2">
+            <legend className="block text-sm font-medium text-gray-700 mb-1">
+              Befintliga skador:
+            </legend>
+            <div className={`rounded-xl ${car ? 'bg-gray-50 border border-gray-200' : 'bg-gray-50 border border-dashed border-gray-200'} p-3`}>
+              {car ? (
+                car.skador.length === 0 ? (
+                  <p>Inga skador registrerade.</p>
+                ) : (
+                  <ul className="list-disc pl-6 space-y-1">
+                    {car.skador.map(s => (
+                      <li key={s.id}>
+                        <span className="font-medium">{s.plats}</span> – {s.typ}{s.beskrivning ? ` (${s.beskrivning})` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : (
+                <ul className="list-disc pl-6 opacity-60">
+                  <li>Repa</li>
+                  <li>Lackskada</li>
+                </ul>
+              )}
+            </div>
+          </fieldset>
+
+          <div>
+            <button type="submit" className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50">
+              Hämta fordonsdata
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Fordonsinformation */}
       {car && (
-        <section>
-          <h2>Fordonsinformation</h2>
-          <dl>
+        <section className="mt-6 bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+          <h2 className="text-lg font-semibold mb-3">Fordonsinformation</h2>
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <dt>Reg.nr</dt>
-              <dd><strong>{car.regnr}</strong></dd>
+              <dt className="text-sm text-gray-600">Reg.nr</dt>
+              <dd className="font-medium">{car.regnr}</dd>
             </div>
             <div>
-              <dt>Bilmodell</dt>
-              <dd><strong>{car.model || '—'}</strong></dd>
+              <dt className="text-sm text-gray-600">Bilmodell</dt>
+              <dd className="font-medium">{car.model || '—'}</dd>
             </div>
             <div>
-              <dt>Hjulförvaring</dt>
-              <dd><strong>{car.wheelStorage || '—'}</strong></dd>
+              <dt className="text-sm text-gray-600">Hjulförvaring</dt>
+              <dd className="font-medium">{car.wheelStorage || '—'}</dd>
             </div>
           </dl>
         </section>
       )}
 
-      {/* ===== Övriga fält – placeholders för att inte bryta din sida ===== */}
-      <div>
-        <label>Ort *</label>
-        <select defaultValue="">
-          <option value="" disabled>— Välj ort —</option>
-          <option>Malmö</option>
-          <option>Trelleborg</option>
-          <option>Halmstad</option>
-        </select>
+      {/* Övriga fält – kvar som neutrala placeholders */}
+      <div className="mt-6 grid grid-cols-1 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Ort *</label>
+          <select className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-gray-400" defaultValue="">
+            <option value="" disabled>— Välj ort —</option>
+            <option>Malmö</option>
+            <option>Trelleborg</option>
+            <option>Halmstad</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Station / Depå *</label>
+          <select className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-gray-400" defaultValue="">
+            <option value="" disabled>— Välj station / depå —</option>
+            <option>Malmö – Central</option>
+            <option>Trelleborg – Depå</option>
+            <option>Halmstad – Hedbergs</option>
+          </select>
+        </div>
       </div>
 
-      <div>
-        <label>Station / Depå *</label>
-        <select defaultValue="">
-          <option value="" disabled>— Välj station / depå —</option>
-          <option>Malmö – Central</option>
-          <option>Trelleborg – Depå</option>
-          <option>Halmstad – Hedbergs</option>
-        </select>
-      </div>
+      {/* Diagnostik (kan tas bort när allt sitter) */}
+      <details className="mt-6">
+        <summary>Diagnostik</summary>
+        <pre className="mt-2 text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap">
+{JSON.stringify({
+  input: regInput,
+  normalizedInput: normalizeReg(regInput),
+  tried, found: !!car,
+  foundKey: car ? normalizeReg(car.regnr) : null,
+  sampleKeys: knownKeys.slice(0, 10),
+}, null, 2)}
+        </pre>
+        {car && (
+          <>
+            <h4 className="mt-3 font-semibold">Matchad bil</h4>
+            <pre className="text-xs bg-gray-50 border border-gray-200 rounded-lg p-3 whitespace-pre-wrap">
+{JSON.stringify(car, null, 2)}
+            </pre>
+          </>
+        )}
+      </details>
     </div>
   );
 }
