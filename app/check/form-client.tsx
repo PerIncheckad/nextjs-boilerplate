@@ -2,12 +2,12 @@
 
 import React, { useMemo, useState, ChangeEvent, FormEvent } from 'react';
 
-/* -------------------- Typer -------------------- */
+/* ===================== Typer ===================== */
 type RegNr = string;
 type DamageEntry = { id: string; plats: string; typ: string; beskrivning?: string };
 type CanonicalCar = { regnr: RegNr; model: string; wheelStorage: string; skador: DamageEntry[] };
 
-/* ---------------- Normalisering ---------------- */
+/* =============== Normalisering av reg.nr =============== */
 function normalizeReg(input: string): string {
   return (input ?? '')
     .toUpperCase()
@@ -17,7 +17,7 @@ function normalizeReg(input: string): string {
     .trim();
 }
 
-/* ----------- Rådata → CanonicalCar ------------- */
+/* =========== Mappa rådata → CanonicalCar =========== */
 function toCanonicalCar(raw: any): CanonicalCar | null {
   if (!raw) return null;
 
@@ -48,7 +48,7 @@ function toCanonicalCar(raw: any): CanonicalCar | null {
   return { regnr: String(reg), model: String(model ?? ''), wheelStorage: String(wheelStorage ?? ''), skador };
 }
 
-/* ---------------- Exempelpost (till test) ---------------- */
+/* ============== Tillfällig lista (test) ============== */
 const RAW_CARS_FALLBACK: any[] = [
   {
     regnr: 'DGF14H',
@@ -61,7 +61,7 @@ const RAW_CARS_FALLBACK: any[] = [
   },
 ];
 
-/* ----------------- Indexbygge ------------------ */
+/* ================ Index (normaliserat) ================ */
 function buildIndex(rawList: any[]): Record<string, CanonicalCar> {
   const map: Record<string, CanonicalCar> = {};
   for (const item of rawList ?? []) {
@@ -72,24 +72,22 @@ function buildIndex(rawList: any[]): Record<string, CanonicalCar> {
   return map;
 }
 
-/* ================== KOMPONENT ================== */
+/* ===================== Komponent ===================== */
 export default function FormClient() {
   const CAR_MAP = useMemo(() => buildIndex(RAW_CARS_FALLBACK), []);
-  const knownKeys = useMemo(() => Object.keys(CAR_MAP).sort(), [CAR_MAP]);
-
   const [regInput, setRegInput] = useState('');
   const [car, setCar] = useState<CanonicalCar | null>(null);
   const [tried, setTried] = useState(false);
 
-  function find(reg: string) { return CAR_MAP[normalizeReg(reg)] ?? null; }
+  const find = (reg: string) => CAR_MAP[normalizeReg(reg)] ?? null;
 
   function onChangeReg(e: ChangeEvent<HTMLInputElement>) {
     setRegInput(e.target.value);
-    setTried(false);
+    setTr ied(false);
     setCar(null);
   }
 
-  function onBlurReg() {
+  function lookupNow() {
     if (!regInput.trim()) return;
     const found = find(regInput);
     setCar(found ?? null);
@@ -98,17 +96,7 @@ export default function FormClient() {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    const found = find(regInput);
-    setCar(found ?? null);
-    setTried(true);
-  }
-
-  function onSelectKnown(e: ChangeEvent<HTMLSelectElement>) {
-    const raw = e.target.value;
-    setRegInput(raw);
-    const found = find(raw);
-    setCar(found ?? null);
-    setTried(true);
+    lookupNow();
   }
 
   const showError = tried && !car && regInput.trim().length > 0;
@@ -120,81 +108,73 @@ export default function FormClient() {
           <h1 className="h1">Ny incheckning</h1>
           <p className="p">Inloggad: <strong>Bob</strong></p>
 
-          {/* Kort: Reg.nr + Bilinfo + Skador */}
-          <div className="card">
-            <form onSubmit={onSubmit} className="stack">
+          {/* Huvudkort: Reg.nr → Bilinfo → Skador → Knapp */}
+          <div className="card stack-lg">
+            {/* Reg.nr */}
+            <div className="stack-sm">
+              <label htmlFor="regnr" className="label">Registreringsnummer *</label>
+              <form onSubmit={onSubmit}>
+                <input
+                  id="regnr"
+                  type="text"
+                  value={regInput}
+                  onChange={onChangeReg}
+                  onBlur={lookupNow}
+                  placeholder="Skriv reg.nr (t.ex. DGF14H)"
+                  autoComplete="off"
+                  inputMode="text"
+                  className="input"
+                />
+              </form>
+              {showError && <p className="error" role="alert">Okänt reg.nr</p>}
+            </div>
 
-              {/* Rad: reg.nr + snabbval */}
-              <div className="grid">
+            {/* Bilinfo (direkt under reg.nr) */}
+            {car && (
+              <div className="info">
                 <div>
-                  <label htmlFor="regnr" className="label">Registreringsnummer *</label>
-                  <input
-                    id="regnr"
-                    type="text"
-                    value={regInput}
-                    onChange={onChangeReg}
-                    onBlur={onBlurReg}
-                    placeholder="Skriv reg.nr (t.ex. DGF14H)"
-                    autoComplete="off"
-                    inputMode="text"
-                    className="input"
-                  />
-                  {showError && <p className="error" role="alert">Okänt reg.nr</p>}
+                  <div className="muted">Bilmodell</div>
+                  <div className="value">{car.model || '—'}</div>
                 </div>
-
                 <div>
-                  <label htmlFor="known" className="label">Kända reg.nr (test)</label>
-                  <select id="known" onChange={onSelectKnown} defaultValue="" className="input">
-                    <option value="">— Välj —</option>
-                    {knownKeys.map(k => (
-                      <option key={k} value={CAR_MAP[k].regnr}>{CAR_MAP[k].regnr}</option>
-                    ))}
-                  </select>
+                  <div className="muted">Hjulförvaring</div>
+                  <div className="value">{car.wheelStorage || '—'}</div>
                 </div>
               </div>
+            )}
 
-              {/* Bilinfo – visas direkt under reg.nr när bilen finns */}
-              {car && (
-                <div className="info-grid">
-                  <div>
-                    <div className="muted">Bilmodell</div>
-                    <div className="value">{car.model || '—'}</div>
-                  </div>
-                  <div>
-                    <div className="muted">Hjulförvaring</div>
-                    <div className="value">{car.wheelStorage || '—'}</div>
-                  </div>
-                </div>
-              )}
-
-              {/* Befintliga skador */}
-              <fieldset disabled={!car}>
-                <legend className="label">Befintliga skador:</legend>
-                <div className={`panel ${car ? '' : 'panel-disabled'}`}>
-                  {car ? (
-                    car.skador.length === 0 ? (
-                      <p>Inga skador registrerade.</p>
-                    ) : (
-                      <ul className="ul">
-                        {car.skador.map(s => (
-                          <li key={s.id}><strong>{s.plats}</strong> – {s.typ}{s.beskrivning ? ` (${s.beskrivning})` : ''}</li>
-                        ))}
-                      </ul>
-                    )
+            {/* Skador */}
+            <div className="stack-sm">
+              <div className="label">Befintliga skador:</div>
+              <div className={`panel ${car ? '' : 'panel-disabled'}`}>
+                {car ? (
+                  car.skador.length === 0 ? (
+                    <p>Inga skador registrerade.</p>
                   ) : (
-                    <ul className="ul dim">
-                      <li>Repa</li>
-                      <li>Lackskada</li>
+                    <ul className="ul">
+                      {car.skador.map(s => (
+                        <li key={s.id}><strong>{s.plats}</strong> – {s.typ}{s.beskrivning ? ` (${s.beskrivning})` : ''}</li>
+                      ))}
                     </ul>
-                  )}
-                </div>
-              </fieldset>
+                  )
+                ) : (
+                  <ul className="ul dim">
+                    <li>Repa</li>
+                    <li>Lackskada</li>
+                  </ul>
+                )}
+              </div>
+            </div>
 
-              <div><button type="submit" className="btn">Hämta fordonsdata</button></div>
-            </form>
+            {/* Knapp */}
+            <div>
+              <button className="btn" onClick={lookupNow} type="button">
+                Hämta fordonsdata
+              </button>
+            </div>
           </div>
 
-          {/* Övriga fält – som tidigare */}
+          {/* Övriga fält (oförändrade) */}
           <div className="mt grid-2">
             <div>
               <label className="label">Ort *</label>
@@ -214,7 +194,7 @@ export default function FormClient() {
         </div>
       </div>
 
-      {/* ---------- Skopad ljus stil (som funkar hos dig) ---------- */}
+      {/* ---------- Skopad ljus stil (stabil) ---------- */}
       <style jsx global>{`
         .incheckad-scope { all: initial; display:block; }
         .incheckad-scope, .incheckad-scope * { box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important; }
@@ -222,30 +202,34 @@ export default function FormClient() {
         .incheckad-scope .container { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
         .incheckad-scope .h1 { font-size: 28px; line-height:1.2; margin:0 0 4px; font-weight:700; color:#111 !important; }
         .incheckad-scope .p { margin:0 0 16px; color:#111 !important; }
-        .incheckad-scope .card { background:#ffffff !important; border:1px solid #E5E7EB !important; border-radius:16px !important; padding:16px !important; box-shadow:0 1px 2px rgba(0,0,0,.04) !important; }
-        .incheckad-scope .stack > * + * { margin-top:12px; }
-        .incheckad-scope .grid { display:grid; grid-template-columns: 1fr minmax(200px,260px); gap:12px; align-items:end; }
-        @media (max-width:640px){ .incheckad-scope .grid { grid-template-columns:1fr; } }
-        .incheckad-scope .info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-        @media (max-width:640px){ .incheckad-scope .info-grid { grid-template-columns:1fr; } }
-        .incheckad-scope .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-        @media (max-width:640px){ .incheckad-scope .grid-2 { grid-template-columns:1fr; } }
-        .incheckad-scope .mt { margin-top:24px !important; }
-        .incheckad-scope .label { display:block; font-size:14px; font-weight:600; color:#111 !important; }
-        .incheckad-scope .input { width:100%; padding:10px 12px !important; border-radius:12px !important; border:1px solid #D1D5DB !important; background:#ffffff !important; color:#111111 !important; outline:none !important; }
+
+        .incheckad-scope .card { background:#fff !important; border:1px solid #E5E7EB !important; border-radius:16px !important; padding:16px !important; box-shadow:0 1px 2px rgba(0,0,0,.04) !important; }
+        .incheckad-scope .stack-sm > * + * { margin-top:8px; }
+        .incheckad-scope .stack-lg > * + * { margin-top:16px; }
+
+        .incheckad-scope .label { font-size:14px; font-weight:600; color:#111 !important; }
+        .incheckad-scope .input { width:100%; padding:10px 12px !important; border-radius:12px !important; border:1px solid #D1D5DB !important; background:#ffffff !important; color:#111 !important; outline:none !important; }
         .incheckad-scope .input::placeholder { color:#9CA3AF !important; }
         .incheckad-scope .input:focus { box-shadow:0 0 0 2px rgba(0,0,0,.08) !important; }
-        .incheckad-scope fieldset { border:0; margin:0; padding:0; }
-        .incheckad-scope legend { margin-bottom:6px; }
-        .incheckad-scope .panel { background:#F9FAFB !important; border:1px solid #E5E7EB !important; border-radius:12px !important; padding:12px !important; color:#111 !important; }
-        .incheckad-scope .panel-disabled { border-style:dashed !important; opacity:.75 !important; }
+
+        .incheckad-scope .info { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        @media (max-width:640px){ .incheckad-scope .info { grid-template-columns:1fr; } }
+        .incheckad-scope .muted { font-size:13px; color:#6B7280 !important; }
+        .incheckad-scope .value { font-weight:600; color:#111 !important; }
+
+        .incheckad-scope .panel { background:#F9FAFB !important; border:1px solid #E5E7EB !important; border-radius:12px !important; padding:12px !important; }
+        .incheckad-scope .panel-disabled { border-style:dashed !important; opacity:.7 !important; }
         .incheckad-scope .ul { margin:0; padding-left:22px; }
         .incheckad-scope .dim { opacity:.6 !important; }
-        .incheckad-scope .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px !important; border-radius:12px !important; background:#ffffff !important; color:#111 !important; border:1px solid #D1D5DB !important; font-weight:700 !important; }
-        .incheckad-scope .btn:hover { background:#F9FAFB !important; }
+
+        .incheckad-scope .btn { display:inline-flex; align-items:center; justify-content:center; padding:10px 14px !important; border-radius:12px !important; background:#111 !important; color:#fff !important; border:1px solid #111 !important; font-weight:700 !important; }
+        .incheckad-scope .btn:hover { filter:brightness(0.95); }
+
+        .incheckad-scope .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        @media (max-width:640px){ .incheckad-scope .grid-2 { grid-template-columns:1fr; } }
+
         .incheckad-scope .error { margin-top:6px; font-size:14px; color:#C00000 !important; }
-        .incheckad-scope .muted { font-size:14px; color:#6B7280 !important; }
-        .incheckad-scope .value { font-weight:600 !important; color:#111 !important; }
+        .incheckad-scope .mt { margin-top:24px !important; }
       `}</style>
     </section>
   );
