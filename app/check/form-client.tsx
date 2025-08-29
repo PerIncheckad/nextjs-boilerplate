@@ -130,7 +130,7 @@ export default function CheckinForm() {
             autoCapitalize="characters"
             inputMode="latin"
           />
-          {regValid === false && <div className="mt-1 text-sm text-red-600">Fel reg.nr</div>}
+          {regValid === false && <div className="mt-1 text-sm text-red-600">Okänt reg.nr</div>}
           {loadingLookup && <div className="mt-1 text-sm text-zinc-500">Kontrollerar…</div>}
 
           {/* (Resten av din form – oförändrat) */}
