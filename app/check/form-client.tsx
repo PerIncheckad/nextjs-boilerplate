@@ -3,6 +3,7 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+/* ====== Supabase-klient ====== */
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
 
@@ -13,11 +14,14 @@ function getSupabaseClient() {
 }
 const supabase = getSupabaseClient();
 
+/* ====== Typer ====== */
 type DamageEntry = { id: string; plats?: string; typ?: string; beskrivning?: string };
 type CanonicalCar = { regnr: string; model: string; wheelStorage: string; skador: DamageEntry[] };
+
 type DebugStep = { name: string; ok?: boolean; rows?: number; error?: string; picked?: any };
 type DebugLog = { envOk: boolean; steps: DebugStep[]; rawInput: string; normalizedInput: string };
 
+/* ====== Hjälp ====== */
 function normalizeReg(s: string) {
   return (s ?? '')
     .toUpperCase()
@@ -27,10 +31,11 @@ function normalizeReg(s: string) {
     .trim();
 }
 
+/* ====== Uppslag: bil + skador + hjulförvaring ====== */
 async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar | null; log: DebugLog }> {
   const norm = normalizeReg(regInput);
   const log: DebugLog = { envOk: Boolean(supabase), steps: [], rawInput: regInput, normalizedInput: norm };
-  if (!supabase) { log.steps.push({ name:'init', error:'Supabase saknas (env-nycklar)' }); return { car:null, log }; }
+  if (!supabase) { log.steps.push({ name:'init', error:'Supabase-nycklar saknas' }); return { car:null, log }; }
 
   // 1) Bil
   const { data: carRows, error: carErr } = await supabase.rpc('car_lookup_any', { p_reg: regInput });
@@ -46,7 +51,7 @@ async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar
   });
   if (dmgErr) log.steps.push({ name:'rpc:damages_lookup_any', error: dmgErr.message });
 
-  // 3) Hjulförvaring – om saknas, försök separat
+  // 3) Hjulförvaring (kan vara tomt tills vi normaliserat däcklistan)
   let wheelStorage: string =
     (carRow.wheelstorage && String(carRow.wheelstorage).trim()) ||
     (carRow.wheelStorage && String(carRow.wheelStorage).trim()) ||
@@ -84,12 +89,35 @@ async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar
   return { car, log };
 }
 
+/* ====== UI-komponent ====== */
 export default function FormClient() {
+  // Biluppslag
   const [regInput, setRegInput] = useState('');
   const [car, setCar] = useState<CanonicalCar | null>(null);
   const [tried, setTried] = useState(false);
   const [loading, setLoading] = useState(false);
   const [debug, setDebug] = useState<DebugLog | null>(null);
+
+  // Övriga formfält (99%-läget)
+  const [ort, setOrt] = useState<string>('');
+  const [station, setStation] = useState<string>('');
+  const [annanPlats, setAnnanPlats] = useState<string>('');
+  const [matarstallning, setMatarstallning] = useState<string>('');
+  const [tankFull, setTankFull] = useState<boolean | null>(null);
+  const [adBlueOk, setAdBlueOk] = useState<boolean | null>(null);
+  const [spolarOk, setSpolarOk] = useState<boolean | null>(null);
+  const [insynsskyddOk, setInsynsskyddOk] = useState<boolean | null>(null);
+  const [laddsladdar, setLaddsladdar] = useState<number>(0);
+  const [hjulSomSitterPa, setHjulSomSitterPa] = useState<'Sommarhjul'|'Vinterhjul'|null>(null);
+  const [nyaSkador, setNyaSkador] = useState<boolean | null>(null);
+
+  // Dynamiska nya skador (lokalt)
+  type LocalSkada = { id: string; text: string; files: File[] };
+  const [skador, setSkador] = useState<LocalSkada[]>([]);
+
+  // Dummydata för ort/station – byt till din riktiga lista när den finns
+  const ORTER = ['HALMSTAD','MALMÖ','HELSINGBORG','GÖTEBORG','STOCKHOLM'];
+  const STATIONER = ['Hedin Automotive Kia','Hedin Bil','MABI Central','Depå Syd','Depå Nord'];
 
   async function lookupNow() {
     const value = regInput.trim(); if (!value) return;
@@ -97,8 +125,28 @@ export default function FormClient() {
     const { car: found, log } = await fetchCarAndDamages(value);
     setCar(found); setDebug(log); setTried(true); setLoading(false);
   }
-  function onChangeReg(e: ChangeEvent<HTMLInputElement>) { setRegInput(e.target.value); setTried(false); setCar(null); }
-  function onSubmit(e: FormEvent) { e.preventDefault(); lookupNow(); }
+
+  function onChangeReg(e: ChangeEvent<HTMLInputElement>) {
+    setRegInput(e.target.value);
+    setTried(false);
+    setCar(null);
+  }
+
+  function addSkada() { setSkador(v => [...v, { id: crypto.randomUUID(), text: '', files: [] }]); }
+  function removeSkada(id: string) { setSkador(v => v.filter(s => s.id !== id)); }
+  function changeSkadaText(id: string, text: string) { setSkador(v => v.map(s => s.id===id?{...s,text}:s)); }
+  function addSkadaFiles(id: string, files: FileList | null) {
+    if (!files) return;
+    const arr = Array.from(files);
+    setSkador(v => v.map(s => s.id===id?{...s, files:[...s.files, ...arr]}:s));
+  }
+
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    // Här kan vi POST:a till Supabase (checkins/checkin_damages) när du vill
+    alert('Formuläret är klart visuellt. Spara-funktion kan kopplas på när tabellnamn/kolumner bekräftas.');
+  }
+
   const showError = tried && !car && regInput.trim().length > 0;
 
   return (
@@ -107,89 +155,168 @@ export default function FormClient() {
         <h1 className="h1">Ny incheckning</h1>
         <p className="p">Inloggad: <strong>Bob</strong></p>
 
-        <div className="card stack-lg">
-          <div className="stack-sm">
-            <label htmlFor="regnr" className="label">Registreringsnummer *</label>
-            <form onSubmit={onSubmit}>
-              <input id="regnr" type="text" value={regInput} onChange={onChangeReg} onBlur={lookupNow}
-                placeholder="Skriv reg.nr (t.ex. DGF14H)" autoComplete="off" className="input" />
-            </form>
-            {loading && <p className="muted">Hämtar…</p>}
-            {showError && <p className="error">Okänt reg.nr</p>}
-            {!supabase && <p className="error">Supabase ej konfigurerat.</p>}
+        <form onSubmit={onSubmit} className="stack-xl">
+
+          {/* Kort 1: Biluppslag */}
+          <div className="card stack-lg">
+            <div className="stack-sm">
+              <label htmlFor="regnr" className="label">Registreringsnummer *</label>
+              <input
+                id="regnr"
+                type="text"
+                value={regInput}
+                onChange={onChangeReg}
+                onBlur={lookupNow}
+                placeholder="Skriv reg.nr (t.ex. DGF14H)"
+                autoComplete="off"
+                className="input"
+              />
+              {loading && <p className="muted">Hämtar…</p>}
+              {showError && <p className="error">Okänt reg.nr</p>}
+              {!supabase && <p className="error">Supabase ej konfigurerat.</p>}
+            </div>
+
+            {car && (
+              <>
+                <div className="info">
+                  <div>
+                    <div className="muted">Bilmodell</div>
+                    <div className="value">{car.model || '--'}</div>
+                  </div>
+                  <div>
+                    <div className="muted">Hjulförvaring</div>
+                    <div className="value">{car.wheelStorage || '--'}</div>
+                  </div>
+                </div>
+
+                <div className="stack-sm">
+                  <div className="label">Befintliga skador:</div>
+                  <div className="panel">
+                    {car.skador.length === 0 ? (
+                      <p>--</p>
+                    ) : (
+                      <ul className="ul">
+                        {car.skador.map(s => {
+                          const hasPlats = !!s.plats && s.plats.trim() !== '';
+                          const hasTyp = !!s.typ && s.typ.trim() !== '';
+                          const hasBes = !!s.beskrivning && s.beskrivning.trim() !== '';
+                          return (
+                            <li key={s.id}>
+                              {hasPlats && <strong>{s.plats!.trim()}</strong>}
+                              {hasPlats && hasTyp ? ' – ' : ''}
+                              {hasTyp && s.typ!.trim()}
+                              {hasBes && (!hasTyp || s.beskrivning!.trim().toLowerCase() !== s.typ!.trim().toLowerCase())
+                                ? ` (${s.beskrivning!.trim()})` : ''}
+                              {!hasPlats && !hasTyp && hasBes && s.beskrivning}
+                              {!hasPlats && !hasTyp && !hasBes && '--'}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
-          {car && (
-            <>
-              <div className="info">
-                <div><div className="muted">Bilmodell</div><div className="value">{car.model || '--'}</div></div>
-                <div><div className="muted">Hjulförvaring</div><div className="value">{car.wheelStorage || '--'}</div></div>
-              </div>
+          {/* Kort 2: Ort / Station */}
+          <div className="card stack-lg">
+            <div className="stack-sm">
+              <label className="label">Ort *</label>
+              <select className="select" value={ort} onChange={e => setOrt(e.target.value)}>
+                <option value="">— Välj ort —</option>
+                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div className="stack-sm">
+              <label className="label">Station / Depå *</label>
+              <select className="select" value={station} onChange={e => setStation(e.target.value)}>
+                <option value="">— Välj station / depå —</option>
+                {STATIONER.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="stack-sm">
+              <label className="label">Ev. annan inlämningsplats</label>
+              <input className="input" value={annanPlats} onChange={e=>setAnnanPlats(e.target.value)} placeholder="Övrig info…" />
+            </div>
+          </div>
 
+          {/* Kort 3: Mätare / Tank / Vätskor */}
+          <div className="card stack-lg">
+            <div className="stack-sm">
+              <label className="label">Mätarställning *</label>
+              <div className="row">
+                <input className="input" type="number" inputMode="numeric" pattern="[0-9]*"
+                  value={matarstallning} onChange={e=>setMatarstallning(e.target.value)} placeholder="ex. 42 180" />
+                <span className="suffix muted">km</span>
+              </div>
+            </div>
+
+            <div className="stack-sm">
+              <label className="label">Tanknivå *</label>
+              <div className="seg">
+                <button type="button" className={`segbtn ${tankFull===true?'on':''}`} onClick={()=>setTankFull(true)}>Fulltankad</button>
+                <button type="button" className={`segbtn ${tankFull===false?'on':''}`} onClick={()=>setTankFull(false)}>Ej fulltankad</button>
+              </div>
+            </div>
+
+            <div className="grid2">
               <div className="stack-sm">
-                <div className="label">Befintliga skador:</div>
-                <div className="panel">
-                  {car.skador.length === 0 ? (
-                    <p>--</p>
-                  ) : (
-                    <ul className="ul">
-                      {car.skador.map(s => {
-                        const parts: string[] = [];
-                        if (s.plats && s.plats.trim() !== '') parts.push(`**${s.plats.trim()}**`);
-                        if (s.typ && s.typ.trim() !== '') parts.push(s.typ.trim());
-                        const desc = s.beskrivning && s.typ && s.beskrivning.trim().toLowerCase() !== s.typ.trim().toLowerCase()
-                          ? ` (${s.beskrivning.trim()})` : '';
-                        const text = (parts.join(' – ') || '').replace(/\*\*/g, '');
-                        return (
-                          <li key={s.id}>
-                            {parts.length > 0 ? (
-                              <>
-                                {s.plats && <strong>{s.plats.trim()}</strong>}
-                                {s.plats && s.typ ? ' – ' : ''}
-                                {s.typ && s.typ.trim()}
-                                {desc}
-                              </>
-                            ) : (
-                              s.beskrivning ? s.beskrivning : '--'
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                <label className="label">AdBlue OK? *</label>
+                <div className="seg">
+                  <button type="button" className={`segbtn ${adBlueOk===true?'on':''}`} onClick={()=>setAdBlueOk(true)}>Ja</button>
+                  <button type="button" className={`segbtn ${adBlueOk===false?'on':''}`} onClick={()=>setAdBlueOk(false)}>Nej</button>
                 </div>
               </div>
-            </>
-          )}
-        </div>
+              <div className="stack-sm">
+                <label className="label">Spolarvätska OK? *</label>
+                <div className="seg">
+                  <button type="button" className={`segbtn ${spolarOk===true?'on':''}`} onClick={()=>setSpolarOk(true)}>Ja</button>
+                  <button type="button" className={`segbtn ${spolarOk===false?'on':''}`} onClick={()=>setSpolarOk(false)}>Nej</button>
+                </div>
+              </div>
+            </div>
 
-        {debug && (<div className="card mt"><h2 className="h2">Diagnostik</h2><pre className="pre">
-{JSON.stringify(debug, null, 2)}</pre></div>)}
-      </div></div>
+            <div className="stack-sm">
+              <label className="label">Insynsskydd OK? *</label>
+              <div className="seg">
+                <button type="button" className={`segbtn ${insynsskyddOk===true?'on':''}`} onClick={()=>setInsynsskyddOk(true)}>Ja</button>
+                <button type="button" className={`segbtn ${insynsskyddOk===false?'on':''}`} onClick={()=>setInsynsskyddOk(false)}>Nej</button>
+              </div>
+            </div>
+          </div>
 
-      <style jsx global>{`
-        .incheckad-scope { all: initial; display:block; }
-        .incheckad-scope, .incheckad-scope * { box-sizing: border-box; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important; }
-        .incheckad-scope .page { min-height: 100dvh; background:#fff !important; color:#111 !important; }
-        .incheckad-scope .container { max-width: 860px; margin: 0 auto; padding: 24px 16px; }
-        .incheckad-scope .h1 { font-size:28px; margin:0 0 4px; font-weight:700; color:#111 !important; }
-        .incheckad-scope .h2 { font-size:18px; margin:0 0 8px; font-weight:700; color:#111 !important; }
-        .incheckad-scope .p { margin:0 0 16px; color:#111 !important; }
-        .incheckad-scope .card { background:#fff !important; border:1px solid #E5E7EB !important; border-radius:16px !important; padding:16px !important; box-shadow:0 1px 2px rgba(0,0,0,.04) !important; }
-        .incheckad-scope .stack-sm > * + * { margin-top:8px; }
-        .incheckad-scope .stack-lg > * + * { margin-top:16px; }
-        .incheckad-scope .label { font-size:14px; font-weight:600; color:#111 !important; }
-        .incheckad-scope .input { width:100%; padding:10px 12px !important; border-radius:12px !important; border:1px solid #D1D5DB !important; background:#fff !important; color:#111 !important; outline:none !important; }
-        .incheckad-scope .muted { font-size:13px; color:#6B7280 !important; }
-        .incheckad-scope .value { font-weight:600; color:#111 !important; }
-        .incheckad-scope .info { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-        @media (max-width:640px){ .incheckad-scope .info { grid-template-columns:1fr; } }
-        .incheckad-scope .panel { background:#F9FAFB !important; border:1px solid #E5E7EB !important; border-radius:12px !important; padding:12px !important; }
-        .incheckad-scope .ul { margin:0; padding-left:22px; }
-        .incheckad-scope .mt{ margin-top:24px !important; }
-        .incheckad-scope .error{ color:#C00000 !important; }
-        .incheckad-scope .pre{ white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas; font-size:12px; background:#F9FAFB; border:1px solid #E5E7EB; padding:12px; border-radius:12px; }
-      `}</style>
-    </section>
-  );
-}
+          {/* Kort 4: Laddsladdar / Hjul */}
+          <div className="card stack-lg">
+            <div className="stack-sm">
+              <label className="label">Antal laddsladdar</label>
+              <input className="input" type="number" value={laddsladdar} onChange={e=>setLaddsladdar(parseInt(e.target.value || '0'))} />
+            </div>
+
+            <div className="stack-sm">
+              <label className="label">Hjul som sitter på *</label>
+              <div className="seg">
+                <button type="button" className={`segbtn ${hjulSomSitterPa==='Sommarhjul'?'on':''}`} onClick={()=>setHjulSomSitterPa('Sommarhjul')}>Sommarhjul</button>
+                <button type="button" className={`segbtn ${hjulSomSitterPa==='Vinterhjul'?'on':''}`} onClick={()=>setHjulSomSitterPa('Vinterhjul')}>Vinterhjul</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Kort 5: Nya skador */}
+          <div className="card stack-lg">
+            <div className="stack-sm">
+              <label className="label">Nya skador?</label>
+              <div className="seg">
+                <button type="button" className={`segbtn ${nyaSkador===true?'on':''}`} onClick={()=>setNyaSkador(true)}>Ja</button>
+                <button type="button" className={`segbtn ${nyaSkador===false?'on':''}`} onClick={()=>setNyaSkador(false)}>Nej</button>
+              </div>
+            </div>
+
+            {nyaSkador && (
+              <div className="stack-sm">
+                <button type="button" onClick={addSkada} className="btn">+ Lägg till skada</button>
+                {skador.map(s => (
+                  <div key={s.id} className="panel stack-sm">
+                    <input className="input" value={s.text} onChange={e=>changeSkadaText(s.id, e.target.value)} placeholder="Beskriv skadan" />
+                    <input type="file" multiple onChange={e=>addSkadaFiles(s.id, e.target.files)}
