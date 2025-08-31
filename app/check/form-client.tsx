@@ -1,368 +1,409 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { createClient } from '@/utils/supabase/client';
 
-// ====== Hjälp: platser (Ort -> stationer/depåer) ======
-const PLATSER: Record<string, string[]> = {
-  'MALMÖ': [
-    'Huvudstation Malmö Jägersro',
-    'Ford Malmö',
-    'Mechanum',
-    'Malmö Automera',
-    'Mercedes Malmö',
-    'Werksta St Bernstorp',
-    'Werksta Malmö Hamn',
-    'Hedbergs Malmö',
-    'Hedin Automotive Burlöv',
-    'Sturup',
+type CarRow = {
+  regnr: string;
+  model: string | null;
+  wheelstorage: string | null;
+  car_id: string | null;
+};
+
+type DamageRow = {
+  id: string;
+  beskrivning: string | null;
+};
+
+type Option = { value: string; label: string };
+
+const ORTER: Option[] = [
+  { value: 'MALMÖ', label: 'MALMÖ' },
+  { value: 'HELSINGBORG', label: 'HELSINGBORG' },
+  { value: 'ÄNGELHOLM', label: 'ÄNGELHOLM' },
+  { value: 'HALMSTAD', label: 'HALMSTAD' },
+  { value: 'FALKENBERG', label: 'FALKENBERG' },
+  { value: 'TRELLEBORG', label: 'TRELLEBORG' },
+  { value: 'VARBERG', label: 'VARBERG' },
+  { value: 'LUND', label: 'LUND' },
+];
+
+const DEPÅER: Record<string, Option[]> = {
+  MALMÖ: [
+    { value: 'HUVUDSTATION MALMÖ JÄGERSRO', label: 'Huvudstation Malmö Jägersro' },
+    { value: 'FORD MALMÖ', label: 'Ford Malmö' },
+    { value: 'MECHANUM', label: 'Mechanum' },
+    { value: 'MALMÖ AUTOMERA', label: 'Malmö Automera' },
+    { value: 'MERCEDES MALMÖ', label: 'Mercedes Malmö' },
+    { value: 'WERKSTA ST BERNSTORP', label: 'Werksta St Bernstorp' },
+    { value: 'WERKSTA MALMÖ HAMN', label: 'Werksta Malmö Hamn' },
+    { value: 'HEDBERGS MALMÖ', label: 'Hedbergs Malmö' },
+    { value: 'HEDIN AUTOMOTIVE BURLÖV', label: 'Hedin Automotive Burlöv' },
+    { value: 'STURUP', label: 'Sturup' },
   ],
-  'HELSINGBORG': [
-    'Huvudstation Helsingborg',
-    'HBSC Helsingborg',
-    'Ford Helsingborg',
-    'Transport Helsingborg',
-    'S. Jönsson',
-    'BMW Helsingborg',
-    'KIA Helsingborg',
-    'Euromaster Helsingborg',
-    'B/S Klippan',
-    'B/S Munka-Ljungby',
-    'B/S Helsingborg',
-    'Werksta Helsingborg',
-    'Båstad',
+  HELSINGBORG: [
+    { value: 'HUVUDSTATION HELSINGBORG', label: 'Huvudstation Helsingborg' },
+    { value: 'HBSC HELSINGBORG', label: 'HBSC Helsingborg' },
+    { value: 'FORD HELSINGBORG', label: 'Ford Helsingborg' },
+    { value: 'TRANSPORT HELSINGBORG', label: 'Transport Helsingborg' },
+    { value: 'S JÖNSSON', label: 'S. Jönsson' },
+    { value: 'BMW HELSINGBORG', label: 'BMW Helsingborg' },
+    { value: 'KIA HELSINGBORG', label: 'KIA Helsingborg' },
+    { value: 'EUROMASTER HELSINGBORG', label: 'Euromaster Helsingborg' },
+    { value: 'B/S KLIPPAN', label: 'B/S Klippan' },
+    { value: 'B/S MUNKA-LJUNGBY', label: 'B/S Munka-Ljungby' },
+    { value: 'B/S HELSINGBORG', label: 'B/S Helsingborg' },
+    { value: 'WERKSTA HELSINGBORG', label: 'Werksta Helsingborg' },
+    { value: 'BÅSTAD', label: 'Båstad' },
   ],
-  'ÄNGELHOLM': [
-    'Huvudstation Ängelholm',
-    'FORD Ängelholm',
-    'Mekonomen Ängelholm',
-    'Flyget Ängelholm',
+  ÄNGELHOLM: [
+    { value: 'HUVUDSTATION ÄNGELHOLM', label: 'Huvudstation Ängelholm' },
+    { value: 'FORD ÄNGELHOLM', label: 'FORD Ängelholm' },
+    { value: 'MEKONOMEN ÄNGELHOLM', label: 'Mekonomen Ängelholm' },
+    { value: 'FLYGET ÄNGELHOLM', label: 'Flyget Ängelholm' },
   ],
-  'HALMSTAD': [
-    'Huvudstation Halmstad',
-    'Flyget Halmstad',
-    'KIA Halmstad',
-    'FORD Halmstad',
+  HALMSTAD: [
+    { value: 'HUVUDSTATION HALMSTAD', label: 'Huvudstation Halmstad' },
+    { value: 'FLYGET HALMSTAD', label: 'Flyget Halmstad' },
+    { value: 'KIA HALMSTAD', label: 'KIA Halmstad' },
+    { value: 'FORD HALMSTAD', label: 'FORD Halmstad' },
   ],
-  'FALKENBERG': ['Huvudstation Falkenberg'],
-  'TRELLEBORG': ['Huvudstation Trelleborg'],
-  'VARBERG': [
-    'Huvudstation Varberg',
-    'Ford Varberg',
-    'Hedin Automotive Varberg',
-    'Sällstorp lack plåt',
-    'Finnveden plåt',
+  FALKENBERG: [{ value: 'HUVUDSTATION FALKENBERG', label: 'Huvudstation Falkenberg' }],
+  TRELLEBORG: [{ value: 'HUVUDSTATION TRELLEBORG', label: 'Huvudstation Trelleborg' }],
+  VARBERG: [
+    { value: 'HUVUDSTATION VARBERG', label: 'Huvudstation Varberg' },
+    { value: 'FORD VARBERG', label: 'Ford Varberg' },
+    { value: 'HEDIN AUTOMOTIVE VARBERG', label: 'Hedin Automotive Varberg' },
+    { value: 'SÄLLSTORP LACK PLÅT', label: 'Sällstorp lack plåt' },
+    { value: 'FINNVEDEN PLÅT', label: 'Finnveden plåt' },
   ],
-  'LUND': [
-    'Huvudstation Lund',
-    'Ford Lund',
-    'Hedin Lund',
-    'B/S Lund',
-    'P7 Revinge',
+  LUND: [
+    { value: 'HUVUDSTATION LUND', label: 'Huvudstation Lund' },
+    { value: 'FORD LUND', label: 'Ford Lund' },
+    { value: 'HEDIN LUND', label: 'Hedin Lund' },
+    { value: 'B/S LUND', label: 'B/S Lund' },
+    { value: 'P7 REVINGE', label: 'P7 Revinge' },
   ],
 };
 
-// ====== Supabase RPC-hjälpare ======
-async function rpc<T = any>(fn: string, args: any): Promise<{ data: T[]; error?: string }> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const res = await fetch(`${url}/rest/v1/rpc/${fn}`, {
-    method: 'POST',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify(args),
-  });
-  if (!res.ok) {
-    return { data: [], error: `${res.status} ${res.statusText}` };
-  }
-  const data = (await res.json()) as T[];
-  return { data };
-}
-
-// ====== Typer för formulär ======
-type FuelType = 'Bensin' | 'Diesel' | null;
-type DamagePhoto = { id: string; url: string | undefined; file?: File };
-type NewDamage = { id: string; text: string; photos: DamagePhoto[] };
+type NewDamage = {
+  id: string;
+  text: string;
+  photos: string[]; // just names/urls placeholder
+};
 
 export default function CheckInForm() {
-  const userName = 'Bob';
-
-  // — Reg.nr
-  const [regInput, setRegInput] = useState('');
+  const supabase = useMemo(() => createClient(), []);
+  // ————————— State
+  const [rawReg, setRawReg] = useState('');
   const normalizedReg = useMemo(
-    () => regInput.toUpperCase().replace(/[^\w]/g, ''),
-    [regInput]
+    () => rawReg.toUpperCase().replace(/[^A-Z0-9]/g, ''),
+    [rawReg]
   );
-  const [carModel, setCarModel] = useState<string | null>(null);
-  const [wheelStorage, setWheelStorage] = useState<string | null>(null);
-  const [existingDamages, setExistingDamages] = useState<string[]>([]);
-  const [isKnownReg, setIsKnownReg] = useState<boolean | null>(null);
 
-  // — Plats
-  const orter = Object.keys(PLATSER);
-  const [ort, setOrt] = useState('');
-  const [station, setStation] = useState('');
-  const [showOtherPlace, setShowOtherPlace] = useState(false);
+  // lookup data
+  const [car, setCar] = useState<CarRow | null>(null);
+  const [known, setKnown] = useState<boolean | null>(null);
+  const [damages, setDamages] = useState<DamageRow[]>([]);
+  const [loadingLookup, setLoadingLookup] = useState(false);
+
+  // plats
+  const [city, setCity] = useState<string>('');
+  const [station, setStation] = useState<string>('');
+  const [otherPlace, setOtherPlace] = useState(false);
   const [otherPlaceText, setOtherPlaceText] = useState('');
 
-  // — Fordonsstatus
+  // fordonsstatus
   const [odometer, setOdometer] = useState('');
   const [tankFull, setTankFull] = useState<boolean | null>(null);
   const [liters, setLiters] = useState('');
-  const [fuelType, setFuelType] = useState<FuelType>(null);
+  const [fuelType, setFuelType] = useState<'Bensin' | 'Diesel' | null>(null);
   const [adBlueOk, setAdBlueOk] = useState<boolean | null>(null);
   const [spolarOk, setSpolarOk] = useState<boolean | null>(null);
-  const [privacyOk, setPrivacyOk] = useState<boolean | null>(null);
-  const [cords, setCords] = useState<0 | 1 | 2 | null>(null);
-  const [wheelOn, setWheelOn] = useState<'Sommarhjul' | 'Vinterhjul' | null>(null);
+  const [privacy, setPrivacy] = useState<boolean>(false);
+  const [tintedOk, setTintedOk] = useState<boolean | null>(null);
+  const [cables, setCables] = useState<0 | 1 | 2 | null>(null);
+  const [wheels, setWheels] = useState<'Sommarhjul' | 'Vinterhjul' | null>(null);
 
-  // — Nya skador
+  // nya skador
   const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
-  const addDamage = () =>
-    setNewDamages((arr) => [...arr, { id: crypto.randomUUID(), text: '', photos: [] }]);
-  const removeDamage = (id: string) =>
-    setNewDamages((arr) => arr.filter((d) => d.id !== id));
-  const setDamageText = (id: string, text: string) =>
-    setNewDamages((arr) => arr.map((d) => (d.id === id ? { ...d, text } : d)));
-  const addDamagePhoto = (id: string, files: FileList | null) => {
-    if (!files?.length) return;
-    const file = files[0];
-    setNewDamages((arr) =>
-      arr.map((d) =>
-        d.id === id
-          ? {
-              ...d,
-              photos: [
-                ...d.photos,
-                { id: crypto.randomUUID(), file, url: URL.createObjectURL(file) },
-              ],
-            }
-          : d
-      )
-    );
-  };
-  const removeDamagePhoto = (id: string, photoId: string) =>
-    setNewDamages((arr) =>
-      arr.map((d) =>
-        d.id === id ? { ...d, photos: d.photos.filter((p) => p.id !== photoId) } : d
-      )
-    );
 
-  // — Fel & status
-  const [saveError, setSaveError] = useState('');
-  const [saveOk, setSaveOk] = useState('');
+  // submit UI
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveOk, setSaveOk] = useState<boolean>(false);
 
-  // ====== Hämtning av fordonsdata ======
+  // ————————— Lookup on normalizedReg
   useEffect(() => {
-    setIsKnownReg(null);
-    setCarModel(null);
-    setWheelStorage(null);
-    setExistingDamages([]);
-    if (!normalizedReg) return;
+    setSaveOk(false);
+    setSaveError(null);
 
+    if (!normalizedReg) {
+      setKnown(null);
+      setCar(null);
+      setDamages([]);
+      return;
+    }
+
+    let cancelled = false;
     (async () => {
-      // Bil
-      const car = await rpc<any>('car_lookup_any', { regnr: normalizedReg });
-      if (car.error || car.data.length === 0) {
-        setIsKnownReg(false);
-        return;
-      }
-      const picked = car.data[0];
-      setIsKnownReg(true);
-      setCarModel(picked?.model ?? null);
-      setWheelStorage(picked?.wheelstorage ?? null);
+      setLoadingLookup(true);
+      try {
+        // 1) car
+        const { data: carRows, error: carErr } = await supabase
+          .rpc('car_lookup_any', { reg: normalizedReg });
+        if (carErr) throw carErr;
 
-      // Skador
-      const carId = picked.car_id ?? null;
-      let dm: any[] = [];
-      const dmgRes = await rpc<any>('damages_lookup_any', { car_id: carId, regnr: normalizedReg });
-      if (!dmgRes.error) dm = dmgRes.data ?? [];
-      const texts = dm
-        .map((d) => (d?.desc || d?.description || d?.beskrivning || '').toString().trim())
-        .filter(Boolean);
-      setExistingDamages(texts);
+        const carRow = Array.isArray(carRows) && carRows.length > 0 ? (carRows[0] as CarRow) : null;
+        if (!cancelled) {
+          setCar(carRow);
+          setKnown(!!carRow);
+        }
+
+        // 2) damages (om car_id finns)
+        if (carRow?.car_id) {
+          const { data: dmg, error: dmgErr } = await supabase
+            .rpc('damages_lookup_any', { car_id: carRow.car_id, reg: normalizedReg });
+          if (dmgErr) throw dmgErr;
+          if (!cancelled) setDamages((dmg as DamageRow[]) ?? []);
+        } else {
+          if (!cancelled) setDamages([]);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setKnown(false);
+          setCar(null);
+          setDamages([]);
+        }
+      } finally {
+        if (!cancelled) setLoadingLookup(false);
+      }
     })();
-  }, [normalizedReg]);
-  // ====== Validering ======
+
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedReg, supabase]);
+
+  // ————————— Validation
   const litersValid = useMemo(() => {
-    if (tankFull !== false) return true;            // bara relevant när Ej fulltankad
+    if (tankFull !== false) return true;
     if (!liters) return false;
-    // tillåt 0–4 siffror + ev 1 kommatecken + 1 siffra (12,5)
-    return /^(\d{1,4})(,\d)?$/.test(liters);
+    // tillåt 0-4 siffror + ev , + 1 siffra
+    return /^[0-9]{1,4}(,[0-9])?$/.test(liters);
   }, [tankFull, liters]);
 
   const canSave = useMemo(() => {
     if (!normalizedReg) return false;
 
-    // Plats
-    if (!showOtherPlace) {
-      if (!ort) return false;
+    // plats
+    if (!otherPlace) {
+      if (!city) return false;
       if (!station) return false;
     } else {
       if (!otherPlaceText.trim()) return false;
     }
 
-    // Fordonsstatus
+    // fordonsstatus
     if (!odometer.trim()) return false;
     if (tankFull === null) return false;
     if (tankFull === false) {
       if (!litersValid) return false;
       if (!fuelType) return false;
     }
-    if (adBlueOk === null || spolarOk === null || privacyOk === null) return false;
-    if (cords === null) return false;
-    if (!wheelOn) return false;
 
-    // Skador – inget krav, men om block finns måste text finnas
-    for (const d of newDamages) {
-      if (!d.text.trim()) return false;
-    }
+    if (adBlueOk === null || spolarOk === null || tintedOk === null) return false;
+    if (cables === null) return false;
+    if (wheels === null) return false;
+
     return true;
   }, [
     normalizedReg,
-    showOtherPlace,
-    ort,
-    station,
+    otherPlace,
     otherPlaceText,
+    city,
+    station,
     odometer,
     tankFull,
     litersValid,
     fuelType,
     adBlueOk,
     spolarOk,
-    privacyOk,
-    cords,
-    wheelOn,
-    newDamages,
+    tintedOk,
+    cables,
+    wheels,
   ]);
 
-  // ====== Submit (dummy) ======
-  async function onSubmit(e: React.FormEvent) {
+  // ————————— Handlers
+  const onAddDamage = () => {
+    setNewDamages((ds) => [
+      ...ds,
+      { id: crypto.randomUUID(), text: '', photos: [] },
+    ]);
+  };
+
+  const onRemoveDamage = (id: string) => {
+    setNewDamages((ds) => ds.filter((d) => d.id !== id));
+  };
+
+  const onPhotoPick = (id: string) => {
+    // Dummy: visa filpicker & lägg till ett “foto-namn”.
+    const name = `foto_${Math.floor(Math.random() * 1000)}.jpg`;
+    setNewDamages((ds) =>
+      ds.map((d) => (d.id === id ? { ...d, photos: [...d.photos, name] } : d))
+    );
+  };
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaveError('');
-    setSaveOk('');
+    setSaveError(null);
+    setSaveOk(false);
 
     if (!canSave) {
-      setSaveError('Vänligen fyll i all information först.');
+      setSaveError('Vänligen fyll i all obligatorisk information först.');
       return;
     }
 
-    // Dummy: visa lyckad incheckning
-    setSaveOk(`Tack ${userName}! Incheckningen är sparad.`);
-    // Rulla ned så man ser meddelandet nära knappen
-    requestAnimationFrame(() => {
-      document.getElementById('save-footer')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
-  }
+    // Dummy-spara: lyckas alltid om odometer är ifyllt och >= 0
+    if (odometer.trim()) {
+      setSaveOk(true);
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    } else {
+      setSaveError('Något gick fel vid sparande. Försök igen.');
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+  };
 
-  // ====== Render ======
-  const stationer = ort ? PLATSER[ort] ?? [] : [];
+  const stationOptions = city ? DEPÅER[city] ?? [] : [];
 
+  const showFuelFollowups = tankFull === false;
+
+  // ————————— Render
   return (
     <div className="page">
       <div className="container">
         <h1>Ny incheckning</h1>
-        <p className="muted">Inloggad: <strong>{userName}</strong></p>
+        <p className="muted">Inloggad: <strong>Bob</strong></p>
 
-        <form onSubmit={onSubmit} noValidate>
-          {/* REG/lookup */}
-          <div className="card">
+        <form onSubmit={onSubmit}>
+          {/* REG */}
+          <section className="card">
             <label className="label">Registreringsnummer *</label>
             <input
               className="input"
               placeholder="Skriv reg.nr"
-              value={regInput}
-              onChange={(e) => setRegInput(e.target.value)}
-              autoCapitalize="characters"
+              value={rawReg}
+              onChange={(e) => setRawReg(e.target.value)}
               inputMode="text"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
             />
-            {isKnownReg === false && (
+
+            {normalizedReg && known === false && (
               <div className="reg-warning">Okänt reg.nr</div>
             )}
 
-            <div className="kv">
-              <div><span className="kv-key">Bilmodell:</span> <span className="kv-val">{carModel ?? '--'}</span></div>
-              <div><span className="kv-key">Hjulförvaring:</span> <span className="kv-val">{wheelStorage ?? '--'}</span></div>
-              <div className="kv-col">
-                <div className="kv-key">Befintliga skador:</div>
-                {existingDamages.length ? (
-                  <ul className="damage-list">
-                    {existingDamages.map((t, i) => <li key={i}>{t}</li>)}
-                  </ul>
-                ) : (
-                  <div className="kv-val">–</div>
-                )}
+            <div className="row-meta">
+              <div>
+                <div className="meta-title">Bilmodell:</div>
+                <div className="meta-val">{car?.model || '--'}</div>
+              </div>
+              <div>
+                <div className="meta-title">Hjulförvaring:</div>
+                <div className="meta-val">{car?.wheelstorage || '--'}</div>
               </div>
             </div>
-          </div>
+
+            <div className="meta-title" style={{ marginTop: 8 }}>Befintliga skador:</div>
+            {damages.length === 0 ? (
+              <div className="meta-val">–</div>
+            ) : (
+              <ul className="damage-list">
+                {damages.map((d) => (
+                  <li key={d.id}>{d.beskrivning || '—'}</li>
+                ))}
+              </ul>
+            )}
+          </section>
 
           {/* PLATS */}
           <h2>Plats för incheckning</h2>
-          <div className="card">
-            {!showOtherPlace && (
-              <>
-                <label className="label">Ort *</label>
-                <select
-                  className="input"
-                  value={ort}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setOrt(v);
-                    setStation('');
-                  }}
-                >
-                  <option value="">— Välj ort —</option>
-                  {orter.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
+          <section className="card">
+            <label className="label">Ort *</label>
+            <select
+              className={`input select ${!otherPlace && !city && 'invalid'}`}
+              value={city}
+              onChange={(e) => {
+                setCity(e.target.value);
+                setStation('');
+              }}
+              disabled={otherPlace}
+            >
+              <option value="">— Välj ort —</option>
+              {ORTER.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
 
-                <label className="label">Station / Depå *</label>
-                <select
-                  className="input"
-                  value={station}
-                  onChange={(e) => setStation(e.target.value)}
-                  disabled={!ort}
-                >
-                  <option value="">{ort ? '— Välj station / depå —' : 'Välj ort först'}</option>
-                  {stationer.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </>
-            )}
+            <label className="label">Station / Depå *</label>
+            <select
+              className={`input select ${!otherPlace && !station && 'invalid'}`}
+              value={station}
+              onChange={(e) => setStation(e.target.value)}
+              disabled={otherPlace || !city}
+            >
+              <option value="">{city ? '— Välj station / depå —' : 'Välj ort först'}</option>
+              {stationOptions.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
 
-            {showOtherPlace ? (
-              <>
-                <label className="label">Annan plats (fritext) *</label>
+            {!otherPlace ? (
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  setOtherPlace(true);
+                  setCity('');
+                  setStation('');
+                }}
+              >
+                + Annan plats (fritext)
+              </button>
+            ) : (
+              <div className="stack-sm">
+                <label className="label">Annan plats *</label>
                 <input
-                  className="input"
-                  placeholder="Skriv platsbeskrivning…"
+                  className={`input ${otherPlace && !otherPlaceText.trim() && 'invalid'}`}
+                  placeholder="Beskriv platsen…"
                   value={otherPlaceText}
                   onChange={(e) => setOtherPlaceText(e.target.value)}
                 />
-              </>
-            ) : null}
-
-            <button
-              type="button"
-              className="link"
-              onClick={() => setShowOtherPlace((b) => !b)}
-            >
-              {showOtherPlace ? '⟵ Välj från listan istället' : '+ Annan plats (fritext)'}
-            </button>
-          </div>
+                <button
+                  type="button"
+                  className="link"
+                  onClick={() => {
+                    setOtherPlace(false);
+                    setOtherPlaceText('');
+                  }}
+                >
+                  – Avbryt annan plats
+                </button>
+              </div>
+            )}
+          </section>
 
           {/* FORDONSSTATUS */}
           <h2>Fordonsstatus</h2>
-          <div className="card">
+          <section className="card">
             <label className="label">Mätarställning *</label>
-            <div className="input-with-suffix">
+            <div className="seg input-with-suffix">
               <input
-                className="input"
+                className={`input ${!odometer.trim() && 'invalid'}`}
                 placeholder="ex. 42 180"
                 inputMode="numeric"
                 value={odometer}
@@ -371,41 +412,47 @@ export default function CheckInForm() {
               <span className="suffix muted">km</span>
             </div>
 
-            <label className="label">Tanknivå *</label>
-            <div className="seg">
-              <button
-                type="button"
-                className={`segbtn ${tankFull === true ? 'on' : ''}`}
-                onClick={() => { setTankFull(true); setLiters(''); setFuelType(null); }}
-              >
-                Fulltankad
-              </button>
-              <button
-                type="button"
-                className={`segbtn ${tankFull === false ? 'on' : ''}`}
-                onClick={() => setTankFull(false)}
-              >
-                Ej fulltankad
-              </button>
+            <div className="stack-sm">
+              <label className="label">Tanknivå *</label>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={`segbtn ${tankFull === true ? 'on' : ''}`}
+                  onClick={() => {
+                    setTankFull(true);
+                    setLiters('');
+                    setFuelType(null);
+                  }}
+                >
+                  Fulltankad
+                </button>
+                <button
+                  type="button"
+                  className={`segbtn ${tankFull === false ? 'on' : ''}`}
+                  onClick={() => setTankFull(false)}
+                >
+                  Ej fulltankad
+                </button>
+              </div>
             </div>
 
-            {tankFull === false && (
-              <div className="subgrid">
-                <div className="stack-sm subright">
+            {showFuelFollowups && (
+              <div className="followups">
+                <div className="followup">
                   <label className="label">Antal liter påfyllda *</label>
                   <input
-                    className={`input narrow ${litersValid ? '' : 'invalid'}`}
+                    className={`input narrow ${!litersValid && 'invalid'}`}
                     inputMode="decimal"
-                    placeholder="ex. 12,5"
+                    placeholder="ex. 7,5"
                     value={liters}
                     onChange={(e) => {
-                      const v = e.target.value.replace('.', ','); // punkt -> komma
-                      if (/^[0-9]{0,4}(,[0-9])?$/.test(v) || v === '') setLiters(v);
+                      const v = e.target.value.replace('.', ',');
+                      if (/^[0-9]{0,4}(,[0-9])?$/.test(v)) setLiters(v);
                     }}
                   />
                 </div>
 
-                <div className="stack-sm subright">
+                <div className="followup">
                   <label className="label">Bränsletyp *</label>
                   <div className="seg">
                     <button
@@ -427,207 +474,153 @@ export default function CheckInForm() {
               </div>
             )}
 
-            <label className="label">AdBlue OK? *</label>
-            <div className="seg">
-              <button
-                type="button"
-                className={`segbtn ${adBlueOk === true ? 'on' : ''}`}
-                onClick={() => setAdBlueOk(true)}
-              >
-                Ja
-              </button>
-              <button
-                type="button"
-                className={`segbtn ${adBlueOk === false ? 'on' : ''}`}
-                onClick={() => setAdBlueOk(false)}
-              >
-                Nej
-              </button>
+            <div className="grid-2">
+              <div className="stack-sm">
+                <label className="label">AdBlue OK? *</label>
+                <div className="seg">
+                  <button
+                    type="button"
+                    className={`segbtn ${adBlueOk === true ? 'on' : ''}`}
+                    onClick={() => setAdBlueOk(true)}
+                  >
+                    Ja
+                  </button>
+                  <button
+                    type="button"
+                    className={`segbtn ${adBlueOk === false ? 'on' : ''}`}
+                    onClick={() => setAdBlueOk(false)}
+                  >
+                    Nej
+                  </button>
+                </div>
+              </div>
+
+              <div className="stack-sm">
+                <label className="label">Spolarvätska OK? *</label>
+                <div className="seg">
+                  <button
+                    type="button"
+                    className={`segbtn ${spolarOk === true ? 'on' : ''}`}
+                    onClick={() => setSpolarOk(true)}
+                  >
+                    Ja
+                  </button>
+                  <button
+                    type="button"
+                    className={`segbtn ${spolarOk === false ? 'on' : ''}`}
+                    onClick={() => setSpolarOk(false)}
+                  >
+                    Nej
+                  </button>
+                </div>
+              </div>
+
+              <div className="stack-sm">
+                <label className="label">Insynsskydd OK? *</label>
+                <div className="seg">
+                  <button
+                    type="button"
+                    className={`segbtn ${tintedOk === true ? 'on' : ''}`}
+                    onClick={() => setTintedOk(true)}
+                  >
+                    Ja
+                  </button>
+                  <button
+                    type="button"
+                    className={`segbtn ${tintedOk === false ? 'on' : ''}`}
+                    onClick={() => setTintedOk(false)}
+                  >
+                    Nej
+                  </button>
+                </div>
+              </div>
+
+              <div className="stack-sm">
+                <label className="label">Antal laddsladdar *</label>
+                <div className="seg">
+                  {[0, 1, 2].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`segbtn ${cables === n ? 'on' : ''}`}
+                      onClick={() => setCables(n as 0 | 1 | 2)}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            <label className="label">Spolarvätska OK? *</label>
-            <div className="seg">
-              <button
-                type="button"
-                className={`segbtn ${spolarOk === true ? 'on' : ''}`}
-                onClick={() => setSpolarOk(true)}
-              >
-                Ja
-              </button>
-              <button
-                type="button"
-                className={`segbtn ${spolarOk === false ? 'on' : ''}`}
-                onClick={() => setSpolarOk(false)}
-              >
-                Nej
-              </button>
-            </div>
-
-            <label className="label">Insynsskydd OK? *</label>
-            <div className="seg">
-              <button
-                type="button"
-                className={`segbtn ${privacyOk === true ? 'on' : ''}`}
-                onClick={() => setPrivacyOk(true)}
-              >
-                Ja
-              </button>
-              <button
-                type="button"
-                className={`segbtn ${privacyOk === false ? 'on' : ''}`}
-                onClick={() => setPrivacyOk(false)}
-              >
-                Nej
-              </button>
-            </div>
-
-            <label className="label">Antal laddsladdar *</label>
-            <div className="seg">
-              {[0, 1, 2].map((n) => (
+            <div className="stack-sm">
+              <label className="label">Hjul som sitter på *</label>
+              <div className="seg">
                 <button
-                  key={n}
                   type="button"
-                  className={`segbtn ${cords === n ? 'on' : ''}`}
-                  onClick={() => setCords(n as 0 | 1 | 2)}
+                  className={`segbtn ${wheels === 'Sommarhjul' ? 'on' : ''}`}
+                  onClick={() => setWheels('Sommarhjul')}
                 >
-                  {n}
+                  Sommarhjul
                 </button>
-              ))}
+                <button
+                  type="button"
+                  className={`segbtn ${wheels === 'Vinterhjul' ? 'on' : ''}`}
+                  onClick={() => setWheels('Vinterhjul')}
+                >
+                  Vinterhjul
+                </button>
+              </div>
             </div>
-
-            <label className="label">Hjul som sitter på *</label>
-            <div className="seg">
-              <button
-                type="button"
-                className={`segbtn ${wheelOn === 'Sommarhjul' ? 'on' : ''}`}
-                onClick={() => setWheelOn('Sommarhjul')}
-              >
-                Sommarhjul
-              </button>
-              <button
-                type="button"
-                className={`segbtn ${wheelOn === 'Vinterhjul' ? 'on' : ''}`}
-                onClick={() => setWheelOn('Vinterhjul')}
-              >
-                Vinterhjul
-              </button>
-            </div>
-          </div>
+          </section>
 
           {/* NYA SKADOR */}
           <h2>Nya skador på bilen?</h2>
+          {newDamages.length === 0 ? (
+            <button type="button" className="btn outline" onClick={onAddDamage}>
+              Lägg till skada
+            </button>
+          ) : (
+            <>
+              {newDamages.map((dmg, idx) => (
+                <section key={dmg.id} className="card warn">
+                  <div className="card-title">
+                    <strong>Skada {idx + 1}</strong>
+                    <button
+                      type="button"
+                      className="link danger"
+                      onClick={() => onRemoveDamage(dmg.id)}
+                      aria-label="Ta bort skada"
+                    >
+                      Ta bort
+                    </button>
+                  </div>
 
-          {newDamages.map((dmg, idx) => (
-            <div key={dmg.id} className="card dmg">
-              <div className="row-between">
-                <strong>Skada {idx + 1}</strong>
-                <button type="button" className="link danger" onClick={() => removeDamage(dmg.id)}>
-                  Ta bort
-                </button>
-              </div>
+                  <label className="label">Text (obligatorisk)</label>
+                  <input
+                    className={`input ${!dmg.text.trim() && 'invalid'}`}
+                    placeholder="Beskriv skadan…"
+                    value={dmg.text}
+                    onChange={(e) =>
+                      setNewDamages((ds) =>
+                        ds.map((x) => (x.id === dmg.id ? { ...x, text: e.target.value } : x))
+                      )
+                    }
+                  />
 
-              <label className="label">Text (obligatorisk)</label>
-              <input
-                className={`input ${!dmg.text.trim() ? 'invalid' : ''}`}
-                placeholder="Beskriv skadan…"
-                value={dmg.text}
-                onChange={(e) => setDamageText(dmg.id, e.target.value)}
-              />
-
-              <label className="label">Lägg till bild</label>
-              <input
-                className="file"
-                type="file"
-                accept="image/*"
-                onChange={(e) => addDamagePhoto(dmg.id, e.target.files)}
-              />
-
-              {!!dmg.photos.length && (
-                <div className="thumbs">
-                  {dmg.photos.map((p) => (
-                    <div key={p.id} className="thumb">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.url} alt="skada" />
-                      <button type="button" className="thumb-del" onClick={() => removeDamagePhoto(dmg.id, p.id)}>
-                        ✕
+                  <div className="stack-sm">
+                    <label className="label">Bilder</label>
+                    <div className="seg">
+                      <button type="button" className="btn" onClick={() => onPhotoPick(dmg.id)}>
+                        Lägg till bild
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          <button type="button" className="btn outline" onClick={addDamage}>
-            Lägg till ytterligare en skada
-          </button>
-
-          {/* SAVE */}
-          <div id="save-footer" className="save-wrap">
-            {saveError && <div className="alert error">{saveError}</div>}
-            {saveOk && <div className="alert ok">{saveOk}</div>}
-            <button type="submit" className="btn primary" disabled={!canSave}>
-              Spara incheckning
-            </button>
-          </div>
-
-          {/* Stil */}
-          <style jsx>{`
-            .page { padding: 16px; background: #f6f7f9; }
-            .container { max-width: 720px; margin: 0 auto; }
-            h1 { font-size: 28px; margin: 0 0 12px; }
-            h2 { font-size: 18px; margin: 24px 0 8px; }
-            .muted { color: #6b7280; }
-
-            .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin: 12px 0; }
-            .label { display: block; font-size: 14px; margin: 6px 0 4px; color: #111827; }
-            .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px; font-size: 16px; background:#fff; color:#111;}
-            .input.invalid { border-color: #ef4444; background: #fff5f5; }
-
-            .input-with-suffix { position: relative; }
-            .suffix { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
-
-            .seg { display: flex; gap: 10px; margin: 6px 0 10px; }
-            .segbtn { padding: 10px 14px; border-radius: 10px; border: 1px solid #d1d5db; background:#fff; }
-            .segbtn.on { background: #e8f2ff; border-color: #3b82f6; color: #1d4ed8; }
-
-            .link { margin-top: 6px; background: transparent; border: none; color: #2563eb; padding: 0; }
-            .link.danger { color: #b91c1c; }
-
-            .reg-warning { margin-top: 6px; color: #dc2626; font-weight: 600; }
-
-            .kv { margin-top: 10px; display: grid; gap: 6px; }
-            .kv-key { color: #374151; margin-right: 8px; }
-            .damage-list { margin: 6px 0 0 18px; }
-
-            .subgrid { display: grid; grid-template-columns: 1fr; gap: 8px; }
-            .subright { text-align: right; }
-            .narrow { max-width: 120px; margin-left: auto; }
-            @media (min-width: 560px) {
-              .subgrid { grid-template-columns: 1fr 1fr; }
-            }
-
-            .file { display: block; }
-
-            .thumbs { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
-            .thumb { position: relative; width: 90px; height: 90px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
-            .thumb img { width: 100%; height: 100%; object-fit: cover; }
-            .thumb-del { position: absolute; top: 2px; right: 2px; border: none; background: rgba(0,0,0,.55); color: #fff; border-radius: 50%; width: 22px; height: 22px; }
-
-            .btn { display: inline-block; padding: 12px 16px; border-radius: 12px; border: 1px solid #d1d5db; background:#fff; }
-            .btn.primary { background: #1d4ed8; color: #fff; border-color: #1d4ed8; }
-            .btn.primary:disabled { opacity: 0.45; }
-            .btn.outline { background:#fff; color:#1f2937; }
-
-            .save-wrap { margin: 18px 0 40px; display: grid; gap: 10px; }
-            .alert { padding: 12px; border-radius: 10px; }
-            .alert.error { background:#fee2e2; color:#991b1b; }
-            .alert.ok { background:#dcfce7; color:#166534; }
-
-            .row-between { display:flex; align-items:center; justify-content:space-between; }
-          `}</style>
-        </form>
-      </div>
-    </div>
-  );
-}
+                    {dmg.photos.length > 0 && (
+                      <div className="thumbs">
+                        {dmg.photos.map((p, i) => (
+                          <div key={i} className="thumb">
+                            <div className="ph">{p}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                 
