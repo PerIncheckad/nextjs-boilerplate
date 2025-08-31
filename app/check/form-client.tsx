@@ -226,14 +226,14 @@ export default function FormClient() {
               <label className="label">Ort *</label>
               <select className="select" value={ort} onChange={e => setOrt(e.target.value)}>
                 <option value="">— Välj ort —</option>
-                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+                {['HALMSTAD','MALMÖ','HELSINGBORG','GÖTEBORG','STOCKHOLM'].map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
             <div className="stack-sm">
               <label className="label">Station / Depå *</label>
               <select className="select" value={station} onChange={e => setStation(e.target.value)}>
                 <option value="">— Välj station / depå —</option>
-                {STATIONER.map(s => <option key={s} value={s}>{s}</option>)}
+                {['Hedin Automotive Kia','Hedin Bil','MABI Central','Depå Syd','Depå Nord'].map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
             <div className="stack-sm">
@@ -319,4 +319,61 @@ export default function FormClient() {
                 {skador.map(s => (
                   <div key={s.id} className="panel stack-sm">
                     <input className="input" value={s.text} onChange={e=>changeSkadaText(s.id, e.target.value)} placeholder="Beskriv skadan" />
-                    <input type="file" multiple onChange={e=>addSkadaFiles(s.id, e.target.files)}
+                    <input type="file" multiple onChange={e=>addSkadaFiles(s.id, e.target.files)} />
+                    <button type="button" className="link" onClick={()=>removeSkada(s.id)}>Ta bort</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Kort 6: Övrigt + Spara */}
+          <div className="card stack-lg">
+            <button type="submit" className="btn primary">Spara incheckning</button>
+          </div>
+
+          {/* Diagnostik */}
+          {debug && (
+            <details className="debug">
+              <summary>Diagnostik</summary>
+              <pre>{JSON.stringify(debug, null, 2)}</pre>
+            </details>
+          )}
+        </form>
+      </div></div>
+
+      {/* Minimal styling för 99%-läget */}
+      <style jsx>{`
+        .page { padding: 16px; }
+        .container{ max-width: 720px; margin:0 auto; }
+        .h1{ font-size:28px; font-weight:700; margin:8px 0 16px; }
+        .p{ margin:0 0 16px; color:#9aa0a6; }
+        .stack-xl > * + *{ margin-top:24px; }
+        .stack-lg > * + *{ margin-top:16px; }
+        .stack-sm > * + *{ margin-top:8px; }
+        .card{ background:#111; border:1px solid #2a2a2a; border-radius:12px; padding:16px; }
+        .label{ font-weight:600; }
+        .input,.select{ width:100%; background:#0c0c0c; color:#fff; border:1px solid #2a2a2a; border-radius:8px; padding:12px; }
+        .row{ display:flex; align-items:center; gap:8px; }
+        .suffix{ min-width:40px; }
+        .seg{ display:flex; gap:8px; }
+        .segbtn{ padding:10px 14px; border:1px solid #2a2a2a; border-radius:8px; background:#0c0c0c; color:#fff; }
+        .segbtn.on{ background:#d2f4d3; color:#0a0a0a; border-color:#d2f4d3; }
+        .btn{ padding:12px 16px; border-radius:10px; border:1px solid #2a2a2a; background:#222; color:#fff; }
+        .btn.primary{ background:#1a4bff; border-color:#1a4bff; }
+        .link{ background:transparent; color:#7aa7ff; border:none; padding:0; }
+        .muted{ color:#9aa0a6; }
+        .error{ color:#ef4444; }
+        .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .info{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+        .value{ font-weight:600; }
+        .panel{ background:#0c0c0c; border:1px solid #2a2a2a; border-radius:8px; padding:12px; }
+        .ul{ margin:0; padding-left:18px; }
+        details.debug{ margin-top:16px; }
+        pre{ white-space:pre-wrap; word-break:break-word; }
+        @media (max-width:640px){ .grid2,.info{ grid-template-columns:1fr; } }
+      `}</style>
+    </section>
+  );
+}
+
