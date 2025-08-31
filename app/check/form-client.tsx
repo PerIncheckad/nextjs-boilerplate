@@ -13,13 +13,18 @@ function getSupabaseClient() {
 }
 const supabase = getSupabaseClient();
 
-type DamageEntry = { id: string; plats: string; typ: string; beskrivning?: string };
+type DamageEntry = { id: string; plats?: string; typ?: string; beskrivning?: string };
 type CanonicalCar = { regnr: string; model: string; wheelStorage: string; skador: DamageEntry[] };
 type DebugStep = { name: string; ok?: boolean; rows?: number; error?: string; picked?: any };
 type DebugLog = { envOk: boolean; steps: DebugStep[]; rawInput: string; normalizedInput: string };
 
 function normalizeReg(s: string) {
-  return (s ?? '').toUpperCase().normalize('NFKC').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/[\s\-_.]/g, '').trim();
+  return (s ?? '')
+    .toUpperCase()
+    .normalize('NFKC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .replace(/[\s\-_.]/g, '')
+    .trim();
 }
 
 async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar | null; log: DebugLog }> {
@@ -34,27 +39,46 @@ async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar
   log.steps.push({ name:'rpc:car_lookup_any', ok: !!carRow, rows: Array.isArray(carRows)?carRows.length:0, picked: carRow || undefined });
   if (!carRow) return { car:null, log };
 
-  // 2) Skador (nu: p_car_id TEXT + p_reg TEXT)
+  // 2) Skador
   const { data: dmgRows, error: dmgErr } = await supabase.rpc('damages_lookup_any', {
     p_car_id: carRow.car_id ?? null,
     p_reg: carRow.regnr ?? regInput,
   });
   if (dmgErr) log.steps.push({ name:'rpc:damages_lookup_any', error: dmgErr.message });
 
+  // 3) Hjulförvaring – om saknas, försök separat
+  let wheelStorage: string =
+    (carRow.wheelstorage && String(carRow.wheelstorage).trim()) ||
+    (carRow.wheelStorage && String(carRow.wheelStorage).trim()) ||
+    '';
+
+  if (!wheelStorage) {
+    const { data: wheelRows, error: wheelErr } = await supabase.rpc('wheel_lookup_any', {
+      p_car_id: carRow.car_id ?? null,
+      p_reg: carRow.regnr ?? regInput,
+    });
+    if (wheelErr) {
+      log.steps.push({ name:'rpc:wheel_lookup_any', error: wheelErr.message });
+    } else {
+      const w = Array.isArray(wheelRows) && wheelRows.length ? wheelRows[0] : null;
+      log.steps.push({ name:'rpc:wheel_lookup_any', ok: !!w, rows: Array.isArray(wheelRows)?wheelRows.length:0, picked: w || undefined });
+      wheelStorage = (w && w.wheelstorage && String(w.wheelstorage).trim())
+                  || (w && w.wheelStorage && String(w.wheelStorage).trim())
+                  || '';
+    }
+  }
+
   const skador: DamageEntry[] = (Array.isArray(dmgRows) ? dmgRows : []).map((d:any, i:number) => ({
     id: String(d?.id ?? i + 1),
-    plats: (d?.plats && String(d.plats).trim()) || '--',
-    typ: (d?.typ && String(d.typ).trim()) || '--',
+    plats: d?.plats ? String(d.plats) : undefined,
+    typ: d?.typ ? String(d.typ) : undefined,
     beskrivning: d?.beskrivning ? String(d.beskrivning) : undefined,
   }));
 
   const car: CanonicalCar = {
     regnr: carRow.regnr || regInput,
     model: (carRow.model && String(carRow.model).trim()) || '--',
-    wheelStorage:
-      (carRow.wheelstorage && String(carRow.wheelstorage).trim()) ||
-      (carRow.wheelStorage && String(carRow.wheelStorage).trim()) ||
-      '--',
+    wheelStorage: wheelStorage || '--',
     skador,
   };
   return { car, log };
@@ -105,13 +129,32 @@ export default function FormClient() {
               <div className="stack-sm">
                 <div className="label">Befintliga skador:</div>
                 <div className="panel">
-                  {car.skador.length === 0 ? <p>--</p> : (
+                  {car.skador.length === 0 ? (
+                    <p>--</p>
+                  ) : (
                     <ul className="ul">
-                      {car.skador.map(s => (
-                        <li key={s.id}>
-                          <strong>{s.plats || '--'}</strong> – {s.typ || '--'}{s.beskrivning ? ` (${s.beskrivning})` : ''}
-                        </li>
-                      ))}
+                      {car.skador.map(s => {
+                        const parts: string[] = [];
+                        if (s.plats && s.plats.trim() !== '') parts.push(`**${s.plats.trim()}**`);
+                        if (s.typ && s.typ.trim() !== '') parts.push(s.typ.trim());
+                        const desc = s.beskrivning && s.typ && s.beskrivning.trim().toLowerCase() !== s.typ.trim().toLowerCase()
+                          ? ` (${s.beskrivning.trim()})` : '';
+                        const text = (parts.join(' – ') || '').replace(/\*\*/g, '');
+                        return (
+                          <li key={s.id}>
+                            {parts.length > 0 ? (
+                              <>
+                                {s.plats && <strong>{s.plats.trim()}</strong>}
+                                {s.plats && s.typ ? ' – ' : ''}
+                                {s.typ && s.typ.trim()}
+                                {desc}
+                              </>
+                            ) : (
+                              s.beskrivning ? s.beskrivning : '--'
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
