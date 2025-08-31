@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 /* -------------------------------------------------------
    Hjälptyper
@@ -131,7 +131,12 @@ export default function CheckInForm() {
     const norm = normalizeReg(raw);
     if (norm === 'DGF14H') {
       setRegKnown(true);
-      setCar({ regnr: 'DGF14H', model: 'Volvo V90', wheelstorage: 'Malmö Jägersro', car_id: '1' });
+      setCar({
+        regnr: 'DGF14H',
+        model: 'Volvo V90',
+        wheelstorage: 'Malmö Jägersro',
+        car_id: '1',
+      });
       setDamages([{ plats: 'Vänster dörr', typ: 'Repa', beskrivning: 'Liten repa' }]);
     } else {
       setRegKnown(false);
@@ -169,7 +174,9 @@ export default function CheckInForm() {
     <div className="page">
       <div className="container">
         <h1>Ny incheckning</h1>
-        <p className="muted">Inloggad: <b>Bob</b></p>
+        <p className="muted">
+          Inloggad: <b>Bob</b>
+        </p>
 
         <form onSubmit={onSubmit} noValidate>
           <section className="card">
@@ -183,13 +190,22 @@ export default function CheckInForm() {
             {regKnown === false && <p className="reg-warning">Okänt reg.nr</p>}
 
             <div className="info">
-              <div><b>Bilmodell:</b> {car?.model ?? '--'}</div>
-              <div><b>Hjulförvaring:</b> {car?.wheelstorage ?? '--'}</div>
-              <div><b>Befintliga skador:</b>
-                {damages.length === 0 ? ' –' : (
+              <div>
+                <b>Bilmodell:</b> {car?.model ?? '--'}
+              </div>
+              <div>
+                <b>Hjulförvaring:</b> {car?.wheelstorage ?? '--'}
+              </div>
+              <div>
+                <b>Befintliga skador:</b>
+                {damages.length === 0 ? (
+                  ' –'
+                ) : (
                   <ul className="damage-list">
                     {damages.map((d, i) => (
-                      <li key={i}>{d.plats} – {d.typ} {d.beskrivning && `(${d.beskrivning})`}</li>
+                      <li key={i}>
+                        {d.plats} – {d.typ} {d.beskrivning && `(${d.beskrivning})`}
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -203,11 +219,18 @@ export default function CheckInForm() {
             <select
               className={`select ${fieldInvalid(!showOtherPlace && !ort) ? 'invalid' : ''}`}
               value={ort}
-              onChange={(e) => { setOrt(e.target.value); setDepa(''); }}
+              onChange={(e) => {
+                setOrt(e.target.value);
+                setDepa('');
+              }}
               disabled={showOtherPlace}
             >
               <option value="">— Välj ort —</option>
-              {ORTER.map((o) => <option key={o} value={o}>{o}</option>)}
+              {ORTER.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
             </select>
 
             <label className="label">Station / Depå *</label>
@@ -218,12 +241,23 @@ export default function CheckInForm() {
               disabled={showOtherPlace || !ort}
             >
               <option value="">— Välj station / depå —</option>
-              {depaOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+              {depaOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
 
             {!showOtherPlace ? (
-              <button type="button" className="linkbtn"
-                onClick={() => { setShowOtherPlace(true); setOrt(''); setDepa(''); }}>
+              <button
+                type="button"
+                className="linkbtn"
+                onClick={() => {
+                  setShowOtherPlace(true);
+                  setOrt('');
+                  setDepa('');
+                }}
+              >
                 + Annan plats (fritext)
               </button>
             ) : (
@@ -235,8 +269,14 @@ export default function CheckInForm() {
                   onChange={(e) => setOtherPlace(e.target.value)}
                   placeholder="Beskriv platsen"
                 />
-                <button type="button" className="linkbtn"
-                  onClick={() => { setShowOtherPlace(false); setOtherPlace(''); }}>
+                <button
+                  type="button"
+                  className="linkbtn"
+                  onClick={() => {
+                    setShowOtherPlace(false);
+                    setOtherPlace('');
+                  }}
+                >
                   Använd ort/station i stället
                 </button>
               </>
@@ -256,8 +296,20 @@ export default function CheckInForm() {
 
             <label className="label">Tanknivå *</label>
             <div className="seg">
-              <button type="button" className={`segbtn ${tankFull === true ? 'on' : ''}`} onClick={() => setTankFull(true)}>Fulltankad</button>
-              <button type="button" className={`segbtn ${tankFull === false ? 'on' : ''}`} onClick={() => setTankFull(false)}>Ej fulltankad</button>
+              <button
+                type="button"
+                className={`segbtn ${tankFull === true ? 'on' : ''}`}
+                onClick={() => setTankFull(true)}
+              >
+                Fulltankad
+              </button>
+              <button
+                type="button"
+                className={`segbtn ${tankFull === false ? 'on' : ''}`}
+                onClick={() => setTankFull(false)}
+              >
+                Ej fulltankad
+              </button>
             </div>
 
             {tankFull === false && (
@@ -271,74 +323,162 @@ export default function CheckInForm() {
                 />
                 <label className="label">Bränsletyp *</label>
                 <div className="seg">
-                  <button type="button" className={`segbtn ${fuelType === 'Bensin' ? 'on' : ''}`} onClick={() => setFuelType('Bensin')}>Bensin</button>
-                  <button type="button" className={`segbtn ${fuelType === 'Diesel' ? 'on' : ''}`} onClick={() => setFuelType('Diesel')}>Diesel</button>
+                  <button
+                    type="button"
+                    className={`segbtn ${fuelType === 'Bensin' ? 'on' : ''}`}
+                    onClick={() => setFuelType('Bensin')}
+                  >
+                    Bensin
+                  </button>
+                  <button
+                    type="button"
+                    className={`segbtn ${fuelType === 'Diesel' ? 'on' : ''}`}
+                    onClick={() => setFuelType('Diesel')}
+                  >
+                    Diesel
+                  </button>
                 </div>
               </div>
             )}
 
             <label className="label">AdBlue OK? *</label>
             <div className="seg">
-              <button type="button" className={`segbtn ${adBlueOk === true ? 'on' : ''}`} onClick={() => setAdBlueOk(true)}>Ja</button>
-              <button type="button" className={`segbtn ${adBlueOk === false ? 'on' : ''}`} onClick={() => setAdBlueOk(false)}>Nej</button>
+              <button
+                type="button"
+                className={`segbtn ${adBlueOk === true ? 'on' : ''}`}
+                onClick={() => setAdBlueOk(true)}
+              >
+                Ja
+              </button>
+              <button
+                type="button"
+                className={`segbtn ${adBlueOk === false ? 'on' : ''}`}
+                onClick={() => setAdBlueOk(false)}
+              >
+                Nej
+              </button>
             </div>
 
             <label className="label">Spolarvätska OK? *</label>
             <div className="seg">
-              <button type="button" className={`segbtn ${spolarOk === true ? 'on' : ''}`} onClick={() => setSpolarOk(true)}>Ja</button>
-              <button type="button" className={`segbtn ${spolarOk === false ? 'on' : ''}`} onClick={() => setSpolarOk(false)}>Nej</button>
+              <button
+                type="button"
+                className={`segbtn ${spolarOk === true ? 'on' : ''}`}
+                onClick={() => setSpolarOk(true)}
+              >
+                Ja
+              </button>
+              <button
+                type="button"
+                className={`segbtn ${spolarOk === false ? 'on' : ''}`}
+                onClick={() => setSpolarOk(false)}
+              >
+                Nej
+              </button>
             </div>
 
             <label className="label">Insynsskydd OK? *</label>
             <div className="seg">
-              <button type="button" className={`segbtn ${insynOk === true ? 'on' : ''}`} onClick={() => setInsynOk(true)}>Ja</button>
-              <button type="button" className={`segbtn ${insynOk === false ? 'on' : ''}`} onClick={() => setInsynOk(false)}>Nej</button>
+              <button
+                type="button"
+                className={`segbtn ${insynOk === true ? 'on' : ''}`}
+                onClick={() => setInsynOk(true)}
+              >
+                Ja
+              </button>
+              <button
+                type="button"
+                className={`segbtn ${insynOk === false ? 'on' : ''}`}
+                onClick={() => setInsynOk(false)}
+              >
+                Nej
+              </button>
             </div>
 
             <label className="label">Antal laddsladdar *</label>
             <div className="seg">
               {[0, 1, 2].map((n) => (
-                <button key={n} type="button" className={`segbtn ${sladd === n ? 'on' : ''}`} onClick={() => setSladd(n as 0 | 1 | 2)}>{n}</button>
+                <button
+                  key={n}
+                  type="button"
+                  className={`segbtn ${sladd === n ? 'on' : ''}`}
+                  onClick={() => setSladd(n as 0 | 1 | 2)}
+                >
+                  {n}
+                </button>
               ))}
             </div>
 
             <label className="label">Hjul som sitter på *</label>
             <div className="seg">
-              <button type="button" className={`segbtn ${hjul === 'Sommarhjul' ? 'on' : ''}`} onClick={() => setHjul('Sommarhjul')}>Sommarhjul</button>
-              <button type="button" className={`segbtn ${hjul === 'Vinterhjul' ? 'on' : ''}`} onClick={() => setHjul('Vinterhjul')}>Vinterhjul</button>
+              <button
+                type="button"
+                className={`segbtn ${hjul === 'Sommarhjul' ? 'on' : ''}`}
+                onClick={() => setHjul('Sommarhjul')}
+              >
+                Sommarhjul
+              </button>
+              <button
+                type="button"
+                className={`segbtn ${hjul === 'Vinterhjul' ? 'on' : ''}`}
+                onClick={() => setHjul('Vinterhjul')}
+              >
+                Vinterhjul
+              </button>
             </div>
           </section>
 
-          {submitOk === false && <div className="banner error">Vänligen fyll i all obligatorisk information först.</div>}
+          {submitOk === false && (
+            <div className="banner error">Vänligen fyll i all obligatorisk information först.</div>
+          )}
           {submitOk === true && <div className="banner ok">Tack Bob! Incheckningen sparades.</div>}
 
-          <button type="submit" className="btn primary" disabled={!canSubmit}>Spara incheckning</button>
+          <button type="submit" className="btn primary" disabled={!canSubmit}>
+            Spara incheckning
+          </button>
         </form>
       </div>
 
       <style jsx>{`
-        .page { background:#f6f7f9; min-height:100vh; padding:20px; }
+        /* Basfärger – mörk, tydlig text */
+        .page { background:#f6f7f9; min-height:100vh; padding:20px; color:#111; }
         .container { max-width:720px; margin:0 auto; }
-        h1 { font-size:28px; margin:0 0 8px; }
-        h2 { font-size:18px; margin:24px 0 12px; }
-        .muted { color:#6b7280; }
+        h1 { font-size:28px; margin:0 0 8px; color:#111; }
+        h2 { font-size:18px; margin:24px 0 12px; color:#111; }
+        .muted { color:#4b5563; }
+
         .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:16px; }
-        .label { font-weight:600; margin-top:8px; }
-        .input, .select { width:100%; border:1px solid #d1d5db; border-radius:8px; padding:10px; }
+        .label { font-weight:600; margin-top:8px; color:#111; }
+
+        .input, .select {
+          width:100%;
+          border:1px solid #d1d5db;
+          border-radius:8px;
+          padding:10px;
+          background:#fff;
+          color:#111;
+        }
+        .input::placeholder { color:#9ca3af; }
         .invalid { border-color:#ef4444; background:#fef2f2; }
+
         .reg-warning { color:#dc2626; font-weight:600; margin-top:6px; }
+
         .seg { display:flex; gap:10px; flex-wrap:wrap; margin:6px 0; }
-        .segbtn { padding:8px 12px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; }
+        .segbtn { padding:8px 12px; border-radius:8px; border:1px solid #cbd5e1; background:#fff; color:#111; }
         .segbtn.on { background:#e0edff; border-color:#2563eb; color:#1d4ed8; }
+
         .btn.primary { width:100%; margin-top:12px; background:#1d4ed8; color:#fff; border:none; border-radius:10px; padding:12px; font-weight:700; }
         .btn.primary:disabled { background:#9ca3af; }
+
         .banner { padding:10px; border-radius:8px; margin:10px 0; font-weight:600; }
         .banner.ok { background:#ecfdf5; color:#065f46; }
         .banner.error { background:#fef2f2; color:#991b1b; }
-        .info { margin-top:10px; }
-        .damage-list { margin:6px 0 0 20px; list-style:disc; }
+
+        .info { margin-top:10px; color:#111; }
+        .damage-list { margin:6px 0 0 20px; list-style:disc; color:#111; }
+
         .linkbtn { background:none; border:none; color:#1d4ed8; font-weight:600; margin-top:10px; cursor:pointer; }
-        .suffix { margin-left:6px; color:#6b7280; }
+
         .narrow { max-width:120px; }
       `}</style>
     </div>
