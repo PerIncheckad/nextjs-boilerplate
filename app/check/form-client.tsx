@@ -51,7 +51,7 @@ async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar
   });
   if (dmgErr) log.steps.push({ name:'rpc:damages_lookup_any', error: dmgErr.message });
 
-  // 3) Hjulförvaring (kan vara tomt tills vi normaliserat däcklistan)
+  // 3) Hjulförvaring (kan vara tomt tills däcklistan är normaliserad)
   let wheelStorage: string =
     (carRow.wheelstorage && String(carRow.wheelstorage).trim()) ||
     (carRow.wheelStorage && String(carRow.wheelStorage).trim()) ||
@@ -89,6 +89,19 @@ async function fetchCarAndDamages(regInput: string): Promise<{ car: CanonicalCar
   return { car, log };
 }
 
+/* ====== Platsdata (byt till din fil/DB när du vill) ====== */
+type Stationer = Record<string, string[]>;
+// Fallback – funkar direkt. När du vill använda “Stationer o Depåer Albarone”
+// byt bara innehållet i PLATSER (eller läs från Supabase).
+const PLATSER: Stationer = {
+  'HALMSTAD': ['Hedin Automotive Kia', 'MABI Halmstad', 'Depå Halmstad'],
+  'MALMÖ': ['MABI Malmö City', 'Depå Malmö', 'Hjulhotell Malmö'],
+  'HELSINGBORG': ['MABI Helsingborg', 'Depå Helsingborg'],
+  'GÖTEBORG': ['MABI Göteborg', 'Hedin Bil Göteborg', 'Depå Göteborg'],
+  'STOCKHOLM': ['MABI Central', 'Depå Nord', 'Depå Syd'],
+};
+const ORTER = Object.keys(PLATSER);
+
 /* ====== UI-komponent ====== */
 export default function FormClient() {
   // Biluppslag
@@ -107,17 +120,16 @@ export default function FormClient() {
   const [adBlueOk, setAdBlueOk] = useState<boolean | null>(null);
   const [spolarOk, setSpolarOk] = useState<boolean | null>(null);
   const [insynsskyddOk, setInsynsskyddOk] = useState<boolean | null>(null);
-  const [laddsladdar, setLaddsladdar] = useState<number>(0);
+  const [laddsladdar, setLaddsladdar] = useState<0|1|2>(0);
   const [hjulSomSitterPa, setHjulSomSitterPa] = useState<'Sommarhjul'|'Vinterhjul'|null>(null);
   const [nyaSkador, setNyaSkador] = useState<boolean | null>(null);
 
-  // Dynamiska nya skador (lokalt)
-  type LocalSkada = { id: string; text: string; files: File[] };
-  const [skador, setSkador] = useState<LocalSkada[]>([]);
+  // Demoläge – simulera fel vid sparande
+  const [simulateFail, setSimulateFail] = useState<boolean>(false);
 
-  // Dummydata för ort/station – byt till din riktiga lista när den finns
-  const ORTER = ['HALMSTAD','MALMÖ','HELSINGBORG','GÖTEBORG','STOCKHOLM'];
-  const STATIONER = ['Hedin Automotive Kia','Hedin Bil','MABI Central','Depå Syd','Depå Nord'];
+  // Dynamiska nya skador (lokalt)
+  type LocalSkada = { id: string; text: string; files: File[]; previews: string[] };
+  const [skador, setSkador] = useState<LocalSkada[]>([]);
 
   async function lookupNow() {
     const value = regInput.trim(); if (!value) return;
@@ -132,19 +144,46 @@ export default function FormClient() {
     setCar(null);
   }
 
-  function addSkada() { setSkador(v => [...v, { id: crypto.randomUUID(), text: '', files: [] }]); }
-  function removeSkada(id: string) { setSkador(v => v.filter(s => s.id !== id)); }
-  function changeSkadaText(id: string, text: string) { setSkador(v => v.map(s => s.id===id?{...s,text}:s)); }
+  function addSkada() {
+    setSkador(v => [...v, { id: crypto.randomUUID(), text: '', files: [], previews: [] }]);
+  }
+  function removeSkada(id: string) {
+    setSkador(v => v.filter(s => s.id !== id));
+  }
+  function changeSkadaText(id: string, text: string) {
+    setSkador(v => v.map(s => s.id===id?{...s,text}:s));
+  }
   function addSkadaFiles(id: string, files: FileList | null) {
     if (!files) return;
     const arr = Array.from(files);
-    setSkador(v => v.map(s => s.id===id?{...s, files:[...s.files, ...arr]}:s));
+    const withPreviews = arr.map(f => URL.createObjectURL(f));
+    setSkador(v => v.map(s => s.id===id?{...s, files:[...s.files, ...arr], previews:[...s.previews, ...withPreviews]}:s));
+  }
+
+  function onSelectOrt(o: string) {
+    setOrt(o);
+    setStation(''); // nollställ station vid byte av ort
   }
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    // Här kan vi POST:a till Supabase (checkins/checkin_damages) när du vill
-    alert('Formuläret är klart visuellt. Spara-funktion kan kopplas på när tabellnamn/kolumner bekräftas.');
+
+    // Dummyvalidering
+    const errors: string[] = [];
+    if (!regInput.trim()) errors.push('Ange reg.nr');
+    if (!matarstallning.trim()) errors.push('Ange mätarställning');
+    if (!ort) errors.push('Välj ort');
+    if (!station) errors.push('Välj station/depå');
+
+    if (simulateFail) {
+      alert('Misslyckades att spara (simulerat fel). Kontrollera fält och försök igen.');
+      return;
+    }
+    if (errors.length) {
+      alert('Misslyckades att spara. ' + errors.join(' · '));
+      return;
+    }
+    alert('Incheckning sparad (demo).');
   }
 
   const showError = tried && !car && regInput.trim().length > 0;
@@ -220,22 +259,28 @@ export default function FormClient() {
             )}
           </div>
 
-          {/* Kort 2: Ort / Station */}
+          {/* Kort 2: Plats för incheckning */}
           <div className="card stack-lg">
             <div className="stack-sm">
+              <div className="label">Plats för incheckning</div>
+            </div>
+
+            <div className="stack-sm">
               <label className="label">Ort *</label>
-              <select className="select" value={ort} onChange={e => setOrt(e.target.value)}>
+              <select className="select" value={ort} onChange={e => onSelectOrt(e.target.value)}>
                 <option value="">— Välj ort —</option>
-                {['HALMSTAD','MALMÖ','HELSINGBORG','GÖTEBORG','STOCKHOLM'].map(o => <option key={o} value={o}>{o}</option>)}
+                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
+
             <div className="stack-sm">
               <label className="label">Station / Depå *</label>
-              <select className="select" value={station} onChange={e => setStation(e.target.value)}>
-                <option value="">— Välj station / depå —</option>
-                {['Hedin Automotive Kia','Hedin Bil','MABI Central','Depå Syd','Depå Nord'].map(s => <option key={s} value={s}>{s}</option>)}
+              <select className="select" value={station} onChange={e => setStation(e.target.value)} disabled={!ort}>
+                <option value="">{ort ? '— Välj station / depå —' : '— Välj ort först —'}</option>
+                {ort && PLATSER[ort]?.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+
             <div className="stack-sm">
               <label className="label">Ev. annan inlämningsplats</label>
               <input className="input" value={annanPlats} onChange={e=>setAnnanPlats(e.target.value)} placeholder="Övrig info…" />
@@ -291,7 +336,11 @@ export default function FormClient() {
           <div className="card stack-lg">
             <div className="stack-sm">
               <label className="label">Antal laddsladdar</label>
-              <input className="input" type="number" value={laddsladdar} onChange={e=>setLaddsladdar(parseInt(e.target.value || '0'))} />
+              <div className="seg">
+                <button type="button" className={`segbtn ${laddsladdar===0?'on':''}`} onClick={()=>setLaddsladdar(0)}>0</button>
+                <button type="button" className={`segbtn ${laddsladdar===1?'on':''}`} onClick={()=>setLaddsladdar(1)}>1</button>
+                <button type="button" className={`segbtn ${laddsladdar===2?'on':''}`} onClick={()=>setLaddsladdar(2)}>2</button>
+              </div>
             </div>
 
             <div className="stack-sm">
@@ -319,7 +368,24 @@ export default function FormClient() {
                 {skador.map(s => (
                   <div key={s.id} className="panel stack-sm">
                     <input className="input" value={s.text} onChange={e=>changeSkadaText(s.id, e.target.value)} placeholder="Beskriv skadan" />
-                    <input type="file" multiple onChange={e=>addSkadaFiles(s.id, e.target.files)} />
+                    <label className="filebtn">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        multiple
+                        onChange={e=>addSkadaFiles(s.id, e.target.files)}
+                        style={{ display:'none' }}
+                      />
+                      Lägg till bild
+                    </label>
+                    {s.previews.length > 0 && (
+                      <div className="thumbs">
+                        {s.previews.map((src, i) => (
+                          <img key={i} src={src} alt={`Skada ${i+1}`} />
+                        ))}
+                      </div>
+                    )}
                     <button type="button" className="link" onClick={()=>removeSkada(s.id)}>Ta bort</button>
                   </div>
                 ))}
@@ -329,6 +395,14 @@ export default function FormClient() {
 
           {/* Kort 6: Övrigt + Spara */}
           <div className="card stack-lg">
+            <div className="stack-sm">
+              <label className="label">Demoläge</label>
+              <div className="seg">
+                <button type="button" className={`segbtn ${simulateFail?'on':''}`} onClick={()=>setSimulateFail(!simulateFail)}>
+                  {simulateFail ? 'Simulera fel vid sparande: PÅ' : 'Simulera fel vid sparande: AV'}
+                </button>
+              </div>
+            </div>
             <button type="submit" className="btn primary">Spara incheckning</button>
           </div>
 
@@ -342,33 +416,36 @@ export default function FormClient() {
         </form>
       </div></div>
 
-      {/* Minimal styling för 99%-läget */}
+      {/* Ljus ”99%”-stil */}
       <style jsx>{`
-        .page { padding: 16px; }
+        .page { padding: 16px; background:#f6f7f9; min-height:100vh; }
         .container{ max-width: 720px; margin:0 auto; }
-        .h1{ font-size:28px; font-weight:700; margin:8px 0 16px; }
-        .p{ margin:0 0 16px; color:#9aa0a6; }
+        .h1{ font-size:28px; font-weight:700; margin:8px 0 16px; color:#0b0d12; }
+        .p{ margin:0 0 16px; color:#5f6368; }
         .stack-xl > * + *{ margin-top:24px; }
         .stack-lg > * + *{ margin-top:16px; }
         .stack-sm > * + *{ margin-top:8px; }
-        .card{ background:#111; border:1px solid #2a2a2a; border-radius:12px; padding:16px; }
-        .label{ font-weight:600; }
-        .input,.select{ width:100%; background:#0c0c0c; color:#fff; border:1px solid #2a2a2a; border-radius:8px; padding:12px; }
+        .card{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.03); }
+        .label{ font-weight:600; color:#0b0d12; }
+        .input,.select{ width:100%; background:#fff; color:#111; border:1px solid #d3d6da; border-radius:8px; padding:12px; }
         .row{ display:flex; align-items:center; gap:8px; }
         .suffix{ min-width:40px; }
-        .seg{ display:flex; gap:8px; }
-        .segbtn{ padding:10px 14px; border:1px solid #2a2a2a; border-radius:8px; background:#0c0c0c; color:#fff; }
-        .segbtn.on{ background:#d2f4d3; color:#0a0a0a; border-color:#d2f4d3; }
-        .btn{ padding:12px 16px; border-radius:10px; border:1px solid #2a2a2a; background:#222; color:#fff; }
-        .btn.primary{ background:#1a4bff; border-color:#1a4bff; }
-        .link{ background:transparent; color:#7aa7ff; border:none; padding:0; }
-        .muted{ color:#9aa0a6; }
-        .error{ color:#ef4444; }
+        .seg{ display:flex; flex-wrap:wrap; gap:8px; }
+        .segbtn{ padding:10px 14px; border:1px solid #d3d6da; border-radius:8px; background:#fff; color:#111; }
+        .segbtn.on{ background:#e7f3ff; color:#0b57d0; border-color:#b7d3ff; }
+        .btn{ padding:12px 16px; border-radius:10px; border:1px solid #d3d6da; background:#fff; color:#111; font-weight:600; }
+        .btn.primary{ background:#1a73e8; border-color:#1a73e8; color:#fff; }
+        .filebtn{ display:inline-block; padding:10px 14px; border:1px dashed #b7c0cc; border-radius:8px; color:#0b57d0; cursor:pointer; width:max-content; }
+        .link{ background:transparent; color:#0b57d0; border:none; padding:0; }
+        .muted{ color:#5f6368; }
+        .error{ color:#d93025; }
         .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
         .info{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-        .value{ font-weight:600; }
-        .panel{ background:#0c0c0c; border:1px solid #2a2a2a; border-radius:8px; padding:12px; }
+        .value{ font-weight:600; color:#0b0d12; }
+        .panel{ background:#fafbfc; border:1px solid #e5e7eb; border-radius:8px; padding:12px; }
         .ul{ margin:0; padding-left:18px; }
+        .thumbs{ display:flex; gap:8px; flex-wrap:wrap; }
+        .thumbs img{ width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid #e5e7eb; }
         details.debug{ margin-top:16px; }
         pre{ white-space:pre-wrap; word-break:break-word; }
         @media (max-width:640px){ .grid2,.info{ grid-template-columns:1fr; } }
@@ -376,4 +453,3 @@ export default function FormClient() {
     </section>
   );
 }
-
