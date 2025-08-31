@@ -1,429 +1,471 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import { createClient } from '@supabase/supabase-js';
 
-/* =============================
-   ORTER & DEPÅER (vänster/höger kolumnen i din bild)
-   ============================= */
-const ORTER: Record<string, string[]> = {
-  "MALMÖ": [
-    "Huvudstation Malmö Jägersro",
-    "Ford Malmö",
-    "Mechanum",
-    "Malmö Automera",
-    "Mercedes Malmö",
-    "Werksta St Bernstorp",
-    "Werksta Malmö Hamn",
-    "Hedbergs Malmö",
-    "Hedin Automotive Burlöv",
-    "Sturup",
-  ],
-  "HELSINGBORG": [
-    "Huvudstation Helsingborg",
-    "HBSC Helsingborg",
-    "Ford Helsingborg",
-    "Transport Helsingborg",
-    "S. Jönsson",
-    "BMW Helsingborg",
-    "KIA Helsingborg",
-    "Euromaster Helsingborg",
-    "B/S Klippan",
-    "B/S Munka-Ljungby",
-    "B/S Helsingborg",
-    "Werksta Helsingborg",
-    "Båstad",
-  ],
-  "ÄNGELHOLM": [
-    "Huvudstation Ängelholm",
-    "FORD Ängelholm",
-    "Mekonomen Ängelholm",
-    "Flyget Ängelholm",
-  ],
-  "HALMSTAD": [
-    "Huvudstation Halmstad",
-    "Flyget Halmstad",
-    "KIA Halmstad",
-    "FORD Halmstad",
-  ],
-  "FALKENBERG": ["Huvudstation Falkenberg"],
-  "TRELLEBORG": ["Huvudstation Trelleborg"],
-  "VARBERG": [
-    "Huvudstation Varberg",
-    "Ford Varberg",
-    "Hedin Automotive Varberg",
-    "Sällstorp lack plåt",
-    "Finnveden plåt",
-  ],
-  "LUND": ["Ford Lund", "Hedin Lund", "B/S Lund", "P7 Revinge"],
-};
+/* ---------- Supabase-klient ---------- */
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-/* =============================
-   Hjälpfunktioner
-   ============================= */
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-async function callRpc<T>(fn: string, body: Record<string, any>): Promise<T> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
-    method: "POST",
-    headers: {
-      apikey: SUPABASE_KEY,
-      Authorization: `Bearer ${SUPABASE_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw new Error(`${fn} failed: ${res.status} ${await res.text()}`);
-  }
-  return res.json();
-}
-
-function normReg(raw: string) {
-  // Normalisera: ta bort mellanslag/streck/punkt, A-Z/0-9
-  return (raw || "")
+/* ---------- Hjälpare ---------- */
+const norm = (s: string) =>
+  (s || '')
     .toUpperCase()
-    .replace(/[^\p{L}0-9]/gu, "");
-}
+    .replace(/[\s\-_.]/g, '')
+    .trim();
 
-/* =============================
-   Typer
-   ============================= */
-type CarHit = {
-  regnr: string;
-  model: string | null;
-  wheelstorage: string | null;
-  car_id: string | null;
+const fmtKm = (v: string) => v.replace(/[^\d]/g, '');
+const isNumber = (v: string) => /^-?\d+([,.]\d+)?$/.test(v);
+
+type CarLookup =
+  | {
+      regnr: string | null;
+      model: string | null;
+      wheelstorage: string | null;
+      car_id: string | null;
+    }
+  | null;
+
+type DamageRow = { id?: string; plats?: string; typ?: string; beskrivning?: string };
+
+/* ---------- PLATSER ---------- */
+/* Denna lista är filtrerad & förenklad ur din Excel. Lägg till/ändra fritt. */
+const PLATSER: Record<
+  string,
+  { label: string; stations: string[] }
+> = {
+  'MALMÖ JÄGERSRO': {
+    label: 'MALMÖ JÄGERSRO',
+    stations: [
+      'Huvudstation Malmö Jägersro',
+      'Ford Malmö',
+      'Mechanum',
+      'Malmö Automera',
+      'Mercedes Malmö',
+      'Werksta St Bernstorps',
+      'Werksta Malmö Hamn',
+      'Hedbergs Malmö',
+      'Hedin Automotive Burlöv',
+      'Sturup',
+    ],
+  },
+  HELSINGBORG: {
+    label: 'HELSINGBORG',
+    stations: [
+      'Huvudstation Helsingborg',
+      'HBSC Helsingborg',
+      'Ford Helsingborg',
+      'Transport Helsingborg',
+      'S. Jönsson',
+      'BMW Helsingborg',
+      'KIA Helsingborg',
+      'Euromaster Helsingborg',
+      'B/S Klippan',
+      'B/S Munka-Ljungby',
+      'B/S Helsingborg',
+      'Werksta Helsingborg',
+      'Båstad',
+    ],
+  },
+  ÄNGELHOLM: {
+    label: 'ÄNGELHOLM',
+    stations: ['Huvudstation Ängelholm', 'FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
+  },
+  HALMSTAD: {
+    label: 'HALMSTAD',
+    stations: ['Huvudstation Halmstad', 'Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
+  },
+  FALKENBERG: {
+    label: 'FALKENBERG',
+    stations: ['Huvudstation Falkenberg'],
+  },
+  TRELLEBORG: {
+    label: 'TRELLEBORG',
+    stations: ['Huvudstation Trelleborg'],
+  },
+  VARBERG: {
+    label: 'VARBERG',
+    stations: [
+      'Huvudstation Varberg',
+      'Ford Varberg',
+      'Hedin Automotive Varberg',
+      'Sällstorp lack plåt',
+      'Finnveden plåt',
+    ],
+  },
+  LUND: {
+    label: 'LUND',
+    stations: ['Ford Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
+  },
 };
 
-type DamageRow = {
-  plats?: string | null;
-  typ?: string | null;
-  beskrivning?: string | null;
-};
-
-type Fetched = {
-  car: CarHit | null;
-  damages: DamageRow[];
-  wheel: string | null;
-};
-
-/* =============================
-   Komponent
-   ============================= */
+/* ---------- Komponent ---------- */
 export default function CheckinForm() {
-  // Formstate
-  const [regnr, setRegnr] = useState("");
-  const [regUnknown, setRegUnknown] = useState<boolean>(false);
+  /* Form-state */
+  const [regInput, setRegInput] = useState('');
+  const regNorm = useMemo(() => norm(regInput), [regInput]);
 
-  const [ort, setOrt] = useState<string>("");
-  const [depa, setDepa] = useState<string>("");
+  const [car, setCar] = useState<CarLookup>(null);
+  const [damages, setDamages] = useState<DamageRow[]>([]);
+  const [lookedUp, setLookedUp] = useState(false);
+  const [lookupBusy, setLookupBusy] = useState(false);
 
-  const [matarstallning, setMatarstallning] = useState<string>("");
+  // plats
+  const [useCustomPlace, setUseCustomPlace] = useState(false);
+  const [ort, setOrt] = useState<string>('');
+  const [station, setStation] = useState<string>('');
+  const [customPlace, setCustomPlace] = useState<string>('');
+  const [geo, setGeo] = useState<string>('');
 
+  // fordonsstatus
+  const [odo, setOdo] = useState('');
   const [tankFull, setTankFull] = useState<boolean | null>(null);
-  const [liters, setLiters] = useState<string>(""); // en decimal
-  const [bransle, setBransle] = useState<"Bensin" | "Diesel" | null>(null);
-
+  const [fuelLiters, setFuelLiters] = useState(''); // decimal med komma
+  const [fuelType, setFuelType] = useState<'Bensin' | 'Diesel' | ''>('');
   const [adBlueOk, setAdBlueOk] = useState<boolean | null>(null);
   const [spolarOk, setSpolarOk] = useState<boolean | null>(null);
-  const [insynOk, setInsynOk] = useState<boolean | null>(null);
-  const [laddsladdar, setLaddsladdar] = useState<number | null>(null);
-  const [hjul, setHjul] = useState<"sommar" | "vinter" | null>(null);
+  const [privacyOk, setPrivacyOk] = useState<boolean | null>(null);
+  const [cables, setCables] = useState<0 | 1 | 2 | null>(null);
+  const [wheelsOn, setWheelsOn] = useState<'Sommarhjul' | 'Vinterhjul' | ''>('');
+  const [newDamages, setNewDamages] = useState<
+    { text: string; files: { file: File; url: string }[] }[]
+  >([]);
 
-  // Skador (flera)
-  type Skada = { text: string; bilder: string[] };
-  const [skador, setSkador] = useState<Skada[]>([]);
-  const addSkada = () => setSkador((s) => [...s, { text: "", bilder: [] }]);
-  const removeSkada = (idx: number) =>
-    setSkador((s) => s.filter((_, i) => i !== idx));
+  // UI
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [submitOk, setSubmitOk] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [anteckning, setAnteckning] = useState("");
-
-  // Uppslagna fordonsdata
-  const [fetched, setFetched] = useState<Fetched>({
-    car: null,
-    damages: [],
-    wheel: null,
-  });
-
-  // Feedback
-  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(
-    null
-  );
-
-  // Depålista beroende på ort
-  const depaLista = useMemo(() => (ort ? ORTER[ort] ?? [] : []), [ort]);
-
-  /* ---------- Reg.nr-uppslag ---------- */
+  /* ---------- Regnr-lookup ---------- */
   useEffect(() => {
-    let alive = true;
-    const raw = regnr.trim();
-    if (!raw) {
-      setFetched({ car: null, damages: [], wheel: null });
-      setRegUnknown(false);
-      return;
-    }
+    let cancelled = false;
 
-    const n = normReg(raw);
-    const run = async () => {
+    const doLookup = async () => {
+      setLookedUp(false);
+      setCar(null);
+      setDamages([]);
+      if (!regNorm) return;
+
+      setLookupBusy(true);
       try {
-        // Bil
-        const carList = await callRpc<CarHit[]>("car_lookup_any", { regnr: n });
-        const car = carList?.[0] ?? null;
+        // 1) Hämta bilinfo
+        const carRes = await supabase.rpc('car_lookup_any', { regnr: regNorm }).catch(() => null);
+        let picked: CarLookup = null;
 
-        // Hjul
-        let w: string | null = null;
-        try {
-          const wrows = await callRpc<{ wheel_storage: string | null }[]>(
-            "wheel_lookup_any",
-            { regnr: n }
-          );
-          w = wrows?.[0]?.wheel_storage ?? null;
-        } catch {
-          // ignore
+        if (carRes && (carRes as any).data) {
+          const data = (carRes as any).data as any[];
+          if (Array.isArray(data) && data.length) {
+            const row = data[0];
+            picked = {
+              regnr: row.regnr ?? row.registration ?? null,
+              model: row.model ?? row.brand_model ?? null,
+              wheelstorage: row.wheelstorage ?? row.wheel_storage ?? null,
+              car_id: row.car_id ?? row.id ?? null,
+            };
+          }
         }
 
-        // Skador
-        let d: DamageRow[] = [];
-        try {
-          const drows = await callRpc<DamageRow[]>("damages_lookup_any", {
-            regnr: n,
-          });
-          d = Array.isArray(drows) ? drows : [];
-        } catch {
-          // ignore
+        // 2) Hämta befintliga skador (om vi har car_id eller regnr)
+        let dmg: DamageRow[] = [];
+        if (picked?.car_id || regNorm) {
+          const damRes = await supabase
+            .rpc('damages_lookup_any', {
+              car_id: picked?.car_id ?? null,
+              regnr: regNorm,
+            })
+            .catch(() => null);
+
+          if (damRes && (damRes as any).data) {
+            const arr = (damRes as any).data as any[];
+            if (Array.isArray(arr)) {
+              dmg = arr.map((r) => ({
+                id: r.id,
+                plats: r.plats ?? r.place ?? undefined,
+                typ: r.typ ?? r.type ?? undefined,
+                beskrivning: r.beskrivning ?? r.description ?? undefined,
+              }));
+            }
+          }
         }
 
-        if (!alive) return;
-        setFetched({ car, damages: d, wheel: w });
-        setRegUnknown(!car); // visa "Okänt reg.nr" om ingen träff
-      } catch {
-        if (!alive) return;
-        setFetched({ car: null, damages: [], wheel: null });
-        setRegUnknown(true);
+        if (!cancelled) {
+          setCar(picked);
+          setDamages(dmg);
+          setLookedUp(true);
+        }
+      } finally {
+        if (!cancelled) setLookupBusy(false);
       }
     };
 
-    const t = setTimeout(run, 350); // lätt debounce
+    const t = setTimeout(doLookup, 300); // enkel debounce
     return () => {
-      alive = false;
+      cancelled = true;
       clearTimeout(t);
     };
-  }, [regnr]);
+  }, [regNorm]);
 
-  /* ---------- Filuppladdning: ”Lägg till bild” (+ ta bort) ---------- */
-  const hiddenInputs = useRef<Record<number, HTMLInputElement | null>>({});
+  /* ---------- Validering ---------- */
+  const needFuelFollowUps = tankFull === false;
+  const fuelLitersOk =
+    !needFuelFollowUps || (fuelLiters && isNumber(fuelLiters.replace('.', ',')));
+  const fuelTypeOk = !needFuelFollowUps || !!fuelType;
 
-  function triggerAddImage(skadaIx: number) {
-    hiddenInputs.current[skadaIx]?.click();
-  }
-  function onAddImages(skadaIx: number, e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    const urls = files.map((f) => URL.createObjectURL(f));
-    setSkador((prev) =>
-      prev.map((s, i) => (i === skadaIx ? { ...s, bilder: s.bilder.concat(urls) } : s))
+  const placeOk = useCustomPlace
+    ? customPlace.trim().length > 0
+    : !!ort && !!station;
+
+  const regOk = regNorm.length > 0;
+  const odoOk = fmtKm(odo).length > 0;
+  const togglesOk =
+    tankFull !== null &&
+    adBlueOk !== null &&
+    spolarOk !== null &&
+    privacyOk !== null &&
+    cables !== null &&
+    !!wheelsOn &&
+    fuelLitersOk &&
+    fuelTypeOk;
+
+  const allOk = regOk && placeOk && odoOk && togglesOk;
+
+  const markInvalid = submitAttempted && !allOk;
+
+  /* ---------- Handlers ---------- */
+  const onPickGeo = () => {
+    if (!navigator.geolocation) {
+      setGeo('Geolokalisering saknas i denna webbläsare.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeo(`${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`);
+      },
+      (err) => setGeo(`Kunde inte hämta position (${err.code})`)
     );
-    e.currentTarget.value = ""; // reset
-  }
-  function removeImage(skadaIx: number, imgIx: number) {
-    setSkador((prev) =>
-      prev.map((s, i) =>
-        i === skadaIx ? { ...s, bilder: s.bilder.filter((_, j) => j !== imgIx) } : s
-      )
-    );
-  }
+  };
 
-  /* ---------- Submit (dummy) + validering + scroll-to-top ---------- */
-  function onSubmit(e: React.FormEvent) {
+  const addDamageCard = () =>
+    setNewDamages((arr) => [...arr, { text: '', files: [] }]);
+
+  const updateDamageText = (i: number, v: string) =>
+    setNewDamages((arr) => {
+      const copy = [...arr];
+      copy[i] = { ...copy[i], text: v };
+      return copy;
+    });
+
+  const addDamageFiles = (i: number, files: FileList | null) => {
+    if (!files || !files.length) return;
+    setNewDamages((arr) => {
+      const copy = [...arr];
+      const more = Array.from(files).map((f) => ({ file: f, url: URL.createObjectURL(f) }));
+      copy[i] = { ...copy[i], files: [...copy[i].files, ...more] };
+      return copy;
+    });
+  };
+
+  const removeDamageFile = (cardIdx: number, url: string) =>
+    setNewDamages((arr) => {
+      const copy = [...arr];
+      copy[cardIdx] = { ...copy[cardIdx], files: copy[cardIdx].files.filter((x) => x.url !== url) };
+      return copy;
+    });
+
+  const removeDamageCard = (i: number) =>
+    setNewDamages((arr) => arr.filter((_, idx) => idx !== i));
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMsg(null);
+    setSubmitAttempted(true);
+    setSubmitError(null);
+    setSubmitOk(false);
 
-    const requiredOk =
-      !!normReg(regnr) &&
-      !!ort &&
-      !!depa &&
-      !!matarstallning &&
-      tankFull !== null &&
-      adBlueOk !== null &&
-      spolarOk !== null &&
-      insynOk !== null &&
-      laddsladdar !== null &&
-      hjul !== null &&
-      skador.every((s) => s.text.trim().length > 0); // varje skada behöver text
-
-    // extra krav när ej fulltankad
-    const fuelOk =
-      tankFull === true ||
-      (tankFull === false &&
-        !!liters &&
-        !isNaN(Number(liters)) &&
-        bransle !== null);
-
-    if (!requiredOk || !fuelOk) {
-      setMsg({
-        type: "err",
-        text: "Vänligen fyll i all information först.",
-      });
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!allOk) {
+      setSubmitError('Vänligen fyll i all obligatorisk information först.');
       return;
     }
 
-    setMsg({
-      type: "ok",
-      text: `Tack Bob! Incheckningen för ${normReg(regnr)} är sparad.`,
-    });
+    // Dummy-spara.
+    setTimeout(() => {
+      setSubmitOk(true);
+      setSubmitError(null);
+    }, 400);
+  };
 
-    // (dummy – ingen faktisk persist här)
-  }
+  /* ---------- Render ---------- */
+  const stationsForOrt = useMemo(() => {
+    const key = Object.keys(PLATSER).find((k) => k === ort);
+    return key ? PLATSER[key].stations : [];
+  }, [ort]);
+
+  const unknownReg =
+    lookedUp &&
+    regNorm &&
+    !lookupBusy &&
+    (!car || (!car.model && !car.wheelstorage && !damages.length));
 
   return (
     <div className="page">
       <div className="container">
         <h1>Ny incheckning</h1>
-        <p className="muted">
-          Inloggad: <b>Bob</b>
-        </p>
+        <p className="muted">Inloggad: <b>Bob</b></p>
 
-        {msg && (
-          <div className={`alert ${msg.type === "ok" ? "success" : "error"}`}>
-            {msg.text}
-          </div>
-        )}
-
-        <form onSubmit={onSubmit}>
-          {/* Reg.nr + Fordonsinfo */}
-          <section className="card">
-            <label className="label" htmlFor="regnr">
-              Registreringsnummer *
-            </label>
-            <input
-              id="regnr"
-              autoCapitalize="characters"
-              placeholder="Skriv reg.nr"
-              value={regnr}
-              onChange={(e) => setRegnr(e.target.value)}
-              className="input"
-            />
-            {regUnknown && (
-              <div className="warn">Okänt reg.nr</div>
-            )}
-
-            <div className="infoGrid">
-              <div>
-                <div className="smallLabel">Bilmodell</div>
-                <div className="infoLine">
-                  {fetched.car?.model || "--"}
-                </div>
-              </div>
-              <div>
-                <div className="smallLabel">Hjulförvaring</div>
-                <div className="infoLine">
-                  {fetched.wheel || fetched.car?.wheelstorage || "--"}
-                </div>
-              </div>
+        <form onSubmit={onSubmit} noValidate>
+          {/* --- REG + AUTO-DATA --- */}
+          <div className="card">
+            <div className="field">
+              <label>Registreringsnummer *</label>
+              <input
+                className={submitAttempted && !regOk ? 'invalid' : ''}
+                value={regInput}
+                onChange={(e) => setRegInput(e.target.value)}
+                placeholder="Skriv reg.nr"
+                inputMode="text"
+                autoCapitalize="characters"
+              />
+              {unknownReg && <div className="error-inline">Okänt reg.nr</div>}
             </div>
 
-            <div>
-              <div className="smallLabel">Befintliga skador:</div>
-              <div className="damageBox">
-                {fetched.damages && fetched.damages.length > 0 ? (
-                  <ul>
-                    {fetched.damages.map((d, i) => (
-                      <li key={i}>
-                        {[
-                          d.plats ? String(d.plats) : undefined,
-                          d.typ ? String(d.typ) : undefined,
-                          d.beskrivning ? String(d.beskrivning) : undefined,
-                        ]
-                          .filter(Boolean)
-                          .join(" – ")}
+            <div className="auto">
+              <div>
+                <div className="sub">Bilmodell</div>
+                <div className="auto-val">{car?.model || '--'}</div>
+              </div>
+              <div>
+                <div className="sub">Hjulförvaring</div>
+                <div className="auto-val">{car?.wheelstorage || '--'}</div>
+              </div>
+              <div>
+                <div className="sub">Befintliga skador:</div>
+                {damages.length === 0 ? (
+                  <div className="auto-val">–</div>
+                ) : (
+                  <ul className="damage-list">
+                    {damages.map((d, idx) => (
+                      <li key={d.id || idx}>
+                        {[d.plats, d.typ, d.beskrivning].filter(Boolean).join(' – ')}
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <span className="muted">—</span>
                 )}
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Plats för incheckning (rubrik innesluter Ort + Station/depå) */}
-          <h2 className="blockTitle">Plats för incheckning</h2>
-          <section className="card">
-            <label className="label" htmlFor="ort">
-              Ort *
-            </label>
-            <select
-              id="ort"
-              className="input"
-              value={ort}
-              onChange={(e) => {
-                setOrt(e.target.value);
-                setDepa("");
-              }}
-            >
-              <option value="">— Välj ort —</option>
-              {Object.keys(ORTER).map((o) => (
-                <option key={o} value={o}>
-                  {o}
-                </option>
-              ))}
-            </select>
-
-            <label className="label" htmlFor="depa">
-              Station / Depå *
-            </label>
-            <select
-              id="depa"
-              className="input"
-              value={depa}
-              onChange={(e) => setDepa(e.target.value)}
-              disabled={!ort}
-            >
-              <option value="">— Välj station / depå —</option>
-              {depaLista.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </section>
-
-          {/* Mätare + fordonstillbehör mm */}
-          <section className="card">
-            <label className="label" htmlFor="matar">
-              Mätarställning *
-            </label>
-            <div className="with-suffix">
-              <input
-                id="matar"
-                inputMode="numeric"
-                placeholder="ex. 42 180"
-                className="input"
-                value={matarstallning}
-                onChange={(e) => setMatarstallning(e.target.value)}
-              />
-              <span className="suffix">km</span>
+          {/* --- PLATS --- */}
+          <h2>Plats för incheckning</h2>
+          <div className="card">
+            <div className="row between">
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={useCustomPlace}
+                  onChange={(e) => setUseCustomPlace(e.target.checked)}
+                />
+                <span>Annan plats (fritext)</span>
+              </label>
+              {useCustomPlace && (
+                <button
+                  type="button"
+                  className="btnplain"
+                  onClick={onPickGeo}
+                  title="Hämta geokoordinater från enheten"
+                >
+                  Hämta position
+                </button>
+              )}
             </div>
 
-            <div className="stack">
-              <label className="label">Tanknivå *</label>
+            {!useCustomPlace ? (
+              <>
+                <div className="field">
+                  <label>Ort *</label>
+                  <select
+                    className={submitAttempted && !ort ? 'invalid' : ''}
+                    value={ort}
+                    onChange={(e) => {
+                      setOrt(e.target.value);
+                      setStation('');
+                    }}
+                  >
+                    <option value="">— Välj ort —</option>
+                    {Object.keys(PLATSER).map((k) => (
+                      <option key={k} value={k}>
+                        {PLATSER[k].label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label>Station / Depå *</label>
+                  <select
+                    className={submitAttempted && !station ? 'invalid' : ''}
+                    value={station}
+                    onChange={(e) => setStation(e.target.value)}
+                    disabled={!ort}
+                  >
+                    <option value="">— Välj station / depå —</option>
+                    {stationsForOrt.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="field">
+                  <label>Beskriv plats *</label>
+                  <textarea
+                    className={submitAttempted && !customPlace ? 'invalid' : ''}
+                    value={customPlace}
+                    onChange={(e) => setCustomPlace(e.target.value)}
+                    placeholder="Ex. ”Parkering södra infarten, rad 3”"
+                  />
+                </div>
+                <div className="field">
+                  <label>Geotagg (valfritt)</label>
+                  <input value={geo} onChange={(e) => setGeo(e.target.value)} placeholder="lat, long" />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* --- FORDONSSTATUS --- */}
+          <h2>Fordonsstatus</h2>
+          <div className="card">
+            <div className="field">
+              <label>Mätarställning *</label>
+              <div className="with-suffix">
+                <input
+                  className={submitAttempted && !odoOk ? 'invalid' : ''}
+                  value={odo}
+                  onChange={(e) => setOdo(e.target.value)}
+                  placeholder="ex. 42 180"
+                  inputMode="numeric"
+                />
+                <span className="suffix muted">km</span>
+              </div>
+            </div>
+
+            <div className="group">
+              <div className="label">Tanknivå *</div>
               <div className="seg">
                 <button
                   type="button"
-                  className={`segbtn ${tankFull === true ? "on" : ""}`}
-                  onClick={() => {
-                    setTankFull(true);
-                    setLiters("");
-                    setBransle(null);
-                  }}
+                  className={`segbtn ${tankFull === true ? 'on' : ''}`}
+                  onClick={() => setTankFull(true)}
                 >
                   Fulltankad
                 </button>
                 <button
                   type="button"
-                  className={`segbtn ${tankFull === false ? "on" : ""}`}
+                  className={`segbtn ${tankFull === false ? 'on' : ''}`}
                   onClick={() => setTankFull(false)}
                 >
                   Ej fulltankad
@@ -431,43 +473,38 @@ export default function CheckinForm() {
               </div>
             </div>
 
-            {/* Följdfrågor när ”Ej fulltankad” */}
-            {tankFull === false && (
-              <div className="grid2">
-                <div className="stack">
-                  <label className="label" htmlFor="liters">
-                    Antal liter påfyllda
-                  </label>
+            {needFuelFollowUps && (
+              <div className="fuel-extra">
+                <div className="field small">
+                  <label>Antal liter påfyllda *</label>
                   <input
-                    id="liters"
-                    className="input"
-                    inputMode="decimal"
-                    placeholder="ex. 12,5"
-                    value={liters}
+                    className={submitAttempted && !fuelLitersOk ? 'invalid' : ''}
+                    value={fuelLiters}
                     onChange={(e) => {
-                      // Ersätt komma med punkt vid inmatning
-                      const v = e.target.value.replace(",", ".");
-                      // Endast siffror + ett decimaltecken
-                      if (/^\d*([.]\d?)?$/.test(v) || v === "") {
-                        setLiters(v);
-                      }
+                      // Tillåt siffror och komma, byt punkt till komma
+                      let v = e.target.value.replace('.', ',');
+                      // max 4 siffror + ev komma + 1 decimal -> enklare: begränsa längd till 6
+                      if (v.length > 6) v = v.slice(0, 6);
+                      setFuelLiters(v);
                     }}
+                    placeholder="ex. 7,5"
+                    inputMode="decimal"
                   />
                 </div>
-                <div className="stack">
-                  <label className="label">Bränsle</label>
+                <div className="field">
+                  <label>Bränsletyp *</label>
                   <div className="seg">
                     <button
                       type="button"
-                      className={`segbtn ${bransle === "Bensin" ? "on" : ""}`}
-                      onClick={() => setBransle("Bensin")}
+                      className={`segbtn ${fuelType === 'Bensin' ? 'on' : ''}`}
+                      onClick={() => setFuelType('Bensin')}
                     >
                       Bensin
                     </button>
                     <button
                       type="button"
-                      className={`segbtn ${bransle === "Diesel" ? "on" : ""}`}
-                      onClick={() => setBransle("Diesel")}
+                      className={`segbtn ${fuelType === 'Diesel' ? 'on' : ''}`}
+                      onClick={() => setFuelType('Diesel')}
                     >
                       Diesel
                     </button>
@@ -476,77 +513,75 @@ export default function CheckinForm() {
               </div>
             )}
 
-            <div className="grid2">
-              <div className="stack">
-                <label className="label">AdBlue OK? *</label>
-                <div className="seg">
-                  <button
-                    type="button"
-                    className={`segbtn ${adBlueOk === true ? "on" : ""}`}
-                    onClick={() => setAdBlueOk(true)}
-                  >
-                    Ja
-                  </button>
-                  <button
-                    type="button"
-                    className={`segbtn ${adBlueOk === false ? "on" : ""}`}
-                    onClick={() => setAdBlueOk(false)}
-                  >
-                    Nej
-                  </button>
-                </div>
-              </div>
-
-              <div className="stack">
-                <label className="label">Spolarvätska OK? *</label>
-                <div className="seg">
-                  <button
-                    type="button"
-                    className={`segbtn ${spolarOk === true ? "on" : ""}`}
-                    onClick={() => setSpolarOk(true)}
-                  >
-                    Ja
-                  </button>
-                  <button
-                    type="button"
-                    className={`segbtn ${spolarOk === false ? "on" : ""}`}
-                    onClick={() => setSpolarOk(false)}
-                  >
-                    Nej
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="stack">
-              <label className="label">Insynsskydd OK? *</label>
+            <div className="group">
+              <div className="label">AdBlue OK? *</div>
               <div className="seg">
                 <button
                   type="button"
-                  className={`segbtn ${insynOk === true ? "on" : ""}`}
-                  onClick={() => setInsynOk(true)}
+                  className={`segbtn ${adBlueOk === true ? 'on' : ''}`}
+                  onClick={() => setAdBlueOk(true)}
                 >
                   Ja
                 </button>
                 <button
                   type="button"
-                  className={`segbtn ${insynOk === false ? "on" : ""}`}
-                  onClick={() => setInsynOk(false)}
+                  className={`segbtn ${adBlueOk === false ? 'on' : ''}`}
+                  onClick={() => setAdBlueOk(false)}
                 >
                   Nej
                 </button>
               </div>
             </div>
 
-            <div className="stack">
-              <label className="label">Antal laddsladdar *</label>
+            <div className="group">
+              <div className="label">Spolarvätska OK? *</div>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={`segbtn ${spolarOk === true ? 'on' : ''}`}
+                  onClick={() => setSpolarOk(true)}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  className={`segbtn ${spolarOk === false ? 'on' : ''}`}
+                  onClick={() => setSpolarOk(false)}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div className="group">
+              <div className="label">Insynsskydd OK? *</div>
+              <div className="seg">
+                <button
+                  type="button"
+                  className={`segbtn ${privacyOk === true ? 'on' : ''}`}
+                  onClick={() => setPrivacyOk(true)}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  className={`segbtn ${privacyOk === false ? 'on' : ''}`}
+                  onClick={() => setPrivacyOk(false)}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div className="group">
+              <div className="label">Antal laddsladdar *</div>
               <div className="seg">
                 {[0, 1, 2].map((n) => (
                   <button
                     key={n}
                     type="button"
-                    className={`segbtn ${laddsladdar === n ? "on" : ""}`}
-                    onClick={() => setLaddsladdar(n)}
+                    className={`segbtn ${cables === n ? 'on' : ''}`}
+                    onClick={() => setCables(n as 0 | 1 | 2)}
                   >
                     {n}
                   </button>
@@ -554,209 +589,158 @@ export default function CheckinForm() {
               </div>
             </div>
 
-            <div className="stack">
-              <label className="label">Hjul som sitter på *</label>
+            <div className="group">
+              <div className="label">Hjul som sitter på *</div>
               <div className="seg">
                 <button
                   type="button"
-                  className={`segbtn ${hjul === "sommar" ? "on" : ""}`}
-                  onClick={() => setHjul("sommar")}
+                  className={`segbtn ${wheelsOn === 'Sommarhjul' ? 'on' : ''}`}
+                  onClick={() => setWheelsOn('Sommarhjul')}
                 >
                   Sommarhjul
                 </button>
                 <button
                   type="button"
-                  className={`segbtn ${hjul === "vinter" ? "on" : ""}`}
-                  onClick={() => setHjul("vinter")}
+                  className={`segbtn ${wheelsOn === 'Vinterhjul' ? 'on' : ''}`}
+                  onClick={() => setWheelsOn('Vinterhjul')}
                 >
                   Vinterhjul
                 </button>
               </div>
             </div>
-          </section>
+          </div>
 
-          {/* Nya skador */}
-          <section className="card">
-            <div className="stack">
-              <label className="label">Nya skador på bilen?</label>
-              <div className="seg">
+          {/* --- Nya skador --- */}
+          <h2>Nya skador på bilen?</h2>
+          {newDamages.map((d, i) => (
+            <div className="damage-card" key={i}>
+              <div className="row between">
+                <div className="title">Skada {i + 1}</div>
                 <button
                   type="button"
-                  className={`segbtn ${skador.length > 0 ? "on" : ""}`}
-                  onClick={() => {
-                    if (skador.length === 0) addSkada();
-                  }}
+                  className="link danger"
+                  onClick={() => removeDamageCard(i)}
                 >
-                  Ja
-                </button>
-                <button
-                  type="button"
-                  className={`segbtn ${skador.length === 0 ? "on" : ""}`}
-                  onClick={() => setSkador([])}
-                >
-                  Nej
+                  Ta bort
                 </button>
               </div>
-            </div>
 
-            {skador.map((s, idx) => (
-              <div key={idx} className="skadakort">
-                <div className="skadatitle">
-                  <h3>Skada {idx + 1}</h3>
-                  <button
-                    type="button"
-                    className="linkbtn"
-                    onClick={() => removeSkada(idx)}
-                  >
-                    Ta bort
-                  </button>
-                </div>
-
-                <label className="label">Text (obligatorisk)</label>
+              <div className="field">
+                <label>Text (obligatorisk)</label>
                 <input
-                  className="input"
+                  className={submitAttempted && !d.text ? 'invalid' : ''}
+                  value={d.text}
+                  onChange={(e) => updateDamageText(i, e.target.value)}
                   placeholder="Beskriv skadan…"
-                  value={s.text}
-                  onChange={(e) =>
-                    setSkador((prev) =>
-                      prev.map((x, i) => (i === idx ? { ...x, text: e.target.value } : x))
-                    )
-                  }
                 />
+              </div>
 
-                <div className="stack">
-                  <label className="label">Bilder</label>
-                  <input
-                    ref={(el) => (hiddenInputs.current[idx] = el)}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    multiple
-                    onChange={(e) => onAddImages(idx, e)}
-                    style={{ display: "none" }}
-                  />
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => triggerAddImage(idx)}
-                  >
-                    Lägg till bild
-                  </button>
-
+              <div className="field">
+                <label>Lägg till bild</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  // ingen capture => användaren får välja kamera eller galleri
+                  onChange={(e) => addDamageFiles(i, e.target.files)}
+                />
+                {!!d.files.length && (
                   <div className="thumbs">
-                    {s.bilder.map((src, i) => (
-                      <div key={i} className="thumb">
-                        <img src={src} alt={`foto-${i}`} />
+                    {d.files.map((f) => (
+                      <div className="thumb" key={f.url}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={f.url} alt="bild" />
                         <button
                           type="button"
-                          className="del"
-                          onClick={() => removeImage(idx, i)}
+                          className="x"
                           aria-label="Ta bort bild"
-                          title="Ta bort bild"
+                          onClick={() => removeDamageFile(i, f.url)}
                         >
                           ×
                         </button>
                       </div>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
-            ))}
+            </div>
+          ))}
 
-            {skador.length > 0 && (
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={addSkada}
-              >
-                Lägg till ytterligare en skada
-              </button>
-            )}
-          </section>
+          <div className="row">
+            <button type="button" className="btn outline" onClick={addDamageCard}>
+              Lägg till ytterligare en skada
+            </button>
+          </div>
 
-          {/* Övrigt + Spara */}
-          <section className="card">
-            <label className="label">Övriga anteckningar</label>
-            <textarea
-              className="input"
-              rows={3}
-              placeholder="Fritt fält"
-              value={anteckning}
-              onChange={(e) => setAnteckning(e.target.value)}
-            />
+          {/* --- Fel & Spara --- */}
+          {submitError && <div className="form-error">{submitError}</div>}
 
-            <button type="submit" className="btn primary">
+          <div className="row">
+            <button type="submit" className="btn primary" disabled={!allOk}>
               Spara incheckning
             </button>
-          </section>
+          </div>
+
+          {submitOk && (
+            <div className="success">
+              Tack Bob! Incheckningen sparades (dummy). Du kan stänga sidan eller göra en ny.
+            </div>
+          )}
         </form>
       </div>
 
-      {/* Stil */}
+      {/* ---------- Stilar (light, ”99%-känsla”) ---------- */}
       <style jsx>{`
-        :global(html, body) { background:#0b0b0b; }
-        .page { background:#f6f7f9; min-height:100vh; padding:20px 0 60px; }
-        .container { width:92%; max-width:720px; margin:0 auto; color:#111; }
-        h1 { font-size:28px; margin:0 0 4px; }
-        .muted { color:#555; margin:0 0 16px; }
-
-        .blockTitle { margin:18px 0 8px; font-size:16px; color:#374151; }
-
-        .alert {
-          border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; font-weight:600;
+        .page { background:#f6f7f9; min-height:100vh; padding:16px; }
+        .container { max-width:720px; margin:0 auto; }
+        h1 { font-size:28px; margin:6px 0 14px; }
+        h2 { margin:22px 0 10px; font-size:18px; color:#2b2f3a; }
+        .muted { color:#6b7280; }
+        .card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin:8px 0 14px; }
+        .field { display:flex; flex-direction:column; gap:6px; margin:10px 0; }
+        label { font-weight:600; font-size:14px; color:#2b2f3a; }
+        input, select, textarea {
+          border:1px solid #cbd5e1; border-radius:10px; padding:12px 12px;
+          font-size:16px; background:#fff; outline:none;
         }
-        .alert.success { background:#ecfdf5; color:#065f46; border:1px solid #10b981; }
-        .alert.error   { background:#fef2f2; color:#7f1d1d; border:1px solid #ef4444; }
-
-        .card {
-          background:#fff; border:1px solid #e5e7eb; border-radius:14px;
-          box-shadow:0 1px 2px rgba(10,10,10,.03);
-          padding:16px; display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:14px;
-        }
-
-        .label { font-weight:700; font-size:14px; color:#111; }
-        .input, select, textarea {
-          width:100%; border:1px solid #cfd6df; border-radius:8px; padding:10px 12px; background:#fff; color:#111;
-        }
+        textarea { min-height:80px; resize:vertical; }
+        input.invalid, select.invalid, textarea.invalid { border-color:#ef4444; background:#fff6f6; }
+        .error-inline { color:#e11d48; margin-top:6px; font-weight:600; }
         .with-suffix { position:relative; }
-        .with-suffix .suffix { position:absolute; right:10px; top:50%; transform:translateY(-50%); color:#6b7280; font-weight:600; }
-
-        .infoGrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-        @media (max-width:560px){ .infoGrid{ grid-template-columns:1fr; } }
-
-        .smallLabel { font-size:12px; color:#6b7280; margin-bottom:2px; }
-        .infoLine { font-weight:700; color:#111; }
-
-        .damageBox { background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:10px 12px; }
-        .damageBox ul { margin:0; padding-left:18px; }
-
-        .warn { color:#b91c1c; font-weight:700; }
-
-        .stack { display:grid; gap:8px; }
-        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-        @media (max-width:560px){ .grid2{ grid-template-columns:1fr; } }
-
+        .with-suffix .suffix { position:absolute; right:12px; top:50%; transform:translateY(-50%); }
+        .group { margin:12px 0; }
+        .group .label { font-weight:700; margin-bottom:8px; }
         .seg { display:flex; gap:10px; flex-wrap:wrap; }
         .segbtn {
-          background:#fff; border:1px solid #cfd6df; border-radius:10px; padding:10px 14px; font-weight:600; color:#0f172a;
+          border:1px solid #cbd5e1; background:#fff; padding:10px 14px; border-radius:10px;
         }
-        .segbtn.on { background:#d1fae5; border-color:#10b981; color:#065f46; }
-
-        .btn.primary { margin-top:6px; background:#1a56db; color:#fff; border:none; border-radius:12px; padding:14px 16px; font-weight:700; }
-        .btn.ghost { background:#fff; border:1px solid #cfd6df; border-radius:10px; padding:10px 14px; font-weight:600; color:#0f172a; }
-
-        .skadakort {
-          background:#fff8f0; border:1px solid #f59e0b55; border-radius:12px; padding:12px; display:grid; gap:10px;
-        }
-        .skadatitle { display:flex; gap:12px; align-items:center; justify-content:space-between; }
-        .linkbtn { background:none; border:none; color:#b91c1c; font-weight:700; }
-
-        .thumbs { display:flex; gap:10px; flex-wrap:wrap; }
-        .thumb { position:relative; }
-        .thumb img { width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid #d1d5db; }
-        .thumb .del {
-          position:absolute; top:-8px; right:-8px; width:22px; height:22px;
-          border-radius:50%; background:#ef4444; color:#fff; border:none; font-weight:700; line-height:22px;
+        .segbtn.on { background:#e8f1ff; border-color:#2563eb; }
+        .row { display:flex; gap:12px; align-items:center; margin:10px 0; }
+        .row.between { justify-content:space-between; }
+        .btn { border-radius:10px; padding:12px 16px; font-weight:700; }
+        .btn.primary { background:#1d4ed8; color:#fff; border:1px solid #1d4ed8; }
+        .btn.primary[disabled] { background:#a8b3cf; border-color:#a8b3cf; cursor:not-allowed; }
+        .btn.outline { border:1px solid #cbd5e1; background:#fff; }
+        .btnplain { border:none; background:transparent; color:#1d4ed8; font-weight:700; }
+        .link.danger { color:#b91c1c; background:transparent; border:none; }
+        .switch input { margin-right:8px; }
+        .success { margin:12px 0; padding:12px; border-radius:10px; background:#ecfdf5; border:1px solid #bbf7d0; color:#065f46; font-weight:700; }
+        .form-error { margin:12px 0; padding:12px; border-radius:10px; background:#fff1f2; border:1px solid #fecdd3; color:#9f1239; font-weight:700; }
+        .auto { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:8px; }
+        .auto .sub { font-size:13px; color:#6b7280; }
+        .auto-val { font-size:16px; }
+        .damage-list { margin:6px 0 0 16px; }
+        .fuel-extra { display:grid; grid-template-columns:140px 1fr; gap:12px; align-items:end; }
+        .field.small input { width:110px; }
+        .damage-card { border:1px solid #fde68a; background:#fffbeb; border-radius:12px; padding:12px; margin:12px 0; }
+        .damage-card .title { font-weight:800; }
+        .thumbs { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+        .thumb { position:relative; width:90px; height:90px; border-radius:8px; overflow:hidden; border:1px solid #e5e7eb; }
+        .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+        .thumb .x { position:absolute; right:2px; top:0; border:none; background:#fff; border-radius:0 0 0 8px; padding:0 6px; font-size:18px; }
+        @media (max-width:560px) {
+          .auto { grid-template-columns:1fr; }
+          .fuel-extra { grid-template-columns:1fr; }
+          .field.small input { width:100%; max-width:160px; }
         }
       `}</style>
     </div>
