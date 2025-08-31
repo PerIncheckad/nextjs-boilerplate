@@ -1,8 +1,8 @@
 export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
+import React from 'react';
 import FormClient from './form-client';
 
-export default function CheckPage() {
+export default function Page() {
   return <FormClient />;
 }
