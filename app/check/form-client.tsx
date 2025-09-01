@@ -231,9 +231,9 @@ export default function CheckInForm() {
                   color: '#dc2626',
                   fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : 'normal'
                 }}>
-                  {new Date(saludatum).toLocaleDateString('sv-SE')}
+                  {' '}{new Date(saludatum).toLocaleDateString('sv-SE')}
                 </span>
-              ) : '—'}
+              ) : <span> —</span>}
             </div>
             <div>
               <strong>Befintliga skador:</strong>
@@ -362,6 +362,7 @@ export default function CheckInForm() {
               type="text"
               value={matarstallning}
               onChange={(e) => {
+                // Tillåt bara siffror och mellanslag
                 const value = e.target.value.replace(/[^0-9\s]/g, '');
                 setMatarstallning(value);
               }}
@@ -427,8 +428,11 @@ export default function CheckInForm() {
                 type="text"
                 value={liters}
                 onChange={(e) => {
-                  const v = e.target.value.replace('.', ',');
-                  if (/^\d{0,4}([,]\d{0,1})?$/.test(v)) setLiters(v);
+                  const value = e.target.value.replace('.', ','); // Ersätt punkt med komma först
+                  // Tillåt bara siffror och ETT kommatecken i rätt position  
+                  if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
+                    setLiters(value);
+                  }
                 }}
                 placeholder="ex. 12,5"
                 style={{
