@@ -62,8 +62,17 @@ export default function CheckInForm() {
   const [liters, setLiters] = useState('');
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
 
+  // Nya fält
+  const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
+  const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
+  const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
+  const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
+
   // Nya skador
   const [newDamages, setNewDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
+  
+  // Övriga anteckningar
+  const [ovrigaAnteckningar, setOvrigaAnteckningar] = useState('');
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
@@ -134,7 +143,7 @@ export default function CheckInForm() {
 
   const availableStations = ort ? STATIONER[ort] || [] : [];
 
-  // Validering för spara-knappen
+  // Validering för spara-knappen - utökad med nya fält
   const canSave = () => {
     if (!regInput.trim()) return false;
     if (!matarstallning.trim()) return false;
@@ -145,6 +154,16 @@ export default function CheckInForm() {
       (ort && station);
       
     if (!hasLocation) return false;
+    
+    // Tanknivå
+    if (fulltankad === null) return false;
+    if (fulltankad === false && (!liters.trim() || !bransletyp)) return false;
+    
+    // Nya obligatoriska fält
+    if (spolarvatska === null) return false;
+    if (insynsskydd === null) return false;
+    if (antalLaddkablar === null) return false;
+    if (hjultyp === null) return false;
     
     return true;
   };
@@ -169,7 +188,7 @@ export default function CheckInForm() {
   const updateDamageFiles = (id: string, files: FileList | null) => {
     if (!files) return;
     setNewDamages(prev => prev.map(d => 
-      d.id === id ? {...d, files: [...d.files, ...Array.from(files)]} : d
+      d.id === d.id ? {...d, files: [...d.files, ...Array.from(files)]} : d
     ));
   };
 
@@ -515,6 +534,174 @@ export default function CheckInForm() {
           </>
         )}
 
+        {/* Nya obligatoriska fält */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Spolarvätska OK? *
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setSpolarvatska(true)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: spolarvatska === true ? '#2563eb' : '#ffffff',
+                color: spolarvatska === true ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ja
+            </button>
+            <button
+              type="button"
+              onClick={() => setSpolarvatska(false)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: spolarvatska === false ? '#2563eb' : '#ffffff',
+                color: spolarvatska === false ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Nej
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Insynsskydd OK? *
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setInsynsskydd(true)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: insynsskydd === true ? '#2563eb' : '#ffffff',
+                color: insynsskydd === true ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ja
+            </button>
+            <button
+              type="button"
+              onClick={() => setInsynsskydd(false)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: insynsskydd === false ? '#2563eb' : '#ffffff',
+                color: insynsskydd === false ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Nej
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Antal laddkablar *
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setAntalLaddkablar('0')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: antalLaddkablar === '0' ? '#2563eb' : '#ffffff',
+                color: antalLaddkablar === '0' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={() => setAntalLaddkablar('1')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: antalLaddkablar === '1' ? '#2563eb' : '#ffffff',
+                color: antalLaddkablar === '1' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              1
+            </button>
+            <button
+              type="button"
+              onClick={() => setAntalLaddkablar('2')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: antalLaddkablar === '2' ? '#2563eb' : '#ffffff',
+                color: antalLaddkablar === '2' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              2
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Hjul som sitter på *
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setHjultyp('Sommarthjul')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: hjultyp === 'Sommarthjul' ? '#2563eb' : '#ffffff',
+                color: hjultyp === 'Sommarthjul' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Sommarthjul
+            </button>
+            <button
+              type="button"
+              onClick={() => setHjultyp('Vinterthjul')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: hjultyp === 'Vinterthjul' ? '#2563eb' : '#ffffff',
+                color: hjultyp === 'Vinterthjul' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Vinterthjul
+            </button>
+          </div>
+        </div>
+
         {/* Nya skador */}
         <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Nya skador på bilen?</h2>
         
@@ -576,7 +763,7 @@ export default function CheckInForm() {
                     color: '#4b5563'
                   }}
                 >
-                  📷 Lägg till bild
+                  Lägg till bild
                 </label>
               </div>
 
@@ -663,6 +850,28 @@ export default function CheckInForm() {
         >
           {newDamages.length === 0 ? 'Lägg till skada' : 'Lägg till ytterligare skada'}
         </button>
+
+        {/* Övriga anteckningar */}
+        <div style={{ marginBottom: '32px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Övriga anteckningar
+          </label>
+          <textarea
+            value={ovrigaAnteckningar}
+            onChange={(e) => setOvrigaAnteckningar(e.target.value)}
+            placeholder="Eventuella ytterligare kommentarer..."
+            rows={3}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              fontSize: '16px',
+              backgroundColor: '#ffffff',
+              resize: 'vertical'
+            }}
+          />
+        </div>
 
         {/* Spara knapp */}
         <button
