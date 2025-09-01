@@ -74,6 +74,9 @@ export default function CheckInForm() {
   // Övriga anteckningar
   const [ovrigaAnteckningar, setOvrigaAnteckningar] = useState('');
 
+  // Modal state
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
   // Hämta bildata
@@ -168,6 +171,35 @@ export default function CheckInForm() {
     return true;
   };
 
+  // Rensa formulär
+  const resetForm = () => {
+    setRegInput('');
+    setCarData([]);
+    setNotFound(false);
+    setOrt('');
+    setStation('');
+    setAnnanPlats(false);
+    setAnnanPlatsText('');
+    setMatarstallning('');
+    setFulltankad(null);
+    setLiters('');
+    setBransletyp(null);
+    setSpolarvatska(null);
+    setInsynsskydd(null);
+    setAntalLaddkablar(null);
+    setHjultyp(null);
+    setNewDamages([]);
+    setOvrigaAnteckningar('');
+    setShowSuccessModal(false);
+  };
+
+  // Hantera spara-klick
+  const handleSave = () => {
+    // Här skulle vi spara till databasen i framtiden
+    console.log('Sparar incheckning...');
+    setShowSuccessModal(true);
+  };
+
   // Skadehantering
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
@@ -188,7 +220,7 @@ export default function CheckInForm() {
   const updateDamageFiles = (id: string, files: FileList | null) => {
     if (!files) return;
     setNewDamages(prev => prev.map(d => 
-      d.id === d.id ? {...d, files: [...d.files, ...Array.from(files)]} : d
+      d.id === id ? {...d, files: [...d.files, ...Array.from(files)]} : d
     ));
   };
 
@@ -399,7 +431,6 @@ export default function CheckInForm() {
               pattern="[0-9\s]*"
               value={matarstallning}
               onChange={(e) => {
-                // Striktare validering - bara siffror och mellanslag
                 const value = e.target.value.replace(/[^0-9\s]/g, '');
                 setMatarstallning(value);
               }}
@@ -468,16 +499,12 @@ export default function CheckInForm() {
                 value={liters}
                 onChange={(e) => {
                   let value = e.target.value;
-                  // Ersätt punkt med komma
                   value = value.replace(/\./g, ',');
-                  // Tillåt bara siffror och kommatecken
                   value = value.replace(/[^0-9,]/g, '');
-                  // Tillåt bara ett kommatecken
                   const parts = value.split(',');
                   if (parts.length > 2) {
                     value = parts[0] + ',' + parts[1];
                   }
-                  // Max 4 siffror före komma och 1 efter
                   if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
                     setLiters(value);
                   }
@@ -738,7 +765,6 @@ export default function CheckInForm() {
                 Lägg till bild
               </label>
               
-              {/* Custom file input */}
               <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                 <input
                   type="file"
@@ -767,7 +793,6 @@ export default function CheckInForm() {
                 </label>
               </div>
 
-              {/* Visa tumnagelbilder */}
               {damage.files.length > 0 && (
                 <div style={{ 
                   marginTop: '12px',
@@ -876,7 +901,7 @@ export default function CheckInForm() {
         {/* Spara knapp */}
         <button
           type="button"
-          onClick={() => alert('Incheckning sparad (demo)')}
+          onClick={handleSave}
           disabled={!canSave()}
           style={{
             width: '100%',
@@ -903,6 +928,83 @@ export default function CheckInForm() {
           © Albarone AB 2025
         </p>
       </div>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '32px',
+            margin: '20px',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            {/* Grön bock-ikon */}
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: '#10b981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              fontSize: '32px',
+              color: '#ffffff'
+            }}>
+              ✓
+            </div>
+            
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              marginBottom: '12px',
+              color: '#1f2937'
+            }}>
+              Tack Bob!
+            </h2>
+            
+            <p style={{
+              fontSize: '16px',
+              color: '#6b7280',
+              marginBottom: '24px'
+            }}>
+              Incheckning sparad för {regInput}
+            </p>
+            
+            <button
+              onClick={resetForm}
+              style={{
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 24px',
+                fontSize: '16px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Starta ny incheckning
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
