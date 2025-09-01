@@ -169,8 +169,19 @@ export default function CheckInForm() {
   const updateDamageFiles = (id: string, files: FileList | null) => {
     if (!files) return;
     setNewDamages(prev => prev.map(d => 
-      d.id === id ? {...d, files: Array.from(files)} : d
+      d.id === id ? {...d, files: [...d.files, ...Array.from(files)]} : d
     ));
+  };
+
+  // Ta bort enskild bild
+  const removeDamageImage = (damageId: string, imageIndex: number) => {
+    setNewDamages(prev => prev.map(d => {
+      if (d.id === damageId) {
+        const newFiles = d.files.filter((_, index) => index !== imageIndex);
+        return { ...d, files: newFiles };
+      }
+      return d;
+    }));
   };
 
   return (
@@ -539,20 +550,84 @@ export default function CheckInForm() {
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
                 Lägg till bild
               </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => updateDamageFiles(damage.id, e.target.files)}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: '#ffffff'
-                }}
-              />
+              
+              {/* Custom file input */}
+              <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => updateDamageFiles(damage.id, e.target.files)}
+                  style={{ display: 'none' }}
+                  id={`file-input-${damage.id}`}
+                />
+                <label
+                  htmlFor={`file-input-${damage.id}`}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: '#ffffff',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    color: '#4b5563'
+                  }}
+                >
+                  📷 Lägg till bild
+                </label>
+              </div>
+
+              {/* Visa tumnagelbilder */}
+              {damage.files.length > 0 && (
+                <div style={{ 
+                  marginTop: '12px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                  gap: '8px'
+                }}>
+                  {damage.files.map((file, index) => (
+                    <div key={index} style={{ position: 'relative' }}>
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt={`Skadebild ${index + 1}`}
+                        style={{
+                          width: '100px',
+                          height: '100px',
+                          objectFit: 'cover',
+                          borderRadius: '6px',
+                          border: '1px solid #d1d5db'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeDamageImage(damage.id, index)}
+                        style={{
+                          position: 'absolute',
+                          top: '-6px',
+                          right: '-6px',
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          backgroundColor: '#dc2626',
+                          color: '#ffffff',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <button
