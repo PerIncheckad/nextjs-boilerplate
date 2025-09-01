@@ -12,9 +12,11 @@ type CarData = {
   regnr: string;
   brand_model: string | null;
   damage_text: string | null;
+  wheelstorage: string | null;
+  saludatum: string | null;
 };
 
-// Platser och stationer (från din Excel)
+// Platser och stationer
 const ORTER = ['MALMÖ', 'HELSINGBORG', 'ÄNGELHOLM', 'HALMSTAD', 'FALKENBERG', 'TRELLEBORG', 'VARBERG', 'LUND'];
 
 const STATIONER: Record<string, string[]> = {
@@ -31,6 +33,16 @@ const STATIONER: Record<string, string[]> = {
 function normalizeReg(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
+
+// Kontrollera om datum är inom X dagar från idag
+const isDateWithinDays = (dateStr: string | null, days: number): boolean => {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  const today = new Date();
+  const diffTime = date.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays <= days && diffDays >= 0;
+};
 
 export default function CheckInForm() {
   // Registreringsnummer och bildata
@@ -108,6 +120,8 @@ export default function CheckInForm() {
 
   // Extrahera data
   const carModel = carData[0]?.brand_model || null;
+  const wheelStorage = carData[0]?.wheelstorage || null;
+  const saludatum = carData[0]?.saludatum || null;
   const damages = carData
     .map(item => item.damage_text)
     .filter(Boolean)
@@ -115,7 +129,22 @@ export default function CheckInForm() {
 
   const availableStations = ort ? STATIONER[ort] || [] : [];
 
-  // Lägg till ny skada
+  // Validering för spara-knappen
+  const canSave = () => {
+    if (!regInput.trim()) return false;
+    if (!matarstallning.trim()) return false;
+    
+    // Antingen ort+station ELLER annan plats
+    const hasLocation = annanPlats ? 
+      annanPlatsText.trim().length > 0 : 
+      (ort && station);
+      
+    if (!hasLocation) return false;
+    
+    return true;
+  };
+
+  // Skadehantering
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
@@ -164,6 +193,8 @@ export default function CheckInForm() {
             value={regInput}
             onChange={(e) => setRegInput(e.target.value.toUpperCase())}
             placeholder="Skriv reg.nr"
+            spellCheck={false}
+            autoComplete="off"
             style={{
               width: '100%',
               padding: '12px',
@@ -192,7 +223,17 @@ export default function CheckInForm() {
               <strong>Bilmodell:</strong> {carModel || '—'}
             </div>
             <div style={{ marginBottom: '8px' }}>
-              <strong>Hjulförvaring:</strong> —
+              <strong>Hjulförvaring:</strong> {wheelStorage || '—'}
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>Saludatum:</strong> {saludatum ? (
+                <span style={{ 
+                  color: '#dc2626',
+                  fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : 'normal'
+                }}>
+                  {new Date(saludatum).toLocaleDateString('sv-SE')}
+                </span>
+              ) : '—'}
             </div>
             <div>
               <strong>Befintliga skador:</strong>
@@ -212,56 +253,68 @@ export default function CheckInForm() {
         {/* Plats för incheckning */}
         <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Plats för incheckning</h2>
         
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-            Ort *
-          </label>
-          <select
-            value={ort}
-            onChange={(e) => {
-              setOrt(e.target.value);
-              setStation('');
-            }}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: '#ffffff'
-            }}
-          >
-            <option value="">— Välj ort —</option>
-            {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </div>
+        {!annanPlats && (
+          <>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Ort *
+              </label>
+              <select
+                value={ort}
+                onChange={(e) => {
+                  setOrt(e.target.value);
+                  setStation('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  backgroundColor: '#ffffff'
+                }}
+              >
+                <option value="">— Välj ort —</option>
+                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
 
-        <div style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-            Station / Depå *
-          </label>
-          <select
-            value={station}
-            onChange={(e) => setStation(e.target.value)}
-            disabled={!ort}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: ort ? '#ffffff' : '#f3f4f6',
-              color: ort ? '#000' : '#9ca3af'
-            }}
-          >
-            <option value="">— Välj station / depå —</option>
-            {availableStations.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Station / Depå *
+              </label>
+              <select
+                value={station}
+                onChange={(e) => setStation(e.target.value)}
+                disabled={!ort}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  backgroundColor: ort ? '#ffffff' : '#f3f4f6',
+                  color: ort ? '#000' : '#9ca3af'
+                }}
+              >
+                <option value="">— Välj station / depå —</option>
+                {availableStations.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </>
+        )}
 
         <button
           type="button"
-          onClick={() => setAnnanPlats(!annanPlats)}
+          onClick={() => {
+            setAnnanPlats(!annanPlats);
+            if (!annanPlats) {
+              setOrt('');
+              setStation('');
+            } else {
+              setAnnanPlatsText('');
+            }
+          }}
           style={{
             background: 'none',
             border: 'none',
@@ -272,13 +325,13 @@ export default function CheckInForm() {
             marginBottom: '24px'
           }}
         >
-          + Annan plats (fritext)
+          {annanPlats ? '← Tillbaka till ort/station' : '+ Annan plats (fritext)'}
         </button>
 
         {annanPlats && (
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Annan plats
+              Annan plats *
             </label>
             <input
               type="text"
@@ -308,8 +361,11 @@ export default function CheckInForm() {
             <input
               type="text"
               value={matarstallning}
-              onChange={(e) => setMatarstallning(e.target.value)}
-              placeholder="ex. 42 180"
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^0-9\s]/g, '');
+                setMatarstallning(value);
+              }}
+              placeholder="ex. 42180"
               style={{
                 flex: 1,
                 padding: '12px',
@@ -515,16 +571,18 @@ export default function CheckInForm() {
         <button
           type="button"
           onClick={() => alert('Incheckning sparad (demo)')}
+          disabled={!canSave()}
           style={{
             width: '100%',
             padding: '16px',
-            backgroundColor: '#2563eb',
+            backgroundColor: canSave() ? '#2563eb' : '#9ca3af',
             color: '#ffffff',
             border: 'none',
             borderRadius: '6px',
             fontSize: '18px',
             fontWeight: '500',
-            cursor: 'pointer'
+            cursor: canSave() ? 'pointer' : 'not-allowed',
+            opacity: canSave() ? 1 : 0.6
           }}
         >
           Spara incheckning
