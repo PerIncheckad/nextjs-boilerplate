@@ -85,7 +85,8 @@ export default function CheckInForm() {
         const { data, error } = await supabase
           .from('car_data')
           .select('*')
-          .eq('regnr', normalizedReg);
+          .eq('regnr', normalizedReg)
+          .order('created_at', { ascending: false });
 
         if (cancelled) return;
 
@@ -94,7 +95,11 @@ export default function CheckInForm() {
           setNotFound(true);
           setCarData([]);
         } else if (data && data.length > 0) {
-          setCarData(data);
+          // Filtrera bort rader med NULL wheelstorage eller saludatum om möjligt
+          const validData = data.filter(row => row.wheelstorage !== null && row.saludatum !== null);
+          const useData = validData.length > 0 ? validData : data;
+          
+          setCarData(useData);
           setNotFound(false);
         } else {
           setCarData([]);
@@ -360,9 +365,11 @@ export default function CheckInForm() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <input
               type="text"
+              inputMode="numeric"
+              pattern="[0-9\s]*"
               value={matarstallning}
               onChange={(e) => {
-                // Tillåt bara siffror och mellanslag
+                // Striktare validering - bara siffror och mellanslag
                 const value = e.target.value.replace(/[^0-9\s]/g, '');
                 setMatarstallning(value);
               }}
@@ -426,10 +433,21 @@ export default function CheckInForm() {
               </label>
               <input
                 type="text"
+                inputMode="decimal"
+                pattern="[0-9,]*"
                 value={liters}
                 onChange={(e) => {
-                  const value = e.target.value.replace('.', ','); // Ersätt punkt med komma först
-                  // Tillåt bara siffror och ETT kommatecken i rätt position  
+                  let value = e.target.value;
+                  // Ersätt punkt med komma
+                  value = value.replace(/\./g, ',');
+                  // Tillåt bara siffror och kommatecken
+                  value = value.replace(/[^0-9,]/g, '');
+                  // Tillåt bara ett kommatecken
+                  const parts = value.split(',');
+                  if (parts.length > 2) {
+                    value = parts[0] + ',' + parts[1];
+                  }
+                  // Max 4 siffror före komma och 1 efter
                   if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
                     setLiters(value);
                   }
