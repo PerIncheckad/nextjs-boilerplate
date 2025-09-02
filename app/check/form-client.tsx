@@ -257,20 +257,21 @@ export default function CheckInForm() {
     }));
   };
 
-  // Subtil sektion-separator (ingen färg, bara typografi)
+  // Förbättrad sektion-separator med större, tydligare rubriker
   const SectionHeader = ({ title }: { title: string }) => (
     <div style={{
       marginTop: '40px',
       marginBottom: '20px',
-      paddingBottom: '8px',
+      paddingBottom: '12px',
       borderBottom: '2px solid #e5e7eb'
     }}>
       <h2 style={{ 
-        fontSize: '18px', 
-        fontWeight: '600', 
+        fontSize: '22px', 
+        fontWeight: '700', 
         margin: 0,
-        color: '#374151',
-        letterSpacing: '0.025em'
+        color: '#1f2937',
+        letterSpacing: '0.05em',
+        textTransform: 'uppercase'
       }}>
         {title}
       </h2>
@@ -288,7 +289,8 @@ export default function CheckInForm() {
         margin: '0 auto',
         padding: '20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>{/* Header med äkta MABI-logga */}
+      }}>
+        {/* Header med MABI-logga */}
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
@@ -299,16 +301,15 @@ export default function CheckInForm() {
             <h1 style={{ fontSize: '28px', margin: 0, color: '#1f2937' }}>Ny incheckning</h1>
             <p style={{ color: '#666', margin: '4px 0 24px 0' }}>Inloggad: <strong>Bob</strong></p>
           </div>
-          {/* Äkta MABI-logga */}
+          {/* MABI-logga - ersätt denna URL med din riktiga logga */}
           <div style={{
             width: '120px',
             height: '60px',
-            backgroundImage: 'url(https://drive.google.com/uc?export=view&id=1your-actual-mabi-logo-id)',
-            backgroundSize: 'contain',
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'center'
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-            {/* Fallback text om bilden inte laddar */}
+            {/* Fallback MABI-text tills du laddar upp loggan */}
             <div style={{
               width: '100%',
               height: '100%',
@@ -603,7 +604,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Resten av fordonsstatus-sektionen... */}
+          {/* Visa tanknivå för bensin/diesel */}
           {drivmedelstyp === 'bensin_diesel' && (
             <>
               <div style={{ marginBottom: '16px' }}>
@@ -736,6 +737,7 @@ export default function CheckInForm() {
             </>
           )}
 
+          {/* Visa laddnivå för elbil */}
           {drivmedelstyp === 'elbil' && (
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
@@ -1249,20 +1251,21 @@ export default function CheckInForm() {
                               onClick={() => removeDamageImage(damage.id, index)}
                               style={{
                                 position: 'absolute',
-                                top: '-6px',
-                                right: '-6px',
-                                width: '20px',
-                                height: '20px',
+                                top: '4px',
+                                right: '4px',
+                                width: '24px',
+                                height: '24px',
                                 borderRadius: '50%',
                                 backgroundColor: '#dc2626',
                                 color: '#ffffff',
                                 border: 'none',
                                 cursor: 'pointer',
-                                fontSize: '12px',
+                                fontSize: '14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontWeight: 'bold'
+                                fontWeight: 'bold',
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
                               }}
                             >
                               ×
