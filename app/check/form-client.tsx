@@ -58,15 +58,20 @@ export default function CheckInForm() {
   const [annanPlatsText, setAnnanPlatsText] = useState('');
   
   const [matarstallning, setMatarstallning] = useState('');
-  const [fulltankad, setFulltankad] = useState<boolean | null>(null);
+  
+  // UPPDATERAD tanknivå-logik med tre alternativ
+  const [tankniva, setTankniva] = useState<'fulltankad' | 'tankas_senare' | 'pafylld_nu' | null>(null);
   const [liters, setLiters] = useState('');
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
 
-  // Nya fält
+  // Befintliga fält
   const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
   const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
   const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
   const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
+
+  // NYTT fält - AdBlue
+  const [adblue, setAdblue] = useState<boolean | null>(null);
 
   // Nya skador
   const [newDamages, setNewDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
@@ -146,7 +151,7 @@ export default function CheckInForm() {
 
   const availableStations = ort ? STATIONER[ort] || [] : [];
 
-  // Validering för spara-knappen - utökad med nya fält
+  // UPPDATERAD validering med nya fält och tanknivå-logik
   const canSave = () => {
     if (!regInput.trim()) return false;
     if (!matarstallning.trim()) return false;
@@ -158,20 +163,23 @@ export default function CheckInForm() {
       
     if (!hasLocation) return false;
     
-    // Tanknivå
-    if (fulltankad === null) return false;
-    if (fulltankad === false && (!liters.trim() || !bransletyp)) return false;
+    // UPPDATERAD tanknivå-validering
+    if (tankniva === null) return false;
+    if (tankniva === 'pafylld_nu' && (!liters.trim() || !bransletyp)) return false;
     
-    // Nya obligatoriska fält
+    // Befintliga obligatoriska fält
     if (spolarvatska === null) return false;
     if (insynsskydd === null) return false;
     if (antalLaddkablar === null) return false;
     if (hjultyp === null) return false;
     
+    // NYTT obligatoriskt fält
+    if (adblue === null) return false;
+    
     return true;
   };
 
-  // Rensa formulär
+  // Rensa formulär - uppdaterad för nya fält
   const resetForm = () => {
     setRegInput('');
     setCarData([]);
@@ -181,13 +189,14 @@ export default function CheckInForm() {
     setAnnanPlats(false);
     setAnnanPlatsText('');
     setMatarstallning('');
-    setFulltankad(null);
+    setTankniva(null);  // UPPDATERAT
     setLiters('');
     setBransletyp(null);
     setSpolarvatska(null);
     setInsynsskydd(null);
     setAntalLaddkablar(null);
     setHjultyp(null);
+    setAdblue(null);  // NYTT
     setNewDamages([]);
     setOvrigaAnteckningar('');
     setShowSuccessModal(false);
@@ -195,7 +204,6 @@ export default function CheckInForm() {
 
   // Hantera spara-klick
   const handleSave = () => {
-    // Här skulle vi spara till databasen i framtiden
     console.log('Sparar incheckning...');
     setShowSuccessModal(true);
   };
@@ -448,21 +456,22 @@ export default function CheckInForm() {
           </div>
         </div>
 
+        {/* UPPDATERAD tanknivå med tre alternativ */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
             Tanknivå *
           </label>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button
               type="button"
-              onClick={() => setFulltankad(true)}
+              onClick={() => setTankniva('fulltankad')}
               style={{
-                flex: 1,
+                width: '100%',
                 padding: '12px',
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
-                backgroundColor: fulltankad === true ? '#2563eb' : '#ffffff',
-                color: fulltankad === true ? '#ffffff' : '#000',
+                backgroundColor: tankniva === 'fulltankad' ? '#2563eb' : '#ffffff',
+                color: tankniva === 'fulltankad' ? '#ffffff' : '#000',
                 cursor: 'pointer'
               }}
             >
@@ -470,23 +479,39 @@ export default function CheckInForm() {
             </button>
             <button
               type="button"
-              onClick={() => setFulltankad(false)}
+              onClick={() => setTankniva('tankas_senare')}
               style={{
-                flex: 1,
+                width: '100%',
                 padding: '12px',
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
-                backgroundColor: fulltankad === false ? '#2563eb' : '#ffffff',
-                color: fulltankad === false ? '#ffffff' : '#000',
+                backgroundColor: tankniva === 'tankas_senare' ? '#2563eb' : '#ffffff',
+                color: tankniva === 'tankas_senare' ? '#ffffff' : '#000',
                 cursor: 'pointer'
               }}
             >
-              Ej fulltankad
+              Ej fulltankad - tankas senare
+            </button>
+            <button
+              type="button"
+              onClick={() => setTankniva('pafylld_nu')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: tankniva === 'pafylld_nu' ? '#2563eb' : '#ffffff',
+                color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ej fulltankad - påfylld nu
             </button>
           </div>
         </div>
 
-        {fulltankad === false && (
+        {/* Visa liter + bränsletyp bara när "påfylld nu" är valt */}
+        {tankniva === 'pafylld_nu' && (
           <>
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
@@ -561,7 +586,7 @@ export default function CheckInForm() {
           </>
         )}
 
-        {/* Nya obligatoriska fält */}
+        {/* Befintliga fält */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
             Spolarvätska OK? *
@@ -592,6 +617,45 @@ export default function CheckInForm() {
                 borderRadius: '6px',
                 backgroundColor: spolarvatska === false ? '#2563eb' : '#ffffff',
                 color: spolarvatska === false ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Nej
+            </button>
+          </div>
+        </div>
+
+        {/* NYTT AdBlue-fält */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            AdBlue OK? *
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setAdblue(true)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: adblue === true ? '#2563eb' : '#ffffff',
+                color: adblue === true ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ja
+            </button>
+            <button
+              type="button"
+              onClick={() => setAdblue(false)}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: adblue === false ? '#2563eb' : '#ffffff',
+                color: adblue === false ? '#ffffff' : '#000',
                 cursor: 'pointer'
               }}
             >
@@ -953,7 +1017,6 @@ export default function CheckInForm() {
             textAlign: 'center',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
           }}>
-            {/* Grön bock-ikon */}
             <div style={{
               width: '64px',
               height: '64px',
