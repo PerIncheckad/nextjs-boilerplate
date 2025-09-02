@@ -301,7 +301,7 @@ export default function CheckInForm() {
             <h1 style={{ fontSize: '28px', margin: 0, color: '#1f2937' }}>Ny incheckning</h1>
             <p style={{ color: '#666', margin: '4px 0 24px 0' }}>Inloggad: <strong>Bob</strong></p>
           </div>
-          {/* MABI-logga - ersätt denna URL med din riktiga logga */}
+          {/* MABI-logga */}
           <div style={{
             width: '120px',
             height: '60px',
@@ -309,13 +309,26 @@ export default function CheckInForm() {
             alignItems: 'center',
             justifyContent: 'center'
           }}>
-            {/* Fallback MABI-text tills du laddar upp loggan */}
+            <img 
+              src="/mabi-logo.png" 
+              alt="MABI" 
+              style={{
+                maxWidth: '120px',
+                maxHeight: '60px',
+                objectFit: 'contain'
+              }}
+              onError={(e) => {
+                // Fallback till text-logga om bilden inte laddar
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling!.style.display = 'flex';
+              }}
+            />
             <div style={{
               width: '100%',
               height: '100%',
               backgroundColor: '#2563eb',
               borderRadius: '6px',
-              display: 'flex',
+              display: 'none',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
@@ -1251,21 +1264,21 @@ export default function CheckInForm() {
                               onClick={() => removeDamageImage(damage.id, index)}
                               style={{
                                 position: 'absolute',
-                                top: '4px',
-                                right: '4px',
+                                top: '-8px',
+                                right: '-8px',
                                 width: '24px',
                                 height: '24px',
                                 borderRadius: '50%',
                                 backgroundColor: '#dc2626',
                                 color: '#ffffff',
-                                border: 'none',
+                                border: '2px solid #ffffff',
                                 cursor: 'pointer',
                                 fontSize: '14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontWeight: 'bold',
-                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
+                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)'
                               }}
                             >
                               ×
