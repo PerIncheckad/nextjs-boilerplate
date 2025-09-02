@@ -81,12 +81,13 @@ export default function CheckInForm() {
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
 
-  // STEG 3: Omstrukturerad skadehantering
+  // Skadehantering
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
   
-  // Övriga anteckningar
-  const [ovrigaAnteckningar, setOvrigaAnteckningar] = useState('');
+  // STEG 4: Uthyrningsstatus och prel. avslut notering
+  const [uthyrningsstatus, setUthyrningsstatus] = useState<'redo_for_uthyrning' | 'ledig_tankad' | 'ledig_otankad' | 'klar_otankad' | null>(null);
+  const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
 
   // Modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -160,7 +161,7 @@ export default function CheckInForm() {
 
   const availableStations = ort ? STATIONER[ort] || [] : [];
 
-  // UPPDATERAD validering med skadekontroll
+  // UPPDATERAD validering med uthyrningsstatus
   const canSave = () => {
     if (!regInput.trim()) return false;
     if (!matarstallning.trim()) return false;
@@ -197,7 +198,7 @@ export default function CheckInForm() {
     if (tvatt === null) return false;
     if (inre === null) return false;
     
-    // STEG 3: Skadekontroll-validering
+    // Skadekontroll-validering
     if (skadekontroll === null) return false;
     
     // Om "nya skador" är valt, måste alla skador ha text ifylld
@@ -205,6 +206,9 @@ export default function CheckInForm() {
       if (newDamages.length === 0) return false;
       if (newDamages.some(damage => !damage.text.trim())) return false;
     }
+    
+    // STEG 4: Uthyrningsstatus är obligatorisk
+    if (uthyrningsstatus === null) return false;
     
     return true;
   };
@@ -237,11 +241,14 @@ export default function CheckInForm() {
     setTvatt(null);
     setInre(null);
     
-    // STEG 3: Rensa skadekontroll-fält
+    // Rensa skadekontroll-fält
     setSkadekontroll(null);
     setNewDamages([]);
     
-    setOvrigaAnteckningar('');
+    // STEG 4: Rensa nya fält
+    setUthyrningsstatus(null);
+    setPreliminarAvslutNotering('');
+    
     setShowSuccessModal(false);
   };
 
@@ -251,7 +258,7 @@ export default function CheckInForm() {
     setShowSuccessModal(true);
   };
 
-  // STEG 3: Uppdaterad skadehantering
+  // Skadehantering
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
@@ -1013,7 +1020,7 @@ export default function CheckInForm() {
           </div>
         </div>
 
-        {/* STEG 3: Omstrukturerad skadehantering */}
+        {/* Skadehantering */}
         <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Skador</h2>
 
         <div style={{ marginBottom: '16px' }}>
@@ -1224,15 +1231,86 @@ export default function CheckInForm() {
           </>
         )}
 
-        {/* Övriga anteckningar */}
+        {/* STEG 4: Uthyrningsstatus */}
+        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Uthyrningsstatus</h2>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Status *
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setUthyrningsstatus('redo_for_uthyrning')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: uthyrningsstatus === 'redo_for_uthyrning' ? '#2563eb' : '#ffffff',
+                color: uthyrningsstatus === 'redo_for_uthyrning' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Redo för uthyrning
+            </button>
+            <button
+              type="button"
+              onClick={() => setUthyrningsstatus('ledig_tankad')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: uthyrningsstatus === 'ledig_tankad' ? '#2563eb' : '#ffffff',
+                color: uthyrningsstatus === 'ledig_tankad' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ledig tankad
+            </button>
+            <button
+              type="button"
+              onClick={() => setUthyrningsstatus('ledig_otankad')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: uthyrningsstatus === 'ledig_otankad' ? '#2563eb' : '#ffffff',
+                color: uthyrningsstatus === 'ledig_otankad' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ledig otankad
+            </button>
+            <button
+              type="button"
+              onClick={() => setUthyrningsstatus('klar_otankad')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: uthyrningsstatus === 'klar_otankad' ? '#2563eb' : '#ffffff',
+                color: uthyrningsstatus === 'klar_otankad' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Klar otankad
+            </button>
+          </div>
+        </div>
+
+        {/* STEG 4: Prel. avslut notering (ersätter "Övriga anteckningar") */}
         <div style={{ marginBottom: '32px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-            Övriga anteckningar
+            Prel. avslut notering
           </label>
           <textarea
-            value={ovrigaAnteckningar}
-            onChange={(e) => setOvrigaAnteckningar(e.target.value)}
-            placeholder="Eventuella ytterligare kommentarer..."
+            value={preliminarAvslutNotering}
+            onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
+            placeholder="Preliminära kommentarer för avslut..."
             rows={3}
             style={{
               width: '100%',
