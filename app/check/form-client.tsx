@@ -59,7 +59,7 @@ export default function CheckInForm() {
   
   const [matarstallning, setMatarstallning] = useState('');
   
-  // UPPDATERAD energi-logik med drivmedelstyp
+  // Energi-logik med drivmedelstyp
   const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
   
   // För bensin/diesel
@@ -76,6 +76,10 @@ export default function CheckInForm() {
   const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
   const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
   const [adblue, setAdblue] = useState<boolean | null>(null);
+
+  // STEG 2: Nya rengöringsfält
+  const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
+  const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
 
   // Nya skador
   const [newDamages, setNewDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
@@ -155,7 +159,7 @@ export default function CheckInForm() {
 
   const availableStations = ort ? STATIONER[ort] || [] : [];
 
-  // UPPDATERAD validering med energi-logik
+  // UPPDATERAD validering med rengöringsfält
   const canSave = () => {
     if (!regInput.trim()) return false;
     if (!matarstallning.trim()) return false;
@@ -167,7 +171,7 @@ export default function CheckInForm() {
       
     if (!hasLocation) return false;
     
-    // UPPDATERAD energi-validering
+    // Energi-validering
     if (drivmedelstyp === null) return false;
     
     if (drivmedelstyp === 'bensin_diesel') {
@@ -187,6 +191,10 @@ export default function CheckInForm() {
     if (antalLaddkablar === null) return false;
     if (hjultyp === null) return false;
     if (adblue === null) return false;
+    
+    // STEG 2: Nya obligatoriska rengöringsfält
+    if (tvatt === null) return false;
+    if (inre === null) return false;
     
     return true;
   };
@@ -214,6 +222,11 @@ export default function CheckInForm() {
     setAntalLaddkablar(null);
     setHjultyp(null);
     setAdblue(null);
+    
+    // STEG 2: Rensa rengöringsfält
+    setTvatt(null);
+    setInre(null);
+    
     setNewDamages([]);
     setOvrigaAnteckningar('');
     setShowSuccessModal(false);
@@ -235,7 +248,7 @@ export default function CheckInForm() {
   };
 
   const removeDamage = (id: string) => {
-    setNewDamages(prev => prev.filter(d => d.id !== id));
+    setNewDamages(prev => prev.filter(d => d.id !== d));
   };
 
   const updateDamageText = (id: string, text: string) => {
@@ -473,10 +486,10 @@ export default function CheckInForm() {
           </div>
         </div>
 
-        {/* UPPDATERAD energinivå-sektion */}
+        {/* Tankad/Laddad sektion - UPPDATERADE rubriker */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-            Energinivå *
+            Tankad/Laddad *
           </label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <button
@@ -515,7 +528,7 @@ export default function CheckInForm() {
                 cursor: 'pointer'
               }}
             >
-              Elbil (100%)
+              Elbil
             </button>
           </div>
         </div>
@@ -687,7 +700,7 @@ export default function CheckInForm() {
           </div>
         )}
 
-        {/* Befintliga fält */}
+        {/* Befintliga fordonsstatus-fält */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
             Spolarvätska OK? *
@@ -889,6 +902,100 @@ export default function CheckInForm() {
               }}
             >
               Vinterthjul
+            </button>
+          </div>
+        </div>
+
+        {/* STEG 2: Nya rengöringssektioner */}
+        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Rengöring</h2>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Utvändig tvätt *
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setTvatt('behover_tvattas')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: tvatt === 'behover_tvattas' ? '#2563eb' : '#ffffff',
+                color: tvatt === 'behover_tvattas' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Behöver tvättas
+            </button>
+            <button
+              type="button"
+              onClick={() => setTvatt('behover_grovtvattas')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: tvatt === 'behover_grovtvattas' ? '#2563eb' : '#ffffff',
+                color: tvatt === 'behover_grovtvattas' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Behöver grovtvättas
+            </button>
+            <button
+              type="button"
+              onClick={() => setTvatt('behover_inte_tvattas')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: tvatt === 'behover_inte_tvattas' ? '#2563eb' : '#ffffff',
+                color: tvatt === 'behover_inte_tvattas' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Behöver inte tvättas
+            </button>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Inre rengöring *
+          </label>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setInre('behover_rengoras_inuti')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: inre === 'behover_rengoras_inuti' ? '#2563eb' : '#ffffff',
+                color: inre === 'behover_rengoras_inuti' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Behöver rengöras inuti
+            </button>
+            <button
+              type="button"
+              onClick={() => setInre('ren_inuti')}
+              style={{
+                flex: 1,
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: inre === 'ren_inuti' ? '#2563eb' : '#ffffff',
+                color: inre === 'ren_inuti' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ren inuti
             </button>
           </div>
         </div>
