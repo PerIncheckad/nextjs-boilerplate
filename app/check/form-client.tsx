@@ -1,4 +1,8 @@
 'use client';
+// Updated with MABI logo - trigger deployment
+
+import React, { useEffect, useMemo, useState } from 'react';
+'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
