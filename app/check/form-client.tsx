@@ -77,11 +77,12 @@ export default function CheckInForm() {
   const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
   const [adblue, setAdblue] = useState<boolean | null>(null);
 
-  // STEG 2: Nya rengöringsfält
+  // Rengöringsfält
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
 
-  // Nya skador
+  // STEG 3: Omstrukturerad skadehantering
+  const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
   
   // Övriga anteckningar
@@ -159,7 +160,7 @@ export default function CheckInForm() {
 
   const availableStations = ort ? STATIONER[ort] || [] : [];
 
-  // UPPDATERAD validering med rengöringsfält
+  // UPPDATERAD validering med skadekontroll
   const canSave = () => {
     if (!regInput.trim()) return false;
     if (!matarstallning.trim()) return false;
@@ -192,9 +193,18 @@ export default function CheckInForm() {
     if (hjultyp === null) return false;
     if (adblue === null) return false;
     
-    // STEG 2: Nya obligatoriska rengöringsfält
+    // Rengöringsfält
     if (tvatt === null) return false;
     if (inre === null) return false;
+    
+    // STEG 3: Skadekontroll-validering
+    if (skadekontroll === null) return false;
+    
+    // Om "nya skador" är valt, måste alla skador ha text ifylld
+    if (skadekontroll === 'nya_skador') {
+      if (newDamages.length === 0) return false;
+      if (newDamages.some(damage => !damage.text.trim())) return false;
+    }
     
     return true;
   };
@@ -223,11 +233,14 @@ export default function CheckInForm() {
     setHjultyp(null);
     setAdblue(null);
     
-    // STEG 2: Rensa rengöringsfält
+    // Rensa rengöringsfält
     setTvatt(null);
     setInre(null);
     
+    // STEG 3: Rensa skadekontroll-fält
+    setSkadekontroll(null);
     setNewDamages([]);
+    
     setOvrigaAnteckningar('');
     setShowSuccessModal(false);
   };
@@ -238,7 +251,7 @@ export default function CheckInForm() {
     setShowSuccessModal(true);
   };
 
-  // Skadehantering
+  // STEG 3: Uppdaterad skadehantering
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
@@ -248,7 +261,7 @@ export default function CheckInForm() {
   };
 
   const removeDamage = (id: string) => {
-    setNewDamages(prev => prev.filter(d => d.id !== d));
+    setNewDamages(prev => prev.filter(d => d.id !== id));
   };
 
   const updateDamageText = (id: string, text: string) => {
@@ -486,7 +499,7 @@ export default function CheckInForm() {
           </div>
         </div>
 
-        {/* Tankad/Laddad sektion - UPPDATERADE rubriker */}
+        {/* Tankad/Laddad sektion */}
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
             Tankad/Laddad *
@@ -906,7 +919,7 @@ export default function CheckInForm() {
           </div>
         </div>
 
-        {/* STEG 2: Nya rengöringssektioner */}
+        {/* Rengöringssektioner */}
         <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Rengöring</h2>
 
         <div style={{ marginBottom: '16px' }}>
@@ -1000,152 +1013,216 @@ export default function CheckInForm() {
           </div>
         </div>
 
-        {/* Nya skador */}
-        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Nya skador på bilen?</h2>
-        
-        {newDamages.map(damage => (
-          <div key={damage.id} style={{
-            padding: '16px',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            marginBottom: '16px',
-            backgroundColor: '#fefce8'
-          }}>
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Text (obligatorisk)
-              </label>
-              <input
-                type="text"
-                value={damage.text}
-                onChange={(e) => updateDamageText(damage.id, e.target.value)}
-                placeholder="Beskriv skadan..."
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: '#ffffff'
-                }}
-              />
-            </div>
+        {/* STEG 3: Omstrukturerad skadehantering */}
+        <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Skador</h2>
 
-            <div style={{ marginBottom: '12px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Lägg till bild
-              </label>
-              
-              <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => updateDamageFiles(damage.id, e.target.files)}
-                  style={{ display: 'none' }}
-                  id={`file-input-${damage.id}`}
-                />
-                <label
-                  htmlFor={`file-input-${damage.id}`}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+            Skadekontroll *
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setSkadekontroll('ej_skadekontrollerad');
+                setNewDamages([]);
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: skadekontroll === 'ej_skadekontrollerad' ? '#2563eb' : '#ffffff',
+                color: skadekontroll === 'ej_skadekontrollerad' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Ej skadekontrollerad
+            </button>
+            <button
+              type="button"
+              onClick={() => setSkadekontroll('nya_skador')}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: skadekontroll === 'nya_skador' ? '#2563eb' : '#ffffff',
+                color: skadekontroll === 'nya_skador' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Nya skador
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSkadekontroll('inga_nya_skador');
+                setNewDamages([]);
+              }}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                backgroundColor: skadekontroll === 'inga_nya_skador' ? '#2563eb' : '#ffffff',
+                color: skadekontroll === 'inga_nya_skador' ? '#ffffff' : '#000',
+                cursor: 'pointer'
+              }}
+            >
+              Inga nya skador
+            </button>
+          </div>
+        </div>
+
+        {/* Visa skade-fält bara om "nya_skador" är valt */}
+        {skadekontroll === 'nya_skador' && (
+          <>
+            {newDamages.map(damage => (
+              <div key={damage.id} style={{
+                padding: '16px',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                marginBottom: '16px',
+                backgroundColor: '#fefce8'
+              }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                    Text (obligatorisk)
+                  </label>
+                  <input
+                    type="text"
+                    value={damage.text}
+                    onChange={(e) => updateDamageText(damage.id, e.target.value)}
+                    placeholder="Beskriv skadan..."
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      backgroundColor: '#ffffff'
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                    Lägg till bild
+                  </label>
+                  
+                  <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => updateDamageFiles(damage.id, e.target.files)}
+                      style={{ display: 'none' }}
+                      id={`file-input-${damage.id}`}
+                    />
+                    <label
+                      htmlFor={`file-input-${damage.id}`}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        backgroundColor: '#ffffff',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        color: '#4b5563'
+                      }}
+                    >
+                      Lägg till bild
+                    </label>
+                  </div>
+
+                  {damage.files.length > 0 && (
+                    <div style={{ 
+                      marginTop: '12px',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                      gap: '8px'
+                    }}>
+                      {damage.files.map((file, index) => (
+                        <div key={index} style={{ position: 'relative' }}>
+                          <img
+                            src={URL.createObjectURL(file)}
+                            alt={`Skadebild ${index + 1}`}
+                            style={{
+                              width: '100px',
+                              height: '100px',
+                              objectFit: 'cover',
+                              borderRadius: '6px',
+                              border: '1px solid #d1d5db'
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeDamageImage(damage.id, index)}
+                            style={{
+                              position: 'absolute',
+                              top: '-6px',
+                              right: '-6px',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              backgroundColor: '#dc2626',
+                              color: '#ffffff',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => removeDamage(damage.id)}
                   style={{
-                    display: 'block',
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
+                    padding: '8px 16px',
+                    border: '1px solid #dc2626',
                     borderRadius: '6px',
-                    fontSize: '16px',
                     backgroundColor: '#ffffff',
-                    textAlign: 'center',
+                    color: '#dc2626',
                     cursor: 'pointer',
-                    color: '#4b5563'
+                    fontSize: '14px'
                   }}
                 >
-                  Lägg till bild
-                </label>
+                  Ta bort skada
+                </button>
               </div>
-
-              {damage.files.length > 0 && (
-                <div style={{ 
-                  marginTop: '12px',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-                  gap: '8px'
-                }}>
-                  {damage.files.map((file, index) => (
-                    <div key={index} style={{ position: 'relative' }}>
-                      <img
-                        src={URL.createObjectURL(file)}
-                        alt={`Skadebild ${index + 1}`}
-                        style={{
-                          width: '100px',
-                          height: '100px',
-                          objectFit: 'cover',
-                          borderRadius: '6px',
-                          border: '1px solid #d1d5db'
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeDamageImage(damage.id, index)}
-                        style={{
-                          position: 'absolute',
-                          top: '-6px',
-                          right: '-6px',
-                          width: '20px',
-                          height: '20px',
-                          borderRadius: '50%',
-                          backgroundColor: '#dc2626',
-                          color: '#ffffff',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 'bold'
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            ))}
 
             <button
               type="button"
-              onClick={() => removeDamage(damage.id)}
+              onClick={addDamage}
               style={{
-                padding: '8px 16px',
-                border: '1px solid #dc2626',
-                borderRadius: '6px',
-                backgroundColor: '#ffffff',
-                color: '#dc2626',
+                background: 'none',
+                border: 'none',
+                color: '#2563eb',
+                textDecoration: 'underline',
                 cursor: 'pointer',
-                fontSize: '14px'
+                fontSize: '16px',
+                marginBottom: '32px'
               }}
             >
-              Ta bort skada
+              {newDamages.length === 0 ? 'Lägg till skada' : 'Lägg till ytterligare skada'}
             </button>
-          </div>
-        ))}
-
-        <button
-          type="button"
-          onClick={addDamage}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#2563eb',
-            textDecoration: 'underline',
-            cursor: 'pointer',
-            fontSize: '16px',
-            marginBottom: '32px'
-          }}
-        >
-          {newDamages.length === 0 ? 'Lägg till skada' : 'Lägg till ytterligare skada'}
-        </button>
+          </>
+        )}
 
         {/* Övriga anteckningar */}
         <div style={{ marginBottom: '32px' }}>
