@@ -530,9 +530,7 @@ export default function CheckInForm() {
               />
             </div>
           )}
-        </div>
-
-        {/* Fordonsstatus */}
+        </div>{/* Fordonsstatus */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1268,8 +1266,8 @@ export default function CheckInForm() {
                               onClick={() => removeDamageImage(damage.id, index)}
                               style={{
                                 position: 'absolute',
-                                top: '6px',
-                                right: '6px',
+                                top: '2px',
+                                right: '2px',
                                 width: '24px',
                                 height: '24px',
                                 borderRadius: '50%',
