@@ -1,8 +1,4 @@
 'use client';
-// Updated with MABI logo - trigger deployment
-
-import React, { useEffect, useMemo, useState } from 'react';
-'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -534,7 +530,9 @@ export default function CheckInForm() {
               />
             </div>
           )}
-        </div>{/* Fordonsstatus */}
+        </div>
+
+        {/* Fordonsstatus */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
