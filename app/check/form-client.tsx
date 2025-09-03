@@ -23,7 +23,7 @@ type ExistingDamage = {
   shortText: string; // t.ex. "Lackskada"
   detailText?: string; // t.ex. "höger framskärm"
   fullText: string; // t.ex. "Lackskada - höger framskärm"
-  status: 'not_selected' | 'documented' | 'fixed'; // Ny status för åtgärdat
+  status: 'not_selected' | 'documented' | 'fixed'; // Status för åtgärdat
   userDescription?: string; // Användarens egen beskrivning
   media?: MediaFile[]; // Bilder/videos som användaren lagt till
 };
@@ -760,7 +760,816 @@ export default function CheckInForm() {
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>{/* Skador med "Åtgärdat"-alternativ */}
+      }}>{/* Registreringsnummer med autocomplete */}
+        <div style={{ 
+          backgroundColor: '#ffffff',
+          padding: '24px',
+          borderRadius: '12px',
+          marginBottom: '24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          position: 'relative'
+        }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
+            Registreringsnummer *
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              value={regInput}
+              onChange={(e) => handleRegInputChange(e.target.value)}
+              onFocus={() => setShowSuggestions(regInput.length > 0 && suggestions.length > 0)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} // Delay för att hantera klick på förslag
+              placeholder="Skriv reg.nr"
+              spellCheck={false}
+              autoComplete="off"
+              style={{
+                width: '100%',
+                padding: '14px',
+                border: '2px solid #e5e7eb',
+                borderRadius: '8px',
+                fontSize: '18px',
+                fontWeight: '600',
+                backgroundColor: '#ffffff',
+                textAlign: 'center',
+                letterSpacing: '2px'
+              }}
+            />
+            
+            {/* Autocomplete-förslag */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: '#ffffff',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                zIndex: 10,
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                {suggestions.map((suggestion, index) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => selectSuggestion(suggestion)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: 'none',
+                      backgroundColor: '#ffffff',
+                      textAlign: 'left',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      borderBottom: index === suggestions.length - 1 ? 'none' : '1px solid #f3f4f6',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
+          
+          {notFound && normalizedReg && (
+            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>Okänt reg.nr</p>
+          )}
+
+          {/* Bilinfo */}
+          {carData.length > 0 && (
+            <div style={{ 
+              marginTop: '20px', 
+              padding: '20px', 
+              backgroundColor: '#f0f9ff', 
+              borderRadius: '8px',
+              border: '1px solid #bfdbfe'
+            }}>
+              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Bilmodell:</span> 
+                <span style={{ fontWeight: '500' }}>{carModel || '—'}</span>
+              </div>
+              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Hjulförvaring:</span> 
+                <span style={{ fontWeight: '500' }}>{wheelStorage || '—'}</span>
+              </div>
+              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Saludatum:</span> 
+                {saludatum ? (
+                  <span style={{ 
+                    color: '#dc2626',
+                    fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : '500'
+                  }}>
+                    {new Date(saludatum).toLocaleDateString('sv-SE')}
+                  </span>
+                ) : <span style={{ fontWeight: '500' }}> —</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
+                <div style={{ flex: 1 }}>
+                  {existingDamages.length === 0 ? (
+                    <span style={{ fontWeight: '500' }}> —</span>
+                  ) : (
+                    <ul style={{ margin: '0', paddingLeft: '20px' }}>
+                      {existingDamages.map((damage, i) => (
+                        <li key={i} style={{ marginBottom: '4px' }}>{damage.fullText}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Plats för incheckning */}
+        <div style={{ 
+          backgroundColor: '#ffffff',
+          padding: '24px',
+          borderRadius: '12px',
+          marginBottom: '24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <SectionHeader title="Plats för incheckning" />
+        
+          {!annanPlats && (
+            <>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Ort *
+                </label>
+                <select
+                  value={ort}
+                  onChange={(e) => {
+                    setOrt(e.target.value);
+                    setStation('');
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: '#ffffff'
+                  }}
+                >
+                  <option value="">— Välj ort —</option>
+                  {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Station / Depå *
+                </label>
+                <select
+                  value={station}
+                  onChange={(e) => setStation(e.target.value)}
+                  disabled={!ort}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: ort ? '#ffffff' : '#f3f4f6',
+                    color: ort ? '#000' : '#9ca3af'
+                  }}
+                >
+                  <option value="">— Välj station / depå —</option>
+                  {availableStations.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setAnnanPlats(!annanPlats);
+              if (!annanPlats) {
+                setOrt('');
+                setStation('');
+              } else {
+                setAnnanPlatsText('');
+              }
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#033066',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              fontSize: '14px',
+              marginBottom: '16px'
+            }}
+          >
+            {annanPlats ? '← Tillbaka till ort/station' : '+ Annan plats (fritext)'}
+          </button>
+
+          {annanPlats && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Annan plats *
+              </label>
+              <input
+                type="text"
+                value={annanPlatsText}
+                onChange={(e) => setAnnanPlatsText(e.target.value)}
+                placeholder="Beskriv platsen..."
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  backgroundColor: '#ffffff'
+                }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Fordonsstatus - utan "Bränsle/Energi"-rubrik */}
+        <div style={{ 
+          backgroundColor: '#ffffff',
+          padding: '24px',
+          borderRadius: '12px',
+          marginBottom: '24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <SectionHeader title="Fordonsstatus" />
+        
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Mätarställning *
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9\s]*"
+                value={matarstallning}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/[^0-9\s]/g, '');
+                  setMatarstallning(value);
+                }}
+                placeholder="ex. 42180"
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  backgroundColor: '#ffffff'
+                }}
+              />
+              <span style={{ color: '#666', fontWeight: '500' }}>km</span>
+            </div>
+          </div>
+
+          {/* Drivmedel direkt utan underrubrik */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Drivmedel *
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDrivmedelstyp('bensin_diesel');
+                  setLaddniva('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#033066' : '#ffffff',
+                  color: drivmedelstyp === 'bensin_diesel' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Bensin/Diesel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDrivmedelstyp('elbil');
+                  setTankniva(null);
+                  setLiters('');
+                  setBransletyp(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: drivmedelstyp === 'elbil' ? '#033066' : '#ffffff',
+                  color: drivmedelstyp === 'elbil' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Elbil
+              </button>
+            </div>
+          </div>
+
+          {/* Visa tanknivå för bensin/diesel */}
+          {drivmedelstyp === 'bensin_diesel' && (
+            <>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Tanknivå *
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('fulltankad')}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: tankniva === 'fulltankad' ? '#10b981' : '#ffffff',
+                      color: tankniva === 'fulltankad' ? '#ffffff' : '#000',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Fulltankad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('tankas_senare')}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: tankniva === 'tankas_senare' ? '#f59e0b' : '#ffffff',
+                      color: tankniva === 'tankas_senare' ? '#ffffff' : '#000',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ej fulltankad - tankas senare
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('pafylld_nu')}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: tankniva === 'pafylld_nu' ? '#033066' : '#ffffff',
+                      color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ej fulltankad - påfylld nu
+                  </button>
+                </div>
+              </div>
+
+              {tankniva === 'pafylld_nu' && (
+                <>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      Antal liter påfyllda *
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9,]*"
+                      value={liters}
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        value = value.replace(/\./g, ',');
+                        value = value.replace(/[^0-9,]/g, '');
+                        const parts = value.split(',');
+                        if (parts.length > 2) {
+                          value = parts[0] + ',' + parts[1];
+                        }
+                        if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
+                          setLiters(value);
+                        }
+                      }}
+                      placeholder="ex. 12,5"
+                      style={{
+                        width: '200px',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        backgroundColor: '#ffffff'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      Bränsletyp *
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setBransletyp('Bensin')}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          backgroundColor: bransletyp === 'Bensin' ? '#033066' : '#ffffff',
+                          color: bransletyp === 'Bensin' ? '#ffffff' : '#000',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Bensin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBransletyp('Diesel')}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          backgroundColor: bransletyp === 'Diesel' ? '#033066' : '#ffffff',
+                          color: bransletyp === 'Diesel' ? '#ffffff' : '#000',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Diesel
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Visa laddnivå för elbil */}
+          {drivmedelstyp === 'elbil' && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Laddnivå *
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={laddniva}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    const numValue = parseInt(value);
+                    if (value === '' || (numValue >= 0 && numValue <= 100)) {
+                      setLaddniva(value);
+                    }
+                  }}
+                  placeholder="ex. 85"
+                  style={{
+                    width: '100px',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: '#ffffff'
+                  }}
+                />
+                <span style={{ color: '#666', fontWeight: '500' }}>%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Övriga fordonsstatus-fält i kompakt layout */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Spolarvätska OK? *
+              </label>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSpolarvatska(true)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: spolarvatska === true ? '#10b981' : '#ffffff',
+                    color: spolarvatska === true ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSpolarvatska(false)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: spolarvatska === false ? '#dc2626' : '#ffffff',
+                    color: spolarvatska === false ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                AdBlue OK? *
+              </label>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAdblue(true)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: adblue === true ? '#10b981' : '#ffffff',
+                    color: adblue === true ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdblue(false)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: adblue === false ? '#dc2626' : '#ffffff',
+                    color: adblue === false ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Insynsskydd OK? *
+              </label>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setInsynsskydd(true)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: insynsskydd === true ? '#10b981' : '#ffffff',
+                    color: insynsskydd === true ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInsynsskydd(false)}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: insynsskydd === false ? '#dc2626' : '#ffffff',
+                    color: insynsskydd === false ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Antal laddkablar *
+              </label>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAntalLaddkablar('0')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: antalLaddkablar === '0' ? '#033066' : '#ffffff',
+                    color: antalLaddkablar === '0' ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  0
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAntalLaddkablar('1')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: antalLaddkablar === '1' ? '#033066' : '#ffffff',
+                    color: antalLaddkablar === '1' ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  1
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAntalLaddkablar('2')}
+                  style={{
+                    flex: 1,
+                    padding: '8px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: antalLaddkablar === '2' ? '#033066' : '#ffffff',
+                    color: antalLaddkablar === '2' ? '#ffffff' : '#000',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  2
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Hjul som sitter på *
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setHjultyp('Sommarthjul')}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: hjultyp === 'Sommarthjul' ? '#f59e0b' : '#ffffff',
+                  color: hjultyp === 'Sommarthjul' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Sommarhjul
+              </button>
+              <button
+                type="button"
+                onClick={() => setHjultyp('Vinterthjul')}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: hjultyp === 'Vinterthjul' ? '#3b82f6' : '#ffffff',
+                  color: hjultyp === 'Vinterthjul' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Vinterhjul
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Rengöring */}
+        <div style={{ 
+          backgroundColor: '#ffffff',
+          padding: '24px',
+          borderRadius: '12px',
+          marginBottom: '24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <SectionHeader title="Rengöring" />
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Utvändig tvätt *
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setTvatt('behover_tvattas')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: tvatt === 'behover_tvattas' ? '#f59e0b' : '#ffffff',
+                  color: tvatt === 'behover_tvattas' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Behöver tvättas
+              </button>
+              <button
+                type="button"
+                onClick={() => setTvatt('behover_grovtvattas')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: tvatt === 'behover_grovtvattas' ? '#dc2626' : '#ffffff',
+                  color: tvatt === 'behover_grovtvattas' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Behöver grovtvättas
+              </button>
+              <button
+                type="button"
+                onClick={() => setTvatt('behover_inte_tvattas')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: tvatt === 'behover_inte_tvattas' ? '#10b981' : '#ffffff',
+                  color: tvatt === 'behover_inte_tvattas' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Behöver inte tvättas
+              </button>
+            </div>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Inre rengöring *
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setInre('behover_rengoras_inuti')}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: inre === 'behover_rengoras_inuti' ? '#f59e0b' : '#ffffff',
+                  color: inre === 'behover_rengoras_inuti' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Behöver rengöras inuti
+              </button>
+              <button
+                type="button"
+                onClick={() => setInre('ren_inuti')}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: inre === 'ren_inuti' ? '#10b981' : '#ffffff',
+                  color: inre === 'ren_inuti' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Ren inuti
+              </button>
+            </div>
+          </div>
+        </div>{/* Skador med "Åtgärdat"-alternativ */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1446,7 +2255,9 @@ export default function CheckInForm() {
             © Albarone AB 2025
           </p>
         </div>
-      </div>{/* Bekräftelsedialog för "Åtgärdat" */}
+      </div>
+
+      {/* Bekräftelsedialog för "Åtgärdat" */}
       {showConfirmDialog && (
         <div style={{
           position: 'fixed',
