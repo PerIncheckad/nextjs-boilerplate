@@ -1,4 +1,5 @@
 'use client';
+// Force deployment for MABI logo
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -294,12 +295,31 @@ export default function CheckInForm() {
         <div style={{ 
           display: 'flex', 
           justifyContent: 'space-between', 
-          alignItems: 'flex-start',
-          marginBottom: '8px' 
+          alignItems: 'center',
+          marginBottom: '32px',
+          padding: '24px 0',
+          borderBottom: '3px solid #2563eb'
         }}>
           <div>
-            <h1 style={{ fontSize: '28px', margin: 0, color: '#1f2937' }}>Ny incheckning</h1>
-            <p style={{ color: '#666', margin: '4px 0 24px 0' }}>Inloggad: <strong>Bob</strong></p>
+            <h1 style={{ 
+              fontSize: '36px', 
+              margin: 0, 
+              color: '#1f2937',
+              fontWeight: '800',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+            }}>
+              NY INCHECKNING
+            </h1>
+            <p style={{ 
+              color: '#4b5563', 
+              margin: '8px 0 0 0',
+              fontSize: '16px',
+              fontWeight: '500'
+            }}>
+              Inloggad: <strong style={{ color: '#2563eb' }}>Bob</strong>
+            </p>
           </div>
           {/* MABI-logga */}
           <div style={{
@@ -530,9 +550,7 @@ export default function CheckInForm() {
               />
             </div>
           )}
-        </div>
-
-        {/* Fordonsstatus */}
+        </div>{/* Fordonsstatus */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
