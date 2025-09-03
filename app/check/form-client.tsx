@@ -30,6 +30,9 @@ const STATIONER: Record<string, string[]> = {
   'LUND': ['Huvudstation Lund', 'Ford Lund', 'Hedin Lund', 'B/S Lund']
 };
 
+// Skadetyper
+const DAMAGE_TYPES = ['Buckla', 'Repa', 'Saknas'];
+
 function normalizeReg(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
@@ -76,10 +79,10 @@ export default function CheckInForm() {
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
   
-  // Skador - gamla och nya
-  const [oldDamages, setOldDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
+  // Skador - gamla och nya (nu med typ)
+  const [oldDamages, setOldDamages] = useState<{id: string; type: string; text: string; files: File[]}[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
-  const [newDamages, setNewDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
+  const [newDamages, setNewDamages] = useState<{id: string; type: string; text: string; files: File[]}[]>([]);
   
   const [uthyrningsstatus, setUthyrningsstatus] = useState<'redo_for_uthyrning' | 'ledig_tankad' | 'ledig_otankad' | 'klar_otankad' | null>(null);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
@@ -187,11 +190,11 @@ export default function CheckInForm() {
     
     if (skadekontroll === 'nya_skador') {
       if (newDamages.length === 0) return false;
-      if (newDamages.some(damage => !damage.text.trim())) return false;
+      if (newDamages.some(damage => !damage.type || !damage.text.trim())) return false;
     }
     
-    // Kontrollera att gamla skador har text om de finns
-    if (oldDamages.some(damage => !damage.text.trim())) return false;
+    // Kontrollera att gamla skador har typ och text om de finns
+    if (oldDamages.some(damage => !damage.type || !damage.text.trim())) return false;
     
     if (uthyrningsstatus === null) return false;
     
@@ -236,6 +239,7 @@ export default function CheckInForm() {
   const addOldDamage = () => {
     setOldDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
+      type: '',
       text: '',
       files: []
     }]);
@@ -243,6 +247,10 @@ export default function CheckInForm() {
 
   const removeOldDamage = (id: string) => {
     setOldDamages(prev => prev.filter(d => d.id !== id));
+  };
+
+  const updateOldDamageType = (id: string, type: string) => {
+    setOldDamages(prev => prev.map(d => d.id === id ? {...d, type} : d));
   };
 
   const updateOldDamageText = (id: string, text: string) => {
@@ -270,6 +278,7 @@ export default function CheckInForm() {
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
+      type: '',
       text: '',
       files: []
     }]);
@@ -277,6 +286,10 @@ export default function CheckInForm() {
 
   const removeDamage = (id: string) => {
     setNewDamages(prev => prev.filter(d => d.id !== id));
+  };
+
+  const updateDamageType = (id: string, type: string) => {
+    setNewDamages(prev => prev.map(d => d.id === id ? {...d, type} : d));
   };
 
   const updateDamageText = (id: string, text: string) => {
@@ -1206,7 +1219,7 @@ export default function CheckInForm() {
         }}>
           <SectionHeader title="Skador" />
 
-          {/* Gamla skador - ny sektion */}
+          {/* Gamla skador - med dropdown för typ */}
           <SubSectionHeader title="Gamla skador" />
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
             Dokumentera befintliga skador mer detaljerat för att underlätta identifiering vid framtida incheckningar.
@@ -1222,7 +1235,30 @@ export default function CheckInForm() {
             }}>
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Beskrivning av skada (obligatorisk)
+                  Typ av skada *
+                </label>
+                <select
+                  value={damage.type}
+                  onChange={(e) => updateOldDamageType(damage.id, e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: '#ffffff'
+                  }}
+                >
+                  <option value="">— Välj typ av skada —</option>
+                  {DAMAGE_TYPES.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Beskrivning av skada *
                 </label>
                 <input
                   type="text"
@@ -1424,7 +1460,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Skade-fält bara om "nya_skador" är valt */}
+          {/* Nya skador - med dropdown för typ */}
           {skadekontroll === 'nya_skador' && (
             <>
               {newDamages.map(damage => (
@@ -1437,7 +1473,30 @@ export default function CheckInForm() {
                 }}>
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Text (obligatorisk)
+                      Typ av skada *
+                    </label>
+                    <select
+                      value={damage.type}
+                      onChange={(e) => updateDamageType(damage.id, e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        backgroundColor: '#ffffff'
+                      }}
+                    >
+                      <option value="">— Välj typ av skada —</option>
+                      {DAMAGE_TYPES.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      Beskrivning av skada *
                     </label>
                     <input
                       type="text"
