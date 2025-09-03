@@ -462,6 +462,113 @@ export default function CheckInForm() {
     </div>
   );
 
+  // Media upload component - nu med separata knappar för Android-kompatibilitet
+  const MediaUpload = ({ 
+    damageId, 
+    isOld, 
+    onMediaUpdate 
+  }: { 
+    damageId: string; 
+    isOld: boolean; 
+    onMediaUpdate: (id: string, files: FileList | null) => void; 
+  }) => (
+    <div style={{ marginBottom: '12px' }}>
+      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+        Lägg till bild eller video
+      </label>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* Foto-knapp */}
+        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
+            style={{ display: 'none' }}
+            id={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
+          />
+          <label
+            htmlFor={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '12px',
+              border: '2px dashed #10b981',
+              borderRadius: '6px',
+              fontSize: '16px',
+              backgroundColor: '#f0fdf4',
+              textAlign: 'center',
+              cursor: 'pointer',
+              color: '#047857'
+            }}
+          >
+            📷 Ta foto
+          </label>
+        </div>
+
+        {/* Video-knapp */}
+        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+          <input
+            type="file"
+            accept="video/*"
+            capture="environment"
+            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
+            style={{ display: 'none' }}
+            id={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
+          />
+          <label
+            htmlFor={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '12px',
+              border: '2px dashed #dc2626',
+              borderRadius: '6px',
+              fontSize: '16px',
+              backgroundColor: '#fef2f2',
+              textAlign: 'center',
+              cursor: 'pointer',
+              color: '#dc2626'
+            }}
+          >
+            🎥 Spela in video
+          </label>
+        </div>
+
+        {/* Galleri-knapp */}
+        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
+            style={{ display: 'none' }}
+            id={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
+          />
+          <label
+            htmlFor={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '12px',
+              border: '2px dashed #3b82f6',
+              borderRadius: '6px',
+              fontSize: '16px',
+              backgroundColor: '#eff6ff',
+              textAlign: 'center',
+              cursor: 'pointer',
+              color: '#2563eb'
+            }}
+          >
+            📁 Välj från galleri
+          </label>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ 
       minHeight: '100vh',
@@ -782,7 +889,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Bränsle/Energi sektion - ny rubrik och layout */}
+          {/* Bränsle/Energi sektion */}
           <div style={{ 
             marginBottom: '24px',
             padding: '16px',
@@ -1345,7 +1452,7 @@ export default function CheckInForm() {
         }}>
           <SectionHeader title="Skador" />
 
-          {/* Gamla skador - med video-stöd */}
+          {/* Gamla skador - med separata knappar för Android */}
           <SubSectionHeader title="Gamla skador" />
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
             Dokumentera befintliga skador mer detaljerat för att underlätta identifiering vid framtida incheckningar.
@@ -1402,147 +1509,115 @@ export default function CheckInForm() {
                 />
               </div>
 
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Lägg till bild eller video
-                </label>
-                
-                <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-                  <input
-                    type="file"
-                    accept="image/*,video/*"
-                    multiple
-                    capture="environment"
-                    onChange={(e) => updateOldDamageMedia(damage.id, e.target.files)}
-                    style={{ display: 'none' }}
-                    id={`old-file-input-${damage.id}`}
-                  />
-                  <label
-                    htmlFor={`old-file-input-${damage.id}`}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      padding: '12px',
-                      border: '2px dashed #d1d5db',
-                      borderRadius: '6px',
-                      fontSize: '16px',
-                      backgroundColor: '#ffffff',
-                      textAlign: 'center',
-                      cursor: 'pointer',
-                      color: '#4b5563'
-                    }}
-                  >
-                    📷 Lägg till bild eller video
-                    <br />
-                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                      Stöder bilder och videos från kamera eller galleri
-                    </span>
-                  </label>
-                </div>
+              <MediaUpload 
+                damageId={damage.id} 
+                isOld={true} 
+                onMediaUpdate={updateOldDamageMedia} 
+              />
 
-                {damage.media.length > 0 && (
-                  <div style={{ 
-                    marginTop: '12px',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                    gap: '12px'
-                  }}>
-                    {damage.media.map((mediaFile, index) => (
-                      <div key={index} style={{ 
-                        position: 'relative',
-                        width: '120px',
-                        height: '120px'
-                      }}>
-                        {mediaFile.type === 'image' ? (
-                          <img
-                            src={mediaFile.preview}
-                            alt={`Gammal skadebild ${index + 1}`}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'cover',
-                              borderRadius: '8px',
-                              border: '1px solid #d1d5db'
-                            }}
-                          />
-                        ) : (
-                          <div style={{
+              {damage.media.length > 0 && (
+                <div style={{ 
+                  marginTop: '12px',
+                  marginBottom: '12px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                  gap: '12px'
+                }}>
+                  {damage.media.map((mediaFile, index) => (
+                    <div key={index} style={{ 
+                      position: 'relative',
+                      width: '120px',
+                      height: '120px'
+                    }}>
+                      {mediaFile.type === 'image' ? (
+                        <img
+                          src={mediaFile.preview}
+                          alt={`Gammal skadebild ${index + 1}`}
+                          style={{
                             width: '100%',
                             height: '100%',
+                            objectFit: 'cover',
                             borderRadius: '8px',
-                            border: '1px solid #d1d5db',
-                            position: 'relative',
-                            overflow: 'hidden'
-                          }}>
-                            {mediaFile.thumbnail ? (
-                              <img
-                                src={mediaFile.thumbnail}
-                                alt={`Video thumbnail ${index + 1}`}
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover'
-                                }}
-                              />
-                            ) : (
-                              <div style={{
+                            border: '1px solid #d1d5db'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '100%',
+                          height: '100%',
+                          borderRadius: '8px',
+                          border: '1px solid #d1d5db',
+                          position: 'relative',
+                          overflow: 'hidden'
+                        }}>
+                          {mediaFile.thumbnail ? (
+                            <img
+                              src={mediaFile.thumbnail}
+                              alt={`Video thumbnail ${index + 1}`}
+                              style={{
                                 width: '100%',
                                 height: '100%',
-                                backgroundColor: '#6b7280',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                fontSize: '24px'
-                              }}>
-                                ▶
-                              </div>
-                            )}
+                                objectFit: 'cover'
+                              }}
+                            />
+                          ) : (
                             <div style={{
-                              position: 'absolute',
-                              top: '4px',
-                              left: '4px',
-                              backgroundColor: 'rgba(0,0,0,0.8)',
+                              width: '100%',
+                              height: '100%',
+                              backgroundColor: '#6b7280',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               color: 'white',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontSize: '10px',
-                              fontWeight: 'bold'
+                              fontSize: '24px'
                             }}>
-                              VIDEO
+                              ▶
                             </div>
-                          </div>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => removeOldDamageMedia(damage.id, index)}
-                          style={{
+                          )}
+                          <div style={{
                             position: 'absolute',
-                            top: '2px',
-                            right: '2px',
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            backgroundColor: '#dc2626',
-                            color: '#ffffff',
-                            border: '2px solid #ffffff',
-                            cursor: 'pointer',
-                            fontSize: '12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 'bold',
-                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                            zIndex: 10
-                          }}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                            top: '4px',
+                            left: '4px',
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 'bold'
+                          }}>
+                            VIDEO
+                          </div>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeOldDamageMedia(damage.id, index)}
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: '#dc2626',
+                          color: '#ffffff',
+                          border: '2px solid #ffffff',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 'bold',
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                          zIndex: 10
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <button
                 type="button"
@@ -1578,7 +1653,7 @@ export default function CheckInForm() {
             {oldDamages.length === 0 ? '+ Dokumentera gamla skador' : '+ Lägg till ytterligare gammal skada'}
           </button>
 
-          {/* Nya skador - med video-stöd */}
+          {/* Nya skador - med separata knappar för Android */}
           <SubSectionHeader title="Nya skador" />
 
           <div style={{ marginBottom: '16px' }}>
@@ -1640,7 +1715,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Nya skador - med video-stöd */}
+          {/* Nya skador - med separata knappar för Android */}
           {skadekontroll === 'nya_skador' && (
             <>
               {newDamages.map(damage => (
@@ -1694,147 +1769,115 @@ export default function CheckInForm() {
                     />
                   </div>
 
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Lägg till bild eller video
-                    </label>
-                    
-                    <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-                      <input
-                        type="file"
-                        accept="image/*,video/*"
-                        multiple
-                        capture="environment"
-                        onChange={(e) => updateDamageMedia(damage.id, e.target.files)}
-                        style={{ display: 'none' }}
-                        id={`file-input-${damage.id}`}
-                      />
-                      <label
-                        htmlFor={`file-input-${damage.id}`}
-                        style={{
-                          display: 'block',
-                          width: '100%',
-                          padding: '12px',
-                          border: '2px dashed #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '16px',
-                          backgroundColor: '#ffffff',
-                          textAlign: 'center',
-                          cursor: 'pointer',
-                          color: '#4b5563'
-                        }}
-                      >
-                        📷 Lägg till bild eller video
-                        <br />
-                        <span style={{ fontSize: '12px', color: '#6b7280' }}>
-                          Stöder bilder och videos från kamera eller galleri
-                        </span>
-                      </label>
-                    </div>
+                  <MediaUpload 
+                    damageId={damage.id} 
+                    isOld={false} 
+                    onMediaUpdate={updateDamageMedia} 
+                  />
 
-                    {damage.media.length > 0 && (
-                      <div style={{ 
-                        marginTop: '12px',
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                        gap: '12px'
-                      }}>
-                        {damage.media.map((mediaFile, index) => (
-                          <div key={index} style={{ 
-                            position: 'relative',
-                            width: '120px',
-                            height: '120px'
-                          }}>
-                            {mediaFile.type === 'image' ? (
-                              <img
-                                src={mediaFile.preview}
-                                alt={`Skadebild ${index + 1}`}
-                                style={{
-                                  width: '100%',
-                                  height: '100%',
-                                  objectFit: 'cover',
-                                  borderRadius: '8px',
-                                  border: '1px solid #d1d5db'
-                                }}
-                              />
-                            ) : (
-                              <div style={{
+                  {damage.media.length > 0 && (
+                    <div style={{ 
+                      marginTop: '12px',
+                      marginBottom: '12px',
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                      gap: '12px'
+                    }}>
+                      {damage.media.map((mediaFile, index) => (
+                        <div key={index} style={{ 
+                          position: 'relative',
+                          width: '120px',
+                          height: '120px'
+                        }}>
+                          {mediaFile.type === 'image' ? (
+                            <img
+                              src={mediaFile.preview}
+                              alt={`Skadebild ${index + 1}`}
+                              style={{
                                 width: '100%',
                                 height: '100%',
+                                objectFit: 'cover',
                                 borderRadius: '8px',
-                                border: '1px solid #d1d5db',
-                                position: 'relative',
-                                overflow: 'hidden'
-                              }}>
-                                {mediaFile.thumbnail ? (
-                                  <img
-                                    src={mediaFile.thumbnail}
-                                    alt={`Video thumbnail ${index + 1}`}
-                                    style={{
-                                      width: '100%',
-                                      height: '100%',
-                                      objectFit: 'cover'
-                                    }}
-                                  />
-                                ) : (
-                                  <div style={{
+                                border: '1px solid #d1d5db'
+                              }}
+                            />
+                          ) : (
+                            <div style={{
+                              width: '100%',
+                              height: '100%',
+                              borderRadius: '8px',
+                              border: '1px solid #d1d5db',
+                              position: 'relative',
+                              overflow: 'hidden'
+                            }}>
+                              {mediaFile.thumbnail ? (
+                                <img
+                                  src={mediaFile.thumbnail}
+                                  alt={`Video thumbnail ${index + 1}`}
+                                  style={{
                                     width: '100%',
                                     height: '100%',
-                                    backgroundColor: '#6b7280',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: 'white',
-                                    fontSize: '24px'
-                                  }}>
-                                    ▶
-                                  </div>
-                                )}
+                                    objectFit: 'cover'
+                                  }}
+                                />
+                              ) : (
                                 <div style={{
-                                  position: 'absolute',
-                                  top: '4px',
-                                  left: '4px',
-                                  backgroundColor: 'rgba(0,0,0,0.8)',
+                                  width: '100%',
+                                  height: '100%',
+                                  backgroundColor: '#6b7280',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
                                   color: 'white',
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontSize: '10px',
-                                  fontWeight: 'bold'
+                                  fontSize: '24px'
                                 }}>
-                                  VIDEO
+                                  ▶
                                 </div>
-                              </div>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeDamageMedia(damage.id, index)}
-                              style={{
+                              )}
+                              <div style={{
                                 position: 'absolute',
-                                top: '2px',
-                                right: '2px',
-                                width: '24px',
-                                height: '24px',
-                                borderRadius: '50%',
-                                backgroundColor: '#dc2626',
-                                color: '#ffffff',
-                                border: '2px solid #ffffff',
-                                cursor: 'pointer',
-                                fontSize: '12px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontWeight: 'bold',
-                                boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                                zIndex: 10
-                              }}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                                top: '4px',
+                                left: '4px',
+                                backgroundColor: 'rgba(0,0,0,0.8)',
+                                color: 'white',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: 'bold'
+                              }}>
+                                VIDEO
+                              </div>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeDamageMedia(damage.id, index)}
+                            style={{
+                              position: 'absolute',
+                              top: '2px',
+                              right: '2px',
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '50%',
+                              backgroundColor: '#dc2626',
+                              color: '#ffffff',
+                              border: '2px solid #ffffff',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 'bold',
+                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                              zIndex: 10
+                            }}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <button
                     type="button"
