@@ -322,22 +322,25 @@ export default function CheckInForm() {
             </p>
           </div>
           
-          {/* MABI-logga med cache-buster */}
+          {/* MABI-logga med vit bakgrund */}
           <div style={{
             width: '120px',
             height: '60px',
+            backgroundColor: '#ffffff',
+            borderRadius: '6px',
+            padding: '8px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            border: '2px solid rgba(255, 255, 255, 0.3)'
           }}>
             <img 
               src={`/mabi-logo.png?v=${Date.now()}`}
               alt="MABI" 
               style={{
-                maxWidth: '120px',
-                maxHeight: '60px',
-                objectFit: 'contain',
-                filter: 'brightness(0) invert(1)' // Gör loggan vit
+                maxWidth: '100%',
+                maxHeight: '100%',
+                objectFit: 'contain'
               }}
               onError={(e) => {
                 // Fallback till text-logga om bilden inte laddar
@@ -348,15 +351,12 @@ export default function CheckInForm() {
             <div style={{
               width: '100%',
               height: '100%',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              borderRadius: '8px',
               display: 'none',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'white',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              border: '2px solid rgba(255, 255, 255, 0.3)'
+              color: '#033066',
+              fontSize: '16px',
+              fontWeight: 'bold'
             }}>
               MABI
             </div>
