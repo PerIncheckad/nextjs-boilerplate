@@ -30,8 +30,31 @@ const STATIONER: Record<string, string[]> = {
   'LUND': ['Huvudstation Lund', 'Ford Lund', 'Hedin Lund', 'B/S Lund']
 };
 
-// Skadetyper
-const DAMAGE_TYPES = ['Buckla', 'Repa', 'Saknas'];
+// Kompletta skadetyper från din lista
+const DAMAGE_TYPES = [
+  'Buckla',
+  'Däckskada sommarhjul',
+  'Däckskada vinterhjul', 
+  'Fälgskada sommarhjul',
+  'Fälgskada vinterhjul',
+  'Feltankning',
+  'Höjdledsskada',
+  'Intryck',
+  'Invändig skada',
+  'Jack',
+  'Krockskada',
+  'Krossad ruta',
+  'Oaktsamhet',
+  'Punktering',
+  'Repa',
+  'Repor',
+  'Saknas',
+  'Skrapad',
+  'Spricka',
+  'Stenskott',
+  'Trasig',
+  'Övrigt'
+];
 
 function normalizeReg(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -197,6 +220,9 @@ export default function CheckInForm() {
     if (oldDamages.some(damage => !damage.type || !damage.text.trim())) return false;
     
     if (uthyrningsstatus === null) return false;
+    
+    // Obligatorisk preliminär avslut notering
+    if (!preliminarAvslutNotering.trim()) return false;
     
     return true;
   };
@@ -673,219 +699,236 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Tankad/Laddad sektion */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Tankad/Laddad *
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setDrivmedelstyp('bensin_diesel');
-                  setLaddniva('');
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#033066' : '#ffffff',
-                  color: drivmedelstyp === 'bensin_diesel' ? '#ffffff' : '#000',
-                  cursor: 'pointer'
-                }}
-              >
-                Bensin/Diesel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDrivmedelstyp('elbil');
-                  setTankniva(null);
-                  setLiters('');
-                  setBransletyp(null);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: drivmedelstyp === 'elbil' ? '#033066' : '#ffffff',
-                  color: drivmedelstyp === 'elbil' ? '#ffffff' : '#000',
-                  cursor: 'pointer'
-                }}
-              >
-                Elbil
-              </button>
-            </div>
-          </div>
-
-          {/* Visa tanknivå för bensin/diesel */}
-          {drivmedelstyp === 'bensin_diesel' && (
-            <>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Tanknivå *
-                </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setTankniva('fulltankad')}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: tankniva === 'fulltankad' ? '#10b981' : '#ffffff',
-                      color: tankniva === 'fulltankad' ? '#ffffff' : '#000',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Fulltankad
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTankniva('tankas_senare')}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: tankniva === 'tankas_senare' ? '#f59e0b' : '#ffffff',
-                      color: tankniva === 'tankas_senare' ? '#ffffff' : '#000',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Ej fulltankad - tankas senare
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTankniva('pafylld_nu')}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: tankniva === 'pafylld_nu' ? '#033066' : '#ffffff',
-                      color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Ej fulltankad - påfylld nu
-                  </button>
-                </div>
-              </div>
-
-              {tankniva === 'pafylld_nu' && (
-                <>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Antal liter påfyllda *
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      pattern="[0-9,]*"
-                      value={liters}
-                      onChange={(e) => {
-                        let value = e.target.value;
-                        value = value.replace(/\./g, ',');
-                        value = value.replace(/[^0-9,]/g, '');
-                        const parts = value.split(',');
-                        if (parts.length > 2) {
-                          value = parts[0] + ',' + parts[1];
-                        }
-                        if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
-                          setLiters(value);
-                        }
-                      }}
-                      placeholder="ex. 12,5"
-                      style={{
-                        width: '200px',
-                        padding: '12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        backgroundColor: '#ffffff'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Bränsletyp *
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setBransletyp('Bensin')}
-                        style={{
-                          flex: 1,
-                          padding: '12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          backgroundColor: bransletyp === 'Bensin' ? '#033066' : '#ffffff',
-                          color: bransletyp === 'Bensin' ? '#ffffff' : '#000',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Bensin
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBransletyp('Diesel')}
-                        style={{
-                          flex: 1,
-                          padding: '12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          backgroundColor: bransletyp === 'Diesel' ? '#033066' : '#ffffff',
-                          color: bransletyp === 'Diesel' ? '#ffffff' : '#000',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Diesel
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-
-          {/* Visa laddnivå för elbil */}
-          {drivmedelstyp === 'elbil' && (
+          {/* Bränsle/Energi sektion - ny rubrik och layout */}
+          <div style={{ 
+            marginBottom: '24px',
+            padding: '16px',
+            backgroundColor: '#f9fafb',
+            borderRadius: '8px',
+            border: '1px solid #e5e7eb'
+          }}>
+            <h4 style={{ 
+              fontSize: '16px', 
+              fontWeight: '600', 
+              margin: '0 0 12px 0',
+              color: '#374151'
+            }}>
+              Bränsle / Energi
+            </h4>
+            
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Laddnivå *
+                Drivmedel *
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={laddniva}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '');
-                    const numValue = parseInt(value);
-                    if (value === '' || (numValue >= 0 && numValue <= 100)) {
-                      setLaddniva(value);
-                    }
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrivmedelstyp('bensin_diesel');
+                    setLaddniva('');
                   }}
-                  placeholder="ex. 85"
                   style={{
-                    width: '100px',
+                    width: '100%',
                     padding: '12px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: '#ffffff'
+                    backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#033066' : '#ffffff',
+                    color: drivmedelstyp === 'bensin_diesel' ? '#ffffff' : '#000',
+                    cursor: 'pointer'
                   }}
-                />
-                <span style={{ color: '#666', fontWeight: '500' }}>%</span>
+                >
+                  Bensin/Diesel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDrivmedelstyp('elbil');
+                    setTankniva(null);
+                    setLiters('');
+                    setBransletyp(null);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: drivmedelstyp === 'elbil' ? '#033066' : '#ffffff',
+                    color: drivmedelstyp === 'elbil' ? '#ffffff' : '#000',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Elbil
+                </button>
               </div>
             </div>
-          )}
+
+            {/* Visa tanknivå för bensin/diesel */}
+            {drivmedelstyp === 'bensin_diesel' && (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                    Tanknivå *
+                  </label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setTankniva('fulltankad')}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        backgroundColor: tankniva === 'fulltankad' ? '#10b981' : '#ffffff',
+                        color: tankniva === 'fulltankad' ? '#ffffff' : '#000',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Fulltankad
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTankniva('tankas_senare')}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        backgroundColor: tankniva === 'tankas_senare' ? '#f59e0b' : '#ffffff',
+                        color: tankniva === 'tankas_senare' ? '#ffffff' : '#000',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Ej fulltankad - tankas senare
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTankniva('pafylld_nu')}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        backgroundColor: tankniva === 'pafylld_nu' ? '#033066' : '#ffffff',
+                        color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Ej fulltankad - påfylld nu
+                    </button>
+                  </div>
+                </div>
+
+                {tankniva === 'pafylld_nu' && (
+                  <>
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                        Antal liter påfyllda *
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9,]*"
+                        value={liters}
+                        onChange={(e) => {
+                          let value = e.target.value;
+                          value = value.replace(/\./g, ',');
+                          value = value.replace(/[^0-9,]/g, '');
+                          const parts = value.split(',');
+                          if (parts.length > 2) {
+                            value = parts[0] + ',' + parts[1];
+                          }
+                          if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
+                            setLiters(value);
+                          }
+                        }}
+                        placeholder="ex. 12,5"
+                        style={{
+                          width: '200px',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '16px',
+                          backgroundColor: '#ffffff'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                        Bränsletyp *
+                      </label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setBransletyp('Bensin')}
+                          style={{
+                            flex: 1,
+                            padding: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            backgroundColor: bransletyp === 'Bensin' ? '#033066' : '#ffffff',
+                            color: bransletyp === 'Bensin' ? '#ffffff' : '#000',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Bensin
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBransletyp('Diesel')}
+                          style={{
+                            flex: 1,
+                            padding: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            backgroundColor: bransletyp === 'Diesel' ? '#033066' : '#ffffff',
+                            color: bransletyp === 'Diesel' ? '#ffffff' : '#000',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Diesel
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Visa laddnivå för elbil */}
+            {drivmedelstyp === 'elbil' && (
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Laddnivå *
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={laddniva}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      const numValue = parseInt(value);
+                      if (value === '' || (numValue >= 0 && numValue <= 100)) {
+                        setLaddniva(value);
+                      }
+                    }}
+                    placeholder="ex. 85"
+                    style={{
+                      width: '100px',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      backgroundColor: '#ffffff'
+                    }}
+                  />
+                  <span style={{ color: '#666', fontWeight: '500' }}>%</span>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Övriga fordonsstatus-fält i kompakt layout */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -1219,7 +1262,7 @@ export default function CheckInForm() {
         }}>
           <SectionHeader title="Skador" />
 
-          {/* Gamla skador - med dropdown för typ */}
+          {/* Gamla skador - med komplett dropdown */}
           <SubSectionHeader title="Gamla skador" />
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
             Dokumentera befintliga skador mer detaljerat för att underlätta identifiering vid framtida incheckningar.
@@ -1398,8 +1441,8 @@ export default function CheckInForm() {
             {oldDamages.length === 0 ? '+ Dokumentera gamla skador' : '+ Lägg till ytterligare gammal skada'}
           </button>
 
-          {/* Skadekontroll - befintlig sektion */}
-          <SubSectionHeader title="Skadekontroll" />
+          {/* Nya skador - uppdaterad rubrik */}
+          <SubSectionHeader title="Nya skador" />
 
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
@@ -1460,7 +1503,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Nya skador - med dropdown för typ */}
+          {/* Nya skador - med komplett dropdown */}
           {skadekontroll === 'nya_skador' && (
             <>
               {newDamages.map(damage => (
@@ -1717,10 +1760,10 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Prel. avslut notering */}
+          {/* Prel. avslut notering - nu obligatorisk */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Prel. avslut notering
+              Prel. avslut notering *
             </label>
             <textarea
               value={preliminarAvslutNotering}
@@ -1730,13 +1773,18 @@ export default function CheckInForm() {
               style={{
                 width: '100%',
                 padding: '12px',
-                border: '1px solid #d1d5db',
+                border: preliminarAvslutNotering.trim() ? '1px solid #d1d5db' : '2px solid #dc2626',
                 borderRadius: '6px',
                 fontSize: '16px',
                 backgroundColor: '#ffffff',
                 resize: 'vertical'
               }}
             />
+            {!preliminarAvslutNotering.trim() && (
+              <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
+                Detta fält är obligatoriskt
+              </p>
+            )}
           </div>
         </div>
 
