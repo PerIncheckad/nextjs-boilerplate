@@ -16,6 +16,14 @@ type CarData = {
   saludatum: string | null;
 };
 
+// Media-typ för att hantera både bilder och videos
+type MediaFile = {
+  file: File;
+  type: 'image' | 'video';
+  preview?: string; // För bilder
+  thumbnail?: string; // För videos
+};
+
 // Platser och stationer
 const ORTER = ['MALMÖ', 'HELSINGBORG', 'ÄNGELHOLM', 'HALMSTAD', 'FALKENBERG', 'TRELLEBORG', 'VARBERG', 'LUND'];
 
@@ -69,6 +77,65 @@ const isDateWithinDays = (dateStr: string | null, days: number): boolean => {
   return diffDays <= days && diffDays >= 0;
 };
 
+// Hjälpfunktion för att identifiera filtyp
+const getFileType = (file: File): 'image' | 'video' => {
+  if (file.type.startsWith('image/')) return 'image';
+  if (file.type.startsWith('video/')) return 'video';
+  return 'image'; // default
+};
+
+// Hjälpfunktion för att skapa video-thumbnail
+const createVideoThumbnail = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    
+    video.addEventListener('loadedmetadata', () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      video.currentTime = 0.5; // Ta thumbnail från 0.5 sekunder
+    });
+    
+    video.addEventListener('seeked', () => {
+      ctx.drawImage(video, 0, 0);
+      const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+      resolve(thumbnail);
+    });
+    
+    video.addEventListener('error', () => {
+      // Fallback till en standard video-ikon som data URL
+      resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiM2YjcyODAiLz48cGF0aCBkPSJNNDUgNDBWODBMNzUgNjBMNDUgNDBaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==');
+    });
+    
+    video.src = URL.createObjectURL(file);
+  });
+};
+
+// Hjälpfunktion för att konvertera File[] till MediaFile[]
+const processFiles = async (files: File[]): Promise<MediaFile[]> => {
+  const mediaFiles: MediaFile[] = [];
+  
+  for (const file of files) {
+    const type = getFileType(file);
+    const mediaFile: MediaFile = { file, type };
+    
+    if (type === 'image') {
+      mediaFile.preview = URL.createObjectURL(file);
+    } else if (type === 'video') {
+      try {
+        mediaFile.thumbnail = await createVideoThumbnail(file);
+      } catch (error) {
+        console.warn('Could not create video thumbnail:', error);
+      }
+    }
+    
+    mediaFiles.push(mediaFile);
+  }
+  
+  return mediaFiles;
+};
+
 export default function CheckInForm() {
   // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
@@ -102,10 +169,10 @@ export default function CheckInForm() {
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
   
-  // Skador - gamla och nya (nu med typ)
-  const [oldDamages, setOldDamages] = useState<{id: string; type: string; text: string; files: File[]}[]>([]);
+  // Skador - gamla och nya (nu med MediaFile[])
+  const [oldDamages, setOldDamages] = useState<{id: string; type: string; text: string; media: MediaFile[]}[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
-  const [newDamages, setNewDamages] = useState<{id: string; type: string; text: string; files: File[]}[]>([]);
+  const [newDamages, setNewDamages] = useState<{id: string; type: string; text: string; media: MediaFile[]}[]>([]);
   
   const [uthyrningsstatus, setUthyrningsstatus] = useState<'redo_for_uthyrning' | 'ledig_tankad' | 'ledig_otankad' | 'klar_otankad' | null>(null);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
@@ -258,6 +325,18 @@ export default function CheckInForm() {
 
   const handleSave = () => {
     console.log('Sparar incheckning...');
+    console.log('Media files included:', {
+      oldDamages: oldDamages.map(d => ({ 
+        type: d.type, 
+        mediaCount: d.media.length,
+        mediaTypes: d.media.map(m => m.type)
+      })),
+      newDamages: newDamages.map(d => ({ 
+        type: d.type, 
+        mediaCount: d.media.length,
+        mediaTypes: d.media.map(m => m.type)
+      }))
+    });
     setShowSuccessModal(true);
   };
 
@@ -267,7 +346,7 @@ export default function CheckInForm() {
       id: Math.random().toString(36).slice(2),
       type: '',
       text: '',
-      files: []
+      media: []
     }]);
   };
 
@@ -283,18 +362,20 @@ export default function CheckInForm() {
     setOldDamages(prev => prev.map(d => d.id === id ? {...d, text} : d));
   };
 
-  const updateOldDamageFiles = (id: string, files: FileList | null) => {
+  const updateOldDamageMedia = async (id: string, files: FileList | null) => {
     if (!files) return;
+    
+    const newMediaFiles = await processFiles(Array.from(files));
     setOldDamages(prev => prev.map(d => 
-      d.id === id ? {...d, files: [...d.files, ...Array.from(files)]} : d
+      d.id === id ? {...d, media: [...d.media, ...newMediaFiles]} : d
     ));
   };
 
-  const removeOldDamageImage = (damageId: string, imageIndex: number) => {
+  const removeOldDamageMedia = (damageId: string, mediaIndex: number) => {
     setOldDamages(prev => prev.map(d => {
       if (d.id === damageId) {
-        const newFiles = d.files.filter((_, index) => index !== imageIndex);
-        return { ...d, files: newFiles };
+        const newMedia = d.media.filter((_, index) => index !== mediaIndex);
+        return { ...d, media: newMedia };
       }
       return d;
     }));
@@ -306,7 +387,7 @@ export default function CheckInForm() {
       id: Math.random().toString(36).slice(2),
       type: '',
       text: '',
-      files: []
+      media: []
     }]);
   };
 
@@ -322,18 +403,20 @@ export default function CheckInForm() {
     setNewDamages(prev => prev.map(d => d.id === id ? {...d, text} : d));
   };
 
-  const updateDamageFiles = (id: string, files: FileList | null) => {
+  const updateDamageMedia = async (id: string, files: FileList | null) => {
     if (!files) return;
+    
+    const newMediaFiles = await processFiles(Array.from(files));
     setNewDamages(prev => prev.map(d => 
-      d.id === id ? {...d, files: [...d.files, ...Array.from(files)]} : d
+      d.id === id ? {...d, media: [...d.media, ...newMediaFiles]} : d
     ));
   };
 
-  const removeDamageImage = (damageId: string, imageIndex: number) => {
+  const removeDamageMedia = (damageId: string, mediaIndex: number) => {
     setNewDamages(prev => prev.map(d => {
       if (d.id === damageId) {
-        const newFiles = d.files.filter((_, index) => index !== imageIndex);
-        return { ...d, files: newFiles };
+        const newMedia = d.media.filter((_, index) => index !== mediaIndex);
+        return { ...d, media: newMedia };
       }
       return d;
     }));
@@ -1262,7 +1345,7 @@ export default function CheckInForm() {
         }}>
           <SectionHeader title="Skador" />
 
-          {/* Gamla skador - med komplett dropdown */}
+          {/* Gamla skador - med video-stöd */}
           <SubSectionHeader title="Gamla skador" />
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
             Dokumentera befintliga skador mer detaljerat för att underlätta identifiering vid framtida incheckningar.
@@ -1321,15 +1404,16 @@ export default function CheckInForm() {
 
               <div style={{ marginBottom: '12px' }}>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Lägg till bild
+                  Lägg till bild eller video
                 </label>
                 
                 <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     multiple
-                    onChange={(e) => updateOldDamageFiles(damage.id, e.target.files)}
+                    capture="environment"
+                    onChange={(e) => updateOldDamageMedia(damage.id, e.target.files)}
                     style={{ display: 'none' }}
                     id={`old-file-input-${damage.id}`}
                   />
@@ -1348,37 +1432,90 @@ export default function CheckInForm() {
                       color: '#4b5563'
                     }}
                   >
-                    Lägg till bild
+                    📷 Lägg till bild eller video
+                    <br />
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                      Stöder bilder och videos från kamera eller galleri
+                    </span>
                   </label>
                 </div>
 
-                {damage.files.length > 0 && (
+                {damage.media.length > 0 && (
                   <div style={{ 
                     marginTop: '12px',
                     display: 'grid',
                     gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
                     gap: '12px'
                   }}>
-                    {damage.files.map((file, index) => (
+                    {damage.media.map((mediaFile, index) => (
                       <div key={index} style={{ 
                         position: 'relative',
                         width: '120px',
                         height: '120px'
                       }}>
-                        <img
-                          src={URL.createObjectURL(file)}
-                          alt={`Gammal skadebild ${index + 1}`}
-                          style={{
+                        {mediaFile.type === 'image' ? (
+                          <img
+                            src={mediaFile.preview}
+                            alt={`Gammal skadebild ${index + 1}`}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'cover',
+                              borderRadius: '8px',
+                              border: '1px solid #d1d5db'
+                            }}
+                          />
+                        ) : (
+                          <div style={{
                             width: '100%',
                             height: '100%',
-                            objectFit: 'cover',
                             borderRadius: '8px',
-                            border: '1px solid #d1d5db'
-                          }}
-                        />
+                            border: '1px solid #d1d5db',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            {mediaFile.thumbnail ? (
+                              <img
+                                src={mediaFile.thumbnail}
+                                alt={`Video thumbnail ${index + 1}`}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover'
+                                }}
+                              />
+                            ) : (
+                              <div style={{
+                                width: '100%',
+                                height: '100%',
+                                backgroundColor: '#6b7280',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: 'white',
+                                fontSize: '24px'
+                              }}>
+                                ▶
+                              </div>
+                            )}
+                            <div style={{
+                              position: 'absolute',
+                              top: '4px',
+                              left: '4px',
+                              backgroundColor: 'rgba(0,0,0,0.8)',
+                              color: 'white',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              fontSize: '10px',
+                              fontWeight: 'bold'
+                            }}>
+                              VIDEO
+                            </div>
+                          </div>
+                        )}
                         <button
                           type="button"
-                          onClick={() => removeOldDamageImage(damage.id, index)}
+                          onClick={() => removeOldDamageMedia(damage.id, index)}
                           style={{
                             position: 'absolute',
                             top: '2px',
@@ -1441,7 +1578,7 @@ export default function CheckInForm() {
             {oldDamages.length === 0 ? '+ Dokumentera gamla skador' : '+ Lägg till ytterligare gammal skada'}
           </button>
 
-          {/* Nya skador - uppdaterad rubrik */}
+          {/* Nya skador - med video-stöd */}
           <SubSectionHeader title="Nya skador" />
 
           <div style={{ marginBottom: '16px' }}>
@@ -1503,7 +1640,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Nya skador - med komplett dropdown */}
+          {/* Nya skador - med video-stöd */}
           {skadekontroll === 'nya_skador' && (
             <>
               {newDamages.map(damage => (
@@ -1559,15 +1696,16 @@ export default function CheckInForm() {
 
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Lägg till bild
+                      Lägg till bild eller video
                     </label>
                     
                     <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,video/*"
                         multiple
-                        onChange={(e) => updateDamageFiles(damage.id, e.target.files)}
+                        capture="environment"
+                        onChange={(e) => updateDamageMedia(damage.id, e.target.files)}
                         style={{ display: 'none' }}
                         id={`file-input-${damage.id}`}
                       />
@@ -1586,37 +1724,90 @@ export default function CheckInForm() {
                           color: '#4b5563'
                         }}
                       >
-                        Lägg till bild
+                        📷 Lägg till bild eller video
+                        <br />
+                        <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                          Stöder bilder och videos från kamera eller galleri
+                        </span>
                       </label>
                     </div>
 
-                    {damage.files.length > 0 && (
+                    {damage.media.length > 0 && (
                       <div style={{ 
                         marginTop: '12px',
                         display: 'grid',
                         gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
                         gap: '12px'
                       }}>
-                        {damage.files.map((file, index) => (
+                        {damage.media.map((mediaFile, index) => (
                           <div key={index} style={{ 
                             position: 'relative',
                             width: '120px',
                             height: '120px'
                           }}>
-                            <img
-                              src={URL.createObjectURL(file)}
-                              alt={`Skadebild ${index + 1}`}
-                              style={{
+                            {mediaFile.type === 'image' ? (
+                              <img
+                                src={mediaFile.preview}
+                                alt={`Skadebild ${index + 1}`}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  objectFit: 'cover',
+                                  borderRadius: '8px',
+                                  border: '1px solid #d1d5db'
+                                }}
+                              />
+                            ) : (
+                              <div style={{
                                 width: '100%',
                                 height: '100%',
-                                objectFit: 'cover',
                                 borderRadius: '8px',
-                                border: '1px solid #d1d5db'
-                              }}
-                            />
+                                border: '1px solid #d1d5db',
+                                position: 'relative',
+                                overflow: 'hidden'
+                              }}>
+                                {mediaFile.thumbnail ? (
+                                  <img
+                                    src={mediaFile.thumbnail}
+                                    alt={`Video thumbnail ${index + 1}`}
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      objectFit: 'cover'
+                                    }}
+                                  />
+                                ) : (
+                                  <div style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    backgroundColor: '#6b7280',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    fontSize: '24px'
+                                  }}>
+                                    ▶
+                                  </div>
+                                )}
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '4px',
+                                  left: '4px',
+                                  backgroundColor: 'rgba(0,0,0,0.8)',
+                                  color: 'white',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold'
+                                }}>
+                                  VIDEO
+                                </div>
+                              </div>
+                            )}
                             <button
                               type="button"
-                              onClick={() => removeDamageImage(damage.id, index)}
+                              onClick={() => removeDamageMedia(damage.id, index)}
                               style={{
                                 position: 'absolute',
                                 top: '2px',
