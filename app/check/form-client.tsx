@@ -289,7 +289,7 @@ export default function CheckInForm() {
         backgroundColor: '#033066',
         width: '100vw',
         marginLeft: 'calc(-50vw + 50%)',
-        padding: '24px 0',
+        padding: '20px 0',
         marginBottom: '32px'
       }}>
         <div style={{
@@ -302,7 +302,7 @@ export default function CheckInForm() {
         }}>
           <div>
             <h1 style={{ 
-              fontSize: '32px', 
+              fontSize: '28px', 
               margin: 0, 
               color: '#ffffff',
               fontWeight: '800',
@@ -313,7 +313,7 @@ export default function CheckInForm() {
             </h1>
             <p style={{ 
               color: '#ffffff', 
-              margin: '8px 0 0 0',
+              margin: '6px 0 0 0',
               fontSize: '16px',
               fontWeight: '400',
               opacity: 0.9
@@ -322,7 +322,7 @@ export default function CheckInForm() {
             </p>
           </div>
           
-          {/* MABI-logga */}
+          {/* MABI-logga med cache-buster */}
           <div style={{
             width: '120px',
             height: '60px',
@@ -331,7 +331,7 @@ export default function CheckInForm() {
             justifyContent: 'center'
           }}>
             <img 
-              src="/mabi-logo.png" 
+              src={`/mabi-logo.png?v=${Date.now()}`}
               alt="MABI" 
               style={{
                 maxWidth: '120px',
@@ -369,8 +369,7 @@ export default function CheckInForm() {
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>
-        {/* Registreringsnummer */}
+      }}>{/* Registreringsnummer */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -451,7 +450,9 @@ export default function CheckInForm() {
               </div>
             </div>
           )}
-        </div>{/* Plats för incheckning */}
+        </div>
+
+        {/* Plats för incheckning */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1295,8 +1296,8 @@ export default function CheckInForm() {
                               onClick={() => removeDamageImage(damage.id, index)}
                               style={{
                                 position: 'absolute',
-                                top: '-8px',
-                                right: '-8px',
+                                top: '2px',
+                                right: '2px',
                                 width: '24px',
                                 height: '24px',
                                 borderRadius: '50%',
@@ -1304,7 +1305,7 @@ export default function CheckInForm() {
                                 color: '#ffffff',
                                 border: '2px solid #ffffff',
                                 cursor: 'pointer',
-                                fontSize: '14px',
+                                fontSize: '12px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
