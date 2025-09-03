@@ -12,8 +12,20 @@ type CarData = {
   regnr: string;
   brand_model: string | null;
   damage_text: string | null;
+  damage_detail?: string | null; // Ny kolumn för mer detaljerad skadebeskrivning
   wheelstorage: string | null;
   saludatum: string | null;
+};
+
+// Detaljerad skada från databas
+type ExistingDamage = {
+  id: string;
+  shortText: string; // t.ex. "Lackskada"
+  detailText?: string; // t.ex. "höger framskärm"
+  fullText: string; // t.ex. "Lackskada - höger framskärm"
+  documented?: boolean; // Om användaren valt att dokumentera denna skada
+  userDescription?: string; // Användarens egen beskrivning
+  media?: MediaFile[]; // Bilder/videos som användaren lagt till
 };
 
 // Media-typ för att hantera både bilder och videos
@@ -140,6 +152,8 @@ export default function CheckInForm() {
   // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
   const [carData, setCarData] = useState<CarData[]>([]);
+  const [allRegistrations, setAllRegistrations] = useState<string[]>([]); // För autocomplete
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
@@ -169,8 +183,8 @@ export default function CheckInForm() {
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
   
-  // Skador - gamla och nya (nu med MediaFile[])
-  const [oldDamages, setOldDamages] = useState<{id: string; type: string; text: string; media: MediaFile[]}[]>([]);
+  // Skador - gamla (från databas) och nya
+  const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<{id: string; type: string; text: string; media: MediaFile[]}[]>([]);
   
@@ -180,10 +194,41 @@ export default function CheckInForm() {
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
+  // Hämta alla registreringsnummer för autocomplete
+  useEffect(() => {
+    async function fetchAllRegistrations() {
+      try {
+        const { data, error } = await supabase
+          .from('car_data')
+          .select('regnr')
+          .order('regnr');
+
+        if (!error && data) {
+          const uniqueRegs = [...new Set(data.map(item => item.regnr))].filter(Boolean);
+          setAllRegistrations(uniqueRegs);
+        }
+      } catch (err) {
+        console.warn('Could not fetch registrations for autocomplete:', err);
+      }
+    }
+    
+    fetchAllRegistrations();
+  }, []);
+
+  // Filtrera förslag baserat på input
+  const suggestions = useMemo(() => {
+    if (!regInput.trim()) return [];
+    const input = regInput.toUpperCase();
+    return allRegistrations
+      .filter(reg => reg.toUpperCase().startsWith(input))
+      .slice(0, 5); // Max 5 förslag
+  }, [regInput, allRegistrations]);
+
   // Hämta bildata
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
+      setExistingDamages([]);
       setNotFound(false);
       return;
     }
@@ -207,14 +252,39 @@ export default function CheckInForm() {
           console.error('Database error:', error);
           setNotFound(true);
           setCarData([]);
+          setExistingDamages([]);
         } else if (data && data.length > 0) {
           const validData = data.filter(row => row.wheelstorage !== null && row.saludatum !== null);
           const useData = validData.length > 0 ? validData : data;
           
           setCarData(useData);
+          
+          // Skapa ExistingDamage-objekt från databasen
+          const damages: ExistingDamage[] = useData
+            .map((item, index) => {
+              if (!item.damage_text) return null;
+              
+              const shortText = item.damage_text;
+              const detailText = item.damage_detail || null;
+              const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
+              
+              return {
+                id: `existing-${index}`,
+                shortText,
+                detailText,
+                fullText,
+                documented: false,
+                userDescription: '',
+                media: []
+              };
+            })
+            .filter((damage): damage is ExistingDamage => damage !== null);
+          
+          setExistingDamages(damages);
           setNotFound(false);
         } else {
           setCarData([]);
+          setExistingDamages([]);
           setNotFound(true);
         }
       } catch (err) {
@@ -222,6 +292,7 @@ export default function CheckInForm() {
           console.error('Fetch error:', err);
           setNotFound(true);
           setCarData([]);
+          setExistingDamages([]);
         }
       }
 
@@ -239,10 +310,6 @@ export default function CheckInForm() {
   const carModel = carData[0]?.brand_model || null;
   const wheelStorage = carData[0]?.wheelstorage || null;
   const saludatum = carData[0]?.saludatum || null;
-  const damages = carData
-    .map(item => item.damage_text)
-    .filter(Boolean)
-    .filter((damage, index, arr) => arr.indexOf(damage) === index);
 
   const availableStations = ort ? STATIONER[ort] || [] : [];
 
@@ -283,8 +350,9 @@ export default function CheckInForm() {
       if (newDamages.some(damage => !damage.type || !damage.text.trim())) return false;
     }
     
-    // Kontrollera att gamla skador har typ och text om de finns
-    if (oldDamages.some(damage => !damage.type || !damage.text.trim())) return false;
+    // Kontrollera att dokumenterade gamla skador har beskrivning
+    const documentedOldDamages = existingDamages.filter(d => d.documented);
+    if (documentedOldDamages.some(damage => !damage.userDescription?.trim())) return false;
     
     if (uthyrningsstatus === null) return false;
     
@@ -297,6 +365,8 @@ export default function CheckInForm() {
   const resetForm = () => {
     setRegInput('');
     setCarData([]);
+    setExistingDamages([]);
+    setShowSuggestions(false);
     setNotFound(false);
     setOrt('');
     setStation('');
@@ -315,7 +385,6 @@ export default function CheckInForm() {
     setAdblue(null);
     setTvatt(null);
     setInre(null);
-    setOldDamages([]);
     setSkadekontroll(null);
     setNewDamages([]);
     setUthyrningsstatus(null);
@@ -325,55 +394,36 @@ export default function CheckInForm() {
 
   const handleSave = () => {
     console.log('Sparar incheckning...');
-    console.log('Media files included:', {
-      oldDamages: oldDamages.map(d => ({ 
-        type: d.type, 
-        mediaCount: d.media.length,
-        mediaTypes: d.media.map(m => m.type)
-      })),
-      newDamages: newDamages.map(d => ({ 
-        type: d.type, 
-        mediaCount: d.media.length,
-        mediaTypes: d.media.map(m => m.type)
-      }))
-    });
+    console.log('Dokumenterade gamla skador:', existingDamages.filter(d => d.documented));
+    console.log('Nya skador:', newDamages);
     setShowSuccessModal(true);
   };
 
-  // Funktioner för gamla skador
-  const addOldDamage = () => {
-    setOldDamages(prev => [...prev, {
-      id: Math.random().toString(36).slice(2),
-      type: '',
-      text: '',
-      media: []
-    }]);
-  };
-
-  const removeOldDamage = (id: string) => {
-    setOldDamages(prev => prev.filter(d => d.id !== id));
-  };
-
-  const updateOldDamageType = (id: string, type: string) => {
-    setOldDamages(prev => prev.map(d => d.id === id ? {...d, type} : d));
-  };
-
-  const updateOldDamageText = (id: string, text: string) => {
-    setOldDamages(prev => prev.map(d => d.id === id ? {...d, text} : d));
-  };
-
-  const updateOldDamageMedia = async (id: string, files: FileList | null) => {
-    if (!files) return;
-    
-    const newMediaFiles = await processFiles(Array.from(files));
-    setOldDamages(prev => prev.map(d => 
-      d.id === id ? {...d, media: [...d.media, ...newMediaFiles]} : d
+  // Funktioner för befintliga skador
+  const toggleExistingDamageDocumentation = (id: string) => {
+    setExistingDamages(prev => prev.map(d => 
+      d.id === id ? { ...d, documented: !d.documented, userDescription: d.documented ? '' : d.userDescription, media: d.documented ? [] : d.media } : d
     ));
   };
 
-  const removeOldDamageMedia = (damageId: string, mediaIndex: number) => {
-    setOldDamages(prev => prev.map(d => {
-      if (d.id === damageId) {
+  const updateExistingDamageDescription = (id: string, description: string) => {
+    setExistingDamages(prev => prev.map(d => 
+      d.id === id ? { ...d, userDescription: description } : d
+    ));
+  };
+
+  const updateExistingDamageMedia = async (id: string, files: FileList | null) => {
+    if (!files) return;
+    
+    const newMediaFiles = await processFiles(Array.from(files));
+    setExistingDamages(prev => prev.map(d => 
+      d.id === id ? { ...d, media: [...(d.media || []), ...newMediaFiles] } : d
+    ));
+  };
+
+  const removeExistingDamageMedia = (damageId: string, mediaIndex: number) => {
+    setExistingDamages(prev => prev.map(d => {
+      if (d.id === damageId && d.media) {
         const newMedia = d.media.filter((_, index) => index !== mediaIndex);
         return { ...d, media: newMedia };
       }
@@ -420,6 +470,17 @@ export default function CheckInForm() {
       }
       return d;
     }));
+  };
+
+  // Hantera reg.nr input och autocomplete
+  const handleRegInputChange = (value: string) => {
+    setRegInput(value.toUpperCase());
+    setShowSuggestions(value.length > 0 && suggestions.length > 0);
+  };
+
+  const selectSuggestion = (suggestion: string) => {
+    setRegInput(suggestion);
+    setShowSuggestions(false);
   };
 
   // Förbättrad sektion-separator med större, tydligare rubriker
@@ -660,36 +721,82 @@ export default function CheckInForm() {
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>{/* Registreringsnummer */}
+      }}>{/* Registreringsnummer med autocomplete */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+          position: 'relative'
         }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
             Registreringsnummer *
           </label>
-          <input
-            type="text"
-            value={regInput}
-            onChange={(e) => setRegInput(e.target.value.toUpperCase())}
-            placeholder="Skriv reg.nr"
-            spellCheck={false}
-            autoComplete="off"
-            style={{
-              width: '100%',
-              padding: '14px',
-              border: '2px solid #e5e7eb',
-              borderRadius: '8px',
-              fontSize: '18px',
-              fontWeight: '600',
-              backgroundColor: '#ffffff',
-              textAlign: 'center',
-              letterSpacing: '2px'
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              value={regInput}
+              onChange={(e) => handleRegInputChange(e.target.value)}
+              onFocus={() => setShowSuggestions(regInput.length > 0 && suggestions.length > 0)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} // Delay för att hantera klick på förslag
+              placeholder="Skriv reg.nr"
+              spellCheck={false}
+              autoComplete="off"
+              style={{
+                width: '100%',
+                padding: '14px',
+                border: '2px solid #e5e7eb',
+                borderRadius: '8px',
+                fontSize: '18px',
+                fontWeight: '600',
+                backgroundColor: '#ffffff',
+                textAlign: 'center',
+                letterSpacing: '2px'
+              }}
+            />
+            
+            {/* Autocomplete-förslag */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: '#ffffff',
+                border: '1px solid #d1d5db',
+                borderRadius: '8px',
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                zIndex: 10,
+                maxHeight: '200px',
+                overflowY: 'auto'
+              }}>
+                {suggestions.map((suggestion, index) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() => selectSuggestion(suggestion)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: 'none',
+                      backgroundColor: '#ffffff',
+                      textAlign: 'left',
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      borderBottom: index === suggestions.length - 1 ? 'none' : '1px solid #f3f4f6',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
           
@@ -728,12 +835,12 @@ export default function CheckInForm() {
               <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
                 <div style={{ flex: 1 }}>
-                  {damages.length === 0 ? (
+                  {existingDamages.length === 0 ? (
                     <span style={{ fontWeight: '500' }}> —</span>
                   ) : (
                     <ul style={{ margin: '0', paddingLeft: '20px' }}>
-                      {damages.map((damage, i) => (
-                        <li key={i} style={{ marginBottom: '4px' }}>{damage}</li>
+                      {existingDamages.map((damage, i) => (
+                        <li key={i} style={{ marginBottom: '4px' }}>{damage.fullText}</li>
                       ))}
                     </ul>
                   )}
@@ -851,7 +958,7 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* Fordonsstatus */}
+        {/* Fordonsstatus - utan "Bränsle/Energi"-rubrik */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -889,236 +996,219 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Bränsle/Energi sektion */}
-          <div style={{ 
-            marginBottom: '24px',
-            padding: '16px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px',
-            border: '1px solid #e5e7eb'
-          }}>
-            <h4 style={{ 
-              fontSize: '16px', 
-              fontWeight: '600', 
-              margin: '0 0 12px 0',
-              color: '#374151'
-            }}>
-              Bränsle / Energi
-            </h4>
-            
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Drivmedel *
-              </label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDrivmedelstyp('bensin_diesel');
-                    setLaddniva('');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#033066' : '#ffffff',
-                    color: drivmedelstyp === 'bensin_diesel' ? '#ffffff' : '#000',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Bensin/Diesel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDrivmedelstyp('elbil');
-                    setTankniva(null);
-                    setLiters('');
-                    setBransletyp(null);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: drivmedelstyp === 'elbil' ? '#033066' : '#ffffff',
-                    color: drivmedelstyp === 'elbil' ? '#ffffff' : '#000',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Elbil
-                </button>
-              </div>
+          {/* Drivmedel direkt utan underrubrik */}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Drivmedel *
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDrivmedelstyp('bensin_diesel');
+                  setLaddniva('');
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#033066' : '#ffffff',
+                  color: drivmedelstyp === 'bensin_diesel' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Bensin/Diesel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDrivmedelstyp('elbil');
+                  setTankniva(null);
+                  setLiters('');
+                  setBransletyp(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: drivmedelstyp === 'elbil' ? '#033066' : '#ffffff',
+                  color: drivmedelstyp === 'elbil' ? '#ffffff' : '#000',
+                  cursor: 'pointer'
+                }}
+              >
+                Elbil
+              </button>
             </div>
+          </div>
 
-            {/* Visa tanknivå för bensin/diesel */}
-            {drivmedelstyp === 'bensin_diesel' && (
-              <>
-                <div style={{ marginBottom: '16px' }}>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                    Tanknivå *
-                  </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setTankniva('fulltankad')}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        backgroundColor: tankniva === 'fulltankad' ? '#10b981' : '#ffffff',
-                        color: tankniva === 'fulltankad' ? '#ffffff' : '#000',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Fulltankad
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTankniva('tankas_senare')}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        backgroundColor: tankniva === 'tankas_senare' ? '#f59e0b' : '#ffffff',
-                        color: tankniva === 'tankas_senare' ? '#ffffff' : '#000',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Ej fulltankad - tankas senare
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTankniva('pafylld_nu')}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        backgroundColor: tankniva === 'pafylld_nu' ? '#033066' : '#ffffff',
-                        color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Ej fulltankad - påfylld nu
-                    </button>
-                  </div>
-                </div>
-
-                {tankniva === 'pafylld_nu' && (
-                  <>
-                    <div style={{ marginBottom: '16px' }}>
-                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                        Antal liter påfyllda *
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        pattern="[0-9,]*"
-                        value={liters}
-                        onChange={(e) => {
-                          let value = e.target.value;
-                          value = value.replace(/\./g, ',');
-                          value = value.replace(/[^0-9,]/g, '');
-                          const parts = value.split(',');
-                          if (parts.length > 2) {
-                            value = parts[0] + ',' + parts[1];
-                          }
-                          if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
-                            setLiters(value);
-                          }
-                        }}
-                        placeholder="ex. 12,5"
-                        style={{
-                          width: '200px',
-                          padding: '12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          fontSize: '16px',
-                          backgroundColor: '#ffffff'
-                        }}
-                      />
-                    </div>
-
-                    <div style={{ marginBottom: '16px' }}>
-                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                        Bränsletyp *
-                      </label>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          type="button"
-                          onClick={() => setBransletyp('Bensin')}
-                          style={{
-                            flex: 1,
-                            padding: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            backgroundColor: bransletyp === 'Bensin' ? '#033066' : '#ffffff',
-                            color: bransletyp === 'Bensin' ? '#ffffff' : '#000',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Bensin
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setBransletyp('Diesel')}
-                          style={{
-                            flex: 1,
-                            padding: '12px',
-                            border: '1px solid #d1d5db',
-                            borderRadius: '6px',
-                            backgroundColor: bransletyp === 'Diesel' ? '#033066' : '#ffffff',
-                            color: bransletyp === 'Diesel' ? '#ffffff' : '#000',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          Diesel
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-
-            {/* Visa laddnivå för elbil */}
-            {drivmedelstyp === 'elbil' && (
+          {/* Visa tanknivå för bensin/diesel */}
+          {drivmedelstyp === 'bensin_diesel' && (
+            <>
               <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Laddnivå *
+                  Tanknivå *
                 </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={laddniva}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9]/g, '');
-                      const numValue = parseInt(value);
-                      if (value === '' || (numValue >= 0 && numValue <= 100)) {
-                        setLaddniva(value);
-                      }
-                    }}
-                    placeholder="ex. 85"
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('fulltankad')}
                     style={{
-                      width: '100px',
+                      width: '100%',
                       padding: '12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
-                      fontSize: '16px',
-                      backgroundColor: '#ffffff'
+                      backgroundColor: tankniva === 'fulltankad' ? '#10b981' : '#ffffff',
+                      color: tankniva === 'fulltankad' ? '#ffffff' : '#000',
+                      cursor: 'pointer'
                     }}
-                  />
-                  <span style={{ color: '#666', fontWeight: '500' }}>%</span>
+                  >
+                    Fulltankad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('tankas_senare')}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: tankniva === 'tankas_senare' ? '#f59e0b' : '#ffffff',
+                      color: tankniva === 'tankas_senare' ? '#ffffff' : '#000',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ej fulltankad - tankas senare
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('pafylld_nu')}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: tankniva === 'pafylld_nu' ? '#033066' : '#ffffff',
+                      color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Ej fulltankad - påfylld nu
+                  </button>
                 </div>
               </div>
-            )}
-          </div>
+
+              {tankniva === 'pafylld_nu' && (
+                <>
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      Antal liter påfyllda *
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      pattern="[0-9,]*"
+                      value={liters}
+                      onChange={(e) => {
+                        let value = e.target.value;
+                        value = value.replace(/\./g, ',');
+                        value = value.replace(/[^0-9,]/g, '');
+                        const parts = value.split(',');
+                        if (parts.length > 2) {
+                          value = parts[0] + ',' + parts[1];
+                        }
+                        if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
+                          setLiters(value);
+                        }
+                      }}
+                      placeholder="ex. 12,5"
+                      style={{
+                        width: '200px',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        backgroundColor: '#ffffff'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      Bränsletyp *
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setBransletyp('Bensin')}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          backgroundColor: bransletyp === 'Bensin' ? '#033066' : '#ffffff',
+                          color: bransletyp === 'Bensin' ? '#ffffff' : '#000',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Bensin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBransletyp('Diesel')}
+                        style={{
+                          flex: 1,
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          backgroundColor: bransletyp === 'Diesel' ? '#033066' : '#ffffff',
+                          color: bransletyp === 'Diesel' ? '#ffffff' : '#000',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Diesel
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Visa laddnivå för elbil */}
+          {drivmedelstyp === 'elbil' && (
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Laddnivå *
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={laddniva}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, '');
+                    const numValue = parseInt(value);
+                    if (value === '' || (numValue >= 0 && numValue <= 100)) {
+                      setLaddniva(value);
+                    }
+                  }}
+                  placeholder="ex. 85"
+                  style={{
+                    width: '100px',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: '#ffffff'
+                  }}
+                />
+                <span style={{ color: '#666', fontWeight: '500' }}>%</span>
+              </div>
+            </div>
+          )}
 
           {/* Övriga fordonsstatus-fält i kompakt layout */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
@@ -1452,208 +1542,203 @@ export default function CheckInForm() {
         }}>
           <SectionHeader title="Skador" />
 
-          {/* Gamla skador - med separata knappar för Android */}
+          {/* Gamla skador - nu från databas */}
           <SubSectionHeader title="Gamla skador" />
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
-            Dokumentera befintliga skador mer detaljerat för att underlätta identifiering vid framtida incheckningar.
+            Klicka på de befintliga skador du vill dokumentera mer detaljerat med egen beskrivning och bild/video.
           </p>
 
-          {oldDamages.map(damage => (
-            <div key={damage.id} style={{
-              padding: '16px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              backgroundColor: '#f9fafb'
-            }}>
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Typ av skada *
-                </label>
-                <select
-                  value={damage.type}
-                  onChange={(e) => updateOldDamageType(damage.id, e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: '#ffffff'
-                  }}
-                >
-                  <option value="">— Välj typ av skada —</option>
-                  {DAMAGE_TYPES.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '12px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Beskrivning av skada *
-                </label>
-                <input
-                  type="text"
-                  value={damage.text}
-                  onChange={(e) => updateOldDamageText(damage.id, e.target.value)}
-                  placeholder="Beskriv skadan detaljerat, t.ex. 'repa vänster framdörr'..."
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: '#ffffff'
-                  }}
-                />
-              </div>
-
-              <MediaUpload 
-                damageId={damage.id} 
-                isOld={true} 
-                onMediaUpdate={updateOldDamageMedia} 
-              />
-
-              {damage.media.length > 0 && (
-                <div style={{ 
-                  marginTop: '12px',
-                  marginBottom: '12px',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                  gap: '12px'
-                }}>
-                  {damage.media.map((mediaFile, index) => (
-                    <div key={index} style={{ 
-                      position: 'relative',
-                      width: '120px',
-                      height: '120px'
+          {existingDamages.length > 0 ? (
+            <div style={{ marginBottom: '20px' }}>
+              {existingDamages.map(damage => (
+                <div key={damage.id} style={{ marginBottom: '12px' }}>
+                  <button
+                    type="button"
+                    onClick={() => toggleExistingDamageDocumentation(damage.id)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '2px solid #d1d5db',
+                      borderRadius: '8px',
+                      backgroundColor: damage.documented ? '#dbeafe' : '#ffffff',
+                      color: damage.documented ? '#1e40af' : '#374151',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      fontSize: '16px',
+                      fontWeight: damage.documented ? '600' : '500',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px'
+                    }}
+                  >
+                    <span style={{
+                      width: '20px',
+                      height: '20px',
+                      border: '2px solid',
+                      borderColor: damage.documented ? '#1e40af' : '#9ca3af',
+                      borderRadius: '4px',
+                      backgroundColor: damage.documented ? '#1e40af' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '14px',
+                      color: '#ffffff'
                     }}>
-                      {mediaFile.type === 'image' ? (
-                        <img
-                          src={mediaFile.preview}
-                          alt={`Gammal skadebild ${index + 1}`}
+                      {damage.documented ? '✓' : ''}
+                    </span>
+                    {damage.fullText}
+                  </button>
+
+                  {damage.documented && (
+                    <div style={{
+                      marginTop: '12px',
+                      padding: '16px',
+                      border: '1px solid #bfdbfe',
+                      borderRadius: '8px',
+                      backgroundColor: '#eff6ff'
+                    }}>
+                      <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                          Din detaljerade beskrivning *
+                        </label>
+                        <textarea
+                          value={damage.userDescription || ''}
+                          onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
+                          placeholder={`Beskriv "${damage.shortText}" mer detaljerat...`}
+                          rows={3}
                           style={{
                             width: '100%',
-                            height: '100%',
-                            objectFit: 'cover',
-                            borderRadius: '8px',
-                            border: '1px solid #d1d5db'
+                            padding: '12px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            fontSize: '16px',
+                            backgroundColor: '#ffffff',
+                            resize: 'vertical'
                           }}
                         />
-                      ) : (
-                        <div style={{
-                          width: '100%',
-                          height: '100%',
-                          borderRadius: '8px',
-                          border: '1px solid #d1d5db',
-                          position: 'relative',
-                          overflow: 'hidden'
+                      </div>
+
+                      <MediaUpload 
+                        damageId={damage.id} 
+                        isOld={true} 
+                        onMediaUpdate={updateExistingDamageMedia} 
+                      />
+
+                      {damage.media && damage.media.length > 0 && (
+                        <div style={{ 
+                          marginTop: '12px',
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                          gap: '12px'
                         }}>
-                          {mediaFile.thumbnail ? (
-                            <img
-                              src={mediaFile.thumbnail}
-                              alt={`Video thumbnail ${index + 1}`}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover'
-                              }}
-                            />
-                          ) : (
-                            <div style={{
-                              width: '100%',
-                              height: '100%',
-                              backgroundColor: '#6b7280',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'white',
-                              fontSize: '24px'
+                          {damage.media.map((mediaFile, index) => (
+                            <div key={index} style={{ 
+                              position: 'relative',
+                              width: '120px',
+                              height: '120px'
                             }}>
-                              ▶
+                              {mediaFile.type === 'image' ? (
+                                <img
+                                  src={mediaFile.preview}
+                                  alt={`Skadebild ${index + 1}`}
+                                  style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover',
+                                    borderRadius: '8px',
+                                    border: '1px solid #d1d5db'
+                                  }}
+                                />
+                              ) : (
+                                <div style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  borderRadius: '8px',
+                                  border: '1px solid #d1d5db',
+                                  position: 'relative',
+                                  overflow: 'hidden'
+                                }}>
+                                  {mediaFile.thumbnail ? (
+                                    <img
+                                      src={mediaFile.thumbnail}
+                                      alt={`Video thumbnail ${index + 1}`}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        objectFit: 'cover'
+                                      }}
+                                    />
+                                  ) : (
+                                    <div style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      backgroundColor: '#6b7280',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      color: 'white',
+                                      fontSize: '24px'
+                                    }}>
+                                      ▶
+                                    </div>
+                                  )}
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '4px',
+                                    left: '4px',
+                                    backgroundColor: 'rgba(0,0,0,0.8)',
+                                    color: 'white',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    VIDEO
+                                  </div>
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeExistingDamageMedia(damage.id, index)}
+                                style={{
+                                  position: 'absolute',
+                                  top: '2px',
+                                  right: '2px',
+                                  width: '24px',
+                                  height: '24px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#dc2626',
+                                  color: '#ffffff',
+                                  border: '2px solid #ffffff',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 'bold',
+                                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                                  zIndex: 10
+                                }}
+                              >
+                                ×
+                              </button>
                             </div>
-                          )}
-                          <div style={{
-                            position: 'absolute',
-                            top: '4px',
-                            left: '4px',
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            color: 'white',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            fontWeight: 'bold'
-                          }}>
-                            VIDEO
-                          </div>
+                          ))}
                         </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => removeOldDamageMedia(damage.id, index)}
-                        style={{
-                          position: 'absolute',
-                          top: '2px',
-                          right: '2px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: '#dc2626',
-                          color: '#ffffff',
-                          border: '2px solid #ffffff',
-                          cursor: 'pointer',
-                          fontSize: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 'bold',
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-                          zIndex: 10
-                        }}
-                      >
-                        ×
-                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => removeOldDamage(damage.id)}
-                style={{
-                  padding: '8px 16px',
-                  border: '1px solid #dc2626',
-                  borderRadius: '6px',
-                  backgroundColor: '#ffffff',
-                  color: '#dc2626',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Ta bort gamla skada
-              </button>
+              ))}
             </div>
-          ))}
+          ) : (
+            <p style={{ color: '#6b7280', fontSize: '16px', marginBottom: '24px', fontStyle: 'italic' }}>
+              Inga befintliga skador hittades för detta fordon.
+            </p>
+          )}
 
-          <button
-            type="button"
-            onClick={addOldDamage}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#033066',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              fontSize: '16px',
-              marginBottom: '24px'
-            }}
-          >
-            {oldDamages.length === 0 ? '+ Dokumentera gamla skador' : '+ Lägg till ytterligare gammal skada'}
-          </button>
-
-          {/* Nya skador - med separata knappar för Android */}
+          {/* Nya skador */}
           <SubSectionHeader title="Nya skador" />
 
           <div style={{ marginBottom: '16px' }}>
@@ -1715,7 +1800,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Nya skador - med separata knappar för Android */}
+          {/* Nya skador fält */}
           {skadekontroll === 'nya_skador' && (
             <>
               {newDamages.map(damage => (
