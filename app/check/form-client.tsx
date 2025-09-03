@@ -75,8 +75,12 @@ export default function CheckInForm() {
   const [adblue, setAdblue] = useState<boolean | null>(null);
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
+  
+  // Skador - gamla och nya
+  const [oldDamages, setOldDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<{id: string; text: string; files: File[]}[]>([]);
+  
   const [uthyrningsstatus, setUthyrningsstatus] = useState<'redo_for_uthyrning' | 'ledig_tankad' | 'ledig_otankad' | 'klar_otankad' | null>(null);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -186,6 +190,9 @@ export default function CheckInForm() {
       if (newDamages.some(damage => !damage.text.trim())) return false;
     }
     
+    // Kontrollera att gamla skador har text om de finns
+    if (oldDamages.some(damage => !damage.text.trim())) return false;
+    
     if (uthyrningsstatus === null) return false;
     
     return true;
@@ -212,6 +219,7 @@ export default function CheckInForm() {
     setAdblue(null);
     setTvatt(null);
     setInre(null);
+    setOldDamages([]);
     setSkadekontroll(null);
     setNewDamages([]);
     setUthyrningsstatus(null);
@@ -224,6 +232,41 @@ export default function CheckInForm() {
     setShowSuccessModal(true);
   };
 
+  // Funktioner för gamla skador
+  const addOldDamage = () => {
+    setOldDamages(prev => [...prev, {
+      id: Math.random().toString(36).slice(2),
+      text: '',
+      files: []
+    }]);
+  };
+
+  const removeOldDamage = (id: string) => {
+    setOldDamages(prev => prev.filter(d => d.id !== id));
+  };
+
+  const updateOldDamageText = (id: string, text: string) => {
+    setOldDamages(prev => prev.map(d => d.id === id ? {...d, text} : d));
+  };
+
+  const updateOldDamageFiles = (id: string, files: FileList | null) => {
+    if (!files) return;
+    setOldDamages(prev => prev.map(d => 
+      d.id === id ? {...d, files: [...d.files, ...Array.from(files)]} : d
+    ));
+  };
+
+  const removeOldDamageImage = (damageId: string, imageIndex: number) => {
+    setOldDamages(prev => prev.map(d => {
+      if (d.id === damageId) {
+        const newFiles = d.files.filter((_, index) => index !== imageIndex);
+        return { ...d, files: newFiles };
+      }
+      return d;
+    }));
+  };
+
+  // Funktioner för nya skador
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
@@ -275,6 +318,25 @@ export default function CheckInForm() {
       }}>
         {title}
       </h2>
+    </div>
+  );
+
+  // Undersektion för skador
+  const SubSectionHeader = ({ title }: { title: string }) => (
+    <div style={{
+      marginTop: '24px',
+      marginBottom: '16px',
+      paddingBottom: '8px',
+      borderBottom: '1px solid #d1d5db'
+    }}>
+      <h3 style={{ 
+        fontSize: '18px', 
+        fontWeight: '600', 
+        margin: 0,
+        color: '#374151'
+      }}>
+        {title}
+      </h3>
     </div>
   );
 
@@ -1143,6 +1205,165 @@ export default function CheckInForm() {
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
         }}>
           <SectionHeader title="Skador" />
+
+          {/* Gamla skador - ny sektion */}
+          <SubSectionHeader title="Gamla skador" />
+          <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
+            Dokumentera befintliga skador mer detaljerat för att underlätta identifiering vid framtida incheckningar.
+          </p>
+
+          {oldDamages.map(damage => (
+            <div key={damage.id} style={{
+              padding: '16px',
+              border: '1px solid #d1d5db',
+              borderRadius: '8px',
+              marginBottom: '16px',
+              backgroundColor: '#f9fafb'
+            }}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Beskrivning av skada (obligatorisk)
+                </label>
+                <input
+                  type="text"
+                  value={damage.text}
+                  onChange={(e) => updateOldDamageText(damage.id, e.target.value)}
+                  placeholder="Beskriv skadan detaljerat, t.ex. 'repa vänster framdörr'..."
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: '#ffffff'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Lägg till bild
+                </label>
+                
+                <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => updateOldDamageFiles(damage.id, e.target.files)}
+                    style={{ display: 'none' }}
+                    id={`old-file-input-${damage.id}`}
+                  />
+                  <label
+                    htmlFor={`old-file-input-${damage.id}`}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '12px',
+                      border: '2px dashed #d1d5db',
+                      borderRadius: '6px',
+                      fontSize: '16px',
+                      backgroundColor: '#ffffff',
+                      textAlign: 'center',
+                      cursor: 'pointer',
+                      color: '#4b5563'
+                    }}
+                  >
+                    Lägg till bild
+                  </label>
+                </div>
+
+                {damage.files.length > 0 && (
+                  <div style={{ 
+                    marginTop: '12px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                    gap: '12px'
+                  }}>
+                    {damage.files.map((file, index) => (
+                      <div key={index} style={{ 
+                        position: 'relative',
+                        width: '120px',
+                        height: '120px'
+                      }}>
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={`Gammal skadebild ${index + 1}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            border: '1px solid #d1d5db'
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeOldDamageImage(damage.id, index)}
+                          style={{
+                            position: 'absolute',
+                            top: '2px',
+                            right: '2px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            backgroundColor: '#dc2626',
+                            color: '#ffffff',
+                            border: '2px solid #ffffff',
+                            cursor: 'pointer',
+                            fontSize: '12px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold',
+                            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+                            zIndex: 10
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => removeOldDamage(damage.id)}
+                style={{
+                  padding: '8px 16px',
+                  border: '1px solid #dc2626',
+                  borderRadius: '6px',
+                  backgroundColor: '#ffffff',
+                  color: '#dc2626',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                Ta bort gamla skada
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addOldDamage}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#033066',
+              textDecoration: 'underline',
+              cursor: 'pointer',
+              fontSize: '16px',
+              marginBottom: '24px'
+            }}
+          >
+            {oldDamages.length === 0 ? '+ Dokumentera gamla skador' : '+ Lägg till ytterligare gammal skada'}
+          </button>
+
+          {/* Skadekontroll - befintlig sektion */}
+          <SubSectionHeader title="Skadekontroll" />
 
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
