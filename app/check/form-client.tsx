@@ -1,5 +1,4 @@
 'use client';
-// Force deployment for MABI logo
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -285,42 +284,44 @@ export default function CheckInForm() {
       backgroundColor: '#f8fafc',
       color: '#111827'
     }}>
+      {/* Full-width MABI Header med Cobalt Blue från brandguiden */}
       <div style={{
-        maxWidth: '600px',
-        margin: '0 auto',
-        padding: '20px',
-        fontFamily: 'system-ui, -apple-system, sans-serif'
+        backgroundColor: '#033066',
+        width: '100vw',
+        marginLeft: 'calc(-50vw + 50%)',
+        padding: '24px 0',
+        marginBottom: '32px'
       }}>
-        {/* Header med MABI-logga */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '32px',
-          padding: '24px 0',
-          borderBottom: '3px solid #2563eb'
+        <div style={{
+          maxWidth: '600px',
+          margin: '0 auto',
+          padding: '0 20px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end'
         }}>
           <div>
             <h1 style={{ 
-              fontSize: '36px', 
+              fontSize: '32px', 
               margin: 0, 
-              color: '#1f2937',
+              color: '#ffffff',
               fontWeight: '800',
               textTransform: 'uppercase',
-              letterSpacing: '1px',
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+              letterSpacing: '1px'
             }}>
               NY INCHECKNING
             </h1>
             <p style={{ 
-              color: '#4b5563', 
+              color: '#ffffff', 
               margin: '8px 0 0 0',
               fontSize: '16px',
-              fontWeight: '500'
+              fontWeight: '400',
+              opacity: 0.9
             }}>
-              Inloggad: <strong style={{ color: '#2563eb' }}>Bob</strong>
+              Inloggad: <strong>Bob</strong>
             </p>
           </div>
+          
           {/* MABI-logga */}
           <div style={{
             width: '120px',
@@ -335,7 +336,8 @@ export default function CheckInForm() {
               style={{
                 maxWidth: '120px',
                 maxHeight: '60px',
-                objectFit: 'contain'
+                objectFit: 'contain',
+                filter: 'brightness(0) invert(1)' // Gör loggan vit
               }}
               onError={(e) => {
                 // Fallback till text-logga om bilden inte laddar
@@ -346,21 +348,28 @@ export default function CheckInForm() {
             <div style={{
               width: '100%',
               height: '100%',
-              backgroundColor: '#2563eb',
-              borderRadius: '6px',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '8px',
               display: 'none',
               alignItems: 'center',
               justifyContent: 'center',
               color: 'white',
               fontSize: '18px',
               fontWeight: 'bold',
-              border: '2px solid #1e40af'
+              border: '2px solid rgba(255, 255, 255, 0.3)'
             }}>
               MABI
             </div>
           </div>
         </div>
+      </div>
 
+      <div style={{
+        maxWidth: '600px',
+        margin: '0 auto',
+        padding: '0 20px',
+        fontFamily: 'system-ui, -apple-system, sans-serif'
+      }}>
         {/* Registreringsnummer */}
         <div style={{ 
           backgroundColor: '#ffffff',
@@ -392,7 +401,7 @@ export default function CheckInForm() {
             }}
           />
 
-          {loading && <p style={{ color: '#2563eb', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
+          {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
           
           {notFound && normalizedReg && (
             <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>Okänt reg.nr</p>
@@ -408,15 +417,15 @@ export default function CheckInForm() {
               border: '1px solid #bfdbfe'
             }}>
               <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#1e40af', minWidth: '130px' }}>Bilmodell:</span> 
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Bilmodell:</span> 
                 <span style={{ fontWeight: '500' }}>{carModel || '—'}</span>
               </div>
               <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#1e40af', minWidth: '130px' }}>Hjulförvaring:</span> 
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Hjulförvaring:</span> 
                 <span style={{ fontWeight: '500' }}>{wheelStorage || '—'}</span>
               </div>
               <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#1e40af', minWidth: '130px' }}>Saludatum:</span> 
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Saludatum:</span> 
                 {saludatum ? (
                   <span style={{ 
                     color: '#dc2626',
@@ -427,7 +436,7 @@ export default function CheckInForm() {
                 ) : <span style={{ fontWeight: '500' }}> —</span>}
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: '600', color: '#1e40af', minWidth: '130px' }}>Befintliga skador:</span>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
                 <div style={{ flex: 1 }}>
                   {damages.length === 0 ? (
                     <span style={{ fontWeight: '500' }}> —</span>
@@ -442,9 +451,7 @@ export default function CheckInForm() {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Plats för incheckning */}
+        </div>{/* Plats för incheckning */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -519,7 +526,7 @@ export default function CheckInForm() {
             style={{
               background: 'none',
               border: 'none',
-              color: '#2563eb',
+              color: '#033066',
               textDecoration: 'underline',
               cursor: 'pointer',
               fontSize: '14px',
@@ -550,7 +557,9 @@ export default function CheckInForm() {
               />
             </div>
           )}
-        </div>{/* Fordonsstatus */}
+        </div>
+
+        {/* Fordonsstatus */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -605,7 +614,7 @@ export default function CheckInForm() {
                   padding: '12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#2563eb' : '#ffffff',
+                  backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#033066' : '#ffffff',
                   color: drivmedelstyp === 'bensin_diesel' ? '#ffffff' : '#000',
                   cursor: 'pointer'
                 }}
@@ -625,7 +634,7 @@ export default function CheckInForm() {
                   padding: '12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  backgroundColor: drivmedelstyp === 'elbil' ? '#2563eb' : '#ffffff',
+                  backgroundColor: drivmedelstyp === 'elbil' ? '#033066' : '#ffffff',
                   color: drivmedelstyp === 'elbil' ? '#ffffff' : '#000',
                   cursor: 'pointer'
                 }}
@@ -681,7 +690,7 @@ export default function CheckInForm() {
                       padding: '12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
-                      backgroundColor: tankniva === 'pafylld_nu' ? '#2563eb' : '#ffffff',
+                      backgroundColor: tankniva === 'pafylld_nu' ? '#033066' : '#ffffff',
                       color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
                       cursor: 'pointer'
                     }}
@@ -739,7 +748,7 @@ export default function CheckInForm() {
                           padding: '12px',
                           border: '1px solid #d1d5db',
                           borderRadius: '6px',
-                          backgroundColor: bransletyp === 'Bensin' ? '#2563eb' : '#ffffff',
+                          backgroundColor: bransletyp === 'Bensin' ? '#033066' : '#ffffff',
                           color: bransletyp === 'Bensin' ? '#ffffff' : '#000',
                           cursor: 'pointer'
                         }}
@@ -754,7 +763,7 @@ export default function CheckInForm() {
                           padding: '12px',
                           border: '1px solid #d1d5db',
                           borderRadius: '6px',
-                          backgroundColor: bransletyp === 'Diesel' ? '#2563eb' : '#ffffff',
+                          backgroundColor: bransletyp === 'Diesel' ? '#033066' : '#ffffff',
                           color: bransletyp === 'Diesel' ? '#ffffff' : '#000',
                           cursor: 'pointer'
                         }}
@@ -939,7 +948,7 @@ export default function CheckInForm() {
                     padding: '8px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
-                    backgroundColor: antalLaddkablar === '0' ? '#2563eb' : '#ffffff',
+                    backgroundColor: antalLaddkablar === '0' ? '#033066' : '#ffffff',
                     color: antalLaddkablar === '0' ? '#ffffff' : '#000',
                     cursor: 'pointer',
                     fontSize: '14px'
@@ -955,7 +964,7 @@ export default function CheckInForm() {
                     padding: '8px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
-                    backgroundColor: antalLaddkablar === '1' ? '#2563eb' : '#ffffff',
+                    backgroundColor: antalLaddkablar === '1' ? '#033066' : '#ffffff',
                     color: antalLaddkablar === '1' ? '#ffffff' : '#000',
                     cursor: 'pointer',
                     fontSize: '14px'
@@ -971,7 +980,7 @@ export default function CheckInForm() {
                     padding: '8px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
-                    backgroundColor: antalLaddkablar === '2' ? '#2563eb' : '#ffffff',
+                    backgroundColor: antalLaddkablar === '2' ? '#033066' : '#ffffff',
                     color: antalLaddkablar === '2' ? '#ffffff' : '#000',
                     cursor: 'pointer',
                     fontSize: '14px'
@@ -1286,8 +1295,8 @@ export default function CheckInForm() {
                               onClick={() => removeDamageImage(damage.id, index)}
                               style={{
                                 position: 'absolute',
-                                top: '2px',
-                                right: '2px',
+                                top: '-8px',
+                                right: '-8px',
                                 width: '24px',
                                 height: '24px',
                                 borderRadius: '50%',
@@ -1295,7 +1304,7 @@ export default function CheckInForm() {
                                 color: '#ffffff',
                                 border: '2px solid #ffffff',
                                 cursor: 'pointer',
-                                fontSize: '12px',
+                                fontSize: '14px',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
@@ -1336,7 +1345,7 @@ export default function CheckInForm() {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#2563eb',
+                  color: '#033066',
                   textDecoration: 'underline',
                   cursor: 'pointer',
                   fontSize: '16px',
@@ -1550,7 +1559,7 @@ export default function CheckInForm() {
             <button
               onClick={resetForm}
               style={{
-                backgroundColor: '#2563eb',
+                backgroundColor: '#033066',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: '8px',
