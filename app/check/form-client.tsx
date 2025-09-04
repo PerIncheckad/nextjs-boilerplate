@@ -8,20 +8,24 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// Uppdaterad CarData-typ för 3 skadekolumner
 type CarData = {
   regnr: string;
   brand_model: string | null;
-  damage_text: string | null;
-  damage_detail?: string | null;
+  damage_text: string | null;     // Kolumn G - Skadetyp
+  damage_location: string | null; // Kolumn K - Skadans plats  
+  damage_notes: string | null;    // Kolumn M - Intern notering
   wheelstorage: string | null;
   saludatum: string | null;
 };
 
+// Uppdaterad ExistingDamage för sammanslagen info
 type ExistingDamage = {
   id: string;
-  shortText: string;
-  detailText?: string;
-  fullText: string;
+  skadetyp: string;        // G: Lackskada, Repa etc.
+  plats: string;           // K: Bak höger, FRAM EXK etc.
+  notering: string;        // M: Intern notering (kan vara tom)
+  fullText: string;        // Sammanslagen visning
   status: 'not_selected' | 'documented' | 'fixed';
   userType?: string;
   userCarPart?: string;
@@ -77,7 +81,7 @@ const DAMAGE_TYPES = [
   'Övrigt'
 ].sort();
 
-// Uppdaterade bildelar och positioner - Motorhuv bara Utsida
+// Uppdaterade bildelar och positioner
 const CAR_PARTS: Record<string, string[]> = {
   'Annan del': [],
   'Bagagelucka': ['Insida', 'Utsida'],
@@ -135,6 +139,19 @@ const getRelevantCarParts = (damageType: string): string[] => {
 };
 
 const CAR_PART_OPTIONS = Object.keys(CAR_PARTS).sort();
+
+// Funktion för att skapa sammanslagen skadetext
+const createCombinedDamageText = (skadetyp: string, plats: string, notering: string): string => {
+  const parts: string[] = [];
+  
+  if (skadetyp?.trim()) parts.push(skadetyp.trim());
+  if (plats?.trim() && plats.trim() !== skadetyp?.trim()) parts.push(plats.trim());
+  if (notering?.trim() && notering.trim() !== skadetyp?.trim() && notering.trim() !== plats?.trim()) {
+    parts.push(notering.trim());
+  }
+  
+  return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
+};
 
 function normalizeReg(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -292,7 +309,7 @@ export default function CheckInForm() {
       .slice(0, 5);
   }, [regInput, allRegistrations]);
 
-  // Hämta bildata
+  // Hämta bildata med 3-kolumn skadeinformation
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -327,18 +344,23 @@ export default function CheckInForm() {
           
           setCarData(useData);
           
+          // Skapa ExistingDamage-objekt från 3 kolumner
           const damages: ExistingDamage[] = useData
             .map((item, index) => {
-              if (!item.damage_text) return null;
+              const skadetyp = item.damage_text || '';        // Kolumn G
+              const plats = item.damage_location || '';       // Kolumn K  
+              const notering = item.damage_notes || '';       // Kolumn M
               
-              const shortText = item.damage_text;
-              const detailText = item.damage_detail || null;
-              const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
+              // Hoppa över rader utan någon skadeinformation
+              if (!skadetyp && !plats && !notering) return null;
+              
+              const fullText = createCombinedDamageText(skadetyp, plats, notering);
               
               return {
                 id: `existing-${index}`,
-                shortText,
-                detailText,
+                skadetyp,
+                plats,
+                notering,
                 fullText,
                 status: 'not_selected',
                 userType: '',
@@ -500,7 +522,7 @@ export default function CheckInForm() {
     setShowSuccessModal(true);
   };
 
-  // Funktioner för befintliga skador
+  // Funktioner för befintliga skador (samma som tidigare)
   const toggleExistingDamageStatus = (id: string, newStatus: 'documented' | 'fixed') => {
     if (newStatus === 'fixed') {
       setDamageToFix(id);
@@ -543,7 +565,7 @@ export default function CheckInForm() {
     setDamageToFix(null);
   };
 
-  // Funktioner för gamla skador
+  // Funktioner för gamla skador (samma som tidigare)
   const updateExistingDamageType = (id: string, type: string) => {
     setExistingDamages(prev => prev.map(d => 
       d.id === id ? { ...d, userType: type, userCarPart: '', userPosition: '' } : d
@@ -587,7 +609,7 @@ export default function CheckInForm() {
     }));
   };
 
-  // Funktioner för nya skador
+  // Funktioner för nya skador (samma som tidigare)
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
@@ -1006,7 +1028,7 @@ export default function CheckInForm() {
             </p>
           )}
 
-          {/* Bilinfo */}
+          {/* Bilinfo med utökad skadeinformation från 3 kolumner */}
           {carData.length > 0 && (
             <div style={{ 
               marginTop: '20px', 
@@ -1040,11 +1062,33 @@ export default function CheckInForm() {
                   {existingDamages.length === 0 ? (
                     <span style={{ fontWeight: '500' }}> —</span>
                   ) : (
-                    <ul style={{ margin: '0', paddingLeft: '20px' }}>
+                    <div style={{ margin: '0' }}>
                       {existingDamages.map((damage, i) => (
-                        <li key={i} style={{ marginBottom: '4px' }}>{damage.fullText}</li>
+                        <div key={i} style={{ 
+                          marginBottom: i === existingDamages.length - 1 ? '0' : '8px',
+                          padding: '8px 12px',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '6px',
+                          border: '1px solid #e5e7eb'
+                        }}>
+                          <div style={{ fontWeight: '500', color: '#374151', fontSize: '14px' }}>
+                            {damage.fullText}
+                          </div>
+                          {/* Visa detaljer från de 3 kolumnerna om de skiljer sig */}
+                          {(damage.skadetyp !== damage.fullText || damage.plats || damage.notering) && (
+                            <div style={{ marginTop: '4px', fontSize: '12px', color: '#6b7280' }}>
+                              {damage.skadetyp && <span><strong>Typ:</strong> {damage.skadetyp}</span>}
+                              {damage.plats && damage.plats !== damage.skadetyp && (
+                                <span>{damage.skadetyp ? ' • ' : ''}<strong>Plats:</strong> {damage.plats}</span>
+                              )}
+                              {damage.notering && damage.notering !== damage.skadetyp && damage.notering !== damage.plats && (
+                                <div style={{ marginTop: '2px' }}><strong>Notering:</strong> {damage.notering}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1206,7 +1250,6 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Drivmedel */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
               Drivmedel *
@@ -1255,7 +1298,6 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Tanknivå för bensin/diesel */}
           {drivmedelstyp === 'bensin_diesel' && (
             <>
               <div style={{ marginBottom: '16px' }}>
@@ -1388,7 +1430,6 @@ export default function CheckInForm() {
             </>
           )}
 
-          {/* Laddnivå för elbil */}
           {drivmedelstyp === 'elbil' && (
             <div style={{ marginBottom: '16px' }}>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
@@ -1469,7 +1510,6 @@ export default function CheckInForm() {
               </div>
             </div>
 
-            {/* AdBlue visas bara för bensin/diesel */}
             {drivmedelstyp === 'bensin_diesel' && (
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
@@ -1559,7 +1599,6 @@ export default function CheckInForm() {
               </div>
             </div>
 
-            {/* Laddkablar visas bara för elbilar */}
             {drivmedelstyp === 'elbil' && (
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
@@ -1994,7 +2033,7 @@ export default function CheckInForm() {
                           <textarea
                             value={damage.userDescription || ''}
                             onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
-                            placeholder={`Beskriv "${damage.shortText}" mer detaljerat...`}
+                            placeholder={`Beskriv "${damage.skadetyp || damage.fullText}" mer detaljerat...`}
                             rows={4}
                             style={{
                               width: '100%',
@@ -2701,7 +2740,7 @@ export default function CheckInForm() {
         </div>
       )}
 
-      {/* FINAL CONFIRMATION - Sammanfattningsdialog */}
+      {/* FINAL CONFIRMATION - Sammanfattningsdialog med korrekt svenska */}
       {showFinalConfirmation && (
         <div style={{
           position: 'fixed',
@@ -2758,24 +2797,65 @@ export default function CheckInForm() {
               
               <div style={{ marginBottom: '12px' }}>
                 <strong>🚗 Fordonsstatus:</strong> {matarstallning} km, {drivmedelstyp === 'bensin_diesel' ? 
-                  `${tankniva?.replace('_', ' ')}${tankniva === 'pafylld_nu' ? ` (${liters}L ${bransletyp})` : ''}` : 
-                  `${laddniva}% laddning`}, {hjultyp?.toLowerCase()}
+                  `${tankniva?.replace(/_/g, ' ')
+                    .replace('fulltankad', 'fulltankad')
+                    .replace('tankas senare', 'tankas senare')
+                    .replace('pafylld nu', 'påfylld nu')}${
+                      tankniva === 'pafylld_nu' ? ` (${liters}L ${bransletyp})` : ''
+                    }` : 
+                  `${laddniva}% laddning`}, {hjultyp?.toLowerCase().replace('thjul', 'hjul')}
               </div>
               
               <div style={{ marginBottom: '12px' }}>
-                <strong>🧽 Rengöring:</strong> {tvatt?.replace('_', ' ')}, {inre?.replace('_', ' ')}
+                <strong>🧽 Rengöring:</strong> {
+                  tvatt?.replace(/_/g, ' ')
+                    .replace('behover tvattas', 'behöver tvättas')
+                    .replace('behover grovtvattas', 'behöver grovtvättas')
+                    .replace('behover inte tvattas', 'behöver inte tvättas')
+                }, {
+                  inre?.replace(/_/g, ' ')
+                    .replace('behover rengoras inuti', 'behöver rengöras inuti')
+                    .replace('ren inuti', 'ren inuti')
+                }
               </div>
               
               <div style={{ marginBottom: '12px' }}>
                 <strong>⚠️ Gamla skador:</strong> {existingDamages.filter(d => d.status === 'documented').length} dokumenterade, {existingDamages.filter(d => d.status === 'fixed').length} åtgärdade
+                {existingDamages.filter(d => d.status !== 'not_selected').length > 0 && (
+                  <div style={{ marginLeft: '16px', fontSize: '12px', marginTop: '4px' }}>
+                    {existingDamages.filter(d => d.status !== 'not_selected').map((damage, i) => (
+                      <div key={i} style={{ color: damage.status === 'fixed' ? '#10b981' : '#2563eb' }}>
+                        • {damage.fullText} ({damage.status === 'fixed' ? 'åtgärdat' : 'dokumenterat'})
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               
               <div style={{ marginBottom: '12px' }}>
-                <strong>🆕 Nya skador:</strong> {skadekontroll === 'nya_skador' ? `${newDamages.length} rapporterade` : skadekontroll?.replace('_', ' ')}
+                <strong>🆕 Nya skador:</strong> {skadekontroll === 'nya_skador' ? `${newDamages.length} rapporterade` : 
+                  skadekontroll?.replace(/_/g, ' ')
+                    .replace('ej skadekontrollerad', 'ej skadekontrollerad')
+                    .replace('inga nya skador', 'inga nya skador')
+                }
+                {newDamages.length > 0 && (
+                  <div style={{ marginLeft: '16px', fontSize: '12px', marginTop: '4px' }}>
+                    {newDamages.map((damage, i) => (
+                      <div key={i} style={{ color: '#dc2626' }}>
+                        • {damage.type} - {damage.carPart} {damage.position && `- ${damage.position}`}: {damage.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               
               <div style={{ marginBottom: '12px' }}>
-                <strong>📋 Status:</strong> {uthyrningsstatus?.replace('_', ' ')}
+                <strong>📋 Status:</strong> {uthyrningsstatus?.replace(/_/g, ' ')
+                  .replace('redo for uthyrning', 'redo för uthyrning')
+                  .replace('ledig tankad', 'ledig tankad')
+                  .replace('ledig otankad', 'ledig otankad')
+                  .replace('klar otankad', 'klar otankad')
+                }
               </div>
               
               <div>
