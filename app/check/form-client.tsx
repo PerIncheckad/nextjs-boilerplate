@@ -12,28 +12,30 @@ type CarData = {
   regnr: string;
   brand_model: string | null;
   damage_text: string | null;
-  damage_detail?: string | null; // Ny kolumn för mer detaljerad skadebeskrivning
+  damage_detail?: string | null;
   wheelstorage: string | null;
   saludatum: string | null;
 };
 
-// Detaljerad skada från databas
+// Detaljerad skada från databas - nu med kategorier
 type ExistingDamage = {
   id: string;
-  shortText: string; // t.ex. "Lackskada"
-  detailText?: string; // t.ex. "höger framskärm"
-  fullText: string; // t.ex. "Lackskada - höger framskärm"
-  status: 'not_selected' | 'documented' | 'fixed'; // Status för åtgärdat
-  userDescription?: string; // Användarens egen beskrivning
-  media?: MediaFile[]; // Bilder/videos som användaren lagt till
+  shortText: string;
+  detailText?: string;
+  fullText: string;
+  status: 'not_selected' | 'documented' | 'fixed';
+  userType?: string;      // NY: Vald typ
+  userCarPart?: string;   // NY: Vald bil-del
+  userPosition?: string;  // NY: Vald position
+  userDescription?: string;
+  media?: MediaFile[];
 };
 
-// Media-typ för att hantera både bilder och videos
 type MediaFile = {
   file: File;
   type: 'image' | 'video';
-  preview?: string; // För bilder
-  thumbnail?: string; // För videos
+  preview?: string;
+  thumbnail?: string;
 };
 
 // Platser och stationer
@@ -50,7 +52,7 @@ const STATIONER: Record<string, string[]> = {
   'LUND': ['Huvudstation Lund', 'Ford Lund', 'Hedin Lund', 'B/S Lund']
 };
 
-// Kompletta skadetyper från din lista
+// Skadetyper (alfabetisk ordning)
 const DAMAGE_TYPES = [
   'Buckla',
   'Däckskada sommarhjul',
@@ -74,28 +76,61 @@ const DAMAGE_TYPES = [
   'Stenskott',
   'Trasig',
   'Övrigt'
-];
+].sort();
 
-// Bildelar och deras positioner (baserat på din skärmdump)
+// Bildelar och deras positioner (alfabetisk ordning)
 const CAR_PARTS: Record<string, string[]> = {
-  'Stötfångare fram': ['Fram', 'Bak', 'Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
-  'Skärm': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
-  'Dörr utsida': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
-  'Dörr insida': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
-  'Motorhuv': ['Utsida', 'Insida'],
+  'Annan del': [],
+  'Bagagelucka': ['Insida', 'Utsida'],
+  'Däck': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
+  'Dörr insida': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
+  'Dörr utsida': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
+  'Front läpp': ['Höger', 'Mitten', 'Vänster'],
+  'Fälg': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
+  'Glas': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
   'Grill': [],
-  'Bagagelucka': ['Utsida', 'Insida'],
-  'Glas': ['Fram', 'Bak', 'Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
-  'Front läpp': ['Vänster', 'Höger', 'Mitten', 'Höger'],
-  'Tröskel': ['Vänster', 'Höger'],
+  'Motorhuv': ['Insida', 'Utsida'],
+  'Skärm': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
+  'Stötfångare fram': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
   'Tak': [],
-  'Yttre backspegel': ['Vänster', 'Höger'],
-  'Fälg': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
-  'Däck': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
-  'Annan del': []
+  'Tröskel': ['Höger', 'Vänster'],
+  'Yttre backspegel': ['Höger', 'Vänster']
 };
 
-const CAR_PART_OPTIONS = Object.keys(CAR_PARTS);
+// Smart filtering: skadetyp → relevanta bildelar
+const getRelevantCarParts = (damageType: string): string[] => {
+  const lowerType = damageType.toLowerCase();
+  
+  // Däck-relaterade skador
+  if (lowerType.includes('däck')) {
+    return ['Däck', 'Fälg'].sort();
+  }
+  
+  // Fälg-relaterade skador
+  if (lowerType.includes('fälg')) {
+    return ['Fälg', 'Däck'].sort();
+  }
+  
+  // Glas-relaterade skador (krossad ruta, stenskott)
+  if (lowerType.includes('ruta') || lowerType.includes('stenskott')) {
+    return ['Glas', 'Motorhuv', 'Tak'].sort();
+  }
+  
+  // Krockskador - oftast stötfångare och karosseri
+  if (lowerType.includes('krock')) {
+    return ['Stötfångare fram', 'Skärm', 'Dörr utsida', 'Bagagelucka', 'Motorhuv'].sort();
+  }
+  
+  // Höjdledsskador - oftast tak och motorhuv
+  if (lowerType.includes('höjdled')) {
+    return ['Tak', 'Motorhuv', 'Bagagelucka'].sort();
+  }
+  
+  // Övriga skador - alla delar
+  return Object.keys(CAR_PARTS).sort();
+};
+
+const CAR_PART_OPTIONS = Object.keys(CAR_PARTS).sort();
 
 function normalizeReg(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -114,7 +149,7 @@ const isDateWithinDays = (dateStr: string | null, days: number): boolean => {
 const getFileType = (file: File): 'image' | 'video' => {
   if (file.type.startsWith('image/')) return 'image';
   if (file.type.startsWith('video/')) return 'video';
-  return 'image'; // default
+  return 'image';
 };
 
 // Hjälpfunktion för att skapa video-thumbnail
@@ -127,7 +162,7 @@ const createVideoThumbnail = (file: File): Promise<string> => {
     video.addEventListener('loadedmetadata', () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      video.currentTime = 0.5; // Ta thumbnail från 0.5 sekunder
+      video.currentTime = 0.5;
     });
     
     video.addEventListener('seeked', () => {
@@ -137,7 +172,6 @@ const createVideoThumbnail = (file: File): Promise<string> => {
     });
     
     video.addEventListener('error', () => {
-      // Fallback till en standard video-ikon som data URL
       resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiM2YjcyODAiLz48cGF0aCBkPSJNNDUgNDBWODBMNzUgNjBMNDUgNDBaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==');
     });
     
@@ -173,7 +207,7 @@ export default function CheckInForm() {
   // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
   const [carData, setCarData] = useState<CarData[]>([]);
-  const [allRegistrations, setAllRegistrations] = useState<string[]>([]); // För autocomplete
+  const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
@@ -199,7 +233,7 @@ export default function CheckInForm() {
   // För elbil
   const [laddniva, setLaddniva] = useState('');
 
-  // Övriga fält
+  // Övriga fält - nu smarta baserat på drivmedel
   const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
   const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
   const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
@@ -208,15 +242,15 @@ export default function CheckInForm() {
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
   
-  // Skador - gamla (från databas) och nya (nu med del + position)
+  // Skador - gamla (från databas) och nya
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<{
     id: string; 
     type: string; 
-    carPart: string;  // NY: Vilken del av bilen
-    position: string; // NY: Position på den delen
-    text: string;     // Fritext beskrivning
+    carPart: string;
+    position: string;
+    text: string;
     media: MediaFile[]
   }[]>([]);
   
@@ -253,7 +287,7 @@ export default function CheckInForm() {
     const input = regInput.toUpperCase();
     return allRegistrations
       .filter(reg => reg.toUpperCase().startsWith(input))
-      .slice(0, 5); // Max 5 förslag
+      .slice(0, 5);
   }, [regInput, allRegistrations]);
 
   // Hämta bildata
@@ -306,6 +340,9 @@ export default function CheckInForm() {
                 detailText,
                 fullText,
                 status: 'not_selected',
+                userType: '',
+                userCarPart: '',
+                userPosition: '',
                 userDescription: '',
                 media: []
               };
@@ -360,38 +397,42 @@ export default function CheckInForm() {
     if (drivmedelstyp === 'bensin_diesel') {
       if (tankniva === null) return false;
       if (tankniva === 'pafylld_nu' && (!liters.trim() || !bransletyp)) return false;
+      // AdBlue krävs för bensin/diesel
+      if (adblue === null) return false;
     }
     
     if (drivmedelstyp === 'elbil') {
       if (!laddniva.trim()) return false;
       const laddnivaParsed = parseInt(laddniva);
       if (isNaN(laddnivaParsed) || laddnivaParsed < 0 || laddnivaParsed > 100) return false;
+      // Laddkablar krävs för elbilar
+      if (antalLaddkablar === null) return false;
     }
     
     if (spolarvatska === null) return false;
     if (insynsskydd === null) return false;
-    if (antalLaddkablar === null) return false;
     if (hjultyp === null) return false;
-    if (adblue === null) return false;
     if (tvatt === null) return false;
     if (inre === null) return false;
     if (skadekontroll === null) return false;
     
     if (skadekontroll === 'nya_skador') {
       if (newDamages.length === 0) return false;
-      // Uppdaterad validering: typ, del, position OCH text måste vara ifyllda
+      // Alla skador måste ha video (obligatoriskt)
+      if (newDamages.some(damage => !damage.media.some(m => m.type === 'video'))) return false;
       if (newDamages.some(damage => !damage.type || !damage.carPart || !damage.text.trim())) return false;
-      // Position är bara obligatorisk om det finns positioner för den valda delen
       if (newDamages.some(damage => damage.carPart && CAR_PARTS[damage.carPart].length > 0 && !damage.position)) return false;
     }
     
-    // Kontrollera att dokumenterade gamla skador har beskrivning
+    // Kontrollera dokumenterade gamla skador
     const documentedOldDamages = existingDamages.filter(d => d.status === 'documented');
     if (documentedOldDamages.some(damage => !damage.userDescription?.trim())) return false;
+    if (documentedOldDamages.some(damage => !damage.userType || !damage.userCarPart)) return false;
+    if (documentedOldDamages.some(damage => damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && !damage.userPosition)) return false;
+    // Gamla skador måste också ha video
+    if (documentedOldDamages.some(damage => !damage.media?.some(m => m.type === 'video'))) return false;
     
     if (uthyrningsstatus === null) return false;
-    
-    // Obligatorisk preliminär avslut notering
     if (!preliminarAvslutNotering.trim()) return false;
     
     return true;
@@ -440,16 +481,17 @@ export default function CheckInForm() {
   // Funktioner för befintliga skador
   const toggleExistingDamageStatus = (id: string, newStatus: 'documented' | 'fixed') => {
     if (newStatus === 'fixed') {
-      // Visa bekräftelsedialog för åtgärdat
       setDamageToFix(id);
       setShowConfirmDialog(true);
     } else {
-      // Direkt toggle för dokumentation
       setExistingDamages(prev => prev.map(d => 
         d.id === id ? { 
           ...d, 
           status: d.status === 'documented' ? 'not_selected' : 'documented',
           userDescription: d.status === 'documented' ? '' : d.userDescription,
+          userType: d.status === 'documented' ? '' : d.userType,
+          userCarPart: d.status === 'documented' ? '' : d.userCarPart,
+          userPosition: d.status === 'documented' ? '' : d.userPosition,
           media: d.status === 'documented' ? [] : d.media 
         } : d
       ));
@@ -463,6 +505,9 @@ export default function CheckInForm() {
           ...d, 
           status: 'fixed',
           userDescription: '',
+          userType: '',
+          userCarPart: '',
+          userPosition: '',
           media: []
         } : d
       ));
@@ -474,6 +519,25 @@ export default function CheckInForm() {
   const cancelFixDamage = () => {
     setShowConfirmDialog(false);
     setDamageToFix(null);
+  };
+
+  // Uppdaterade funktioner för gamla skador med kategorier
+  const updateExistingDamageType = (id: string, type: string) => {
+    setExistingDamages(prev => prev.map(d => 
+      d.id === id ? { ...d, userType: type, userCarPart: '', userPosition: '' } : d
+    ));
+  };
+
+  const updateExistingDamageCarPart = (id: string, carPart: string) => {
+    setExistingDamages(prev => prev.map(d => 
+      d.id === id ? { ...d, userCarPart: carPart, userPosition: '' } : d
+    ));
+  };
+
+  const updateExistingDamagePosition = (id: string, position: string) => {
+    setExistingDamages(prev => prev.map(d => 
+      d.id === id ? { ...d, userPosition: position } : d
+    ));
   };
 
   const updateExistingDamageDescription = (id: string, description: string) => {
@@ -501,13 +565,13 @@ export default function CheckInForm() {
     }));
   };
 
-  // Funktioner för nya skador (uppdaterade för del + position)
+  // Funktioner för nya skador
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
       type: '',
-      carPart: '',    // NY
-      position: '',   // NY
+      carPart: '',
+      position: '',
       text: '',
       media: []
     }]);
@@ -518,11 +582,11 @@ export default function CheckInForm() {
   };
 
   const updateDamageType = (id: string, type: string) => {
-    setNewDamages(prev => prev.map(d => d.id === id ? {...d, type} : d));
+    setNewDamages(prev => prev.map(d => d.id === id ? {...d, type, carPart: '', position: ''} : d));
   };
 
   const updateDamageCarPart = (id: string, carPart: string) => {
-    setNewDamages(prev => prev.map(d => d.id === id ? {...d, carPart, position: ''} : d)); // Reset position när man byter del
+    setNewDamages(prev => prev.map(d => d.id === id ? {...d, carPart, position: ''} : d));
   };
 
   const updateDamagePosition = (id: string, position: string) => {
@@ -563,7 +627,7 @@ export default function CheckInForm() {
     setShowSuggestions(false);
   };
 
-  // Förbättrad sektion-separator med större, tydligare rubriker
+  // Förbättrad sektion-separator
   const SectionHeader = ({ title }: { title: string }) => (
     <div style={{
       marginTop: '40px',
@@ -584,7 +648,6 @@ export default function CheckInForm() {
     </div>
   );
 
-  // Undersektion för skador
   const SubSectionHeader = ({ title }: { title: string }) => (
     <div style={{
       marginTop: '24px',
@@ -603,19 +666,21 @@ export default function CheckInForm() {
     </div>
   );
 
-  // Media upload component - nu med separata knappar för Android-kompatibilitet
+  // Media upload component - uppdaterad med obligatorisk video
   const MediaUpload = ({ 
     damageId, 
     isOld, 
-    onMediaUpdate 
+    onMediaUpdate,
+    hasRequiredVideo = false
   }: { 
     damageId: string; 
     isOld: boolean; 
-    onMediaUpdate: (id: string, files: FileList | null) => void; 
+    onMediaUpdate: (id: string, files: FileList | null) => void;
+    hasRequiredVideo?: boolean;
   }) => (
     <div style={{ marginBottom: '12px' }}>
       <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-        Lägg till bild eller video
+        Lägg till bild eller video {!hasRequiredVideo && <span style={{ color: '#dc2626' }}>*</span>}
       </label>
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -649,7 +714,7 @@ export default function CheckInForm() {
           </label>
         </div>
 
-        {/* Video-knapp */}
+        {/* Video-knapp - uppdaterad text */}
         <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
           <input
             type="file"
@@ -665,16 +730,17 @@ export default function CheckInForm() {
               display: 'block',
               width: '100%',
               padding: '12px',
-              border: '2px dashed #dc2626',
+              border: hasRequiredVideo ? '2px dashed #dc2626' : '2px solid #dc2626',
               borderRadius: '6px',
               fontSize: '16px',
-              backgroundColor: '#fef2f2',
+              backgroundColor: hasRequiredVideo ? '#fef2f2' : '#fee2e2',
               textAlign: 'center',
               cursor: 'pointer',
-              color: '#dc2626'
+              color: '#dc2626',
+              fontWeight: hasRequiredVideo ? 'normal' : 'bold'
             }}
           >
-            🎥 Spela in video
+            🎥 {hasRequiredVideo ? 'Lägg till mer video' : 'Spela in video med skada OCH reg.nr. *'}
           </label>
         </div>
 
@@ -707,6 +773,12 @@ export default function CheckInForm() {
           </label>
         </div>
       </div>
+      
+      {!hasRequiredVideo && (
+        <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
+          Video är obligatorisk för alla skador
+        </p>
+      )}
     </div>
   );
 
@@ -716,7 +788,7 @@ export default function CheckInForm() {
       backgroundColor: '#f8fafc',
       color: '#111827'
     }}>
-      {/* Full-width MABI Header med Cobalt Blue från brandguiden */}
+      {/* MABI Header */}
       <div style={{
         backgroundColor: '#033066',
         width: '100vw',
@@ -754,7 +826,6 @@ export default function CheckInForm() {
             </p>
           </div>
           
-          {/* MABI-logga med vit bakgrund */}
           <div style={{
             width: '120px',
             height: '60px',
@@ -775,7 +846,6 @@ export default function CheckInForm() {
                 objectFit: 'contain'
               }}
               onError={(e) => {
-                // Fallback till text-logga om bilden inte laddar
                 e.currentTarget.style.display = 'none';
                 e.currentTarget.nextElementSibling!.style.display = 'flex';
               }}
@@ -819,7 +889,7 @@ export default function CheckInForm() {
               value={regInput}
               onChange={(e) => handleRegInputChange(e.target.value)}
               onFocus={() => setShowSuggestions(regInput.length > 0 && suggestions.length > 0)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} // Delay för att hantera klick på förslag
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder="Skriv reg.nr"
               spellCheck={false}
               autoComplete="off"
@@ -1038,7 +1108,7 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* Fordonsstatus */}
+        {/* Fordonsstatus med smart drivmedelslogik */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1087,6 +1157,7 @@ export default function CheckInForm() {
                 onClick={() => {
                   setDrivmedelstyp('bensin_diesel');
                   setLaddniva('');
+                  setAntalLaddkablar(null); // Reset laddkablar för bensin/diesel
                 }}
                 style={{
                   width: '100%',
@@ -1107,6 +1178,7 @@ export default function CheckInForm() {
                   setTankniva(null);
                   setLiters('');
                   setBransletyp(null);
+                  setAdblue(null); // Reset AdBlue för elbilar
                 }}
                 style={{
                   width: '100%',
@@ -1290,8 +1362,13 @@ export default function CheckInForm() {
             </div>
           )}
 
-          {/* Övriga fordonsstatus-fält i kompakt layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          {/* Övriga fordonsstatus-fält - smart layout baserat på drivmedel */}
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: drivmedelstyp === 'bensin_diesel' ? '1fr 1fr' : '1fr', 
+            gap: '16px', 
+            marginBottom: '16px' 
+          }}>
             <div>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
                 Spolarvätska OK? *
@@ -1332,48 +1409,56 @@ export default function CheckInForm() {
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                AdBlue OK? *
-              </label>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setAdblue(true)}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: adblue === true ? '#10b981' : '#ffffff',
-                    color: adblue === true ? '#ffffff' : '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  Ja
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAdblue(false)}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: adblue === false ? '#dc2626' : '#ffffff',
-                    color: adblue === false ? '#ffffff' : '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  Nej
-                </button>
+            {/* AdBlue visas bara för bensin/diesel */}
+            {drivmedelstyp === 'bensin_diesel' && (
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  AdBlue OK? *
+                </label>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAdblue(true)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: adblue === true ? '#10b981' : '#ffffff',
+                      color: adblue === true ? '#ffffff' : '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Ja
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdblue(false)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: adblue === false ? '#dc2626' : '#ffffff',
+                      color: adblue === false ? '#ffffff' : '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Nej
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: drivmedelstyp === 'elbil' ? '1fr 1fr' : '1fr', 
+            gap: '16px', 
+            marginBottom: '16px' 
+          }}>
             <div>
               <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
                 Insynsskydd OK? *
@@ -1414,61 +1499,64 @@ export default function CheckInForm() {
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Antal laddkablar *
-              </label>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setAntalLaddkablar('0')}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: antalLaddkablar === '0' ? '#033066' : '#ffffff',
-                    color: antalLaddkablar === '0' ? '#ffffff' : '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  0
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAntalLaddkablar('1')}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: antalLaddkablar === '1' ? '#033066' : '#ffffff',
-                    color: antalLaddkablar === '1' ? '#ffffff' : '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  1
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAntalLaddkablar('2')}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: antalLaddkablar === '2' ? '#033066' : '#ffffff',
-                    color: antalLaddkablar === '2' ? '#ffffff' : '#000',
-                    cursor: 'pointer',
-                    fontSize: '14px'
-                  }}
-                >
-                  2
-                </button>
+            {/* Laddkablar visas bara för elbilar */}
+            {drivmedelstyp === 'elbil' && (
+              <div>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Antal laddkablar *
+                </label>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAntalLaddkablar('0')}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: antalLaddkablar === '0' ? '#033066' : '#ffffff',
+                      color: antalLaddkablar === '0' ? '#ffffff' : '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    0
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAntalLaddkablar('1')}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: antalLaddkablar === '1' ? '#033066' : '#ffffff',
+                      color: antalLaddkablar === '1' ? '#ffffff' : '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    1
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAntalLaddkablar('2')}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: antalLaddkablar === '2' ? '#033066' : '#ffffff',
+                      color: antalLaddkablar === '2' ? '#ffffff' : '#000',
+                      cursor: 'pointer',
+                      fontSize: '14px'
+                    }}
+                  >
+                    2
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div style={{ marginBottom: '16px' }}>
@@ -1610,7 +1698,7 @@ export default function CheckInForm() {
               </button>
             </div>
           </div>
-        </div>{/* Skador med utökad struktur */}
+        </div>{/* Skador med utökad struktur och gamla skador */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1620,7 +1708,7 @@ export default function CheckInForm() {
         }}>
           <SectionHeader title="Skador" />
 
-          {/* Gamla skador - nu från databas med "Åtgärdat"-alternativ */}
+          {/* Gamla skador - nu med kategorier */}
           <SubSectionHeader title="Gamla skador" />
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px' }}>
             Klicka på de befintliga skador du vill dokumentera eller markera som åtgärdade.
@@ -1630,7 +1718,6 @@ export default function CheckInForm() {
             <div style={{ marginBottom: '20px' }}>
               {existingDamages.map(damage => (
                 <div key={damage.id} style={{ marginBottom: '16px' }}>
-                  {/* Huvudknapp för skada */}
                   <div style={{
                     border: '2px solid',
                     borderColor: damage.status === 'fixed' ? '#10b981' : damage.status === 'documented' ? '#2563eb' : '#d1d5db',
@@ -1682,7 +1769,6 @@ export default function CheckInForm() {
                       )}
                     </div>
 
-                    {/* Åtgärdsknappar */}
                     {damage.status === 'not_selected' && (
                       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                         <button
@@ -1722,12 +1808,19 @@ export default function CheckInForm() {
                       </div>
                     )}
 
-                    {/* Återställ-knappar */}
                     {damage.status !== 'not_selected' && (
                       <button
                         type="button"
                         onClick={() => setExistingDamages(prev => prev.map(d => 
-                          d.id === damage.id ? { ...d, status: 'not_selected', userDescription: '', media: [] } : d
+                          d.id === damage.id ? { 
+                            ...d, 
+                            status: 'not_selected', 
+                            userType: '',
+                            userCarPart: '',
+                            userPosition: '',
+                            userDescription: '', 
+                            media: [] 
+                          } : d
                         ))}
                         style={{
                           padding: '8px 16px',
@@ -1744,18 +1837,95 @@ export default function CheckInForm() {
                       </button>
                     )}
 
-                    {/* Dokumentationsformulär */}
+                    {/* Dokumentationsformulär för gamla skador */}
                     {damage.status === 'documented' && (
                       <div style={{ marginTop: '12px' }}>
+                        {/* STEG 1: Typ av skada för gamla skador */}
                         <div style={{ marginBottom: '12px' }}>
                           <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                            Din detaljerade beskrivning *
+                            1. Typ av skada *
+                          </label>
+                          <select
+                            value={damage.userType || ''}
+                            onChange={(e) => updateExistingDamageType(damage.id, e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '12px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '16px',
+                              backgroundColor: '#ffffff'
+                            }}
+                          >
+                            <option value="">— Välj typ av skada —</option>
+                            {DAMAGE_TYPES.map(type => (
+                              <option key={type} value={type}>{type}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* STEG 2: Del på bilen för gamla skador */}
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                            2. Del på bilen *
+                          </label>
+                          <select
+                            value={damage.userCarPart || ''}
+                            onChange={(e) => updateExistingDamageCarPart(damage.id, e.target.value)}
+                            disabled={!damage.userType}
+                            style={{
+                              width: '100%',
+                              padding: '12px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '6px',
+                              fontSize: '16px',
+                              backgroundColor: damage.userType ? '#ffffff' : '#f3f4f6',
+                              color: damage.userType ? '#000' : '#9ca3af'
+                            }}
+                          >
+                            <option value="">— Välj bil-del —</option>
+                            {(damage.userType ? getRelevantCarParts(damage.userType) : CAR_PART_OPTIONS).map(part => (
+                              <option key={part} value={part}>{part}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* STEG 3: Position för gamla skador (om relevant) */}
+                        {damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                              3. Position *
+                            </label>
+                            <select
+                              value={damage.userPosition || ''}
+                              onChange={(e) => updateExistingDamagePosition(damage.id, e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '12px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '16px',
+                                backgroundColor: '#ffffff'
+                              }}
+                            >
+                              <option value="">— Välj position —</option>
+                              {CAR_PARTS[damage.userCarPart].map(position => (
+                                <option key={position} value={position}>{position}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        {/* STEG 4: Detaljerad beskrivning för gamla skador */}
+                        <div style={{ marginBottom: '12px' }}>
+                          <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                            {damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 ? '4. ' : '3. '}Din detaljerade beskrivning *
                           </label>
                           <textarea
                             value={damage.userDescription || ''}
                             onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
                             placeholder={`Beskriv "${damage.shortText}" mer detaljerat...`}
-                            rows={3}
+                            rows={4}
                             style={{
                               width: '100%',
                               padding: '12px',
@@ -1763,7 +1933,8 @@ export default function CheckInForm() {
                               borderRadius: '6px',
                               fontSize: '16px',
                               backgroundColor: '#ffffff',
-                              resize: 'vertical'
+                              resize: 'vertical',
+                              minHeight: '100px'
                             }}
                           />
                         </div>
@@ -1772,6 +1943,7 @@ export default function CheckInForm() {
                           damageId={damage.id} 
                           isOld={true} 
                           onMediaUpdate={updateExistingDamageMedia} 
+                          hasRequiredVideo={damage.media?.some(m => m.type === 'video') || false}
                         />
 
                         {damage.media && damage.media.length > 0 && (
@@ -1950,7 +2122,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Nya skador fält - nu med 4 steg: typ → del → position → beskrivning */}
+          {/* Nya skador fält - med smart skadehierarki */}
           {skadekontroll === 'nya_skador' && (
             <>
               {newDamages.map(damage => (
@@ -1985,7 +2157,7 @@ export default function CheckInForm() {
                     </select>
                   </div>
 
-                  {/* STEG 2: Del på bilen */}
+                  {/* STEG 2: Del på bilen - smart filtrering */}
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
                       2. Del på bilen *
@@ -2005,7 +2177,7 @@ export default function CheckInForm() {
                       }}
                     >
                       <option value="">— Välj bil-del —</option>
-                      {CAR_PART_OPTIONS.map(part => (
+                      {(damage.type ? getRelevantCarParts(damage.type) : CAR_PART_OPTIONS).map(part => (
                         <option key={part} value={part}>{part}</option>
                       ))}
                     </select>
@@ -2030,7 +2202,7 @@ export default function CheckInForm() {
                         }}
                       >
                         <option value="">— Välj position —</option>
-                        {CAR_PARTS[damage.carPart].map(position => (
+                        {CAR_PARTS[damage.carPart].sort().map(position => (
                           <option key={position} value={position}>{position}</option>
                         ))}
                       </select>
@@ -2042,12 +2214,12 @@ export default function CheckInForm() {
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
                       {damage.carPart && CAR_PARTS[damage.carPart].length > 0 ? '4. ' : '3. '}Beskrivning av skada *
                     </label>
-                    <input
-                      type="text"
+                    <textarea
                       value={damage.text}
                       onChange={(e) => updateDamageText(damage.id, e.target.value)}
                       placeholder="Beskriv skadan mer detaljerat..."
                       disabled={!damage.carPart}
+                      rows={4}
                       style={{
                         width: '100%',
                         padding: '12px',
@@ -2055,7 +2227,9 @@ export default function CheckInForm() {
                         borderRadius: '6px',
                         fontSize: '16px',
                         backgroundColor: damage.carPart ? '#ffffff' : '#f3f4f6',
-                        color: damage.carPart ? '#000' : '#9ca3af'
+                        color: damage.carPart ? '#000' : '#9ca3af',
+                        resize: 'vertical',
+                        minHeight: '100px'
                       }}
                     />
                   </div>
@@ -2064,6 +2238,7 @@ export default function CheckInForm() {
                     damageId={damage.id} 
                     isOld={false} 
                     onMediaUpdate={updateDamageMedia} 
+                    hasRequiredVideo={damage.media.some(m => m.type === 'video')}
                   />
 
                   {damage.media.length > 0 && (
@@ -2285,6 +2460,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
+          {/* Prel. avslut notering - fixad färg */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
               Prel. avslut notering *
@@ -2293,15 +2469,16 @@ export default function CheckInForm() {
               value={preliminarAvslutNotering}
               onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
               placeholder="Preliminära kommentarer för avslut..."
-              rows={3}
+              rows={4}
               style={{
                 width: '100%',
                 padding: '12px',
-                border: preliminarAvslutNotering.trim() ? '1px solid #d1d5db' : '2px solid #dc2626',
+                border: '1px solid #d1d5db', // Fixad färg - inte röd längre
                 borderRadius: '6px',
                 fontSize: '16px',
                 backgroundColor: '#ffffff',
-                resize: 'vertical'
+                resize: 'vertical',
+                minHeight: '100px'
               }}
             />
             {!preliminarAvslutNotering.trim() && (
