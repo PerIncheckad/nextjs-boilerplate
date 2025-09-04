@@ -76,6 +76,27 @@ const DAMAGE_TYPES = [
   'Övrigt'
 ];
 
+// Bildelar och deras positioner (baserat på din skärmdump)
+const CAR_PARTS: Record<string, string[]> = {
+  'Stötfångare fram': ['Fram', 'Bak', 'Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
+  'Skärm': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
+  'Dörr utsida': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
+  'Dörr insida': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
+  'Motorhuv': ['Utsida', 'Insida'],
+  'Grill': [],
+  'Bagagelucka': ['Utsida', 'Insida'],
+  'Glas': ['Fram', 'Bak', 'Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
+  'Front läpp': ['Vänster', 'Höger', 'Mitten', 'Höger'],
+  'Tröskel': ['Vänster', 'Höger'],
+  'Tak': [],
+  'Yttre backspegel': ['Vänster', 'Höger'],
+  'Fälg': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
+  'Däck': ['Vänster fram', 'Vänster bak', 'Höger fram', 'Höger bak'],
+  'Annan del': []
+};
+
+const CAR_PART_OPTIONS = Object.keys(CAR_PARTS);
+
 function normalizeReg(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
@@ -187,10 +208,17 @@ export default function CheckInForm() {
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
   
-  // Skador - gamla (från databas) och nya
+  // Skador - gamla (från databas) och nya (nu med del + position)
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
-  const [newDamages, setNewDamages] = useState<{id: string; type: string; text: string; media: MediaFile[]}[]>([]);
+  const [newDamages, setNewDamages] = useState<{
+    id: string; 
+    type: string; 
+    carPart: string;  // NY: Vilken del av bilen
+    position: string; // NY: Position på den delen
+    text: string;     // Fritext beskrivning
+    media: MediaFile[]
+  }[]>([]);
   
   const [uthyrningsstatus, setUthyrningsstatus] = useState<'redo_for_uthyrning' | 'ledig_tankad' | 'ledig_otankad' | 'klar_otankad' | null>(null);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
@@ -351,7 +379,10 @@ export default function CheckInForm() {
     
     if (skadekontroll === 'nya_skador') {
       if (newDamages.length === 0) return false;
-      if (newDamages.some(damage => !damage.type || !damage.text.trim())) return false;
+      // Uppdaterad validering: typ, del, position OCH text måste vara ifyllda
+      if (newDamages.some(damage => !damage.type || !damage.carPart || !damage.text.trim())) return false;
+      // Position är bara obligatorisk om det finns positioner för den valda delen
+      if (newDamages.some(damage => damage.carPart && CAR_PARTS[damage.carPart].length > 0 && !damage.position)) return false;
     }
     
     // Kontrollera att dokumenterade gamla skador har beskrivning
@@ -470,11 +501,13 @@ export default function CheckInForm() {
     }));
   };
 
-  // Funktioner för nya skador
+  // Funktioner för nya skador (uppdaterade för del + position)
   const addDamage = () => {
     setNewDamages(prev => [...prev, {
       id: Math.random().toString(36).slice(2),
       type: '',
+      carPart: '',    // NY
+      position: '',   // NY
       text: '',
       media: []
     }]);
@@ -486,6 +519,14 @@ export default function CheckInForm() {
 
   const updateDamageType = (id: string, type: string) => {
     setNewDamages(prev => prev.map(d => d.id === id ? {...d, type} : d));
+  };
+
+  const updateDamageCarPart = (id: string, carPart: string) => {
+    setNewDamages(prev => prev.map(d => d.id === id ? {...d, carPart, position: ''} : d)); // Reset position när man byter del
+  };
+
+  const updateDamagePosition = (id: string, position: string) => {
+    setNewDamages(prev => prev.map(d => d.id === id ? {...d, position} : d));
   };
 
   const updateDamageText = (id: string, text: string) => {
@@ -997,7 +1038,7 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* Fordonsstatus - utan "Bränsle/Energi"-rubrik */}
+        {/* Fordonsstatus */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1035,7 +1076,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Drivmedel direkt utan underrubrik */}
+          {/* Drivmedel */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
               Drivmedel *
@@ -1569,7 +1610,7 @@ export default function CheckInForm() {
               </button>
             </div>
           </div>
-        </div>{/* Skador med "Åtgärdat"-alternativ */}
+        </div>{/* Skador med utökad struktur */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1909,7 +1950,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Nya skador fält */}
+          {/* Nya skador fält - nu med 4 steg: typ → del → position → beskrivning */}
           {skadekontroll === 'nya_skador' && (
             <>
               {newDamages.map(damage => (
@@ -1920,9 +1961,10 @@ export default function CheckInForm() {
                   marginBottom: '16px',
                   backgroundColor: '#fefce8'
                 }}>
+                  {/* STEG 1: Typ av skada */}
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Typ av skada *
+                      1. Typ av skada *
                     </label>
                     <select
                       value={damage.type}
@@ -1943,22 +1985,77 @@ export default function CheckInForm() {
                     </select>
                   </div>
 
+                  {/* STEG 2: Del på bilen */}
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Beskrivning av skada *
+                      2. Del på bilen *
                     </label>
-                    <input
-                      type="text"
-                      value={damage.text}
-                      onChange={(e) => updateDamageText(damage.id, e.target.value)}
-                      placeholder="Beskriv skadan..."
+                    <select
+                      value={damage.carPart}
+                      onChange={(e) => updateDamageCarPart(damage.id, e.target.value)}
+                      disabled={!damage.type}
                       style={{
                         width: '100%',
                         padding: '12px',
                         border: '1px solid #d1d5db',
                         borderRadius: '6px',
                         fontSize: '16px',
-                        backgroundColor: '#ffffff'
+                        backgroundColor: damage.type ? '#ffffff' : '#f3f4f6',
+                        color: damage.type ? '#000' : '#9ca3af'
+                      }}
+                    >
+                      <option value="">— Välj bil-del —</option>
+                      {CAR_PART_OPTIONS.map(part => (
+                        <option key={part} value={part}>{part}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* STEG 3: Position (visas bara om vald del har positioner) */}
+                  {damage.carPart && CAR_PARTS[damage.carPart].length > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                        3. Position *
+                      </label>
+                      <select
+                        value={damage.position}
+                        onChange={(e) => updateDamagePosition(damage.id, e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          fontSize: '16px',
+                          backgroundColor: '#ffffff'
+                        }}
+                      >
+                        <option value="">— Välj position —</option>
+                        {CAR_PARTS[damage.carPart].map(position => (
+                          <option key={position} value={position}>{position}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* STEG 4: Beskrivning */}
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      {damage.carPart && CAR_PARTS[damage.carPart].length > 0 ? '4. ' : '3. '}Beskrivning av skada *
+                    </label>
+                    <input
+                      type="text"
+                      value={damage.text}
+                      onChange={(e) => updateDamageText(damage.id, e.target.value)}
+                      placeholder="Beskriv skadan mer detaljerat..."
+                      disabled={!damage.carPart}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '6px',
+                        fontSize: '16px',
+                        backgroundColor: damage.carPart ? '#ffffff' : '#f3f4f6',
+                        color: damage.carPart ? '#000' : '#9ca3af'
                       }}
                     />
                   </div>
@@ -2188,7 +2285,6 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Prel. avslut notering - nu obligatorisk */}
           <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
               Prel. avslut notering *
