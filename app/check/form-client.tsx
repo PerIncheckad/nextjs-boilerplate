@@ -258,7 +258,7 @@ export default function CheckInForm() {
       .slice(0, 5);
   }, [regInput, allRegistrations]);
 
-  // SMART DATAHÄMTNING - försök nya tabellen först, fallback till gamla
+  // SMART DATAHÄMTNING med fixad skadehantering
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -288,21 +288,26 @@ export default function CheckInForm() {
           // Använd nya rika data från MABI
           useData = newData.map(row => ({
             regnr: getColumnValue(row, 'Regnr', ['regnr']),
-            brand_model: getColumnValue(row, 'modell', ['Modell', 'brand_model']),
-            damage_text: getColumnValue(row, 'skadetyp', ['Skadetyp']),
-            damage_location: getColumnValue(row, 'skadeanmalan', ['Skadeanmälan']),
-            damage_notes: getColumnValue(row, 'intern_notering', ['Intern notering']),
+            brand_model: getColumnValue(row, 'Modell', ['modell', 'brand_model']),
+            damage_text: getColumnValue(row, 'Skadetyp', ['skadetyp']),
+            damage_location: getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']),
+            damage_notes: getColumnValue(row, 'Intern notering', ['intern_notering']),
             wheelstorage: null,
             saludatum: null
           }));
 
+          // FIXAD SKADEHANTERING - alla skador, inte bara första
           damages = newData
+            .filter(row => {
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
+              const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
+              const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
+              return skadetyp || plats || notering;
+            })
             .map((row, index) => {
-              const skadetyp = getColumnValue(row, 'skadetyp', ['Skadetyp']) || '';
-              const plats = getColumnValue(row, 'skadeanmalan', ['Skadeanmälan']) || '';
-              const notering = getColumnValue(row, 'intern_notering', ['Intern notering']) || '';
-              
-              if (!skadetyp && !plats && !notering) return null;
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
+              const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
+              const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
               
               const fullText = createCombinedDamageText(skadetyp, plats, notering);
               
@@ -320,8 +325,7 @@ export default function CheckInForm() {
                 userDescription: '',
                 media: []
               };
-            })
-            .filter((damage): damage is ExistingDamage => damage !== null);
+            });
         } else {
           // Fallback till gamla car_data
           const { data: oldData, error: oldError } = await supabase
@@ -908,332 +912,7 @@ export default function CheckInForm() {
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>{/* Registreringsnummer med visuell feedback */}
-        <div style={{ 
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          position: 'relative',
-          border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isRegComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Fordon" isComplete={isRegComplete()} />
-          
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
-            Registreringsnummer *
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              value={regInput}
-              onChange={(e) => handleRegInputChange(e.target.value)}
-              onFocus={() => setShowSuggestions(regInput.length > 0 && suggestions.length > 0)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              placeholder="Skriv reg.nr"
-              spellCheck={false}
-              autoComplete="off"
-              style={{
-                width: '100%',
-                padding: '14px',
-                border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '18px',
-                fontWeight: '600',
-                backgroundColor: '#ffffff',
-                textAlign: 'center',
-                letterSpacing: '2px'
-              }}
-            />
-            
-            {showSuggestions && suggestions.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                backgroundColor: '#ffffff',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                zIndex: 10,
-                maxHeight: '200px',
-                overflowY: 'auto'
-              }}>
-                {suggestions.map((suggestion, index) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => selectSuggestion(suggestion)}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      border: 'none',
-                      backgroundColor: '#ffffff',
-                      textAlign: 'left',
-                      fontSize: '16px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      borderBottom: index === suggestions.length - 1 ? 'none' : '1px solid #f3f4f6',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
-          
-          {notFound && normalizedReg && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>Okänt reg.nr</p>
-          )}
-          
-          {showFieldErrors && !isRegComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>
-              ⚠️ Registreringsnummer är obligatoriskt
-            </p>
-          )}
-
-          {/* Bilinfo med utökad skadeinformation från 3 kolumner */}
-          {carData.length > 0 && (
-            <div style={{ 
-              marginTop: '20px', 
-              padding: '20px', 
-              backgroundColor: '#f0f9ff', 
-              borderRadius: '8px',
-              border: '1px solid #bfdbfe'
-            }}>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Bilmodell:</span> 
-                <span style={{ fontWeight: '500' }}>{carModel || '—'}</span>
-              </div>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Hjulförvaring:</span> 
-                <span style={{ fontWeight: '500' }}>{wheelStorage || '—'}</span>
-              </div>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Saludatum:</span> 
-                {saludatum ? (
-                  <span style={{ 
-                    color: '#dc2626',
-                    fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : '500'
-                  }}>
-                    {new Date(saludatum).toLocaleDateString('sv-SE')}
-                  </span>
-                ) : <span style={{ fontWeight: '500' }}> —</span>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
-                <div style={{ flex: 1 }}>
-                  {existingDamages.length === 0 ? (
-                    <span style={{ fontWeight: '500' }}> —</span>
-                  ) : (
-                    <div style={{ margin: '0' }}>
-                      {existingDamages.map((damage, i) => (
-                        <div key={i} style={{ 
-                          marginBottom: i === existingDamages.length - 1 ? '0' : '8px',
-                          padding: '8px 12px',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '6px',
-                          border: '1px solid #e5e7eb'
-                        }}>
-                          <div style={{ fontWeight: '500', color: '#374151', fontSize: '14px' }}>
-                            {damage.fullText}
-                          </div>
-                          {/* Visa detaljer från de 3 kolumnerna om de skiljer sig */}
-                          {(damage.skadetyp || damage.plats || damage.notering) && (
-                            <div style={{ marginTop: '4px', fontSize: '12px', color: '#6b7280' }}>
-                              {damage.skadetyp && <span><strong>Typ:</strong> {damage.skadetyp}</span>}
-                              {damage.plats && damage.plats !== damage.skadetyp && (
-                                <span>{damage.skadetyp ? ' • ' : ''}<strong>Plats:</strong> {damage.plats}</span>
-                              )}
-                              {damage.notering && damage.notering !== damage.skadetyp && damage.notering !== damage.plats && (
-                                <div style={{ marginTop: '2px' }}><strong>Notering:</strong> {damage.notering}</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Plats för incheckning */}
-        <div style={{ 
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isLocationComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Plats för incheckning" isComplete={isLocationComplete()} />
-        
-          {!annanPlats && (
-            <>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Ort *
-                </label>
-                <select
-                  value={ort}
-                  onChange={(e) => {
-                    setOrt(e.target.value);
-                    setStation('');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: showFieldErrors && !ort ? '2px solid #dc2626' : '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: '#ffffff'
-                  }}
-                >
-                  <option value="">— Välj ort —</option>
-                  {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Station / Depå *
-                </label>
-                <select
-                  value={station}
-                  onChange={(e) => setStation(e.target.value)}
-                  disabled={!ort}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: showFieldErrors && !station ? '2px solid #dc2626' : '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: ort ? '#ffffff' : '#f3f4f6',
-                    color: ort ? '#000' : '#9ca3af'
-                  }}
-                >
-                  <option value="">— Välj station / depå —</option>
-                  {availableStations.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={() => {
-              setAnnanPlats(!annanPlats);
-              if (!annanPlats) {
-                setOrt('');
-                setStation('');
-              } else {
-                setAnnanPlatsText('');
-              }
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#033066',
-              textDecoration: 'underline',
-              cursor: 'pointer',
-              fontSize: '14px',
-              marginBottom: '16px'
-            }}
-          >
-            {annanPlats ? '← Tillbaka till ort/station' : '+ Annan plats (fritext)'}
-          </button>
-
-          {annanPlats && (
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Annan plats *
-              </label>
-              <input
-                type="text"
-                value={annanPlatsText}
-                onChange={(e) => setAnnanPlatsText(e.target.value)}
-                placeholder="Beskriv platsen..."
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !annanPlatsText.trim() ? '2px solid #dc2626' : '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: '#ffffff'
-                }}
-              />
-            </div>
-          )}
-          
-          {showFieldErrors && !isLocationComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>
-              ⚠️ Ort och station/depå eller annan plats är obligatorisk
-            </p>
-          )}
-        </div>
-
-        {/* Fordonsstatus - resten av formuläret skulle fortsätta här... */}
-        {/* För att spara utrymme visar jag bara skelett för resten */}
-        
-        {/* FINAL CONFIRMATION - Sammanfattningsdialog med korrekt svenska */}
-        {showFinalConfirmation && (
-          <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '20px'
-          }}>
-            <div style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '12px',
-              padding: '32px',
-              maxWidth: '600px',
-              width: '100%',
-              maxHeight: '80vh',
-              overflowY: 'auto',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-            }}>
-              <h2 style={{
-                fontSize: '24px',
-                fontWeight: '600',
-                marginBottom: '20px',
-                color: '#1f2937',
-                textAlign: 'center'
-              }}>
-                Bekräfta incheckning
-              </h2>
-              
-              <div style={{
-                backgroundColor: '#f8fafc',
-                padding: '20px',
-                borderRadius: '8px',
-                marginBottom: '24px',
-                fontSize: '14px',
-                lineHeight: '1.6'
-              }}>
-                <p style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>
-                  <strong>Bob</strong> checkar in: <strong>{regInput}</strong>
-                </p>
-                
-                <div style={{ marginBottom: '12px' }}>
-                  <strong>📍 Plats:</strong> {annanPlats ? annanPlatsText : `${ort}, ${station}`}
+      }}><strong>📍 Plats:</strong> {annanPlats ? annanPlatsText : `${ort}, ${station}`}
                 </div>
                 
                 <div style={{ marginBottom: '12px' }}>
@@ -1387,9 +1066,7 @@ export default function CheckInForm() {
               </button>
             </div>
           </div>
-        )}
-
-        <p style={{ 
+        )}<p style={{ 
           textAlign: 'center', 
           color: '#666', 
           fontSize: '12px', 
