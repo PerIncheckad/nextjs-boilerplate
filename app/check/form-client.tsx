@@ -40,68 +40,70 @@ type MediaFile = {
   thumbnail?: string;
 };
 
-// FIXADE stationer med korrekta ID:n
-const ORTER = ['Ängelholm', 'Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg'];
+// KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
+const ORTER = ['Malmö Jägersro', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
 
 const STATIONER: Record<string, string[]> = {
-  'Malmö': [
-    'Huvudstation Malmö Jägersro (166)',
-    'Ford Malmö (104)',
-    'Mechanum (107)',
-    'Malmö Automera (1661)',
-    'Mercedes Malmö (1662)',
-    'Werksta St Bernstorp (1663)',
-    'Werksta Malmö Hamn (1664)',
-    'Hedbergs Malmö (201)',
-    'Hedin Automotive Burlöv (302)',
-    'LÅNGTID (77)'
+  'Malmö Jägersro': [
+    'Ford Malmö',
+    'Mechanum',
+    'Malmö Automera',
+    'Mercedes Malmö',
+    'Werksta St Bernstorp',
+    'Werksta Malmö Hamn',
+    'Hedbergs Malmö',
+    'Hedin Automotive Burlöv',
+    'Sturup'  // Inte "LÅNGTID"
   ],
   'Helsingborg': [
-    'Bil & Skadeservice (1301)',
-    'Hedin Automotive Ford (1302)',
-    'Hedin Automotive (1303)',
-    'Hedin Bil (1304)',
-    'P7 Revingehed (1305)'
+    'HBSC Helsingborg',
+    'Ford Helsingborg',
+    'Transport Helsingborg',
+    'S. Jönsson',
+    'BMW Helsingborg',
+    'KIA Helsingborg',
+    'Euromaster Helsingborg',
+    'B/S Klippan',
+    'B/S Munka-Ljungby',
+    'B/S Helsingborg',
+    'Werksta Helsingborg',
+    'Båstad'
   ],
   'Lund': [
-    'Huvudstation Lund (406)',
-    'Ford Lund (4061)',
-    'Hedin Lund (4062)',
-    'B/S Lund (4063)',
-    'P7 Revinge (4064)'
+    'Ford Lund',
+    'Hedin Lund',
+    'B/S Lund',
+    'P7 Revinge'
   ],
   'Ängelholm': [
-    'Hedin Automotive Ford (1701)',
-    'Hedin Automotive (1702)',
-    'Ängelholm Airport (1703)'
+    'FORD Ängelholm',
+    'Mekonomen Ängelholm',
+    'Flyget Ängelholm'
   ],
   'Falkenberg': [
-    'Falkenberg (1801)'
+    'Falkenberg'
   ],
   'Halmstad': [
-    'Hedin Automotive Ford (1401)',
-    'Hedin Automotive Kia (1402)',
-    'Hedin Automotive Mercedes (1403)',
-    'Hedin Automotive (1404)',
-    'Halmstad City Airport (1405)'
+    'Flyget Halmstad',
+    'KIA Halmstad',  // Inte "Hedin Automotive KIA"
+    'FORD Halmstad'
   ],
   'Trelleborg': [
-    'Trelleborg (1901)'
+    'Trelleborg'
   ],
   'Varberg': [
-    'Finnvedens Bil Skadecenter (1201)',
-    'Hedin Automotive Ford (1202)',
-    'Hedin Automotive Holmgärde (1203)',
-    'Hedin Automotive (1204)',
-    'Sällstorps Plåt & Lack (1205)'
+    'Ford Varberg',
+    'Hedin Automotive Varberg',
+    'Sällstorp lack plåt',
+    'Finnveden plåt'
   ]
 };
 
 const DAMAGE_TYPES = [
-  'Buckla', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
+  'Buckla', 'Däckskada', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
   'Fälgskada vinterhjul', 'Feltankning', 'Höjdledsskada', 'Intryck', 'Invändig skada',
   'Jack', 'Krockskada', 'Krossad ruta', 'Oaktsamhet', 'Punktering', 'Repa', 'Repor',
-  'Saknas', 'Skrapad', 'Spricka', 'Stenskott', 'Trasig', 'Övrigt'
+  'Saknas', 'Skrapad', 'Skrapad fälg', 'Spricka', 'Stenskott', 'Trasig', 'Övrigt'
 ].sort();
 
 const CAR_PARTS: Record<string, string[]> = {
@@ -205,6 +207,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
   return mediaFiles;
 };
 
+// KORRIGERAD kolumnmappning för att läsa H, K, M korrekt
 const createCombinedDamageText = (skadetyp: string, plats: string, notering: string): string => {
   const parts = [];
   
@@ -213,23 +216,30 @@ const createCombinedDamageText = (skadetyp: string, plats: string, notering: str
   }
   
   if (plats?.trim() && plats.trim() !== skadetyp?.trim()) {
-    parts.push(`Plats: ${plats.trim()}`);
+    parts.push(plats.trim());
   }
   
   if (notering?.trim()) {
-    parts.push(`Not: ${notering.trim()}`);
-  } else {
-    parts.push('Not: ---');
+    parts.push(`(${notering.trim()})`);
   }
   
-  return parts.join(' - ');
+  return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
 };
 
+// FÖRBÄTTRAD kolumnhantering för svenska tecken
 const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] = []): string | null => {
-  if (row[primaryKey] !== undefined && row[primaryKey] !== null) return row[primaryKey];
-  for (const altKey of alternativeKeys) {
-    if (row[altKey] !== undefined && row[altKey] !== null) return row[altKey];
+  // Prova huvudnyckeln först
+  if (row[primaryKey] !== undefined && row[primaryKey] !== null && row[primaryKey] !== '') {
+    return String(row[primaryKey]).trim();
   }
+  
+  // Prova alternativa nycklar
+  for (const altKey of alternativeKeys) {
+    if (row[altKey] !== undefined && row[altKey] !== null && row[altKey] !== '') {
+      return String(row[altKey]).trim();
+    }
+  }
+  
   return null;
 };
 
@@ -293,7 +303,7 @@ export default function CheckInForm() {
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
-  // FIXAD autocomplete - hämtar från BÅDA tabellerna
+  // Hämtar från BÅDA tabellerna för autocomplete
   useEffect(() => {
     async function fetchAllRegistrations() {
       try {
@@ -325,14 +335,16 @@ export default function CheckInForm() {
     fetchAllRegistrations();
   }, []);
 
-  // FIX 1: Suggestions från 2 tecken
+  // Autocomplete från 2 tecken
   const suggestions = useMemo(() => {
     if (!regInput.trim() || regInput.trim().length < 2) return [];
     const input = regInput.toUpperCase();
     return allRegistrations
       .filter(reg => reg.includes(input))
       .slice(0, 5);
-  }, [regInput, allRegistrations]);// FIX 2: Hämta ALLA skador (varje rad blir en skada)
+  }, [regInput, allRegistrations]);
+
+  // KORRIGERAD skadehantering - läser H, K, M och skapar EN skada per RAD
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -367,23 +379,28 @@ export default function CheckInForm() {
         let damages: ExistingDamage[] = [];
 
         if (!mabiResult.error && mabiResult.data && mabiResult.data.length > 0) {
-          useData = mabiResult.data.map(row => ({
-            regnr: getColumnValue(row, 'Regnr', ['regnr']) || normalizedReg,
-            brand_model: getColumnValue(row, 'Modell', ['Modell', 'brand_model']),
-            damage_text: getColumnValue(row, 'Skadetyp', ['skadetyp']),
-            damage_location: getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']),
-            damage_notes: getColumnValue(row, 'Intern notering', ['intern_notering']),
-            wheelstorage: null,
-            saludatum: null
-          }));
+          // Använd första raden för bildata
+          const firstRow = mabiResult.data[0];
+          useData = [{
+            regnr: normalizedReg,
+            brand_model: getColumnValue(firstRow, 'Modell', ['brand_model']),
+            damage_text: null,
+            damage_location: null,
+            damage_notes: null,
+            wheelstorage: getColumnValue(firstRow, 'wheelstorage', ['Hjulförvaring']),
+            saludatum: getColumnValue(firstRow, 'saludatum', ['Saludatum'])
+          }];
 
-          // FIX 2: VARJE rad blir EN skada istället för att groupera
+          // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
           damages = mabiResult.data.map((row, index) => {
-            const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
-            const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
-            const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
+            // Kolumn H: Skadetyp
+            const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
+            // Kolumn K: Skadeanmälan 
+            const plats = getColumnValue(row, 'Skadeanmälan', ['damage_location', 'plats']) || '';
+            // Kolumn M: Intern notering
+            const notering = getColumnValue(row, 'Intern notering', ['internal_notes', 'damage_notes', 'notering']) || '';
             
-            // Ta VARJE rad som har någon skadeinformation
+            // Hoppa över rader utan skadeinformation
             if (!skadetyp && !plats && !notering) return null;
             
             const fullText = createCombinedDamageText(skadetyp, plats, notering);
@@ -467,9 +484,7 @@ export default function CheckInForm() {
   const carModel = carData[0]?.brand_model || null;
   const wheelStorage = carData[0]?.wheelstorage || null;
   const saludatum = carData[0]?.saludatum || null;
-  const availableStations = ort ? STATIONER[ort] || [] : [];
-
-  // Validering
+  const availableStations = ort ? STATIONER[ort] || [] : [];// KORRIGERAD validering - mer noggrann kontroll
   const isRegComplete = () => regInput.trim().length > 0;
   const isLocationComplete = () => annanPlats ? annanPlatsText.trim().length > 0 : (ort && station);
   const isVehicleStatusComplete = () => {
@@ -490,16 +505,19 @@ export default function CheckInForm() {
   };
 
   const isCleaningComplete = () => tvatt !== null && inre !== null;
+  
   const isDamagesComplete = () => {
     if (!skadekontroll) return false;
 
     if (skadekontroll === 'nya_skador') {
       if (newDamages.length === 0) return false;
-      if (newDamages.some(damage => !damage.media.some(m => m.type === 'image') || !damage.media.some(m => m.type === 'video'))) return false;
+      // Kontrollera att alla nya skador har obligatoriska fält
       if (newDamages.some(damage => !damage.type || !damage.carPart || !damage.text.trim())) return false;
       if (newDamages.some(damage => damage.carPart && CAR_PARTS[damage.carPart].length > 0 && !damage.position)) return false;
+      if (newDamages.some(damage => !damage.media.some(m => m.type === 'image') || !damage.media.some(m => m.type === 'video'))) return false;
     }
 
+    // Kontrollera dokumenterade gamla skador
     const documentedOldDamages = existingDamages.filter(d => d.status === 'documented');
     if (documentedOldDamages.some(damage => !damage.userDescription?.trim())) return false;
     if (documentedOldDamages.some(damage => !damage.userType || !damage.userCarPart)) return false;
@@ -510,13 +528,27 @@ export default function CheckInForm() {
   };
 
   const isStatusComplete = () => uthyrningsstatus !== null && preliminarAvslutNotering.trim().length > 0;
+  
+  // KORRIGERAD canSave - mer omfattande kontroll
   const canSave = () => {
-    return isRegComplete() &&
-           isLocationComplete() &&
-           isVehicleStatusComplete() &&
-           isCleaningComplete() &&
-           isDamagesComplete() &&
-           isStatusComplete();
+    const regOk = isRegComplete();
+    const locationOk = isLocationComplete();
+    const vehicleOk = isVehicleStatusComplete();
+    const cleaningOk = isCleaningComplete();
+    const damagesOk = isDamagesComplete();
+    const statusOk = isStatusComplete();
+    
+    console.log('Validation check:', {
+      regOk,
+      locationOk,
+      vehicleOk,
+      cleaningOk,
+      damagesOk,
+      statusOk,
+      overall: regOk && locationOk && vehicleOk && cleaningOk && damagesOk && statusOk
+    });
+    
+    return regOk && locationOk && vehicleOk && cleaningOk && damagesOk && statusOk;
   };
 
   const resetForm = () => {
@@ -574,12 +606,11 @@ export default function CheckInForm() {
     setShowSuccessModal(true);
   };
 
-  // FIX 1: Autocomplete från 2 tecken
+  // Autocomplete från 2 tecken
   const handleRegInputChange = (value: string) => {
     const upperValue = value.toUpperCase();
     setRegInput(upperValue);
     
-    // FIXAD: Visa suggestions redan vid 2 tecken
     if (upperValue.length >= 2) {
       const immediateSuggestions = allRegistrations
         .filter(reg => reg.includes(upperValue))
@@ -1073,7 +1104,7 @@ export default function CheckInForm() {
             </p>
           )}
 
-          {/* Bilinfo med befintliga skador */}
+          {/* Bilinfo med ALLA befintliga skador */}
           {carData.length > 0 && (
             <div style={{
               marginTop: '20px',
@@ -1123,7 +1154,7 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* 2. PLATS FÖR INCHECKNING */}
+        {/* 2. PLATS FÖR INCHECKNING - KORRIGERADE namn */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1237,7 +1268,7 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* 3. FORDONSSTATUS */}
+        {/* 3. FORDONSSTATUS - komplett med alla fält */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1311,7 +1342,7 @@ export default function CheckInForm() {
             </div>
           </div>
 
-          {/* Bensin/Diesel fält */}
+          {/* Komplett bensin/diesel sektion */}
           {drivmedelstyp === 'bensin_diesel' && (
             <>
               <div style={{ marginBottom: '20px' }}>
@@ -1455,7 +1486,7 @@ export default function CheckInForm() {
             </>
           )}
 
-          {/* Elbil fält */}
+          {/* Komplett elbil sektion */}
           {drivmedelstyp === 'elbil' && (
             <>
               <div style={{ marginBottom: '20px' }}>
@@ -1600,7 +1631,7 @@ export default function CheckInForm() {
                   gap: '8px',
                   padding: '12px 16px',
                   border: '2px solid #e5e7eb',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   cursor: 'pointer',
                   backgroundColor: hjultyp === typ ? '#033066' : '#ffffff',
                   color: hjultyp === typ ? '#ffffff' : '#374151',
@@ -1715,9 +1746,7 @@ export default function CheckInForm() {
               ⚠️ Alla rengöringsfält är obligatoriska
             </p>
           )}
-        </div>
-
-        {/* 5. SKADEKONTROLL med hierarkisk struktur */}
+        </div>{/* 5. SKADEKONTROLL med ÅTERSTÄLLD befintliga skador-sektion */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1728,7 +1757,7 @@ export default function CheckInForm() {
         }} className={showFieldErrors && !isDamagesComplete() ? 'section-incomplete' : ''}>
           <SectionHeader title="Skadekontroll" isComplete={isDamagesComplete()} />
 
-          {/* Befintliga skador från databas */}
+          {/* ÅTERSTÄLLD: Befintliga skador från databas */}
           {existingDamages.length > 0 && (
             <>
               <SubSectionHeader title="Befintliga skador" />
@@ -2015,7 +2044,6 @@ export default function CheckInForm() {
                     </button>
                   </div>
 
-                  {/* Hierarkisk skadeformulär */}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                     <div>
                       <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
@@ -2275,7 +2303,7 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* SPARA-KNAPP */}
+        {/* SPARA-KNAPP med förbättrad debugging */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -2363,7 +2391,7 @@ export default function CheckInForm() {
             
             <p style={{
               fontSize: '16px',
-              colorcolor: '#6b7280',
+              color: '#6b7280',
               marginBottom: '24px'
             }}>
               Är du säker på att denna skada är åtgärdad?
