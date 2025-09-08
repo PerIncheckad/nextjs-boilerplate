@@ -1,4 +1,9 @@
 'use client';
+// Updated 2025-01-09 - Fixed JSX syntax errors
+
+import React, { useEffect, useMemo, useState } from 'react';
+// ... resten av koden
+'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
