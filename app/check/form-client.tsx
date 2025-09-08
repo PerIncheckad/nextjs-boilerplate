@@ -40,13 +40,39 @@ type MediaFile = {
   thumbnail?: string;
 };
 
-// FIXADE stationer med KORREKTA ID:n från projektbiblioteket
+// FIX 3: KORREKTA stationer med riktiga ID:n från din data
 const ORTER = ['Ängelholm', 'Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg'];
 
 const STATIONER: Record<string, string[]> = {
+  'Malmö': [
+    'Huvudstation Malmö Jägersro (166)',
+    'Ford Malmö (104)',
+    'Mechanum (107)',
+    'Malmö Automera (1661)',
+    'Mercedes Malmö (1662)',
+    'Werksta St Bernstorp (1663)',
+    'Werksta Malmö Hamn (1664)',
+    'Hedbergs Malmö (201)',
+    'Hedin Automotive Burlöv (302)',
+    'LÅNGTID (77)'
+  ],
+  'Helsingborg': [
+    'Bil & Skadeservice (1301)',
+    'Hedin Automotive Ford (1302)',
+    'Hedin Automotive (1303)',
+    'Hedin Bil (1304)',
+    'P7 Revingehed (1305)'
+  ],
+  'Lund': [
+    'Huvudstation Lund (406)',
+    'Ford Lund (4061)',
+    'Hedin Lund (4062)',
+    'B/S Lund (4063)',
+    'P7 Revinge (4064)'
+  ],
   'Ängelholm': [
     'Hedin Automotive Ford (1701)',
-    'Hedin Automotive (1702)', 
+    'Hedin Automotive (1702)',
     'Ängelholm Airport (1703)'
   ],
   'Falkenberg': [
@@ -58,38 +84,6 @@ const STATIONER: Record<string, string[]> = {
     'Hedin Automotive Mercedes (1403)',
     'Hedin Automotive (1404)',
     'Halmstad City Airport (1405)'
-  ],
-  'Helsingborg': [
-    'Bil & Skadeservice (1501)',
-    'Floretten (1502)',
-    'Förenade Bil (1503)',
-    'Hedin Automotive Ford (1504)',
-    'Hedin Automotive Kia (1505)',
-    'Hedin Automotive (1506)',
-    'Hedin Bil Transport (1507)',
-    'S.Jönsson Bil (1508)',
-    'Verkstad (1509)',
-    'HBSC (1510)'
-  ],
-  'Lund': [
-    'Bil & Skadeservice (1301)',
-    'Hedin Automotive Ford (1302)',
-    'Hedin Automotive (1303)',
-    'Hedin Bil (1304)',
-    'P7 Revingehed (1305)'
-  ],
-  'Malmö': [
-    'Automerna (1662)',
-    'Hedin Automotive Ford (1663)',
-    'Hedin Automotive Jägersro (1664)',
-    'Hedin Automotive Mercedes (1665)',
-    'Mechanum (1666)',
-    'Malmö Airport (1667)',
-    'BERNSTORP Verkstad (1668)',
-    'BURLÖV Hedin Automotive (1669)',
-    'FOSIE Hedbergs Bil (1670)',
-    'HAMN Verkstad (1671)',
-    'LÅNGTID (1672)'
   ],
   'Trelleborg': [
     'Trelleborg (1901)'
@@ -211,7 +205,6 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
   return mediaFiles;
 };
 
-// UPPDATERAD skadetext-sammanslagning för alla 3 kolumner
 const createCombinedDamageText = (skadetyp: string, plats: string, notering: string): string => {
   const parts = [];
   
@@ -330,7 +323,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     fetchAllRegistrations();
   }, []);
 
-  // FIXAD suggestions - aktiveras från 2 tecken
+  // FIX 1: Suggestions från 2 tecken
   const suggestions = useMemo(() => {
     if (!regInput.trim() || regInput.trim().length < 2) return [];
     const input = regInput.toUpperCase();
@@ -339,7 +332,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
       .slice(0, 5);
   }, [regInput, allRegistrations]);
 
-  // FIXAD bildata-hämtning med ALLA TRE skadekolumner
+  // FIX 2: Hämta ALLA skador (varje rad blir en skada)
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -384,36 +377,32 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             saludatum: null
           }));
 
-          // FIXAD skadehantering - hämtar ALLA skador från ALLA TRE kolumner
-          damages = mabiResult.data
-            .filter(row => {
-              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
-              const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
-              const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
-              return skadetyp || plats || notering;
-            })
-            .map((row, index) => {
-              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
-              const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
-              const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
-              
-              const fullText = createCombinedDamageText(skadetyp, plats, notering);
-              
-              return {
-                id: `mabi-${index}`,
-                skadetyp,
-                plats,
-                notering,
-                fullText,
-                shortText: skadetyp || plats || 'Okänd skada',
-                status: 'not_selected' as const,
-                userType: '',
-                userCarPart: '',
-                userPosition: '',
-                userDescription: '',
-                media: []
-              };
-            });
+          // FIX 2: VARJE rad blir EN skada istället för att groupera
+          damages = mabiResult.data.map((row, index) => {
+            const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
+            const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
+            const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
+            
+            // Ta VARJE rad som har någon skadeinformation
+            if (!skadetyp && !plats && !notering) return null;
+            
+            const fullText = createCombinedDamageText(skadetyp, plats, notering);
+            
+            return {
+              id: `mabi-${index}`,
+              skadetyp,
+              plats,
+              notering,
+              fullText,
+              shortText: skadetyp || plats || 'Okänd skada',
+              status: 'not_selected' as const,
+              userType: '',
+              userCarPart: '',
+              userPosition: '',
+              userDescription: '',
+              media: []
+            };
+          }).filter((damage): damage is ExistingDamage => damage !== null);
 
         } else if (!carResult.error && carResult.data && carResult.data.length > 0) {
           const validData = carResult.data.filter(row => row.wheelstorage !== null && row.saludatum !== null);
@@ -585,6 +574,27 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     setShowSuccessModal(true);
   };
 
+  // FIX 1: Autocomplete från 2 tecken
+  const handleRegInputChange = (value: string) => {
+    const upperValue = value.toUpperCase();
+    setRegInput(upperValue);
+    
+    // FIXAD: Visa suggestions redan vid 2 tecken
+    if (upperValue.length >= 2) {
+      const immediateSuggestions = allRegistrations
+        .filter(reg => reg.includes(upperValue))
+        .slice(0, 5);
+      setShowSuggestions(immediateSuggestions.length > 0);
+    } else {
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (suggestion: string) => {
+    setRegInput(suggestion);
+    setShowSuggestions(false);
+  };
+
   // Skadehantering
   const toggleExistingDamageStatus = (id: string, newStatus: 'documented' | 'fixed') => {
     if (newStatus === 'fixed') {
@@ -721,610 +731,64 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
       }
       return d;
     }));
-  };
-
-  // FIXAD input handler - från 2 tecken
-  const handleRegInputChange = (value: string) => {
-    const upperValue = value.toUpperCase();
-    setRegInput(upperValue);
-    const shouldShow = upperValue.length >= 2 && suggestions.length > 0;
-    setShowSuggestions(shouldShow);
-  };
-
-  const selectSuggestion = (suggestion: string) => {
-    setRegInput(suggestion);
-    setShowSuggestions(false);
-  };// Visuella komponenter
-  const SectionHeader = ({ title, isComplete }: { title: string; isComplete?: boolean }) => (
-    <div style={{
-      marginTop: '40px',
-      marginBottom: '20px',
-      paddingBottom: '12px',
-      borderBottom: '2px solid #e5e7eb',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px'
-    }}>
-      <h2 style={{
-        fontSize: '22px',
-        fontWeight: '700',
-        margin: 0,
-        color: '#1f2937',
-        letterSpacing: '0.05em',
-        textTransform: 'uppercase',
-        flex: 1
-      }}>
-        {title}
-      </h2>
-      {isComplete !== undefined && (
-        <div style={{
-          width: '24px',
-          height: '24px',
-          borderRadius: '50%',
-          backgroundColor: isComplete ? '#10b981' : '#dc2626',
-          color: '#ffffff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '14px',
-          fontWeight: 'bold'
-        }}>
-          {isComplete ? '✓' : '!'}
-        </div>
-      )}
-    </div>
-  );
-
-  const SubSectionHeader = ({ title }: { title: string }) => (
-    <div style={{
-      marginTop: '24px',
-      marginBottom: '16px',
-      paddingBottom: '8px',
-      borderBottom: '1px solid #d1d5db'
-    }}>
-      <h3 style={{
-        fontSize: '18px',
-        fontWeight: '600',
-        margin: 0,
-        color: '#374151'
-      }}>
-        {title}
-      </h3>
-    </div>
-  );
-
-  const MediaUpload = ({
-    damageId,
-    isOld,
-    onMediaUpdate,
-    hasImage = false,
-    hasVideo = false
-  }: {
-    damageId: string;
-    isOld: boolean;
-    onMediaUpdate: (id: string, files: FileList | null) => void;
-    hasImage?: boolean;
-    hasVideo?: boolean;
-  }) => (
-    <div style={{ marginBottom: '12px' }}>
-      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-        Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
-      </label>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: hasImage ? '2px dashed #10b981' : '2px solid #dc2626',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: hasImage ? '#f0fdf4' : '#fee2e2',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: hasImage ? '#047857' : '#dc2626',
-              fontWeight: hasImage ? 'normal' : 'bold'
-            }}
-          >
-            📷 {hasImage ? 'Lägg till fler bilder' : 'Ta foto *'}
-          </label>
-        </div>
-
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="video/*"
-            capture="environment"
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: hasVideo ? '2px dashed #10b981' : '2px solid #dc2626',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: hasVideo ? '#f0fdf4' : '#fee2e2',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: '#dc2626',
-              fontWeight: hasVideo ? 'normal' : 'bold'
-            }}
-          >
-            🎥 {hasVideo ? 'Lägg till mer video' : 'Spela in video med skada OCH reg.nr. *'}
-          </label>
-        </div>
-
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: '2px dashed #3b82f6',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: '#eff6ff',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: '#2563eb'
-            }}
-          >
-            📁 Välj från galleri
-          </label>
-        </div>
-      </div>
-      {(!hasImage || !hasVideo) && (
-        <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
-          Både bild och video är obligatoriska för alla skador
-        </p>
-      )}
-    </div>
-  );
-
-  return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f8fafc',
-      color: '#111827'
-    }}>
-      {/* MABI Header */}
-      <div style={{
-        backgroundColor: '#033066',
-        width: '100vw',
-        marginLeft: 'calc(-50vw + 50%)',
-        padding: '20px 0',
-        marginBottom: '32px'
-      }}>
-        <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
-          padding: '0 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end'
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '28px',
-              margin: 0,
-              color: '#ffffff',
-              fontWeight: '800',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}>
-              NY INCHECKNING
-            </h1>
-            <p style={{
-              color: '#ffffff',
-              margin: '6px 0 0 0',
-              fontSize: '16px',
-              fontWeight: '400',
-              opacity: 0.9
-            }}>
-              Inloggad: <strong>Bob</strong>
-            </p>
-          </div>
-          <div style={{
-            width: '120px',
-            height: '60px',
-            backgroundColor: '#ffffff',
-            borderRadius: '6px',
-            padding: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid rgba(255, 255, 255, 0.3)'
-          }}>
-            <div style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#033066',
-              fontSize: '16px',
-              fontWeight: 'bold'
-            }}>
-              MABI
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{
-        maxWidth: '600px',
-        margin: '0 auto',
-        padding: '0 20px',
-        fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>
-
-        {/* Registreringsnummer med autocomplete */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          position: 'relative',
-          border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isRegComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Fordon" isComplete={isRegComplete()} />
-          
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
-            Registreringsnummer *
-          </label>
-          <div style={{ position: 'relative' }}>
-            <input
-              type="text"
-              value={regInput}
-              onChange={(e) => handleRegInputChange(e.target.value)}
-              onFocus={() => {
-                if (regInput.length >= 2 && suggestions.length > 0) {
-                  setShowSuggestions(true);
-                }
-              }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              placeholder="Skriv reg.nr"
-              spellCheck={false}
-              autoComplete="off"
-              style={{
-                width: '100%',
-                padding: '14px',
-                border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '18px',
-                fontWeight: '600',
-                backgroundColor: '#ffffff',
-                textAlign: 'center',
-                letterSpacing: '2px'
-              }}
-            />
-
-            {showSuggestions && suggestions.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                right: 0,
-                backgroundColor: '#ffffff',
-                border: '1px solid #d1d5db',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                zIndex: 10,
-                maxHeight: '200px',
-                overflowY: 'auto'
-              }}>
-                {suggestions.map((suggestion, index) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => selectSuggestion(suggestion)}
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      border: 'none',
-                      backgroundColor: '#ffffff',
-                      textAlign: 'left',
-                      fontSize: '16px',
-                      fontWeight: '500',
-                      cursor: 'pointer',
-                      borderBottom: index === suggestions.length - 1 ? 'none' : '1px solid #f3f4f6',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
-          {notFound && normalizedReg && !loading && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>Okänt reg.nr</p>
-          )}
-          {showFieldErrors && !isRegComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>
-              ⚠️ Registreringsnummer är obligatoriskt
-            </p>
-          )}
-
-          {/* Bilinfo med utökad skadeinformation */}
-          {carData.length > 0 && (
-            <div style={{
-              marginTop: '20px',
-              padding: '20px',
-              backgroundColor: '#f0f9ff',
-              borderRadius: '8px',
-              border: '1px solid #bfdbfe'
-            }}>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Bilmodell:</span>
-                <span style={{ fontWeight: '500' }}>{carModel || '---'}</span>
-              </div>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Hjulförvaring:</span>
-                <span style={{ fontWeight: '500' }}>{wheelStorage || '---'}</span>
-              </div>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Saludatum:</span>
-                {saludatum ? (
-                  <span style={{
-                    color: '#dc2626',
-                    fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : '500'
-                  }}>
-                    {new Date(saludatum).toLocaleDateString('sv-SE')}
-                  </span>
-                ) : <span style={{ fontWeight: '500' }}> ---</span>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
-                <div style={{ flex: 1 }}>
-                  {existingDamages.length === 0 ? (
-                    <span style={{ fontWeight: '500' }}> ---</span>
-                  ) : (
-                    <div style={{ margin: '0' }}>
-                      {existingDamages.map((damage, i) => (
-                        <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                          <div style={{ fontWeight: '500', color: '#1f2937' }}>
-                            {damage.fullText}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Plats för incheckning */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isLocationComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Plats för incheckning" isComplete={isLocationComplete()} />
-          
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Ort *
-              </label>
-              <select
-                value={ort}
-                onChange={(e) => {
-                  setOrt(e.target.value);
-                  setStation('');
-                }}
-                disabled={annanPlats}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !ort && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: annanPlats ? '#f9fafb' : '#ffffff',
-                  opacity: annanPlats ? 0.6 : 1
-                }}
-              >
-                <option value="">Välj ort</option>
-                {ORTER.map(ortOption => (
-                  <option key={ortOption} value={ortOption}>{ortOption}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Station *
-              </label>
-              <select
-                value={station}
-                onChange={(e) => setStation(e.target.value)}
-                disabled={!ort || annanPlats}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !station && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: (ort && !annanPlats) ? '#ffffff' : '#f9fafb',
-                  opacity: (ort && !annanPlats) ? 1 : 0.6
-                }}
-              >
-                <option value="">Välj station</option>
-                {availableStations.map(stationOption => (
-                  <option key={stationOption} value={stationOption}>{stationOption}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-              <input
-                type="checkbox"
-                checked={annanPlats}
-                onChange={(e) => {
-                  setAnnanPlats(e.target.checked);
-                  if (e.target.checked) {
-                    setOrt('');
-                    setStation('');
-                  } else {
-                    setAnnanPlatsText('');
-                  }
-                }}
-                style={{ transform: 'scale(1.2)' }}
-              />
-              <span style={{ fontWeight: '500' }}>Annan plats</span>
-            </label>
-
-            {annanPlats && (
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Ange plats *
-                </label>
-                <input
-                  type="text"
-                  value={annanPlatsText}
-                  onChange={(e) => setAnnanPlatsText(e.target.value)}
-                  placeholder="T.ex. gatuadress"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: showFieldErrors && !annanPlatsText.trim() ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                />
-              </div>
-            )}
-          </div>
-
-          {showFieldErrors && !isLocationComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500', marginTop: '12px' }}>
-              ⚠️ Plats för incheckning är obligatorisk
-            </p>
-          )}
-        </div>
-
-        {/* Fordonsstatus - resten av formuläret har komprimerats för utrymme */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isVehicleStatusComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isVehicleStatusComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Fordonsstatus" isComplete={isVehicleStatusComplete()} />
-          
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Mätarställning (km) *
-            </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={matarstallning}
-              onChange={(e) => setMatarstallning(e.target.value)}
-              placeholder="Ange mätarställning"
-              style={{
-                width: '100%',
-                padding: '12px',
-                border: showFieldErrors && !matarstallning.trim() ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                borderRadius: '6px',
-                fontSize: '16px'
-              }}
-            />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-              Drivmedelstyp *
-            </label>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {(['bensin_diesel', 'elbil'] as const).map(type => (
-                <label key={type} style={{
+  };, tankad' },
+                { value: 'ledig_otankad', label: 'Ledig, otankad' },
+                { value: 'klar_otankad', label: 'Klar, otankad' }
+              ] as const).map(option => (
+                <label key={option.value} style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '12px 16px',
+                  padding: '12px',
                   border: '2px solid #e5e7eb',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: drivmedelstyp === type ? '#033066' : '#ffffff',
-                  color: drivmedelstyp === type ? '#ffffff' : '#374151',
-                  flex: 1,
-                  justifyContent: 'center',
-                  fontWeight: '500'
+                  backgroundColor: uthyrningsstatus === option.value ? '#033066' : '#ffffff',
+                  color: uthyrningsstatus === option.value ? '#ffffff' : '#374151'
                 }}>
                   <input
                     type="radio"
-                    name="drivmedelstyp"
-                    value={type}
-                    checked={drivmedelstyp === type}
-                    onChange={(e) => {
-                      setDrivmedelstyp(e.target.value as 'bensin_diesel' | 'elbil');
-                      setTankniva(null);
-                      setLiters('');
-                      setBransletyp(null);
-                      setLiterpris('');
-                      setLaddniva('');
-                    }}
+                    name="uthyrningsstatus"
+                    value={option.value}
+                    checked={uthyrningsstatus === option.value}
+                    onChange={(e) => setUthyrningsstatus(e.target.value as any)}
                     style={{ display: 'none' }}
                   />
-                  <span>
-                    {type === 'bensin_diesel' ? 'Bensin/Diesel' : 'Elbil'}
-                  </span>
+                  <span>{option.label}</span>
                 </label>
               ))}
             </div>
           </div>
 
-          {/* Komprimerat fordonsstatus-formulär följer... */}
-          {/* [Resten av formuläret kan inte visas här på grund av teckenrestriktioner] */}
-          
-          {showFieldErrors && !isVehicleStatusComplete() && (
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Preliminär avslut notering *
+            </label>
+            <textarea
+              value={preliminarAvslutNotering}
+              onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
+              placeholder="Skriv en kort notering om incheckningen..."
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: showFieldErrors && !preliminarAvslutNotering.trim() ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                borderRadius: '6px',
+                fontSize: '16px',
+                resize: 'vertical',
+                minHeight: '80px'
+              }}
+            />
+          </div>
+
+          {showFieldErrors && !isStatusComplete() && (
             <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500' }}>
-              ⚠️ Alla fält under fordonsstatus är obligatoriska
+              ⚠️ Uthyrningsstatus och preliminär notering är obligatoriska
             </p>
           )}
         </div>
 
-        {/* Spara-knapp */}
+        {/* Smart spara-knapp */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1361,9 +825,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             © Albarone AB 2025
           </p>
         </div>
-      </div>
-
-      {/* Bekräftelsedialoger */}
+      </div>{/* Bekräftelsedialoger och success modal */}
       {showConfirmDialog && (
         <div style={{
           position: 'fixed',
@@ -1458,7 +920,127 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
         </div>
       )}
 
-      {/* Success Modal */}
+      {/* FINAL CONFIRMATION - Sammanfattningsdialog */}
+      {showFinalConfirmation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              marginBottom: '20px',
+              color: '#1f2937',
+              textAlign: 'center'
+            }}>
+              Bekräfta incheckning
+            </h2>
+            
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '20px',
+              borderRadius: '8px',
+              marginBottom: '24px',
+              fontSize: '14px',
+              lineHeight: '1.6'
+            }}>
+              <p style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>
+                <strong>Bob</strong> checkar in: <strong>{regInput}</strong>
+              </p>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>📍 Plats:</strong> {annanPlats ? annanPlatsText : `${ort}, ${station}`}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🕐 Datum/Tid:</strong> {new Date().toLocaleString('sv-SE')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🚗 Fordonsstatus:</strong> {matarstallning} km, {drivmedelstyp === 'bensin_diesel' ? 
+                  `${tankniva?.replace(/_/g, ' ').replace('behover', 'behöver').replace('pafylld', 'påfylld')}${tankniva === 'pafylld_nu' ? ` (${liters}L ${bransletyp}, ${literpris} kr/L)` : ''}` : 
+                  `${laddniva}% laddning`}, {hjultyp?.toLowerCase().replace('thjul', 'hjul')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🧽 Rengöring:</strong> {tvatt?.replace(/_/g, ' ').replace('behover', 'behöver').replace('grovtvattas', 'grovtvättas').replace('inte tvattas', 'inte tvättas')}, {inre?.replace(/_/g, ' ').replace('behover', 'behöver').replace('rengoras', 'rengöras')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>⚠️ Gamla skador:</strong> {existingDamages.filter(d => d.status === 'documented').length} dokumenterade, {existingDamages.filter(d => d.status === 'fixed').length} åtgärdade
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🆕 Nya skador:</strong> {skadekontroll === 'nya_skador' ? `${newDamages.length} rapporterade` : skadekontroll?.replace(/_/g, ' ').replace('ej skadekontrollerad', 'ej skadekontrollerad').replace('inga nya', 'inga nya')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>📋 Status:</strong> {uthyrningsstatus?.replace(/_/g, ' ').replace('redo for', 'redo för')}
+              </div>
+              
+              <div>
+                <strong>📝 Avslut notering:</strong> {preliminarAvslutNotering}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowFinalConfirmation(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                ← Återgå till formuläret
+              </button>
+              <button
+                onClick={confirmFinalSave}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                ✅ Bekräfta & Spara
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUCCESS Modal - "Tack Bob!" */}
       {showSuccessModal && (
         <div style={{
           position: 'fixed',
