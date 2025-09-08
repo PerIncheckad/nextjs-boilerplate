@@ -37,18 +37,67 @@ type MediaFile = {
   thumbnail?: string;
 };
 
-// Platser och stationer
-const ORTER = ['MALMÖ', 'HELSINGBORG', 'ÄNGELHOLM', 'HALMSTAD', 'FALKENBERG', 'TRELLEBORG', 'VARBERG', 'LUND'];
+// UPPDATERADE platser och stationer från "Stationer o Depåer Albarone"
+const ORTER = ['Ängelholm', 'Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg'];
 
 const STATIONER: Record<string, string[]> = {
-  'MALMÖ': ['Huvudstation Malmö Jägersro', 'Ford Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö'],
-  'HELSINGBORG': ['Huvudstation Helsingborg', 'HBSC Helsingborg', 'Ford Helsingborg', 'Transport Helsingborg'],
-  'ÄNGELHOLM': ['Huvudstation Ängelholm', 'FORD Ängelholm', 'Mekonomen Ängelholm'],
-  'HALMSTAD': ['Huvudstation Halmstad', 'Flyget Halmstad', 'KIA Halmstad'],
-  'FALKENBERG': ['Huvudstation Falkenberg'],
-  'TRELLEBORG': ['Huvudstation Trelleborg'],
-  'VARBERG': ['Huvudstation Varberg', 'Ford Varberg', 'Hedin Automotive Varberg'],
-  'LUND': ['Huvudstation Lund', 'Ford Lund', 'Hedin Lund', 'B/S Lund']
+  'Ängelholm': [
+    'Hedin Automotive Ford (angelholm-hedin-ford)',
+    'Hedin Automotive (angelholm-hedin)',
+    'Ängelholm Airport (angelholm-airport)'
+  ],
+  'Falkenberg': [
+    'Falkenberg (falkenberg)'
+  ],
+  'Halmstad': [
+    'Hedin Automotive Ford (halmstad-hedin-ford)',
+    'Hedin Automotive Kia (halmstad-hedin-kia)',
+    'Hedin Automotive Mercedes (halmstad-hedin-mercedes)',
+    'Hedin Automotive (halmstad-hedin)',
+    'Halmstad City Airport (halmstad-city-airport)'
+  ],
+  'Helsingborg': [
+    'Bil & Skadeservice (helsingborg-bilskadeservice)',
+    'Floretten (helsingborg-floretten)',
+    'Förenade Bil (helsingborg-forenade-bil)',
+    'Hedin Automotive Ford (helsingborg-hedin-ford)',
+    'Hedin Automotive Kia (helsingborg-hedin-kia)',
+    'Hedin Automotive (helsingborg-hedin)',
+    'Hedin Bil Transport (helsingborg-hedin-transport)',
+    'S.Jönsson Bil (helsingborg-sjonsson)',
+    'Verkstad (helsingborg-verkstad)',
+    'HBSC (helsingborg-hbsc)'
+  ],
+  'Lund': [
+    'Bil & Skadeservice (lund-bilskadeservice)',
+    'Hedin Automotive Ford (lund-hedin-ford)',
+    'Hedin Automotive (lund-hedin)',
+    'Hedin Bil (lund-hedin-bil)',
+    'P7 Revingehed (lund-p7-revingehed)'
+  ],
+  'Malmö': [
+    'Automerna (malmo-automerna)',
+    'Hedin Automotive Ford (malmo-hedin-ford)',
+    'Hedin Automotive Jägersro (malmo-hedin-jagersro)',
+    'Hedin Automotive Mercedes (malmo-hedin-mercedes)',
+    'Mechanum (malmo-mechanum)',
+    'Malmö Airport (malmo-airport)',
+    'BERNSTORP (Verkstad) (malmo-bernstorp-verkstad)',
+    'BURLÖV (Hedin Automotive) (malmo-burlov-hedin)',
+    'FOSIE (Hedbergs Bil) (malmo-fosie-hedbergs)',
+    'HAMN (Verkstad) (malmo-hamn-verkstad)',
+    'LÅNGTID (malmo-langtid)'
+  ],
+  'Trelleborg': [
+    'Trelleborg (trelleborg)'
+  ],
+  'Varberg': [
+    'Finnvedens Bil Skadecenter (varberg-finnvedens-skadecenter)',
+    'Hedin Automotive Ford (varberg-hedin-ford)',
+    'Hedin Automotive Holmgärde (varberg-hedin-holmgarde)',
+    'Hedin Automotive (varberg-hedin)',
+    'Sällstorps Plåt & Lack (varberg-sallstorps-plat-lack)'
+  ]
 };
 
 // Skadetyper (alfabetisk ordning)
@@ -162,13 +211,27 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
   return mediaFiles;
 };
 
-// Smart skadetext-sammanslagning med korrekt mappning
+// Smart skadetext-sammanslagning med korrekt mappning för ALLA kolumner
 const createCombinedDamageText = (skadetyp: string, skadeanmalan: string, internNotering: string): string => {
   const parts = [];
-  if (skadetyp?.trim()) parts.push(skadetyp.trim());
-  if (skadeanmalan?.trim() && skadeanmalan !== skadetyp?.trim()) parts.push(skadeanmalan.trim());
-  if (internNotering?.trim()) parts.push(`Intern not: ${internNotering.trim()}`);
-  else parts.push('Intern not: ---');
+  
+  // Skadetyp (H-kolumn) - alltid först
+  if (skadetyp?.trim()) {
+    parts.push(skadetyp.trim());
+  }
+  
+  // Skadeanmälan (K-kolumn) - bara om den skiljer sig från skadetyp
+  if (skadeanmalan?.trim() && skadeanmalan.trim() !== skadetyp?.trim()) {
+    parts.push(`Avtal: ${skadeanmalan.trim()}`);
+  }
+  
+  // Intern notering (M-kolumn)
+  if (internNotering?.trim()) {
+    parts.push(`Intern not: ${internNotering.trim()}`);
+  } else {
+    parts.push('Intern not: ---');
+  }
+  
   return parts.join(' - ');
 };
 
@@ -207,12 +270,13 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
   const [tankniva, setTankniva] = useState<'fulltankad' | 'tankas_senare' | 'pafylld_nu' | null>(null);
   const [liters, setLiters] = useState('');
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
+  const [literpris, setLiterpris] = useState(''); // NYTT: Literpris
   
   // För elbil
   const [laddniva, setLaddniva] = useState('');
 
-  // Övriga fält
-  const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
+  // Övriga fält - UPPDATERADE med rätt logik
+  const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null); // ÄNDRAT: boolean för OK/Behöver påfyllning
   const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
   const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
   const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
@@ -238,7 +302,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
-  // Hämta alla registreringsnummer för autocomplete från mabi_damage_data
+  // FÖRBÄTTRAD autocomplete - aktiveras från 2 tecken
   useEffect(() => {
     async function fetchAllRegistrations() {
       try {
@@ -259,15 +323,16 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     fetchAllRegistrations();
   }, []);
 
+  // FÖRBÄTTRADE suggestions - från 2 tecken
   const suggestions = useMemo(() => {
-    if (!regInput.trim()) return [];
+    if (!regInput.trim() || regInput.trim().length < 2) return [];
     const input = regInput.toUpperCase();
     return allRegistrations
       .filter(reg => reg.toUpperCase().startsWith(input))
       .slice(0, 5);
   }, [regInput, allRegistrations]);
 
-  // Hämta bildata från mabi_damage_data med fallback till car_data
+  // FIXAD skademappning - hämtar från ALLA 3 kolumner (H, K, M)
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -306,25 +371,25 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             saludatum: null
           }));
 
-          // FIXAD SKADEHANTERING - alla skador, inte bara första
+          // KOMPLETT SKADEHANTERING - ALLA TRE KOLUMNER (H, K, M)
           damages = newData
             .filter(row => {
-              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
-              const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
-              const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
-              return skadetyp || plats || notering;
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';           // H
+              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || ''; // K
+              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || ''; // M
+              return skadetyp || skadeanmalan || internNotering;
             })
             .map((row, index) => {
-              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
-              const plats = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
-              const notering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';           // H
+              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || ''; // K  
+              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || ''; // M
               
-              const fullText = createCombinedDamageText(skadetyp, plats, notering);
+              const fullText = createCombinedDamageText(skadetyp, skadeanmalan, internNotering);
               
               return {
                 id: `mabi-${index}`,
-                shortText: skadetyp || plats || 'Okänd skada',
-                detailText: plats !== skadetyp ? plats : undefined,
+                shortText: skadetyp || skadeanmalan || 'Okänd skada',
+                detailText: skadeanmalan !== skadetyp ? skadeanmalan : undefined,
                 fullText,
                 status: 'not_selected' as const,
                 userType: '',
@@ -417,17 +482,17 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     if (!matarstallning.trim() || !drivmedelstyp) return false;
 
     if (drivmedelstyp === 'bensin_diesel') {
-      if (!tankniva || adblue === null) return false;
-      if (tankniva === 'pafylld_nu' && (!liters.trim() || !bransletyp)) return false;
+      if (!tankniva || adblue === null || spolarvatska === null) return false;
+      if (tankniva === 'pafylld_nu' && (!liters.trim() || !bransletyp || !literpris.trim())) return false;
     }
 
     if (drivmedelstyp === 'elbil') {
-      if (!laddniva.trim() || antalLaddkablar === null) return false;
+      if (!laddniva.trim() || antalLaddkablar === null || spolarvatska === null) return false;
       const laddnivaParsed = parseInt(laddniva);
       if (isNaN(laddnivaParsed) || laddnivaParsed < 0 || laddnivaParsed > 100) return false;
     }
 
-    return spolarvatska !== null && insynsskydd !== null && hjultyp !== null;
+    return insynsskydd !== null && hjultyp !== null;
   };
 
   const isCleaningComplete = () => tvatt !== null && inre !== null;
@@ -465,7 +530,9 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
            isCleaningComplete() &&
            isDamagesComplete() &&
            isStatusComplete();
-  };const resetForm = () => {
+  };
+
+  const resetForm = () => {
     setRegInput('');
     setCarData([]);
     setExistingDamages([]);
@@ -484,6 +551,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     setTankniva(null);
     setLiters('');
     setBransletyp(null);
+    setLiterpris('');
     setLaddniva('');
     setSpolarvatska(null);
     setInsynsskydd(null);
@@ -523,9 +591,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 
     setShowFinalConfirmation(false);
     setShowSuccessModal(true);
-  };
-
-  // Funktioner för befintliga skador
+  };// Funktioner för befintliga skador
   const toggleExistingDamageStatus = (id: string, newStatus: 'documented' | 'fixed') => {
     if (newStatus === 'fixed') {
       setDamageToFix(id);
@@ -663,9 +729,10 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     }));
   };
 
+  // FÖRBÄTTRADE input handlers
   const handleRegInputChange = (value: string) => {
     setRegInput(value.toUpperCase());
-    setShowSuggestions(value.length > 0 && suggestions.length > 0);
+    setShowSuggestions(value.length >= 2 && suggestions.length > 0); // ÄNDRAT: från 2 tecken
   };
 
   const selectSuggestion = (suggestion: string) => {
@@ -938,7 +1005,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>{/* Registreringsnummer med visuell feedback */}
+      }}>{/* Registreringsnummer med förbättrad autocomplete */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -958,7 +1025,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               type="text"
               value={regInput}
               onChange={(e) => handleRegInputChange(e.target.value)}
-              onFocus={() => setShowSuggestions(regInput.length > 0 && suggestions.length > 0)}
+              onFocus={() => setShowSuggestions(regInput.length >= 2 && suggestions.length > 0)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder="Skriv reg.nr"
               spellCheck={false}
@@ -976,6 +1043,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               }}
             />
 
+            {/* FÖRBÄTTRAD autocomplete dropdown */}
             {showSuggestions && suggestions.length > 0 && (
               <div style={{
                 position: 'absolute',
@@ -1029,7 +1097,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             </p>
           )}
 
-          {/* Bilinfo med korrekt skadevisning */}
+          {/* FIXAD bilinfo med ALLA TRE skadekolumner */}
           {carData.length > 0 && (
             <div style={{
               marginTop: '20px',
@@ -1067,13 +1135,8 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                       {existingDamages.map((damage, i) => (
                         <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
                           <div style={{ fontWeight: '500', color: '#1f2937' }}>
-                            {damage.shortText}
+                            {damage.fullText}
                           </div>
-                          {damage.detailText && (
-                            <div style={{ color: '#6b7280', fontSize: '13px' }}>
-                              {damage.detailText}
-                            </div>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -1084,7 +1147,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
           )}
         </div>
 
-        {/* Plats för incheckning */}
+        {/* OMORGANISERAD Plats för incheckning */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1095,7 +1158,64 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
         }} className={showFieldErrors && !isLocationComplete() ? 'section-incomplete' : ''}>
           <SectionHeader title="Plats för incheckning" isComplete={isLocationComplete()} />
           
-          <div style={{ marginBottom: '16px' }}>
+          {/* Ort och Station först */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Ort *
+              </label>
+              <select
+                value={ort}
+                onChange={(e) => {
+                  setOrt(e.target.value);
+                  setStation('');
+                }}
+                disabled={annanPlats}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: showFieldErrors && !ort && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  backgroundColor: annanPlats ? '#f9fafb' : '#ffffff',
+                  opacity: annanPlats ? 0.6 : 1
+                }}
+              >
+                <option value="">Välj ort</option>
+                {ORTER.map(ortOption => (
+                  <option key={ortOption} value={ortOption}>{ortOption}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Station *
+              </label>
+              <select
+                value={station}
+                onChange={(e) => setStation(e.target.value)}
+                disabled={!ort || annanPlats}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: showFieldErrors && !station && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  backgroundColor: (ort && !annanPlats) ? '#ffffff' : '#f9fafb',
+                  opacity: (ort && !annanPlats) ? 1 : 0.6
+                }}
+              >
+                <option value="">Välj station</option>
+                {availableStations.map(stationOption => (
+                  <option key={stationOption} value={stationOption}>{stationOption}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Annan plats-alternativet EFTER ort/station */}
+          <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
               <input
                 type="checkbox"
@@ -1114,16 +1234,16 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               <span style={{ fontWeight: '500' }}>Annan plats</span>
             </label>
 
-            {annanPlats ? (
+            {annanPlats && (
               <div>
                 <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Beskriv platsen *
+                  Ange plats *
                 </label>
                 <input
                   type="text"
                   value={annanPlatsText}
                   onChange={(e) => setAnnanPlatsText(e.target.value)}
-                  placeholder="T.ex. Hemkörning, Kundens adress..."
+                  placeholder="T.ex. gatuadress"
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -1133,70 +1253,17 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   }}
                 />
               </div>
-            ) : (
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                    Ort *
-                  </label>
-                  <select
-                    value={ort}
-                    onChange={(e) => {
-                      setOrt(e.target.value);
-                      setStation('');
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: showFieldErrors && !ort ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontSize: '16px',
-                      backgroundColor: '#ffffff'
-                    }}
-                  >
-                    <option value="">Välj ort</option>
-                    {ORTER.map(ortOption => (
-                      <option key={ortOption} value={ortOption}>{ortOption}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ flex: 1 }}>
-                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                    Station *
-                  </label>
-                  <select
-                    value={station}
-                    onChange={(e) => setStation(e.target.value)}
-                    disabled={!ort}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: showFieldErrors && !station ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                      borderRadius: '6px',
-                      fontSize: '16px',
-                      backgroundColor: ort ? '#ffffff' : '#f9fafb',
-                      opacity: ort ? 1 : 0.6
-                    }}
-                  >
-                    <option value="">Välj station</option>
-                    {availableStations.map(stationOption => (
-                      <option key={stationOption} value={stationOption}>{stationOption}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
             )}
           </div>
 
           {showFieldErrors && !isLocationComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500' }}>
+            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500', marginTop: '12px' }}>
               ⚠️ Plats för incheckning är obligatorisk
             </p>
           )}
         </div>
 
-        {/* Fordonsstatus */}
+        {/* UPPDATERAD Fordonsstatus med fler ändringar */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1237,12 +1304,14 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   alignItems: 'center',
                   gap: '8px',
                   padding: '12px 16px',
-                  border: drivmedelstyp === type ? '2px solid #033066' : '2px solid #e5e7eb',
+                  border: '2px solid #e5e7eb',
                   borderRadius: '8px',
                   cursor: 'pointer',
-                  backgroundColor: drivmedelstyp === type ? '#f0f9ff' : '#ffffff',
+                  backgroundColor: drivmedelstyp === type ? '#033066' : '#ffffff',
+                  color: drivmedelstyp === type ? '#ffffff' : '#374151',
                   flex: 1,
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  fontWeight: '500'
                 }}>
                   <input
                     type="radio"
@@ -1254,11 +1323,12 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                       setTankniva(null);
                       setLiters('');
                       setBransletyp(null);
+                      setLiterpris('');
                       setLaddniva('');
                     }}
-                    style={{ transform: 'scale(1.2)' }}
+                    style={{ display: 'none' }}
                   />
-                  <span style={{ fontWeight: '500' }}>
+                  <span>
                     {type === 'bensin_diesel' ? 'Bensin/Diesel' : 'Elbil'}
                   </span>
                 </label>
@@ -1284,10 +1354,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                       alignItems: 'center',
                       gap: '8px',
                       padding: '12px',
-                      border: tankniva === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                      border: '2px solid #e5e7eb',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      backgroundColor: tankniva === option.value ? '#f0f9ff' : '#ffffff'
+                      backgroundColor: tankniva === option.value ? '#033066' : '#ffffff',
+                      color: tankniva === option.value ? '#ffffff' : '#374151'
                     }}>
                       <input
                         type="radio"
@@ -1295,7 +1366,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                         value={option.value}
                         checked={tankniva === option.value}
                         onChange={(e) => setTankniva(e.target.value as any)}
-                        style={{ transform: 'scale(1.2)' }}
+                        style={{ display: 'none' }}
                       />
                       <span>{option.label}</span>
                     </label>
@@ -1304,16 +1375,63 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               </div>
 
               {tankniva === 'pafylld_nu' && (
-                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                  <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                        Antal liter *
+                      </label>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        value={liters}
+                        onChange={(e) => setLiters(e.target.value)}
+                        placeholder="T.ex. 45.2"
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '6px',
+                          fontSize: '16px'
+                        }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                        Bränsletyp *
+                      </label>
+                      <select
+                        value={bransletyp || ''}
+                        onChange={(e) => setBransletyp(e.target.value as 'Bensin' | 'Diesel')}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          border: '2px solid #e5e7eb',
+                          borderRadius: '6px',
+                          fontSize: '16px',
+                          backgroundColor: '#ffffff'
+                        }}
+                      >
+                        <option value="">Välj typ</option>
+                        <option value="Bensin">Bensin</option>
+                        <option value="Diesel">Diesel</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* NYTT: Literpris */}
+                  <div>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Antal liter *
+                      Literpris *
                     </label>
                     <input
-                      type="text"
-                      value={liters}
-                      onChange={(e) => setLiters(e.target.value)}
-                      placeholder="T.ex. 45,2"
+                      type="number"
+                      inputMode="decimal"
+                      step="0.01"
+                      value={literpris}
+                      onChange={(e) => setLiterpris(e.target.value)}
+                      placeholder="T.ex. 16.95"
                       style={{
                         width: '100%',
                         padding: '12px',
@@ -1322,27 +1440,6 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                         fontSize: '16px'
                       }}
                     />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Bränsletyp *
-                    </label>
-                    <select
-                      value={bransletyp || ''}
-                      onChange={(e) => setBransletyp(e.target.value as 'Bensin' | 'Diesel')}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        border: '2px solid #e5e7eb',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        backgroundColor: '#ffffff'
-                      }}
-                    >
-                      <option value="">Välj typ</option>
-                      <option value="Bensin">Bensin</option>
-                      <option value="Diesel">Diesel</option>
-                    </select>
                   </div>
                 </div>
               )}
@@ -1361,10 +1458,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                       alignItems: 'center',
                       gap: '8px',
                       padding: '12px 16px',
-                      border: adblue === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                      border: '2px solid #e5e7eb',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      backgroundColor: adblue === option.value ? '#f0f9ff' : '#ffffff',
+                      backgroundColor: adblue === option.value ? '#033066' : '#ffffff',
+                      color: adblue === option.value ? '#ffffff' : '#374151',
                       flex: 1,
                       justifyContent: 'center'
                     }}>
@@ -1373,7 +1471,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                         name="adblue"
                         checked={adblue === option.value}
                         onChange={() => setAdblue(option.value)}
-                        style={{ transform: 'scale(1.2)' }}
+                        style={{ display: 'none' }}
                       />
                       <span>{option.label}</span>
                     </label>
@@ -1418,10 +1516,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                       alignItems: 'center',
                       gap: '8px',
                       padding: '12px 16px',
-                      border: antalLaddkablar === antal ? '2px solid #033066' : '2px solid #e5e7eb',
+                      border: '2px solid #e5e7eb',
                       borderRadius: '6px',
                       cursor: 'pointer',
-                      backgroundColor: antalLaddkablar === antal ? '#f0f9ff' : '#ffffff',
+                      backgroundColor: antalLaddkablar === antal ? '#033066' : '#ffffff',
+                      color: antalLaddkablar === antal ? '#ffffff' : '#374151',
                       flex: 1,
                       justifyContent: 'center'
                     }}>
@@ -1431,7 +1530,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                         value={antal}
                         checked={antalLaddkablar === antal}
                         onChange={(e) => setAntalLaddkablar(e.target.value as '0' | '1' | '2')}
-                        style={{ transform: 'scale(1.2)' }}
+                        style={{ display: 'none' }}
                       />
                       <span>{antal} st</span>
                     </label>
@@ -1441,7 +1540,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             </>
           )}
 
-          {/* Gemensamma fält */}
+          {/* UPPDATERADE gemensamma fält */}
           <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
@@ -1450,17 +1549,18 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               <div style={{ display: 'flex', gap: '8px' }}>
                 {[
                   { value: true, label: 'OK' },
-                  { value: false, label: 'Tom' }
+                  { value: false, label: 'Behöver påfyllning' }
                 ].map(option => (
                   <label key={String(option.value)} style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
                     padding: '12px',
-                    border: spolarvatska === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                    border: '2px solid #e5e7eb',
                     borderRadius: '6px',
                     cursor: 'pointer',
-                    backgroundColor: spolarvatska === option.value ? '#f0f9ff' : '#ffffff',
+                    backgroundColor: spolarvatska === option.value ? '#033066' : '#ffffff',
+                    color: spolarvatska === option.value ? '#ffffff' : '#374151',
                     flex: 1,
                     justifyContent: 'center'
                   }}>
@@ -1469,7 +1569,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                       name="spolarvatska"
                       checked={spolarvatska === option.value}
                       onChange={() => setSpolarvatska(option.value)}
-                      style={{ transform: 'scale(1.2)' }}
+                      style={{ display: 'none' }}
                     />
                     <span style={{ fontSize: '14px' }}>{option.label}</span>
                   </label>
@@ -1491,10 +1591,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                     alignItems: 'center',
                     gap: '8px',
                     padding: '12px',
-                    border: insynsskydd === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                    border: '2px solid #e5e7eb',
                     borderRadius: '6px',
                     cursor: 'pointer',
-                    backgroundColor: insynsskydd === option.value ? '#f0f9ff' : '#ffffff',
+                    backgroundColor: insynsskydd === option.value ? '#033066' : '#ffffff',
+                    color: insynsskydd === option.value ? '#ffffff' : '#374151',
                     flex: 1,
                     justifyContent: 'center'
                   }}>
@@ -1503,7 +1604,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                       name="insynsskydd"
                       checked={insynsskydd === option.value}
                       onChange={() => setInsynsskydd(option.value)}
-                      style={{ transform: 'scale(1.2)' }}
+                      style={{ display: 'none' }}
                     />
                     <span style={{ fontSize: '14px' }}>{option.label}</span>
                   </label>
@@ -1523,10 +1624,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   alignItems: 'center',
                   gap: '8px',
                   padding: '12px 16px',
-                  border: hjultyp === typ ? '2px solid #033066' : '2px solid #e5e7eb',
+                  border: '2px solid #e5e7eb',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: hjultyp === typ ? '#f0f9ff' : '#ffffff',
+                  backgroundColor: hjultyp === typ ? '#033066' : '#ffffff',
+                  color: hjultyp === typ ? '#ffffff' : '#374151',
                   flex: 1,
                   justifyContent: 'center'
                 }}>
@@ -1536,7 +1638,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                     value={typ}
                     checked={hjultyp === typ}
                     onChange={(e) => setHjultyp(e.target.value as 'Sommarthjul' | 'Vinterthjul')}
-                    style={{ transform: 'scale(1.2)' }}
+                    style={{ display: 'none' }}
                   />
                   <span>{typ}</span>
                 </label>
@@ -1575,10 +1677,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   alignItems: 'center',
                   gap: '8px',
                   padding: '12px',
-                  border: tvatt === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                  border: '2px solid #e5e7eb',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: tvatt === option.value ? '#f0f9ff' : '#ffffff'
+                  backgroundColor: tvatt === option.value ? '#033066' : '#ffffff',
+                  color: tvatt === option.value ? '#ffffff' : '#374151'
                 }}>
                   <input
                     type="radio"
@@ -1586,7 +1689,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                     value={option.value}
                     checked={tvatt === option.value}
                     onChange={(e) => setTvatt(e.target.value as any)}
-                    style={{ transform: 'scale(1.2)' }}
+                    style={{ display: 'none' }}
                   />
                   <span>{option.label}</span>
                 </label>
@@ -1608,10 +1711,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   alignItems: 'center',
                   gap: '8px',
                   padding: '12px 16px',
-                  border: inre === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                  border: '2px solid #e5e7eb',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: inre === option.value ? '#f0f9ff' : '#ffffff',
+                  backgroundColor: inre === option.value ? '#033066' : '#ffffff',
+                  color: inre === option.value ? '#ffffff' : '#374151',
                   flex: 1,
                   justifyContent: 'center'
                 }}>
@@ -1621,7 +1725,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                     value={option.value}
                     checked={inre === option.value}
                     onChange={(e) => setInre(e.target.value as any)}
-                    style={{ transform: 'scale(1.2)' }}
+                    style={{ display: 'none' }}
                   />
                   <span style={{ fontSize: '14px', textAlign: 'center' }}>{option.label}</span>
                 </label>
@@ -1879,10 +1983,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   alignItems: 'center',
                   gap: '8px',
                   padding: '12px',
-                  border: skadekontroll === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                  border: '2px solid #e5e7eb',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: skadekontroll === option.value ? '#f0f9ff' : '#ffffff'
+                  backgroundColor: skadekontroll === option.value ? '#033066' : '#ffffff',
+                  color: skadekontroll === option.value ? '#ffffff' : '#374151'
                 }}>
                   <input
                     type="radio"
@@ -1895,7 +2000,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                         setNewDamages([]);
                       }
                     }}
-                    style={{ transform: 'scale(1.2)' }}
+                    style={{ display: 'none' }}
                   />
                   <span>{option.label}</span>
                 </label>
@@ -2140,10 +2245,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   alignItems: 'center',
                   gap: '8px',
                   padding: '12px',
-                  border: uthyrningsstatus === option.value ? '2px solid #033066' : '2px solid #e5e7eb',
+                  border: '2px solid #e5e7eb',
                   borderRadius: '6px',
                   cursor: 'pointer',
-                  backgroundColor: uthyrningsstatus === option.value ? '#f0f9ff' : '#ffffff'
+                  backgroundColor: uthyrningsstatus === option.value ? '#033066' : '#ffffff',
+                  color: uthyrningsstatus === option.value ? '#ffffff' : '#374151'
                 }}>
                   <input
                     type="radio"
@@ -2151,7 +2257,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                     value={option.value}
                     checked={uthyrningsstatus === option.value}
                     onChange={(e) => setUthyrningsstatus(e.target.value as any)}
-                    style={{ transform: 'scale(1.2)' }}
+                    style={{ display: 'none' }}
                   />
                   <span>{option.label}</span>
                 </label>
@@ -2226,7 +2332,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
         </div>
       </div>
 
-      {/* Bekräftelsedialoger */}
+      {/* Bekräftelsedialoger och success modal */}
       {showConfirmDialog && (
         <div style={{
           position: 'fixed',
@@ -2378,7 +2484,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               
               <div style={{ marginBottom: '12px' }}>
                 <strong>🚗 Fordonsstatus:</strong> {matarstallning} km, {drivmedelstyp === 'bensin_diesel' ? 
-                  `${tankniva?.replace(/_/g, ' ').replace('behover', 'behöver').replace('pafylld', 'påfylld')}${tankniva === 'pafylld_nu' ? ` (${liters}L ${bransletyp})` : ''}` : 
+                  `${tankniva?.replace(/_/g, ' ').replace('behover', 'behöver').replace('pafylld', 'påfylld')}${tankniva === 'pafylld_nu' ? ` (${liters}L ${bransletyp}, ${literpris} kr/L)` : ''}` : 
                   `${laddniva}% laddning`}, {hjultyp?.toLowerCase().replace('thjul', 'hjul')}
               </div>
               
@@ -2441,7 +2547,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
         </div>
       )}
 
-      {/* Success Modal */}
+      {/* UPPDATERAD Success Modal - "Tack Bob!" */}
       {showSuccessModal && (
         <div style={{
           position: 'fixed',
