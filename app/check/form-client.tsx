@@ -11,17 +11,19 @@ const supabase = createClient(
 type CarData = {
   regnr: string;
   brand_model: string | null;
-  damage_text: string | null;
-  damage_detail?: string | null;
+  damage_text: string | null;        // Kolumn H - Skadetyp
+  damage_detail: string | null;      // Kolumn K - Skada notering på avtal/faktura  
+  damage_location?: string | null;   // Kolumn M - Intern notering
   wheelstorage: string | null;
   saludatum: string | null;
 };
 
 type ExistingDamage = {
   id: string;
-  shortText: string;
-  detailText?: string;
-  fullText: string;
+  skadetyp: string;           // H: Lackskada, Spricka etc.
+  avtalNotering: string;      // K: Avtal/faktura beskrivning
+  internNot: string;          // M: Intern notering eller "---"
+  fullText: string;           // Smart sammanslagen visning
   status: 'not_selected' | 'documented' | 'fixed';
   userType?: string;
   userCarPart?: string;
@@ -51,7 +53,7 @@ const STATIONER: Record<string, string[]> = {
   'LUND': ['Huvudstation Lund', 'Ford Lund', 'Hedin Lund', 'B/S Lund']
 };
 
-// Skadetyper (alfabetisk ordning)
+// Skadetyper för NYA skador (alfabetisk ordning)
 const DAMAGE_TYPES = [
   'Buckla', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
   'Fälgskada vinterhjul', 'Feltankning', 'Höjdledsskada', 'Intryck', 'Invändig skada',
@@ -59,7 +61,7 @@ const DAMAGE_TYPES = [
   'Saknas', 'Skrapad', 'Spricka', 'Stenskott', 'Trasig', 'Övrigt'
 ].sort();
 
-// Uppdaterade bildelar och positioner
+// Bildelar för NYA skador - Motorhuv bara Utsida
 const CAR_PARTS: Record<string, string[]> = {
   'Annan del': [],
   'Bagagelucka': ['Insida', 'Utsida'],
@@ -78,7 +80,7 @@ const CAR_PARTS: Record<string, string[]> = {
   'Yttre backspegel': ['Höger', 'Vänster']
 };
 
-// TAJT skadelogik
+// TAJT skadelogik för NYA skador - mer specifik
 const getRelevantCarParts = (damageType: string): string[] => {
   const lowerType = damageType.toLowerCase();
   if (lowerType.includes('däckskada')) return ['Däck'];
@@ -109,6 +111,28 @@ const isDateWithinDays = (dateStr: string | null, days: number): boolean => {
   const diffTime = date.getTime() - today.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   return diffDays <= days && diffDays >= 0;
+};
+
+// Smart skadetext för BEFINTLIGA skador (Excel H, K, M)
+const createExistingDamageText = (skadetyp: string, avtalNotering: string, internNot?: string): string => {
+  const cleanSkadetyp = skadetyp?.trim() || '';
+  const cleanAvtal = avtalNotering?.trim() || '';
+  const cleanIntern = internNot?.trim() || '';
+  
+  // Om H och K är identiska, visa bara en gång
+  if (cleanSkadetyp.toLowerCase() === cleanAvtal.toLowerCase()) {
+    if (cleanIntern) {
+      return `${cleanSkadetyp} - Intern not: ${cleanIntern}`;
+    }
+    return `${cleanSkadetyp} - Intern not: ---`;
+  }
+  
+  // Om H och K skiljer sig, visa båda + intern notering
+  if (cleanIntern) {
+    return `${cleanSkadetyp} (${cleanAvtal}) - Intern not: ${cleanIntern}`;
+  }
+  
+  return `${cleanSkadetyp} (${cleanAvtal}) - Intern not: ---`;
 };
 
 const getFileType = (file: File): 'image' | 'video' => {
@@ -248,7 +272,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
       .slice(0, 5);
   }, [regInput, allRegistrations]);
 
-  // Hämta bildata
+  // Hämta bildata med korrekt skademappning
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -282,19 +306,21 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
           const useData = validData.length > 0 ? validData : data;
           setCarData(useData);
 
+          // Skapa befintliga skador från Excel-data (H, K, M kolumner)
           const damages: ExistingDamage[] = useData
             .map((item, index) => {
               if (!item.damage_text) return null;
 
-              const shortText = item.damage_text;
-              const detailText = item.damage_detail || null;
-              const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
+              const skadetyp = item.damage_text || '';           // H-kolumn
+              const avtalNotering = item.damage_detail || '';    // K-kolumn  
+              const internNot = item.damage_location || '';      // M-kolumn
 
               return {
                 id: `existing-${index}`,
-                shortText,
-                detailText,
-                fullText,
+                skadetyp,
+                avtalNotering,
+                internNot: internNot || '---',
+                fullText: createExistingDamageText(skadetyp, avtalNotering, internNot),
                 status: 'not_selected',
                 userType: '',
                 userCarPart: '',
@@ -396,7 +422,9 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
            isCleaningComplete() &&
            isDamagesComplete() &&
            isStatusComplete();
-  };const resetForm = () => {
+  };
+
+  const resetForm = () => {
     setRegInput('');
     setCarData([]);
     setExistingDamages([]);
@@ -430,11 +458,13 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
     setShowSuccessModal(false);
   };
 
+  // UPPDATERAD handleSave - visar antingen fel eller bekräftelse
   const handleSave = () => {
     if (canSave()) {
       setShowFinalConfirmation(true);
     } else {
       setShowFieldErrors(true);
+      // Scrolla till första ofullständiga sektion
       setTimeout(() => {
         const firstIncomplete = document.querySelector('.section-incomplete');
         if (firstIncomplete) {
@@ -495,9 +525,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
   const cancelFixDamage = () => {
     setShowConfirmDialog(false);
     setDamageToFix(null);
-  };
-
-  // Funktioner för gamla skador
+  };// Funktioner för gamla skador
   const updateExistingDamageType = (id: string, type: string) => {
     setExistingDamages(prev => prev.map(d =>
       d.id === id ? { ...d, userType: type, userCarPart: '', userPosition: '' } : d
@@ -661,7 +689,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
     </div>
   );
 
-  // Media upload component
+  // Media upload component - uppdaterad text
   const MediaUpload = ({
     damageId,
     isOld,
@@ -680,6 +708,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
         Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
       </label>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {/* Foto-knapp */}
         <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
           <input
             type="file"
@@ -710,6 +739,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
           </label>
         </div>
 
+        {/* Video-knapp */}
         <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
           <input
             type="file"
@@ -739,6 +769,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
           </label>
         </div>
 
+        {/* Galleri-knapp */}
         <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
           <input
             type="file"
@@ -776,7 +807,8 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
     </div>
   );
 
-  return (<div style={{
+  return (
+    <div style={{
       minHeight: '100vh',
       backgroundColor: '#f8fafc',
       color: '#111827'
@@ -863,8 +895,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>
-        {/* Registreringsnummer med visuell feedback */}
+      }}>{/* Registreringsnummer med visuell feedback */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -955,7 +986,7 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
             </p>
           )}
 
-          {/* Bilinfo */}
+          {/* Bilinfo med korrekt skadevisning */}
           {carData.length > 0 && (
             <div style={{
               marginTop: '20px',
@@ -989,11 +1020,23 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
                   {existingDamages.length === 0 ? (
                     <span style={{ fontWeight: '500' }}> ---</span>
                   ) : (
-                    <ul style={{ margin: '0', paddingLeft: '20px' }}>
+                    <div style={{ margin: '0' }}>
                       {existingDamages.map((damage, i) => (
-                        <li key={i} style={{ marginBottom: '4px' }}>{damage.fullText}</li>
+                        <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
+                          <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                            {damage.skadetyp}
+                          </div>
+                          {damage.avtalNotering && damage.avtalNotering !== damage.skadetyp && (
+                            <div style={{ color: '#6b7280', fontSize: '13px' }}>
+                              Avtal: {damage.avtalNotering}
+                            </div>
+                          )}
+                          <div style={{ color: '#6b7280', fontSize: '13px' }}>
+                            Intern not: {damage.internNot}
+                          </div>
+                        </div>
                       ))}
-                    </ul>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1039,6 +1082,222 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
           </p>
         </div>
       </div>
+
+      {/* Bekräftelsedialog för "Åtgärdat" */}
+      {showConfirmDialog && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '32px',
+            margin: '20px',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: '#f59e0b',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              fontSize: '32px',
+              color: '#ffffff'
+            }}>
+              ⚠️
+            </div>
+            
+            <h2 style={{
+              fontSize: '20px',
+              fontWeight: '600',
+              marginBottom: '12px',
+              color: '#1f2937'
+            }}>
+              Bekräfta åtgärdning
+            </h2>
+            
+            <p style={{
+              fontSize: '16px',
+              color: '#6b7280',
+              marginBottom: '24px'
+            }}>
+              Är du säker på att denna skada är åtgärdad?
+              <br />
+              <strong>"{existingDamages.find(d => d.id === damageToFix)?.fullText}"</strong>
+            </p>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={cancelFixDamage}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={confirmFixDamage}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                ✅ Bekräfta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FINAL CONFIRMATION - Sammanfattningsdialog */}
+      {showFinalConfirmation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              marginBottom: '20px',
+              color: '#1f2937',
+              textAlign: 'center'
+            }}>
+              Bekräfta incheckning
+            </h2>
+            
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '20px',
+              borderRadius: '8px',
+              marginBottom: '24px',
+              fontSize: '14px',
+              lineHeight: '1.6'
+            }}>
+              <p style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>
+                <strong>Bob</strong> checkar in: <strong>{regInput}</strong>
+              </p>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>📍 Plats:</strong> {annanPlats ? annanPlatsText : `${ort}, ${station}`}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🕐 Datum/Tid:</strong> {new Date().toLocaleString('sv-SE')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🚗 Fordonsstatus:</strong> {matarstallning} km, {drivmedelstyp === 'bensin_diesel' ? 
+                  `${tankniva?.replace(/_/g, ' ').replace('behover', 'behöver').replace('pafylld', 'påfylld')}${tankniva === 'pafylld_nu' ? ` (${liters}L ${bransletyp})` : ''}` : 
+                  `${laddniva}% laddning`}, {hjultyp?.toLowerCase().replace('thjul', 'hjul')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🧽 Rengöring:</strong> {tvatt?.replace(/_/g, ' ').replace('behover', 'behöver').replace('grovtvattas', 'grovtvättas').replace('inte tvattas', 'inte tvättas')}, {inre?.replace(/_/g, ' ').replace('behover', 'behöver').replace('rengoras', 'rengöras')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>⚠️ Gamla skador:</strong> {existingDamages.filter(d => d.status === 'documented').length} dokumenterade, {existingDamages.filter(d => d.status === 'fixed').length} åtgärdade
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🆕 Nya skador:</strong> {skadekontroll === 'nya_skador' ? `${newDamages.length} rapporterade` : skadekontroll?.replace(/_/g, ' ').replace('ej skadekontrollerad', 'ej skadekontrollerad').replace('inga nya', 'inga nya')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>📋 Status:</strong> {uthyrningsstatus?.replace(/_/g, ' ').replace('redo for', 'redo för')}
+              </div>
+              
+              <div>
+                <strong>📝 Avslut notering:</strong> {preliminarAvslutNotering}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowFinalConfirmation(false)}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                ← Återgå till formuläret
+              </button>
+              <button
+                onClick={confirmFinalSave}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                ✅ Bekräfta & Spara
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Success Modal */}
       {showSuccessModal && (
