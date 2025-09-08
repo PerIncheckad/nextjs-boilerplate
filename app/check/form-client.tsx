@@ -53,31 +53,13 @@ const STATIONER: Record<string, string[]> = {
 
 // Skadetyper (alfabetisk ordning)
 const DAMAGE_TYPES = [
-  'Buckla',
-  'Däckskada sommarhjul',
-  'Däckskada vinterhjul',
-  'Fälgskada sommarhjul',
-  'Fälgskada vinterhjul',
-  'Feltankning',
-  'Höjdledsskada',
-  'Intryck',
-  'Invändig skada',
-  'Jack',
-  'Krockskada',
-  'Krossad ruta',
-  'Oaktsamhet',
-  'Punktering',
-  'Repa',
-  'Repor',
-  'Saknas',
-  'Skrapad',
-  'Spricka',
-  'Stenskott',
-  'Trasig',
-  'Övrigt'
+  'Buckla', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
+  'Fälgskada vinterhjul', 'Feltankning', 'Höjdledsskada', 'Intryck', 'Invändig skada',
+  'Jack', 'Krockskada', 'Krossad ruta', 'Oaktsamhet', 'Punktering', 'Repa', 'Repor',
+  'Saknas', 'Skrapad', 'Spricka', 'Stenskott', 'Trasig', 'Övrigt'
 ].sort();
 
-// Uppdaterade bildelar och positioner - Motorhuv bara Utsida
+// Uppdaterade bildelar och positioner
 const CAR_PARTS: Record<string, string[]> = {
   'Annan del': [],
   'Bagagelucka': ['Insida', 'Utsida'],
@@ -88,7 +70,7 @@ const CAR_PARTS: Record<string, string[]> = {
   'Fälg': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
   'Glas': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
   'Grill': [],
-  'Motorhuv': ['Utsida'], // Bara Utsida
+  'Motorhuv': ['Utsida'],
   'Skärm': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
   'Stötfångare fram': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
   'Tak': [],
@@ -96,41 +78,21 @@ const CAR_PARTS: Record<string, string[]> = {
   'Yttre backspegel': ['Höger', 'Vänster']
 };
 
-// TAJT skadelogik - mer specifik
+// TAJT skadelogik
 const getRelevantCarParts = (damageType: string): string[] => {
   const lowerType = damageType.toLowerCase();
-  
-  // Däck-relaterade skador - bara däck
-  if (lowerType.includes('däckskada')) {
-    return ['Däck'];
-  }
-  
-  // Fälg-relaterade skador - bara fälg
-  if (lowerType.includes('fälgskada')) {
-    return ['Fälg'];
-  }
-  
-  // Punktering - bara däck
-  if (lowerType.includes('punktering')) {
-    return ['Däck'];
-  }
-  
-  // Glas-relaterade skador
+  if (lowerType.includes('däckskada')) return ['Däck'];
+  if (lowerType.includes('fälgskada')) return ['Fälg'];
+  if (lowerType.includes('punktering')) return ['Däck'];
   if (lowerType.includes('ruta') || lowerType.includes('stenskott')) {
     return ['Glas', 'Motorhuv', 'Tak'].sort();
   }
-  
-  // Krockskador - karosseri
   if (lowerType.includes('krock')) {
     return ['Stötfångare fram', 'Skärm', 'Dörr utsida', 'Bagagelucka', 'Motorhuv'].sort();
   }
-  
-  // Höjdledsskador - tak och motorhuv
   if (lowerType.includes('höjdled')) {
     return ['Tak', 'Motorhuv', 'Bagagelucka'].sort();
   }
-  
-  // Övriga skador - alla delar
   return Object.keys(CAR_PARTS).sort();
 };
 
@@ -183,11 +145,9 @@ const createVideoThumbnail = (file: File): Promise<string> => {
 
 const processFiles = async (files: File[]): Promise<MediaFile[]> => {
   const mediaFiles: MediaFile[] = [];
-  
   for (const file of files) {
     const type = getFileType(file);
     const mediaFile: MediaFile = { file, type };
-    
     if (type === 'image') {
       mediaFile.preview = URL.createObjectURL(file);
     } else if (type === 'video') {
@@ -197,14 +157,10 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
         console.warn('Could not create video thumbnail:', error);
       }
     }
-    
     mediaFiles.push(mediaFile);
   }
-  
   return mediaFiles;
-};
-
-export default function CheckInForm() {
+};export default function CheckInForm() {
   // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
   const [carData, setCarData] = useState<CarData[]>([]);
@@ -440,9 +396,7 @@ export default function CheckInForm() {
            isCleaningComplete() &&
            isDamagesComplete() &&
            isStatusComplete();
-  };
-
-  const resetForm = () => {
+  };const resetForm = () => {
     setRegInput('');
     setCarData([]);
     setExistingDamages([]);
@@ -476,13 +430,11 @@ export default function CheckInForm() {
     setShowSuccessModal(false);
   };
 
-  // UPPDATERAD handleSave - visar antingen fel eller bekräftelse
   const handleSave = () => {
     if (canSave()) {
       setShowFinalConfirmation(true);
     } else {
       setShowFieldErrors(true);
-      // Scrolla till första ofullständiga sektion
       setTimeout(() => {
         const firstIncomplete = document.querySelector('.section-incomplete');
         if (firstIncomplete) {
@@ -709,7 +661,7 @@ export default function CheckInForm() {
     </div>
   );
 
-  // Media upload component - uppdaterad text
+  // Media upload component
   const MediaUpload = ({
     damageId,
     isOld,
@@ -728,7 +680,6 @@ export default function CheckInForm() {
         Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
       </label>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {/* Foto-knapp */}
         <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
           <input
             type="file"
@@ -759,7 +710,6 @@ export default function CheckInForm() {
           </label>
         </div>
 
-        {/* Video-knapp */}
         <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
           <input
             type="file"
@@ -789,7 +739,6 @@ export default function CheckInForm() {
           </label>
         </div>
 
-        {/* Galleri-knapp */}
         <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
           <input
             type="file"
@@ -827,8 +776,7 @@ export default function CheckInForm() {
     </div>
   );
 
-  return (
-    <div style={{
+  return (<div style={{
       minHeight: '100vh',
       backgroundColor: '#f8fafc',
       color: '#111827'
@@ -891,7 +839,7 @@ export default function CheckInForm() {
               }}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling!.style.display = 'flex';
+                (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex';
               }}
             />
             <div style={{
@@ -1053,395 +1001,120 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* Plats för incheckning med visuell feedback */}
-        <div style={{
+        {/* Smart spara-knapp */}
+        <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isLocationComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Plats för incheckning" isComplete={isLocationComplete()} />
-
-          {!annanPlats && (
-            <>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Ort *
-                </label>
-                <select
-                  value={ort}
-                  onChange={(e) => {
-                    setOrt(e.target.value);
-                    setStation('');
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: showFieldErrors && !ort ? '2px solid #dc2626' : '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: '#ffffff'
-                  }}
-                >
-                  <option value="">--- Välj ort ---</option>
-                  {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Station / Depå *
-                </label>
-                <select
-                  value={station}
-                  onChange={(e) => setStation(e.target.value)}
-                  disabled={!ort}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: showFieldErrors && !station ? '2px solid #dc2626' : '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: ort ? '#ffffff' : '#f3f4f6',
-                    color: ort ? '#000' : '#9ca3af'
-                  }}
-                >
-                  <option value="">--- Välj station / depå ---</option>
-                  {availableStations.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            </>
-          )}
-
+          textAlign: 'center'
+        }}>
           <button
             type="button"
-            onClick={() => {
-              setAnnanPlats(!annanPlats);
-              if (!annanPlats) {
-                setOrt('');
-                setStation('');
-              } else {
-                setAnnanPlatsText('');
-              }
-            }}
+            onClick={handleSave}
             style={{
-              background: 'none',
+              width: '100%',
+              padding: '18px',
+              backgroundColor: canSave() ? '#10b981' : '#6b7280',
+              color: '#ffffff',
               border: 'none',
-              color: '#033066',
-              textDecoration: 'underline',
+              borderRadius: '8px',
+              fontSize: '20px',
+              fontWeight: '600',
               cursor: 'pointer',
-              fontSize: '14px',
-              marginBottom: '16px'
+              opacity: 1,
+              boxShadow: canSave() ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
             }}
           >
-            {annanPlats ? '← Tillbaka till ort/station' : '+ Annan plats (fritext)'}
+            {canSave() ? 'Spara incheckning' : 'Visa saknade fält'}
           </button>
-
-          {annanPlats && (
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Annan plats *
-              </label>
-              <input
-                type="text"
-                value={annanPlatsText}
-                onChange={(e) => setAnnanPlatsText(e.target.value)}
-                placeholder="Beskriv platsen..."
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !annanPlatsText.trim() ? '2px solid #dc2626' : '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: '#ffffff'
-                }}
-              />
-            </div>
-          )}
-
-          {showFieldErrors && !isLocationComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>
-              ⚠️ Ort och station/depå eller annan plats är obligatorisk
-            </p>
-          )}
-        </div>
-
-        {/* Fordonsstatus med smart drivmedelslogik och feedback */}
-        <div style={{
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isVehicleStatusComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isVehicleStatusComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Fordonsstatus" isComplete={isVehicleStatusComplete()} />
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Mätarställning *
-            </label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9\s]*"
-                value={matarstallning}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9\s]/g, '');
-                  setMatarstallning(value);
-                }}
-                placeholder="ex. 42180"
-                style={{
-                  flex: 1,
-                  padding: '12px',
-                  border: showFieldErrors && !matarstallning.trim() ? '2px solid #dc2626' : '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: '#ffffff'
-                }}
-              />
-              <span style={{ color: '#666', fontWeight: '500' }}>km</span>
-            </div>
-          </div>
-
-          {/* Drivmedel */}
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Drivmedel *
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setDrivmedelstyp('bensin_diesel');
-                  setLaddniva('');
-                  setAntalLaddkablar(null);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !drivmedelstyp ? '2px solid #dc2626' : '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#033066' : '#ffffff',
-                  color: drivmedelstyp === 'bensin_diesel' ? '#ffffff' : '#000',
-                  cursor: 'pointer'
-                }}
-              >
-                Bensin/Diesel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setDrivmedelstyp('elbil');
-                  setTankniva(null);
-                  setLiters('');
-                  setBransletyp(null);
-                  setAdblue(null);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !drivmedelstyp ? '2px solid #dc2626' : '1px solid #d1d5db',
-                  borderRadius: '6px',
-                  backgroundColor: drivmedelstyp === 'elbil' ? '#033066' : '#ffffff',
-                  color: drivmedelstyp === 'elbil' ? '#ffffff' : '#000',
-                  cursor: 'pointer'
-                }}
-              >
-                Elbil
-              </button>
-            </div>
-          </div>
-
-          {/* Tanknivå för bensin/diesel */}
-          {drivmedelstyp === 'bensin_diesel' && (
-            <>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Tanknivå *
-                </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setTankniva('fulltankad')}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: tankniva === 'fulltankad' ? '#10b981' : '#ffffff',
-                      color: tankniva === 'fulltankad' ? '#ffffff' : '#000',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Fulltankad
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTankniva('tankas_senare')}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: tankniva === 'tankas_senare' ? '#f59e0b' : '#ffffff',
-                      color: tankniva === 'tankas_senare' ? '#ffffff' : '#000',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Ej fulltankad - tankas senare
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTankniva('pafylld_nu')}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '6px',
-                      backgroundColor: tankniva === 'pafylld_nu' ? '#033066' : '#ffffff',
-                      color: tankniva === 'pafylld_nu' ? '#ffffff' : '#000',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Ej fulltankad - påfylld nu
-                  </button>
-                </div>
-              </div>
-
-              {tankniva === 'pafylld_nu' && (
-                <>
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Antal liter påfyllda *
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      pattern="[0-9,]*"
-                      value={liters}
-                      onChange={(e) => {
-                        let value = e.target.value;
-                        value = value.replace(/\./g, ',');
-                        value = value.replace(/[^0-9,]/g, '');
-                        const parts = value.split(',');
-                        if (parts.length > 2) {
-                          value = parts[0] + ',' + parts[1];
-                        }
-                        if (/^\d{0,4}(,\d{0,1})?$/.test(value)) {
-                          setLiters(value);
-                        }
-                      }}
-                      placeholder="ex. 12,5"
-                      style={{
-                        width: '200px',
-                        padding: '12px',
-                        border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        backgroundColor: '#ffffff'
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: '16px' }}>
-                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Bränsletyp *
-                    </label>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setBransletyp('Bensin')}
-                        style={{
-                          flex: 1,
-                          padding: '12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          backgroundColor: bransletyp === 'Bensin' ? '#033066' : '#ffffff',
-                          color: bransletyp === 'Bensin' ? '#ffffff' : '#000',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Bensin
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBransletyp('Diesel')}
-                        style={{
-                          flex: 1,
-                          padding: '12px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '6px',
-                          backgroundColor: bransletyp === 'Diesel' ? '#033066' : '#ffffff',
-                          color: bransletyp === 'Diesel' ? '#ffffff' : '#000',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Diesel
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
-          )}
-
-          {/* Laddnivå för elbil */}
-          {drivmedelstyp === 'elbil' && (
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Laddnivå *
-              </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={laddniva}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, '');
-                    const numValue = parseInt(value);
-                    if (value === '' || (numValue >= 0 && numValue <= 100)) {
-                      setLaddniva(value);
-                    }
-                  }}
-                  placeholder="ex. 85"
-                  style={{
-                    width: '100px',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    backgroundColor: '#ffffff'
-                  }}
-                />
-                <span style={{ color: '#666', fontWeight: '500' }}>%</span>
-              </div>
-            </div>
-          )}
-
-          {/* Övriga fordonsstatus-fält - smart layout */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: drivmedelstyp === 'bensin_diesel' ? '1fr 1fr' : '1fr',
-            gap: '16px',
-            marginBottom: '16px'
+          <p style={{ 
+            textAlign: 'center', 
+            color: '#666', 
+            fontSize: '12px', 
+            margin: '16px 0 0 0'
           }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Spolarvätska OK? *
-              </label>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setSpolarvatska(true)}
-                  style={{
-                    flex: 1,
-                    padding: '8px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '6px',
-                    backgroundColor: spolarvatska === true ? '#10b981' : '#ffffff',
-                    color: spolarvatska
+            © Albarone AB 2025
+          </p>
+        </div>
+      </div>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '32px',
+            margin: '20px',
+            maxWidth: '400px',
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: '#10b981',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 20px',
+              fontSize: '32px',
+              color: '#ffffff'
+            }}>
+              ✓
+            </div>
+            
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              marginBottom: '12px',
+              color: '#1f2937'
+            }}>
+              Tack Bob!
+            </h2>
+            
+            <p style={{
+              fontSize: '16px',
+              color: '#6b7280',
+              marginBottom: '24px'
+            }}>
+              Incheckning sparad för {regInput}
+            </p>
+            
+            <button
+              onClick={resetForm}
+              style={{
+                backgroundColor: '#033066',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 24px',
+                fontSize: '16px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Starta ny incheckning
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
