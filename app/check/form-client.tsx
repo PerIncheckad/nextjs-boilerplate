@@ -37,66 +37,66 @@ type MediaFile = {
   thumbnail?: string;
 };
 
-// UPPDATERADE platser och stationer från "Stationer o Depåer Albarone"
+// UPPDATERADE platser och stationer - BARA stationsnummer i parentes
 const ORTER = ['Ängelholm', 'Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg'];
 
 const STATIONER: Record<string, string[]> = {
   'Ängelholm': [
-    'Hedin Automotive Ford (angelholm-hedin-ford)',
-    'Hedin Automotive (angelholm-hedin)',
-    'Ängelholm Airport (angelholm-airport)'
+    'Hedin Automotive Ford (1701)',
+    'Hedin Automotive (1702)',
+    'Ängelholm Airport (1703)'
   ],
   'Falkenberg': [
-    'Falkenberg (falkenberg)'
+    'Falkenberg (1801)'
   ],
   'Halmstad': [
-    'Hedin Automotive Ford (halmstad-hedin-ford)',
-    'Hedin Automotive Kia (halmstad-hedin-kia)',
-    'Hedin Automotive Mercedes (halmstad-hedin-mercedes)',
-    'Hedin Automotive (halmstad-hedin)',
-    'Halmstad City Airport (halmstad-city-airport)'
+    'Hedin Automotive Ford (1401)',
+    'Hedin Automotive Kia (1402)',
+    'Hedin Automotive Mercedes (1403)',
+    'Hedin Automotive (1404)',
+    'Halmstad City Airport (1405)'
   ],
   'Helsingborg': [
-    'Bil & Skadeservice (helsingborg-bilskadeservice)',
-    'Floretten (helsingborg-floretten)',
-    'Förenade Bil (helsingborg-forenade-bil)',
-    'Hedin Automotive Ford (helsingborg-hedin-ford)',
-    'Hedin Automotive Kia (helsingborg-hedin-kia)',
-    'Hedin Automotive (helsingborg-hedin)',
-    'Hedin Bil Transport (helsingborg-hedin-transport)',
-    'S.Jönsson Bil (helsingborg-sjonsson)',
-    'Verkstad (helsingborg-verkstad)',
-    'HBSC (helsingborg-hbsc)'
+    'Bil & Skadeservice (1501)',
+    'Floretten (1502)',
+    'Förenade Bil (1503)',
+    'Hedin Automotive Ford (1504)',
+    'Hedin Automotive Kia (1505)',
+    'Hedin Automotive (1506)',
+    'Hedin Bil Transport (1507)',
+    'S.Jönsson Bil (1508)',
+    'Verkstad (1509)',
+    'HBSC (1510)'
   ],
   'Lund': [
-    'Bil & Skadeservice (lund-bilskadeservice)',
-    'Hedin Automotive Ford (lund-hedin-ford)',
-    'Hedin Automotive (lund-hedin)',
-    'Hedin Bil (lund-hedin-bil)',
-    'P7 Revingehed (lund-p7-revingehed)'
+    'Bil & Skadeservice (1301)',
+    'Hedin Automotive Ford (1302)',
+    'Hedin Automotive (1303)',
+    'Hedin Bil (1304)',
+    'P7 Revingehed (1305)'
   ],
   'Malmö': [
-    'Automerna (malmo-automerna)',
-    'Hedin Automotive Ford (malmo-hedin-ford)',
-    'Hedin Automotive Jägersro (malmo-hedin-jagersro)',
-    'Hedin Automotive Mercedes (malmo-hedin-mercedes)',
-    'Mechanum (malmo-mechanum)',
-    'Malmö Airport (malmo-airport)',
-    'BERNSTORP (Verkstad) (malmo-bernstorp-verkstad)',
-    'BURLÖV (Hedin Automotive) (malmo-burlov-hedin)',
-    'FOSIE (Hedbergs Bil) (malmo-fosie-hedbergs)',
-    'HAMN (Verkstad) (malmo-hamn-verkstad)',
-    'LÅNGTID (malmo-langtid)'
+    'Automerna (1662)',
+    'Hedin Automotive Ford (1663)',
+    'Hedin Automotive Jägersro (1664)',
+    'Hedin Automotive Mercedes (1665)',
+    'Mechanum (1666)',
+    'Malmö Airport (1667)',
+    'BERNSTORP Verkstad (1668)',
+    'BURLÖV Hedin Automotive (1669)',
+    'FOSIE Hedbergs Bil (1670)',
+    'HAMN Verkstad (1671)',
+    'LÅNGTID (1672)'
   ],
   'Trelleborg': [
-    'Trelleborg (trelleborg)'
+    'Trelleborg (1901)'
   ],
   'Varberg': [
-    'Finnvedens Bil Skadecenter (varberg-finnvedens-skadecenter)',
-    'Hedin Automotive Ford (varberg-hedin-ford)',
-    'Hedin Automotive Holmgärde (varberg-hedin-holmgarde)',
-    'Hedin Automotive (varberg-hedin)',
-    'Sällstorps Plåt & Lack (varberg-sallstorps-plat-lack)'
+    'Finnvedens Bil Skadecenter (1201)',
+    'Hedin Automotive Ford (1202)',
+    'Hedin Automotive Holmgärde (1203)',
+    'Hedin Automotive (1204)',
+    'Sällstorps Plåt & Lack (1205)'
   ]
 };
 
@@ -270,13 +270,13 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
   const [tankniva, setTankniva] = useState<'fulltankad' | 'tankas_senare' | 'pafylld_nu' | null>(null);
   const [liters, setLiters] = useState('');
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
-  const [literpris, setLiterpris] = useState(''); // NYTT: Literpris
+  const [literpris, setLiterpris] = useState('');
   
   // För elbil
   const [laddniva, setLaddniva] = useState('');
 
-  // Övriga fält - UPPDATERADE med rätt logik
-  const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null); // ÄNDRAT: boolean för OK/Behöver påfyllning
+  // Övriga fält
+  const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
   const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
   const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
   const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
@@ -302,19 +302,35 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
-  // FÖRBÄTTRAD autocomplete - aktiveras från 2 tecken
+  // FIXAD autocomplete - hämtar från BÅDA tabellerna
   useEffect(() => {
     async function fetchAllRegistrations() {
       try {
-        const { data, error } = await supabase
-          .from('mabi_damage_data')
-          .select('Regnr')
-          .order('Regnr');
+        // Hämta från båda tabellerna parallellt
+        const [mabiResult, carResult] = await Promise.all([
+          supabase.from('mabi_damage_data').select('Regnr').order('Regnr'),
+          supabase.from('car_data').select('regnr').order('regnr')
+        ]);
 
-        if (!error && data) {
-          const uniqueRegs = [...new Set(data.map(item => item.Regnr))].filter(Boolean);
-          setAllRegistrations(uniqueRegs);
+        const allRegs = new Set<string>();
+        
+        // Lägg till från mabi_damage_data
+        if (!mabiResult.error && mabiResult.data) {
+          mabiResult.data.forEach(item => {
+            if (item.Regnr) allRegs.add(item.Regnr.toString().toUpperCase());
+          });
         }
+
+        // Lägg till från car_data
+        if (!carResult.error && carResult.data) {
+          carResult.data.forEach(item => {
+            if (item.regnr) allRegs.add(item.regnr.toString().toUpperCase());
+          });
+        }
+
+        const sortedRegs = Array.from(allRegs).sort();
+        setAllRegistrations(sortedRegs);
+        console.log('Loaded registrations:', sortedRegs.length, 'found');
       } catch (err) {
         console.warn('Could not fetch registrations for autocomplete:', err);
       }
@@ -323,16 +339,17 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     fetchAllRegistrations();
   }, []);
 
-  // FÖRBÄTTRADE suggestions - från 2 tecken
+  // FIXADE suggestions - fungerar med substring-sökning
   const suggestions = useMemo(() => {
     if (!regInput.trim() || regInput.trim().length < 2) return [];
     const input = regInput.toUpperCase();
-    return allRegistrations
-      .filter(reg => reg.toUpperCase().startsWith(input))
+    const matches = allRegistrations
+      .filter(reg => reg.includes(input))
       .slice(0, 5);
+    return matches;
   }, [regInput, allRegistrations]);
 
-  // FIXAD skademappning - hämtar från ALLA 3 kolumner (H, K, M)
+  // FIXAD bildata-hämtning - söker i BÅDA tabellerna mer effektivt
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -348,22 +365,31 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
       setNotFound(false);
 
       try {
-        // Först försök hämta från mabi_damage_data
-        const { data: newData, error: newError } = await supabase
-          .from('mabi_damage_data')
-          .select('*')
-          .eq('Regnr', normalizedReg)
-          .order('id', { ascending: false });
+        // Parallell sökning i båda tabellerna
+        const [mabiResult, carResult] = await Promise.all([
+          supabase
+            .from('mabi_damage_data')
+            .select('*')
+            .eq('Regnr', normalizedReg)
+            .order('id', { ascending: false }),
+          supabase
+            .from('car_data')
+            .select('*')
+            .eq('regnr', normalizedReg)
+            .order('created_at', { ascending: false })
+        ]);
 
         if (cancelled) return;
 
         let useData: CarData[] = [];
         let damages: ExistingDamage[] = [];
 
-        if (!newError && newData && newData.length > 0) {
-          // Mappa från mabi_damage_data med svenska kolumnnamn
-          useData = newData.map(row => ({
-            regnr: getColumnValue(row, 'Regnr', ['regnr']),
+        // Prioritera mabi_damage_data om den har data
+        if (!mabiResult.error && mabiResult.data && mabiResult.data.length > 0) {
+          console.log('Found in mabi_damage_data:', mabiResult.data.length, 'rows');
+          
+          useData = mabiResult.data.map(row => ({
+            regnr: getColumnValue(row, 'Regnr', ['regnr']) || normalizedReg,
             brand_model: getColumnValue(row, 'Modell', ['Modell', 'brand_model']),
             damage_text: getColumnValue(row, 'Skadetyp', ['skadetyp']),
             damage_detail: getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']),
@@ -371,18 +397,18 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             saludatum: null
           }));
 
-          // KOMPLETT SKADEHANTERING - ALLA TRE KOLUMNER (H, K, M)
-          damages = newData
+          // Skapa skador från ALLA TRE kolumner
+          damages = mabiResult.data
             .filter(row => {
-              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';           // H
-              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || ''; // K
-              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || ''; // M
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
+              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
+              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
               return skadetyp || skadeanmalan || internNotering;
             })
             .map((row, index) => {
-              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';           // H
-              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || ''; // K  
-              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || ''; // M
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
+              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
+              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
               
               const fullText = createCombinedDamageText(skadetyp, skadeanmalan, internNotering);
               
@@ -399,51 +425,47 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                 media: []
               };
             });
-        } else {
-          // Fallback till gamla car_data
-          const { data: oldData, error: oldError } = await supabase
-            .from('car_data')
-            .select('*')
-            .eq('regnr', normalizedReg)
-            .order('created_at', { ascending: false });
 
-          if (!oldError && oldData && oldData.length > 0) {
-            const validData = oldData.filter(row => row.wheelstorage !== null && row.saludatum !== null);
-            useData = validData.length > 0 ? validData : oldData;
+        } else if (!carResult.error && carResult.data && carResult.data.length > 0) {
+          console.log('Found in car_data:', carResult.data.length, 'rows');
+          
+          const validData = carResult.data.filter(row => row.wheelstorage !== null && row.saludatum !== null);
+          useData = validData.length > 0 ? validData : carResult.data;
 
-            damages = useData
-              .map((item, index) => {
-                if (!item.damage_text) return null;
+          damages = useData
+            .map((item, index) => {
+              if (!item.damage_text) return null;
 
-                const shortText = item.damage_text;
-                const detailText = item.damage_detail || null;
-                const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
+              const shortText = item.damage_text;
+              const detailText = item.damage_detail || null;
+              const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
 
-                return {
-                  id: `existing-${index}`,
-                  shortText,
-                  detailText,
-                  fullText,
-                  status: 'not_selected',
-                  userType: '',
-                  userCarPart: '',
-                  userPosition: '',
-                  userDescription: '',
-                  media: []
-                };
-              })
-              .filter((damage): damage is ExistingDamage => damage !== null);
-          }
+              return {
+                id: `existing-${index}`,
+                shortText,
+                detailText,
+                fullText,
+                status: 'not_selected',
+                userType: '',
+                userCarPart: '',
+                userPosition: '',
+                userDescription: '',
+                media: []
+              };
+            })
+            .filter((damage): damage is ExistingDamage => damage !== null);
         }
 
         if (useData.length > 0) {
           setCarData(useData);
           setExistingDamages(damages);
           setNotFound(false);
+          console.log('Car data loaded successfully');
         } else {
           setCarData([]);
           setExistingDamages([]);
           setNotFound(true);
+          console.log('No data found for:', normalizedReg);
         }
 
       } catch (err) {
@@ -729,10 +751,15 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     }));
   };
 
-  // FÖRBÄTTRADE input handlers
+  // FIXADE input handlers
   const handleRegInputChange = (value: string) => {
-    setRegInput(value.toUpperCase());
-    setShowSuggestions(value.length >= 2 && suggestions.length > 0); // ÄNDRAT: från 2 tecken
+    const upperValue = value.toUpperCase();
+    setRegInput(upperValue);
+    
+    // Visa suggestions från 2 tecken om det finns matches
+    const shouldShow = upperValue.length >= 2 && suggestions.length > 0;
+    setShowSuggestions(shouldShow);
+    console.log('Input changed to:', upperValue, 'Should show suggestions:', shouldShow, 'Matches:', suggestions.length);
   };
 
   const selectSuggestion = (suggestion: string) => {
@@ -799,7 +826,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
     </div>
   );
 
-  // Media upload component - uppdaterad text
+  // Media upload component
   const MediaUpload = ({
     damageId,
     isOld,
@@ -1005,7 +1032,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>{/* Registreringsnummer med förbättrad autocomplete */}
+      }}>{/* FIXAD Registreringsnummer med förbättrad autocomplete */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1025,7 +1052,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               type="text"
               value={regInput}
               onChange={(e) => handleRegInputChange(e.target.value)}
-              onFocus={() => setShowSuggestions(regInput.length >= 2 && suggestions.length > 0)}
+              onFocus={() => {
+                if (regInput.length >= 2 && suggestions.length > 0) {
+                  setShowSuggestions(true);
+                }
+              }}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
               placeholder="Skriv reg.nr"
               spellCheck={false}
@@ -1043,7 +1074,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
               }}
             />
 
-            {/* FÖRBÄTTRAD autocomplete dropdown */}
+            {/* FIXAD autocomplete dropdown */}
             {showSuggestions && suggestions.length > 0 && (
               <div style={{
                 position: 'absolute',
@@ -1087,7 +1118,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 
           {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
           
-          {notFound && normalizedReg && (
+          {notFound && normalizedReg && !loading && (
             <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>Okänt reg.nr</p>
           )}
 
@@ -1097,7 +1128,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             </p>
           )}
 
-          {/* FIXAD bilinfo med ALLA TRE skadekolumner */}
+          {/* Bilinfo med ALLA TRE skadekolumner */}
           {carData.length > 0 && (
             <div style={{
               marginTop: '20px',
@@ -1263,7 +1294,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
           )}
         </div>
 
-        {/* UPPDATERAD Fordonsstatus med fler ändringar */}
+        {/* UPPDATERAD Fordonsstatus med literpris */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -1280,6 +1311,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             </label>
             <input
               type="number"
+              inputMode="numeric"
               value={matarstallning}
               onChange={(e) => setMatarstallning(e.target.value)}
               placeholder="Ange mätarställning"
@@ -1423,7 +1455,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                   {/* NYTT: Literpris */}
                   <div>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Literpris *
+                      Literpris (kr) *
                     </label>
                     <input
                       type="number"
@@ -1490,6 +1522,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
                 </label>
                 <input
                   type="number"
+                  inputMode="numeric"
                   min="0"
                   max="100"
                   value={laddniva}
@@ -1540,7 +1573,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
             </>
           )}
 
-          {/* UPPDATERADE gemensamma fält */}
+          {/* Gemensamma fält */}
           <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
             <div style={{ flex: 1 }}>
               <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
@@ -2547,7 +2580,7 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
         </div>
       )}
 
-      {/* UPPDATERAD Success Modal - "Tack Bob!" */}
+      {/* SUCCESS Modal - "Tack Bob!" */}
       {showSuccessModal && (
         <div style={{
           position: 'fixed',
