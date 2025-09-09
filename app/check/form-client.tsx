@@ -8,23 +8,38 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// FIXAD getColumnValue för korrekt kolumnmappning
+const getColumnValue = (row: any, primaryName: string, fallbacks: string[] = []) => {
+  // Prova först det primära namnet
+  if (row[primaryName] !== undefined && row[primaryName] !== null) {
+    return String(row[primaryName]).trim() || null;
+  }
+  
+  // Prova fallbacks
+  for (const fallback of fallbacks) {
+    if (row[fallback] !== undefined && row[fallback] !== null) {
+      return String(row[fallback]).trim() || null;
+    }
+  }
+  
+  return null;
+};
+
 type CarData = {
   regnr: string;
   brand_model: string | null;
-  damage_text: string | null;
-  damage_location: string | null;
-  damage_notes: string | null;
+  damage_text: string | null;      // H: Skadetyp
+  damage_detail: string | null;    // K: Skadeanmälan  
+  damage_notes: string | null;     // M: Intern notering
   wheelstorage: string | null;
   saludatum: string | null;
 };
 
 type ExistingDamage = {
   id: string;
-  skadetyp: string;
-  plats: string;
-  notering: string;
-  fullText: string;
   shortText: string;
+  detailText?: string;
+  fullText: string;
   status: 'not_selected' | 'documented' | 'fixed';
   userType?: string;
   userCarPart?: string;
@@ -40,24 +55,33 @@ type MediaFile = {
   thumbnail?: string;
 };
 
-// KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
+type NewDamage = {
+  id: string;
+  type: string;
+  carPart: string;
+  position: string;
+  description: string;
+  media: MediaFile[];
+};
+
+// KORRIGERADE stationsnamn från "Stationer o Depåer Albarone"
 const ORTER = ['Malmö Jägersro', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
 
 const STATIONER: Record<string, string[]> = {
   'Malmö Jägersro': [
     'Ford Malmö',
-    'Mechanum',
+    'Mechanum', 
     'Malmö Automera',
     'Mercedes Malmö',
     'Werksta St Bernstorp',
     'Werksta Malmö Hamn',
     'Hedbergs Malmö',
     'Hedin Automotive Burlöv',
-    'Sturup'  // Inte "LÅNGTID"
+    'Sturup'
   ],
   'Helsingborg': [
     'HBSC Helsingborg',
-    'Ford Helsingborg',
+    'Ford Helsingborg', 
     'Transport Helsingborg',
     'S. Jönsson',
     'BMW Helsingborg',
@@ -65,45 +89,41 @@ const STATIONER: Record<string, string[]> = {
     'Euromaster Helsingborg',
     'B/S Klippan',
     'B/S Munka-Ljungby',
-    'B/S Helsingborg',
+    'B/S Helsingborg', 
     'Werksta Helsingborg',
     'Båstad'
-  ],
-  'Lund': [
-    'Ford Lund',
-    'Hedin Lund',
-    'B/S Lund',
-    'P7 Revinge'
   ],
   'Ängelholm': [
     'FORD Ängelholm',
     'Mekonomen Ängelholm',
     'Flyget Ängelholm'
   ],
-  'Falkenberg': [
-    'Falkenberg'
-  ],
   'Halmstad': [
     'Flyget Halmstad',
-    'KIA Halmstad',  // Inte "Hedin Automotive KIA"
+    'KIA Halmstad', 
     'FORD Halmstad'
   ],
-  'Trelleborg': [
-    'Trelleborg'
-  ],
+  'Falkenberg': [],
+  'Trelleborg': [],
   'Varberg': [
     'Ford Varberg',
     'Hedin Automotive Varberg',
     'Sällstorp lack plåt',
     'Finnveden plåt'
+  ],
+  'Lund': [
+    'Ford Lund',
+    'Hedin Lund',
+    'B/S Lund', 
+    'P7 Revinge'
   ]
 };
 
 const DAMAGE_TYPES = [
-  'Buckla', 'Däckskada', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
+  'Buckla', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
   'Fälgskada vinterhjul', 'Feltankning', 'Höjdledsskada', 'Intryck', 'Invändig skada',
-  'Jack', 'Krockskada', 'Krossad ruta', 'Oaktsamhet', 'Punktering', 'Repa', 'Repor',
-  'Saknas', 'Skrapad', 'Skrapad fälg', 'Spricka', 'Stenskott', 'Trasig', 'Övrigt'
+  'Jack', 'Krockskada', 'Krossad ruta', 'Oaktsamhet', 'Punktering', 'Repa',
+  'Spricka', 'Stenskott', 'Trasig', 'Övrigt'
 ].sort();
 
 const CAR_PARTS: Record<string, string[]> = {
@@ -124,227 +144,98 @@ const CAR_PARTS: Record<string, string[]> = {
   'Yttre backspegel': ['Höger', 'Vänster']
 };
 
-const getRelevantCarParts = (damageType: string): string[] => {
-  const lowerType = damageType.toLowerCase();
-  if (lowerType.includes('däckskada')) return ['Däck'];
-  if (lowerType.includes('fälgskada')) return ['Fälg'];
-  if (lowerType.includes('punktering')) return ['Däck'];
-  if (lowerType.includes('ruta') || lowerType.includes('stenskott')) {
-    return ['Glas', 'Motorhuv', 'Tak'].sort();
-  }
-  if (lowerType.includes('krock')) {
-    return ['Stötfångare fram', 'Skärm', 'Dörr utsida', 'Bagagelucka', 'Motorhuv'].sort();
-  }
-  if (lowerType.includes('höjdled')) {
-    return ['Tak', 'Motorhuv', 'Bagagelucka'].sort();
-  }
-  return Object.keys(CAR_PARTS).sort();
-};
-
-const CAR_PART_OPTIONS = Object.keys(CAR_PARTS).sort();
-
 function normalizeReg(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-const isDateWithinDays = (dateStr: string | null, days: number): boolean => {
-  if (!dateStr) return false;
-  const date = new Date(dateStr);
-  const today = new Date();
-  const diffTime = date.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays <= days && diffDays >= 0;
-};
-
-const getFileType = (file: File): 'image' | 'video' => {
-  if (file.type.startsWith('image/')) return 'image';
-  if (file.type.startsWith('video/')) return 'video';
-  return 'image';
-};
-
-const createVideoThumbnail = (file: File): Promise<string> => {
-  return new Promise((resolve) => {
-    const video = document.createElement('video');
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d')!;
-
-    video.addEventListener('loadedmetadata', () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      video.currentTime = 0.5;
-    });
-
-    video.addEventListener('seeked', () => {
-      ctx.drawImage(video, 0, 0);
-      const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
-      resolve(thumbnail);
-    });
-
-    video.addEventListener('error', () => {
-      resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiM2YjcyODAiLz48cGF0aCBkPSJNNDUgNDBWODBMNzUgNjBMNDUgNDBaIiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==');
-    });
-
-    video.src = URL.createObjectURL(file);
-  });
-};
-
-const processFiles = async (files: File[]): Promise<MediaFile[]> => {
-  const mediaFiles: MediaFile[] = [];
-  for (const file of files) {
-    const type = getFileType(file);
-    const mediaFile: MediaFile = { file, type };
-    if (type === 'image') {
-      mediaFile.preview = URL.createObjectURL(file);
-    } else if (type === 'video') {
-      try {
-        mediaFile.thumbnail = await createVideoThumbnail(file);
-      } catch (error) {
-        console.warn('Could not create video thumbnail:', error);
-      }
-    }
-    mediaFiles.push(mediaFile);
-  }
-  return mediaFiles;
-};
-
-// KORRIGERAD kolumnmappning för att läsa H, K, M korrekt
-const createCombinedDamageText = (skadetyp: string, plats: string, notering: string): string => {
-  const parts = [];
+// FIXAD funktion för att skapa combined text för befintliga skador
+const createCombinedDamageText = (skadetyp: string, skadeanmalan: string, internNotering: string): string => {
+  const parts: string[] = [];
   
-  if (skadetyp?.trim()) {
-    parts.push(skadetyp.trim());
+  if (skadetyp) {
+    parts.push(skadetyp);
   }
   
-  if (plats?.trim() && plats.trim() !== skadetyp?.trim()) {
-    parts.push(plats.trim());
+  if (skadeanmalan && skadeanmalan !== skadetyp) {
+    parts.push(skadeanmalan);
   }
   
-  if (notering?.trim()) {
-    parts.push(`(${notering.trim()})`);
+  if (internNotering && internNotering !== '---' && internNotering.trim()) {
+    parts.push(`Intern not: ${internNotering}`);
   }
   
-  return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
-};
-
-// FÖRBÄTTRAD kolumnhantering för svenska tecken
-const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] = []): string | null => {
-  // Prova huvudnyckeln först
-  if (row[primaryKey] !== undefined && row[primaryKey] !== null && row[primaryKey] !== '') {
-    return String(row[primaryKey]).trim();
-  }
-  
-  // Prova alternativa nycklar
-  for (const altKey of alternativeKeys) {
-    if (row[altKey] !== undefined && row[altKey] !== null && row[altKey] !== '') {
-      return String(row[altKey]).trim();
-    }
-  }
-  
-  return null;
-};
-
-export default function CheckInForm() {
+  return parts.join(' - ') || 'Okänd skada';
+};export default function FormClient() {
   // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
   const [carData, setCarData] = useState<CarData[]>([]);
-  const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
+  const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
-  // State för bekräftelsedialoger
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [damageToFix, setDamageToFix] = useState<string | null>(null);
-  const [showFinalConfirmation, setShowFinalConfirmation] = useState(false);
-  const [showFieldErrors, setShowFieldErrors] = useState(false);
-
-  // Formulärfält
+  // State för formulärfält
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
   const [annanPlats, setAnnanPlats] = useState(false);
   const [annanPlatsText, setAnnanPlatsText] = useState('');
-  
   const [matarstallning, setMatarstallning] = useState('');
   const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
-  
-  // För bensin/diesel
-  const [tankniva, setTankniva] = useState<'fulltankad' | 'tankas_senare' | 'pafylld_nu' | null>(null);
+  const [tankniva, setTankniva] = useState<'full' | 'pafylld_nu' | null>(null);
   const [liters, setLiters] = useState('');
-  const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
-  const [literpris, setLiterpris] = useState('');
-  
-  // För elbil
+  const [bransletyp, setBransletyp] = useState<'bensin' | 'diesel' | null>(null);
   const [laddniva, setLaddniva] = useState('');
-
-  // Övriga fält
   const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
   const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
-  const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
-  const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
+  const [antalLaddkablar, setAntalLaddkablar] = useState<0 | 1 | 2 | null>(null);
+  const [hjultyp, setHjultyp] = useState<'sommar' | 'vinter' | null>(null);
   const [adblue, setAdblue] = useState<boolean | null>(null);
-  const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
-  const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
-
-  // Skador
-  const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
-  const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
-  const [newDamages, setNewDamages] = useState<{
-    id: string;
-    type: string;
-    carPart: string;
-    position: string;
-    text: string;
-    media: MediaFile[]
-  }[]>([]);
-
-  const [uthyrningsstatus, setUthyrningsstatus] = useState<'redo_for_uthyrning' | 'ledig_tankad' | 'ledig_otankad' | 'klar_otankad' | null>(null);
+  const [tvatt, setTvatt] = useState<boolean | null>(null);
+  const [inre, setInre] = useState<'bra' | 'acceptabelt' | 'daligt' | null>(null);
+  const [skadekontroll, setSkadekontroll] = useState<'inga_skador' | 'befintliga_skador' | 'nya_skador' | null>(null);
+  const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
+  const [uthyrningsstatus, setUthyrningsstatus] = useState<'klar_tankad' | 'klar_otankad' | null>(null);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
+
+  // UI state
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [showFinalConfirmation, setShowFinalConfirmation] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [damageToFix, setDamageToFix] = useState<string | null>(null);
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
-  // Hämtar från BÅDA tabellerna för autocomplete
+  // FIXAD autocomplete - startar vid 2 tecken istället för 3
   useEffect(() => {
-    async function fetchAllRegistrations() {
-      try {
-        const [mabiResult, carResult] = await Promise.all([
-          supabase.from('mabi_damage_data').select('Regnr').order('Regnr'),
-          supabase.from('car_data').select('regnr').order('regnr')
-        ]);
+    if (regInput.length >= 2) {
+      const fetchSuggestions = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('mabi_damage_data')
+            .select('Regnr')
+            .ilike('Regnr', `${regInput}%`)
+            .limit(10);
 
-        const allRegs = new Set<string>();
-        
-        if (!mabiResult.error && mabiResult.data) {
-          mabiResult.data.forEach(item => {
-            if (item.Regnr) allRegs.add(item.Regnr.toString().toUpperCase());
-          });
+          if (!error && data) {
+            const uniqueSuggestions = [...new Set(data.map(row => row.Regnr).filter(Boolean))];
+            setSuggestions(uniqueSuggestions);
+          }
+        } catch (err) {
+          console.error('Autocomplete error:', err);
         }
+      };
 
-        if (!carResult.error && carResult.data) {
-          carResult.data.forEach(item => {
-            if (item.regnr) allRegs.add(item.regnr.toString().toUpperCase());
-          });
-        }
-
-        setAllRegistrations(Array.from(allRegs).sort());
-      } catch (err) {
-        console.warn('Could not fetch registrations for autocomplete:', err);
-      }
+      const timeoutId = setTimeout(fetchSuggestions, 300);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
     }
+  }, [regInput]);
 
-    fetchAllRegistrations();
-  }, []);
-
-  // Autocomplete från 2 tecken
-  const suggestions = useMemo(() => {
-    if (!regInput.trim() || regInput.trim().length < 2) return [];
-    const input = regInput.toUpperCase();
-    return allRegistrations
-      .filter(reg => reg.includes(input))
-      .slice(0, 5);
-  }, [regInput, allRegistrations]);
-
-  // KORRIGERAD skadehantering - läser H, K, M och skapar EN skada per RAD
+  // FIXAD datahämtning - hämtar ALLA tre kolumner (H, K, M)
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -360,95 +251,93 @@ export default function CheckInForm() {
       setNotFound(false);
 
       try {
-        const [mabiResult, carResult] = await Promise.all([
-          supabase
-            .from('mabi_damage_data')
-            .select('*')
-            .eq('Regnr', normalizedReg)
-            .order('id', { ascending: false }),
-          supabase
-            .from('car_data')
-            .select('*')
-            .eq('regnr', normalizedReg)
-            .order('created_at', { ascending: false })
-        ]);
+        // FIX 1: Läs från mabi_damage_data för rika skadedata
+        const { data: mabiData, error: mabiError } = await supabase
+          .from('mabi_damage_data')
+          .select('*')
+          .eq('Regnr', normalizedReg)
+          .order('id', { ascending: false });
 
         if (cancelled) return;
 
         let useData: CarData[] = [];
         let damages: ExistingDamage[] = [];
 
-        if (!mabiResult.error && mabiResult.data && mabiResult.data.length > 0) {
-          // Använd första raden för bildata
-          const firstRow = mabiResult.data[0];
-          useData = [{
-            regnr: normalizedReg,
-            brand_model: getColumnValue(firstRow, 'Modell', ['brand_model']),
-            damage_text: null,
-            damage_location: null,
-            damage_notes: null,
-            wheelstorage: getColumnValue(firstRow, 'wheelstorage', ['Hjulförvaring']),
-            saludatum: getColumnValue(firstRow, 'saludatum', ['Saludatum'])
-          }];
+        if (!mabiError && mabiData && mabiData.length > 0) {
+          // Mappa från mabi_damage_data
+          useData = mabiData.map(row => ({
+            regnr: getColumnValue(row, 'Regnr', ['regnr']),
+            brand_model: getColumnValue(row, 'Modell', ['Modell', 'brand_model']),
+            damage_text: getColumnValue(row, 'Skadetyp', ['skadetyp']),
+            damage_detail: getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']),
+            damage_notes: getColumnValue(row, 'Intern notering', ['intern_notering']),
+            wheelstorage: null,
+            saludatum: null
+          }));
 
-          // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
-          damages = mabiResult.data.map((row, index) => {
-            // Kolumn H: Skadetyp
-            const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
-            // Kolumn K: Skadeanmälan 
-            const plats = getColumnValue(row, 'Skadeanmälan', ['damage_location', 'plats']) || '';
-            // Kolumn M: Intern notering
-            const notering = getColumnValue(row, 'Intern notering', ['internal_notes', 'damage_notes', 'notering']) || '';
-            
-            // Hoppa över rader utan skadeinformation
-            if (!skadetyp && !plats && !notering) return null;
-            
-            const fullText = createCombinedDamageText(skadetyp, plats, notering);
-            
-            return {
-              id: `mabi-${index}`,
-              skadetyp,
-              plats,
-              notering,
-              fullText,
-              shortText: skadetyp || plats || 'Okänd skada',
-              status: 'not_selected' as const,
-              userType: '',
-              userCarPart: '',
-              userPosition: '',
-              userDescription: '',
-              media: []
-            };
-          }).filter((damage): damage is ExistingDamage => damage !== null);
-
-        } else if (!carResult.error && carResult.data && carResult.data.length > 0) {
-          const validData = carResult.data.filter(row => row.wheelstorage !== null && row.saludatum !== null);
-          useData = validData.length > 0 ? validData : carResult.data;
-
-          damages = useData
-            .map((item, index) => {
-              if (!item.damage_text) return null;
-
-              const shortText = item.damage_text;
-              const detailText = item.damage_detail || null;
-              const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
-
+          // FIX 2: Skapa skador från ALLA TRE kolumner (H, K, M)
+          damages = mabiData
+            .filter(row => {
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
+              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
+              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
+              return skadetyp || skadeanmalan || internNotering;
+            })
+            .map((row, index) => {
+              const skadetyp = getColumnValue(row, 'Skadetyp', ['skadetyp']) || '';
+              const skadeanmalan = getColumnValue(row, 'Skadeanmälan', ['skadeanmalan']) || '';
+              const internNotering = getColumnValue(row, 'Intern notering', ['intern_notering']) || '';
+              
+              const fullText = createCombinedDamageText(skadetyp, skadeanmalan, internNotering);
+              
               return {
-                id: `existing-${index}`,
-                skadetyp: shortText,
-                plats: detailText || '',
-                notering: '',
+                id: `mabi-${index}`,
+                shortText: skadetyp || skadeanmalan || 'Okänd skada',
+                detailText: skadeanmalan !== skadetyp ? skadeanmalan : undefined,
                 fullText,
-                shortText,
-                status: 'not_selected',
+                status: 'not_selected' as const,
                 userType: '',
                 userCarPart: '',
                 userPosition: '',
                 userDescription: '',
                 media: []
               };
-            })
-            .filter((damage): damage is ExistingDamage => damage !== null);
+            });
+        } else {
+          // Om inte hittat i mabi_damage_data, sök i car_data
+          const { data: carData, error: carError } = await supabase
+            .from('car_data')
+            .select('*')
+            .eq('regnr', normalizedReg)
+            .order('created_at', { ascending: false });
+
+          if (!carError && carData && carData.length > 0) {
+            const validData = carData.filter(row => row.wheelstorage !== null && row.saludatum !== null);
+            useData = validData.length > 0 ? validData : carData;
+
+            damages = useData
+              .map((item, index) => {
+                if (!item.damage_text) return null;
+
+                const shortText = item.damage_text;
+                const detailText = item.damage_detail || null;
+                const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
+
+                return {
+                  id: `existing-${index}`,
+                  shortText,
+                  detailText,
+                  fullText,
+                  status: 'not_selected',
+                  userType: '',
+                  userCarPart: '',
+                  userPosition: '',
+                  userDescription: '',
+                  media: []
+                };
+              })
+              .filter((damage): damage is ExistingDamage => damage !== null);
+          }
         }
 
         if (useData.length > 0) {
@@ -484,71 +373,100 @@ export default function CheckInForm() {
   const carModel = carData[0]?.brand_model || null;
   const wheelStorage = carData[0]?.wheelstorage || null;
   const saludatum = carData[0]?.saludatum || null;
-  const availableStations = ort ? STATIONER[ort] || [] : [];// KORRIGERAD validering - mer noggrann kontroll
+  const availableStations = ort ? STATIONER[ort] || [] : [];// FIXAD validering - alla fält kontrolleras korrekt
   const isRegComplete = () => regInput.trim().length > 0;
   const isLocationComplete = () => annanPlats ? annanPlatsText.trim().length > 0 : (ort && station);
   const isVehicleStatusComplete = () => {
-    if (!matarstallning.trim() || !drivmedelstyp) return false;
-
+    if (!matarstallning.trim()) return false;
+    if (drivmedelstyp === null) return false;
+    
     if (drivmedelstyp === 'bensin_diesel') {
-      if (!tankniva || adblue === null || spolarvatska === null) return false;
-      if (tankniva === 'pafylld_nu' && (!liters.trim() || !bransletyp || !literpris.trim())) return false;
+      if (tankniva === null) return false;
+      if (tankniva === 'pafylld_nu' && (!liters.trim() || !bransletyp)) return false;
     }
-
+    
     if (drivmedelstyp === 'elbil') {
-      if (!laddniva.trim() || antalLaddkablar === null || spolarvatska === null) return false;
+      if (!laddniva.trim()) return false;
       const laddnivaParsed = parseInt(laddniva);
       if (isNaN(laddnivaParsed) || laddnivaParsed < 0 || laddnivaParsed > 100) return false;
     }
-
-    return insynsskydd !== null && hjultyp !== null;
-  };
-
-  const isCleaningComplete = () => tvatt !== null && inre !== null;
-  
-  const isDamagesComplete = () => {
-    if (!skadekontroll) return false;
-
-    if (skadekontroll === 'nya_skador') {
-      if (newDamages.length === 0) return false;
-      // Kontrollera att alla nya skador har obligatoriska fält
-      if (newDamages.some(damage => !damage.type || !damage.carPart || !damage.text.trim())) return false;
-      if (newDamages.some(damage => damage.carPart && CAR_PARTS[damage.carPart].length > 0 && !damage.position)) return false;
-      if (newDamages.some(damage => !damage.media.some(m => m.type === 'image') || !damage.media.some(m => m.type === 'video'))) return false;
-    }
-
-    // Kontrollera dokumenterade gamla skador
-    const documentedOldDamages = existingDamages.filter(d => d.status === 'documented');
-    if (documentedOldDamages.some(damage => !damage.userDescription?.trim())) return false;
-    if (documentedOldDamages.some(damage => !damage.userType || !damage.userCarPart)) return false;
-    if (documentedOldDamages.some(damage => damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && !damage.userPosition)) return false;
-    if (documentedOldDamages.some(damage => !damage.media?.some(m => m.type === 'image') || !damage.media?.some(m => m.type === 'video'))) return false;
-
+    
     return true;
   };
 
-  const isStatusComplete = () => uthyrningsstatus !== null && preliminarAvslutNotering.trim().length > 0;
-  
-  // KORRIGERAD canSave - mer omfattande kontroll
+  const isCleaningComplete = () => {
+    return spolarvatska !== null && insynsskydd !== null && antalLaddkablar !== null && 
+           hjultyp !== null && adblue !== null && tvatt !== null && inre !== null;
+  };
+
+  const isDamageCheckComplete = () => {
+    if (skadekontroll === null) return false;
+    
+    if (skadekontroll === 'befintliga_skador') {
+      return existingDamages.some(d => d.status === 'documented' || d.status === 'fixed');
+    }
+    
+    if (skadekontroll === 'nya_skador') {
+      return newDamages.length > 0 && newDamages.every(d => 
+        d.type && d.carPart && d.position && d.description.trim()
+      );
+    }
+    
+    return true; // 'inga_skador'
+  };
+
+  const isStatusComplete = () => {
+    return uthyrningsstatus !== null && preliminarAvslutNotering.trim().length > 0;
+  };
+
+  // FIXAD canSave - alla sektioner måste vara kompletta
   const canSave = () => {
-    const regOk = isRegComplete();
-    const locationOk = isLocationComplete();
-    const vehicleOk = isVehicleStatusComplete();
-    const cleaningOk = isCleaningComplete();
-    const damagesOk = isDamagesComplete();
-    const statusOk = isStatusComplete();
+    console.log('=== VALIDERING ===');
+    console.log('Reg complete:', isRegComplete());
+    console.log('Location complete:', isLocationComplete());
+    console.log('Vehicle status complete:', isVehicleStatusComplete());
+    console.log('Cleaning complete:', isCleaningComplete());
+    console.log('Damage check complete:', isDamageCheckComplete());
+    console.log('Status complete:', isStatusComplete());
     
-    console.log('Validation check:', {
-      regOk,
-      locationOk,
-      vehicleOk,
-      cleaningOk,
-      damagesOk,
-      statusOk,
-      overall: regOk && locationOk && vehicleOk && cleaningOk && damagesOk && statusOk
-    });
+    return isRegComplete() && 
+           isLocationComplete() && 
+           isVehicleStatusComplete() && 
+           isCleaningComplete() && 
+           isDamageCheckComplete() && 
+           isStatusComplete();
+  };
+
+  // FIXAD handleSave - med debug-logging
+  const handleSave = () => {
+    console.log('handleSave called');
+    console.log('canSave():', canSave());
     
-    return regOk && locationOk && vehicleOk && cleaningOk && damagesOk && statusOk;
+    if (canSave()) {
+      console.log('Validering OK - visar final confirmation');
+      setShowFinalConfirmation(true);
+    } else {
+      console.log('Validering misslyckades - visar fel');
+      setShowFieldErrors(true);
+      
+      // Scrolla till första ofullständiga sektion
+      setTimeout(() => {
+        const firstIncomplete = document.querySelector('.section-incomplete');
+        if (firstIncomplete) {
+          firstIncomplete.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  };
+
+  const confirmFinalSave = () => {
+    console.log('Sparar incheckning...');
+    console.log('Dokumenterade gamla skador:', existingDamages.filter(d => d.status === 'documented'));
+    console.log('Åtgärdade gamla skador:', existingDamages.filter(d => d.status === 'fixed'));
+    console.log('Nya skador:', newDamages);
+    
+    setShowFinalConfirmation(false);
+    setShowSuccessModal(true);
   };
 
   const resetForm = () => {
@@ -570,7 +488,6 @@ export default function CheckInForm() {
     setTankniva(null);
     setLiters('');
     setBransletyp(null);
-    setLiterpris('');
     setLaddniva('');
     setSpolarvatska(null);
     setInsynsskydd(null);
@@ -586,39 +503,12 @@ export default function CheckInForm() {
     setShowSuccessModal(false);
   };
 
-  const handleSave = () => {
-    if (canSave()) {
-      setShowFinalConfirmation(true);
-    } else {
-      setShowFieldErrors(true);
-      setTimeout(() => {
-        const firstIncomplete = document.querySelector('.section-incomplete');
-        if (firstIncomplete) {
-          firstIncomplete.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
-    }
-  };
-
-  const confirmFinalSave = () => {
-    console.log('Sparar incheckning...');
-    setShowFinalConfirmation(false);
-    setShowSuccessModal(true);
-  };
-
-  // Autocomplete från 2 tecken
+  // Funktioner för autocomplete
   const handleRegInputChange = (value: string) => {
-    const upperValue = value.toUpperCase();
-    setRegInput(upperValue);
-    
-    if (upperValue.length >= 2) {
-      const immediateSuggestions = allRegistrations
-        .filter(reg => reg.includes(upperValue))
-        .slice(0, 5);
-      setShowSuggestions(immediateSuggestions.length > 0);
-    } else {
-      setShowSuggestions(false);
-    }
+    setRegInput(value.toUpperCase());
+    // FIXAD - visa suggestions redan från 2 tecken om det finns matches
+    const shouldShow = value.length >= 2 && suggestions.length > 0;
+    setShowSuggestions(shouldShow);
   };
 
   const selectSuggestion = (suggestion: string) => {
@@ -626,7 +516,7 @@ export default function CheckInForm() {
     setShowSuggestions(false);
   };
 
-  // Skadehantering funktioner
+  // Funktioner för befintliga skador
   const toggleExistingDamageStatus = (id: string, newStatus: 'documented' | 'fixed') => {
     if (newStatus === 'fixed') {
       setDamageToFix(id);
@@ -649,410 +539,196 @@ export default function CheckInForm() {
   const confirmFixDamage = () => {
     if (damageToFix) {
       setExistingDamages(prev => prev.map(d =>
-        d.id === damageToFix ? {
-          ...d,
-          status: 'fixed',
-          userDescription: '',
-          userType: '',
-          userCarPart: '',
-          userPosition: '',
-          media: []
-        } : d
+        d.id === damageToFix ? { ...d, status: 'fixed' as const } : d
       ));
+      setDamageToFix(null);
+      setShowConfirmDialog(false);
     }
-    setShowConfirmDialog(false);
-    setDamageToFix(null);
   };
 
-  const cancelFixDamage = () => {
-    setShowConfirmDialog(false);
-    setDamageToFix(null);
-  };
-
-  // Funktioner för gamla skador
-  const updateExistingDamageType = (id: string, type: string) => {
+  const updateExistingDamageField = (id: string, field: keyof ExistingDamage, value: any) => {
     setExistingDamages(prev => prev.map(d =>
-      d.id === id ? { ...d, userType: type, userCarPart: '', userPosition: '' } : d
+      d.id === id ? { ...d, [field]: value } : d
     ));
-  };
-
-  const updateExistingDamageCarPart = (id: string, carPart: string) => {
-    setExistingDamages(prev => prev.map(d =>
-      d.id === id ? { ...d, userCarPart: carPart, userPosition: '' } : d
-    ));
-  };
-
-  const updateExistingDamagePosition = (id: string, position: string) => {
-    setExistingDamages(prev => prev.map(d =>
-      d.id === id ? { ...d, userPosition: position } : d
-    ));
-  };
-
-  const updateExistingDamageDescription = (id: string, description: string) => {
-    setExistingDamages(prev => prev.map(d =>
-      d.id === id ? { ...d, userDescription: description } : d
-    ));
-  };
-
-  const updateExistingDamageMedia = async (id: string, files: FileList | null) => {
-    if (!files) return;
-
-    const newMediaFiles = await processFiles(Array.from(files));
-    setExistingDamages(prev => prev.map(d =>
-      d.id === id ? { ...d, media: [...(d.media || []), ...newMediaFiles] } : d
-    ));
-  };
-
-  const removeExistingDamageMedia = (damageId: string, mediaIndex: number) => {
-    setExistingDamages(prev => prev.map(d => {
-      if (d.id === damageId && d.media) {
-        const newMedia = d.media.filter((_, index) => index !== mediaIndex);
-        return { ...d, media: newMedia };
-      }
-      return d;
-    }));
   };
 
   // Funktioner för nya skador
-  const addDamage = () => {
-    setNewDamages(prev => [...prev, {
-      id: Math.random().toString(36).slice(2),
+  const addNewDamage = () => {
+    const newDamage: NewDamage = {
+      id: `new-${Date.now()}`,
       type: '',
       carPart: '',
       position: '',
-      text: '',
+      description: '',
       media: []
-    }]);
+    };
+    setNewDamages(prev => [...prev, newDamage]);
   };
 
-  const removeDamage = (id: string) => {
+  const removeNewDamage = (id: string) => {
     setNewDamages(prev => prev.filter(d => d.id !== id));
   };
 
-  const updateDamageType = (id: string, type: string) => {
-    setNewDamages(prev => prev.map(d => d.id === id ? {...d, type, carPart: '', position: ''} : d));
-  };
-
-  const updateDamageCarPart = (id: string, carPart: string) => {
-    setNewDamages(prev => prev.map(d => d.id === id ? {...d, carPart, position: ''} : d));
-  };
-
-  const updateDamagePosition = (id: string, position: string) => {
-    setNewDamages(prev => prev.map(d => d.id === id ? {...d, position} : d));
-  };
-
-  const updateDamageText = (id: string, text: string) => {
-    setNewDamages(prev => prev.map(d => d.id === id ? {...d, text} : d));
-  };
-
-  const updateDamageMedia = async (id: string, files: FileList | null) => {
-    if (!files) return;
-
-    const newMediaFiles = await processFiles(Array.from(files));
+  const updateNewDamage = (id: string, field: keyof NewDamage, value: any) => {
     setNewDamages(prev => prev.map(d =>
-      d.id === id ? {...d, media: [...d.media, ...newMediaFiles]} : d
+      d.id === id ? { ...d, [field]: value } : d
     ));
   };
 
-  const removeDamageMedia = (damageId: string, mediaIndex: number) => {
-    setNewDamages(prev => prev.map(d => {
-      if (d.id === damageId) {
-        const newMedia = d.media.filter((_, index) => index !== mediaIndex);
-        return { ...d, media: newMedia };
-      }
-      return d;
-    }));
+  const getRelevantCarParts = (damageType: string): string[] => {
+    const lowerType = damageType.toLowerCase();
+    if (lowerType.includes('däckskada')) return ['Däck'];
+    if (lowerType.includes('fälgskada')) return ['Fälg'];
+    if (lowerType.includes('punktering')) return ['Däck'];
+    if (lowerType.includes('ruta') || lowerType.includes('stenskott')) {
+      return ['Glas', 'Motorhuv', 'Tak'].sort();
+    }
+    if (lowerType.includes('krock')) {
+      return ['Stötfångare fram', 'Skärm', 'Dörr utsida', 'Bagagelucka', 'Motorhuv'].sort();
+    }
+    if (lowerType.includes('höjdled')) {
+      return ['Tak', 'Motorhuv', 'Bagagelucka'].sort();
+    }
+    return CAR_PART_OPTIONS;
   };
 
-  // Visuella komponenter
-  const SectionHeader = ({ title, isComplete }: { title: string; isComplete?: boolean }) => (
-    <div style={{
-      marginTop: '40px',
-      marginBottom: '20px',
-      paddingBottom: '12px',
-      borderBottom: '2px solid #e5e7eb',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '12px'
-    }}>
-      <h2 style={{
-        fontSize: '22px',
-        fontWeight: '700',
-        margin: 0,
-        color: '#1f2937',
-        letterSpacing: '0.05em',
-        textTransform: 'uppercase',
-        flex: 1
-      }}>
-        {title}
-      </h2>
-      {isComplete !== undefined && (
-        <div style={{
-          width: '24px',
-          height: '24px',
-          borderRadius: '50%',
-          backgroundColor: isComplete ? '#10b981' : '#dc2626',
-          color: '#ffffff',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '14px',
-          fontWeight: 'bold'
-        }}>
-          {isComplete ? '✓' : '!'}
-        </div>
-      )}
-    </div>
-  );
+  // Media-hantering
+  const getFileType = (file: File): 'image' | 'video' => {
+    return file.type.startsWith('image/') ? 'image' : 'video';
+  };
 
-  const SubSectionHeader = ({ title }: { title: string }) => (
-    <div style={{
-      marginTop: '24px',
-      marginBottom: '16px',
-      paddingBottom: '8px',
-      borderBottom: '1px solid #d1d5db'
-    }}>
-      <h3 style={{
-        fontSize: '18px',
-        fontWeight: '600',
-        margin: 0,
-        color: '#374151'
-      }}>
-        {title}
-      </h3>
-    </div>
-  );
+  const createVideoThumbnail = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
 
-  const MediaUpload = ({
-    damageId,
-    isOld,
-    onMediaUpdate,
-    hasImage = false,
-    hasVideo = false
-  }: {
-    damageId: string;
-    isOld: boolean;
-    onMediaUpdate: (id: string, files: FileList | null) => void;
-    hasImage?: boolean;
-    hasVideo?: boolean;
-  }) => (
-    <div style={{ marginBottom: '12px' }}>
-      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-        Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
-      </label>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: hasImage ? '2px dashed #10b981' : '2px solid #dc2626',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: hasImage ? '#f0fdf4' : '#fee2e2',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: hasImage ? '#047857' : '#dc2626',
-              fontWeight: hasImage ? 'normal' : 'bold'
-            }}
-          >
-            📷 {hasImage ? 'Lägg till fler bilder' : 'Ta foto *'}
-          </label>
-        </div>
+      video.addEventListener('loadedmetadata', () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        video.currentTime = 0.5;
+      });
 
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="video/*"
-            capture="environment"
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: hasVideo ? '2px dashed #10b981' : '2px solid #dc2626',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: hasVideo ? '#f0fdf4' : '#fee2e2',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: '#dc2626',
-              fontWeight: hasVideo ? 'normal' : 'bold'
-            }}
-          >
-            🎥 {hasVideo ? 'Lägg till mer video' : 'Spela in video med skada OCH reg.nr. *'}
-          </label>
-        </div>
+      video.addEventListener('seeked', () => {
+        ctx.drawImage(video, 0, 0);
+        const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(thumbnail);
+      });
 
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: '2px dashed #3b82f6',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: '#eff6ff',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: '#2563eb'
-            }}
-          >
-            📁 Välj från galleri
-          </label>
-        </div>
-      </div>
-      {(!hasImage || !hasVideo) && (
-        <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
-          Både bild och video är obligatoriska för alla skador
-        </p>
-      )}
-    </div>
-  );return (
+      video.addEventListener('error', () => {
+        resolve('');
+      });
+
+      video.src = URL.createObjectURL(file);
+    });
+  };
+
+  const processFiles = async (files: File[]): Promise<MediaFile[]> => {
+    const mediaFiles: MediaFile[] = [];
+    for (const file of files) {
+      const type = getFileType(file);
+      const mediaFile: MediaFile = { file, type };
+      if (type === 'image') {
+        mediaFile.preview = URL.createObjectURL(file);
+      } else if (type === 'video') {
+        try {
+          mediaFile.thumbnail = await createVideoThumbnail(file);
+        } catch (error) {
+          console.warn('Could not create video thumbnail:', error);
+        }
+      }
+      mediaFiles.push(mediaFile);
+    }
+    return mediaFiles;
+  };return (
     <div style={{
       minHeight: '100vh',
       backgroundColor: '#f8fafc',
-      color: '#111827'
+      padding: '16px'
     }}>
-      {/* MABI Header */}
       <div style={{
-        backgroundColor: '#033066',
-        width: '100vw',
-        marginLeft: 'calc(-50vw + 50%)',
-        padding: '20px 0',
-        marginBottom: '32px'
+        maxWidth: '800px',
+        margin: '0 auto'
       }}>
-        <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
-          padding: '0 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end'
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '28px',
-              margin: 0,
-              color: '#ffffff',
-              fontWeight: '800',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}>
-              NY INCHECKNING
-            </h1>
-            <p style={{
-              color: '#ffffff',
-              margin: '6px 0 0 0',
-              fontSize: '16px',
-              fontWeight: '400',
-              opacity: 0.9
-            }}>
-              Inloggad: <strong>Bob</strong>
-            </p>
-          </div>
-          <div style={{
-            width: '120px',
-            height: '60px',
-            backgroundColor: '#ffffff',
-            borderRadius: '6px',
-            padding: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid rgba(255, 255, 255, 0.3)'
-          }}>
-            <div style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#033066',
-              fontSize: '16px',
-              fontWeight: 'bold'
-            }}>
-              MABI
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{
-        maxWidth: '600px',
-        margin: '0 auto',
-        padding: '0 20px',
-        fontFamily: 'system-ui, -apple-system, sans-serif'
-      }}>
-
-        {/* 1. REGISTRERINGSNUMMER med autocomplete */}
+        {/* Header */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          position: 'relative',
-          border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isRegComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Fordon" isComplete={isRegComplete()} />
-          
-          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
-            Registreringsnummer *
-          </label>
-          <div style={{ position: 'relative' }}>
+          textAlign: 'center'
+        }}>
+          <div style={{
+            width: '120px',
+            height: '40px',
+            backgroundColor: '#033066',
+            margin: '0 auto 16px',
+            borderRadius: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#ffffff',
+            fontWeight: '600',
+            fontSize: '18px'
+          }}>
+            MABI
+          </div>
+          <h1 style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            margin: '0 0 8px 0',
+            color: '#1f2937'
+          }}>
+            Incheckning av fordon
+          </h1>
+          <p style={{
+            color: '#6b7280',
+            margin: '0',
+            fontSize: '16px'
+          }}>
+            Fyll i alla obligatoriska fält för att slutföra incheckningen
+          </p>
+        </div>
+
+        {/* Sektion 1: Fordon */}
+        <div style={{
+          backgroundColor: '#ffffff',
+          padding: '24px',
+          borderRadius: '12px',
+          marginBottom: '24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            marginBottom: '20px',
+            color: '#1f2937'
+          }}>
+            Fordon
+          </h2>
+
+          <div style={{ position: 'relative', marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Registreringsnummer *
+            </label>
             <input
               type="text"
               value={regInput}
               onChange={(e) => handleRegInputChange(e.target.value)}
-              onFocus={() => {
-                if (regInput.length >= 2 && suggestions.length > 0) {
-                  setShowSuggestions(true);
-                }
-              }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-              placeholder="Skriv reg.nr"
-              spellCheck={false}
-              autoComplete="off"
+              onFocus={() => setShowSuggestions(regInput.length >= 2 && suggestions.length > 0)}
+              placeholder="Ange registreringsnummer"
               style={{
                 width: '100%',
-                padding: '14px',
-                border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                borderRadius: '8px',
-                fontSize: '18px',
-                fontWeight: '600',
-                backgroundColor: '#ffffff',
-                textAlign: 'center',
-                letterSpacing: '2px'
+                padding: '12px',
+                border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '1px solid #d1d5db',
+                backgroundColor: showFieldErrors && !isRegComplete() ? '#fef2f2' : '#ffffff',
+                borderRadius: '6px',
+                fontSize: '16px'
               }}
             />
-
+            
+            {/* Autocomplete dropdown */}
             {showSuggestions && suggestions.length > 0 && (
               <div style={{
                 position: 'absolute',
@@ -1061,167 +737,130 @@ export default function CheckInForm() {
                 right: 0,
                 backgroundColor: '#ffffff',
                 border: '1px solid #d1d5db',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
                 zIndex: 10,
                 maxHeight: '200px',
                 overflowY: 'auto'
               }}>
                 {suggestions.map((suggestion, index) => (
-                  <button
-                    key={suggestion}
-                    type="button"
+                  <div
+                    key={index}
                     onClick={() => selectSuggestion(suggestion)}
                     style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      border: 'none',
-                      backgroundColor: '#ffffff',
-                      textAlign: 'left',
-                      fontSize: '16px',
-                      fontWeight: '500',
+                      padding: '12px',
                       cursor: 'pointer',
-                      borderBottom: index === suggestions.length - 1 ? 'none' : '1px solid #f3f4f6',
-                      transition: 'background-color 0.2s'
+                      borderBottom: index < suggestions.length - 1 ? '1px solid #e5e7eb' : 'none'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f9fafb'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f3f4f6';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#ffffff';
+                    }}
                   >
                     {suggestion}
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
           </div>
 
-          {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
-          {notFound && normalizedReg && !loading && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>Okänt reg.nr</p>
-          )}
-          {showFieldErrors && !isRegComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>
-              ⚠️ Registreringsnummer är obligatoriskt
+          {loading && (
+            <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+              Söker fordonsinformation...
             </p>
           )}
 
-          {/* Bilinfo med ALLA befintliga skador */}
-          {carData.length > 0 && (
+          {notFound && regInput && (
+            <p style={{ color: '#dc2626', fontWeight: '500' }}>
+              ⚠️ Okänt registreringsnummer
+            </p>
+          )}
+
+          {carModel && (
             <div style={{
-              marginTop: '20px',
-              padding: '20px',
               backgroundColor: '#f0f9ff',
+              padding: '16px',
               borderRadius: '8px',
-              border: '1px solid #bfdbfe'
+              marginBottom: '16px'
             }}>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Bilmodell:</span>
-                <span style={{ fontWeight: '500' }}>{carModel || '---'}</span>
-              </div>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Hjulförvaring:</span>
-                <span style={{ fontWeight: '500' }}>{wheelStorage || '---'}</span>
-              </div>
-              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Saludatum:</span>
-                {saludatum ? (
-                  <span style={{
-                    color: '#dc2626',
-                    fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : '500'
-                  }}>
-                    {new Date(saludatum).toLocaleDateString('sv-SE')}
-                  </span>
-                ) : <span style={{ fontWeight: '500' }}> ---</span>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
-                <div style={{ flex: 1 }}>
-                  {existingDamages.length === 0 ? (
-                    <span style={{ fontWeight: '500' }}> ---</span>
-                  ) : (
-                    <div style={{ margin: '0' }}>
-                      {existingDamages.map((damage, i) => (
-                        <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                          <div style={{ fontWeight: '500', color: '#1f2937' }}>
-                            {damage.fullText}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <p style={{ margin: '0 0 8px 0', fontWeight: '500' }}>
+                <strong>Bilmodell:</strong> {carModel}
+              </p>
+              {wheelStorage && (
+                <p style={{ margin: '0 0 8px 0' }}>
+                  <strong>Hjulförvaring:</strong> {wheelStorage}
+                </p>
+              )}
+              {saludatum && (
+                <p style={{ margin: '0' }}>
+                  <strong>Saludatum:</strong> {saludatum}
+                </p>
+              )}
             </div>
+          )}
+
+          {/* Befintliga skador */}
+          {existingDamages.length > 0 && (
+            <div style={{
+              backgroundColor: '#fffbeb',
+              padding: '16px',
+              borderRadius: '8px',
+              marginBottom: '16px'
+            }}>
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '12px',
+                color: '#92400e'
+              }}>
+                Befintliga skador ({existingDamages.length})
+              </h3>
+              {existingDamages.map((damage) => (
+                <div key={damage.id} style={{
+                  padding: '8px 0',
+                  borderBottom: '1px solid #fde68a'
+                }}>
+                  <p style={{ margin: '0', fontSize: '14px' }}>
+                    {damage.fullText}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showFieldErrors && !isRegComplete() && (
+            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500' }}>
+              ⚠️ Registreringsnummer är obligatoriskt
+            </p>
           )}
         </div>
 
-        {/* 2. PLATS FÖR INCHECKNING - KORRIGERADE namn */}
+        {/* Sektion 2: Plats */}
         <div style={{
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isLocationComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Plats för incheckning" isComplete={isLocationComplete()} />
-          
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Ort *
-              </label>
-              <select
-                value={ort}
-                onChange={(e) => {
-                  setOrt(e.target.value);
-                  setStation('');
-                }}
-                disabled={annanPlats}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !ort && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: annanPlats ? '#f9fafb' : '#ffffff',
-                  opacity: annanPlats ? 0.6 : 1
-                }}
-              >
-                <option value="">Välj ort</option>
-                {ORTER.map(ortOption => (
-                  <option key={ortOption} value={ortOption}>{ortOption}</option>
-                ))}
-              </select>
-            </div>
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            marginBottom: '20px',
+            color: '#1f2937'
+          }}>
+            Plats för incheckning
+          </h2>
 
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                Station *
-              </label>
-              <select
-                value={station}
-                onChange={(e) => setStation(e.target.value)}
-                disabled={!ort || annanPlats}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: showFieldErrors && !station && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                  borderRadius: '6px',
-                  fontSize: '16px',
-                  backgroundColor: (ort && !annanPlats) ? '#ffffff' : '#f9fafb',
-                  opacity: (ort && !annanPlats) ? 1 : 0.6
-                }}
-              >
-                <option value="">Välj station</option>
-                {availableStations.map(stationOption => (
-                  <option key={stationOption} value={stationOption}>{stationOption}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginBottom: '12px',
+              fontSize: '14px'
+            }}>
               <input
                 type="checkbox"
                 checked={annanPlats}
@@ -1234,824 +873,753 @@ export default function CheckInForm() {
                     setAnnanPlatsText('');
                   }
                 }}
-                style={{ transform: 'scale(1.2)' }}
+                style={{ marginRight: '8px' }}
               />
-              <span style={{ fontWeight: '500' }}>Annan plats</span>
+              Annan plats (fritext)
             </label>
 
-            {annanPlats && (
-              <div>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Ange plats *
-                </label>
-                <input
-                  type="text"
-                  value={annanPlatsText}
-                  onChange={(e) => setAnnanPlatsText(e.target.value)}
-                  placeholder="T.ex. gatuadress"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: showFieldErrors && !annanPlatsText.trim() ? '2px solid #dc2626' : '2px solid #e5e7eb',
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                />
-              </div>
+            {annanPlats ? (
+              <input
+                type="text"
+                value={annanPlatsText}
+                onChange={(e) => setAnnanPlatsText(e.target.value)}
+                placeholder="Beskriv platsen för incheckning"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '1px solid #d1d5db',
+                  backgroundColor: showFieldErrors && !isLocationComplete() ? '#fef2f2' : '#ffffff',
+                  borderRadius: '6px',
+                  fontSize: '16px'
+                }}
+              />
+            ) : (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                    Ort *
+                  </label>
+                  <select
+                    value={ort}
+                    onChange={(e) => {
+                      setOrt(e.target.value);
+                      setStation('');
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '1px solid #d1d5db',
+                      backgroundColor: showFieldErrors && !isLocationComplete() ? '#fef2f2' : '#ffffff',
+                      borderRadius: '6px',
+                      fontSize: '16px'
+                    }}
+                  >
+                    <option value="">Välj ort</option>
+                    {ORTER.map(ortName => (
+                      <option key={ortName} value={ortName}>{ortName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {ort && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      Station/Depå *
+                    </label>
+                    <select
+                      value={station}
+                      onChange={(e) => setStation(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '1px solid #d1d5db',
+                        backgroundColor: showFieldErrors && !isLocationComplete() ? '#fef2f2' : '#ffffff',
+                        borderRadius: '6px',
+                        fontSize: '16px'
+                      }}
+                    >
+                      <option value="">Välj station/depå</option>
+                      {availableStations.map(stationName => (
+                        <option key={stationName} value={stationName}>{stationName}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {showFieldErrors && !isLocationComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500', marginTop: '12px' }}>
-              ⚠️ Plats för incheckning är obligatorisk
+            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500' }}>
+              ⚠️ Ort och station/depå eller annan plats är obligatorisk
             </p>
           )}
         </div>
 
-        {/* 3. FORDONSSTATUS - komplett med alla fält */}
-        <div style={{
+        {/* Sektion 3: Fordonsstatus */}
+        <div className={`${showFieldErrors && !isVehicleStatusComplete() ? 'section-incomplete' : ''}`} style={{
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isVehicleStatusComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isVehicleStatusComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Fordonsstatus" isComplete={isVehicleStatusComplete()} />
-          
-          <div style={{ marginBottom: '20px' }}>
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            marginBottom: '20px',
+            color: '#1f2937'
+          }}>
+            Fordonsstatus
+          </h2>
+
+          <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Mätarställning (km) *
+              Mätarställning *
             </label>
             <input
-              type="number"
-              inputMode="numeric"
+              type="text"
               value={matarstallning}
-              onChange={(e) => setMatarstallning(e.target.value)}
-              placeholder="Ange mätarställning"
+              onChange={(e) => setMatarstallning(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="Ange kilometerställning"
               style={{
                 width: '100%',
                 padding: '12px',
-                border: showFieldErrors && !matarstallning.trim() ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                border: showFieldErrors && !matarstallning.trim() ? '2px solid #dc2626' : '1px solid #d1d5db',
+                backgroundColor: showFieldErrors && !matarstallning.trim() ? '#fef2f2' : '#ffffff',
                 borderRadius: '6px',
                 fontSize: '16px'
               }}
             />
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
               Drivmedelstyp *
             </label>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {(['bensin_diesel', 'elbil'] as const).map(type => (
-                <label key={type} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 16px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  backgroundColor: drivmedelstyp === type ? '#033066' : '#ffffff',
-                  color: drivmedelstyp === type ? '#ffffff' : '#374151',
-                  flex: 1,
-                  justifyContent: 'center',
-                  fontWeight: '500'
-                }}>
-                  <input
-                    type="radio"
-                    name="drivmedelstyp"
-                    value={type}
-                    checked={drivmedelstyp === type}
-                    onChange={(e) => {
-                      setDrivmedelstyp(e.target.value as 'bensin_diesel' | 'elbil');
-                      setTankniva(null);
-                      setLiters('');
-                      setBransletyp(null);
-                      setLiterpris('');
-                      setLaddniva('');
-                    }}
-                    style={{ display: 'none' }}
-                  />
-                  <span>
-                    {type === 'bensin_diesel' ? 'Bensin/Diesel' : 'Elbil'}
-                  </span>
-                </label>
-              ))}
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setDrivmedelstyp('bensin_diesel')}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: drivmedelstyp === 'bensin_diesel' ? '#dbeafe' : '#ffffff',
+                  color: drivmedelstyp === 'bensin_diesel' ? '#1e40af' : '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Bensin/Diesel
+              </button>
+              <button
+                type="button"
+                onClick={() => setDrivmedelstyp('elbil')}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: drivmedelstyp === 'elbil' ? '#dbeafe' : '#ffffff',
+                  color: drivmedelstyp === 'elbil' ? '#1e40af' : '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Elbil
+              </button>
             </div>
           </div>
 
-          {/* Komplett bensin/diesel sektion */}
           {drivmedelstyp === 'bensin_diesel' && (
             <>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-                  Tankstatus *
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                  Tanknivå *
                 </label>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {([
-                    { value: 'fulltankad', label: 'Fulltankad' },
-                    { value: 'tankas_senare', label: 'Behöver tankas senare' },
-                    { value: 'pafylld_nu', label: 'Påfylld nu' }
-                  ] as const).map(option => (
-                    <label key={option.value} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '12px',
-                      border: '2px solid #e5e7eb',
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('full')}
+                    style={{
+                      padding: '10px 16px',
+                      border: '1px solid #d1d5db',
                       borderRadius: '6px',
-                      cursor: 'pointer',
-                      backgroundColor: tankniva === option.value ? '#033066' : '#ffffff',
-                      color: tankniva === option.value ? '#ffffff' : '#374151'
-                    }}>
-                      <input
-                        type="radio"
-                        name="tankniva"
-                        value={option.value}
-                        checked={tankniva === option.value}
-                        onChange={(e) => setTankniva(e.target.value as any)}
-                        style={{ display: 'none' }}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
+                      backgroundColor: tankniva === 'full' ? '#dbeafe' : '#ffffff',
+                      color: tankniva === 'full' ? '#1e40af' : '#374151',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Fulltankad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTankniva('pafylld_nu')}
+                    style={{
+                      padding: '10px 16px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: tankniva === 'pafylld_nu' ? '#dbeafe' : '#ffffff',
+                      color: tankniva === 'pafylld_nu' ? '#1e40af' : '#374151',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Påfylld nu
+                  </button>
                 </div>
               </div>
 
               {tankniva === 'pafylld_nu' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                        Antal liter *
-                      </label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.1"
-                        value={liters}
-                        onChange={(e) => setLiters(e.target.value)}
-                        placeholder="T.ex. 45.2"
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '6px',
-                          fontSize: '16px'
-                        }}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                        Bränsletyp *
-                      </label>
-                      <select
-                        value={bransletyp || ''}
-                        onChange={(e) => setBransletyp(e.target.value as 'Bensin' | 'Diesel')}
-                        style={{
-                          width: '100%',
-                          padding: '12px',
-                          border: '2px solid #e5e7eb',
-                          borderRadius: '6px',
-                          fontSize: '16px',
-                          backgroundColor: '#ffffff'
-                        }}
-                      >
-                        <option value="">Välj typ</option>
-                        <option value="Bensin">Bensin</option>
-                        <option value="Diesel">Diesel</option>
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div>
+                <>
+                  <div style={{ marginBottom: '16px' }}>
                     <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                      Literpris (kr) *
+                      Antal liter påfyllda *
                     </label>
                     <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      value={literpris}
-                      onChange={(e) => setLiterpris(e.target.value)}
-                      placeholder="T.ex. 16.95"
+                      type="text"
+                      value={liters}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9,]/g, '');
+                        setLiters(value);
+                      }}
+                      placeholder="t.ex. 25,5"
                       style={{
                         width: '100%',
                         padding: '12px',
-                        border: '2px solid #e5e7eb',
+                        border: '1px solid #d1d5db',
                         borderRadius: '6px',
                         fontSize: '16px'
                       }}
                     />
                   </div>
-                </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                      Bränsletyp *
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setBransletyp('bensin')}
+                        style={{
+                          padding: '10px 16px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          backgroundColor: bransletyp === 'bensin' ? '#dbeafe' : '#ffffff',
+                          color: bransletyp === 'bensin' ? '#1e40af' : '#374151',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Bensin
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBransletyp('diesel')}
+                        style={{
+                          padding: '10px 16px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          backgroundColor: bransletyp === 'diesel' ? '#dbeafe' : '#ffffff',
+                          color: bransletyp === 'diesel' ? '#1e40af' : '#374151',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Diesel
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-                  AdBlue *
-                </label>
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  {[
-                    { value: true, label: 'OK' },
-                    { value: false, label: 'Behöver påfyllning' }
-                  ].map(option => (
-                    <label key={String(option.value)} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '12px 16px',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      backgroundColor: adblue === option.value ? '#033066' : '#ffffff',
-                      color: adblue === option.value ? '#ffffff' : '#374151',
-                      flex: 1,
-                      justifyContent: 'center'
-                    }}>
-                      <input
-                        type="radio"
-                        name="adblue"
-                        checked={adblue === option.value}
-                        onChange={() => setAdblue(option.value)}
-                        style={{ display: 'none' }}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
             </>
           )}
 
-          {/* Komplett elbil sektion */}
           {drivmedelstyp === 'elbil' && (
-            <>
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-                  Laddningsnivå (%) *
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min="0"
-                  max="100"
-                  value={laddniva}
-                  onChange={(e) => setLaddniva(e.target.value)}
-                  placeholder="T.ex. 85"
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-                  Antal laddkablar *
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {(['0', '1', '2'] as const).map(antal => (
-                    <label key={antal} style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '12px 16px',
-                      border: '2px solid #e5e7eb',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      backgroundColor: antalLaddkablar === antal ? '#033066' : '#ffffff',
-                      color: antalLaddkablar === antal ? '#ffffff' : '#374151',
-                      flex: 1,
-                      justifyContent: 'center'
-                    }}>
-                      <input
-                        type="radio"
-                        name="antalLaddkablar"
-                        value={antal}
-                        checked={antalLaddkablar === antal}
-                        onChange={(e) => setAntalLaddkablar(e.target.value as '0' | '1' | '2')}
-                        style={{ display: 'none' }}
-                      />
-                      <span>{antal} st</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Laddnivå (%) *
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={laddniva}
+                onChange={(e) => setLaddniva(e.target.value)}
+                placeholder="0-100"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  fontSize: '16px'
+                }}
+              />
+            </div>
           )}
-
-          {/* Gemensamma fält */}
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-                Spolarväska *
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {[
-                  { value: true, label: 'OK' },
-                  { value: false, label: 'Behöver påfyllning' }
-                ].map(option => (
-                  <label key={String(option.value)} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    backgroundColor: spolarvatska === option.value ? '#033066' : '#ffffff',
-                    color: spolarvatska === option.value ? '#ffffff' : '#374151',
-                    flex: 1,
-                    justifyContent: 'center'
-                  }}>
-                    <input
-                      type="radio"
-                      name="spolarvatska"
-                      checked={spolarvatska === option.value}
-                      onChange={() => setSpolarvatska(option.value)}
-                      style={{ display: 'none' }}
-                    />
-                    <span style={{ fontSize: '14px' }}>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-                Insynsskydd *
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {[
-                  { value: true, label: 'OK' },
-                  { value: false, label: 'Saknas' }
-                ].map(option => (
-                  <label key={String(option.value)} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '12px',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    backgroundColor: insynsskydd === option.value ? '#033066' : '#ffffff',
-                    color: insynsskydd === option.value ? '#ffffff' : '#374151',
-                    flex: 1,
-                    justifyContent: 'center'
-                  }}>
-                    <input
-                      type="radio"
-                      name="insynsskydd"
-                      checked={insynsskydd === option.value}
-                      onChange={() => setInsynsskydd(option.value)}
-                      style={{ display: 'none' }}
-                    />
-                    <span style={{ fontSize: '14px' }}>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-              Hjultyp *
-            </label>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {(['Sommarthjul', 'Vinterthjul'] as const).map(typ => (
-                <label key={typ} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 16px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  backgroundColor: hjultyp === typ ? '#033066' : '#ffffff',
-                  color: hjultyp === typ ? '#ffffff' : '#374151',
-                  flex: 1,
-                  justifyContent: 'center'
-                }}>
-                  <input
-                    type="radio"
-                    name="hjultyp"
-                    value={typ}
-                    checked={hjultyp === typ}
-                    onChange={(e) => setHjultyp(e.target.value as 'Sommarthjul' | 'Vinterthjul')}
-                    style={{ display: 'none' }}
-                  />
-                  <span>{typ}</span>
-                </label>
-              ))}
-            </div>
-          </div>
 
           {showFieldErrors && !isVehicleStatusComplete() && (
             <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500' }}>
-              ⚠️ Alla fält under fordonsstatus är obligatoriska
+              ⚠️ Alla fordonsstatus-fält är obligatoriska
             </p>
           )}
-        </div>
-
-        {/* 4. RENGÖRING */}
-        <div style={{
+        </div>{/* Sektion 4: Rengöring */}
+        <div className={`${showFieldErrors && !isCleaningComplete() ? 'section-incomplete' : ''}`} style={{
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isCleaningComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isCleaningComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Rengöring" isComplete={isCleaningComplete()} />
-          
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-              Tvättning *
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {([
-                { value: 'behover_inte_tvattas', label: 'Behöver inte tvättas' },
-                { value: 'behover_tvattas', label: 'Behöver tvättas' },
-                { value: 'behover_grovtvattas', label: 'Behöver grovtvättas' }
-              ] as const).map(option => (
-                <label key={option.value} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  backgroundColor: tvatt === option.value ? '#033066' : '#ffffff',
-                  color: tvatt === option.value ? '#ffffff' : '#374151'
-                }}>
-                  <input
-                    type="radio"
-                    name="tvatt"
-                    value={option.value}
-                    checked={tvatt === option.value}
-                    onChange={(e) => setTvatt(e.target.value as any)}
-                    style={{ display: 'none' }}
-                  />
-                  <span>{option.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            marginBottom: '20px',
+            color: '#1f2937'
+          }}>
+            Rengöring
+          </h2>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
-              Inre *
-            </label>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              {([
-                { value: 'ren_inuti', label: 'Ren inuti' },
-                { value: 'behover_rengoras_inuti', label: 'Behöver rengöras inuti' }
-              ] as const).map(option => (
-                <label key={option.value} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px 16px',
-                  border: '2px solid #e5e7eb',
-                  borderRadius: '6px',
-                  cursor: 'pointer',
-                  backgroundColor: inre === option.value ? '#033066' : '#ffffff',
-                  color: inre === option.value ? '#ffffff' : '#374151',
-                  flex: 1,
-                  justifyContent: 'center'
-                }}>
-                  <input
-                    type="radio"
-                    name="inre"
-                    value={option.value}
-                    checked={inre === option.value}
-                    onChange={(e) => setInre(e.target.value as any)}
-                    style={{ display: 'none' }}
-                  />
-                  <span style={{ fontSize: '14px', textAlign: 'center' }}>{option.label}</span>
-                </label>
-              ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Spolarvätska OK? *
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setSpolarvatska(true)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: spolarvatska === true ? '#dcfce7' : '#ffffff',
+                    color: spolarvatska === true ? '#166534' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSpolarvatska(false)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: spolarvatska === false ? '#fef2f2' : '#ffffff',
+                    color: spolarvatska === false ? '#dc2626' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Insynsskydd OK? *
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setInsynsskydd(true)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: insynsskydd === true ? '#dcfce7' : '#ffffff',
+                    color: insynsskydd === true ? '#166534' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInsynsskydd(false)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: insynsskydd === false ? '#fef2f2' : '#ffffff',
+                    color: insynsskydd === false ? '#dc2626' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Antal laddsladdar *
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[0, 1, 2].map(num => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setAntalLaddkablar(num as 0 | 1 | 2)}
+                    style={{
+                      padding: '8px 16px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '6px',
+                      backgroundColor: antalLaddkablar === num ? '#dbeafe' : '#ffffff',
+                      color: antalLaddkablar === num ? '#1e40af' : '#374151',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {num}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Hjultyp *
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setHjultyp('sommar')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: hjultyp === 'sommar' ? '#dbeafe' : '#ffffff',
+                    color: hjultyp === 'sommar' ? '#1e40af' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Sommar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHjultyp('vinter')}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: hjultyp === 'vinter' ? '#dbeafe' : '#ffffff',
+                    color: hjultyp === 'vinter' ? '#1e40af' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Vinter
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                AdBlue OK? *
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setAdblue(true)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: adblue === true ? '#dcfce7' : '#ffffff',
+                    color: adblue === true ? '#166534' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdblue(false)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: adblue === false ? '#fef2f2' : '#ffffff',
+                    color: adblue === false ? '#dc2626' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Tvätt genomförd? *
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setTvatt(true)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: tvatt === true ? '#dcfce7' : '#ffffff',
+                    color: tvatt === true ? '#166534' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ja
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTvatt(false)}
+                  style={{
+                    padding: '8px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: tvatt === false ? '#fef2f2' : '#ffffff',
+                    color: tvatt === false ? '#dc2626' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Nej
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Inre skick *
+              </label>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setInre('bra')}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: inre === 'bra' ? '#dcfce7' : '#ffffff',
+                    color: inre === 'bra' ? '#166534' : '#374151',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Bra
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInre('acceptabelt')}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: inre === 'acceptabelt' ? '#fef3c7' : '#ffffff',
+                    color: inre === 'acceptabelt' ? '#92400e' : '#374151',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Acceptabelt
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInre('daligt')}
+                  style={{
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: inre === 'daligt' ? '#fef2f2' : '#ffffff',
+                    color: inre === 'daligt' ? '#dc2626' : '#374151',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Dåligt
+                </button>
+              </div>
             </div>
           </div>
 
           {showFieldErrors && !isCleaningComplete() && (
-            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500' }}>
+            <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500', marginTop: '16px' }}>
               ⚠️ Alla rengöringsfält är obligatoriska
             </p>
           )}
-        </div>{/* 5. SKADEKONTROLL med ÅTERSTÄLLD befintliga skador-sektion */}
-        <div style={{
+        </div>
+
+        {/* Sektion 5: Skadekontroll */}
+        <div className={`${showFieldErrors && !isDamageCheckComplete() ? 'section-incomplete' : ''}`} style={{
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isDamagesComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isDamagesComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Skadekontroll" isComplete={isDamagesComplete()} />
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            marginBottom: '20px',
+            color: '#1f2937'
+          }}>
+            Skadekontroll
+          </h2>
 
-          {/* ÅTERSTÄLLD: Befintliga skador från databas */}
+          {/* Befintliga skador sektion */}
           {existingDamages.length > 0 && (
-            <>
-              <SubSectionHeader title="Befintliga skador" />
-              <div style={{ marginBottom: '24px' }}>
-                {existingDamages.map((damage) => (
-                  <div key={damage.id} style={{
-                    marginBottom: '16px',
-                    padding: '16px',
-                    border: damage.status === 'documented' ? '2px solid #10b981' : 
-                           damage.status === 'fixed' ? '2px solid #6b7280' : '2px solid #e5e7eb',
-                    borderRadius: '8px',
-                    backgroundColor: damage.status === 'documented' ? '#f0fdf4' : 
-                                   damage.status === 'fixed' ? '#f9fafb' : '#ffffff'
-                  }}>
-                    <div style={{ marginBottom: '12px' }}>
-                      <div style={{ fontWeight: '600', marginBottom: '4px' }}>{damage.fullText}</div>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
-                          disabled={damage.status === 'fixed'}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: damage.status === 'fixed' ? 'not-allowed' : 'pointer',
-                            backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
-                            color: damage.status === 'documented' ? '#ffffff' : '#374151',
-                            opacity: damage.status === 'fixed' ? 0.5 : 1
-                          }}
-                        >
-                          {damage.status === 'documented' ? '✓ Dokumenterad' : 'Dokumentera'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '4px',
-                            border: 'none',
-                            fontSize: '14px',
-                            fontWeight: '500',
-                            cursor: 'pointer',
-                            backgroundColor: damage.status === 'fixed' ? '#6b7280' : '#f59e0b',
-                            color: '#ffffff'
-                          }}
-                        >
-                          {damage.status === 'fixed' ? '✓ Åtgärdad' : 'Åtgärdad?'}
-                        </button>
-                      </div>
-                    </div>
-
-                    {damage.status === 'documented' && (
-                      <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '12px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                          <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                              1. Skadetyp *
-                            </label>
-                            <select
-                              value={damage.userType || ''}
-                              onChange={(e) => updateExistingDamageType(damage.id, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '8px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                fontSize: '14px'
-                              }}
-                            >
-                              <option value="">Välj typ</option>
-                              {DAMAGE_TYPES.map(type => (
-                                <option key={type} value={type}>{type}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                              2. Bildel *
-                            </label>
-                            <select
-                              value={damage.userCarPart || ''}
-                              onChange={(e) => updateExistingDamageCarPart(damage.id, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '8px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                fontSize: '14px'
-                              }}
-                            >
-                              <option value="">Välj bildel</option>
-                              {(damage.userType ? getRelevantCarParts(damage.userType) : CAR_PART_OPTIONS).map(part => (
-                                <option key={part} value={part}>{part}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && (
-                          <div style={{ marginBottom: '12px' }}>
-                            <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                              3. Position *
-                            </label>
-                            <select
-                              value={damage.userPosition || ''}
-                              onChange={(e) => updateExistingDamagePosition(damage.id, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '8px',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '4px',
-                                fontSize: '14px'
-                              }}
-                            >
-                              <option value="">Välj position</option>
-                              {CAR_PARTS[damage.userCarPart].map(pos => (
-                                <option key={pos} value={pos}>{pos}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
-
-                        <div style={{ marginBottom: '12px' }}>
-                          <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                            {damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 ? '4. ' : '3. '}Din detaljerade beskrivning *
-                          </label>
-                          <textarea
-                            value={damage.userDescription || ''}
-                            onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
-                            placeholder={`Beskriv "${damage.shortText}" mer detaljerat...`}
-                            rows={3}
-                            style={{
-                              width: '100%',
-                              padding: '8px',
-                              border: '1px solid #d1d5db',
-                              borderRadius: '4px',
-                              fontSize: '14px',
-                              resize: 'vertical',
-                              minHeight: '80px'
-                            }}
-                          />
-                        </div>
-
-                        <MediaUpload
-                          damageId={damage.id}
-                          isOld={true}
-                          onMediaUpdate={updateExistingDamageMedia}
-                          hasImage={damage.media?.some(m => m.type === 'image') || false}
-                          hasVideo={damage.media?.some(m => m.type === 'video') || false}
-                        />
-
-                        {damage.media && damage.media.length > 0 && (
-                          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
-                            {damage.media.map((media, index) => (
-                              <div key={index} style={{ position: 'relative' }}>
-                                {media.type === 'image' ? (
-                                  <img
-                                    src={media.preview}
-                                    alt="Skadebild"
-                                    style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }}
-                                  />
-                                ) : (
-                                  <div style={{
-                                    width: '60px',
-                                    height: '60px',
-                                    backgroundColor: '#f3f4f6',
-                                    borderRadius: '4px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundImage: media.thumbnail ? `url(${media.thumbnail})` : undefined,
-                                    backgroundSize: 'cover'
-                                  }}>
-                                    {!media.thumbnail && '🎥'}
-                                  </div>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={() => removeExistingDamageMedia(damage.id, index)}
-                                  style={{
-                                    position: 'absolute',
-                                    top: '-6px',
-                                    right: '-6px',
-                                    width: '20px',
-                                    height: '20px',
-                                    borderRadius: '50%',
-                                    border: 'none',
-                                    backgroundColor: '#dc2626',
-                                    color: '#ffffff',
-                                    fontSize: '12px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center'
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+            <div style={{
+              backgroundColor: '#fef7cd',
+              padding: '16px',
+              borderRadius: '8px',
+              marginBottom: '20px'
+            }}>
+              <h3 style={{
+                fontSize: '16px',
+                fontWeight: '600',
+                marginBottom: '16px',
+                color: '#92400e'
+              }}>
+                Befintliga skador ({existingDamages.length})
+              </h3>
+              
+              {existingDamages.map((damage) => (
+                <div key={damage.id} style={{
+                  backgroundColor: '#ffffff',
+                  padding: '12px',
+                  borderRadius: '6px',
+                  marginBottom: '8px',
+                  border: '1px solid #fde68a'
+                }}>
+                  <p style={{ margin: '0 0 8px 0', fontWeight: '500' }}>
+                    {damage.fullText}
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
+                      style={{
+                        padding: '6px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        backgroundColor: damage.status === 'documented' ? '#dbeafe' : '#ffffff',
+                        color: damage.status === 'documented' ? '#1e40af' : '#374151',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      {damage.status === 'documented' ? 'Dokumenterad ✓' : 'Dokumentera'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
+                      style={{
+                        padding: '6px 12px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '4px',
+                        backgroundColor: damage.status === 'fixed' ? '#dcfce7' : '#ffffff',
+                        color: damage.status === 'fixed' ? '#166534' : '#374151',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Markera som åtgärdad'}
+                    </button>
                   </div>
-                ))}
-              </div>
-            </>
+                </div>
+              ))}
+            </div>
           )}
 
-          {/* Skadekontroll val */}
-          <SubSectionHeader title="Nya skador" />
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
               Skadekontroll *
             </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {([
-                { value: 'inga_nya_skador', label: 'Inga nya skador' },
-                { value: 'nya_skador', label: 'Nya skador upptäckta' },
-                { value: 'ej_skadekontrollerad', label: 'Ej skadekontrollerad' }
-              ] as const).map(option => (
-                <label key={option.value} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setSkadekontroll('inga_skador')}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  cursor: 'pointer',
-                  backgroundColor: skadekontroll === option.value ? '#033066' : '#ffffff',
-                  color: skadekontroll === option.value ? '#ffffff' : '#374151'
-                }}>
-                  <input
-                    type="radio"
-                    name="skadekontroll"
-                    value={option.value}
-                    checked={skadekontroll === option.value}
-                    onChange={(e) => {
-                      setSkadekontroll(e.target.value as any);
-                      if (e.target.value !== 'nya_skador') {
-                        setNewDamages([]);
-                      }
-                    }}
-                    style={{ display: 'none' }}
-                  />
-                  <span>{option.label}</span>
-                </label>
-              ))}
+                  backgroundColor: skadekontroll === 'inga_skador' ? '#dcfce7' : '#ffffff',
+                  color: skadekontroll === 'inga_skador' ? '#166534' : '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Inga skador
+              </button>
+              {existingDamages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSkadekontroll('befintliga_skador')}
+                  style={{
+                    padding: '10px 16px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '6px',
+                    backgroundColor: skadekontroll === 'befintliga_skador' ? '#fef3c7' : '#ffffff',
+                    color: skadekontroll === 'befintliga_skador' ? '#92400e' : '#374151',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Befintliga skador
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSkadekontroll('nya_skador')}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: skadekontroll === 'nya_skador' ? '#fef2f2' : '#ffffff',
+                  color: skadekontroll === 'nya_skador' ? '#dc2626' : '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Nya skador
+              </button>
             </div>
           </div>
 
-          {/* Nya skador formulär med hierarkisk struktur */}
           {skadekontroll === 'nya_skador' && (
-            <div>
+            <div style={{
+              backgroundColor: '#fef2f2',
+              padding: '16px',
+              borderRadius: '8px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', margin: '0', color: '#dc2626' }}>
+                  Nya skador
+                </h3>
+                <button
+                  type="button"
+                  onClick={addNewDamage}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Lägg till skada
+                </button>
+              </div>
+
               {newDamages.map((damage) => (
                 <div key={damage.id} style={{
-                  marginBottom: '20px',
+                  backgroundColor: '#ffffff',
                   padding: '16px',
-                  border: '2px solid #f59e0b',
-                  borderRadius: '8px',
-                  backgroundColor: '#fffbeb'
+                  borderRadius: '6px',
+                  marginBottom: '12px',
+                  border: '1px solid #fecaca'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                    <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '600' }}>Ny skada</h4>
-                    <button
-                      type="button"
-                      onClick={() => removeDamage(damage.id)}
-                      style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: 'none',
-                        backgroundColor: '#dc2626',
-                        color: '#ffffff',
-                        fontSize: '12px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Ta bort
-                    </button>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '12px' }}>
                     <div>
                       <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                        1. Skadetyp *
+                        Skadetyp *
                       </label>
                       <select
                         value={damage.type}
-                        onChange={(e) => updateDamageType(damage.id, e.target.value)}
+                        onChange={(e) => updateNewDamage(damage.id, 'type', e.target.value)}
                         style={{
                           width: '100%',
                           padding: '8px',
@@ -2069,38 +1637,14 @@ export default function CheckInForm() {
 
                     <div>
                       <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                        2. Bildel *
+                        Bildel *
                       </label>
                       <select
                         value={damage.carPart}
-                        onChange={(e) => updateDamageCarPart(damage.id, e.target.value)}
-                        disabled={!damage.type}
-                        style={{
-                          width: '100%',
-                          padding: '8px',
-                          border: '1px solid #d1d5db',
-                          borderRadius: '4px',
-                          fontSize: '14px',
-                          backgroundColor: damage.type ? '#ffffff' : '#f9fafb',
-                          opacity: damage.type ? 1 : 0.6
+                        onChange={(e) => {
+                          updateNewDamage(damage.id, 'carPart', e.target.value);
+                          updateNewDamage(damage.id, 'position', '');
                         }}
-                      >
-                        <option value="">Välj bildel</option>
-                        {(damage.type ? getRelevantCarParts(damage.type) : CAR_PART_OPTIONS).map(part => (
-                          <option key={part} value={part}>{part}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {damage.carPart && CAR_PARTS[damage.carPart].length > 0 && (
-                    <div style={{ marginBottom: '12px' }}>
-                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                        3. Position *
-                      </label>
-                      <select
-                        value={damage.position}
-                        onChange={(e) => updateDamagePosition(damage.id, e.target.value)}
                         style={{
                           width: '100%',
                           padding: '8px',
@@ -2109,82 +1653,153 @@ export default function CheckInForm() {
                           fontSize: '14px'
                         }}
                       >
+                        <option value="">Välj bildel</option>
+                        {(damage.type ? getRelevantCarParts(damage.type) : CAR_PART_OPTIONS).map(part => (
+                          <option key={part} value={part}>{part}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
+                        Position *
+                      </label>
+                      <select
+                        value={damage.position}
+                        onChange={(e) => updateNewDamage(damage.id, 'position', e.target.value)}
+                        disabled={!damage.carPart}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '4px',
+                          fontSize: '14px',
+                          opacity: !damage.carPart ? 0.5 : 1
+                        }}
+                      >
                         <option value="">Välj position</option>
-                        {CAR_PARTS[damage.carPart].map(pos => (
+                        {damage.carPart && CAR_PARTS[damage.carPart]?.map(pos => (
                           <option key={pos} value={pos}>{pos}</option>
                         ))}
                       </select>
                     </div>
-                  )}
+                  </div>
 
                   <div style={{ marginBottom: '12px' }}>
                     <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: '500' }}>
-                      {damage.carPart && CAR_PARTS[damage.carPart].length > 0 ? '4. ' : '3. '}Beskrivning av skada *
+                      Beskrivning *
                     </label>
-                    <input
-                      type="text"
-                      value={damage.text}
-                      onChange={(e) => updateDamageText(damage.id, e.target.value)}
-                      placeholder="Beskriv skadan mer detaljerat..."
-                      disabled={!damage.carPart}
+                    <textarea
+                      value={damage.description}
+                      onChange={(e) => updateNewDamage(damage.id, 'description', e.target.value)}
+                      placeholder="Beskriv skadan detaljerat..."
+                      rows={2}
                       style={{
                         width: '100%',
-                        padding: '12px',
+                        padding: '8px',
                         border: '1px solid #d1d5db',
-                        borderRadius: '6px',
-                        fontSize: '16px',
-                        backgroundColor: damage.carPart ? '#ffffff' : '#f3f4f6',
-                        color: damage.carPart ? '#000' : '#9ca3af'
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        resize: 'vertical'
                       }}
                     />
                   </div>
 
-                  <MediaUpload
-                    damageId={damage.id}
-                    isOld={false}
-                    onMediaUpdate={updateDamageMedia}
-                    hasImage={damage.media.some(m => m.type === 'image')}
-                    hasVideo={damage.media.some(m => m.type === 'video')}
-                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,video/*"
+                        onChange={async (e) => {
+                          if (e.target.files) {
+                            const files = Array.from(e.target.files);
+                            const mediaFiles = await processFiles(files);
+                            updateNewDamage(damage.id, 'media', [...damage.media, ...mediaFiles]);
+                          }
+                        }}
+                        style={{ display: 'none' }}
+                        id={`file-${damage.id}`}
+                      />
+                      <label
+                        htmlFor={`file-${damage.id}`}
+                        style={{
+                          padding: '8px 12px',
+                          backgroundColor: '#3b82f6',
+                          color: '#ffffff',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          display: 'inline-block'
+                        }}
+                      >
+                        Lägg till bild/video
+                      </label>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeNewDamage(damage.id)}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#ef4444',
+                        color: '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                    >
+                      Ta bort
+                    </button>
+                  </div>
 
                   {damage.media.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                    <div style={{ marginTop: '12px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {damage.media.map((media, index) => (
                         <div key={index} style={{ position: 'relative' }}>
                           {media.type === 'image' ? (
                             <img
                               src={media.preview}
                               alt="Skadebild"
-                              style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '4px' }}
+                              style={{
+                                width: '80px',
+                                height: '80px',
+                                objectFit: 'cover',
+                                borderRadius: '4px',
+                                border: '1px solid #d1d5db'
+                              }}
                             />
                           ) : (
                             <div style={{
-                              width: '60px',
-                              height: '60px',
+                              width: '80px',
+                              height: '80px',
                               backgroundColor: '#f3f4f6',
                               borderRadius: '4px',
+                              border: '1px solid #d1d5db',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              backgroundImage: media.thumbnail ? `url(${media.thumbnail})` : undefined,
-                              backgroundSize: 'cover'
+                              fontSize: '12px'
                             }}>
-                              {!media.thumbnail && '🎥'}
+                              📹 Video
                             </div>
                           )}
                           <button
                             type="button"
-                            onClick={() => removeDamageMedia(damage.id, index)}
+                            onClick={() => {
+                              const newMedia = damage.media.filter((_, i) => i !== index);
+                              updateNewDamage(damage.id, 'media', newMedia);
+                            }}
                             style={{
                               position: 'absolute',
-                              top: '-6px',
-                              right: '-6px',
+                              top: '-4px',
+                              right: '-4px',
                               width: '20px',
                               height: '20px',
                               borderRadius: '50%',
-                              border: 'none',
-                              backgroundColor: '#dc2626',
+                              backgroundColor: '#ef4444',
                               color: '#ffffff',
+                              border: 'none',
                               fontSize: '12px',
                               cursor: 'pointer',
                               display: 'flex',
@@ -2200,98 +1815,86 @@ export default function CheckInForm() {
                   )}
                 </div>
               ))}
-
-              <button
-                type="button"
-                onClick={addDamage}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '2px dashed #f59e0b',
-                  borderRadius: '6px',
-                  backgroundColor: '#fffbeb',
-                  color: '#f59e0b',
-                  fontSize: '16px',
-                  fontWeight: '500',
-                  cursor: 'pointer'
-                }}
-              >
-                + Lägg till skada
-              </button>
             </div>
           )}
 
-          {showFieldErrors && !isDamagesComplete() && (
+          {showFieldErrors && !isDamageCheckComplete() && (
             <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: '500' }}>
-              ⚠️ Skadekontroll och alla skadeuppgifter är obligatoriska
+              ⚠️ Skadekontroll är obligatorisk
             </p>
           )}
         </div>
 
-        {/* 6. UTHYRNINGSSTATUS */}
-        <div style={{
+        {/* Sektion 6: Uthyrningsstatus */}
+        <div className={`${showFieldErrors && !isStatusComplete() ? 'section-incomplete' : ''}`} style={{
           backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: showFieldErrors && !isStatusComplete() ? '2px solid #dc2626' : '2px solid transparent'
-        }} className={showFieldErrors && !isStatusComplete() ? 'section-incomplete' : ''}>
-          <SectionHeader title="Uthyrningsstatus" isComplete={isStatusComplete()} />
-          
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '12px', fontWeight: '500' }}>
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }}>
+          <h2 style={{
+            fontSize: '20px',
+            fontWeight: '600',
+            marginBottom: '20px',
+            color: '#1f2937'
+          }}>
+            Uthyrningsstatus
+          </h2>
+
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
               Status *
             </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {([
-                { value: 'redo_for_uthyrning', label: 'Redo för uthyrning' },
-                { value: 'ledig_tankad', label: 'Ledig, tankad' },
-                { value: 'ledig_otankad', label: 'Ledig, otankad' },
-                { value: 'klar_otankad', label: 'Klar, otankad' }
-              ] as const).map(option => (
-                <label key={option.value} style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '12px',
-                  border: '2px solid #e5e7eb',
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => setUthyrningsstatus('klar_tankad')}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  cursor: 'pointer',
-                  backgroundColor: uthyrningsstatus === option.value ? '#033066' : '#ffffff',
-                  color: uthyrningsstatus === option.value ? '#ffffff' : '#374151'
-                }}>
-                  <input
-                    type="radio"
-                    name="uthyrningsstatus"
-                    value={option.value}
-                    checked={uthyrningsstatus === option.value}
-                    onChange={(e) => setUthyrningsstatus(e.target.value as any)}
-                    style={{ display: 'none' }}
-                  />
-                  <span>{option.label}</span>
-                </label>
-              ))}
+                  backgroundColor: uthyrningsstatus === 'klar_tankad' ? '#dcfce7' : '#ffffff',
+                  color: uthyrningsstatus === 'klar_tankad' ? '#166534' : '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Klar tankad
+              </button>
+              <button
+                type="button"
+                onClick={() => setUthyrningsstatus('klar_otankad')}
+                style={{
+                  padding: '10px 16px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  backgroundColor: uthyrningsstatus === 'klar_otankad' ? '#fef3c7' : '#ffffff',
+                  color: uthyrningsstatus === 'klar_otankad' ? '#92400e' : '#374151',
+                  cursor: 'pointer'
+                }}
+              >
+                Klar otankad
+              </button>
             </div>
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
+          <div style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-              Preliminär avslut notering *
+              Preliminär avslutnotering *
             </label>
             <textarea
               value={preliminarAvslutNotering}
               onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
-              placeholder="Skriv en kort notering om incheckningen..."
+              placeholder="Preliminära kommentarer för avslut..."
               rows={3}
               style={{
                 width: '100%',
                 padding: '12px',
-                border: showFieldErrors && !preliminarAvslutNotering.trim() ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                border: showFieldErrors && !preliminarAvslutNotering.trim() ? '2px solid #dc2626' : '1px solid #d1d5db',
+                backgroundColor: showFieldErrors && !preliminarAvslutNotering.trim() ? '#fef2f2' : '#ffffff',
                 borderRadius: '6px',
                 fontSize: '16px',
-                resize: 'vertical',
-                minHeight: '80px'
+                resize: 'vertical'
               }}
             />
           </div>
@@ -2303,7 +1906,7 @@ export default function CheckInForm() {
           )}
         </div>
 
-        {/* SPARA-KNAPP med förbättrad debugging */}
+        {/* Smart spara-knapp */}
         <div style={{ 
           backgroundColor: '#ffffff',
           padding: '24px',
@@ -2340,9 +1943,128 @@ export default function CheckInForm() {
             © Albarone AB 2025
           </p>
         </div>
+
       </div>
 
-      {/* ALLA BEKRÄFTELSEDIALOGER */}
+      {/* Final Confirmation Dialog */}
+      {showFinalConfirmation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '12px',
+            padding: '32px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }}>
+            <h2 style={{
+              fontSize: '24px',
+              fontWeight: '600',
+              marginBottom: '20px',
+              color: '#1f2937',
+              textAlign: 'center'
+            }}>
+              Bekräfta incheckning
+            </h2>
+            
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '20px',
+              borderRadius: '8px',
+              marginBottom: '24px',
+              fontSize: '14px',
+              lineHeight: '1.6'
+            }}>
+              <p style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>
+                <strong>Bob</strong> checkar in: <strong>{regInput}</strong>
+              </p>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>📍 Plats:</strong> {annanPlats ? annanPlatsText : `${ort} - ${station}`}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🚗 Fordon:</strong> {carModel || 'Okänd modell'} | Mätare: {matarstallning} km
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>⛽ Drivmedel:</strong> {drivmedelstyp === 'bensin_diesel' ? 'Bensin/Diesel' : 'Elbil'}
+                {drivmedelstyp === 'bensin_diesel' && tankniva === 'pafylld_nu' && (
+                  <span> | Påfylld: {liters}L {bransletyp}</span>
+                )}
+                {drivmedelstyp === 'elbil' && (
+                  <span> | Laddning: {laddniva}%</span>
+                )}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🔧 Status:</strong> {uthyrningsstatus === 'klar_tankad' ? 'Klar tankad' : 'Klar otankad'}
+              </div>
+              
+              {existingDamages.some(d => d.status !== 'not_selected') && (
+                <div style={{ marginBottom: '12px' }}>
+                  <strong>⚠️ Befintliga skador:</strong> {existingDamages.filter(d => d.status === 'documented').length} dokumenterade, {existingDamages.filter(d => d.status === 'fixed').length} åtgärdade
+                </div>
+              )}
+              
+              {newDamages.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <strong>🔴 Nya skador:</strong> {newDamages.length} st
+                </div>
+              )}
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowFinalConfirmation(false)}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#6b7280',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Tillbaka
+              </button>
+              <button
+                onClick={confirmFinalSave}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: '#10b981',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Bekräfta sparande
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Fix Dialog */}
       {showConfirmDialog && (
         <div style={{
           position: 'fixed',
@@ -2359,58 +2081,29 @@ export default function CheckInForm() {
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: '12px',
-            padding: '32px',
-            margin: '20px',
+            padding: '24px',
             maxWidth: '400px',
-            width: '100%',
-            textAlign: 'center',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+            width: '90%',
+            textAlign: 'center'
           }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#f59e0b',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 20px',
-              fontSize: '32px'
-            }}>
-              ⚠️
-            </div>
-            
-            <h2 style={{
-              fontSize: '20px',
-              fontWeight: '600',
-              marginBottom: '12px',
-              color: '#1f2937'
-            }}>
-              Bekräfta åtgärdning
-            </h2>
-            
-            <p style={{
-              fontSize: '16px',
-              color: '#6b7280',
-              marginBottom: '24px'
-            }}>
-              Är du säker på att denna skada är åtgärdad?
-              <br />
-              <strong>"{existingDamages.find(d => d.id === damageToFix)?.fullText}"</strong>
+            <h3 style={{ marginBottom: '16px', color: '#1f2937' }}>
+              Bekräfta åtgärd
+            </h3>
+            <p style={{ marginBottom: '20px', color: '#6b7280' }}>
+              Är du säker på att denna skada har åtgärdats?
             </p>
-            
-            <div style={{ display: 'flex', gap: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button
-                onClick={cancelFixDamage}
+                onClick={() => {
+                  setShowConfirmDialog(false);
+                  setDamageToFix(null);
+                }}
                 style={{
-                  flex: 1,
-                  backgroundColor: '#f3f4f6',
-                  color: '#374151',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  padding: '12px 24px',
-                  fontSize: '16px',
-                  fontWeight: '500',
+                  padding: '8px 16px',
+                  backgroundColor: '#6b7280',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
                   cursor: 'pointer'
                 }}
               >
@@ -2419,25 +2112,22 @@ export default function CheckInForm() {
               <button
                 onClick={confirmFixDamage}
                 style={{
-                  flex: 1,
+                  padding: '8px 16px',
                   backgroundColor: '#10b981',
                   color: '#ffffff',
                   border: 'none',
-                  borderRadius: '8px',
-                  padding: '12px 24px',
-                  fontSize: '16px',
-                  fontWeight: '500',
+                  borderRadius: '6px',
                   cursor: 'pointer'
                 }}
               >
-                ✅ Bekräfta
+                Bekräfta
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* SUCCESS MODAL */}
+      {/* Success Modal */}
       {showSuccessModal && (
         <div style={{
           position: 'fixed',
@@ -2515,3 +2205,5 @@ export default function CheckInForm() {
     </div>
   );
 }
+
+const CAR_PART_OPTIONS = Object.keys(CAR_PARTS).sort();
