@@ -368,7 +368,7 @@ if (item.regnr && item.regnr !== null) {
           supabase
             .from('mabi_damage_data')
             .select('*')
-            .eq('Regnr', normalizedReg)
+            .eq('regnr', normalizedReg)
             .order('id', { ascending: false }),
           supabase
             .from('car_data')
@@ -387,7 +387,7 @@ if (item.regnr && item.regnr !== null) {
           const firstRow = mabiResult.data[0];
           useData = [{
             regnr: normalizedReg,
-            brand_model: getColumnValue(firstRow, 'Modell', ['brand_model']),
+            brand_model: getColumnValue(firstRow, 'modell', ['brand_model']),
             damage_text: null,
             damage_location: null,
             damage_notes: null,
@@ -398,11 +398,11 @@ if (item.regnr && item.regnr !== null) {
           // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
           damages = mabiResult.data.map((row, index) => {
             // Kolumn H: Skadetyp
-            const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
+            const skadetyp = getColumnValue(row, 'skadetyp', ['damage_type', 'damage_text']) || '';
             // Kolumn K: Skadeanmälan 
-            const plats = getColumnValue(row, 'Skadeanmälan', ['damage_location', 'plats']) || '';
+            const plats = getColumnValue(row, 'skadeanmälan', ['damage_location', 'plats']) || '';
             // Kolumn M: Intern notering
-            const notering = getColumnValue(row, 'Intern notering', ['internal_notes', 'damage_notes', 'notering']) || '';
+            const notering = getColumnValue(row, 'sntern notering', ['internal_notes', 'damage_notes', 'notering']) || '';
             
             // Hoppa över rader utan skadeinformation
             if (!skadetyp && !plats && !notering) return null;
