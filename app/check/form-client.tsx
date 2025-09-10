@@ -316,14 +316,16 @@ export default function CheckInForm() {
         
         if (!mabiResult.error && mabiResult.data) {
           mabiResult.data.forEach(item => {
-            if (item.Regnr) allRegs.add(item.Regnr.toString().toUpperCase());
-          });
+if (item.Regnr && item.Regnr !== null) {
+  allRegs.add(item.Regnr.toString().toUpperCase());
+}          });
         }
 
         if (!carResult.error && carResult.data) {
           carResult.data.forEach(item => {
-            if (item.regnr) allRegs.add(item.regnr.toString().toUpperCase());
-          });
+if (item.regnr && item.regnr !== null) {
+  allRegs.add(item.regnr.toString().toUpperCase());
+}          });
         }
 
         setAllRegistrations(Array.from(allRegs).sort());
