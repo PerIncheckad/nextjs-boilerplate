@@ -369,7 +369,7 @@ if (item.regnr && item.regnr !== null) {
         supabase
             .from('mabi_damage_data')
             .select('*')
-            .eq('Regnr', normalizedReg)
+            .eq('"Regnr"', normalizedReg)
             .order('id', { ascending: false }),
           supabase
             .from('car_data')
