@@ -373,7 +373,7 @@ if (item.regnr && item.regnr !== null) {
           supabase
             .from('car_data')
             .select('*')
-            .eq('Regnr', normalizedReg)
+            .ilike('Regnr', normalizedReg)
             .order('created_at', { ascending: false })
         ]);
 console.log('MABI Result:', mabiResult);
