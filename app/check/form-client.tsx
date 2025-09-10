@@ -215,12 +215,14 @@ const createCombinedDamageText = (skadetyp: string, plats: string, notering: str
     parts.push(skadetyp.trim());
   }
   
+  // Lägg till plats ENDAST om den är olika från skadetyp
   if (plats?.trim() && plats.trim() !== skadetyp?.trim()) {
     parts.push(plats.trim());
   }
   
+  // Lägg ALLTID till notering om den finns
   if (notering?.trim()) {
-    parts.push(`(${notering.trim()})`);
+    parts.push(notering.trim());
   }
   
   return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
