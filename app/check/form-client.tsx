@@ -367,9 +367,9 @@ if (item.regnr && item.regnr !== null) {
       try {
         const [mabiResult, carResult] = await Promise.all([
         supabase
-            .from('mabi_damage_data')
-            .select('*')
-            .eq('Regnr', normalizedReg)
+.from('simple_mabi_damage')
+          .select('*')
+            .eq('regnr', normalizedReg)
             .order('id', { ascending: false }),
           supabase
             .from('car_data')
