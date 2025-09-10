@@ -2508,7 +2508,7 @@ const handleSave = () => {
           </div>
         </div>
       )}
-      {/* Final Confirmation Dialog */}
+{/* Final Confirmation Dialog - Detaljerad sammanfattning */}
       {showFinalConfirmation && (
         <div style={{
           position: 'fixed',
@@ -2520,33 +2520,85 @@ const handleSave = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000
+          zIndex: 1000,
+          padding: '20px'
         }}>
           <div style={{
             backgroundColor: '#ffffff',
             borderRadius: '12px',
             padding: '32px',
-            maxWidth: '400px',
+            maxWidth: '600px',
             width: '100%',
-            textAlign: 'center',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
           }}>
             <h2 style={{
               fontSize: '24px',
               fontWeight: '600',
-              marginBottom: '16px',
-              color: '#1f2937'
+              marginBottom: '20px',
+              color: '#1f2937',
+              textAlign: 'center'
             }}>
               Bekräfta incheckning
             </h2>
             
-            <p style={{
-              fontSize: '16px',
-              color: '#6b7280',
-              marginBottom: '24px'
+            <div style={{
+              backgroundColor: '#f8fafc',
+              padding: '20px',
+              borderRadius: '8px',
+              marginBottom: '24px',
+              fontSize: '14px',
+              lineHeight: '1.6'
             }}>
-              Vill du spara incheckningen för {regInput}?
-            </p>
+              <p style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>
+                <strong>Bob</strong> checkar in: <strong>{regInput}</strong>
+              </p>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>📍 Plats:</strong> {annanPlats ? annanPlatsText : `${ort} - ${station}`}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🕐 Datum/Tid:</strong> {new Date().toLocaleString('sv-SE')}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🚗 Fordon:</strong> {carModel || 'Okänd modell'} | Mätare: {matarstallning} km
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>⛽ Drivmedel:</strong> {drivmedelstyp === 'bensin_diesel' ? 'Bensin/Diesel' : 'Elbil'}
+                {drivmedelstyp === 'bensin_diesel' && tankniva === 'pafylld_nu' && (
+                  <span> | Påfylld: {liters}L {bransletyp}</span>
+                )}
+                {drivmedelstyp === 'elbil' && (
+                  <span> | Laddning: {laddniva}%</span>
+                )}
+              </div>
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🧽 Rengöring:</strong> Tvätt {tvatt ? 'genomförd' : 'ej genomförd'}, 
+                Inre skick: {inre?.replace(/_/g, ' ') || 'ej angivet'}
+              </div>
+              
+              {existingDamages.some(d => d.status !== 'not_selected') && (
+                <div style={{ marginBottom: '12px' }}>
+                  <strong>⚠️ Befintliga skador:</strong> {existingDamages.filter(d => d.status === 'documented').length} dokumenterade, 
+                  {existingDamages.filter(d => d.status === 'fixed').length} åtgärdade
+                </div>
+              )}
+              
+              {newDamages.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <strong>🔴 Nya skador:</strong> {newDamages.length} st
+                </div>
+              )}
+              
+              <div style={{ marginBottom: '12px' }}>
+                <strong>🔧 Status:</strong> {uthyrningsstatus?.replace(/_/g, ' ') || 'ej angivet'}
+              </div>
+            </div>
             
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button
@@ -2557,6 +2609,8 @@ const handleSave = () => {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: '500',
                   cursor: 'pointer'
                 }}
               >
@@ -2573,6 +2627,8 @@ const handleSave = () => {
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: '500',
                   cursor: 'pointer'
                 }}
               >
