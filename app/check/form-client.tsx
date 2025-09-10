@@ -587,8 +587,10 @@ export default function CheckInForm() {
     setShowSuccessModal(false);
   };
 
-  const handleSave = () => {
-    if (canSave()) {
+const handleSave = () => {
+  console.log('=== HANDLEAVE CALLED ===');
+  console.log('canSave():', canSave());
+  if (canSave()) {
       setShowFinalConfirmation(true);
     } else {
       setShowFieldErrors(true);
