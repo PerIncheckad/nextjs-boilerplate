@@ -590,20 +590,10 @@ export default function CheckInForm() {
 const handleSave = () => {
   console.log('=== HANDLEAVE CALLED ===');
   console.log('canSave():', canSave());
-  if (canSave()) {
-  console.log('Setting showFinalConfirmation to true');
+  
+  // Force visa dialogen för test
   setShowFinalConfirmation(true);
-} else {
-  console.log('canSave() returned false, showing field errors');
-      setShowFieldErrors(true);
-      setTimeout(() => {
-        const firstIncomplete = document.querySelector('.section-incomplete');
-        if (firstIncomplete) {
-          firstIncomplete.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 100);
-    }
-  };
+};
 
   const confirmFinalSave = () => {
     console.log('Sparar incheckning...');
