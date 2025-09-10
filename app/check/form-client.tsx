@@ -384,8 +384,9 @@ console.log('CAR Result:', carResult);
         let useData: CarData[] = [];
         let damages: ExistingDamage[] = [];
 
-        if (!mabiResult.error && mabiResult.data && mabiResult.data.length > 0) {
-          // Använd första raden för bildata
+if (mabiResult && mabiResult.data && mabiResult.data.length > 0) {
+  console.log('Inside MABI if-statement, processing data...');
+  // Använd första raden för bildata
          console.log('MABI Data found:', mabiResult.data);
           const firstRow = mabiResult.data[0];
           useData = [{
