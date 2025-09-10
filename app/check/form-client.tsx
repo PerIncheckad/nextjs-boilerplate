@@ -365,7 +365,6 @@ if (item.regnr && item.regnr !== null) {
 
       try {
         const [mabiResult, carResult] = await Promise.all([
-          console.log('MABI Result:', mabiResult);
         supabase
             .from('mabi_damage_data')
             .select('*')
@@ -377,7 +376,8 @@ if (item.regnr && item.regnr !== null) {
             .eq('Regnr', normalizedReg)
             .order('created_at', { ascending: false })
         ]);
-
+console.log('MABI Result:', mabiResult);
+console.log('CAR Result:', carResult);
         if (cancelled) return;
 
         let useData: CarData[] = [];
