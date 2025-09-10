@@ -401,6 +401,7 @@ if (mabiResult && mabiResult.data && mabiResult.data.length > 0) {
 
           // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
           damages = mabiResult.data.map((row, index) => {
+            console.log('Row', index, 'columns:', Object.keys(row));
             // Kolumn H: Skadetyp
             const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
             // Kolumn K: Skadeanmälan 
