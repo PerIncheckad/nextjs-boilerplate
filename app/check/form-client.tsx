@@ -591,8 +591,10 @@ const handleSave = () => {
   console.log('=== HANDLEAVE CALLED ===');
   console.log('canSave():', canSave());
   if (canSave()) {
-      setShowFinalConfirmation(true);
-    } else {
+  console.log('Setting showFinalConfirmation to true');
+  setShowFinalConfirmation(true);
+} else {
+  console.log('canSave() returned false, showing field errors');
       setShowFieldErrors(true);
       setTimeout(() => {
         const firstIncomplete = document.querySelector('.section-incomplete');
