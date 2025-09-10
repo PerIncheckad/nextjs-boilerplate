@@ -365,7 +365,8 @@ if (item.regnr && item.regnr !== null) {
 
       try {
         const [mabiResult, carResult] = await Promise.all([
-          supabase
+          console.log('MABI Result:', mabiResult);
+        supabase
             .from('mabi_damage_data')
             .select('*')
             .eq('Regnr', normalizedReg)
@@ -384,6 +385,7 @@ if (item.regnr && item.regnr !== null) {
 
         if (!mabiResult.error && mabiResult.data && mabiResult.data.length > 0) {
           // Använd första raden för bildata
+         console.log('MABI Data found:', mabiResult.data);
           const firstRow = mabiResult.data[0];
           useData = [{
             regnr: normalizedReg,
