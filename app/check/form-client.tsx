@@ -932,7 +932,6 @@ const handleSave = () => {
     </div>
   );
 
-  const MediaUpload = ({
     damageId,
     isOld,
     onMediaUpdate,
