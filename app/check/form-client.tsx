@@ -945,103 +945,111 @@ const handleSave = () => {
     hasImage?: boolean;
     hasVideo?: boolean;
   }) => (
-    <div style={{ marginBottom: '12px' }}>
-      <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-        Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
+<div style={{ marginBottom: '12px' }}>
+  <label style={{ display: 'block', marginBottom: '6px', fontWeight: 500 }}>
+    Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
+  </label>
+
+  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+    {/* Foto */}
+    <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+      <input
+        type="file"
+        accept="image/*"
+        multiple
+        capture="environment"
+        onChange={(e) => onMediaUpdate(damageId, e.target.files)}
+        style={{ display: 'none' }}
+        id={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
+      />
+      <label
+        htmlFor={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
+        style={{
+          display: 'block',
+          width: '100%',
+          padding: '12px',
+          border: hasImage ? '2px dashed #10b981' : '2px solid #dc2626',
+          borderRadius: '6px',
+          fontSize: '16px',
+          backgroundColor: hasImage ? '#f0fdf4' : '#fee2e2',
+          textAlign: 'center',
+          cursor: 'pointer',
+          color: hasImage ? '#047857' : '#dc2626',
+          fontWeight: hasImage ? 'normal' : 'bold',
+        }}
+      >
+        {hasImage ? 'Lägg till fler bilder' : 'Ta foto *'}
       </label>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            capture="environment"
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-photo-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: hasImage ? '2px dashed #10b981' : '2px solid #dc2626',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: hasImage ? '#f0fdf4' : '#fee2e2',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: hasImage ? '#047857' : '#dc2626',
-              fontWeight: hasImage ? 'normal' : 'bold'
-            }}
-          >
-            📷 {hasImage ? 'Lägg till fler bilder' : 'Ta foto *'}
-          </label>
-        </div>
+    </div>
 
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="video/*"
-            capture="environment"
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: hasVideo ? '2px dashed #10b981' : '2px solid #dc2626',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: hasVideo ? '#f0fdf4' : '#fee2e2',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: '#dc2626',
-              fontWeight: hasVideo ? 'normal' : 'bold'
-            }}
-          >
-            🎥 {hasVideo ? 'Lägg till mer video' : 'Spela in video med skada OCH reg.nr. *'}
-          </label>
-        </div>
+    {/* Video */}
+    <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+      <input
+        type="file"
+        accept="video/*"
+        capture="environment"
+        onChange={(e) => onMediaUpdate(damageId, e.target.files)}
+        style={{ display: 'none' }}
+        id={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
+      />
+      <label
+        htmlFor={`${isOld ? 'old' : 'new'}-video-input-${damageId}`}
+        style={{
+          display: 'block',
+          width: '100%',
+          padding: '12px',
+          border: hasVideo ? '2px dashed #10b981' : '2px solid #dc2626',
+          borderRadius: '6px',
+          fontSize: '16px',
+          backgroundColor: hasVideo ? '#f0fdf4' : '#fee2e2',
+          textAlign: 'center',
+          cursor: 'pointer',
+          color: '#dc2626',
+          fontWeight: hasVideo ? 'normal' : 'bold',
+        }}
+      >
+        {hasVideo ? 'Lägg till mer video' : 'Spela in video * (koppla till reg.nr)'}
+      </label>
+    </div>
 
-        <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-          <input
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={(e) => onMediaUpdate(damageId, e.target.files)}
-            style={{ display: 'none' }}
-            id={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
-          />
-          <label
-            htmlFor={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '12px',
-              border: '2px dashed #3b82f6',
-              borderRadius: '6px',
-              fontSize: '16px',
-              backgroundColor: '#eff6ff',
-              textAlign: 'center',
-              cursor: 'pointer',
-              color: '#2563eb'
-            }}
-          >
-            📁 Välj från galleri
-          </label>
-        </div>
-      </div>
-      {(!hasImage || !hasVideo) && (
-        <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
-          Både bild och video är obligatoriska för alla skador
-        </p>
-      )}
+    {/* Galleri (valfritt – flera filer) */}
+    <div style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+      <input
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        onChange={(e) => onMediaUpdate(damageId, e.target.files)}
+        style={{ display: 'none' }}
+        id={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
+      />
+      <label
+        htmlFor={`${isOld ? 'old' : 'new'}-gallery-input-${damageId}`}
+        style={{
+          display: 'block',
+          width: '100%',
+          padding: '12px',
+          border: '2px dashed #3b82f6',
+          borderRadius: '6px',
+          fontSize: '16px',
+          backgroundColor: '#eff6ff',
+          textAlign: 'center',
+          cursor: 'pointer',
+          color: '#2563eb',
+        }}
+      >
+        Välj från galleri
+      </label>
+    </div>
+  </div>
+</div>
+
+{/* Varning om något saknas */}
+{(!hasImage || !hasVideo) && (
+  <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
+    Både bild och video är obligatoriska för alla skador
+  </p>
+)}
+
 
  return (
     <div style={{
