@@ -1043,12 +1043,6 @@ const handleSave = () => {
   </div>
 </div>
 
-{/* Varning om något saknas */}
-{(!hasImage || !hasVideo) && (
-  <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
-    Både bild och video är obligatoriska för alla skador
-  </p>
-)}
 
 
  return (
@@ -1057,7 +1051,22 @@ const handleSave = () => {
       backgroundColor: '#f8fafc',
       color: '#111827'
     }}>
-      {/* MABI Header */}
+      {(!hasImage || !hasVideo) && (
+  <div
+    style={{
+      margin: '8px 0',
+      padding: '8px 12px',
+      background: '#fff5f5',
+      border: '1px solid #fca5a5',
+      borderRadius: '6px',
+      color: '#dc2626',
+      fontWeight: 600,
+    }}
+  >
+    Både bild och video är obligatoriska för alla skador
+  </div>
+)}
+{/* MABI Header */}
       <div style={{
         backgroundColor: '#033066',
         width: '100vw',
