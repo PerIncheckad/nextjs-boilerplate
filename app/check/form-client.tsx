@@ -1042,8 +1042,7 @@ const handleSave = () => {
           Både bild och video är obligatoriska för alla skador
         </p>
       )}
-    </div>
-  );
+
  return (
     <div style={{
       minHeight: '100vh',
