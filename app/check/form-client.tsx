@@ -1,4 +1,21 @@
 'use client';
+type MabiDamageRow = {
+  regnr: string;
+  brand_model: string | null;
+  wheelstorage: string | null;
+  saludatum: string | null;
+  "Skadetyp": string | null;
+  "Skadans plats på fordonet": string | null;
+  "Intern notering": string | null;
+  "Skadeanmälan": string | null;
+};
+
+type NormalizedMabiDamage = {
+  type: string | null;
+  place: string | null;
+  note: string | null;   // Intern notering
+  report: string | null; // Skadeanmälan
+};
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
@@ -245,10 +262,21 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
   
   return null;
 };
+function normalizeMabiDamage(row: MabiDamageRow): NormalizedMabiDamage {
+  return {
+    type: row["Skadetyp"] ?? null,
+    place: row["Skadans plats på fordonet"] ?? null,
+    note: row["Intern notering"] ?? null,
+    report: row["Skadeanmälan"] ?? null,
+  };
+}
 
 export default function CheckInForm() {
   // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
+  const [usingMabiData, setUsingMabiData] = useState(false);
+const [mabiDamages, setMabiDamages] = useState<NormalizedMabiDamage[]>([]);
+
   const [carData, setCarData] = useState<CarData[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -305,6 +333,72 @@ export default function CheckInForm() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
+// --- NY FUNKTION: hämtar bildata från MABI, annars fallback ---
+const searchCarData = async (regnr: string) => {
+  if (!regnr || regnr.length < 3) return;
+
+  setLoading(true);
+  setNotFound(false);
+  setUsingMabiData(false);
+  setMabiDamages([]);
+  setCarData([] as any);
+
+  try {
+    const { data: mabiRows, error: mabiErr } = await supabase
+      .from('mabi_damage_data')
+      .select(`
+        regnr,
+        brand_model,
+        wheelstorage,
+        saludatum,
+        "Skadetyp",
+        "Skadans plats på fordonet",
+        "Intern notering",
+        "Skadeanmälan"
+      `)
+      .eq('regnr', regnr);
+
+    if (!mabiErr && mabiRows && mabiRows.length > 0) {
+      const first = mabiRows[0] as MabiDamageRow;
+
+      setCarData([{
+        regnr: first.regnr,
+        brand_model: first.brand_model ?? null,
+        damage_text: null,
+        wheelstorage: first.wheelstorage ?? null,
+        saludatum: first.saludatum ?? null
+      }] as any);
+
+      const normalized = (mabiRows as MabiDamageRow[]).map(normalizeMabiDamage);
+      const filtered = normalized.filter(d => d.type || d.place || d.note || d.report);
+
+      setMabiDamages(filtered);
+      setUsingMabiData(true);
+      setLoading(false);
+      return;
+    }
+
+    const { data: carRows, error: carErr } = await supabase
+      .from('car_data')
+      .select('*')
+      .eq('regnr', regnr);
+
+    if (!carErr && carRows && carRows.length > 0) {
+      setCarData(carRows as any);
+      setUsingMabiData(false);
+      setLoading(false);
+      return;
+    }
+
+    setNotFound(true);
+  } catch (e) {
+    console.error('Search error', e);
+    setNotFound(true);
+  } finally {
+    setLoading(false);
+  }
+};
+// --- SLUT NY FUNKTION ---
 
   // Hämtar från BÅDA tabellerna för autocomplete
   useEffect(() => {
@@ -348,7 +442,18 @@ if (item.regnr && item.regnr !== null) {
       .filter(reg => reg.includes(input))
       .slice(0, 5);
   }, [regInput, allRegistrations]);
-
+// Anropa nya sökfunktionen när regnumret är 3+ tecken
+useEffect(() => {
+  const reg = (normalizedReg || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (reg.length < 3) {
+    setUsingMabiData(false);
+    setMabiDamages([]);
+    return;
+  }
+  const t = setTimeout(() => searchCarData(reg), 250);
+  return () => clearTimeout(t);
+}, [normalizedReg]);
+/*  
   // KORRIGERAD skadehantering - läser H, K, M och skapar EN skada per RAD
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
@@ -489,7 +594,7 @@ if (mabiResult && mabiResult.data && mabiResult.data.length > 0) {
       clearTimeout(timeout);
     };
   }, [normalizedReg]);
-
+*/
   const carModel = carData[0]?.brand_model || null;
   const wheelStorage = carData[0]?.wheelstorage || null;
   const saludatum = carData[0]?.saludatum || null;
@@ -1139,16 +1244,41 @@ const handleSave = () => {
               </div>
               <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
-                <div style={{ flex: 1 }}>
-                  {existingDamages.length === 0 ? (
-                    <span style={{ fontWeight: '500' }}> ---</span>
-                  ) : (
-                    <div style={{ margin: '0' }}>
-                      {existingDamages.map((damage, i) => (
-                        <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                          <div style={{ fontWeight: '500', color: '#1f2937' }}>
-                            {damage.fullText}
-                          </div>
+               <div style={{ flex: 1 }}>
+  {usingMabiData ? (
+    mabiDamages.length === 0 ? (
+      <span style={{ fontWeight: 500 }}> —</span>
+    ) : (
+      <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
+        {mabiDamages.map((d, i) => {
+          const parts: string[] = [];
+          if (d.type)   parts.push(d.type);
+          if (d.place)  parts.push(d.place);
+          if (d.note)   parts.push(`Notering: ${d.note}`);
+          if (d.report) parts.push(`Skadeanmälan: ${d.report}`);
+        return (
+            <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
+              {parts.join(' • ')}
+            </li>
+          );
+        })}
+      </ul>
+    )
+  ) : (
+    existingDamages.length === 0 ? (
+      <span style={{ fontWeight: 500 }}> —</span>
+    ) : (
+      <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
+        {existingDamages.map((damage, i) => (
+          <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
+            {damage.fullText}
+          </li>
+        ))}
+      </ul>
+    )
+  )}
+</div>
+
                         </div>
                       ))}
                     </div>
