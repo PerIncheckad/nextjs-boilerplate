@@ -1051,7 +1051,7 @@ const handleSave = () => {
       backgroundColor: '#f8fafc',
       color: '#111827'
     }}>
-{!(hasImage && hasVideo) && (
+{(!hasImage || !hasVideo) && (
   <div
     style={{
       margin: '8px 0',
