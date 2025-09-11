@@ -1242,42 +1242,47 @@ const handleSave = () => {
                   </span>
                 ) : <span style={{ fontWeight: '500' }}> ---</span>}
               </div>
-              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
-               <div style={{ flex: 1 }}>
-  {usingMabiData ? (
-    mabiDamages.length === 0 ? (
-      <span style={{ fontWeight: 500 }}> —</span>
+<div style={{ display: 'flex', alignItems: 'flex-start' }}>
+  <span style={{ fontWeight: '600', color: '#033666', minWidth: '130px' }}>
+    Befintliga skador:
+  </span>
+  <div style={{ flex: 1 }}>
+    {usingMabiData ? (
+      mabiDamages.length === 0 ? (
+        <span style={{ fontWeight: 500 }}> —</span>
+      ) : (
+        <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
+          {mabiDamages.map((d, i) => {
+            const parts: string[] = [];
+            if (d.type)   parts.push(d.type);
+            if (d.place)  parts.push(d.place);
+            if (d.note)   parts.push(`Notering: ${d.note}`);
+            if (d.report) parts.push(`Skadeanmälan: ${d.report}`);
+            return (
+              <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
+                {parts.join(' • ')}
+              </li>
+            );
+          })}
+        </ul>
+      )
     ) : (
-      <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
-        {mabiDamages.map((d, i) => {
-          const parts: string[] = [];
-          if (d.type)   parts.push(d.type);
-          if (d.place)  parts.push(d.place);
-          if (d.note)   parts.push(`Notering: ${d.note}`);
-          if (d.report) parts.push(`Skadeanmälan: ${d.report}`);
-        return (
+      existingDamages.length === 0 ? (
+        <span style={{ fontWeight: 500 }}> —</span>
+      ) : (
+        <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
+          {existingDamages.map((damage, i) => (
             <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
-              {parts.join(' • ')}
+              {damage.fullText}
             </li>
-          );
-        })}
-      </ul>
-    )
-  ) : (
-    existingDamages.length === 0 ? (
-      <span style={{ fontWeight: 500 }}> —</span>
-    ) : (
-      <ul style={{ margin: '8px 0 0 20px', padding: 0 }}>
-        {existingDamages.map((damage, i) => (
-          <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
-            {damage.fullText}
-          </li>
-        ))}
-      </ul>
-    )
-  )}
+          ))}
+        </ul>
+      )
+    )}
+  </div>
 </div>
+
+
 
                         </div>
                       ))}
