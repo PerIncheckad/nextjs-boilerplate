@@ -1051,7 +1051,7 @@ const handleSave = () => {
       backgroundColor: '#f8fafc',
       color: '#111827'
     }}>
-      {(!hasImage || !hasVideo) && (
+{!(hasImage && hasVideo) && (
   <div
     style={{
       margin: '8px 0',
@@ -1066,6 +1066,7 @@ const handleSave = () => {
     Både bild och video är obligatoriska för alla skador
   </div>
 )}
+
 {/* MABI Header */}
       <div style={{
         backgroundColor: '#033066',
