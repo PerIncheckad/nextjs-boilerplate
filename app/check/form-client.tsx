@@ -931,7 +931,7 @@ const handleSave = () => {
       </h3>
     </div>
   );
-
+const MediaUpload = ({
     damageId,
     isOld,
     onMediaUpdate,
@@ -1064,7 +1064,7 @@ const handleSave = () => {
   >
     Både bild och video är obligatoriska för alla skador
   </div>
-)}
+);
 
 {/* MABI Header */}
       <div style={{
