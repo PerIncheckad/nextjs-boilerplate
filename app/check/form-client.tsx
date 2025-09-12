@@ -1191,7 +1191,6 @@ const MediaUpload = ({
       </div>
     </div>
   </div>
-)}
          
               </div>
             </div>
