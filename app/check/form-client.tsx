@@ -944,7 +944,6 @@ const MediaUpload = ({
   hasImage?: boolean;
   hasVideo?: boolean;
 }) => (
-
 <div style={{ marginBottom: '12px' }}>
   <label style={{ display: 'block', marginBottom: '6px', fontWeight: 500 }}>
     Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
@@ -1045,9 +1044,9 @@ const MediaUpload = ({
 
 );
 
-
-
-{/* MABI Header */}
+  return (
+    <div>
+      {/* MABI Header */}
       <div style={{
         backgroundColor: '#033066',
         width: '100vw',
@@ -1123,79 +1122,76 @@ const MediaUpload = ({
               ⚠️ Registreringsnummer är obligatoriskt
             </p>
           )}
-{/* Bilinfo med ALLA befintliga skador */}
-{carData.length > 0 && (
-  <div style={{
-    marginTop: '20px',
-    padding: '20px',
-    backgroundColor: '#f0f9ff',
-    borderRadius: '8px',
-    border: '1px solid #bdfbfe'
-  }}>
-    <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-      <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Bilmodell:</span>
-      <span style={{ fontWeight: '500' }}>{carModel || '---'}</span>
-    </div>
-    <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-      <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Hjulförvaring:</span>
-      <span style={{ fontWeight: '500' }}>{wheelStorage || '---'}</span>
-    </div>
-    <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
-      <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Salutdatum:</span>
-      {saludatum ? (
-        <span style={{
-          color: '#dc2626',
-          fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : '500'
-        }}>
-          {new Date(saludatum).toLocaleDateString('sv-SE')}
-        </span>
-      ) : (
-        <span style={{ fontWeight: '500' }}>---</span>
-      )}
-    </div>
-    <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-      <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
-      <div style={{ flex: 1 }}>
-        {usingMabiData ? (
-          mabiDamages.length === 0 ? (
-            <span style={{ fontWeight: 500 }}>–</span>
-          ) : (
-            <ul style={{ margin: '8px 0 20px', padding: 0 }}>
-              {mabiDamages.map((d, i) => {
-                const parts: string[] = [];
-                if (d.type) parts.push(d.type);
-                if (d.place) parts.push(d.place);
-                if (d.note) parts.push('Notering: ' + d.note);
-                if (d.report) parts.push('Skadeanmälan: ' + d.report);
-                return (
-                  <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
-                    {parts.join(' • ')}
-                  </li>
-                );
-              })}
-            </ul>
-          )
-        ) : (
-          existingDamages.length === 0 ? (
-            <span style={{ fontWeight: 500 }}>–</span>
-          ) : (
-            <ul style={{ margin: '8px 0 20px', padding: 0 }}>
-              {existingDamages.map((damage, i) => (
-                <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
-                  {damage.fullText}
-                </li>
-              ))}
-            </ul>
-          )
-        )}
-      </div>
-    </div>
-  </div>
-         
+
+          {/* Bilinfo med ALLA befintliga skador */}
+          {carData.length > 0 && (
+            <div style={{
+              marginTop: '20px',
+              padding: '20px',
+              backgroundColor: '#f0f9ff',
+              borderRadius: '8px',
+              border: '1px solid #bdfbfe'
+            }}>
+              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Bilmodell:</span>
+                <span style={{ fontWeight: '500' }}>{carModel || '---'}</span>
+              </div>
+              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Hjulförvaring:</span>
+                <span style={{ fontWeight: '500' }}>{wheelStorage || '---'}</span>
+              </div>
+              <div style={{ marginBottom: '12px', display: 'flex', alignItems: 'center' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Salutdatum:</span>
+                {saludatum ? (
+                  <span style={{
+                    color: '#dc2626',
+                    fontWeight: isDateWithinDays(saludatum, 10) ? 'bold' : '500'
+                  }}>
+                    {new Date(saludatum).toLocaleDateString('sv-SE')}
+                  </span>
+                ) : (
+                  <span style={{ fontWeight: '500' }}>---</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
+                <div style={{ flex: 1 }}>
+                  {usingMabiData ? (
+                    mabiDamages.length === 0 ? (
+                      <span style={{ fontWeight: 500 }}>–</span>
+                    ) : (
+                      <ul style={{ margin: '8px 0 20px', padding: 0 }}>
+                        {mabiDamages.map((d, i) => {
+                          const parts: string[] = [];
+                          if (d.type) parts.push(d.type);
+                          if (d.place) parts.push(d.place);
+                          if (d.note) parts.push('Notering: ' + d.note);
+                          if (d.report) parts.push('Skadeanmälan: ' + d.report);
+                          return (
+                            <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
+                              {parts.join(' • ')}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )
+                  ) : (
+                    existingDamages.length === 0 ? (
+                      <span style={{ fontWeight: 500 }}>–</span>
+                    ) : (
+                      <ul style={{ margin: '8px 0 20px', padding: 0 }}>
+                        {existingDamages.map((damage, i) => (
+                          <li key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
+                            {damage.fullText}
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  )}
+                </div>
               </div>
             </div>
           )}
-        </div>
 
         {/* 2. PLATS FÖR INCHECKNING - KORRIGERADE namn */}
         <div style={{
@@ -2383,7 +2379,6 @@ const MediaUpload = ({
             © Albarone AB 2025
           </p>
         </div>
-      </div>
 
       {/* ALLA BEKRÄFTELSEDIALOGER */}
       {showConfirmDialog && (
