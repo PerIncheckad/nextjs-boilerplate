@@ -1045,27 +1045,7 @@ const MediaUpload = ({
 
 );
 
- return (
-    <div style={{
-      minHeight: '100vh',
-      backgroundColor: '#f8fafc',
-      color: '#111827'
-    }}>
-{(!hasImage || !hasVideo) && (
-  <div
-    style={{
-      margin: '8px 0',
-      padding: '8px 12px',
-      background: '#fff5f5',
-      border: '1px solid #fca5a5',
-      borderRadius: '6px',
-      color: '#dc2626',
-      fontWeight: 600,
-    }}
-  >
-    Både bild och video är obligatoriska för alla skador
-  </div>
-);
+
 
 {/* MABI Header */}
       <div style={{
