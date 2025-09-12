@@ -1107,16 +1107,17 @@ const MediaUpload = ({
             }}>
               MABI
             </div>
-          </div>
-        </div>
-      </div>
-
-     
+              
 
           {loading && <p style={{ color: '#033066', fontSize: '14px', marginTop: '8px' }}>Söker...</p>}
           {notFound && normalizedReg && !loading && (
             <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>Okänt reg.nr</p>
           )}
+          </div>
+        </div>
+      </div>
+
+   
           {showFieldErrors && !isRegComplete() && (
             <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px', fontWeight: '500' }}>
               ⚠️ Registreringsnummer är obligatoriskt
