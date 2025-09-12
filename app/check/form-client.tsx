@@ -932,18 +932,19 @@ const handleSave = () => {
     </div>
   );
 const MediaUpload = ({
-    damageId,
-    isOld,
-    onMediaUpdate,
-    hasImage = false,
-    hasVideo = false
-  }: {
-    damageId: string;
-    isOld: boolean;
-    onMediaUpdate: (id: string, files: FileList | null) => void;
-    hasImage?: boolean;
-    hasVideo?: boolean;
-  }) => (
+  damageId,
+  isOld,
+  onMediaUpdate,
+  hasImage = false,
+  hasVideo = false,
+}: {
+  damageId: string;
+  isOld: boolean;
+  onMediaUpdate: (id: string, files: FileList | null) => void;
+  hasImage?: boolean;
+  hasVideo?: boolean;
+}) => (
+
 <div style={{ marginBottom: '12px' }}>
   <label style={{ display: 'block', marginBottom: '6px', fontWeight: 500 }}>
     Lägg till bild och video <span style={{ color: '#dc2626' }}>*</span>
