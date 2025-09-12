@@ -1123,8 +1123,7 @@ const MediaUpload = ({
               ⚠️ Registreringsnummer är obligatoriskt
             </p>
           )}
-
-          {/* Bilinfo med ALLA befintliga skador */}
+ {/* Bilinfo med ALLA befintliga skador */}
           {carData.length > 0 && (
             <div style={{
               marginTop: '20px',
@@ -1199,6 +1198,7 @@ const MediaUpload = ({
                     </div>
                   )}
                 </div>
+         
               </div>
             </div>
           )}
