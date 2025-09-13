@@ -280,7 +280,7 @@ export default function CheckInForm() {
   const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
   const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
   const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
-  const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterthjul' | null>(null);
+  const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterhjul' | null>(null);
   const [adblue, setAdblue] = useState<boolean | null>(null);
   const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
   const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
@@ -1627,7 +1627,7 @@ export default function CheckInForm() {
               Hjultyp *
             </label>
             <div style={{ display: 'flex', gap: '12px' }}>
-              {(['Sommarthjul', 'Vinterthjul'] as const).map(typ => (
+              {(['Sommarthjul', 'Vinterhjul'] as const).map(typ => (
                 <label key={typ} style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -1646,7 +1646,7 @@ export default function CheckInForm() {
                     name="hjultyp"
                     value={typ}
                     checked={hjultyp === typ}
-                    onChange={(e) => setHjultyp(e.target.value as 'Sommarthjul' | 'Vinterthjul')}
+                    onChange={(e) => setHjultyp(e.target.value as 'Sommarthjul' | 'Vinterhjul')}
                     style={{ display: 'none' }}
                   />
                   <span>{typ}</span>
