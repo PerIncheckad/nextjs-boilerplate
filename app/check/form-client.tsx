@@ -1,10 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''; 
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''; 
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '../../lib/supabase';
 
 export default function FormClient() {
   const [regnr, setRegnr] = useState('');
@@ -16,11 +12,19 @@ export default function FormClient() {
     setLoading(true);
     setError(null);
     setSkador([]);
+    
+    if (!supabase) {
+      setError('Supabase-konfiguration saknas. Kontrollera miljövariabler.');
+      setLoading(false);
+      return;
+    }
+    
     try {
+      const processedRegnr = regnr.trim().toUpperCase();
       const { data, error } = await supabase
         .from('mabi_damage_data')
         .select('H, K, M')
-        .eq('regnr', regnr);
+        .eq('regnr', processedRegnr);
 
       if (error) {
         setError('Fel vid hämtning: ' + error.message);
@@ -61,7 +65,7 @@ export default function FormClient() {
             border: '1px solid #bdfbfe',
           }}
         >
-          <h3>Skador för {regnr}</h3>
+          <h3>Skador för {regnr.trim().toUpperCase()}</h3>
           {skador.map((row, idx) => (
             <div key={idx} style={{ marginBottom: 12 }}>
               <p>
@@ -79,7 +83,7 @@ export default function FormClient() {
       )}
       {skador.length === 0 && !loading && regnr && !error && (
         <div style={{ marginTop: 24, color: '#555' }}>
-          Inga skador hittades för {regnr}.
+          Inga skador hittades för {regnr.trim().toUpperCase()}.
         </div>
       )}
     </div>
