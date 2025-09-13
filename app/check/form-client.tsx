@@ -207,23 +207,72 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
   return mediaFiles;
 };
 
-// KORRIGERAD kolumnmappning för att läsa H, K, M korrekt
+// ENHANCED damage text creation with comprehensive deduplication
 const createCombinedDamageText = (skadetyp: string, plats: string, notering: string): string => {
-  const parts = [];
+  const uniqueParts = new Set<string>();
   
+  // Normalize and add unique non-empty values
+  if (skadetyp?.trim()) {
+    uniqueParts.add(skadetyp.trim().toLowerCase());
+  }
+  
+  if (plats?.trim()) {
+    const normalizedPlats = plats.trim().toLowerCase();
+    if (!uniqueParts.has(normalizedPlats)) {
+      uniqueParts.add(normalizedPlats);
+    }
+  }
+  
+  // Convert back to array maintaining original case and order
+  const parts = [];
   if (skadetyp?.trim()) {
     parts.push(skadetyp.trim());
   }
   
-  if (plats?.trim() && plats.trim() !== skadetyp?.trim()) {
-    parts.push(plats.trim());
+  if (plats?.trim()) {
+    const normalizedPlats = plats.trim().toLowerCase();
+    const normalizedSkadetyp = skadetyp?.trim().toLowerCase();
+    if (normalizedPlats !== normalizedSkadetyp) {
+      parts.push(plats.trim());
+    }
   }
   
+  // Always add notes in parentheses if they exist and are different
   if (notering?.trim()) {
-    parts.push(`(${notering.trim()})`);
+    const normalizedNotering = notering.trim().toLowerCase();
+    const hasMatchingPart = parts.some(part => part.toLowerCase() === normalizedNotering);
+    if (!hasMatchingPart) {
+      parts.push(`(${notering.trim()})`);
+    }
   }
   
   return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
+};
+
+// Cross-row deduplication function to ensure unique damage entries
+const deduplicateDamages = (damages: ExistingDamage[]): ExistingDamage[] => {
+  const seen = new Set<string>();
+  const uniqueDamages: ExistingDamage[] = [];
+  
+  for (const damage of damages) {
+    // Create a normalized signature for the damage entry
+    const signature = [
+      damage.skadetyp?.trim().toLowerCase() || '',
+      damage.plats?.trim().toLowerCase() || '',
+      damage.notering?.trim().toLowerCase() || ''
+    ].filter(Boolean).sort().join('|');
+    
+    // Also check if the full text is identical (case-insensitive)
+    const normalizedFullText = damage.fullText.toLowerCase().trim();
+    
+    if (!seen.has(signature) && !seen.has(normalizedFullText)) {
+      seen.add(signature);
+      seen.add(normalizedFullText);
+      uniqueDamages.push(damage);
+    }
+  }
+  
+  return uniqueDamages;
 };
 
 // FÖRBÄTTRAD kolumnhantering för svenska tecken
@@ -391,7 +440,7 @@ export default function CheckInForm() {
             saludatum: getColumnValue(firstRow, 'saludatum', ['Saludatum'])
           }];
 
-          // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
+          // ENHANCED: Fetch damage data from all three columns with comprehensive deduplication
           damages = mabiResult.data.map((row, index) => {
             // Kolumn H: Skadetyp
             const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
@@ -421,6 +470,9 @@ export default function CheckInForm() {
             };
           }).filter((damage): damage is ExistingDamage => damage !== null);
 
+          // Apply cross-row deduplication to ensure unique damage entries
+          damages = deduplicateDamages(damages);
+
         } else if (!carResult.error && carResult.data && carResult.data.length > 0) {
           const validData = carResult.data.filter(row => row.wheelstorage !== null && row.saludatum !== null);
           useData = validData.length > 0 ? validData : carResult.data;
@@ -449,6 +501,9 @@ export default function CheckInForm() {
               };
             })
             .filter((damage): damage is ExistingDamage => damage !== null);
+
+          // Apply cross-row deduplication for car_data as well
+          damages = deduplicateDamages(damages);
         }
 
         if (useData.length > 0) {
@@ -1143,9 +1198,23 @@ export default function CheckInForm() {
                   ) : (
                     <div style={{ margin: '0' }}>
                       {existingDamages.map((damage, i) => (
-                        <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                          <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                        <div key={i} style={{ 
+                          marginBottom: '12px', 
+                          fontSize: '14px',
+                          padding: '8px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '6px',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
                             {damage.fullText}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748b' }}>
+                            {[
+                              damage.skadetyp && `Typ: ${damage.skadetyp}`,
+                              damage.plats && `Plats: ${damage.plats}`,
+                              damage.notering && `Notering: ${damage.notering}`
+                            ].filter(Boolean).join(' • ')}
                           </div>
                         </div>
                       ))}
