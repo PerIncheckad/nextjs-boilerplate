@@ -207,16 +207,16 @@ const processFiles = async (files: File[]): Promise<MediaFile[]> => {
   return mediaFiles;
 };
 
-// KORRIGERAD kolumnmappning för att läsa H, K, M korrekt
-const createCombinedDamageText = (skadetyp: string, plats: string, notering: string): string => {
+// KORRIGERAD kolumnmappning för att läsa G, H, K korrekt
+const createCombinedDamageText = (skadetyp: string, skadenr: string, notering: string): string => {
   const parts = [];
+  
+  if (skadenr?.trim()) {
+    parts.push(`#${skadenr.trim()}`);
+  }
   
   if (skadetyp?.trim()) {
     parts.push(skadetyp.trim());
-  }
-  
-  if (plats?.trim() && plats.trim() !== skadetyp?.trim()) {
-    parts.push(plats.trim());
   }
   
   if (notering?.trim()) {
@@ -226,7 +226,7 @@ const createCombinedDamageText = (skadetyp: string, plats: string, notering: str
   return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
 };
 
-// FÖRBÄTTRAD kolumnhantering för svenska tecken
+// FÖRBÄTTRAD kolumnhantering för svenska tecken och korrekta kolumner G, H, K
 const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] = []): string | null => {
   // Prova huvudnyckeln först
   if (row[primaryKey] !== undefined && row[primaryKey] !== null && row[primaryKey] !== '') {
@@ -344,7 +344,7 @@ export default function CheckInForm() {
       .slice(0, 5);
   }, [regInput, allRegistrations]);
 
-  // KORRIGERAD skadehantering - läser H, K, M och skapar EN skada per RAD
+  // KORRIGERAD skadehantering - läser G, H, K och skapar EN skada per RAD
   useEffect(() => {
     if (!normalizedReg || normalizedReg.length < 3) {
       setCarData([]);
@@ -391,27 +391,27 @@ export default function CheckInForm() {
             saludatum: getColumnValue(firstRow, 'saludatum', ['Saludatum'])
           }];
 
-          // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
+          // KORRIGERAT: Skapa EN skada per RAD - läser G, H, K korrekt enligt problemet
           damages = mabiResult.data.map((row, index) => {
-            // Kolumn H: Skadetyp
+            // Kolumn G: Skadenr (damage number)
+            const skadenr = getColumnValue(row, 'Skadenr', ['damage_number', 'damage_nr']) || '';
+            // Kolumn H: Skadetyp (damage type)
             const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
-            // Kolumn K: Skadeanmälan 
-            const plats = getColumnValue(row, 'Skadeanmälan', ['damage_location', 'plats']) || '';
-            // Kolumn M: Intern notering
-            const notering = getColumnValue(row, 'Intern notering', ['internal_notes', 'damage_notes', 'notering']) || '';
+            // Kolumn K: Skada Notering på avtal/faktura (damage notes on contract/invoice)
+            const notering = getColumnValue(row, 'Skada Notering på avtal/faktura', ['damage_notes', 'contract_notes', 'invoice_notes', 'notering']) || '';
             
             // Hoppa över rader utan skadeinformation
-            if (!skadetyp && !plats && !notering) return null;
+            if (!skadenr && !skadetyp && !notering) return null;
             
-            const fullText = createCombinedDamageText(skadetyp, plats, notering);
+            const fullText = createCombinedDamageText(skadetyp, skadenr, notering);
             
             return {
               id: `mabi-${index}`,
               skadetyp,
-              plats,
+              plats: skadenr, // Using skadenr as the "plats" field for backwards compatibility
               notering,
               fullText,
-              shortText: skadetyp || plats || 'Okänd skada',
+              shortText: skadetyp || skadenr || 'Okänd skada',
               status: 'not_selected' as const,
               userType: '',
               userCarPart: '',
@@ -1143,10 +1143,28 @@ export default function CheckInForm() {
                   ) : (
                     <div style={{ margin: '0' }}>
                       {existingDamages.map((damage, i) => (
-                        <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                          <div style={{ fontWeight: '500', color: '#1f2937' }}>
+                        <div key={i} style={{ 
+                          marginBottom: '8px', 
+                          fontSize: '14px',
+                          padding: '8px',
+                          backgroundColor: '#f8fafc',
+                          borderRadius: '4px',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <div style={{ fontWeight: '600', color: '#1f2937', marginBottom: '4px' }}>
                             {damage.fullText}
                           </div>
+                          {damage.skadetyp && damage.plats && damage.notering && (
+                            <div style={{ fontSize: '12px', color: '#64748b' }}>
+                              {damage.plats && <span><strong>Nr:</strong> {damage.plats}</span>}
+                              {damage.skadetyp && <span style={{ marginLeft: '12px' }}><strong>Typ:</strong> {damage.skadetyp}</span>}
+                              {damage.notering && (
+                                <div style={{ marginTop: '2px' }}>
+                                  <strong>Not:</strong> {damage.notering}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
