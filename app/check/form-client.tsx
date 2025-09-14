@@ -260,7 +260,14 @@ async function lookupDamages(regInput: string) {
   setLoadingDamage(true);
   try {
     const view = await fetchDamageCard(plate);
-    console.log('DMG DEBUG', {
+    console.log('DMG FINAL', {
+  plate,
+  view,
+  rawSkador: (view as any)?.skador,
+  isArray: Array.isArray((view as any)?.skador),
+  typeOfSkador: typeof (view as any)?.skador,
+});
+console.log('DMG DEBUG', {
   plate,
   view,
   rawSkador: (view as any)?.skador,
