@@ -1,39 +1,44 @@
-// lib/damages.ts
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type DamageViewRow = {
   regnr: string;
-  saludatum: string | null;
-  skador: string[];
+  salutdatum: string | null;      // finns i vyn
+  skador: string[] | string | null; // ibland text[], ibland text/sträng
 };
 
 function normalizeReg(input: string): string {
   return (input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
-export async function fetchDamageCard(regnr: string): Promise<DamageViewRow | null> {
+export async function fetchDamageCard(regnr: string): Promise<DamageViewRow & { skador: string[] } | null> {
   const plate = normalizeReg(regnr);
 
   const { data, error } = await supabase
     .from('mabi_damage_view')
-    .select('regnr, saludatum, skador') // ⬅️ enbart befintliga kolumner
+    .select('regnr, salutdatum, skador')   // ❗️endast kolumner som finns
     .eq('regnr', plate)
     .maybeSingle();
 
   if (error) throw error;
   if (!data) return null;
 
-  // Normalisera 'skador' till string[]
+  // Normalisera "skador" till string[]
+  let skadorArray: string[] = [];
   const raw = (data as any).skador;
-  let arr: string[] = [];
+
   if (Array.isArray(raw)) {
-    arr = raw.filter(Boolean);
+    skadorArray = raw as string[];
   } else if (typeof raw === 'string' && raw.trim() !== '') {
-    arr = raw
-      .replace(/[{}\[\]"]/g, '')
+    skadorArray = raw
+      .replace(/[{}"]/g, '')
       .split(',')
-      .map((s: string) => s.trim())
+      .map(s => s.trim())
       .filter(Boolean);
   }
 
-  return { regnr: data.regnr, saludatum: data.saludatum, skador: arr };
+  return { ...(data as DamageViewRow), skador: skadorArray };
 }
