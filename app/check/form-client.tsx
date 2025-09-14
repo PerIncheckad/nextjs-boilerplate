@@ -1173,19 +1173,16 @@ const saludatum    = viewSaludatum    ?? carSaludatum    ?? null;
               <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                 <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
                 <div style={{ flex: 1 }}>
-                  {existingDamages.length === 0 ? (
-                    <span style={{ fontWeight: '500' }}> ---</span>
-                  ) : (
-                    <div style={{ margin: '0' }}>
-                      {existingDamages.map((damage, i) => (
-                        <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
-                          <div style={{ fontWeight: '500', color: '#1f2937' }}>
-                            {damage.fullText}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+{damages && damages.length > 0 ? (
+  <ul style={{ margin: 0, paddingLeft: '16px' }}>
+    {damages.map((d, idx) => (
+      <li key={`damage-${idx}`}>{d}</li>
+    ))}
+  </ul>
+) : (
+  <span style={{ fontWeight: '500' }}>---</span>
+)}
+
                 </div>
               </div>
             </div>
