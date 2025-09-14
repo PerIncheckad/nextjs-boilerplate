@@ -259,33 +259,18 @@ async function lookupDamages(regInput: string) {
 
   setLoadingDamage(true);
   try {
+    // Hämtar redan normaliserade värden (inkl. skador som string[])
     const view = await fetchDamageCard(plate);
-    console.log('DMG FINAL', {
-  plate,
-  view,
-  rawSkador: (view as any)?.skador,
-  isArray: Array.isArray((view as any)?.skador),
-  typeOfSkador: typeof (view as any)?.skador,
-});
-console.log('DMG DEBUG', {
-  plate,
-  view,
-  rawSkador: (view as any)?.skador,
-  isArray: Array.isArray((view as any)?.skador),
-  typeofSkador: typeof (view as any)?.skador,
-});
 
-    setViewWheelStorage(view?.hjulförvaring ?? '---');
-    setViewSaludatum(view?.saludatum ?? null);
-// Normalisera skador till string[]
-const rawSkador = (view as any)?.skador;
-const normalizedSkador =
-  Array.isArray(rawSkador)
-    ? rawSkador
-    : typeof rawSkador === 'string'
-      ? rawSkador.replace(/[{}"]/g, '').split(',').map(s => s.trim()).filter(Boolean)
-      : [];
-setDamages(normalizedSkador);
+    if (view) {
+      setViewWheelStorage(view.hjulförvaring ?? '---');
+      setViewSaludatum(view.saludatum ?? null);
+      setDamages(Array.isArray(view.skador) ? view.skador : []);
+    } else {
+      setViewWheelStorage('---');
+      setViewSaludatum(null);
+      setDamages([]);
+    }
   } catch {
     setViewWheelStorage('---');
     setViewSaludatum(null);
@@ -294,6 +279,7 @@ setDamages(normalizedSkador);
     setLoadingDamage(false);
   }
 }
+
  // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
   const [carData, setCarData] = useState<CarData[]>([]);
