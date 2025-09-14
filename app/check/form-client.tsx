@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { fetchDamageCard, normalizeReg, type DamageViewRow } from '@/lib/damages';
+import { fetchDamageCard } from '@/lib/damages';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -246,10 +246,11 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 
 export default function CheckInForm() {
  // === Damage card state ===
-const [wheelStorage, setWheelStorage] = useState<string>('---');
-const [saludatum, setSaludatum] = useState<string | null>(null);
+const [viewWheelStorage, setViewWheelStorage] = useState<string>('---');
+const [viewSaludatum, setViewSaludatum] = useState<string | null>(null);
 const [damages, setDamages] = useState<string[]>([]);
 const [loadingDamage, setLoadingDamage] = useState(false);
+
 
 // Hämta från vyn (tar värdet från input direkt – vi behöver inte känna till din egen regnr-state)
 async function lookupDamages(regInput: string) {
@@ -259,12 +260,12 @@ async function lookupDamages(regInput: string) {
   setLoadingDamage(true);
   try {
     const view = await fetchDamageCard(plate);
-    setWheelStorage(view?.hjulförvaring ?? '---');
-    setSaludatum(view?.saludatum ?? null);
+    setViewWheelStorage(view?.hjulförvaring ?? '---');
+    setViewSaludatum(view?.saludatum ?? null);
     setDamages(view?.skador ?? []);
   } catch {
-    setWheelStorage('---');
-    setSaludatum(null);
+    setViewWheelStorage('---');
+    setViewSaludatum(null);
     setDamages([]);
   } finally {
     setLoadingDamage(false);
