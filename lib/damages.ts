@@ -1,10 +1,6 @@
 // lib/damages.ts
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 
-// Justera dessa två rader om du redan har en delad klient:
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type DamageViewRow = {
   hjulförvaring: string | null;
