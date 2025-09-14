@@ -8,6 +8,15 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// Debug flag for development
+const DEBUG_MODE = process.env.NODE_ENV === 'development';
+
+const debugLog = (message: string, data?: any) => {
+  if (DEBUG_MODE) {
+    console.log(`[DAMAGE DEBUG] ${message}`, data);
+  }
+};
+
 type CarData = {
   regnr: string;
   brand_model: string | null;
@@ -226,19 +235,34 @@ const createCombinedDamageText = (skadetyp: string, plats: string, notering: str
   return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
 };
 
-// FÖRBÄTTRAD kolumnhantering för svenska tecken
+// FÖRBÄTTRAD kolumnhantering för svenska tecken och debugging
 const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] = []): string | null => {
+  // Debug function to log column access attempts
+  const debugColumnAccess = (key: string, value: any) => {
+    if (value !== undefined && value !== null && value !== '') {
+      debugLog(`Found value for '${key}':`, value);
+      return true;
+    }
+    return false;
+  };
+
   // Prova huvudnyckeln först
   if (row[primaryKey] !== undefined && row[primaryKey] !== null && row[primaryKey] !== '') {
+    debugColumnAccess(primaryKey, row[primaryKey]);
     return String(row[primaryKey]).trim();
   }
   
   // Prova alternativa nycklar
   for (const altKey of alternativeKeys) {
     if (row[altKey] !== undefined && row[altKey] !== null && row[altKey] !== '') {
+      debugColumnAccess(altKey, row[altKey]);
       return String(row[altKey]).trim();
     }
   }
+  
+  // Debug: Log all available columns when value not found
+  debugLog(`Column '${primaryKey}' not found. Available columns:`, Object.keys(row));
+  debugLog(`Tried alternatives:`, alternativeKeys);
   
   return null;
 };
@@ -360,20 +384,42 @@ export default function CheckInForm() {
       setNotFound(false);
 
       try {
+        // Enhanced query to ensure ALL rows are retrieved consistently
+        // Added explicit limit removal and consistent ordering
         const [mabiResult, carResult] = await Promise.all([
           supabase
             .from('mabi_damage_data')
             .select('*')
             .eq('Regnr', normalizedReg)
-            .order('id', { ascending: false }),
+            .order('id', { ascending: true }) // Changed to ascending to get all rows in order
+            .limit(1000), // Explicit high limit to ensure all rows are fetched
           supabase
             .from('car_data')
             .select('*')
             .eq('regnr', normalizedReg)
             .order('created_at', { ascending: false })
+            .limit(1000) // Explicit high limit
         ]);
 
         if (cancelled) return;
+
+        // Enhanced error handling
+        if (mabiResult.error) {
+          debugLog('MABI query error:', mabiResult.error);
+        }
+        if (carResult.error) {
+          debugLog('Car data query error:', carResult.error);
+        }
+
+        // Debug logging to trace query results
+        debugLog(`Fetching data for reg.nr: ${normalizedReg}`);
+        debugLog(`MABI rows found: ${mabiResult.data?.length || 0}`);
+        debugLog(`Car data rows found: ${carResult.data?.length || 0}`);
+        
+        if (mabiResult.data?.length) {
+          debugLog('Sample MABI row keys:', Object.keys(mabiResult.data[0]));
+          debugLog('First MABI row data:', mabiResult.data[0]);
+        }
 
         let useData: CarData[] = [];
         let damages: ExistingDamage[] = [];
@@ -391,19 +437,43 @@ export default function CheckInForm() {
             saludatum: getColumnValue(firstRow, 'saludatum', ['Saludatum'])
           }];
 
-          // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
+          // ENHANCED: Process ALL rows and be more permissive with damage data
           damages = mabiResult.data.map((row, index) => {
-            // Kolumn H: Skadetyp
-            const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
-            // Kolumn K: Skadeanmälan 
-            const plats = getColumnValue(row, 'Skadeanmälan', ['damage_location', 'plats']) || '';
-            // Kolumn M: Intern notering
-            const notering = getColumnValue(row, 'Intern notering', ['internal_notes', 'damage_notes', 'notering']) || '';
+            // Enhanced column extraction with more alternatives
+            const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text', 'skadetyp', 'type']) || '';
+            const plats = getColumnValue(row, 'Skadeanmälan', ['damage_location', 'plats', 'location', 'anmälan']) || '';
+            const notering = getColumnValue(row, 'Intern notering', ['internal_notes', 'damage_notes', 'notering', 'notes', 'comment']) || '';
             
-            // Hoppa över rader utan skadeinformation
-            if (!skadetyp && !plats && !notering) return null;
+            // Debug each row
+            debugLog(`Row ${index + 1}:`, {
+              skadetyp,
+              plats,
+              notering,
+              rawData: { 
+                Skadetyp: row['Skadetyp'], 
+                'Skadeanmälan': row['Skadeanmälan'], 
+                'Intern notering': row['Intern notering'] 
+              }
+            });
+            
+            // More permissive filtering - include rows with ANY damage information
+            const hasAnyDamageInfo = skadetyp || plats || notering || 
+              row['Skadetyp'] || row['Skadeanmälan'] || row['Intern notering'] ||
+              Object.keys(row).some(key => 
+                key.toLowerCase().includes('skad') || 
+                key.toLowerCase().includes('damage') ||
+                key.toLowerCase().includes('anmälan') ||
+                key.toLowerCase().includes('noter')
+              );
+            
+            if (!hasAnyDamageInfo) {
+              debugLog(`Skipping row ${index + 1}: No damage information found`);
+              return null;
+            }
             
             const fullText = createCombinedDamageText(skadetyp, plats, notering);
+            
+            debugLog(`Creating damage ${index + 1}:`, { fullText, skadetyp, plats, notering });
             
             return {
               id: `mabi-${index}`,
@@ -411,7 +481,7 @@ export default function CheckInForm() {
               plats,
               notering,
               fullText,
-              shortText: skadetyp || plats || 'Okänd skada',
+              shortText: skadetyp || plats || notering || 'Okänd skada',
               status: 'not_selected' as const,
               userType: '',
               userCarPart: '',
@@ -420,6 +490,8 @@ export default function CheckInForm() {
               media: []
             };
           }).filter((damage): damage is ExistingDamage => damage !== null);
+
+          debugLog(`Total damages created: ${damages.length}`);
 
         } else if (!carResult.error && carResult.data && carResult.data.length > 0) {
           const validData = carResult.data.filter(row => row.wheelstorage !== null && row.saludatum !== null);
@@ -463,7 +535,7 @@ export default function CheckInForm() {
 
       } catch (err) {
         if (!cancelled) {
-          console.error('Fetch error:', err);
+          debugLog('Fetch error:', err);
           setNotFound(true);
           setCarData([]);
           setExistingDamages([]);
@@ -540,7 +612,7 @@ export default function CheckInForm() {
     const damagesOk = isDamagesComplete();
     const statusOk = isStatusComplete();
     
-    console.log('Validation check:', {
+    debugLog('Validation check:', {
       regOk,
       locationOk,
       vehicleOk,
@@ -603,7 +675,7 @@ export default function CheckInForm() {
   };
 
   const confirmFinalSave = () => {
-    console.log('Sparar incheckning...');
+    debugLog('Sparar incheckning...');
     setShowFinalConfirmation(false);
     setShowSuccessModal(true);
   };
@@ -1107,7 +1179,7 @@ export default function CheckInForm() {
             </p>
           )}
 
-          {/* Bilinfo med ALLA befintliga skador */}
+          {/* Bilinfo med ALLA befintliga skador och debugging */}
           {carData.length > 0 && (
             <div style={{
               marginTop: '20px',
@@ -1139,9 +1211,17 @@ export default function CheckInForm() {
                 <span style={{ fontWeight: '600', color: '#033066', minWidth: '130px' }}>Befintliga skador:</span>
                 <div style={{ flex: 1 }}>
                   {existingDamages.length === 0 ? (
-                    <span style={{ fontWeight: '500' }}> ---</span>
+                    <span style={{ fontWeight: '500', color: '#dc2626' }}>Inga skador hittades</span>
                   ) : (
                     <div style={{ margin: '0' }}>
+                      <div style={{ 
+                        marginBottom: '8px', 
+                        fontSize: '12px', 
+                        fontWeight: '600', 
+                        color: '#059669' 
+                      }}>
+                        {existingDamages.length} skador hittades
+                      </div>
                       {existingDamages.map((damage, i) => (
                         <div key={i} style={{ marginBottom: '8px', fontSize: '14px' }}>
                           <div style={{ fontWeight: '500', color: '#1f2937' }}>
