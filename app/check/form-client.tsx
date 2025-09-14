@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { fetchDamageCard, normalizeReg, type DamageViewRow } from '@/lib/damages';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -244,7 +245,32 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 };
 
 export default function CheckInForm() {
-  // State för registreringsnummer och bildata
+ // === Damage card state ===
+const [wheelStorage, setWheelStorage] = useState<string>('---');
+const [saludatum, setSaludatum] = useState<string | null>(null);
+const [damages, setDamages] = useState<string[]>([]);
+const [loadingDamage, setLoadingDamage] = useState(false);
+
+// Hämta från vyn (tar värdet från input direkt – vi behöver inte känna till din egen regnr-state)
+async function lookupDamages(regInput: string) {
+  const plate = normalizeReg(regInput || '');
+  if (!plate) return;
+
+  setLoadingDamage(true);
+  try {
+    const view = await fetchDamageCard(plate);
+    setWheelStorage(view?.hjulförvaring ?? '---');
+    setSaludatum(view?.saludatum ?? null);
+    setDamages(view?.skador ?? []);
+  } catch {
+    setWheelStorage('---');
+    setSaludatum(null);
+    setDamages([]);
+  } finally {
+    setLoadingDamage(false);
+  }
+}
+ // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
   const [carData, setCarData] = useState<CarData[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
@@ -1032,14 +1058,20 @@ export default function CheckInForm() {
           <div style={{ position: 'relative' }}>
             <input
               type="text"
-              value={regInput}
-              onChange={(e) => handleRegInputChange(e.target.value)}
-              onFocus={() => {
-                if (regInput.length >= 2 && suggestions.length > 0) {
-                  setShowSuggestions(true);
-                }
-              }}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+  type="text"
+  value={regInput}
+  onChange={(e) => handleRegInputChange(e.target.value)}
+  onKeyDown={(e) => { if (e.key === 'Enter') lookupDamages(e.currentTarget.value); }}
+  onFocus={() => {
+    if (regInput.length >= 2 && suggestions.length > 0) {
+      setShowSuggestions(true);
+    }
+  }}
+  onBlur={(e) => {
+    setTimeout(() => setShowSuggestions(false), 200);
+    lookupDamages(e.currentTarget.value);
+  }}
+
               placeholder="Skriv reg.nr"
               spellCheck={false}
               autoComplete="off"
