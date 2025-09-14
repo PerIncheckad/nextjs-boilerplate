@@ -262,7 +262,15 @@ async function lookupDamages(regInput: string) {
     const view = await fetchDamageCard(plate);
     setViewWheelStorage(view?.hjulförvaring ?? '---');
     setViewSaludatum(view?.saludatum ?? null);
-    setDamages(view?.skador ?? []);
+// Normalisera skador till string[]
+const rawSkador = (view as any)?.skador;
+const normalizedSkador =
+  Array.isArray(rawSkador)
+    ? rawSkador
+    : typeof rawSkador === 'string'
+      ? rawSkador.replace(/[{}"]/g, '').split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+setDamages(normalizedSkador);
   } catch {
     setViewWheelStorage('---');
     setViewSaludatum(null);
@@ -419,7 +427,7 @@ async function lookupDamages(regInput: string) {
           }];
 
           // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
-          damages = mabiResult.data.map((row, index) => {
+const parsedDamages = mabiResult.data.map((row, index) => {
             // Kolumn H: Skadetyp
             const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
             // Kolumn K: Skadeanmälan 
