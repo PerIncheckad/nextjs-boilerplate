@@ -509,9 +509,11 @@ async function lookupDamages(regInput: string) {
   }, [normalizedReg]);
 
   const carModel = carData[0]?.brand_model || null;
-  const wheelStorage = carData[0]?.wheelstorage || null;
-  const saludatum = carData[0]?.saludatum || null;
+const carWheelStorage = carData[0]?.wheelstorage || null;
+const carSaludatum    = carData[0]?.saludatum   || null;
   const availableStations = ort ? STATIONER[ort] || [] : [];
+const wheelStorage = viewWheelStorage ?? carWheelStorage ?? '---';
+const saludatum    = viewSaludatum    ?? carSaludatum    ?? null;
 
   // KORRIGERAD validering - mer noggrann kontroll
   const isRegComplete = () => regInput.trim().length > 0;
