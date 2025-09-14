@@ -260,6 +260,14 @@ async function lookupDamages(regInput: string) {
   setLoadingDamage(true);
   try {
     const view = await fetchDamageCard(plate);
+    console.log('DMG DEBUG', {
+  plate,
+  view,
+  rawSkador: (view as any)?.skador,
+  isArray: Array.isArray((view as any)?.skador),
+  typeofSkador: typeof (view as any)?.skador,
+});
+
     setViewWheelStorage(view?.hjulförvaring ?? '---');
     setViewSaludatum(view?.saludatum ?? null);
 // Normalisera skador till string[]
