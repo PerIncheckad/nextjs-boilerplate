@@ -1087,16 +1087,19 @@ const saludatum    = viewSaludatum    ?? carSaludatum    ?? null;
   type="text"
   value={regInput}
   onChange={(e) => handleRegInputChange(e.target.value)}
-  onKeyDown={(e) => { if (e.key === 'Enter') lookupDamages(e.currentTarget.value); }}
+onKeyDown={(e) => {
+  if (e.key === 'Enter') lookupDamages(regInput);
+}}
   onFocus={() => {
     if (regInput.length >= 2 && suggestions.length > 0) {
       setShowSuggestions(true);
     }
   }}
-  onBlur={(e) => {
-    setTimeout(() => setShowSuggestions(false), 200);
-    lookupDamages(e.currentTarget.value);
-  }}
+onBlur={() => {
+  setTimeout(() => setShowSuggestions(false), 200);
+  lookupDamages(regInput);
+}}
+
 
               placeholder="Skriv reg.nr"
               spellCheck={false}
