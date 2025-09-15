@@ -1872,7 +1872,7 @@ onBlur={(e) => {
           <SectionHeader title="Skadekontroll" isComplete={isDamagesComplete()} />
 
           {/* ÅTERSTÄLLD: Befintliga skador från databas */}
-          {existingDamages.length > 0 && (
+{Array.isArray(existingDamages) && existingDamages.length > 0 && (
             <>
               <SubSectionHeader title="Befintliga skador" />
               <div style={{ marginBottom: '24px' }}>
