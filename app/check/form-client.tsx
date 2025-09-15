@@ -430,7 +430,25 @@ useData = [{
   damage_location: null,
   damage_notes: null,
   wheelstorage: getColumnValue(viewRow, 'wheelstorage', ['Hjulförvaring']),
-  saludatum: getColumnValue(viewRow, 'saludatum', ['Saludatum']) ?? null,
+saludatum: (() => {
+  const raw =
+    getColumnValue(viewRow, 'skadedatum', ['Skadedatum', 'Skadedatu']) ??
+    getColumnValue(viewRow, 'saludatum', ['Salu datum', 'Saludatum']);
+
+  if (!raw) return null;
+
+  const s = String(raw).trim();
+
+  // YYYY-MM-DD, YYYY/MM/DD eller YYYY.MM.DD
+  const ymd = s.match(/^(\d{4})[-/.](\d{2})[-/.](\d{2})$/);
+  if (ymd) return `${ymd[1]}-${ymd[2]}-${ymd[3]}`;
+
+  // DD-MM-YYYY, DD/MM/YYYY eller DD.MM.YYYY
+  const dmy = s.match(/^(\d{2})[-/.](\d{2})[-/.](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+
+  return s;
+})(),
 }];
 
 // Normalisera och sätt skador direkt från vyn
