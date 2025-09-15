@@ -40,6 +40,12 @@ type MediaFile = {
   preview?: string;
   thumbnail?: string;
 };
+// --- Media helpers (photo required, video optional for existing; both for new) ---
+const hasPhoto = (files?: MediaFile[]) =>
+  Array.isArray(files) && files.some(f => f && f.type === 'image');
+
+const hasVideo = (files?: MediaFile[]) =>
+  Array.isArray(files) && files.some(f => f && f.type === 'video');
 
 // KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
 const ORTER = ['Malmö Jägersro', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
