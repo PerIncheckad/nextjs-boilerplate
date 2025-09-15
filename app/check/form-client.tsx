@@ -473,6 +473,22 @@ if (Array.isArray(rawSk)) {
 // Uppdatera UI-state från vyn
 setViewSaludatum(useData[0].saludatum ?? null);
 setDamages(dmgArr);
+          // Skapa placeholder-poster för "Befintliga skador"-listan från vyns skador
+if (Array.isArray(dmgArr) && dmgArr.length > 0) {
+  const placeholders: ExistingDamage[] = dmgArr.map((text, idx) => ({
+    id: `view-${normalizedReg}-${idx}`,
+    skadetyp: '',         // fylls i vid dokumentation
+    plats: '',            // fylls i vid dokumentation
+    notering: '',         // fylls i vid dokumentation
+    fullText: text,
+    shortText: text,
+    status: 'not_selected',
+    media: [],            // foto läggs till vid dokumentation
+  }));
+
+  setExistingDamages(placeholders);
+}
+
 console.log('DMG via fetchCarData', { plate: normalizedReg, count: dmgArr.length, dmgArr });
 
 
