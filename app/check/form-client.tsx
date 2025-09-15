@@ -418,17 +418,39 @@ const [mabiResult, carResult] = await Promise.all([
         let damages: ExistingDamage[] = [];
 
         if (!mabiResult.error && mabiResult.data && mabiResult.data.length > 0) {
-          // Använd första raden för bildata
-          const firstRow = mabiResult.data[0];
-          useData = [{
-            regnr: normalizedReg,
-            brand_model: getColumnValue(firstRow, 'Modell', ['brand_model']),
-            damage_text: null,
-            damage_location: null,
-            damage_notes: null,
-            wheelstorage: getColumnValue(firstRow, 'wheelstorage', ['Hjulförvaring']),
-            saludatum: getColumnValue(firstRow, 'saludatum', ['Saludatum'])
-          }];
+// Läs rad ur vyn (kan vara array eller single) och sätt kortet
+const viewRow: any = !mabiResult.error
+  ? (Array.isArray(mabiResult.data) ? mabiResult.data[0] : mabiResult.data)
+  : null;
+
+useData = [{
+  regnr: normalizedReg,
+  brand_model: getColumnValue(viewRow, 'Modell', ['brand_model']),
+  damage_text: null,
+  damage_location: null,
+  damage_notes: null,
+  wheelstorage: getColumnValue(viewRow, 'wheelstorage', ['Hjulförvaring']),
+  saludatum: getColumnValue(viewRow, 'saludatum', ['Saludatum']) ?? null,
+}];
+
+// Normalisera och sätt skador direkt från vyn
+let dmgArr: string[] = [];
+const rawSk = viewRow?.skador ?? null;
+if (Array.isArray(rawSk)) {
+  dmgArr = rawSk.map((s: any) => String(s).trim()).filter(Boolean);
+} else if (typeof rawSk === 'string' && rawSk.trim() !== '') {
+  dmgArr = rawSk
+    .replace(/[{}\[\]]/g, '')
+    .split(',')
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+}
+
+// Uppdatera UI-state från vyn
+setViewSaludatum(useData[0].saludatum ?? null);
+setDamages(dmgArr);
+console.log('DMG via fetchCarData', { plate: normalizedReg, count: dmgArr.length, dmgArr });
+
 
           // KORRIGERAT: Skapa EN skada per RAD - läser H, K, M korrekt
 const parsedDamages = mabiResult.data.map((row, index) => {
