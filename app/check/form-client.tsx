@@ -262,23 +262,26 @@ async function lookupDamages(regInput: string) {
     // Hämtar redan normaliserade värden (inkl. skador som string[])
     const view = await fetchDamageCard(plate);
 
+    const skador: string[] = Array.isArray(view?.skador) ? view!.skador : [];
+    console.log('DMG', { plate, view, skador, isArray: Array.isArray(skador) });
+
     if (view) {
-      setViewWheelStorage(view.hjulförvaring ?? '---');
+      // OBS: 'hjulförvaring' finns inte i mabi_damage_view – lämna ev. tidigare state orört
       setViewSaludatum(view.saludatum ?? null);
-      setDamages(Array.isArray(view.skador) ? view.skador : []);
+      setDamages(skador);
     } else {
-      setViewWheelStorage('---');
       setViewSaludatum(null);
       setDamages([]);
     }
-  } catch {
-    setViewWheelStorage('---');
+  } catch (err) {
+    console.error('lookupDamages error', err);
     setViewSaludatum(null);
     setDamages([]);
   } finally {
     setLoadingDamage(false);
   }
 }
+
 
  // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
