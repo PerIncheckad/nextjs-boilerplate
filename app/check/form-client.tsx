@@ -342,37 +342,37 @@ async function lookupDamages(regInput: string) {
 
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
 
-  // Hämtar från BÅDA tabellerna för autocomplete
-  useEffect(() => {
-    async function fetchAllRegistrations() {
-      try {
-        const [mabiResult, carResult] = await Promise.all([
-          supabase.from('mabi_damage_data').select('Regnr').order('Regnr'),
-          supabase.from('car_data').select('regnr').order('regnr')
-        ]);
+// Hämtar från BÅDA tabellerna för autocomplete — via VYN + car_data
+useEffect(() => {
+  async function fetchAllRegistrations() {
+    try {
+      const [viewResult, carResult] = await Promise.all([
+        supabase.from('mabi_damage_view').select('regnr').order('regnr'),
+        supabase.from('car_data').select('regnr').order('regnr'),
+      ]);
 
-        const allRegs = new Set<string>();
-        
-        if (!mabiResult.error && mabiResult.data) {
-          mabiResult.data.forEach(item => {
-            if (item.Regnr) allRegs.add(item.Regnr.toString().toUpperCase());
-          });
-        }
+      const allRegs = new Set<string>();
 
-        if (!carResult.error && carResult.data) {
-          carResult.data.forEach(item => {
-            if (item.regnr) allRegs.add(item.regnr.toString().toUpperCase());
-          });
-        }
-
-        setAllRegistrations(Array.from(allRegs).sort());
-      } catch (err) {
-        console.warn('Could not fetch registrations for autocomplete:', err);
+      if (!viewResult.error && viewResult.data) {
+        viewResult.data.forEach((item: any) => {
+          if (item.regnr) allRegs.add(String(item.regnr).toUpperCase());
+        });
       }
-    }
 
-    fetchAllRegistrations();
-  }, []);
+      if (!carResult.error && carResult.data) {
+        carResult.data.forEach((item: any) => {
+          if (item.regnr) allRegs.add(String(item.regnr).toUpperCase());
+        });
+      }
+
+      setAllRegistrations(Array.from(allRegs).sort());
+    } catch (err) {
+      console.warn('Could not fetch registrations for autocomplete:', err);
+    }
+  }
+
+  fetchAllRegistrations();
+}, []);
 
   // Autocomplete från 2 tecken
   const suggestions = useMemo(() => {
