@@ -144,9 +144,7 @@ const getRelevantCarParts = (damageType: string): string[] => {
 
 const CAR_PART_OPTIONS = Object.keys(CAR_PARTS).sort();
 
-function normalizeReg(input: string): string {
-  return input.toUpperCase().replace(/[^A-Z0-9]/g, '');
-}
+
 
 const isDateWithinDays = (dateStr: string | null, days: number): boolean => {
   if (!dateStr) return false;
