@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { fetchDamageCard, normalizeReg } from '@/lib/damages';
+import { fetchDamageCard, normalizeReg, hasPhoto, hasVideo } from '@/lib/damages';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -616,7 +616,11 @@ const saludatum    = viewSaludatum    ?? carSaludatum    ?? null;
     return true;
   };
 
-  const isStatusComplete = () => uthyrningsstatus !== null && preliminarAvslutNotering.trim().length > 0;
+const isStatusComplete = () => {
+  const statusSet = String(uthyrningsstatus ?? '').trim().length > 0;
+  const noteSet   = String(preliminarAvslutNotering ?? '').trim().length > 0;
+  return statusSet && noteSet;
+};
   
   // KORRIGERAD canSave - mer omfattande kontroll
   const canSave = () => {
@@ -624,7 +628,18 @@ const saludatum    = viewSaludatum    ?? carSaludatum    ?? null;
     const locationOk = isLocationComplete();
     const vehicleOk = isVehicleStatusComplete();
     const cleaningOk = isCleaningComplete();
-    const damagesOk = isDamagesComplete();
+// Befintliga skador: foto krävs, video frivilligt
+const existingOk =
+  (existingDamages ?? [])
+    .filter(d => d.status !== 'not_selected')   // ignorera tomma/placeholder-rader
+    .every(d => hasPhoto(d.media));
+
+// Ny skada: både foto och video krävs
+const newOk = damageToFix
+  ? (hasPhoto(damageToFix.media) && hasVideo(damageToFix.media))
+  : true; // ingen ny skada inskickad => godkänd del
+
+const damagesOk = existingOk && newOk;
     const statusOk = isStatusComplete();
     
     console.log('Validation check:', {
