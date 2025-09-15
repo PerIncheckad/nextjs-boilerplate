@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { fetchDamageCard } from '@/lib/damages';
+import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -255,32 +255,34 @@ const [loadingDamage, setLoadingDamage] = useState(false);
 // Hämta från vyn (tar värdet från input direkt – vi behöver inte känna till din egen regnr-state)
 async function lookupDamages(regInput: string) {
   const plate = normalizeReg(regInput || '');
-  if (!plate) return;
+
+  // slå BARA när plåten är komplett (6 tecken)
+  if (plate.length !== 6) return;
 
   setLoadingDamage(true);
   try {
-    // Hämtar redan normaliserade värden (inkl. skador som string[])
-    const view = await fetchDamageCard(plate);
+    const view = await fetchDamageCard(plate); // läser ALLA rader och flätar ihop
 
-    const skador: string[] = Array.isArray(view?.skador) ? view!.skador : [];
-    console.log('DMG', { plate, view, skador, isArray: Array.isArray(skador) });
+    const skador = view?.skador ?? [];
+    setDamages(skador);
+    setViewSaludatum(view?.saludatum ?? null);
 
-    if (view) {
-      // OBS: 'hjulförvaring' finns inte i mabi_damage_view – lämna ev. tidigare state orört
-      setViewSaludatum(view.saludatum ?? null);
-      setDamages(skador);
-    } else {
-      setViewSaludatum(null);
-      setDamages([]);
-    }
+    // tillfällig verifiering — ta bort när klart
+    console.log('DMG', {
+      plate,
+      isArray: Array.isArray(skador),
+      count: skador.length,
+      skador,
+    });
   } catch (err) {
-    console.error('lookupDamages error', err);
-    setViewSaludatum(null);
+    console.error('lookupDamages error:', err);
     setDamages([]);
+    setViewSaludatum(null);
   } finally {
     setLoadingDamage(false);
   }
 }
+
 
 
  // State för registreringsnummer och bildata
