@@ -399,18 +399,18 @@ useEffect(() => {
       setNotFound(false);
 
       try {
-        const [mabiResult, carResult] = await Promise.all([
-          supabase
-            .from('mabi_damage_data')
-            .select('*')
-            .eq('Regnr', normalizedReg)
-            .order('id', { ascending: false }),
-          supabase
-            .from('car_data')
-            .select('*')
-            .eq('regnr', normalizedReg)
-            .order('created_at', { ascending: false })
-        ]);
+const [mabiResult, carResult] = await Promise.all([
+  // Läs endast från VYN (kolumner som faktiskt finns)
+  supabase
+    .from('mabi_damage_view')
+    .select('regnr, saludatum, skador')
+    .eq('regnr', normalizedReg),
+  supabase
+    .from('car_data')
+    .select('*')
+    .eq('regnr', normalizedReg)
+    .order('created_at', { ascending: false }),
+]);
 
         if (cancelled) return;
 
