@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { fetchDamageCard, normalizeReg, hasPhoto, hasVideo } from '@/lib/damages';
+import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
