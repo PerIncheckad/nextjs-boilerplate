@@ -1942,7 +1942,7 @@ onBlur={(e) => {
                       </div>
                     </div>
 
-                    {damage.status === 'documented' && (
+{damage.status !== 'fixed' && (
                       <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '12px' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                           <div>
