@@ -1,55 +1,48 @@
-import { createClient } from "@supabase/supabase-js";
+// lib/damages.ts
+import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnon);
+export function normalizeReg(input: string): string {
+  return (input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
 
-export const normalizeReg = (s: string) =>
-  (s || "").trim().toUpperCase().replace(/[\s-]/g, "");
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
-const normalizeSkador = (raw: unknown): string[] => {
-  if (Array.isArray(raw)) {
-    return raw
-      .filter((x) => typeof x === "string" && x.trim() !== "")
-      .map((x) => x.trim());
-  }
-  if (typeof raw === "string" && raw.trim() !== "") {
-    const cleaned = raw.replace(/[{}\[\]]/g, "");
-    return cleaned.split(",").map((s) => s.trim()).filter(Boolean);
-  }
-  return [];
+type ViewRow = {
+  regnr: string;
+  saludatum: string | null;
+  skador: string[] | string | null;
 };
 
-/** Läs ALLA rader för plåten från vyn och fläta ihop skadorna */
-export async function fetchDamageCard(plateRaw: string): Promise<{
-  regnr: string | null;
-  saludatum: string | null;
-  skador: string[];
-} | null> {
-  const plate = normalizeReg(plateRaw);
-  if (!plate) return null;
-
+/** Hämtar en (1) rad ur mabi_damage_view + normaliserar skador till string[] */
+export async function fetchDamageCard(plate: string): Promise<{ regnr: string; saludatum: string | null; skador: string[] } | null> {
   const { data, error } = await supabase
-    .from("mabi_damage_view")
-    .select("regnr, saludatum, skador")
-    .eq("regnr", plate); // ← hämta alla rader
+    .from('mabi_damage_view')
+    .select('regnr, saludatum, skador')
+    .eq('regnr', plate)
+    .maybeSingle();
 
-  if (error) throw new Error(`Supabase error (mabi_damage_view): ${error.message}`);
-  if (!data || data.length === 0) return null;
+  if (error) {
+    console.error('fetchDamageCard error:', error);
+    return null;
+  }
 
-  const allSkador = Array.from(
-    new Set(data.flatMap((row: any) => normalizeSkador(row?.skador)))
-  );
+  const row = data as ViewRow | null;
+  if (!row) return null;
 
-  const vals = (data.map((r: any) => r?.saludatum).filter(Boolean) as string[]);
-  const saludatum =
-    vals.every((v) => /^\d{4}-\d{2}-\d{2}/.test(v))
-      ? vals.sort((a, b) => (a < b ? 1 : -1))[0] ?? null
-      : vals[0] ?? null;
+  const raw = row.skador;
+  let arr: string[] = [];
+  if (Array.isArray(raw)) {
+    arr = raw.map(s => String(s).trim()).filter(Boolean);
+  } else if (typeof raw === 'string' && raw.trim() !== '') {
+    arr = raw
+      .replace(/[{}\[\]]/g, '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+  }
 
-  return {
-    regnr: (data[0] as any)?.regnr ?? plate,
-    saludatum,
-    skador: allSkador,
-  };
+  return { regnr: row.regnr, saludatum: row.saludatum ?? null, skador: arr };
 }
