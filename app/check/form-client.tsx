@@ -1006,10 +1006,10 @@ const damagesOk = existingOk && newOk;
               display: 'block',
               width: '100%',
               padding: '12px',
-              border: hasVideo ? '2px dashed #10b981' : '2px solid #dc2626',
+border: hasVideo ? '2px dashed #10b981' : (videoRequired ? '2px solid #dc2626' : '2px dashed #d1d5db'),
               borderRadius: '6px',
               fontSize: '16px',
-              backgroundColor: hasVideo ? '#f0fdf4' : '#fee2e2',
+backgroundColor: hasVideo ? '#f0fdf4' : (videoRequired ? '#fee2e2' : '#ffffff'),
               textAlign: 'center',
               cursor: 'pointer',
               color: '#dc2626',
@@ -1048,11 +1048,14 @@ const damagesOk = existingOk && newOk;
           </label>
         </div>
       </div>
-      {(!hasImage || !hasVideo) && (
-        <p style={{ color: '#dc2626', fontSize: '12px', marginTop: '4px' }}>
-          Både bild och video är obligatoriska för alla skador
-        </p>
-      )}
+{(!hasImage || (!hasVideo && videoRequired)) && (
+  <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>
+    {!hasImage
+      ? 'Foto är obligatoriskt.'
+      : (videoRequired ? 'Video är obligatoriskt.' : 'Video är valfritt för befintliga skador.')}
+  </p>
+)}
+
     </div>
   );
   return (
