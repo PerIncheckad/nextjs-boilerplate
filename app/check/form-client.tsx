@@ -1901,24 +1901,31 @@ onBlur={(e) => {
         style={{
           marginBottom: '16px',
           padding: '16px',
-          border: damage.status === 'documented' ? '2px solid #10b981' : (damage.status === 'fixed' ? '2px solid #6b7280' : '2px solid #e5e7eb'),
+          border:
+            damage.status === 'documented' ? '2px solid #10b981' :
+            damage.status === 'fixed'       ? '2px solid #6b7280' :
+                                              '2px solid #e5e7eb',
           borderRadius: '8px',
-          backgroundColor: damage.status === 'documented' ? '#f0fdf4' : (damage.status === 'fixed' ? '#f9fafb' : '#fff'),
+          backgroundColor: damage.status === 'documented' ? '#f0fdf4'
+                        : damage.status === 'fixed'       ? '#f9fafb'
+                                                            : '#fff',
         }}
       >
-        {/* överrad med text + knappar */}
+        {/* Överrad med text + knappar */}
         <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>{damage.fullText}</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+            {damage.fullText}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
               disabled={damage.status === 'fixed'}
               style={{
                 padding: '6px 12px',
-                borderRadius: 4,
+                borderRadius: '4px',
                 border: 'none',
-                fontSize: 14,
+                fontSize: '14px',
                 fontWeight: 500,
                 cursor: damage.status === 'fixed' ? 'not-allowed' : 'pointer',
                 backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
@@ -1934,9 +1941,9 @@ onBlur={(e) => {
               onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
               style={{
                 padding: '6px 12px',
-                borderRadius: 4,
+                borderRadius: '4px',
                 border: 'none',
-                fontSize: 14,
+                fontSize: '14px',
                 fontWeight: 500,
                 cursor: 'pointer',
                 backgroundColor: damage.status === 'fixed' ? '#6b7280' : '#f59e0b',
@@ -1948,16 +1955,18 @@ onBlur={(e) => {
           </div>
         </div>
 
-        {/* Visa redigeringsfält om skadan inte är åtgärdad */}
+        {/* Fält visas bara när skadan INTE är åtgärdad */}
         {damage.status !== 'fixed' && (
-          <div style={{ borderTop: '1px solid #d1d5db', paddingTop: 12 }}>
+          <div style={{ borderTop: '1px solid #d1d5db', paddingTop: '12px' }}>
             {/* 1. Skadetyp */}
             <div>
-              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>1. Skadetyp *</label>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: 500 }}>
+                1. Skadetyp *
+              </label>
               <select
                 value={damage.userType || ''}
                 onChange={(e) => updateExistingDamageType(damage.id, e.target.value)}
-                style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }}
               >
                 <option value="">Välj typ</option>
                 {DAMAGE_TYPES.map((type) => (
@@ -1967,12 +1976,14 @@ onBlur={(e) => {
             </div>
 
             {/* 2. Bildel */}
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>2. Bildel *</label>
+            <div style={{ marginTop: '12px' }}>
+              <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px', fontWeight: 500 }}>
+                2. Bildel *
+              </label>
               <select
                 value={damage.userCarPart || ''}
                 onChange={(e) => updateExistingDamageCarPart(damage.id, e.target.value)}
-                style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+                style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '14px' }}
               >
                 <option value="">Välj bildel</option>
                 {(damage.userType ? getRelevantCarParts(damage.userType) : CAR_PART_OPTIONS).map((part) => (
@@ -1980,6 +1991,47 @@ onBlur={(e) => {
                 ))}
               </select>
             </div>
+
+            {/* 3. Foto (obligatoriskt) */}
+            <div style={{ marginTop: '12px' }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+                3. Foto (obligatoriskt)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = e.currentTarget.files;
+                  if (files && files.length) updateExistingDamageMedia(damage.id, files);
+                  e.currentTarget.value = ''; // låt användaren ladda upp samma fil igen vid behov
+                }}
+              />
+            </div>
+
+            {/* 4. Video (frivillig) */}
+            <div style={{ marginTop: '12px' }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+                4. Video (frivillig)
+              </label>
+              <input
+                type="file"
+                accept="video/*"
+                multiple
+                onChange={(e) => {
+                  const files = e.currentTarget.files;
+                  if (files && files.length) updateExistingDamageMedia(damage.id, files);
+                  e.currentTarget.value = '';
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    ))}
+  </>
+)}
+
 
 {/* 3. Foto (obligatoriskt) */}
 <div style={{ marginTop: 12 }}>
