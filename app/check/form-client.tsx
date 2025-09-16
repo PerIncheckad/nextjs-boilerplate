@@ -1885,6 +1885,9 @@ onBlur={(e) => {
           boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
           border: showFieldErrors && !isDamagesComplete() ? '2px solid #dc2626' : '2px solid transparent'
         }} className={showFieldErrors && !isDamagesComplete() ? 'section-incomplete' : ''}>
+          
+          {/* DEBUG: */} <div style={{opacity:.6, fontSize:12}}>existingDamages: {Array.isArray(existingDamages) ? existingDamages.length : 'n/a'}</div>
+
           <SectionHeader title="Skadekontroll" isComplete={isDamagesComplete()} />
 {/* --- BEFINTLIGA SKADOR: dokumentation --- */}
 {Array.isArray(existingDamages) && existingDamages.length > 0 && (
