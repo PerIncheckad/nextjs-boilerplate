@@ -1981,33 +1981,46 @@ onBlur={(e) => {
               </select>
             </div>
 
-            {/* 3. Foto (obligatoriskt) */}
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>3. Foto *</label>
-              <MediaPicker
-                value={damage.media}
-                onChange={(files) => updateExistingDamageMedia(damage.id, files)}
-                accept="image/*"
-                max={5}
-              />
-            </div>
+{/* 3. Foto (obligatoriskt) */}
+<div style={{ marginTop: 12 }}>
+  <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+    3. Foto (obligatoriskt)
+  </label>
+  <input
+    type="file"
+    accept="image/*"
+    multiple
+    onChange={(e) => {
+      const files = e.target.files;
+      if (files && files.length) {
+        updateExistingDamageMedia(damage.id, files);
+        // Nollställ så att man kan ladda upp samma fil igen vid behov
+        e.currentTarget.value = '';
+      }
+    }}
+  />
+</div>
 
-            {/* 4. Video (frivillig) */}
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>4. Video (frivillig)</label>
-              <MediaPicker
-                value={damage.media}
-                onChange={(files) => updateExistingDamageMedia(damage.id, files)}
-                accept="video/*"
-                max={2}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    ))}
-  </>
-)}
+
+{/* 4. Video (frivillig) */}
+<div style={{ marginTop: 12 }}>
+  <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>
+    4. Video (frivillig)
+  </label>
+  <input
+    type="file"
+    accept="video/*"
+    multiple
+    onChange={(e) => {
+      const files = e.target.files;
+      if (files && files.length) {
+        updateExistingDamageMedia(damage.id, files);
+        e.currentTarget.value = '';
+      }
+    }}
+  />
+</div>
+
 
           {/* ÅTERSTÄLLD: Befintliga skador från databas */}
 {Array.isArray(existingDamages) && existingDamages.length > 0 && (
