@@ -554,7 +554,7 @@ const parsedDamages = mabiResult.data.map((row, index) => {
 
         if (useData.length > 0) {
           setCarData(useData);
-          setExistingDamages(damages);
+setExistingDamages(prev => (damages.length > 0 ? damages : prev));
           setNotFound(false);
         } else {
           setCarData([]);
