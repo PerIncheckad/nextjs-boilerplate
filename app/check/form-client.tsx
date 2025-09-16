@@ -943,14 +943,24 @@ const damagesOk = existingOk && newOk;
     </div>
   );
 
-const MediaUpload = ({
-  damageId,
-  isOld,
-  onMediaUpdate,
-  hasImage,
-  hasVideo,
-  videoRequired = false, // <— NY
-}) => {
+const MediaUpload = (
+  {
+    damageId,
+    isOld,
+    onMediaUpdate,
+    hasImage,
+    hasVideo,
+    videoRequired = false,
+  }: {
+    damageId: string;
+    isOld: boolean;
+    onMediaUpdate: (id: string, files: FileList | null) => void;
+    hasImage?: boolean;
+    hasVideo?: boolean;
+    videoRequired?: boolean;
+  }
+) => {
+
 
     damageId: string;
     isOld: boolean;
