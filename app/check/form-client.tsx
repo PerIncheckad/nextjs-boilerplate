@@ -1886,6 +1886,125 @@ onBlur={(e) => {
           border: showFieldErrors && !isDamagesComplete() ? '2px solid #dc2626' : '2px solid transparent'
         }} className={showFieldErrors && !isDamagesComplete() ? 'section-incomplete' : ''}>
           <SectionHeader title="Skadekontroll" isComplete={isDamagesComplete()} />
+{/* --- BEFINTLIGA SKADOR: dokumentation --- */}
+{Array.isArray(existingDamages) && existingDamages.length > 0 && (
+  <>
+    <SubSectionHeader title="Befintliga skador" />
+    <div style={{ marginBottom: '24px' }} />
+
+    {existingDamages.map((damage) => (
+      <div
+        key={damage.id}
+        style={{
+          marginBottom: '16px',
+          padding: '16px',
+          border: damage.status === 'documented' ? '2px solid #10b981' : (damage.status === 'fixed' ? '2px solid #6b7280' : '2px solid #e5e7eb'),
+          borderRadius: '8px',
+          backgroundColor: damage.status === 'documented' ? '#f0fdf4' : (damage.status === 'fixed' ? '#f9fafb' : '#fff'),
+        }}
+      >
+        {/* överrad med text + knappar */}
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{damage.fullText}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
+              disabled={damage.status === 'fixed'}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 4,
+                border: 'none',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: damage.status === 'fixed' ? 'not-allowed' : 'pointer',
+                backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
+                color: damage.status === 'documented' ? '#fff' : '#374151',
+                opacity: damage.status === 'fixed' ? 0.5 : 1,
+              }}
+            >
+              {damage.status === 'documented' ? '✓ Dokumenterad' : 'Dokumentera'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 4,
+                border: 'none',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: 'pointer',
+                backgroundColor: damage.status === 'fixed' ? '#6b7280' : '#f59e0b',
+                color: '#fff',
+              }}
+            >
+              {damage.status === 'fixed' ? '✓ Åtgärdad' : 'Åtgärdad'}
+            </button>
+          </div>
+        </div>
+
+        {/* Visa redigeringsfält om skadan inte är åtgärdad */}
+        {damage.status !== 'fixed' && (
+          <div style={{ borderTop: '1px solid #d1d5db', paddingTop: 12 }}>
+            {/* 1. Skadetyp */}
+            <div>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>1. Skadetyp *</label>
+              <select
+                value={damage.userType || ''}
+                onChange={(e) => updateExistingDamageType(damage.id, e.target.value)}
+                style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+              >
+                <option value="">Välj typ</option>
+                {DAMAGE_TYPES.map((type) => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. Bildel */}
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>2. Bildel *</label>
+              <select
+                value={damage.userCarPart || ''}
+                onChange={(e) => updateExistingDamageCarPart(damage.id, e.target.value)}
+                style={{ width: '100%', padding: 8, border: '1px solid #d1d5db', borderRadius: 4, fontSize: 14 }}
+              >
+                <option value="">Välj bildel</option>
+                {(damage.userType ? getRelevantCarParts(damage.userType) : CAR_PART_OPTIONS).map((part) => (
+                  <option key={part} value={part}>{part}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 3. Foto (obligatoriskt) */}
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>3. Foto *</label>
+              <MediaPicker
+                value={damage.media}
+                onChange={(files) => updateExistingDamageMedia(damage.id, files)}
+                accept="image/*"
+                max={5}
+              />
+            </div>
+
+            {/* 4. Video (frivillig) */}
+            <div style={{ marginTop: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 14, fontWeight: 500 }}>4. Video (frivillig)</label>
+              <MediaPicker
+                value={damage.media}
+                onChange={(files) => updateExistingDamageMedia(damage.id, files)}
+                accept="video/*"
+                max={2}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    ))}
+  </>
+)}
 
           {/* ÅTERSTÄLLD: Befintliga skador från databas */}
 {Array.isArray(existingDamages) && existingDamages.length > 0 && (
