@@ -1149,6 +1149,42 @@ const MediaUpload = ({
       backgroundColor: '#f8fafc',
       color: '#111827'
     }}>
+      {TEST_MAIL && (
+  <div
+    style={{
+      maxWidth: '600px',
+      margin: '12px auto',
+      padding: '8px 12px',
+      backgroundColor: '#fef9c3',
+      border: '1px solid #eab308',
+      borderRadius: '8px',
+      display: 'flex',
+      gap: '8px',
+      alignItems: 'center',
+    }}
+  >
+    <button
+      type="button"
+      onClick={notifyQuality}
+      style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+    >
+      Skicka test till Kvalitet
+    </button>
+
+    <button
+      type="button"
+      onClick={notifyStation}
+      style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
+    >
+      Skicka test till Station
+    </button>
+
+    <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
+      (Visas bara när TEST_MAIL är satt)
+    </span>
+  </div>
+)}
+
       {/* MABI Header */}
       <div style={{
         backgroundColor: '#033066',
