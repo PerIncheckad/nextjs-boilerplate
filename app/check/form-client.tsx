@@ -341,6 +341,9 @@ async function lookupDamages(regInput: string) {
   const [station, setStation] = useState('');
   const [annanPlats, setAnnanPlats] = useState(false);
   const [annanPlatsText, setAnnanPlatsText] = useState('');
+  const [sendState, setSendState] = useState<'idle'|'sending-station'|'sending-quality'|'ok'|'fail'>('idle');
+const [sendMsg, setSendMsg] = useState<string>('');
+
   
   const [matarstallning, setMatarstallning] = useState('');
   const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
@@ -1136,16 +1139,36 @@ function buildNotifyPayload() {
 
 
 
-  async function sendNotify(target: 'station' | 'quality') {
+async function sendNotify(target: 'station' | 'quality') {
+  // förhindra dubbelklick om en sändning redan pågår
+  if (sendState === 'sending-station' || sendState === 'sending-quality') return;
+
+  // sätt "sending..."-status
+  const sendingKey = (target === 'station' ? 'sending-station' : 'sending-quality') as typeof sendState;
+  setSendState(sendingKey);
+  setSendMsg('');
+
   try {
-    const payload = buildNotifyPayload();                // det du byggde i steg 2
-    const to = recipientsFor(payload.region, target);    // väljer mottagare
-    await notifyCheckin({ ...payload, recipients: to }); // POST mot /api/notify
-    console.log('notify ok', { target, to, payload });
-  } catch (err) {
-    console.error('notify fail', err);
+    // bygg data och välj mottagare
+    const payload = buildNotifyPayload();
+    const to = recipientsFor(payload.region, target);
+
+    // anropa servern
+    const res = await notifyCheckin({ ...payload, recipients: to });
+
+    if (res?.ok) {
+      setSendState('ok');
+      setSendMsg(`Skickat till ${to.join(', ')}`);   // visas i den lilla texten till höger
+    } else {
+      setSendState('fail');
+      setSendMsg(res?.error || 'Tekniskt fel vid utskick.');
+    }
+  } catch (err: any) {
+    setSendState('fail');
+    setSendMsg(err?.message || 'Tekniskt fel vid utskick.');
   }
 }
+
 
 // Små wrappers – enkla att koppla på knappar
 const notifyStation  = () => sendNotify('station');
@@ -1170,23 +1193,41 @@ const notifyQuality  = () => sendNotify('quality');
       alignItems: 'center',
     }}
   >
-    <button
-      type="button"
-      onClick={notifyQuality}
-      style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-    >
-      Skicka test till Kvalitet
-    </button>
+<button
+  type="button"
+  onClick={() => sendNotify('quality')}
+  disabled={sendState === 'sending-quality'}
+  style={{
+    padding: '6px 10px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    opacity: sendState === 'sending-quality' ? 0.6 : 1,
+  }}
+>
+  {sendState === 'sending-quality' ? 'Skickar…' : 'Skicka test till Kvalitet'}
+</button>
 
-    <button
-      type="button"
-      onClick={notifyStation}
-      style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: '6px' }}
-    >
-      Skicka test till Station
-    </button>
+<button
+  type="button"
+  onClick={() => sendNotify('station')}
+  disabled={sendState === 'sending-station'}
+  style={{
+    padding: '6px 10px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    marginLeft: '8px',
+    opacity: sendState === 'sending-station' ? 0.6 : 1,
+  }}
+>
+  {sendState === 'sending-station' ? 'Skickar…' : 'Skicka test till Station'}
+</button>
 
-    <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
+{!!sendMsg && (
+  <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
+    {sendMsg}
+  </span>
+)}
+
       (Visas bara när TEST_MAIL är satt)
     </span>
   </div>
