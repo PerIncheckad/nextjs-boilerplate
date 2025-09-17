@@ -1179,7 +1179,7 @@ const notifyQuality  = () => sendNotify('quality');
       backgroundColor: '#f8fafc',
       color: '#111827'
     }}>
-      {TEST_MAIL && (
+{TEST_MAIL && (
   <div
     style={{
       maxWidth: '600px',
@@ -1193,45 +1193,42 @@ const notifyQuality  = () => sendNotify('quality');
       alignItems: 'center',
     }}
   >
-<button
-  type="button"
-  onClick={() => sendNotify('quality')}
-  disabled={sendState === 'sending-quality'}
-  style={{
-    padding: '6px 10px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
-    opacity: sendState === 'sending-quality' ? 0.6 : 1,
-  }}
->
-  {sendState === 'sending-quality' ? 'Skickar…' : 'Skicka test till Kvalitet'}
-</button>
+    <button
+      type="button"
+      onClick={() => sendNotify('quality')}
+      disabled={sendState === 'sending-quality'}
+      style={{
+        padding: '6px 10px',
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        opacity: sendState === 'sending-quality' ? 0.6 : 1,
+      }}
+    >
+      {sendState === 'sending-quality' ? 'Skickar…' : 'Skicka test till Kvalitet'}
+    </button>
 
-<button
-  type="button"
-  onClick={() => sendNotify('station')}
-  disabled={sendState === 'sending-station'}
-  style={{
-    padding: '6px 10px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '6px',
-    marginLeft: '8px',
-    opacity: sendState === 'sending-station' ? 0.6 : 1,
-  }}
->
-  {sendState === 'sending-station' ? 'Skickar…' : 'Skicka test till Station'}
-</button>
+    <button
+      type="button"
+      onClick={() => sendNotify('station')}
+      disabled={sendState === 'sending-station'}
+      style={{
+        padding: '6px 10px',
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        opacity: sendState === 'sending-station' ? 0.6 : 1,
+      }}
+    >
+      {sendState === 'sending-station' ? 'Skickar…' : 'Skicka test till Station'}
+    </button>
 
-{!!sendMsg && (
-  <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
-    {sendMsg}
-  </span>
-)}
-
-      (Visas bara när TEST_MAIL är satt)
-    </span>
+    {!!sendMsg && (
+      <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
+        {sendMsg}
+      </span>
+    )}
   </div>
 )}
+
 
       {/* MABI Header */}
       <div style={{
