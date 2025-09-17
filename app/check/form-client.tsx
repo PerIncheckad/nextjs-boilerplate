@@ -1056,7 +1056,9 @@ const MediaUpload = ({
             fontWeight: hasVideo ? 'normal' : 'bold',
           }}
         >
-          🎥 {videoRequired ? 'Spela in video med skada OCH reg.nr. *' : 'Spela in video med skada OCH reg.nr.'}
+🎥 {isOld
+  ? (videoRequired ? 'Spela in video *' : 'Spela in video')
+  : (videoRequired ? 'Spela in video med skada OCH reg.nr. *' : 'Spela in video med skada OCH reg.nr.')}
         </label>
       </div>
 
@@ -1278,7 +1280,6 @@ const notifyQuality  = () => sendNotify('quality');
           </label>
           <div style={{ position: 'relative' }}>
             <input
-              type="text"
   type="text"
   value={regInput}
   onChange={(e) => handleRegInputChange(e.target.value)}
@@ -2017,7 +2018,6 @@ onBlur={(e) => {
           border: showFieldErrors && !isDamagesComplete() ? '2px solid #dc2626' : '2px solid transparent'
         }} className={showFieldErrors && !isDamagesComplete() ? 'section-incomplete' : ''}>
           
-          {/* DEBUG: */} <div style={{opacity:.6, fontSize:12}}>existingDamages: {Array.isArray(existingDamages) ? existingDamages.length : 'n/a'}</div>
 
           <SectionHeader title="Skadekontroll" isComplete={isDamagesComplete()} />
 {/* --- BEFINTLIGA SKADOR: dokumentation --- */}
@@ -2403,13 +2403,14 @@ onBlur={(e) => {
                     />
                   </div>
 
-                  <MediaUpload
-                    damageId={damage.id}
-                    isOld={false}
-                    onMediaUpdate={updateDamageMedia}
-                    hasImage={damage.media.some(m => m.type === 'image')}
-                    hasVideo={damage.media.some(m => m.type === 'video')}
-                  />
+<MediaUpload
+  damageId={damage.id}
+  isOld={false}
+  onMediaUpdate={updateDamageMedia}
+  hasImage={damage.media.some(m => m.type === 'image')}
+  hasVideo={damage.media.some(m => m.type === 'video')}
+  videoRequired
+/>
 
                   {damage.media.length > 0 && (
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
