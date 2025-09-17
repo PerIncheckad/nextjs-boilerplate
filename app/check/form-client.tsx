@@ -1140,34 +1140,42 @@ function buildNotifyPayload() {
 
 
 async function sendNotify(target: 'station' | 'quality') {
-  // förhindra dubbelklick om en sändning redan pågår
-  if (sendState === 'sending-station' || sendState === 'sending-quality') return;
-
-  // sätt "sending..."-status
-  const sendingKey = (target === 'station' ? 'sending-station' : 'sending-quality') as typeof sendState;
-  setSendState(sendingKey);
-  setSendMsg('');
-
   try {
-    // bygg data och välj mottagare
+    // 1) Visa "skickar..."-status direkt
+    if (target === 'station') {
+      setSendState('sending-station');
+      setSendMsg('Skickar till station…');
+    } else {
+      setSendState('sending-quality');
+      setSendMsg('Skickar till kvalitet…');
+    }
+
+    // 2) Bygg payload och hämta mottagare
     const payload = buildNotifyPayload();
     const to = recipientsFor(payload.region, target);
 
-    // anropa servern
+    // 3) Skicka
     const res = await notifyCheckin({ ...payload, recipients: to });
 
+    // 4) Visa resultat
     if (res?.ok) {
       setSendState('ok');
-      setSendMsg(`Skickat till ${to.join(', ')}`);   // visas i den lilla texten till höger
+      setSendMsg('Notis skickad ✅');
     } else {
       setSendState('fail');
-      setSendMsg(res?.error || 'Tekniskt fel vid utskick.');
+      setSendMsg('Kunde inte skicka ✖️');
     }
-  } catch (err: any) {
+  } catch (err) {
+    console.error('notify fail', err);
     setSendState('fail');
-    setSendMsg(err?.message || 'Tekniskt fel vid utskick.');
+    setSendMsg('Kunde inte skicka ✖️');
+  } finally {
+    // 5) Städa efter ~4 sek (ta bort meddelande och gå tillbaka till idle)
+    setTimeout(() => setSendMsg(''), 4000);
+    setTimeout(() => setSendState('idle'), 4000);
   }
 }
+
 
 
 // Små wrappers – enkla att koppla på knappar
@@ -1227,11 +1235,23 @@ const notifyQuality  = () => sendNotify('quality');
 </button>
 
 
-    {!!sendMsg && (
-      <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
-        {sendMsg}
-      </span>
-    )}
+{!!sendMsg && (
+  <span
+    style={{
+      marginLeft: 8,
+      fontSize: 12,
+      opacity: 0.95,
+      // grön vid OK, röd vid fel, annars standard
+      color:
+        sendState === 'ok' ? '#167d00' :
+        sendState === 'fail' ? '#dc2626' :
+        '#111827',
+    }}
+  >
+    {sendMsg}
+  </span>
+)}
+
   </div>
 )}
 
