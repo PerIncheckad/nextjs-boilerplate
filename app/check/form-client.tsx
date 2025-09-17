@@ -1176,8 +1176,6 @@ async function sendNotify(target: 'station' | 'quality') {
   }
 }
 
-
-
 // Små wrappers – enkla att koppla på knappar
 const notifyStation  = () => sendNotify('station');
 const notifyQuality  = () => sendNotify('quality');
