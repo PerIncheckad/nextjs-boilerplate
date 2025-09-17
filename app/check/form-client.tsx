@@ -1184,6 +1184,8 @@ onBlur={(e) => {
 
 
               placeholder="Skriv reg.nr"
+              <input id="regnr" ... />
+
               spellCheck={false}
               autoComplete="off"
               style={{
@@ -1299,7 +1301,9 @@ onBlur={(e) => {
 
         {/* 2. PLATS FÖR INCHECKNING - KORRIGERADE namn */}
         <div style={{
-          backgroundColor: '#ffffff',
+<select id="city" ...> ... </select>
+          
+backgroundColor: '#ffffff',
           padding: '24px',
           borderRadius: '12px',
           marginBottom: '24px',
@@ -1342,6 +1346,7 @@ onBlur={(e) => {
                 Station *
               </label>
               <select
+                  id="station"    
                 value={station}
                 onChange={(e) => setStation(e.target.value)}
                 disabled={!ort || annanPlats}
