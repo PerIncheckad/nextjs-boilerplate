@@ -1129,7 +1129,12 @@ function buildNotifyPayload() {
 
 // ← här ska det vara tom rad, och sedan fortsätter filen
 // --- Steg 3: Hjälpare för att skicka notifiering ---
-async function sendNotify(target: 'station' | 'quality') {
+// Välj mottagare (just nu kör vi bara testadressen)
+
+
+
+
+  async function sendNotify(target: 'station' | 'quality') {
   try {
     const payload = buildNotifyPayload();                // det du byggde i steg 2
     const to = recipientsFor(payload.region, target);    // väljer mottagare
