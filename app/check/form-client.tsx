@@ -22,8 +22,8 @@ const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Trelleborg: 'SYD',
 };
 
+// ← här ska det vara tom rad, och sedan fortsätter filen
 
-);
 
 type CarData = {
   regnr: string;
