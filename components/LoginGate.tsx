@@ -55,7 +55,7 @@ export default function LoginGate({ children }: Props) {
             required
             value={email}
             onChange={e => setEmail(e.target.value)}
-            placeholder="din@mabi.se"
+            placeholder="epost-adress"
             className="border rounded p-2 w-full bg-white text-black placeholder-gray-500"
           />
           <button
