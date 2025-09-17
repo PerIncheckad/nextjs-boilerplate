@@ -1343,6 +1343,8 @@ onBlur={(e) => {
               </label>
               <select
                 value={station}
+                  id="station"
+
                 onChange={(e) => setStation(e.target.value)}
                 disabled={!ort || annanPlats}
                 style={{
