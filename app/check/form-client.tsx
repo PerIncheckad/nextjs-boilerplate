@@ -1173,6 +1173,8 @@ async function sendNotify(target: 'station' | 'quality') {
 // Små wrappers – enkla att koppla på knappar
 const notifyStation  = () => sendNotify('station');
 const notifyQuality  = () => sendNotify('quality');
+  const canSend = isRegComplete() && isLocationComplete();
+
   return (
     <div style={{
       minHeight: '100vh',
@@ -1193,33 +1195,37 @@ const notifyQuality  = () => sendNotify('quality');
       alignItems: 'center',
     }}
   >
-    <button
-      type="button"
-      onClick={() => sendNotify('quality')}
-      disabled={sendState === 'sending-quality'}
-      style={{
-        padding: '6px 10px',
-        border: '1px solid #e5e7eb',
-        borderRadius: '6px',
-        opacity: sendState === 'sending-quality' ? 0.6 : 1,
-      }}
-    >
-      {sendState === 'sending-quality' ? 'Skickar…' : 'Skicka test till Kvalitet'}
-    </button>
+<button
+  type="button"
+  onClick={() => canSend && sendNotify('quality')}
+  disabled={!canSend || sendState === 'sending-quality'}
+  style={{
+    padding: '6px 10px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    opacity: (!canSend || sendState === 'sending-quality') ? 0.6 : 1,
+    cursor: (!canSend || sendState === 'sending-quality') ? 'not-allowed' : 'pointer',
+  }}
+>
+  {sendState === 'sending-quality' ? 'Skickar…' : 'Skicka test till Kvalitet'}
+</button>
 
-    <button
-      type="button"
-      onClick={() => sendNotify('station')}
-      disabled={sendState === 'sending-station'}
-      style={{
-        padding: '6px 10px',
-        border: '1px solid #e5e7eb',
-        borderRadius: '6px',
-        opacity: sendState === 'sending-station' ? 0.6 : 1,
-      }}
-    >
-      {sendState === 'sending-station' ? 'Skickar…' : 'Skicka test till Station'}
-    </button>
+
+<button
+  type="button"
+  onClick={() => canSend && sendNotify('station')}
+  disabled={!canSend || sendState === 'sending-station'}
+  style={{
+    padding: '6px 10px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '6px',
+    opacity: (!canSend || sendState === 'sending-station') ? 0.6 : 1,
+    cursor: (!canSend || sendState === 'sending-station') ? 'not-allowed' : 'pointer',
+  }}
+>
+  {sendState === 'sending-station' ? 'Skickar…' : 'Skicka test till Station'}
+</button>
+
 
     {!!sendMsg && (
       <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
