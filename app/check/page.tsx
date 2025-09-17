@@ -1,8 +1,11 @@
-export const dynamic = 'force-dynamic';
-
-import React from 'react';
+// app/check/page.tsx
 import FormClient from './form-client';
+import LoginGate from '@/components/LoginGate';
 
 export default function Page() {
-  return <FormClient />;
+  return (
+    <LoginGate>
+      <FormClient />
+    </LoginGate>
+  );
 }
