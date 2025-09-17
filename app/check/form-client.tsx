@@ -21,8 +21,65 @@ const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Malmö: 'SYD',
   Trelleborg: 'SYD',
 };
+// --- Region-hubbar + testmottagare ---
+const REGION_HUB: Record<'NORR'|'MITT'|'SYD', string> = {
+  NORR: 'Halmstad',
+  MITT: 'Helsingborg',
+  SYD: 'Malmö',
+};
+
+// OBS: vi kör test tills vidare → allt går hit
+const TEST_MAIL = process.env.NEXT_PUBLIC_TEST_MAIL || 'per.andersson@mabi.se';
+
+// Valfritt: separat testadress för bilkontroll (annars samma som TEST_MAIL)
+const BILKONTROLL_MAIL =
+  process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || TEST_MAIL;
+
+// Returnerar alltid testmottagare i nuläget
+function recipientsFor(region: 'NORR'|'MITT'|'SYD', target: 'station'|'quality') {
+  return [ target === 'quality' ? BILKONTROLL_MAIL : TEST_MAIL ];
+}
+function buildNotifyPayload() {
+  // 1) Region
+  const region =
+    ORT_TILL_REGION[ort as keyof typeof ORT_TILL_REGION] ?? 'SYD';
+
+  // 2) Stationnamn
+  const stationName = annanPlats
+    ? (annanPlatsText || '').trim()
+    : (station || '').trim();
+
+  // 3) Härled flaggor
+  // Byt variabelnamn om dina states heter annorlunda
+  const hasNewDamages = typeof damagesOk === 'boolean' ? !damagesOk : false;   // <— BYT vid behov
+  const needsRecond  = typeof cleaningOk === 'boolean' ? !cleaningOk : false;  // <— BYT vid behov
+
+  return {
+    regnr: normalizeReg(regInput || ''),
+    region,
+    station: stationName,
+    time: new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }),
+    hasNewDamages,
+    needsRecond,
+  } as const;
+}
 
 // ← här ska det vara tom rad, och sedan fortsätter filen
+// --- Steg 3: Hjälpare för att skicka notifiering ---
+async function sendNotify(target: 'station' | 'quality') {
+  try {
+    const payload = buildNotifyPayload();                // det du byggde i steg 2
+    const to = recipientsFor(payload.region, target);    // väljer mottagare
+    await notifyCheckin({ ...payload, recipients: to }); // POST mot /api/notify
+    console.log('notify ok', { target, to, payload });
+  } catch (err) {
+    console.error('notify fail', err);
+  }
+}
+
+// Små wrappers – enkla att koppla på knappar
+const notifyStation  = () => sendNotify('station');
+const notifyQuality  = () => sendNotify('quality');
 
 
 type CarData = {
