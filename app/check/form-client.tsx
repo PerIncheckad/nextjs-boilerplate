@@ -1313,68 +1313,7 @@ const notifyQuality  = () => sendNotify('quality');
 )}
 
 
-      {/* MABI Header */}
-      <div style={{
-        backgroundColor: '#033066',
-        width: '100vw',
-        marginLeft: 'calc(-50vw + 50%)',
-        padding: '20px 0',
-        marginBottom: '32px'
-      }}>
-        <div style={{
-          maxWidth: '600px',
-          margin: '0 auto',
-          padding: '0 20px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end'
-        }}>
-          <div>
-            <h1 style={{
-              fontSize: '28px',
-              margin: 0,
-              color: '#ffffff',
-              fontWeight: '800',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}>
-              NY INCHECKNING
-            </h1>
-            <p style={{
-              color: '#ffffff',
-              margin: '6px 0 0 0',
-              fontSize: '16px',
-              fontWeight: '400',
-              opacity: 0.9
-            }}>
-              Inloggad: <strong>Bob</strong>
-            </p>
-          </div>
-          <div style={{
-            width: '120px',
-            height: '60px',
-            backgroundColor: '#ffffff',
-            borderRadius: '6px',
-            padding: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid rgba(255, 255, 255, 0.3)'
-          }}>
-            <div style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#033066',
-              fontSize: '16px',
-              fontWeight: 'bold'
-            }}>
-              MABI
-            </div>
-          </div>
-        </div>
+
       </div>
 
       <div style={{
