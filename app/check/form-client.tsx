@@ -1300,7 +1300,7 @@ const notifyQuality  = () => sendNotify('quality');
       opacity: 0.95,
       // grön vid OK, röd vid fel, annars standard
       color:
-        sendState === 'ok' ? '#167d00' :
+        sendState === 'ok'  ? '#167d00' :
         sendState === 'fail' ? '#dc2626' :
         '#111827',
     }}
@@ -1308,12 +1308,6 @@ const notifyQuality  = () => sendNotify('quality');
     {sendMsg}
   </span>
 )}
-
-
-
-
-
-      </div>
 
       <div style={{
         maxWidth: '600px',
