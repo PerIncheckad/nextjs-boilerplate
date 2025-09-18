@@ -343,6 +343,14 @@ async function lookupDamages(regInput: string) {
   const [annanPlatsText, setAnnanPlatsText] = useState('');
   const [sendState, setSendState] = useState<'idle'|'sending-station'|'sending-quality'|'ok'|'fail'>('idle');
 const [sendMsg, setSendMsg] = useState<string>('');
+const [carModel, setCarModel] = useState<string>('');
+// Fallback: sätt bilmodell från carData om saknas
+useEffect(() => {
+  if (!carModel && carData?.length) {
+    setCarModel((carData[0]?.brand_model || '').trim());
+  }
+}, [carModel, carData]);
+
 
   
   const [matarstallning, setMatarstallning] = useState('');
@@ -464,6 +472,15 @@ const [mabiResult, carResult] = await Promise.all([
 const viewRow: any = !mabiResult.error
   ? (Array.isArray(mabiResult.data) ? mabiResult.data[0] : mabiResult.data)
   : null;
+const brandModel = getColumnValue(viewRow, 'Modell', [
+  'brand_model',
+  'Bilmodell',
+  'Märke/Modell',
+  'modell',
+  'Model'
+]);
+setCarModel(brandModel || '');
+
 
 useData = [{
   regnr: normalizedReg,
