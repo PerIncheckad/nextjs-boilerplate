@@ -493,22 +493,27 @@ const brandModel = (brandFromView ?? brandFromCar ?? '').toString().trim();
 
 // 4) In i state
 setCarModel(brandModel);
-// Läs befintliga skador från vyn och lägg i state
-const skadorRaw = getColumnValue(viewRow, 'skador', ['Skador']);
+// Läs befintliga skador från vyn och bygg lista
+const skadorRaw  = getColumnValue(viewRow, 'skador', ['Skador']);
 const skadorLista = Array.isArray(skadorRaw)
   ? skadorRaw
-  : (skadorRaw ?? '').split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+  : (skadorRaw ?? '')
+      .split(/[,\;\n]+/)
+      .map(s => s.trim())
+      .filter(Boolean);
 
-// Gör om till ExistingDamage-objekt (minsta fälten vi behöver för visningen)
-setExistingDamages(
-  skadorLista.map((name, i) => ({
-    id: `mabi-${i}`,
-    skadetyp: name,
-    plats: '',
-    notering: '',
-    fullText: name,
-  }))
-);
+// Fyll den lokala variabeln 'damages' (används senare)
+damages = skadorLista.map((name, i) => ({
+  setExistingDamages(damages.length ? damages : []);
+
+  id: `mabi-${i}`,
+  skadetyp: name,
+  plats: '',
+  notering: '',
+  fullText: name,
+}));
+
+setExistingDamages(damages.length ? damages : []);
 
 
 
