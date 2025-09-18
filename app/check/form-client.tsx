@@ -280,8 +280,8 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
   
   return null;
 };
-
-export default function CheckInForm() {
+type CheckInFormProps = { showTestButtons?: boolean };
+export default function CheckInForm({ showTestButtons = false }: CheckInFormProps) {
  // === Damage card state ===
 const [viewWheelStorage, setViewWheelStorage] = useState<string>('---');
 const [viewSaludatum, setViewSaludatum] = useState<string | null>(null);
@@ -1256,6 +1256,8 @@ const notifyQuality  = () => sendNotify('quality');
       alignItems: 'center',
     }}
   >
+{showTestButtons && (
+  <>
 <button
   type="button"
   onClick={() => canSend && sendNotify('quality')}
@@ -1286,6 +1288,8 @@ const notifyQuality  = () => sendNotify('quality');
 >
   {sendState === 'sending-station' ? 'Skickar…' : 'Skicka test till Station'}
 </button>
+  </>
+)}
 
 
 {!!sendMsg && (
