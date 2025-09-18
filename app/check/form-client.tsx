@@ -453,7 +453,7 @@ const [mabiResult, carResult] = await Promise.all([
   // Läs endast från VYN (kolumner som faktiskt finns)
   supabase
     .from('mabi_damage_view')
-    .select('regnr, saludatum, skador')
+.select('regnr, saludatum, skador, "Modell", "Märke/Modell", Bilmodell, brand_model, wheelstorage, "Hjulförvaring"')
     .eq('regnr', normalizedReg),
   supabase
     .from('car_data')
@@ -472,19 +472,33 @@ const [mabiResult, carResult] = await Promise.all([
 const viewRow: any = !mabiResult.error
   ? (Array.isArray(mabiResult.data) ? mabiResult.data[0] : mabiResult.data)
   : null;
-const brandModel = getColumnValue(viewRow, 'Modell', [
+
+// 1) Försök få modell från vyn
+const brandFromView = getColumnValue(viewRow, 'Modell', [
   'brand_model',
   'Bilmodell',
   'Märke/Modell',
   'modell',
-  'Model'
+  'Model',
 ]);
-setCarModel(brandModel || '');
+
+// 2) Fallback: hämta modell från car_data (senaste posten)
+const brandFromCar =
+  (Array.isArray(carResult.data) && carResult.data[0])
+    ? (carResult.data[0].brand_model ?? null)
+    : null;
+
+// 3) Välj det som finns och trimma
+const brandModel = (brandFromView ?? brandFromCar ?? '').toString().trim();
+
+// 4) In i state
+setCarModel(brandModel);
+
 
 
 useData = [{
   regnr: normalizedReg,
-  brand_model: getColumnValue(viewRow, 'Modell', ['brand_model']),
+brand_model: brandModel,
   damage_text: null,
   damage_location: null,
   damage_notes: null,
