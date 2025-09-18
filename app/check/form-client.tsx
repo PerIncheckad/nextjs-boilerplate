@@ -512,10 +512,10 @@ damages = skadorLista.map((name, i) => ({
   notering: '',
   fullText: name,
 }));
-console.log('DEBUG skadorLista:', skadorLista);
 
 // 6) Lägg in i state
 setExistingDamages(damages.length ? damages : []);
+
 
 
 
