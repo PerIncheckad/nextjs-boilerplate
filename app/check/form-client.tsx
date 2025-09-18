@@ -1309,8 +1309,7 @@ const notifyQuality  = () => sendNotify('quality');
   </span>
 )}
 
-  </div>
-)}
+
 
 
 
