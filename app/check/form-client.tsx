@@ -1243,6 +1243,7 @@ const notifyQuality  = () => sendNotify('quality');
       color: '#111827'
     }}>
 {TEST_MAIL && (
+{showTestButtons && (
   <div
     style={{
       maxWidth: '600px',
@@ -1256,7 +1257,6 @@ const notifyQuality  = () => sendNotify('quality');
       alignItems: 'center',
     }}
   >
-{showTestButtons && (
   <>
 <button
   type="button"
