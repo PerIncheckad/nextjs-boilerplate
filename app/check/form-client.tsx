@@ -472,6 +472,7 @@ const [mabiResult, carResult] = await Promise.all([
 const viewRow: any = !mabiResult.error
   ? (Array.isArray(mabiResult.data) ? mabiResult.data[0] : mabiResult.data)
   : null;
+console.log('DEBUG viewRow keys:', Object.keys(viewRow || {}));
 
 // 1) Försök få modell från vyn
 const brandFromView = getColumnValue(viewRow, 'Modell', [
@@ -501,6 +502,7 @@ const skadorLista = Array.isArray(skadorRaw)
       .split(/[,\;\n]+/)
       .map(s => s.trim())
       .filter(Boolean);
+console.log('DEBUG skadorRaw:', skadorRaw);
 
 // 5) Fyll den lokala variabeln 'damages' (används senare)
 damages = skadorLista.map((name, i) => ({
@@ -510,6 +512,7 @@ damages = skadorLista.map((name, i) => ({
   notering: '',
   fullText: name,
 }));
+console.log('DEBUG skadorLista:', skadorLista);
 
 // 6) Lägg in i state
 setExistingDamages(damages.length ? damages : []);
