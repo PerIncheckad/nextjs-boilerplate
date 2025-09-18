@@ -502,10 +502,8 @@ const skadorLista = Array.isArray(skadorRaw)
       .map(s => s.trim())
       .filter(Boolean);
 
-// Fyll den lokala variabeln 'damages' (används senare)
+// 5) Fyll den lokala variabeln 'damages' (används senare)
 damages = skadorLista.map((name, i) => ({
-  setExistingDamages(damages.length ? damages : []);
-
   id: `mabi-${i}`,
   skadetyp: name,
   plats: '',
@@ -513,7 +511,9 @@ damages = skadorLista.map((name, i) => ({
   fullText: name,
 }));
 
+// 6) Lägg in i state
 setExistingDamages(damages.length ? damages : []);
+
 
 
 
