@@ -453,8 +453,8 @@ const [mabiResult, carResult] = await Promise.all([
   // Läs endast från VYN (kolumner som faktiskt finns)
   supabase
     .from('mabi_damage_view')
-.select('regnr, saludatum, skador, "Modell", "Märke/Modell", Bilmodell, brand_model, wheelstorage, "Hjulförvaring"')
-    .eq('regnr', normalizedReg),
+.select('*')
+  .eq('regnr', normalizedReg),
   supabase
     .from('car_data')
     .select('*')
