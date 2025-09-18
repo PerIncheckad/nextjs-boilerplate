@@ -635,7 +635,7 @@ setExistingDamages(prev => (damages.length > 0 ? damages : prev));
     };
   }, [normalizedReg]);
 
-  const carModel = carData[0]?.brand_model || null;
+const carModelRaw = carData[0]?.brand_model || null;
 const carWheelStorage = carData[0]?.wheelstorage || null;
 const carSaludatum    = carData[0]?.saludatum   || null;
   const availableStations = ort ? STATIONER[ort] || [] : [];
