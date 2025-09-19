@@ -1110,7 +1110,6 @@ const MediaUpload = ({
     onMediaUpdate(damageId, e.target.files);
     // tillåt att välja samma fil igen
     e.currentTarget.value = '';
-  };
 
   return (
     <div style={{ marginBottom: '12px' }}>
