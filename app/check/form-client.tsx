@@ -5,22 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
-  // --- Inloggat förnamn baserat på e-post "fornamn.efternamn@mabi.se" ---
-const [firstName, setFirstName] = useState('');
 
-useEffect(() => {
-  (async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const email = user?.email || '';
-      const raw = (email.split('@')[0] || '').split('.')[0] || '';
-      const name = raw ? raw[0].toUpperCase() + raw.slice(1).toLowerCase() : 'du';
-      setFirstName(name);
-    } catch {
-      setFirstName('du');
-    }
-  })();
-}, []);
 useEffect(() => {
   const params = new URLSearchParams(window.location.search);
   const reg = params.get('reg');
@@ -299,6 +284,22 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 };
 type CheckInFormProps = { showTestButtons?: boolean };
 export default function CheckInForm({ showTestButtons = false }: CheckInFormProps) {
+    // --- Inloggat förnamn baserat på e-post "fornamn.efternamn@mabi.se" ---
+const [firstName, setFirstName] = useState('');
+
+useEffect(() => {
+  (async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email || '';
+      const raw = (email.split('@')[0] || '').split('.')[0] || '';
+      const name = raw ? raw[0].toUpperCase() + raw.slice(1).toLowerCase() : 'du';
+      setFirstName(name);
+    } catch {
+      setFirstName('du');
+    }
+  })();
+}, []);
  // === Damage card state ===
 const [viewWheelStorage, setViewWheelStorage] = useState<string>('---');
 const [viewSaludatum, setViewSaludatum] = useState<string | null>(null);
@@ -758,10 +759,12 @@ const existingOk =
     .filter(d => d.status !== 'not_selected')   // ignorera tomma/placeholder-rader
     .every(d => hasPhoto(d.media));
 
-// Ny skada: både foto och video krävs
-const newOk = damageToFix
-  ? (hasPhoto(damageToFix.media) && hasVideo(damageToFix.media))
-  : true; // ingen ny skada inskickad => godkänd del
+// Nya skador: både foto och video krävs för varje ny skada
+const newOk =
+  newDamages.length === 0
+    ? true
+    : newDamages.every(d => hasPhoto(d.media) && hasVideo(d.media));
+
 
 const damagesOk = existingOk && newOk;
     const statusOk = isStatusComplete();
@@ -1297,6 +1300,28 @@ return (
     color: '#111827'
   }}>
 
+
+
+
+
+
+
+{!!sendMsg && (
+  <span
+    style={{
+      marginLeft: 8,
+      fontSize: 12,
+      opacity: 0.95,
+      // grön vid OK, röd vid fel, annars standard
+      color:
+        sendState === 'ok'  ? '#167d00' :
+        sendState === 'fail' ? '#dc2626' :
+        '#111827',
+    }}
+  >
+    {sendMsg}
+  </span>
+)}
 {TEST_MAIL && showTestButtons && (
   <div
     style={{
@@ -1342,28 +1367,6 @@ return (
     </button>
   </div>
 )}
-
-
-
-
-
-{!!sendMsg && (
-  <span
-    style={{
-      marginLeft: 8,
-      fontSize: 12,
-      opacity: 0.95,
-      // grön vid OK, röd vid fel, annars standard
-      color:
-        sendState === 'ok'  ? '#167d00' :
-        sendState === 'fail' ? '#dc2626' :
-        '#111827',
-    }}
-  >
-    {sendMsg}
-  </span>
-)}
-
       <div style={{
         maxWidth: '600px',
         margin: '0 auto',
