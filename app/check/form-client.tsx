@@ -6,7 +6,23 @@ import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  // --- Inloggat förnamn baserat på e-post "fornamn.efternamn@mabi.se" ---
+const [firstName, setFirstName] = useState('');
+
+useEffect(() => {
+  (async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email || '';
+      const raw = (email.split('@')[0] || '').split('.')[0] || '';
+      const name = raw ? raw[0].toUpperCase() + raw.slice(1).toLowerCase() : 'du';
+      setFirstName(name);
+    } catch {
+      setFirstName('du');
+    }
+  })();
+}, []);
+process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
@@ -2800,7 +2816,7 @@ onBlur={(e) => {
               marginBottom: '12px',
               color: '#1f2937'
             }}>
-              Tack Bob!
+              Tack {firstName}!
             </h2>
             
             <p style={{
@@ -2874,7 +2890,7 @@ onBlur={(e) => {
               lineHeight: '1.6'
             }}>
               <p style={{ marginBottom: '16px', fontSize: '16px', fontWeight: '600' }}>
-                <strong>Bob</strong> checkar in: <strong>{regInput}</strong>
+                <strong>{firstName}</strong> checkar in: <strong>{regInput}</strong>
               </p>
               
               <div style={{ marginBottom: '12px' }}>
