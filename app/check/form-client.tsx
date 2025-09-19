@@ -2675,90 +2675,89 @@ onBlur={(e) => {
           )}
         </div>
 
-        {/* SPARA-KNAPP med förbättrad debugging */}
-        <div style={{ 
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          textAlign: 'center'
-        }}>
-          <button
-            type="button"
-            onClick={handleSave}
-            style={{
-              width: '100%',
-              padding: '18px',
-              backgroundColor: canSave() ? '#10b981' : '#6b7280',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '20px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              opacity: 1,
-              boxShadow: canSave() ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
-            }}
-          >
-            {canSave() ? 'Spara och checka in' : 'Visa saknade fält'}
-            {/* Knapprad: Spara (utkast) + Spara och checka in */}
-<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: 10 }}>
-  {/* Spara utkast */}
+{/* SPARA-KNAPP med förbättrad debugging */}
+<div style={{
+  backgroundColor: '#ffffff',
+  padding: '24px',
+  borderRadius: '12px',
+  marginBottom: '24px',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  textAlign: 'center'
+}}>
+  {/* Knapprad: Spara (utkast) + Spara och checka in */}
+  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: 10 }}>
+    {/* Spara utkast */}
+    <button
+      type="button"
+      onClick={saveDraft}
+      disabled={!regInput}
+      style={{
+        width: '100%',
+        padding: '16px',
+        background: regInput ? '#ffffff' : '#f3f4f6',
+        color: '#0b0b0b',
+        border: '1px solid #d1d5db',
+        borderRadius: '8px',
+        fontSize: '16px',
+        fontWeight: 600,
+        cursor: regInput ? 'pointer' : 'not-allowed',
+        boxShadow: 'none'
+      }}
+    >
+      Spara
+    </button>
+
+    {/* Spara och checka in (öppnar befintlig bekräftelsedialog) */}
+    <button
+      type="button"
+      onClick={() => setShowConfirmDialog(true)}
+      disabled={!canSave()}
+      style={{
+        width: '100%',
+        padding: '16px',
+        background: canSave() ? '#10a3e8' : '#9ca3af',
+        color: '#ffffff',
+        border: 'none',
+        borderRadius: '8px',
+        fontSize: '16px',
+        fontWeight: 700,
+        cursor: canSave() ? 'pointer' : 'not-allowed',
+        opacity: 1,
+        boxShadow: canSave() ? '0 4px 12px rgba(16, 163, 232, 0.3)' : 'none'
+      }}
+    >
+      Spara och checka in
+    </button>
+  </div>
+
+  {/* Avbryt */}
   <button
     type="button"
-    onClick={saveDraft}
-    disabled={!regInput}
+    onClick={() => {
+      if (confirm('Är du säker? Ny info kommer inte att sparas')) {
+        window.location.href = '/';
+      }
+    }}
     style={{
       width: '100%',
-      padding: '16px',
-      background: regInput ? '#ffffff' : '#f3f4f6',
+      padding: '12px',
+      marginTop: 8,
+      background: '#ffffff',
       color: '#0b0b0b',
       border: '1px solid #d1d5db',
       borderRadius: '8px',
-      fontSize: '16px',
-      fontWeight: 600,
-      cursor: regInput ? 'pointer' : 'not-allowed',
-      boxShadow: 'none'
+      fontSize: '14px',
+      cursor: 'pointer'
     }}
   >
-    Spara
+    Avbryt
   </button>
 
-  {/* Spara och checka in (öppnar din befintliga bekräftelsedialog) */}
-  <button
-    type="button"
-    onClick={() => setShowConfirmDialog(true)}
-    disabled={!canSave()}
-    style={{
-      width: '100%',
-      padding: '16px',
-      background: canSave() ? '#10a3e8' : '#9ca3af',
-      color: '#ffffff',
-      border: 'none',
-      borderRadius: '8px',
-      fontSize: '16px',
-      fontWeight: 700,
-      cursor: canSave() ? 'pointer' : 'not-allowed',
-      opacity: 1,
-      boxShadow: canSave() ? '0 4px 12px rgba(16, 163, 232, 0.3)' : 'none'
-    }}
-  >
-    Spara och checka in
-  </button>
+  <p style={{ textAlign: 'center', color: '#666', fontSize: '12px', margin: '16px 0 0' }}>
+    © Albarone AB 2025
+  </p>
 </div>
 
-          </button>
-          <p style={{ 
-            textAlign: 'center', 
-            color: '#666', 
-            fontSize: '12px', 
-            margin: '16px 0 0 0'
-          }}>
-            © Albarone AB 2025
-          </p>
-        </div>
-      </div>
 
       {/* ALLA BEKRÄFTELSEDIALOGER */}
       {showConfirmDialog && (
