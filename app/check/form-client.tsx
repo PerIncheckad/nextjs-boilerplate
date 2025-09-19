@@ -2675,62 +2675,27 @@ onBlur={(e) => {
           )}
         </div>
 
-{/* SPARA-KNAPP med förbättrad debugging */}
-<div style={{
-  backgroundColor: '#ffffff',
-  padding: '24px',
-  borderRadius: '12px',
-  marginBottom: '24px',
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  textAlign: 'center'
-}}>
-  {/* Knapprad: Spara (utkast) + Spara och checka in */}
+<div style={{ background: '#fff', padding: '24px', borderRadius: '12px', marginBottom: '24px' }}>
   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: 10 }}>
-    {/* Spara utkast */}
     <button
       type="button"
       onClick={saveDraft}
       disabled={!regInput}
-      style={{
-        width: '100%',
-        padding: '16px',
-        background: regInput ? '#ffffff' : '#f3f4f6',
-        color: '#0b0b0b',
-        border: '1px solid #d1d5db',
-        borderRadius: '8px',
-        fontSize: '16px',
-        fontWeight: 600,
-        cursor: regInput ? 'pointer' : 'not-allowed',
-        boxShadow: 'none'
-      }}
+      style={{ padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
     >
       Spara
     </button>
 
-    {/* Spara och checka in (öppnar befintlig bekräftelsedialog) */}
     <button
       type="button"
       onClick={() => setShowConfirmDialog(true)}
       disabled={!canSave()}
-      style={{
-        width: '100%',
-        padding: '16px',
-        background: canSave() ? '#10a3e8' : '#9ca3af',
-        color: '#ffffff',
-        border: 'none',
-        borderRadius: '8px',
-        fontSize: '16px',
-        fontWeight: 700,
-        cursor: canSave() ? 'pointer' : 'not-allowed',
-        opacity: 1,
-        boxShadow: canSave() ? '0 4px 12px rgba(16, 163, 232, 0.3)' : 'none'
-      }}
+      style={{ padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db' }}
     >
       Spara och checka in
     </button>
   </div>
 
-  {/* Avbryt */}
   <button
     type="button"
     onClick={() => {
@@ -2738,27 +2703,11 @@ onBlur={(e) => {
         window.location.href = '/';
       }
     }}
-    style={{
-      width: '100%',
-      padding: '12px',
-      marginTop: 8,
-      background: '#ffffff',
-      color: '#0b0b0b',
-      border: '1px solid #d1d5db',
-      borderRadius: '8px',
-      fontSize: '14px',
-      cursor: 'pointer'
-    }}
+    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #d1d5db' }}
   >
     Avbryt
   </button>
-
-  <p style={{ textAlign: 'center', color: '#666', fontSize: '12px', margin: '16px 0 0' }}>
-    © Albarone AB 2025
-  </p>
 </div>
-
-
       {/* ALLA BEKRÄFTELSEDIALOGER */}
       {showConfirmDialog && (
         <div style={{
