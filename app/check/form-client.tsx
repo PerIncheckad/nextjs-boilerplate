@@ -828,13 +828,12 @@ const damagesOk = existingOk && newOk;
     }
   };
 
-  const confirmFinalSave = async () => {
+const confirmFinalSave = async () => {
   console.log('Sparar incheckning...');
   setShowFinalConfirmation(false);
 
-  // --- Skicka två testmejl till Per ---
   try {
-    // Din karta använder 'NORR'|'MITT'|'SYD' – mappa till rätt skrift för mejlet
+    // Mappa din ORT_TILL_REGION ('NORR'|'MITT'|'SYD') till skrivsätt i mejlet
     const raw = (ORT_TILL_REGION?.[ort] || 'SYD').toString().toUpperCase();
     const region = raw === 'MITT' ? 'Mitt' : raw === 'NORR' ? 'Norr' : 'Syd';
 
@@ -853,7 +852,6 @@ const damagesOk = existingOk && newOk;
     console.error('Mail misslyckades (vi fortsätter ändå):', e);
   }
 
-  // --- Visa tack ---
   setShowSuccessModal(true);
 };
 
