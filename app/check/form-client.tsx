@@ -1,15 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
-const supabase = createClient(
-
-process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
   // --- Inloggat förnamn baserat på e-post "fornamn.efternamn@mabi.se" ---
 const [firstName, setFirstName] = useState('');
 
