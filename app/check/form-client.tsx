@@ -1204,6 +1204,9 @@ const MediaUpload = ({
           📁 Välj från galleri
         </label>
       </div>
+    </div>   {/* end: MediaUpload content wrapper */}
+  );         // end: return of MediaUpload
+};           // end: const MediaUpload = (...) => { ... }
 
 
 function buildNotifyPayload() {
