@@ -1231,8 +1231,13 @@ function buildNotifyPayload() {
 
   // 3) Härled flaggor
   // Byt variabelnamn om dina states heter annorlunda
-  const hasNewDamages = typeof damagesOk === 'boolean' ? !damagesOk : false;   // <— BYT vid behov
-  const needsRecond  = typeof cleaningOk === 'boolean' ? !cleaningOk : false;  // <— BYT vid behov
+ // Nya skador? (om du valt "nya skador" eller lagt in minst en ny skada)
+const hasNewDamages = skadekontroll === 'nya_skador' || newDamages.length > 0;
+
+// Behöver rekond/tvätt? (om inte uttryckligen rent)
+const needsRecond =
+  tvatt !== 'behover_inte_tvattas' || inre === 'behover_rengoras_inuti';
+
 
   return {
     regnr: normalizeReg(regInput || ''),
