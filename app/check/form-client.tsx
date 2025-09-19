@@ -1244,16 +1244,10 @@ function buildNotifyPayload() {
   } as const;
 }
 
-// ← här ska det vara tom rad, och sedan fortsätter filen
 // --- Steg 3: Hjälpare för att skicka notifiering ---
-// Välj mottagare (just nu kör vi bara testadressen)
-
-
-
-
-async function sendNotify(target: 'station' | 'quality') {
+const sendNotify = async (target: 'station' | 'quality') => {
   try {
-    // 1) Visa "skickar..."-status direkt
+    // 1) Visa "skickar..." direkt
     if (target === 'station') {
       setSendState('sending-station');
       setSendMsg('Skickar till station…');
@@ -1275,36 +1269,28 @@ async function sendNotify(target: 'station' | 'quality') {
       setSendMsg('Notis skickad ✅');
     } else {
       setSendState('fail');
-      setSendMsg('Kunde inte skicka ✖️');
+      setSendMsg('Kunde inte skicka ❌');
     }
   } catch (err) {
     console.error('notify fail', err);
     setSendState('fail');
-    setSendMsg('Kunde inte skicka ✖️');
+    setSendMsg('Kunde inte skicka ❌');
   } finally {
-    // 5) Städa efter ~4 sek (ta bort meddelande och gå tillbaka till idle)
+    // 5) Städning efter ~4s
     setTimeout(() => setSendMsg(''), 4000);
     setTimeout(() => setSendState('idle'), 4000);
   }
-}
+}; // <— VIKTIGT: semikolon här, eftersom det är en const-funktion
 
 // Små wrappers – enkla att koppla på knappar
-const notifyStation  = () => sendNotify('station');
-const notifyQuality  = () => sendNotify('quality');
-const canSend        = isRegComplete() && isLocationComplete();
+const notifyStation = () => sendNotify('station');
+const notifyQuality = () => sendNotify('quality');
+const canSend = isRegComplete() && isLocationComplete();
 
+// Top-level return för komponenten
 return (
-  <div style={{
-    minHeight: '100vh',
-    backgroundColor: '#f8fafc',
-    color: '#111827'
-  }}>
-
-
-
-
-
-
+  <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
+    {/* …här börjar din befintliga JSX-innehåll… */}
 
 {!!sendMsg && (
   <span
