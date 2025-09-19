@@ -1280,7 +1280,7 @@ const sendNotify = async (target: 'station' | 'quality') => {
     setTimeout(() => setSendMsg(''), 4000);
     setTimeout(() => setSendState('idle'), 4000);
   }
-}; // <— VIKTIGT: semikolon här, eftersom det är en const-funktion
+}; // ⬅⬅ VIKTIGT: semikolon här, eftersom detta är en const-funktion
 
 // Små wrappers – enkla att koppla på knappar
 const notifyStation = () => sendNotify('station');
