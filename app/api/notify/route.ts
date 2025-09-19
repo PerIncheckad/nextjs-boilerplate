@@ -1,30 +1,48 @@
-// app/api/notify/route.ts
 import { NextResponse } from 'next/server';
 
-const FROM = process.env.MAIL_FROM || 'no-reply@incheckad.se';
-const RESEND = process.env.RESEND_API_KEY; // valfritt – om den saknas blir det dry-run
+type MailPayload = {
+  to?: string;
+  region?: 'Syd' | 'Mitt' | 'Norr';
+  subjectBase?: string;     // valfritt
+  htmlBody?: string;        // valfritt
+};
 
 export async function POST(req: Request) {
-  const { to, subject, html } = await req.json();
+  const body = (await req.json()) as MailPayload;
 
-  if (!Array.isArray(to) || to.length === 0) {
-    return NextResponse.json({ ok: false, error: 'Missing recipients' }, { status: 400 });
+  const to = body.to ?? 'per.andersson@mabi.se';
+  const region = body.region ?? 'Syd';
+
+  // Två olika hälsningar som du önskat:
+  const msg1 = {
+    subject: (body.subjectBase ?? 'Incheckning') + ' – Bilkontroll',
+    html: `<p>Hej Bilkontroll!</p>${body.htmlBody ?? ''}`,
+  };
+
+  const msg2 = {
+    subject: (body.subjectBase ?? 'Incheckning') + ` – Region ${region}`,
+    html: `<p>Hej Region ${region}!</p>${body.htmlBody ?? ''}`,
+  };
+
+  // Enkelt mailskick: om RESEND_API_KEY finns använder vi Resend, annars mock-loggar vi.
+  try {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.log('[MOCK MAIL]', { to, msg1, msg2 });
+      return NextResponse.json({ ok: true, mocked: true });
+    }
+
+    // Dynamisk import för att undvika bundling när nyckel saknas
+    const { Resend } = await import('resend');
+    const resend = new Resend(apiKey);
+
+    const from = 'no-reply@incheckad.se'; // ändra om du vill (helst domänverifierad)
+    await resend.emails.send({ from, to, subject: msg1.subject, html: msg1.html });
+    await resend.emails.send({ from, to, subject: msg2.subject, html: msg2.html });
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error('Mail error:', err);
+    return NextResponse.json({ ok: false, error: 'MAIL_SEND_FAILED' }, { status: 500 });
   }
-
-  if (!RESEND) {
-    console.log('[EMAIL DRY-RUN]', { from: FROM, to, subject });
-    return NextResponse.json({ ok: true, dryRun: true });
-  }
-
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from: FROM, to, subject, html }),
-  });
-
-  const out = await res.json();
-  return NextResponse.json(out, { status: res.ok ? 200 : 500 });
 }
