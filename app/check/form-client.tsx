@@ -827,6 +827,21 @@ const damagesOk = existingOk && newOk;
       }, 100);
     }
   };
+const saveDraft = async () => {
+  const reg = (regInput || '').toUpperCase().trim();
+  if (!reg) { alert('Ange registreringsnummer först.'); return; }
+
+  try {
+    const { error } = await supabase
+      .from('checkin_drafts')
+      .upsert({ regnr: reg, data: {} }); // vi börjar minimalt
+    if (error) throw error;
+    alert('Utkast sparat.');
+  } catch (e) {
+    console.error(e);
+    alert('Kunde inte spara utkast.');
+  }
+};
 
 const confirmFinalSave = async () => {
   console.log('Sparar incheckning...');
@@ -2686,7 +2701,53 @@ onBlur={(e) => {
               boxShadow: canSave() ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none'
             }}
           >
-            {canSave() ? 'Spara incheckning' : 'Visa saknade fält'}
+            {canSave() ? 'Spara och checka in' : 'Visa saknade fält'}
+            {/* Knapprad: Spara (utkast) + Spara och checka in */}
+<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: 10 }}>
+  {/* Spara utkast */}
+  <button
+    type="button"
+    onClick={saveDraft}
+    disabled={!regInput}
+    style={{
+      width: '100%',
+      padding: '16px',
+      background: regInput ? '#ffffff' : '#f3f4f6',
+      color: '#0b0b0b',
+      border: '1px solid #d1d5db',
+      borderRadius: '8px',
+      fontSize: '16px',
+      fontWeight: 600,
+      cursor: regInput ? 'pointer' : 'not-allowed',
+      boxShadow: 'none'
+    }}
+  >
+    Spara
+  </button>
+
+  {/* Spara och checka in (öppnar din befintliga bekräftelsedialog) */}
+  <button
+    type="button"
+    onClick={() => setShowConfirmDialog(true)}
+    disabled={!canSave()}
+    style={{
+      width: '100%',
+      padding: '16px',
+      background: canSave() ? '#10a3e8' : '#9ca3af',
+      color: '#ffffff',
+      border: 'none',
+      borderRadius: '8px',
+      fontSize: '16px',
+      fontWeight: 700,
+      cursor: canSave() ? 'pointer' : 'not-allowed',
+      opacity: 1,
+      boxShadow: canSave() ? '0 4px 12px rgba(16, 163, 232, 0.3)' : 'none'
+    }}
+  >
+    Spara och checka in
+  </button>
+</div>
+
           </button>
           <p style={{ 
             textAlign: 'center', 
