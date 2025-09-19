@@ -827,11 +827,35 @@ const damagesOk = existingOk && newOk;
     }
   };
 
-  const confirmFinalSave = () => {
-    console.log('Sparar incheckning...');
-    setShowFinalConfirmation(false);
-    setShowSuccessModal(true);
-  };
+  const confirmFinalSave = async () => {
+  console.log('Sparar incheckning...');
+  setShowFinalConfirmation(false);
+
+  // --- Skicka två testmejl till Per ---
+  try {
+    // Din karta använder 'NORR'|'MITT'|'SYD' – mappa till rätt skrift för mejlet
+    const raw = (ORT_TILL_REGION?.[ort] || 'SYD').toString().toUpperCase();
+    const region = raw === 'MITT' ? 'Mitt' : raw === 'NORR' ? 'Norr' : 'Syd';
+
+    const regForMail = String(regInput || '').toUpperCase();
+
+    await notifyCheckin({
+      subjectBase: regForMail ? `Incheckning ${regForMail}` : 'Incheckning',
+      regnr: regForMail,
+      region,
+      htmlBody: `
+        <p>Reg.nr: <b>${regForMail || '—'}</b></p>
+        <p>Ort/Station: ${ort || '—'} / ${station || '—'}</p>
+      `
+    });
+  } catch (e) {
+    console.error('Mail misslyckades (vi fortsätter ändå):', e);
+  }
+
+  // --- Visa tack ---
+  setShowSuccessModal(true);
+};
+
 
   // Autocomplete från 2 tecken
   const handleRegInputChange = (value: string) => {
