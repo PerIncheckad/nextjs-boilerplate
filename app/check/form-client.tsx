@@ -21,6 +21,12 @@ useEffect(() => {
     }
   })();
 }, []);
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const reg = params.get('reg');
+  if (reg) setRegInput(reg.toUpperCase());
+}, []);
+
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
   Falkenberg: 'NORR',
