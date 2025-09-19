@@ -19,6 +19,21 @@ export default function HomePage() {
         >
           Ny incheckning
         </a>
+        <a
+  href="/check/drafts"
+  style={{
+    display: 'inline-block',
+    marginTop: 12,
+    padding: '8px 14px',
+    border: '1px solid #d1d5db',
+    borderRadius: 6,
+    textDecoration: 'none',
+    color: '#e5e7eb'
+  }}
+>
+  Fortsätt påbörjad incheckning
+</a>
+
       </div>
     </main>
   );
