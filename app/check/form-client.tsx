@@ -6,6 +6,10 @@ import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
 const supabase = createClient(
+
+process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
   // --- Inloggat förnamn baserat på e-post "fornamn.efternamn@mabi.se" ---
 const [firstName, setFirstName] = useState('');
 
@@ -22,10 +26,6 @@ useEffect(() => {
     }
   })();
 }, []);
-process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
   Falkenberg: 'NORR',
