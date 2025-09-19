@@ -1283,7 +1283,7 @@ async function sendNotify(target: 'station' | 'quality') {
     setTimeout(() => setSendMsg(''), 4000);
     setTimeout(() => setSendState('idle'), 4000);
   }
-}
+};
 
 // Små wrappers – enkla att koppla på knappar
 const notifyStation  = () => sendNotify('station');
