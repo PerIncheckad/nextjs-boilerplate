@@ -6,12 +6,6 @@ import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const reg = params.get('reg');
-  if (reg) setRegInput(reg.toUpperCase());
-}, []);
-
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
   Falkenberg: 'NORR',
@@ -342,6 +336,12 @@ async function lookupDamages(regInput: string) {
 
  // State för registreringsnummer och bildata
   const [regInput, setRegInput] = useState('');
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const reg = params.get('reg');
+  if (reg) setRegInput(reg.toUpperCase());
+}, []);
+
   const [carData, setCarData] = useState<CarData[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
