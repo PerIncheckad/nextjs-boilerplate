@@ -1206,19 +1206,7 @@ const MediaUpload = ({
         </label>
       </div>
 
-      {/* Meddelande */}
-      {(!hasImage || (!hasVideo && videoRequired)) && (
-        <p style={{ color: '#dc2626', fontSize: 12, marginTop: 4 }}>
-          {!hasImage
-            ? 'Foto är obligatoriskt.'
-            : videoRequired
-            ? 'Video är obligatoriskt.'
-            : 'Video är valfritt för befintliga skador.'}
-        </p>
-      )}
-    </div>
-  );
-};
+
 function buildNotifyPayload() {
   // 1) Region
   const region =
