@@ -1283,9 +1283,9 @@ const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
 
 // Top-level return för komponenten
+;
 return (
 <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
-    {/* …här börjar din befintliga JSX-innehåll… */}
 
 {!!sendMsg && (
   <span
@@ -2993,8 +2993,6 @@ onBlur={(e) => {
           </div>
         </div>
       )}
-    </div>
-  );         // ← lägg DENNA rad direkt under (blir ~2997)
-}          // ← den här klamern som redan finns stänger funktionen
-  );
+</div>
+);
 }
