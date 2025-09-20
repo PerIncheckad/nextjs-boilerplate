@@ -1283,9 +1283,9 @@ const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
 
 // Top-level return för komponenten
-;
+
 return (
-<div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
+return <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
 
 {!!sendMsg && (
   <span
@@ -2994,5 +2994,5 @@ onBlur={(e) => {
         </div>
       )}
 </div>
-);
+;
 }
