@@ -1285,7 +1285,7 @@ const canSend = isRegComplete() && isLocationComplete();
 // Top-level return för komponenten
 
 return (
-return <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
+  <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
 
 {!!sendMsg && (
   <span
@@ -2994,5 +2994,5 @@ onBlur={(e) => {
         </div>
       )}
 </div>
-;
+  );
 }
