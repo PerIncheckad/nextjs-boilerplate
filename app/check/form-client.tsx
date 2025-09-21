@@ -1708,16 +1708,7 @@ return (
                     </p>
                     {/* Här kommer MediaUpload-komponenten senare */}
 <MediaUpload
-  <div style={{ 
-        padding: '16px', 
-        backgroundColor: '#fef2f2', 
-        borderRadius: '8px',
-        marginBottom: '24px'
-      }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 'bold' }}>
-          <input type="checkbox" /> ⚠️ Bilen behöver rekond
-        </label>
-      </div>
+
                       damageId={damage.id}
                       isOld={true}
                       onMediaUpdate={updateExistingDamageMedia}
@@ -1759,6 +1750,12 @@ return (
                           </div>
                         ))}
                       </div>
+  <div style={{ marginBottom: '12px' }}>
+                    <label>Typ av skada</label>
+                    <select style={{ width: '100%', padding: '8px' }}>
+                      <option>Välj typ</option>
+                    </select>
+                  </div>
                     )}
                   </div>
                 )}
