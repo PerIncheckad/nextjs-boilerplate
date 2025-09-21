@@ -765,7 +765,11 @@ const newOk =
     ? true
     : newDamages.every(d => hasPhoto(d.media) && hasVideo(d.media));
 
-
+const isStatusComplete = () => {
+  const statusSet = String(uthyrningsstatus ?? '').trim().length > 0;
+  // Kommentarer är frivilligt
+  return statusSet;
+};
 const damagesOk = existingOk && newOk;
     const statusOk = isStatusComplete();
     
@@ -2117,7 +2121,7 @@ return (
 
         <div style={{ marginBottom: '16px' }}>
           <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-            Status *
+            Kommentarer (frivilligt)
           </label>
           <textarea
             value={preliminarAvslutNotering || ''}
