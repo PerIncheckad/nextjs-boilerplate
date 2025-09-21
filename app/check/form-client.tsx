@@ -976,35 +976,8 @@ const confirmFinalSave = async () => {
     
     if (checkinError) throw checkinError;
     
-    // Spara skador om de finns
-    if (checkin && checkin.id) {
 // Befintliga dokumenterade skador
       for (const damage of documentedExisting) {
-        const photoUrls = [];
-        const videoUrls = [];
-        
-        // Ladda upp media
-        if (damage.media) {
-          for (const mediaFile of damage.media) {
-            const fileName = `${checkin.id}-${Date.now()}-${mediaFile.file.name}`;
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('damage-photos')
-              .upload(fileName, mediaFile.file);
-            
-            if (!uploadError && uploadData) {
-              const { data: { publicUrl } } = supabase.storage
-                .from('damage-photos')
-                .getPublicUrl(fileName);
-              
-              if (mediaFile.type === 'image') {
-                photoUrls.push(publicUrl);
-              } else {
-                videoUrls.push(publicUrl);
-              }
-            }
-          }
-        }
-        
         await supabase.from('checkin_damages').insert({
           checkin_id: checkin.id,
           type: 'existing',
@@ -1012,36 +985,13 @@ const confirmFinalSave = async () => {
           car_part: damage.userCarPart,
           position: damage.userPosition,
           description: damage.userDescription,
-          photo_urls: photoUrls,
-          video_urls: videoUrls
+          photo_urls: [],  // Tom array för nu
+          video_urls: []   // Tom array för nu
         });
       }
       
       // Nya skador
       for (const damage of newDamages) {
-        const photoUrls = [];
-        const videoUrls = [];
-        
-        // Ladda upp media
-        for (const mediaFile of damage.media) {
-          const fileName = `${checkin.id}-${Date.now()}-${mediaFile.file.name}`;
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('damage-photos')
-            .upload(fileName, mediaFile.file);
-          
-          if (!uploadError && uploadData) {
-            const { data: { publicUrl } } = supabase.storage
-              .from('damage-photos')
-              .getPublicUrl(fileName);
-            
-            if (mediaFile.type === 'image') {
-              photoUrls.push(publicUrl);
-            } else {
-              videoUrls.push(publicUrl);
-            }
-          }
-        }
-        
         await supabase.from('checkin_damages').insert({
           checkin_id: checkin.id,
           type: 'new',
@@ -1049,8 +999,8 @@ const confirmFinalSave = async () => {
           car_part: damage.carPart,
           position: damage.position,
           description: damage.text,
-          photo_urls: photoUrls,
-          video_urls: videoUrls
+          photo_urls: [],  // Tom array för nu
+          video_urls: []   // Tom array för nu
         });
       }
 
