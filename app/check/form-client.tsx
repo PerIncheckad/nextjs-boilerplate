@@ -1719,21 +1719,6 @@ return (
                   >
                     {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
                   </button>
-                  <button
-                  onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: damage.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
-                    color: damage.status === 'fixed' ? '#ffffff' : '#374151',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    marginLeft: '8px'
-                  }}
-                >
-                  {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
-                </button>
-                </div>
 
                 {damage.status === 'documented' && (
                   <div style={{ marginTop: '12px' }}>
