@@ -853,27 +853,100 @@ const saveDraft = async () => {
 const confirmFinalSave = async () => {
   console.log('Sparar incheckning...');
   setShowFinalConfirmation(false);
-
+  
   try {
-    // Mappa din ORT_TILL_REGION ('NORR'|'MITT'|'SYD') till skrivsätt i mejlet
+    // Bestäm region
     const raw = (ORT_TILL_REGION?.[ort] || 'SYD').toString().toUpperCase();
     const region = raw === 'MITT' ? 'Mitt' : raw === 'NORR' ? 'Norr' : 'Syd';
-
     const regForMail = String(regInput || '').toUpperCase();
-
-    await notifyCheckin({
-      subjectBase: regForMail ? `Incheckning ${regForMail}` : 'Incheckning',
-      regnr: regForMail,
-      region,
-      htmlBody: `
-        <p>Reg.nr: <b>${regForMail || '—'}</b></p>
-        <p>Ort/Station: ${ort || '—'} / ${station || '—'}</p>
-      `
-    });
+    
+    // Kontrollera om mejl ska skickas
+    const hasNewDamages = skadekontroll === 'nya_skador' && newDamages.length > 0;
+    const needsRecond = tvatt !== 'behover_inte_tvattas' || inre === 'behover_rengoras_inuti';
+    const hasIssues = !insynsskydd || spolarvatska === false || (drivmedelstyp === 'bensin_diesel' && adblue === false);
+    
+    // Dokumenterade befintliga skador (första gången de dokumenteras)
+    const documentedExisting = existingDamages.filter(d => d.status === 'documented');
+    const hasNewlyDocumented = documentedExisting.length > 0;
+    
+    // Skicka till Bilkontroll ENDAST om:
+    // - Nya skador finns
+    // - Befintliga skador dokumenterats (första gången)
+    // - Behöver rekond
+    // - Avvikelser finns
+    const sendToBilkontroll = hasNewDamages || hasNewlyDocumented || needsRecond || hasIssues;
+    
+    // Skicka till Station om nya skador eller rekond behövs
+    const sendToStation = hasNewDamages || needsRecond;
+    
+    // Bygg mejlinnehåll
+    const htmlBody = `
+      <h2>Incheckning ${regForMail}</h2>
+      <p><b>Bilmodell:</b> ${carModel || 'Okänd'}</p>
+      <p><b>Ort/Station:</b> ${ort} / ${station}</p>
+      <p><b>Incheckare:</b> ${firstName}</p>
+      <p><b>Mätarställning:</b> ${matarstallning} km</p>
+      
+      <h3>Tankstatus</h3>
+      <p>${drivmedelstyp === 'elbil' 
+        ? `Laddning: ${laddniva}%` 
+        : `Tank: ${tankniva === 'fulltankad' ? 'Fulltankad' : 
+            tankniva === 'pafylld_nu' ? `Påfylld ${liters}L ${bransletyp} (${literpris} kr/L)` : 
+            'Tankas senare'}`}</p>
+      
+      ${hasNewlyDocumented ? `
+        <h3>Befintliga skador (nyligen dokumenterade)</h3>
+        <ul>
+          ${documentedExisting.map(d => `
+            <li>${d.userType || d.fullText} - ${d.userCarPart || ''} ${d.userPosition || ''}</li>
+          `).join('')}
+        </ul>
+      ` : ''}
+      
+      ${hasNewDamages ? `
+        <h3>NYA SKADOR</h3>
+        <ul>
+          ${newDamages.map(d => `
+            <li><b>${d.type}</b> - ${d.carPart} ${d.position} - ${d.text}</li>
+          `).join('')}
+        </ul>
+      ` : ''}
+      
+      ${needsRecond ? '<p><b>⚠️ BEHÖVER REKOND/TVÄTT</b></p>' : ''}
+      ${hasIssues ? '<p><b>⚠️ AVVIKELSER: Kontrollera insynsskydd/vätskor</b></p>' : ''}
+      
+      <p><b>Kommentarer:</b> ${preliminarAvslutNotering || 'Inga'}</p>
+    `;
+    
+    // Skicka mejl baserat på logiken
+    if (sendToBilkontroll) {
+      await notifyCheckin({
+        subjectBase: `Bilkontroll: ${regForMail}`,
+        regnr: regForMail,
+        region,
+        htmlBody,
+        recipients: [BILKONTROLL_MAIL]
+      });
+    }
+    
+    if (sendToStation) {
+      await notifyCheckin({
+        subjectBase: `Station: ${regForMail} - Åtgärd krävs`,
+        regnr: regForMail,
+        region,
+        htmlBody,
+        recipients: [TEST_MAIL] // Senare: recipientsFor(region, 'station')
+      });
+    }
+    
+    // TODO: Spara all data till Supabase här
+    
   } catch (e) {
-    console.error('Mail misslyckades (vi fortsätter ändå):', e);
+    console.error('Fel vid sparande:', e);
+    alert('Något gick fel vid sparandet.');
+    return;
   }
-
+  
   setShowSuccessModal(true);
 };
 
