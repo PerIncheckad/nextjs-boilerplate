@@ -1750,12 +1750,6 @@ return (
                           </div>
                         ))}
                       </div>
-  <div style={{ marginBottom: '12px' }}>
-                    <label>Typ av skada</label>
-                    <select style={{ width: '100%', padding: '8px' }}>
-                      <option>Välj typ</option>
-                    </select>
-                  </div>
                     )}
                   </div>
                 )}
