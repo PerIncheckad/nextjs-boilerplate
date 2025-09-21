@@ -1307,15 +1307,16 @@ return (
       fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
 {/* 1. REGISTRERINGSNUMMER */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        padding: '24px',
-        borderRadius: '12px',
-        marginBottom: '24px',
-        marginTop: '24px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
-      }}>
+<div style={{
+  backgroundColor: '#ffffff',
+  padding: '24px',
+  borderRadius: '12px',
+  marginBottom: '24px',
+  marginTop: '24px',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  position: 'relative',
+  border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
+}}>
         <h2 style={{
           fontSize: '22px',
           fontWeight: '700',
@@ -1349,6 +1350,38 @@ return (
             letterSpacing: '2px'
           }}
         />
+        {showSuggestions && suggestions.length > 0 && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '6px',
+            marginTop: '4px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            zIndex: 10
+          }}>
+            {suggestions.map(suggestion => (
+              <div
+                key={suggestion}
+                onClick={() => selectSuggestion(suggestion)}
+                style={{
+                  padding: '10px 14px',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid #f3f4f6',
+                  fontSize: '16px',
+                  fontWeight: '500'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+              >
+                {suggestion}
+              </div>
+            ))}
+          </div>
+        )}
       </div>    </div>
     {/* 2. PLATS FÖR INCHECKNING */}
       <div style={{
