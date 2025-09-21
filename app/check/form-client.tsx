@@ -1483,54 +1483,7 @@ return (
           </div>
         </div>
       </div>
-<div style={{
-        backgroundColor: '#ffffff',
-        padding: '24px',
-        borderRadius: '12px',
-        marginBottom: '24px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-      }}>
-        <h2>Utrustning</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="checkbox" checked={insynsskydd === true} onChange={(e) => setInsynsskydd(e.target.checked)} />
-            Insynsskydd
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="checkbox" />
-            Isskrapa
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="checkbox" />
-            Varningstriangel  
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="checkbox" />
-            Klistermärke djur
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input type="checkbox" />
-            Klistermärke rökning
-          </label>
-        </div>
-      </div>
-      <div style={{
-        backgroundColor: '#ffffff',
-        padding: '24px',
-        borderRadius: '12px',
-        marginBottom: '24px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-      }}>
-        <h2>Tvatt och Rekond</h2>
-        <div>
-          <label>
-            <input type="checkbox" /> Tvattad
-          </label>
-          <label>
-            <input type="checkbox" /> Behover rekond
-          </label>
-        </div>
-      </div>
+
     <div style={{
         backgroundColor: '#ffffff',
         padding: '24px',
@@ -1560,7 +1513,7 @@ return (
         
         <div style={{ marginBottom: '16px' }}>
           <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-            Hjultyp *
+            Hjul som sitter på *
           </label>
           <select
             value={hjultyp || ''}
@@ -1835,7 +1788,7 @@ return (
               checked={skadekontroll === 'nya_skador'}
               onChange={() => setSkadekontroll('nya_skador')}
             />
-            Nya skador att rapportera
+            Nya skador
           </label>
         </div>
 
