@@ -1423,7 +1423,6 @@ return (
         </div>
       </div>
   </div>
-  {/* 3. UTRUSTNING */}
       <div style={{
         backgroundColor: '#ffffff',
         padding: '24px',
