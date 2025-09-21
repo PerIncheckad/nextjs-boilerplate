@@ -1592,6 +1592,26 @@ return (
             </div>
 
             {tankniva === 'pafylld_nu' && (
+            <div style={{ marginBottom: '16px' }}>
+  <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+    Bränsletyp *
+  </label>
+  <select
+    value={bransletyp || ''}
+    onChange={(e) => setBransletyp(e.target.value as 'Bensin' | 'Diesel')}
+    style={{
+      width: '100%',
+      padding: '12px',
+      border: '1px solid #e5e7eb',
+      borderRadius: '6px',
+      fontSize: '16px'
+    }}
+  >
+    <option value="">Välj bränsletyp</option>
+    <option value="Bensin">Bensin</option>
+    <option value="Diesel">Diesel</option>
+  </select>
+</div>
               <>
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
