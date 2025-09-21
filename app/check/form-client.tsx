@@ -1592,26 +1592,6 @@ return (
             </div>
 
             {tankniva === 'pafylld_nu' && (
-            <div style={{ marginBottom: '16px' }}>
-  <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-    Bränsletyp *
-  </label>
-  <select
-    value={bransletyp || ''}
-    onChange={(e) => setBransletyp(e.target.value as 'Bensin' | 'Diesel')}
-    style={{
-      width: '100%',
-      padding: '12px',
-      border: '1px solid #e5e7eb',
-      borderRadius: '6px',
-      fontSize: '16px'
-    }}
-  >
-    <option value="">Välj bränsletyp</option>
-    <option value="Bensin">Bensin</option>
-    <option value="Diesel">Diesel</option>
-  </select>
-</div>
               <>
                 <div style={{ marginBottom: '16px' }}>
                   <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
@@ -1719,6 +1699,21 @@ return (
                   >
                     {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
                   </button>
+                  <button
+                  onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: damage.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
+                    color: damage.status === 'fixed' ? '#ffffff' : '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    marginLeft: '8px'
+                  }}
+                >
+                  {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+                </button>
+                </div>
 
                 {damage.status === 'documented' && (
                   <div style={{ marginTop: '12px' }}>
