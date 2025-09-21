@@ -1350,7 +1350,79 @@ return (
             letterSpacing: '2px'
           }}
         />
-      </div>    </div>
-  </div>
+{/* 2. PLATS FÖR INCHECKNING */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '2px solid transparent'
+      }}>
+        <h2 style={{
+          fontSize: '22px',
+          fontWeight: '700',
+          marginBottom: '20px',
+          color: '#1f2937',
+          textTransform: 'uppercase',
+          borderBottom: '2px solid #e5e7eb',
+          paddingBottom: '12px'
+        }}>
+          Plats för incheckning
+        </h2>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Ort *
+            </label>
+            <select
+              value={ort}
+              onChange={(e) => {
+                setOrt(e.target.value);
+                setStation('');
+              }}
+              disabled={annanPlats}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: showFieldErrors && !ort && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                borderRadius: '6px',
+                fontSize: '16px',
+                backgroundColor: annanPlats ? '#f9fafb' : '#ffffff',
+                opacity: annanPlats ? 0.6 : 1
+              }}
+            >
+              <option value="">Välj ort</option>
+              {ORTER.map(ortOption => (
+                <option key={ortOption} value={ortOption}>{ortOption}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+              Station *
+            </label>
+            <select
+              value={station}
+              onChange={(e) => setStation(e.target.value)}
+              disabled={!ort || annanPlats}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: showFieldErrors && !station && !annanPlats ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                borderRadius: '6px',
+                fontSize: '16px',
+                backgroundColor: (ort && !annanPlats) ? '#ffffff' : '#f9fafb',
+                opacity: (ort && !annanPlats) ? 1 : 0.6
+              }}
+            >
+              <option value="">Välj station</option>
+              {availableStations.map(stationOption => (
+                <option key={stationOption} value={stationOption}>{stationOption}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>  </div>
 );
 }
