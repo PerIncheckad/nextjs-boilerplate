@@ -1686,6 +1686,66 @@ return (
         )}
       </div>
     <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2>Befintliga skador</h2>
+        
+        {existingDamages && existingDamages.length > 0 ? (
+          <div>
+            <p style={{ marginBottom: '16px', color: '#6b7280' }}>
+              Dessa skador finns redan registrerade. Dokumentera dem med foto.
+            </p>
+            {existingDamages.map((damage) => (
+              <div key={damage.id} style={{
+                padding: '16px',
+                marginBottom: '12px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '8px',
+                backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: '8px' }}>
+                  {damage.fullText || damage.shortText}
+                </div>
+                
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                  <button
+                    onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
+                      color: damage.status === 'documented' ? '#ffffff' : '#374151',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
+                  </button>
+                </div>
+
+                {damage.status === 'documented' && (
+                  <div style={{ marginTop: '12px' }}>
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+                      Foto krävs, video frivilligt
+                    </p>
+                    {/* Här kommer MediaUpload-komponenten senare */}
+                    <div style={{ padding: '12px', border: '2px dashed #10b981', borderRadius: '6px' }}>
+                      Bilduppladdning kommer här
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: '#6b7280' }}>Inga befintliga skador registrerade för detta fordon.</p>
+        )}
+      </div>
+    <div style={{
         marginTop: '40px',
         paddingTop: '24px',
         borderTop: '2px solid #e5e7eb',
