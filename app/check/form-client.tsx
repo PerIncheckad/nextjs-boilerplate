@@ -1559,6 +1559,133 @@ return (
         </div>
       </div>
     <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2>Tankning/Laddning</h2>
+        
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+            Drivmedelstyp *
+          </label>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="radio"
+                name="drivmedel"
+                checked={drivmedelstyp === 'bensin_diesel'}
+                onChange={() => setDrivmedelstyp('bensin_diesel')}
+              />
+              Bensin/Diesel
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="radio"
+                name="drivmedel"
+                checked={drivmedelstyp === 'elbil'}
+                onChange={() => setDrivmedelstyp('elbil')}
+              />
+              Elbil
+            </label>
+          </div>
+        </div>
+
+        {drivmedelstyp === 'bensin_diesel' && (
+          <div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                Tankstatus *
+              </label>
+              <select
+                value={tankniva || ''}
+                onChange={(e) => setTankniva(e.target.value as any)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  fontSize: '16px'
+                }}
+              >
+                <option value="">Välj tankstatus</option>
+                <option value="fulltankad">Fulltankad</option>
+                <option value="tankas_senare">Tankas senare</option>
+                <option value="pafylld_nu">Påfylld nu</option>
+              </select>
+            </div>
+
+            {tankniva === 'pafylld_nu' && (
+              <>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                    Antal liter *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={liters}
+                    onChange={(e) => setLiters(e.target.value)}
+                    placeholder="0.0"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '16px'
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: '16px' }}>
+                  <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                    Literpris *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={literpris}
+                    onChange={(e) => setLiterpris(e.target.value)}
+                    placeholder="0.00"
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '6px',
+                      fontSize: '16px'
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {drivmedelstyp === 'elbil' && (
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+              Laddningsnivå (%) *
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={laddniva}
+              onChange={(e) => setLaddniva(e.target.value)}
+              placeholder="0-100"
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                fontSize: '16px'
+              }}
+            />
+          </div>
+        )}
+      </div>
+    <div style={{
         marginTop: '40px',
         paddingTop: '24px',
         borderTop: '2px solid #e5e7eb',
