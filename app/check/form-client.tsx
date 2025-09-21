@@ -1754,9 +1754,49 @@ return (
                       Foto krävs, video frivilligt
                     </p>
                     {/* Här kommer MediaUpload-komponenten senare */}
-                    <div style={{ padding: '12px', border: '2px dashed #10b981', borderRadius: '6px' }}>
-                      Bilduppladdning kommer här
-                    </div>
+<MediaUpload
+                      damageId={damage.id}
+                      isOld={true}
+                      onMediaUpdate={updateExistingDamageMedia}
+                      hasImage={hasPhoto(damage.media)}
+                      hasVideo={hasVideo(damage.media)}
+                      videoRequired={false}
+                    />
+                    
+                    {damage.media && damage.media.length > 0 && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                        {damage.media.map((m, i) => (
+                          <div key={i} style={{ position: 'relative' }}>
+                            {m.type === 'image' && (
+                              <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                            )}
+                            {m.type === 'video' && (
+                              m.thumbnail ? 
+                                <img src={m.thumbnail} alt="video" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} /> : 
+                                <div style={{ width: '80px', height: '80px', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>🎥</div>
+                            )}
+                            <button
+                              onClick={() => removeExistingDamageMedia(damage.id, i)}
+                              style={{
+                                position: 'absolute',
+                                top: '-8px',
+                                right: '-8px',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '50%',
+                                backgroundColor: '#dc2626',
+                                color: '#ffffff',
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
