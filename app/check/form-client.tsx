@@ -1449,6 +1449,62 @@ return (
           </label>
         </div>
       </div>
+    <div style={{
+        marginTop: '40px',
+        paddingTop: '24px',
+        borderTop: '2px solid #e5e7eb',
+        display: 'flex',
+        gap: '12px',
+        justifyContent: 'center'
+      }}>
+        <button
+          onClick={() => console.log('Spara utkast')}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: '#6b7280',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          Spara utkast
+        </button>
+        
+        <button
+          onClick={() => console.log('Slutfor incheckning')}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: '#10b981',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          Slutfor incheckning
+        </button>
+        
+        <button
+          onClick={() => console.log('Avbryt')}
+          style={{
+            padding: '12px 24px',
+            backgroundColor: '#dc2626',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+          }}
+        >
+          Avbryt
+        </button>
+      </div>
   </div>
 );
 
