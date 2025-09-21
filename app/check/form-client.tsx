@@ -1906,6 +1906,90 @@ return (
         )}
       </div>
     <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2>Övriga detaljer</h2>
+        
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+            Spolarvätska påfylld?
+          </label>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <label>
+              <input
+                type="radio"
+                checked={spolarvatska === true}
+                onChange={() => setSpolarvatska(true)}
+              />
+              Ja
+            </label>
+            <label>
+              <input
+                type="radio"
+                checked={spolarvatska === false}
+                onChange={() => setSpolarvatska(false)}
+              />
+              Nej
+            </label>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+            AdBlue påfylld? (för dieselbilar)
+          </label>
+          <div style={{ display: 'flex', gap: '16px' }}>
+            <label>
+              <input
+                type="radio"
+                checked={adblue === true}
+                onChange={() => setAdblue(true)}
+              />
+              Ja
+            </label>
+            <label>
+              <input
+                type="radio"
+                checked={adblue === false}
+                onChange={() => setAdblue(false)}
+              />
+              Nej
+            </label>
+            <label>
+              <input
+                type="radio"
+                checked={adblue === null}
+                onChange={() => setAdblue(null)}
+              />
+              Ej tillämpligt
+            </label>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+            Status *
+          </label>
+          <textarea
+            value={preliminarAvslutNotering || ''}
+            onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
+            placeholder="Beskriv bilens status och eventuella kommentarer..."
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '6px',
+              fontSize: '16px',
+              minHeight: '80px'
+            }}
+          />
+        </div>
+      </div>
+    <div style={{
         marginTop: '40px',
         paddingTop: '24px',
         borderTop: '2px solid #e5e7eb',
