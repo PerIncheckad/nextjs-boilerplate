@@ -1958,9 +1958,49 @@ return (
                   />
                 </div>
 
-                <p style={{ fontSize: '14px', color: '#dc2626', fontWeight: '600' }}>
-                  Foto och video med reg.nr krävs
-                </p>
+<MediaUpload
+                  damageId={damage.id}
+                  isOld={false}
+                  onMediaUpdate={updateDamageMedia}
+                  hasImage={hasPhoto(damage.media)}
+                  hasVideo={hasVideo(damage.media)}
+                  videoRequired={true}
+                />
+                
+                {damage.media && damage.media.length > 0 && (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                    {damage.media.map((m, i) => (
+                      <div key={i} style={{ position: 'relative' }}>
+                        {m.type === 'image' && (
+                          <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                        )}
+                        {m.type === 'video' && (
+                          m.thumbnail ? 
+                            <img src={m.thumbnail} alt="video" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} /> : 
+                            <div style={{ width: '80px', height: '80px', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>🎥</div>
+                        )}
+                        <button
+                          onClick={() => removeDamageMedia(damage.id, i)}
+                          style={{
+                            position: 'absolute',
+                            top: '-8px',
+                            right: '-8px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            backgroundColor: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
