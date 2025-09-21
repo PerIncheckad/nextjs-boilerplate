@@ -1282,5 +1282,32 @@ const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
 
-return <div>TEST</div>;
+return (
+  <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
+    {!!sendMsg && (
+      <span
+        style={{
+          marginLeft: 8,
+          fontSize: 12,
+          opacity: 0.95,
+          color:
+            sendState === 'ok' ? '#167d00' :
+            sendState === 'fail' ? '#dc2626' :
+            '#111827',
+        }}
+      >
+        {sendMsg}
+      </span>
+    )}
+    
+    <div style={{
+      maxWidth: '600px',
+      margin: '0 auto',
+      padding: '0 20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+      <div>FORMULÄR KOMMER HÄR</div>
+    </div>
+  </div>
+);
 }
