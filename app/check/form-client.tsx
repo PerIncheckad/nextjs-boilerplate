@@ -1382,7 +1382,35 @@ return (
             ))}
           </div>
         )}
-      </div>    </div>
+{carModel && (
+          <div style={{
+            marginTop: '16px',
+            padding: '16px',
+            backgroundColor: '#f0f9ff',
+            borderRadius: '8px',
+            border: '1px solid #bfdbfe'
+          }}>
+            <div style={{ marginBottom: '8px' }}>
+              <span style={{ fontWeight: '600' }}>Bilmodell:</span> {carModel}
+            </div>
+            {wheelStorage && wheelStorage !== '---' && (
+              <div style={{ marginBottom: '8px' }}>
+                <span style={{ fontWeight: '600' }}>Hjulförvaring:</span> {wheelStorage}
+              </div>
+            )}
+            {damages && damages.length > 0 && (
+              <div>
+                <span style={{ fontWeight: '600' }}>Befintliga skador:</span>
+                <ul style={{ marginTop: '8px', marginLeft: '20px' }}>
+                  {damages.map((damage, idx) => (
+                    <li key={idx} style={{ marginBottom: '4px' }}>{damage}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )} 
+</div>    </div>
     {/* 2. PLATS FÖR INCHECKNING */}
       <div style={{
         backgroundColor: '#ffffff',
