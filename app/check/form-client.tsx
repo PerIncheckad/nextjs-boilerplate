@@ -1306,8 +1306,51 @@ return (
       padding: '0 20px',
       fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
-      <div>FORMULÄR KOMMER HÄR</div>
-    </div>
+{/* 1. REGISTRERINGSNUMMER */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        marginTop: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        position: 'relative',
+        border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
+      }}>
+        <h2 style={{
+          fontSize: '22px',
+          fontWeight: '700',
+          marginBottom: '20px',
+          color: '#1f2937',
+          textTransform: 'uppercase',
+          borderBottom: '2px solid #e5e7eb',
+          paddingBottom: '12px'
+        }}>
+          Fordon
+        </h2>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
+          Registreringsnummer *
+        </label>
+        <input
+          type="text"
+          value={regInput}
+          onChange={(e) => handleRegInputChange(e.target.value)}
+          placeholder="Skriv reg.nr"
+          spellCheck={false}
+          autoComplete="off"
+          style={{
+            width: '100%',
+            padding: '14px',
+            border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid #e5e7eb',
+            borderRadius: '8px',
+            fontSize: '18px',
+            fontWeight: '600',
+            backgroundColor: '#ffffff',
+            textAlign: 'center',
+            letterSpacing: '2px'
+          }}
+        />
+      </div>    </div>
   </div>
 );
 }
