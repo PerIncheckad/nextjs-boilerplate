@@ -1422,7 +1422,6 @@ return (
           </div>
         </div>
       </div>
-  </div>
 <div style={{
         backgroundColor: '#ffffff',
         padding: '24px',
@@ -1432,6 +1431,7 @@ return (
       }}>
         <h2>Utrustning</h2>
 <div>TEST</div>
+  </div>
   </div>
 );
 
