@@ -1749,6 +1749,82 @@ return (
                             </button>
                           </div>
                         ))}
+                        <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '4px' }}>Typ av skada *</label>
+                  <select
+                    value={damage.userType || ''}
+                    onChange={(e) => updateExistingDamageType(damage.id, e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    <option value="">Välj typ</option>
+                    {DAMAGE_TYPES.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {damage.userType && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px' }}>Placering *</label>
+                    <select
+                      value={damage.userCarPart || ''}
+                      onChange={(e) => updateExistingDamageCarPart(damage.id, e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      <option value="">Välj placering</option>
+                      {getRelevantCarParts(damage.userType).map(part => (
+                        <option key={part} value={part}>{part}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
+                    <select
+                      value={damage.userPosition || ''}
+                      onChange={(e) => updateExistingDamagePosition(damage.id, e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      <option value="">Välj position</option>
+                      {CAR_PARTS[damage.userCarPart].map(pos => (
+                        <option key={pos} value={pos}>{pos}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning *</label>
+                  <textarea
+                    value={damage.userDescription || ''}
+                    onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
+                    placeholder="Beskriv skadan..."
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '4px',
+                      minHeight: '60px'
+                    }}
+                  />
+                </div>
                       </div>
                     )}
                   </div>
