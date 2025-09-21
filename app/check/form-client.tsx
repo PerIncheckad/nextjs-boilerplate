@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -976,7 +977,9 @@ const confirmFinalSave = async () => {
     
     if (checkinError) throw checkinError;
     
-// Befintliga dokumenterade skador
+    // Spara skador om de finns
+    if (checkin && checkin.id) {
+      // Befintliga dokumenterade skador
       for (const damage of documentedExisting) {
         await supabase.from('checkin_damages').insert({
           checkin_id: checkin.id,
@@ -985,8 +988,7 @@ const confirmFinalSave = async () => {
           car_part: damage.userCarPart,
           position: damage.userPosition,
           description: damage.userDescription,
-          photo_urls: [],  // Tom array för nu
-          video_urls: []   // Tom array för nu
+          // TODO: Ladda upp bilder till Supabase Storage och spara URL:er
         });
       }
       
@@ -999,10 +1001,18 @@ const confirmFinalSave = async () => {
           car_part: damage.carPart,
           position: damage.position,
           description: damage.text,
-          photo_urls: [],  // Tom array för nu
-          video_urls: []   // Tom array för nu
+          // TODO: Ladda upp bilder till Supabase Storage och spara URL:er
         });
       }
+    }    
+  } catch (e) {
+    console.error('Fel vid sparande:', e);
+    alert('Något gick fel vid sparandet.');
+    return;
+  }
+  
+  setShowSuccessModal(true);
+};
 
 
   // Autocomplete från 2 tecken
