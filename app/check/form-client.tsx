@@ -726,14 +726,14 @@ const saludatum    = viewSaludatum    ?? carSaludatum    ?? null;
     if (skadekontroll === 'nya_skador') {
       if (newDamages.length === 0) return false;
       // Kontrollera att alla nya skador har obligatoriska fält
-      if (newDamages.some(damage => !damage.type || !damage.carPart || !damage.text.trim())) return false;
+      if (newDamages.some(damage => !damage.type || !damage.carPart)) return false;
       if (newDamages.some(damage => damage.carPart && CAR_PARTS[damage.carPart].length > 0 && !damage.position)) return false;
       if (newDamages.some(damage => !damage.media.some(m => m.type === 'image') || !damage.media.some(m => m.type === 'video'))) return false;
     }
 
     // Kontrollera dokumenterade gamla skador
     const documentedOldDamages = existingDamages.filter(d => d.status === 'documented');
-    if (documentedOldDamages.some(damage => !damage.userDescription?.trim())) return false;
+// Beskrivning är nu frivillig - ta bort denna rad helt
     if (documentedOldDamages.some(damage => !damage.userType || !damage.userCarPart)) return false;
     if (documentedOldDamages.some(damage => damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && !damage.userPosition)) return false;
     if (documentedOldDamages.some(damage => !damage.media?.some(m => m.type === 'image') || !damage.media?.some(m => m.type === 'video'))) return false;
