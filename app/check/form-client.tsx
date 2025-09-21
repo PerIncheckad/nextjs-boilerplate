@@ -2089,6 +2089,54 @@ return (
             }}
           />
         </div>
+      <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        border: '2px solid #3b82f6'
+      }}>
+        <h2 style={{ color: '#3b82f6', marginBottom: '16px' }}>Kontrollista - Allt måste vara OK</h2>
+        <div style={{ display: 'grid', gap: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ Insynsskydd OK
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ Dekal djur OK
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ Dekal rökning OK
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ Isskrapa OK
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ P-skiva OK
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ Skylt reg.plåt OK
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ Dekal GPS OK
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" /> ✓ Bilen tvättad
+          </label>
+        </div>
+        
+        <div style={{ 
+          marginTop: '16px', 
+          padding: '12px', 
+          backgroundColor: '#fef2f2', 
+          borderRadius: '6px',
+          border: '1px solid #dc2626'
+        }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 'bold' }}>
+            <input type="checkbox" /> ⚠️ Behöver rekond (straffavgift kan tillkomma)
+          </label>
+        </div>
+      </div>
       </div>
     <div style={{
         marginTop: '40px',
