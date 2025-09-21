@@ -939,8 +939,71 @@ const confirmFinalSave = async () => {
       });
     }
     
-    // TODO: Spara all data till Supabase här
+// Spara till Supabase
+    const checkinData = {
+      regnr: regForMail,
+      bilmodell: carModel,
+      ort,
+      station,
+      incheckare: firstName,
+      matarstallning: parseInt(matarstallning),
+      drivmedelstyp,
+      tankniva,
+      laddniva: drivmedelstyp === 'elbil' ? parseInt(laddniva) : null,
+      liters: tankniva === 'pafylld_nu' ? parseFloat(liters) : null,
+      bransletyp: tankniva === 'pafylld_nu' ? bransletyp : null,
+      literpris: tankniva === 'pafylld_nu' ? parseFloat(literpris) : null,
+      hjultyp,
+      spolarvatska,
+      insynsskydd,
+      adblue: drivmedelstyp === 'bensin_diesel' ? adblue : null,
+      antal_laddkablar: drivmedelstyp === 'elbil' ? antalLaddkablar : null,
+      tvatt,
+      inre,
+      skadekontroll,
+      uthyrningsstatus,
+      kommentarer: preliminarAvslutNotering,
+      region,
+      status: 'completed',
+      created_at: new Date().toISOString()
+    };
     
+    const { data: checkin, error: checkinError } = await supabase
+      .from('checkins')
+      .insert(checkinData)
+      .select()
+      .single();
+    
+    if (checkinError) throw checkinError;
+    
+    // Spara skador om de finns
+    if (checkin && checkin.id) {
+      // Befintliga dokumenterade skador
+      for (const damage of documentedExisting) {
+        await supabase.from('checkin_damages').insert({
+          checkin_id: checkin.id,
+          type: 'existing',
+          damage_type: damage.userType || damage.fullText,
+          car_part: damage.userCarPart,
+          position: damage.userPosition,
+          description: damage.userDescription,
+          // TODO: Ladda upp bilder till Supabase Storage och spara URL:er
+        });
+      }
+      
+      // Nya skador
+      for (const damage of newDamages) {
+        await supabase.from('checkin_damages').insert({
+          checkin_id: checkin.id,
+          type: 'new',
+          damage_type: damage.type,
+          car_part: damage.carPart,
+          position: damage.position,
+          description: damage.text,
+          // TODO: Ladda upp bilder till Supabase Storage och spara URL:er
+        });
+      }
+    }    
   } catch (e) {
     console.error('Fel vid sparande:', e);
     alert('Något gick fel vid sparandet.');
