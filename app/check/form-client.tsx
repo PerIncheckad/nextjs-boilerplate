@@ -1746,6 +1746,166 @@ return (
         )}
       </div>
     <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2>Nya skador</h2>
+        
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontWeight: '600' }}>
+            <input
+              type="radio"
+              name="skadekontroll"
+              checked={skadekontroll === 'inga_nya_skador'}
+              onChange={() => setSkadekontroll('inga_nya_skador')}
+            />
+            Inga nya skador
+          </label>
+        </div>
+        
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ fontWeight: '600' }}>
+            <input
+              type="radio"
+              name="skadekontroll"
+              checked={skadekontroll === 'nya_skador'}
+              onChange={() => setSkadekontroll('nya_skador')}
+            />
+            Nya skador att rapportera
+          </label>
+        </div>
+
+        {skadekontroll === 'nya_skador' && (
+          <div>
+            <button
+              onClick={addDamage}
+              style={{
+                padding: '8px 16px',
+                backgroundColor: '#3b82f6',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                marginBottom: '16px'
+              }}
+            >
+              Lägg till ny skada
+            </button>
+
+            {newDamages.map((damage) => (
+              <div key={damage.id} style={{
+                padding: '16px',
+                marginBottom: '16px',
+                border: '2px solid #dc2626',
+                borderRadius: '8px',
+                backgroundColor: '#fef2f2'
+              }}>
+                <button
+                  onClick={() => removeDamage(damage.id)}
+                  style={{
+                    float: 'right',
+                    padding: '4px 8px',
+                    backgroundColor: '#dc2626',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Ta bort
+                </button>
+                
+                <h4 style={{ marginBottom: '12px' }}>Ny skada</h4>
+                
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '4px' }}>Typ av skada *</label>
+                  <select
+                    value={damage.type}
+                    onChange={(e) => updateDamageType(damage.id, e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '4px'
+                    }}
+                  >
+                    <option value="">Välj typ</option>
+                    {DAMAGE_TYPES.map(type => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {damage.type && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px' }}>Placering *</label>
+                    <select
+                      value={damage.carPart}
+                      onChange={(e) => updateDamageCarPart(damage.id, e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      <option value="">Välj placering</option>
+                      {getRelevantCarParts(damage.type).map(part => (
+                        <option key={part} value={part}>{part}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {damage.carPart && CAR_PARTS[damage.carPart].length > 0 && (
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
+                    <select
+                      value={damage.position}
+                      onChange={(e) => updateDamagePosition(damage.id, e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '4px'
+                      }}
+                    >
+                      <option value="">Välj position</option>
+                      {CAR_PARTS[damage.carPart].map(pos => (
+                        <option key={pos} value={pos}>{pos}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning *</label>
+                  <textarea
+                    value={damage.text}
+                    onChange={(e) => updateDamageText(damage.id, e.target.value)}
+                    placeholder="Beskriv skadan..."
+                    style={{
+                      width: '100%',
+                      padding: '8px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '4px',
+                      minHeight: '60px'
+                    }}
+                  />
+                </div>
+
+                <p style={{ fontSize: '14px', color: '#dc2626', fontWeight: '600' }}>
+                  Foto och video med reg.nr krävs
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    <div style={{
         marginTop: '40px',
         paddingTop: '24px',
         borderTop: '2px solid #e5e7eb',
