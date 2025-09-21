@@ -1423,6 +1423,48 @@ return (
         </div>
       </div>
   </div>
+  {/* 3. UTRUSTNING */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2 style={{
+          fontSize: '22px',
+          fontWeight: '700',
+          marginBottom: '20px',
+          color: '#1f2937',
+          textTransform: 'uppercase',
+          borderBottom: '2px solid #e5e7eb',
+          paddingBottom: '12px'
+        }}>
+          Utrustning
+        </h2>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input type="checkbox" style={{ transform: 'scale(1.2)' }} />
+            <span style={{ fontSize: '16px' }}>Isskrapa</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input type="checkbox" style={{ transform: 'scale(1.2)' }} />
+            <span style={{ fontSize: '16px' }}>P-skiva</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input type="checkbox" style={{ transform: 'scale(1.2)' }} />
+            <span style={{ fontSize: '16px' }}>Skylt reg-plåt</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input type="checkbox" style={{ transform: 'scale(1.2)' }} />
+            <span style={{ fontSize: '16px' }}>Klistermärke hund & rök</span>
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <input type="checkbox" style={{ transform: 'scale(1.2)' }} />
+            <span style={{ fontSize: '16px' }}>Klistermärke GPS</span>
+          </label>
+        </div>
+      </div>
 );
 
 }
