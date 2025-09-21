@@ -1511,6 +1511,54 @@ return (
         </div>
       </div>
     <div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2>Fordonsstatus</h2>
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+            Mätarställning *
+          </label>
+          <input
+            type="number"
+            value={matarstallning}
+            onChange={(e) => setMatarstallning(e.target.value)}
+            placeholder="Ange mätarställning"
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '6px',
+              fontSize: '16px'
+            }}
+          />
+        </div>
+        
+        <div style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+            Hjultyp *
+          </label>
+          <select
+            value={hjultyp || ''}
+            onChange={(e) => setHjultyp(e.target.value as 'Sommardäck' | 'Vinterdäck' | null)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '6px',
+              fontSize: '16px'
+            }}
+          >
+            <option value="">Välj hjultyp</option>
+            <option value="Sommardäck">Sommardäck</option>
+            <option value="Vinterdäck">Vinterdäck</option>
+          </select>
+        </div>
+      </div>
+    <div style={{
         marginTop: '40px',
         paddingTop: '24px',
         borderTop: '2px solid #e5e7eb',
