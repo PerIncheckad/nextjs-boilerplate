@@ -1423,7 +1423,16 @@ return (
         </div>
       </div>
   </div>
-
+<div style={{
+        backgroundColor: '#ffffff',
+        padding: '24px',
+        borderRadius: '12px',
+        marginBottom: '24px',
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+      }}>
+        <h2>Utrustning</h2>
+        <div>Checkboxar kommer här</div>
+      </div>
 );
 
 }
