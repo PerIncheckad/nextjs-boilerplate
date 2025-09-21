@@ -1519,7 +1519,7 @@ return (
         justifyContent: 'center'
       }}>
         <button
-          onClick={() => console.log('Spara utkast')}
+onClick={saveDraft}
           style={{
             padding: '12px 24px',
             backgroundColor: '#6b7280',
@@ -1535,7 +1535,7 @@ return (
         </button>
         
         <button
-          onClick={() => console.log('Slutfor incheckning')}
+          onClick={handleSave}
           style={{
             padding: '12px 24px',
             backgroundColor: '#10b981',
@@ -1551,7 +1551,7 @@ return (
         </button>
         
         <button
-          onClick={() => console.log('Avbryt')}
+          onClick={resetForm}
           style={{
             padding: '12px 24px',
             backgroundColor: '#dc2626',
