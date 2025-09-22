@@ -32,15 +32,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, mocked: true });
     }
 
-    // Dynamisk import för att undvika bundling när nyckel saknas
-    const { Resend } = await import('resend');
-    const resend = new Resend(apiKey);
+// Dynamisk import för att undvika bundling när nyckel saknas
+const { Resend } = await import('resend');
+const resend = new Resend(apiKey);
 
-    const from = 'no-reply@incheckad.se'; // ändra om du vill (helst domänverifierad)
-    await resend.emails.send({ from, to, subject: msg1.subject, html: msg1.html });
-    await resend.emails.send({ from, to, subject: msg2.subject, html: msg2.html });
+const from = process.env.RESEND_FROM || 'onboarding@resend.dev'; // funkar direkt utan domän
+const recipients = Array.isArray(to) ? to : [to];
 
-    return NextResponse.json({ ok: true });
+await resend.emails.send({ from, to: recipients, subject: msg1.subject, html: msg1.html });
+await resend.emails.send({ from, to: recipients, subject: msg2.subject, html: msg2.html });
+
+return NextResponse.json({ ok: true });
+
   } catch (err) {
     console.error('Mail error:', err);
     return NextResponse.json({ ok: false, error: 'MAIL_SEND_FAILED' }, { status: 500 });
