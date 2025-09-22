@@ -30,7 +30,7 @@ export async function notifyCheckin(input: any) {
     `<p>Automatiskt testmeddelande.</p><p>Reg.nr: <b>${reg || 'okänt'}</b></p>`;
 
   return sendTestEmails({
-    to: 'per.andersson@mabi.se',
+    to: TEST_MAIL, // <= använd env-variabeln du redan har
     region,
     subjectBase: reg ? `${subject} ${reg}` : subject,
     htmlBody: html,
