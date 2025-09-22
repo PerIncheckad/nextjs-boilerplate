@@ -1,38 +1,71 @@
-// Enkelt anrop till vårt API som skickar två testmejl till Per
-export async function sendTestEmails(args: {
-  region?: 'Syd' | 'Mitt' | 'Norr';
-  to?: string;
-  subjectBase?: string;
-  htmlBody?: string;
+// /lib/notify.ts
+/**
+ * Enkel helper som väljer mottagare och anropar /api/notify.
+ * Vi håller env-styrningen här för att slippa specialfall i UI.
+ */
+
+type Region = 'Syd' | 'Mitt' | 'Norr';
+type Target = 'station' | 'quality';
+
+const TEST_MAIL = process.env.NEXT_PUBLIC_TEST_MAIL || 'per@incheckad.se';
+const BILKONTROLL_MAIL =
+  process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || TEST_MAIL;
+
+const REGION_MAIL: Record<Region, string> = {
+  Syd: process.env.NEXT_PUBLIC_MAIL_REGION_SYD || TEST_MAIL,
+  Mitt: process.env.NEXT_PUBLIC_MAIL_REGION_MITT || TEST_MAIL,
+  Norr: process.env.NEXT_PUBLIC_MAIL_REGION_NORR || TEST_MAIL,
+};
+
+function parseList(s: string): string[] {
+  return s
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function recipientsFor(region: Region, target: Target): string[] {
+  if (target === 'quality') return parseList(BILKONTROLL_MAIL);
+  return parseList(REGION_MAIL[region]);
+}
+
+export async function notifyCheckin(args: {
+  region: Region;
+  subjectBase: string;
+  htmlBody: string;
+  target: Target; // 'station' eller 'quality'
 }) {
+  const to = recipientsFor(args.region, args.target);
   const res = await fetch('/api/notify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(args ?? {}),
+    body: JSON.stringify({
+      to,
+      region: args.region,
+      subjectBase: args.subjectBase,
+      htmlBody: args.htmlBody,
+    }),
   });
-  if (!res.ok) throw new Error('Failed to send emails');
-  return res.json();
+  const json = await res.json();
+  if (!res.ok || json?.ok === false) {
+    // bubbla upp fel så UI kan visa kvittens
+    throw new Error(
+      `MAIL_${args.target.toUpperCase()}_FAILED: ${JSON.stringify(json)}`
+    );
+  }
+  return json;
 }
 
-/**
- * Kompatibilitets-wrapper för gammal kod.
- * Tar *vilket objekt som helst* och skickar ett testmejl till Per.
- * Om din gamla kod skickar in recipients/payload så ignorerar vi
- * det mesta och använder ämne + enkel html.
- */
-export async function notifyCheckin(input: any) {
-  const subject = input?.subjectBase || input?.subject || 'Incheckning';
-  const reg = input?.regnr || input?.payload?.regnr || '';
-  const region =
-    input?.region === 'Mitt' || input?.region === 'Norr' ? input.region : 'Syd';
-  const html =
-    input?.htmlBody ||
-    `<p>Automatiskt testmeddelande.</p><p>Reg.nr: <b>${reg || 'okänt'}</b></p>`;
-
-  return sendTestEmails({
-    to: TEST_MAIL, // <= använd env-variabeln du redan har
-    region,
-    subjectBase: reg ? `${subject} ${reg}` : subject,
-    htmlBody: html,
-  });
+/** Minimal HTML – fyll på med det ni vill visa i mailet */
+export function renderCheckinEmail(input: {
+  regnr: string;
+  station: string;
+  region: Region;
+}) {
+  return `
+    <p><b>Incheckning</b></p>
+    <p>Reg.nr: <b>${input.regnr}</b><br/>
+       Station: ${input.station}<br/>
+       Region: ${input.region}</p>
+  `;
 }
