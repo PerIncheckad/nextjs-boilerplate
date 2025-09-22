@@ -1433,10 +1433,10 @@ const MediaUpload = ({
           📁 Välj från galleri
         </label>
       </div>
-</div>{/* end: MediaUpload content wrapper */}
+      {/* end: MediaUpload content wrapper */}
+    </div>
   );         // end: return of MediaUpload
 };           // end: const MediaUpload = (...) => { ... }
-
 
 function buildNotifyPayload() {
   // 1) Region
