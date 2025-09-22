@@ -1,3 +1,4 @@
+// app/api/notify/route.ts
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
@@ -9,97 +10,68 @@ type MailPayload = {
   htmlBody?: string;
 };
 
+function normRecipients(input: string | string[] | undefined): string[] {
+  const raw = Array.isArray(input) ? input : (input ? [input] : []);
+  // filtrera, trimma, undvik dubbletter
+  const cleaned = raw
+    .map((s) => String(s || '').trim())
+    .filter(Boolean);
+  return Array.from(new Set(cleaned));
+}
+
+async function sendViaResend(opts: {
+  apiKey: string;
+  from: string;
+  to: string[];
+  subject: string;
+  html: string;
+}) {
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${opts.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: opts.from,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // Skicka tillbaka allt Resend säger (lätt att felsöka)
+    return {
+      ok: false as const,
+      status: res.status,
+      error: data,
+    };
+  }
+
+  // Resend svarar { id: 'email_xxx', ... }
+  return {
+    ok: true as const,
+    status: res.status,
+    id: data?.id ?? null,
+    data,
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as MailPayload;
 
-    // Mottagare (tillåt både sträng och array)
-    const toInput =
-      body.to ??
-      process.env.NEXT_PUBLIC_TEST_MAIL ??
-      'per.andersson@mabi.se';
-    const to = Array.isArray(toInput) ? toInput : [toInput];
-
-    // Ämnen + HTML
-    const subjectBase = body.subjectBase ?? 'Incheckning';
-    const region = body.region ?? 'Syd';
-    const htmlBody = body.htmlBody ?? '';
-
-    const msg1 = {
-      subject: `${subjectBase} - Bilkontroll`,
-      html: `<p>Hej Bilkontroll!</p>${htmlBody}`,
-    };
-    const msg2 = {
-      subject: `${subjectBase} - Region ${region}`,
-      html: `<p>Hej Region ${region}!</p>${htmlBody}`,
-    };
-
-    // Resend-konfig
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
+    // --- Mottagare ---
+    const toFallback =
+      process.env.NEXT_PUBLIC_TEST_MAIL || 'per.andersson@mabi.se';
+    const to = normRecipients(body.to ?? toFallback);
+    if (to.length === 0) {
       return NextResponse.json(
-        { ok: false, error: 'Missing RESEND_API_KEY' },
-        { status: 500 }
+        { ok: false, error: 'No recipients' },
+        { status: 400 }
       );
     }
 
-    const { Resend } = await import('resend');
-    const resend = new Resend(apiKey);
-
-    const from = process.env.RESEND_FROM || 'onboarding@resend.dev';
-
-    // 1) Skicka första mailet
-    const send1 = await resend.emails.send({
-      from,
-      to,
-      subject: msg1.subject,
-      html: msg1.html,
-    });
-    if (send1.error) {
-      return NextResponse.json(
-        { ok: false, where: 'send1', error: send1.error },
-        { status: 500 }
-      );
-    }
-    const id1 = send1.data?.id ?? null;
-
-    // 2) Skicka andra mailet
-    const send2 = await resend.emails.send({
-      from,
-      to,
-      subject: msg2.subject,
-      html: msg2.html,
-    });
-    if (send2.error) {
-      return NextResponse.json(
-        { ok: false, where: 'send2', error: send2.error },
-        { status: 500 }
-      );
-    }
-    const id2 = send2.data?.id ?? null;
-
-    // 3) (valfritt) Hämta status för debug
-    const get1 = id1 ? await resend.emails.get(id1) : null;
-    const get2 = id2 ? await resend.emails.get(id2) : null;
-    const s1 = get1?.data?.status ?? null;
-    const s2 = get2?.data?.status ?? null;
-
-    // 4) Nyckelprefix (för att verifiera att rätt API-nyckel används)
-    const keyPrefix = (process.env.RESEND_API_KEY || '').slice(0, 7);
-
-    // 5) Svar
-    return NextResponse.json({
-      ok: true,
-      ids: [id1, id2],
-      statuses: [s1, s2],
-      to,
-      from,
-      keyPrefix,
-    });
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message ?? e) },
-      { status: 500 }
-    );
-  }
-}
+    // -
