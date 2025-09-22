@@ -78,10 +78,10 @@ const hasVideo = (files?: MediaFile[]) =>
   Array.isArray(files) && files.some(f => f && f.type === 'video');
 
 // KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
-const ORTER = ['Malmö Jägersro', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
+const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
 
 const STATIONER: Record<string, string[]> = {
-  'Malmö Jägersro': [
+  'Malmö': [
     'Ford Malmö',
     'Mechanum',
     'Malmö Automera',
@@ -135,7 +135,67 @@ const STATIONER: Record<string, string[]> = {
     'Finnveden plåt'
   ]
 };
+// === Hjälpare för media-uppladdning ===
+const BUCKET = "damage-photos";
 
+function slugify(s: string) {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
+function partitionMediaByType(files: MediaFile[]) {
+  const photos: File[] = [];
+  const videos: File[] = [];
+  
+  for (const mediaFile of files ?? []) {
+    if (mediaFile.type === 'image') photos.push(mediaFile.file);
+    else if (mediaFile.type === 'video') videos.push(mediaFile.file);
+  }
+  
+  return { photos, videos };
+}
+
+async function uploadOne(
+  file: File,
+  reg: string,
+  damageId: string
+): Promise<string> {
+  const ext = file.name.split(".").pop() || "bin";
+  const base = file.name.replace(/\.[^/.]+$/, "");
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 7);
+  
+  const path = `${slugify(reg)}/${slugify(damageId)}/${ts}-${rand}-${slugify(base)}.${ext}`;
+  
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false,
+    });
+    
+  if (error) throw error;
+  
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function uploadAllForDamage(
+  damage: { id: string; media: MediaFile[] },
+  reg: string
+): Promise<{ photo_urls: string[]; video_urls: string[] }> {
+  const { photos, videos } = partitionMediaByType(damage.media || []);
+  
+  const photo_urls = await Promise.all(photos.map(f => uploadOne(f, reg, damage.id)));
+  const video_urls = await Promise.all(videos.map(f => uploadOne(f, reg, damage.id)));
+  
+  return { photo_urls, video_urls };
+}
 const DAMAGE_TYPES = [
   'Buckla', 'Däckskada', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
   'Fälgskada vinterhjul', 'Feltankning', 'Höjdledsskada', 'Intryck', 'Invändig skada',
