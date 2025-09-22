@@ -1047,7 +1047,7 @@ const confirmFinalSave = async () => {
         
         if (damage.media && damage.media.length > 0) {
           const uploaded = await uploadAllForDamage(
-            { id: damage.id || `existing-${Date.now()}`, media: damage.media },
+            { id: (damage as any).id || `existing-${Date.now()}`, media: damage.media },
             regForMail
           );
           photo_urls = uploaded.photo_urls;
@@ -1073,7 +1073,7 @@ const confirmFinalSave = async () => {
         
         if (damage.media && damage.media.length > 0) {
           const uploaded = await uploadAllForDamage(
-            { id: damage.id || `new-${Date.now()}`, media: damage.media },
+            { id: (damage as any).id || `new-${Date.now()}`, media: damage.media },
             regForMail
           );
           photo_urls = uploaded.photo_urls;
