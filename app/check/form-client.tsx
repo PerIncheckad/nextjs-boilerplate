@@ -1065,7 +1065,7 @@ const confirmFinalSave = async () => {
           video_urls
         });
       }
-      }
+      
       // Nya skador  
       for (const damage of newDamages) {
         let photo_urls: string[] = [];
@@ -1093,7 +1093,7 @@ const confirmFinalSave = async () => {
       }
       }
     }
-    
+    }
     // Nya skador
     }    
   } catch (e) {
