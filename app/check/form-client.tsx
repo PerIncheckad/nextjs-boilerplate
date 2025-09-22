@@ -1094,8 +1094,7 @@ const confirmFinalSave = async () => {
       }
     }
     }
-    // Nya skador
-    }    
+
   } catch (e) {
     console.error('Fel vid sparande:', e);
     alert('Något gick fel vid sparandet.');
