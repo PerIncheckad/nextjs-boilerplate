@@ -1037,63 +1037,61 @@ const confirmFinalSave = async () => {
     
     if (checkinError) throw checkinError;
     
-    // Spara skador om de finns
-    if (checkin && checkin.id) {
-      // Befintliga dokumenterade skador
-// Befintliga dokumenterade skador
-      for (const damage of documentedExisting) {
-        let photo_urls: string[] = [];
-        let video_urls: string[] = [];
-        
-        if (damage.media && damage.media.length > 0) {
-          const uploaded = await uploadAllForDamage(
-            { id: (damage as any).id || `existing-${Date.now()}`, media: damage.media },
-            regForMail
-          );
-          photo_urls = uploaded.photo_urls;
-          video_urls = uploaded.video_urls;
-        }
-        
-        await supabase.from('checkin_damages').insert({
-          checkin_id: checkin.id,
-          type: 'existing',
-          damage_type: damage.userType || damage.fullText,
-          car_part: damage.userCarPart,
-          position: damage.userPosition,
-          description: damage.userDescription,
-          photo_urls,
-          video_urls
-        });
-      }
-      
-      // Nya skador  
-      for (const damage of newDamages) {
-        let photo_urls: string[] = [];
-        let video_urls: string[] = [];
-        
-        if (damage.media && damage.media.length > 0) {
-          const uploaded = await uploadAllForDamage(
-            { id: (damage as any).id || `new-${Date.now()}`, media: damage.media },
-            regForMail
-          );
-          photo_urls = uploaded.photo_urls;
-          video_urls = uploaded.video_urls;
-        }
-        
-        await supabase.from('checkin_damages').insert({
-          checkin_id: checkin.id,
-          type: 'new',
-          damage_type: damage.type,
-          car_part: damage.carPart,
-          position: damage.position,
-          description: damage.text,
-          photo_urls,
-          video_urls
-        });
-      }
-      }
+// Spara skador om de finns
+if (checkin && checkin.id) {
+  // Befintliga dokumenterade skador
+  for (const damage of documentedExisting) {
+    let photo_urls: string[] = [];
+    let video_urls: string[] = [];
+
+    if (damage.media && damage.media.length > 0) {
+      const uploaded = await uploadAllForDamage(
+        { id: (damage as any).id || `existing-${Date.now()}`, media: damage.media },
+        regForMail
+      );
+      photo_urls = uploaded.photo_urls;
+      video_urls = uploaded.video_urls;
     }
+
+    await supabase.from('checkin_damages').insert({
+      checkin_id: checkin.id,
+      type: 'existing',
+      damage_type: damage.userType || damage.fullText,
+      car_part: damage.userCarPart,
+      position: damage.userPosition,
+      description: damage.userDescription,
+      photo_urls,
+      video_urls
+    });
+  }
+
+  // Nya skador
+  for (const damage of newDamages) {
+    let photo_urls: string[] = [];
+    let video_urls: string[] = [];
+
+    if (damage.media && damage.media.length > 0) {
+      const uploaded = await uploadAllForDamage(
+        { id: (damage as any).id || `new-${Date.now()}`, media: damage.media },
+        regForMail
+      );
+      photo_urls = uploaded.photo_urls;
+      video_urls = uploaded.video_urls;
     }
+
+    await supabase.from('checkin_damages').insert({
+      checkin_id: checkin.id,
+      type: 'new',
+      damage_type: damage.type,
+      car_part: damage.carPart,
+      position: damage.position,
+      description: damage.text,
+      photo_urls,
+      video_urls
+    });
+  }
+} // <-- exakt EN stängning för if-blocket här
+
 
   } catch (e) {
     console.error('Fel vid sparande:', e);
@@ -1435,7 +1433,7 @@ const MediaUpload = ({
           📁 Välj från galleri
         </label>
       </div>
-</div> // end: MediaUpload content wrapper
+</div>{/* end: MediaUpload content wrapper */}
   );         // end: return of MediaUpload
 };           // end: const MediaUpload = (...) => { ... }
 
