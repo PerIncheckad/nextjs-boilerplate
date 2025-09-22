@@ -1040,7 +1040,20 @@ const confirmFinalSave = async () => {
     // Spara skador om de finns
     if (checkin && checkin.id) {
       // Befintliga dokumenterade skador
+// Befintliga dokumenterade skador
       for (const damage of documentedExisting) {
+        let photo_urls: string[] = [];
+        let video_urls: string[] = [];
+        
+        if (damage.media && damage.media.length > 0) {
+          const uploaded = await uploadAllForDamage(
+            { id: damage.id || `existing-${Date.now()}`, media: damage.media },
+            regForMail
+          );
+          photo_urls = uploaded.photo_urls;
+          video_urls = uploaded.video_urls;
+        }
+        
         await supabase.from('checkin_damages').insert({
           checkin_id: checkin.id,
           type: 'existing',
@@ -1048,12 +1061,25 @@ const confirmFinalSave = async () => {
           car_part: damage.userCarPart,
           position: damage.userPosition,
           description: damage.userDescription,
-          // TODO: Ladda upp bilder till Supabase Storage och spara URL:er
+          photo_urls,
+          video_urls
         });
       }
       
-      // Nya skador
+      // Nya skador  
       for (const damage of newDamages) {
+        let photo_urls: string[] = [];
+        let video_urls: string[] = [];
+        
+        if (damage.media && damage.media.length > 0) {
+          const uploaded = await uploadAllForDamage(
+            { id: damage.id || `new-${Date.now()}`, media: damage.media },
+            regForMail
+          );
+          photo_urls = uploaded.photo_urls;
+          video_urls = uploaded.video_urls;
+        }
+        
         await supabase.from('checkin_damages').insert({
           checkin_id: checkin.id,
           type: 'new',
@@ -1061,8 +1087,10 @@ const confirmFinalSave = async () => {
           car_part: damage.carPart,
           position: damage.position,
           description: damage.text,
-          // TODO: Ladda upp bilder till Supabase Storage och spara URL:er
+          photo_urls,
+          video_urls
         });
+      }
       }
     }    
   } catch (e) {
