@@ -59,9 +59,19 @@ export async function POST(req: Request) {
       subject: msg2.subject,
       html: msg2.html,
     });
+const s1 = r1?.id ? await resend.emails.get(r1.id) : null;
+const s2 = r2?.id ? await resend.emails.get(r2.id) : null;
+const keyPrefix = (process.env.RESEND_API_KEY || '').slice(0, 7);
 
     // Skicka tillbaka IDs så vi kan verifiera i Resend dashboard
-    return NextResponse.json({ ok: true, ids: [r1?.id, r2?.id], to, from });
+return NextResponse.json({
+  ok: true,
+  ids: [r1?.id, r2?.id],
+  statuses: [s1?.status ?? null, s2?.status ?? null],
+  to,
+  from,
+  keyPrefix
+});
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: String(e?.message || e) },
