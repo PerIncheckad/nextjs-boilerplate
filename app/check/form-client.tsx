@@ -30,7 +30,7 @@ const TEST_MAIL = process.env.NEXT_PUBLIC_TEST_MAIL || 'per.andersson@mabi.se';
 
 // Valfritt: separat testadress för bilkontroll (annars samma som TEST_MAIL)
 const BILKONTROLL_MAIL =
-  process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || TEST_MAIL;
+  process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'per.andersson@mabi.se';
 
 // Returnerar alltid testmottagare i nuläget
 function recipientsFor(region: 'NORR'|'MITT'|'SYD', target: 'station'|'quality') {
