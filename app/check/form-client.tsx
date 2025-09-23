@@ -944,6 +944,7 @@ const handleSubmitFinal = async () => {
   }
 };
 
+
 const confirmFinalSave = async () => {
   console.log('Sparar incheckning...');
   setShowFinalConfirmation(false);
@@ -2520,6 +2521,7 @@ onClick={saveDraft}
 >
   {isFinalSaving ? 'Sparar…' : 'Slutför incheckning'}
 </button>
+
 
         
         <button
