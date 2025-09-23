@@ -13,7 +13,6 @@ const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
   return 'Syd';
 };
 
-const [isFinalSaving, setIsFinalSaving] = useState(false);
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
@@ -416,6 +415,8 @@ async function lookupDamages(regInput: string) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
+  const [isFinalSaving, setIsFinalSaving] = useState(false);
+
 
   // State för bekräftelsedialoger
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
