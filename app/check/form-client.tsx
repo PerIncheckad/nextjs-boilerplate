@@ -1609,37 +1609,39 @@ const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
 
-return ( 
+return (
   <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
-{/* status strip högst upp */}
-{sendMsg ? (
-  <div
-    style={{
-      position: 'sticky',
-      top: 0,
-      zIndex: 50,
-      background: sendState === 'ok' ? '#DCFCE7' : '#FEE2E2',
-      color: sendState === 'ok' ? '#166534' : '#991B1B',
-      padding: '8px 12px',
-      marginBottom: '12px',
-      border: '1px solid',
-      borderColor: sendState === 'ok' ? '#86EFAC' : '#FCA5A5',
-      borderRadius: '6px',
-      fontSize: '14px',
-      fontWeight: 600,
-    }}
-  >
-    {sendMsg}
-  </div>
-) : null}
+    {/* status strip högst upp */}
+    {sendMsg ? (
+      <div
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 50,
+          background: sendState === 'ok' ? '#DCFCE7' : '#FEE2E2',
+          color: sendState === 'ok' ? '#166534' : '#991B1B',
+          padding: '8px 12px',
+          marginBottom: '12px',
+          border: '1px solid',
+          borderColor: sendState === 'ok' ? '#86EFAC' : '#FCA5A5',
+          borderRadius: '6px',
+          fontSize: '14px',
+          fontWeight: 600,
+        }}
+      >
+        {sendMsg}
+      </div>
+    ) : null}
 
-    
-    <div style={{
-      maxWidth: '600px',
-      margin: '0 auto',
-      padding: '0 20px',
-      fontFamily: 'system-ui, -apple-system, sans-serif'
-    }}>
+    <div
+      style={{
+        maxWidth: '600px',
+        margin: '0 auto',
+        padding: '0 20px',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+      }}
+    >
+
 {/* 1. REGISTRERINGSNUMMER */}
 <div style={{
   backgroundColor: '#ffffff',
@@ -2372,9 +2374,9 @@ return (
                   videoRequired={true}
                 />
                 
-                {damage.media && damage.media.length > 0 && (
+                {ui.media && ui.media.length > 0 && (
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                    {damage.media.map((m, i) => (
+                    {ui.media.map((m, i) => (
                       <div key={i} style={{ position: 'relative' }}>
                         {m.type === 'image' && (
                           <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
