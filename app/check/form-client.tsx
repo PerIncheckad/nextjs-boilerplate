@@ -1611,60 +1611,138 @@ const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
 
 return (
-  <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
-    {/* status strip högst upp */}
-    {!!sendMsg && (
-      <span
+  <>
+    {renderStatusStrip()}
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
+      <div
         style={{
-          display: 'block',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          marginBottom: '12px',
-          padding: '8px 12px',
-          border: '1px solid',
-          borderRadius: '6px',
-          background: sendState === 'ok' ? '#DCFCE7' : '#FEE2E2',
-          color: sendState === 'ok' ? '#166534' : '#991B1B',
-          borderColor: sendState === 'ok' ? '#86EFAC' : '#FCA5A5',
-          fontSize: '14px',
-          fontWeight: 600,
+          padding: '24px',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+          marginBottom: '24px',
+          borderRadius: '12px',
+          backgroundColor: '#ffffff',
+          display: showTestButtons ? 'block' : 'none',
         }}
       >
-        {sendMsg}
-      </span>
-    )}
+        <h2>Test-status</h2>
+        <div
+          style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <button
+            onClick={resetForm}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#d1d5db',
+              color: '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Avbryt & Nollställ
+          </button>
+          <button
+            onClick={() => setReg('ABC-123')}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#d1d5db',
+              color: '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Sätt ABC-123
+          </button>
+          <button
+            onClick={() => setReg('XYZ-987')}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#d1d5db',
+              color: '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Sätt XYZ-987
+          </button>
+          <button
+            onClick={isRegComplete}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: '#d1d5db',
+              color: '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: 'pointer',
+            }}
+          >
+            Kontrollera Reg
+          </button>
+          <button
+            onClick={notifyStation}
+            disabled={!canSend}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: !canSend ? '#d1d5db' : '#16a34a',
+              color: !canSend ? '#4b5563' : '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: !canSend ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Skicka stationnotis
+          </button>
+          <button
+            onClick={notifyQuality}
+            disabled={!canSend}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: !canSend ? '#d1d5db' : '#16a34a',
+              color: !canSend ? '#4b5563' : '#ffffff',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: !canSend ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Skicka kvalitetsnotis
+          </button>
+        </div>
+      </div>
 
+      <div
+        style={{
+          backgroundColor: '#ffffff',
+          padding: '24px',
+          borderRadius: '12px',
+          marginBottom: '24px',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+        }}
+      >
+        <h2>Grundläggande information</h2>
+        ...
+      </div>
 
-    <div
-      style={{
-        maxWidth: '600px',
-        margin: '0 auto',
-        padding: '0 20px',
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}>
-    
-
-{/* 1. REGISTRERINGSNUMMER */}
-<div style={{
-  backgroundColor: '#ffffff',
-  padding: '24px',
-  borderRadius: '12px',
-  marginBottom: '24px',
-  marginTop: '24px',
-  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  position: 'relative',
-  border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
-}}>
-        <h2 style={{
-          fontSize: '22px',
-          fontWeight: '700',
-          marginBottom: '20px',
-          color: '#1f2937',
-          textTransform: 'uppercase',
-          borderBottom: '2px solid #e5e7eb',
-          paddingBottom: '12px'
-        }}>
+    </div>
+  </>
+);
           Fordon
         </h2>
         <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
