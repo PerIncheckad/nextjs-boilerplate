@@ -13,7 +13,6 @@ const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
   return 'Syd';
 };
 
-const [isFinalSaving, setIsFinalSaving] = useState(false);
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
@@ -422,6 +421,8 @@ async function lookupDamages(regInput: string) {
   const [damageToFix, setDamageToFix] = useState<string | null>(null);
   const [showFinalConfirmation, setShowFinalConfirmation] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [isFinalSaving, setIsFinalSaving] = useState(false);
+
 
   // Formulärfält
   const [ort, setOrt] = useState('');
@@ -1746,7 +1747,7 @@ return (
             )}
           </div>
         )} 
-</div>    </div>
+</div>
     {/* 2. PLATS FÖR INCHECKNING */}
       <div style={{
         backgroundColor: '#ffffff',
