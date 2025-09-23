@@ -4,7 +4,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
-import { notifyCheckin } from '@/lib/notify';
 import { notifyCheckin, renderCheckinEmail } from '@/lib/notify';
 
 const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
