@@ -2001,66 +2001,93 @@ return (
               Dessa skador finns redan registrerade. Dokumentera dem med foto.
             </p>
             {existingDamages.map((damage) => (
+            const ui = documentedExisting.find(d => d.id === String(damage.id)) ?? { status: null, media: [] };
+
               <div key={damage.id} style={{
                 padding: '16px',
                 marginBottom: '12px',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
+                backgroundColor: ui  .status === 'documented' ? '#f0fdf4' : '#f9fafb'
               }}>
                 <div style={{ fontWeight: '600', marginBottom: '8px' }}>
                   {damage.fullText || damage.shortText}
                 </div>
                 
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-                  <button
-                    onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
-                      color: damage.status === 'documented' ? '#ffffff' : '#374151',
-                      border: 'none',
-                      borderRadius: '6px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
-                  </button>
-                  <button
-                  onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: damage.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
-                    color: damage.status === 'fixed' ? '#ffffff' : '#374151',
-                    border: 'none',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    marginLeft: '8px'
-                  }}
-                >
-                  {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
-                </button>
+<button
+  onClick={() => {
+    setDocumentedExisting(prev =>
+      prev.map(d =>
+        d.id === String(damage.id)
+          ? { ...d, status: d.status === 'documented' ? null : 'documented' }
+          : d
+      )
+    );
+  }}
+  style={{
+    padding: '8px 16px',
+    backgroundColor: ui.status === 'documented' ? '#10b981' : '#e5e7eb',
+    color: ui.status === 'documented' ? '#ffffff' : '#374151',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer'
+  }}
+>
+  {ui.status === 'documented' ? 'Dokumenterad ✓' : 'Dokumentera'}
+</button>
+
+<button
+  onClick={() => {
+    setDocumentedExisting(prev =>
+      prev.map(d =>
+        d.id === String(damage.id)
+          ? { ...d, status: d.status === 'fixed' ? null : 'fixed' }
+          : d
+      )
+    );
+  }}
+  style={{
+    padding: '8px 16px',
+    backgroundColor: ui.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
+    color: ui.status === 'fixed' ? '#ffffff' : '#374151',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    marginLeft: '8px'
+  }}
+>
+  {ui.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+</button>
+
                 </div>
 
-                {damage.status === 'documented' && (
+                {ui.status === 'documented' && (
                   <div style={{ marginTop: '12px' }}>
                     <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
                       Foto krävs, video frivilligt
                     </p>
                     {/* Här kommer MediaUpload-komponenten senare */}
 <MediaUpload
+  damageId={damage.id}
+  isOld={true}
+  onMediaUpdate={({ media }) => {
+    setDocumentedExisting(prev =>
+      prev.map(d =>
+        d.id === String(damage.id) ? { ...d, media } : d
+      )
+    );
+  }}
+  hasImage={hasPhoto(ui.media)}
+  hasVideo={hasVideo(ui.media)}
+  videoRequired={false}
+/>
 
-                      damageId={damage.id}
-                      isOld={true}
-                      onMediaUpdate={updateExistingDamageMedia}
-                      hasImage={hasPhoto(damage.media)}
-                      hasVideo={hasVideo(damage.media)}
-                      videoRequired={false}
-                    />
+
                     
-                    {damage.media && damage.media.length > 0 && (
+                    {ui.media && ui.media.length > 0 && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                        {damage.media.map((m, i) => (
+                        {ui.media.map((m, i) => (
                           <div key={i} style={{ position: 'relative' }}>
                             {m.type === 'image' && (
                               <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
