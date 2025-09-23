@@ -463,6 +463,21 @@ useEffect(() => {
 
   // Skador
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
+  // Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
+const [documentedExisting, setDocumentedExisting] = useState<
+  { id: string; status: 'documented' | 'resolved' | null; media: MediaFile[] }[]
+>([]);
+useEffect(() => {
+  // Behåll tidigare status om den finns, annars initiera till null
+  setDocumentedExisting(prev => {
+    const prevMap = new Map(prev.map(p => [String(p.id), p]));
+    return (existingDamages ?? []).map(d =>
+      prevMap.get(String((d as any).id)) ?? { id: String((d as any).id), status: null, media: [] }
+    );
+  });
+}, [existingDamages]);
+
+  
   const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<{
     id: string;
