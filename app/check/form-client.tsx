@@ -13,6 +13,8 @@ const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
   return 'Syd';
 };
 
+const [isFinalSaving, setIsFinalSaving] = useState(false);
+
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
   Falkenberg: 'NORR',
@@ -420,8 +422,6 @@ async function lookupDamages(regInput: string) {
   const [damageToFix, setDamageToFix] = useState<string | null>(null);
   const [showFinalConfirmation, setShowFinalConfirmation] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
-  const [isFinalSaving, setIsFinalSaving] = useState(false);
-
 
   // Formulärfält
   const [ort, setOrt] = useState('');
@@ -1608,187 +1608,56 @@ const sendNotify = async (target: 'station' | 'quality') => {
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
-// Visar statusremsan (OK / FEL / INFO) överst i formuläret
-function renderStatusStrip(): JSX.Element | null {
-  if (!sendMsg) return null;
 
-  const ok = sendState === 'ok';
-  const fail = sendState === 'fail';
-
-  return (
-    <div
-      style={{
-        position: 'fixed',      // eller 'sticky' om du föredrar
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 100,
-        padding: '12px 24px',
-        backgroundColor: ok ? '#10b981' : fail ? '#dc2626' : '#3b82f6',
-        color: '#ffffff',
-        fontSize: '14px',
-        fontWeight: 600,
-        textAlign: 'center',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        marginBottom: '12px'
-      }}
-    >
-      {sendMsg}
-    </div>
-  );
-}
-
-
-return (
+return ( 
   <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
-    {renderStatusStrip()}
-
-      <div
+    {!!sendMsg && (
+      <span
         style={{
-          padding: '24px',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          marginBottom: '24px',
-          borderRadius: '12px',
-          backgroundColor: '#ffffff',
-          display: showTestButtons ? 'block' : 'none',
+          marginLeft: 8,
+          fontSize: 12,
+          opacity: 0.95,
+          color:
+            sendState === 'ok' ? '#167d00' :
+            sendState === 'fail' ? '#dc2626' :
+            '#111827',
         }}
       >
-        <h2>Test-status</h2>
-        <div
-          style={{
-            display: 'flex',
-            gap: '12px',
-            flexWrap: 'wrap',
-          }}
-        >
-          <button
-            onClick={resetForm}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#d1d5db',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            Avbryt & Nollställ
-          </button>
-          <button
-            onClick={() => setReg('ABC-123')}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#d1d5db',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            Sätt ABC-123
-          </button>
-          <button
-            onClick={() => setReg('XYZ-987')}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#d1d5db',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            Sätt XYZ-987
-          </button>
-          <button
-            onClick={isRegComplete}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: '#d1d5db',
-              color: '#374151',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: 'pointer',
-            }}
-          >
-            Kontrollera Reg
-          </button>
-          <button
-            onClick={notifyStation}
-            disabled={!canSend}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: !canSend ? '#d1d5db' : '#16a34a',
-              color: !canSend ? '#4b5563' : '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: !canSend ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Skicka stationnotis
-          </button>
-          <button
-            onClick={notifyQuality}
-            disabled={!canSend}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: !canSend ? '#d1d5db' : '#16a34a',
-              color: !canSend ? '#4b5563' : '#ffffff',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              fontWeight: '600',
-              cursor: !canSend ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Skicka kvalitetsnotis
-          </button>
-        </div>
-      </div>
-
-<div
-  style={{
-    backgroundColor: '#ffffff',
-    padding: '24px',
-    borderRadius: '12px',
-    marginBottom: '24px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-  }}
->
-  {/* Sektion: Fordon */}
-  <h2 style={{
-    fontSize: '22px',
-    fontWeight: '700',
-    marginBottom: '20px',
-    color: '#1f2937',
-    textTransform: 'uppercase',
-    borderBottom: '2px solid #e5e7eb',
-    paddingBottom: '12px'
-  }}>
-    Fordon
-  </h2>
-
-  {/* ...fält/contents för Fordon här... */}
-</div>
-
-
-
-<label
-  style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}
->
-  Registreringsnummer *
-</label>
-
+        {sendMsg}
+      </span>
+    )}
+    
+    <div style={{
+      maxWidth: '600px',
+      margin: '0 auto',
+      padding: '0 20px',
+      fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
+{/* 1. REGISTRERINGSNUMMER */}
+<div style={{
+  backgroundColor: '#ffffff',
+  padding: '24px',
+  borderRadius: '12px',
+  marginBottom: '24px',
+  marginTop: '24px',
+  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  position: 'relative',
+  border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
+}}>
+        <h2 style={{
+          fontSize: '22px',
+          fontWeight: '700',
+          marginBottom: '20px',
+          color: '#1f2937',
+          textTransform: 'uppercase',
+          borderBottom: '2px solid #e5e7eb',
+          paddingBottom: '12px'
+        }}>
+          Fordon
+        </h2>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
+          Registreringsnummer *
+        </label>
         <input
           type="text"
           value={regInput}
@@ -1868,7 +1737,7 @@ return (
             )}
           </div>
         )} 
-</div>
+</div>    </div>
     {/* 2. PLATS FÖR INCHECKNING */}
       <div style={{
         backgroundColor: '#ffffff',
@@ -2132,95 +2001,66 @@ return (
               Dessa skador finns redan registrerade. Dokumentera dem med foto.
             </p>
             {existingDamages.map((damage) => (
-            const ui = documentedExisting.find(d => d.id === String(damage.id)) ?? { status: null, media: [] };
-
               <div key={damage.id} style={{
                 padding: '16px',
                 marginBottom: '12px',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                backgroundColor: ui  .status === 'documented' ? '#f0fdf4' : '#f9fafb'
+                backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
               }}>
                 <div style={{ fontWeight: '600', marginBottom: '8px' }}>
                   {damage.fullText || damage.shortText}
                 </div>
                 
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-<button
-  onClick={() =>
-    setDocumentedExisting(prev =>
-      prev.map(d =>
-        d.id === String(damage.id)
-          ? { ...d, status: d.status === 'documented' ? null : 'documented' }
-          : d
-      )
-    )
-  }
-  style={{
-    padding: '8px 16px',
-    backgroundColor: ui.status === 'documented' ? '#10b981' : '#e5e7eb',
-    color: ui.status === 'documented' ? '#ffffff' : '#374151',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-  }}
->
-  {ui.status === 'documented' ? 'Dokumenterad ✓' : 'Dokumentera'}
-</button>
-
-
-<button
-  onClick={() =>
-    setDocumentedExisting(prev =>
-      prev.map(d =>
-        d.id === String(damage.id)
-          ? { ...d, status: d.status === 'fixed' ? null : 'fixed' }
-          : d
-      )
-    )
-  }
-  style={{
-    padding: '8px 16px',
-    backgroundColor: ui.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
-    color: ui.status === 'fixed' ? '#ffffff' : '#374151',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    marginLeft: '8px',
-  }}
->
-  {ui.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
-</button>
-
-
+                  <button
+                    onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
+                      color: damage.status === 'documented' ? '#ffffff' : '#374151',
+                      border: 'none',
+                      borderRadius: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
+                  </button>
+                  <button
+                  onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: damage.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
+                    color: damage.status === 'fixed' ? '#ffffff' : '#374151',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    marginLeft: '8px'
+                  }}
+                >
+                  {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+                </button>
                 </div>
 
-                {ui.status === 'documented' && (
+                {damage.status === 'documented' && (
                   <div style={{ marginTop: '12px' }}>
                     <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
                       Foto krävs, video frivilligt
                     </p>
                     {/* Här kommer MediaUpload-komponenten senare */}
 <MediaUpload
-  damageId={damage.id}
-  isOld={true}
-  onMediaUpdate={({ media }) => {
-    setDocumentedExisting(prev =>
-      prev.map(d =>
-        d.id === String(damage.id) ? { ...d, media } : d
-      )
-    );
-  }}
-  hasImage={hasPhoto(ui.media)}
-  hasVideo={hasVideo(ui.media)}
-  videoRequired={false}
-/>
 
-
+                      damageId={damage.id}
+                      isOld={true}
+                      onMediaUpdate={updateExistingDamageMedia}
+                      hasImage={hasPhoto(damage.media)}
+                      hasVideo={hasVideo(damage.media)}
+                      videoRequired={false}
+                    />
                     
-                    {ui.media && ui.media.length > 0 && (
+                    {damage.media && damage.media.length > 0 && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                        {ui.media.map((m, i) => (
+                        {damage.media.map((m, i) => (
                           <div key={i} style={{ position: 'relative' }}>
                             {m.type === 'image' && (
                               <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
@@ -2498,9 +2338,9 @@ return (
                   videoRequired={true}
                 />
                 
-                {ui.media && ui.media.length > 0 && (
+                {damage.media && damage.media.length > 0 && (
                   <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-                    {ui.media.map((m, i) => (
+                    {damage.media.map((m, i) => (
                       <div key={i} style={{ position: 'relative' }}>
                         {m.type === 'image' && (
                           <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
