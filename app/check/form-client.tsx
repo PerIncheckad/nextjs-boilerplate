@@ -1609,7 +1609,7 @@ const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
 // Visar statusremsan (OK / FEL / INFO) överst i formuläret
-const renderStatusStrip = (): JSX.Element | null => {
+function renderStatusStrip(): JSX.Element | null {
   if (!sendMsg) return null;
 
   const ok = sendState === 'ok';
@@ -1618,24 +1618,26 @@ const renderStatusStrip = (): JSX.Element | null => {
   return (
     <div
       style={{
-        position: 'sticky',
+        position: 'fixed',      // eller 'sticky' om du föredrar
         top: 0,
-        zIndex: 50,
-        padding: '8px 12px',
-        marginBottom: '12px',
-        borderRadius: '6px',
-        background: ok ? '#DCFCE7' : fail ? '#FEE2E2' : '#DBEAFE',
-        color: ok ? '#166534' : fail ? '#991B1B' : '#1E3A8A',
-        border: '1px solid',
-        borderColor: ok ? '#86EFAC' : fail ? '#FCA5A5' : '#93C5FD',
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        padding: '12px 24px',
+        backgroundColor: ok ? '#10b981' : fail ? '#dc2626' : '#3b82f6',
+        color: '#ffffff',
         fontSize: '14px',
         fontWeight: 600,
+        textAlign: 'center',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+        marginBottom: '12px'
       }}
     >
       {sendMsg}
     </div>
   );
-};
+}
+
 
 return (
   <>
