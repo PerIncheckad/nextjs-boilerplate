@@ -2474,21 +2474,24 @@ onClick={saveDraft}
           Spara utkast
         </button>
         
-        <button
-          onClick={handleSave}
-          style={{
-            padding: '12px 24px',
-            backgroundColor: '#10b981',
-            color: '#ffffff',
-            border: 'none',
-            borderRadius: '6px',
-            fontSize: '16px',
-            fontWeight: '600',
-            cursor: 'pointer'
-          }}
-        >
-          Slutfor incheckning
-        </button>
+<button
+  id="btn-final"
+  type="button"
+  onClick={handleSubmitFinal}
+  style={{
+    padding: '12px 24px',
+    backgroundColor: '#16a34a',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  }}
+>
+  Slutför incheckning
+</button>
+
         
         <button
           onClick={resetForm}
