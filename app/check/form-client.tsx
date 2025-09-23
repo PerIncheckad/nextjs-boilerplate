@@ -13,7 +13,6 @@ const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
   return 'Syd';
 };
 
-
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
   Falkenberg: 'NORR',
