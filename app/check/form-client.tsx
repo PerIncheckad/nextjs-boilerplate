@@ -13,7 +13,6 @@ const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
   return 'Syd';
 };
 
-const [isFinalSaving, setIsFinalSaving] = useState(false);
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
@@ -422,6 +421,7 @@ async function lookupDamages(regInput: string) {
   const [damageToFix, setDamageToFix] = useState<string | null>(null);
   const [showFinalConfirmation, setShowFinalConfirmation] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
+const [isFinalSaving, setIsFinalSaving] = useState(false); // <-- LÄGG TILL DENNA
 
   // Formulärfält
   const [ort, setOrt] = useState('');
@@ -1163,38 +1163,7 @@ if (checkin && checkin.id) {
     alert('Något gick fel vid sparandet.');
     return;
   }
-  // --- Bygg mejlets innehåll ---
-const reg = String((form?.regnr ?? viewRow?.regnr ?? '')).toUpperCase();
-const stationName = String((form?.station ?? viewRow?.station ?? '') || '');
-const region = normRegion(form?.region ?? viewRow?.region ?? 'Syd');
 
-const subjectBase = 'Incheckning';
-const htmlBody = renderCheckinEmail({
-  regnr: reg,
-  station: stationName,
-  region,
-});
-
-// --- Skicka: först Bilkontroll, sedan Region ---
-try {
-  await notifyCheckin({
-    region,
-    subjectBase,
-    htmlBody,
-    target: 'quality', // -> Bilkontroll (styrd av env NEXT_PUBLIC_BILKONTROLL_MAIL)
-  });
-
-  await notifyCheckin({
-    region,
-    subjectBase,
-    htmlBody,
-    target: 'station', // -> Region (styrd av env per region)
-  });
-
-  console.log('MAIL OK');
-} catch (e) {
-  console.error('MAIL FAILED', e);
-  // Vi stoppar inte flödet om mejl faller; sparningen är redan klar.
 }
 
   setShowSuccessModal(true);
