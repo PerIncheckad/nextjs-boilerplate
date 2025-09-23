@@ -905,6 +905,22 @@ const damagesOk = existingOk && newOk;
     setShowSuccessModal(false);
   };
 
+  function markExistingAsDocumented(id: string | number) {
+  setDocumentedExisting(curr =>
+    curr.map(x => String(x.id) === String(id) ? { ...x, status: 'documented' } : x)
+  );
+}
+
+function markExistingAsResolved(id: string | number) {
+  setDocumentedExisting(curr =>
+    curr.map(x => String(x.id) === String(id) ? { ...x, status: 'resolved' } : x)
+  );
+}
+
+function getExistingStatus(id: string | number): 'documented' | 'resolved' | null {
+  return documentedExisting.find(x => String(x.id) === String(id))?.status ?? null;
+}
+
   const handleSave = () => {
     if (canSave()) {
       setShowFinalConfirmation(true);
