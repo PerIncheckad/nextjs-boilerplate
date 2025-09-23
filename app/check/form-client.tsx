@@ -1640,9 +1640,9 @@ function renderStatusStrip(): JSX.Element | null {
 
 
 return (
-  <>
+  <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
     {renderStatusStrip()}
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
+
       <div
         style={{
           padding: '24px',
