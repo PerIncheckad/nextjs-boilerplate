@@ -13,6 +13,8 @@ const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
   return 'Syd';
 };
 
+const [isFinalSaving, setIsFinalSaving] = useState(false);
+
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
   Falkenberg: 'NORR',
@@ -917,6 +919,8 @@ const saveDraft = async () => {
   }
 };
 const handleSubmitFinal = async () => {
+  if (isFinalSaving) return;
+  setIsFinalSaving(true);
   console.log('[UI] Slutför incheckning klickad');
 
   const regOk = !!(form?.regnr && String(form.regnr).trim());
@@ -924,17 +928,19 @@ const handleSubmitFinal = async () => {
   const stationOk = !!(form?.station);
 
   if (!regOk || !placeOk || !stationOk) {
-    document.getElementById(!regOk ? 'field-regnr' : !placeOk ? 'field-city' : 'field-station')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setIsFinalSaving(false);
     alert('Fyll i registreringsnr, ort och station.');
     return;
   }
 
   try {
     await confirmFinalSave();
+    // valfritt: visa egen modal/success-toast här
   } catch (e) {
     console.error('Final save failed:', e);
     alert('Något gick fel vid sparandet.');
+  } finally {
+    setIsFinalSaving(false);
   }
 };
 
@@ -2499,18 +2505,20 @@ onClick={saveDraft}
   id="btn-final"
   type="button"
   onClick={handleSubmitFinal}
+  disabled={isFinalSaving}
   style={{
     padding: '12px 24px',
-    backgroundColor: '#16a34a',
+    backgroundColor: isFinalSaving ? '#16a34a80' : '#16a34a',
     color: '#ffffff',
     border: 'none',
     borderRadius: '6px',
     fontSize: '16px',
     fontWeight: '600',
-    cursor: 'pointer',
+    cursor: isFinalSaving ? 'not-allowed' : 'pointer',
+    opacity: isFinalSaving ? 0.85 : 1,
   }}
 >
-  Slutför incheckning
+  {isFinalSaving ? 'Sparar…' : 'Slutför incheckning'}
 </button>
 
         
