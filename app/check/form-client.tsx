@@ -2026,37 +2026,38 @@ return (
                 
                 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
 <button
-  onClick={() => {
+  onClick={() =>
     setDocumentedExisting(prev =>
       prev.map(d =>
         d.id === String(damage.id)
           ? { ...d, status: d.status === 'documented' ? null : 'documented' }
           : d
       )
-    );
-  }}
+    )
+  }
   style={{
     padding: '8px 16px',
     backgroundColor: ui.status === 'documented' ? '#10b981' : '#e5e7eb',
     color: ui.status === 'documented' ? '#ffffff' : '#374151',
     border: 'none',
     borderRadius: '6px',
-    cursor: 'pointer'
+    cursor: 'pointer',
   }}
 >
   {ui.status === 'documented' ? 'Dokumenterad ✓' : 'Dokumentera'}
 </button>
 
+
 <button
-  onClick={() => {
+  onClick={() =>
     setDocumentedExisting(prev =>
       prev.map(d =>
         d.id === String(damage.id)
           ? { ...d, status: d.status === 'fixed' ? null : 'fixed' }
           : d
       )
-    );
-  }}
+    )
+  }
   style={{
     padding: '8px 16px',
     backgroundColor: ui.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
@@ -2064,11 +2065,12 @@ return (
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    marginLeft: '8px'
+    marginLeft: '8px',
   }}
 >
   {ui.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
 </button>
+
 
                 </div>
 
