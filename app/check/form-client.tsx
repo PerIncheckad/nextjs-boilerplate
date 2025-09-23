@@ -1766,6 +1766,7 @@ return (
         }}
       >
         <h2>Grundläggande information</h2>
+        {/* noop: trigger vercel build */}
         ...
       </div>
 
