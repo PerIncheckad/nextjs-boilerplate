@@ -1740,13 +1740,26 @@ return (
       </div>
 
     </div>
-  </>
-);
-          Fordon
-        </h2>
-        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
-          Registreringsnummer *
-        </label>
+<h2
+  style={{
+    fontSize: '22px',
+    fontWeight: '700',
+    marginBottom: '20px',
+    color: '#1f2937',
+    textTransform: 'uppercase',
+    borderBottom: '2px solid #e5e7eb',
+    paddingBottom: '12px',
+  }}
+>
+  Fordon
+</h2>
+
+<label
+  style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}
+>
+  Registreringsnummer *
+</label>
+
         <input
           type="text"
           value={regInput}
