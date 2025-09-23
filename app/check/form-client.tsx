@@ -1611,21 +1611,28 @@ const canSend = isRegComplete() && isLocationComplete();
 
 return ( 
   <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
-    {!!sendMsg && (
-      <span
-        style={{
-          marginLeft: 8,
-          fontSize: 12,
-          opacity: 0.95,
-          color:
-            sendState === 'ok' ? '#167d00' :
-            sendState === 'fail' ? '#dc2626' :
-            '#111827',
-        }}
-      >
-        {sendMsg}
-      </span>
-    )}
+{/* status strip högst upp */}
+{sendMsg ? (
+  <div
+    style={{
+      position: 'sticky',
+      top: 0,
+      zIndex: 50,
+      background: sendState === 'ok' ? '#DCFCE7' : '#FEE2E2',
+      color: sendState === 'ok' ? '#166534' : '#991B1B',
+      padding: '8px 12px',
+      marginBottom: '12px',
+      border: '1px solid',
+      borderColor: sendState === 'ok' ? '#86EFAC' : '#FCA5A5',
+      borderRadius: '6px',
+      fontSize: '14px',
+      fontWeight: 600,
+    }}
+  >
+    {sendMsg}
+  </div>
+) : null}
+
     
     <div style={{
       maxWidth: '600px',
