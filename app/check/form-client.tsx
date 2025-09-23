@@ -916,6 +916,27 @@ const saveDraft = async () => {
     alert('Kunde inte spara utkast.');
   }
 };
+const handleSubmitFinal = async () => {
+  console.log('[UI] Slutför incheckning klickad');
+
+  const regOk = !!(form?.regnr && String(form.regnr).trim());
+  const placeOk = !!(form?.city || form?.ort);
+  const stationOk = !!(form?.station);
+
+  if (!regOk || !placeOk || !stationOk) {
+    document.getElementById(!regOk ? 'field-regnr' : !placeOk ? 'field-city' : 'field-station')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    alert('Fyll i registreringsnr, ort och station.');
+    return;
+  }
+
+  try {
+    await confirmFinalSave();
+  } catch (e) {
+    console.error('Final save failed:', e);
+    alert('Något gick fel vid sparandet.');
+  }
+};
 
 const confirmFinalSave = async () => {
   console.log('Sparar incheckning...');
