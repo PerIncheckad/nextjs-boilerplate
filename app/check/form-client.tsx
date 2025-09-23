@@ -1756,23 +1756,17 @@ return (
         </div>
       </div>
 
-      <div
-        style={{
-          backgroundColor: '#ffffff',
-          padding: '24px',
-          borderRadius: '12px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        }}
-      >
-        <h2>Grundläggande information</h2>
-        {/* noop: trigger vercel build */}
-        ...
-      </div>
-
-    </div>
-<h2
+<div
   style={{
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+  }}
+>
+  {/* Sektion: Fordon */}
+  <h2 style={{
     fontSize: '22px',
     fontWeight: '700',
     marginBottom: '20px',
@@ -1780,10 +1774,13 @@ return (
     textTransform: 'uppercase',
     borderBottom: '2px solid #e5e7eb',
     paddingBottom: '12px'
-  }}
->
-  Fordon
-</h2>
+  }}>
+    Fordon
+  </h2>
+
+  {/* ...fält/contents för Fordon här... */}
+</div>
+
 
 
 <label
