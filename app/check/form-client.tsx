@@ -5,7 +5,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
+import { notifyCheckin, renderCheckinEmail } from '@/lib/notify';
 
+const normRegion = (r: any): 'Syd' | 'Mitt' | 'Norr' => {
+  const s = String(r || '').toUpperCase();
+  if (s === 'NORR') return 'Norr';
+  if (s === 'MITT') return 'Mitt';
+  return 'Syd';
+};
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR',
@@ -1098,7 +1105,40 @@ if (checkin && checkin.id) {
     alert('Något gick fel vid sparandet.');
     return;
   }
-  
+  // --- Bygg mejlets innehåll ---
+const reg = String((form?.regnr ?? viewRow?.regnr ?? '')).toUpperCase();
+const stationName = String((form?.station ?? viewRow?.station ?? '') || '');
+const region = normRegion(form?.region ?? viewRow?.region ?? 'Syd');
+
+const subjectBase = 'Incheckning';
+const htmlBody = renderCheckinEmail({
+  regnr: reg,
+  station: stationName,
+  region,
+});
+
+// --- Skicka: först Bilkontroll, sedan Region ---
+try {
+  await notifyCheckin({
+    region,
+    subjectBase,
+    htmlBody,
+    target: 'quality', // -> Bilkontroll (styrd av env NEXT_PUBLIC_BILKONTROLL_MAIL)
+  });
+
+  await notifyCheckin({
+    region,
+    subjectBase,
+    htmlBody,
+    target: 'station', // -> Region (styrd av env per region)
+  });
+
+  console.log('MAIL OK');
+} catch (e) {
+  console.error('MAIL FAILED', e);
+  // Vi stoppar inte flödet om mejl faller; sparningen är redan klar.
+}
+
   setShowSuccessModal(true);
 };
 
