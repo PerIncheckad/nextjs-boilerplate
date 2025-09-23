@@ -1,12 +1,13 @@
 // app/check/page.tsx
-import FormClient from './form-client';
 import LoginGate from '@/components/LoginGate';
-const showTestButtons = (process.env.NEXT_PUBLIC_SHOW_TEST_BUTTONS ?? 'false') === 'true';
+import FormClient from './form-client';
 
-export default function Page() {
+export const dynamic = 'force-dynamic';
+
+export default function CheckPage() {
   return (
     <LoginGate>
-<FormClient showTestButtons={showTestButtons} />
+      <FormClient />
     </LoginGate>
   );
 }
