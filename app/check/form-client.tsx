@@ -1639,7 +1639,7 @@ return (
         margin: '0 auto',
         padding: '0 20px',
         fontFamily: 'system-ui, -apple-system, sans-serif',
-      }}
+      }}>
     
 
 {/* 1. REGISTRERINGSNUMMER */}
