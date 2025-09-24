@@ -4,6 +4,12 @@ import supabase from '@/lib/supabase';
 
 type Props = { children: React.ReactNode };
 
+/** === HÅRD WHITELIST (lägg fler här vid behov) === */
+const EMAIL_WHITELIST = new Set<string>([
+  'per.andersson@mabi.se',
+  'ingemar.carqueija@mabi.se',
+]);
+
 export default function LoginGate({ children }: Props) {
   const [state, setState] =
     useState<'checking' | 'login' | 'denied' | 'ok'>('checking');
@@ -15,10 +21,19 @@ export default function LoginGate({ children }: Props) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setState('login'); return; }
 
+      const lower = user.email?.toLowerCase() ?? null;
+
+      // 1) Släpp in direkt om adressen är vitlistad
+      if (lower && EMAIL_WHITELIST.has(lower)) {
+        setState('ok');
+        return;
+      }
+
+      // 2) I övriga fall: kolla employees.is_active (din befintliga logik)
       const { data, error } = await supabase
         .from('employees')
         .select('email,is_active')
-        .eq('email', user.email!)
+        .eq('email', lower!)
         .single();
 
       if (error || !data?.is_active) {
@@ -26,6 +41,7 @@ export default function LoginGate({ children }: Props) {
         setState('denied');
         return;
       }
+
       setState('ok');
     })();
   }, []);
