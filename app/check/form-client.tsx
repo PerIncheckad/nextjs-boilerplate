@@ -1161,12 +1161,16 @@ if (checkin && checkin.id) {
     return;
   }
 
-  // Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
+// Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
+const _rawRegion = ((ORT_TILL_REGION?.[ort] ?? 'SYD') as 'NORR'|'MITT'|'SYD');
+const _regionTitle = _rawRegion === 'NORR' ? 'Norr' : _rawRegion === 'MITT' ? 'Mitt' : 'Syd';
+
 await notifyCheckin({
   subjectBase: 'Incheckning',
-  region,     // samma region-variabel du redan använder
-  htmlBody,   // den färdiga HTML du redan bygger till mejlet
+  region: _regionTitle,   // <-- skicka titelcase till servern
+  htmlBody,
 });
+
 
   setShowSuccessModal(true);
 };
@@ -1550,11 +1554,14 @@ const sendNotify = async (target: 'station' | 'quality') => {
     }
 
     // 2) Bygg payload och hämta mottagare
-    const payload = buildNotifyPayload();
-    const to = recipientsFor(payload.region, target);
+const payload = buildNotifyPayload();
 
-    // 3) Skicka
-    const res = await notifyCheckin({ ...payload, recipients: to });
+// Bestäm regionnyckel från ort (NORR|MITT|SYD) – använd samma källa överallt
+const _rawRegion = ((ORT_TILL_REGION?.[ort] ?? 'SYD') as 'NORR'|'MITT'|'SYD');
+
+const to = recipientsFor(_rawRegion, target);
+const res = await notifyCheckin({ ...payload, recipients: to });
+
 
     // 4) Visa resultat
     if (res?.ok) {
