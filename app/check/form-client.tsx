@@ -1075,10 +1075,17 @@ const confirmFinalSave = async () => {
       status: 'completed',
       created_at: new Date().toISOString()
     };
-    
+ // Ta bort fält som inte finns i DB och släng null/undefined
+delete (checkinData as any).antal_laddkablar;
+delete (checkinData as any).bransletyp; // (om du ser det i objektet – DB har normalt "drivmedelstyp")
+
+const payload = Object.fromEntries(
+  Object.entries(checkinData).filter(([, v]) => v !== null && v !== undefined)
+);
+   
     const { data: checkin, error: checkinError } = await supabase
       .from('checkins')
-      .insert(checkinData)
+      .insert(payload)
       .select()
       .single();
     
