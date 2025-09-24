@@ -1047,46 +1047,46 @@ const confirmFinalSave = async () => {
     
 
     
-// Spara till Supabase
-    const checkinData = {
-      regnr: regForMail,
-      bilmodell: carModel,
-      ort,
-      station,
-      incheckare: firstName,
-      matarstallning: parseInt(matarstallning),
-      drivmedelstyp,
-      tankniva,
-      laddniva: drivmedelstyp === 'elbil' ? parseInt(laddniva) : null,
-      liters: tankniva === 'pafylld_nu' ? parseFloat(liters) : null,
-      bransletyp: tankniva === 'pafylld_nu' ? bransletyp : null,
-      literpris: tankniva === 'pafylld_nu' ? parseFloat(literpris) : null,
-      hjultyp,
-      spolarvatska,
-      insynsskydd,
-      // Om kolumnen är TEXT (rekommenderat i nuläget):
-adblue: drivmedelstyp === 'bensin_diesel' ? (adblue ? 'ok' : 'nej') : null,
-// (Om du i stället har gjort adblue = boolean i DB, behåll den gamla raden.)
+// --- Spara till Supabase — matchar verkliga kolumner i `checkins` ---
 
-      antal_laddkablar: drivmedelstyp === 'elbil' ? antalLaddkablar : null,
-      tvatt,
-      inre,
-      skadekontroll,
-      uthyrningsstatus,
-      kommentarer: preliminarAvslutNotering,
-      region,
-      status: 'completed',
-      created_at: new Date().toISOString()
-    };
- // Ta bort fält som inte finns i DB och släng null/undefined
-delete (checkinData as any).antal_laddkablar;
-delete (checkinData as any).bransletyp; // (om du ser det i objektet – DB har normalt "drivmedelstyp")
-delete (checkinData as any).bilmodell;
+// Boolean för full tank (tål "Fulltankad"/"Ej fulltankad")
+const fuelFull =
+  typeof tankniva === 'string'
+    ? (tankniva.toLowerCase().includes('full') && !tankniva.toLowerCase().includes('ej'))
+      ? true
+      : (tankniva.toLowerCase().includes('ej') ? false : null)
+    : null;
 
+// Bygg endast kolumner som finns i tabellen
+const dbData = {
+  regnr: regForMail,
+  region,
+  city: ort ?? null,
+  station,
+  status: 'completed',
 
+  notes: (preliminarAvslutNotering ?? '').trim() || null,   // fritext/kommentar
+
+  odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
+  fuel_full: fuelFull,                                      // boolean
+  washer_ok: spolarvatska ?? null,                          // boolean
+  adblue_ok: drivmedelstyp === 'bensin_diesel' ? (adblue ?? null) : null, // boolean, bara för diesel
+  privacy_cover_ok: insynsskydd ?? null,                    // boolean
+
+  rekond_behov: Boolean(needsRecond),                       // boolean
+  has_new_damages: skadekontroll !== 'inga_nya_skador',     // boolean
+
+  completed_at: new Date().toISOString(),                   // tidsstämpel
+};
+
+// Filtrera bort null/undefined så API:t bara får “riktiga” värden
 const payload = Object.fromEntries(
-  Object.entries(checkinData).filter(([, v]) => v !== null && v !== undefined)
+  Object.entries(dbData).filter(([_, v]) => v !== undefined && v !== null)
 );
+
+// (valfritt) hjälp-logg
+console.log('CHECKIN payload keys →', Object.keys(payload));
+
    
     const { data: checkin, error: checkinError } = await supabase
       .from('checkins')
