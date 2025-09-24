@@ -1057,27 +1057,31 @@ const fuelFull =
       : (tankniva.toLowerCase().includes('ej') ? false : null)
     : null;
 
+// Normalisera region till DB-format (kräver 'syd' | 'mitt' | 'norr')
+const regionDb =
+  (region || '').toLowerCase() === 'syd'  ? 'syd'  :
+  (region || '').toLowerCase() === 'mitt' ? 'mitt' :
+  (region || '').toLowerCase() === 'norr' ? 'norr' :
+  'syd';
+    
 // Bygg endast kolumner som finns i tabellen
 const dbData = {
   regnr: regForMail,
-  region,
+  region: regionDb,           // <-- ändra från `region,` till detta
   city: ort ?? null,
   station,
   status: 'completed',
-
-  notes: (preliminarAvslutNotering ?? '').trim() || null,   // fritext/kommentar
-
+  notes: (preliminarAvslutNotering ?? '').trim() || null,
   odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
-  fuel_full: fuelFull,                                      // boolean
-  washer_ok: spolarvatska ?? null,                          // boolean
-  adblue_ok: drivmedelstyp === 'bensin_diesel' ? (adblue ?? null) : null, // boolean, bara för diesel
-  privacy_cover_ok: insynsskydd ?? null,                    // boolean
-
-  rekond_behov: Boolean(needsRecond),                       // boolean
-  has_new_damages: skadekontroll !== 'inga_nya_skador',     // boolean
-
-  completed_at: new Date().toISOString(),                   // tidsstämpel
+  fuel_full: fuelFull,
+  washer_ok: spolarvatska ?? null,
+  adblue_ok: drivmedelstyp === 'bensin_diesel' ? (adblue ?? null) : null,
+  privacy_cover_ok: insynsskydd ?? null,
+  rekond_behov: Boolean(needsRecond),
+  has_new_damages: skadekontroll !== 'inga_nya_skador',
+  completed_at: new Date().toISOString(),
 };
+
 
 // Filtrera bort null/undefined så API:t bara får “riktiga” värden
 const payload = Object.fromEntries(
