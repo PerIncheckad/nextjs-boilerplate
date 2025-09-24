@@ -1045,26 +1045,7 @@ const confirmFinalSave = async () => {
       <p><b>Kommentarer:</b> ${preliminarAvslutNotering || 'Inga'}</p>
     `;
     
-    // Skicka mejl baserat på logiken
-    if (sendToBilkontroll) {
-      await notifyCheckin({
-        subjectBase: `Bilkontroll: ${regForMail}`,
-        regnr: regForMail,
-        region,
-        htmlBody,
-        recipients: [BILKONTROLL_MAIL]
-      });
-    }
-    
-    if (sendToStation) {
-      await notifyCheckin({
-        subjectBase: `Station: ${regForMail} - Åtgärd krävs`,
-        regnr: regForMail,
-        region,
-        htmlBody,
-        recipients: [TEST_MAIL] // Senare: recipientsFor(region, 'station')
-      });
-    }
+
     
 // Spara till Supabase
     const checkinData = {
@@ -1164,6 +1145,13 @@ if (checkin && checkin.id) {
     alert('Något gick fel vid sparandet.');
     return;
   }
+
+  // Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
+await notifyCheckin({
+  subjectBase: 'Incheckning',
+  region,     // samma region-variabel du redan använder
+  htmlBody,   // den färdiga HTML du redan bygger till mejlet
+});
 
   setShowSuccessModal(true);
 };
