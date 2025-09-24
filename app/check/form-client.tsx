@@ -1081,6 +1081,8 @@ adblue: drivmedelstyp === 'bensin_diesel' ? (adblue ? 'ok' : 'nej') : null,
  // Ta bort fält som inte finns i DB och släng null/undefined
 delete (checkinData as any).antal_laddkablar;
 delete (checkinData as any).bransletyp; // (om du ser det i objektet – DB har normalt "drivmedelstyp")
+delete (checkinData as any).bilmodell;
+
 
 const payload = Object.fromEntries(
   Object.entries(checkinData).filter(([, v]) => v !== null && v !== undefined)
