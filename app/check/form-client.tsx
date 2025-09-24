@@ -1063,7 +1063,14 @@ const dbData = {
   status: 'completed',
   notes: (preliminarAvslutNotering ?? '').trim() || null,
   odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
-  fuel_full: fuelFull,
+  fuel_full:
+  typeof tankniva === 'string'
+    ? (tankniva.toLowerCase().includes('full') && !tankniva.toLowerCase().includes('ej')
+        ? true
+        : tankniva.toLowerCase().includes('ej')
+          ? false
+          : null)
+    : null,
   washer_ok: spolarvatska ?? null,
   adblue_ok: drivmedelstyp === 'bensin_diesel' ? (adblue ?? null) : null,
   privacy_cover_ok: insynsskydd ?? null,
