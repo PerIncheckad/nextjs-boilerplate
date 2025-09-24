@@ -1066,7 +1066,7 @@ const dbRegion = (
 
 const dbData = {
   regnr: regForMail,
-  region: dbRegion
+  region: dbRegion,   // <-- lägg till kommatecken här
   city: ort ?? null,
   station,
   status: 'completed',
@@ -1080,6 +1080,7 @@ const dbData = {
   has_new_damages: skadekontroll !== 'inga_nya_skador',
   completed_at: new Date().toISOString(),
 };
+
 
 
 // Filtrera bort null/undefined så API:t bara får “riktiga” värden
