@@ -955,9 +955,9 @@ const handleSubmitFinal = async () => {
   setIsFinalSaving(true);
   console.log('[UI] Slutför incheckning klickad');
 
-  const regOk = !!(form?.regnr && String(form.regnr).trim());
-  const placeOk = !!(form?.city || form?.ort);
-  const stationOk = !!(form?.station);
+  const regOk = !!(form.regnr && String(form.regnr).trim());
+  const placeOk = !!(form.city || form.ort);
+  const stationOk = !!(form.station);
 
   if (!regOk || !placeOk || !stationOk) {
     setIsFinalSaving(false);
