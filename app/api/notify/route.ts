@@ -44,13 +44,38 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as MailPayload;
 
-    // --- mottagare ---
-    const to = normRecipients(
-      body.to ?? process.env.NEXT_PUBLIC_TEST_MAIL ?? 'per.andersson@mabi.se'
-    );
-    if (to.length === 0) {
-      return NextResponse.json({ ok: false, error: 'NO_RECIPIENTS' }, { status: 400 });
-    }
+// --- mottagare ---
+
+// Bilkontroll → TEST om satt, annars BILKONTROLL
+const toQuality = normRecipients(
+  process.env.NEXT_PUBLIC_TEST_MAIL
+    ?? process.env.NEXT_PUBLIC_BILKONTROLL_MAIL
+    ?? ''
+);
+if (toQuality.length === 0) {
+  return NextResponse.json(
+    { ok: false, error: 'NO_RECIPIENTS_QUALITY' },
+    { status: 400 }
+  );
+}
+
+// Region-adress (syd@/mitt@/norr@) → TEST om satt, annars regions-env
+const region = (body.region ?? 'Syd') as 'Syd' | 'Mitt' | 'Norr';
+const toRegion = normRecipients(
+  process.env.NEXT_PUBLIC_TEST_MAIL
+    ?? (region === 'Syd'
+          ? process.env.NEXT_PUBLIC_MAIL_REGION_SYD
+          : region === 'Mitt'
+            ? process.env.NEXT_PUBLIC_MAIL_REGION_MITT
+            : process.env.NEXT_PUBLIC_MAIL_REGION_NORR)
+    ?? ''
+);
+if (toRegion.length === 0) {
+  return NextResponse.json(
+    { ok: false, error: 'NO_RECIPIENTS_REGION', region },
+    { status: 400 }
+  );
+}
 
     // --- ämnen + html ---
     const subjectBase = body.subjectBase ?? 'Incheckning';
@@ -63,33 +88,34 @@ export async function POST(req: Request) {
     }
     const from = process.env.RESEND_FROM ?? 'onboarding@resend.dev';
 
-    // 1) Bilkontroll
-    const r1 = await send(apiKey, {
-      from,
-      to,
-      subject: `${subjectBase} - Bilkontroll`,
-      html: `<p>Hej Bilkontroll!</p>${htmlBody}`,
-    });
-    if (!r1.ok) {
-      return NextResponse.json(
-        { ok: false, where: 'send1', status: r1.status, error: r1.error, payload: { from, to } },
-        { status: 500 }
-      );
-    }
+// 1) Bilkontroll
+const r1 = await send(apiKey, {
+  from,
+  to: toQuality,                             // ⬅️ viktig ändring
+  subject: `${subjectBase} - Bilkontroll`,
+  html: `<p>Hej Bilkontroll!</p>${htmlBody}`,
+});
+if (!r1.ok) {
+  return NextResponse.json(
+    { ok: false, where: 'send1', status: r1.status, error: r1.error, payload: { from, to: toQuality } },
+    { status: 500 }
+  );
+}
 
-    // 2) Region
-    const r2 = await send(apiKey, {
-      from,
-      to,
-      subject: `${subjectBase} - Region ${region}`,
-      html: `<p>Hej Region ${region}!</p>${htmlBody}`,
-    });
-    if (!r2.ok) {
-      return NextResponse.json(
-        { ok: false, where: 'send2', status: r2.status, error: r2.error, payload: { from, to } },
-        { status: 500 }
-      );
-    }
+// 2) Region
+const r2 = await send(apiKey, {
+  from,
+  to: toRegion,                              // ⬅️ viktig ändring
+  subject: `${subjectBase} - Region ${region}`,
+  html: `<p>Hej Region ${region}!</p>${htmlBody}`,
+});
+if (!r2.ok) {
+  return NextResponse.json(
+    { ok: false, where: 'send2', status: r2.status, error: r2.error, payload: { from, to: toRegion } },
+    { status: 500 }
+  );
+}
+
 
     return NextResponse.json({
       ok: true,
