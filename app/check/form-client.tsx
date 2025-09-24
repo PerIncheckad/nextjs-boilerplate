@@ -1060,7 +1060,7 @@ const dbData = {
   region: dbRegion,
   city: ort ?? null,
   station,
-  status: 'COMPLETED',
+  status: 'checked_in',
   notes: (preliminarAvslutNotering ?? '').trim() || null,
   odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
   fuel_full:
