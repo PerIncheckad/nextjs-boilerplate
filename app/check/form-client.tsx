@@ -1047,26 +1047,17 @@ const confirmFinalSave = async () => {
     
 
     
-// --- Spara till Supabase — matchar verkliga kolumner i `checkins` ---
+// --- Spara till Supabase — checkins ---
+// 1) Mappa 'Mitt'/'Norr'/'Syd' -> 'MITT'/'NORR'/'SYD' (krav från checkins_region_chk)
+const dbRegion =
+  region === 'Mitt' ? 'MITT' :
+  region === 'Norr' ? 'NORR' :
+  'SYD';
 
-// Boolean för full tank (tål "Fulltankad"/"Ej fulltankad")
-const fuelFull =
-  typeof tankniva === 'string'
-    ? (tankniva.toLowerCase().includes('full') && !tankniva.toLowerCase().includes('ej'))
-      ? true
-      : (tankniva.toLowerCase().includes('ej') ? false : null)
-    : null;
-
-// Bygg endast kolumner som finns i tabellen
-const dbRegion = (
-  region === 'Mitt' ? 'mitt' :
-  region === 'Norr' ? 'norr' :
-  'syd'
-) as 'syd' | 'mitt' | 'norr';
-
+// 2) Bygg objekt som matchar kolumner i `checkins`
 const dbData = {
   regnr: regForMail,
-  region: dbRegion,   // <-- lägg till kommatecken här
+  region: dbRegion,
   city: ort ?? null,
   station,
   status: 'completed',
@@ -1081,48 +1072,11 @@ const dbData = {
   completed_at: new Date().toISOString(),
 };
 
-
-
-// 1) Region i DB-format (måste vara 'NORR' | 'MITT' | 'SYD')
-const dbRegion =
-  region === 'Mitt' ? 'MITT' :
-  region === 'Norr' ? 'NORR' :
-  'SYD';
-
-// 2) Bygg data som finns i tabellen
-const dbData = {
-  regnr: regForMail,
-  region: dbRegion,
-  city: ort ?? null,
-  station,
-  status: 'completed',
-  notes: (preliminarAvslutNotering ?? '').trim() || null,
-  odometer_km: Number.isFinite(parseInt(matarstallning))
-    ? parseInt(matarstallning) : null,
-  fuel_full: fuelFull,
-  washer_ok: spolarvatska ?? null,
-  adblue_ok: drivmedelstyp === 'bensin_diesel' ? (adblue ?? null) : null,
-  privacy_cover_ok: insynsskydd ?? null,
-  rekond_behov: Boolean(needsRecond),
-  has_new_damages: skadekontroll !== 'inga_nya_skador',
-  completed_at: new Date().toISOString(),
-};
-
-// 3) Filtrera bort null/undefined så API:t bara får “riktiga” värden
+// 3) Skicka – EN gång
 const payload = Object.fromEntries(
-  Object.entries(dbData).filter(([_, v]) => v !== undefined && v !== null)
+  Object.entries(dbData).filter(([, v]) => v !== undefined && v !== null)
 );
 
-// 4) Debug-logg (innan insert)
-console.log('CHECKIN payload preview', {
-  humanRegion: region,           // 'Syd' | 'Mitt' | 'Norr' (UI)
-  dbRegion,                      // 'SYD' | 'MITT' | 'NORR' (DB)
-  payloadRegion: payload.region,
-  keys: Object.keys(payload),
-  sample: { region: payload.region, regnr: payload.regnr },
-});
-
-// 5) Spara till Supabase (EN gång)
 const { data: checkin, error: checkinError } = await supabase
   .from('checkins')
   .insert(payload)
