@@ -1083,22 +1083,58 @@ const dbData = {
 
 
 
-// Filtrera bort null/undefined så API:t bara får “riktiga” värden
+// 1) Region i DB-format (måste vara 'NORR' | 'MITT' | 'SYD')
+const dbRegion =
+  region === 'Mitt' ? 'MITT' :
+  region === 'Norr' ? 'NORR' :
+  'SYD';
+
+// 2) Bygg data som finns i tabellen
+const dbData = {
+  regnr: regForMail,
+  region: dbRegion,
+  city: ort ?? null,
+  station,
+  status: 'completed',
+  notes: (preliminarAvslutNotering ?? '').trim() || null,
+  odometer_km: Number.isFinite(parseInt(matarstallning))
+    ? parseInt(matarstallning) : null,
+  fuel_full: fuelFull,
+  washer_ok: spolarvatska ?? null,
+  adblue_ok: drivmedelstyp === 'bensin_diesel' ? (adblue ?? null) : null,
+  privacy_cover_ok: insynsskydd ?? null,
+  rekond_behov: Boolean(needsRecond),
+  has_new_damages: skadekontroll !== 'inga_nya_skador',
+  completed_at: new Date().toISOString(),
+};
+
+// 3) Filtrera bort null/undefined så API:t bara får “riktiga” värden
 const payload = Object.fromEntries(
   Object.entries(dbData).filter(([_, v]) => v !== undefined && v !== null)
 );
 
-// (valfritt) hjälp-logg
-console.log('CHECKIN payload keys →', Object.keys(payload));
+// 4) Debug-logg (innan insert)
+console.log('CHECKIN payload preview', {
+  humanRegion: region,           // 'Syd' | 'Mitt' | 'Norr' (UI)
+  dbRegion,                      // 'SYD' | 'MITT' | 'NORR' (DB)
+  payloadRegion: payload.region,
+  keys: Object.keys(payload),
+  sample: { region: payload.region, regnr: payload.regnr },
+});
 
-   
-    const { data: checkin, error: checkinError } = await supabase
-      .from('checkins')
-      .insert(payload)
-      .select()
-      .single();
-    
-    if (checkinError) throw checkinError;
+// 5) Spara till Supabase (EN gång)
+const { data: checkin, error: checkinError } = await supabase
+  .from('checkins')
+  .insert(payload)
+  .select()
+  .single();
+
+if (checkinError) {
+  console.error('CHECKIN insert error ->', checkinError);
+  alert('Något gick fel vid sparandet.');
+  return;
+}
+
     
 // Spara skador om de finns
 if (checkin && checkin.id) {
