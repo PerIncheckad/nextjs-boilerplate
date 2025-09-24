@@ -1064,7 +1064,10 @@ const confirmFinalSave = async () => {
       hjultyp,
       spolarvatska,
       insynsskydd,
-      adblue: drivmedelstyp === 'bensin_diesel' ? adblue : null,
+      // Om kolumnen är TEXT (rekommenderat i nuläget):
+adblue: drivmedelstyp === 'bensin_diesel' ? (adblue ? 'ok' : 'nej') : null,
+// (Om du i stället har gjort adblue = boolean i DB, behåll den gamla raden.)
+
       antal_laddkablar: drivmedelstyp === 'elbil' ? antalLaddkablar : null,
       tvatt,
       inre,
