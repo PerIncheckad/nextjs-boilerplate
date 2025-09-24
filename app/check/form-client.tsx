@@ -33,28 +33,18 @@ const REGION_HUB: Record<'NORR'|'MITT'|'SYD', string> = {
 };
 
 // OBS: vi kör test tills vidare → allt går hit
+/* === Mail routing config === */
 const TEST_MAIL = process.env.NEXT_PUBLIC_TEST_MAIL || 'per.andersson@mabi.se';
+const BILKONTROLL_MAIL = process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontroll@incheckad.se';
 
-// Valfritt: separat testadress för bilkontroll (annars samma som TEST_MAIL)
-const BILKONTROLL_MAIL =
-  process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'per.andersson@mabi.se';
-
-// Returnerar alltid testmottagare i nuläget
 function recipientsFor(region: 'NORR'|'MITT'|'SYD', target: 'station'|'quality') {
   const REGION_MAIL: Record<'NORR'|'MITT'|'SYD', string> = {
     NORR: 'norr@mabi.se',
     MITT: 'mitt@mabi.se',
     SYD:  'syd@mabi.se',
   };
-  const BILKONTROLL_MAIL = 'bilkontroll@incheckad.se';
   return [ target === 'quality' ? BILKONTROLL_MAIL : REGION_MAIL[region] ];
 }
-'|'MITT'|'SYD', target: 'station'|'quality') {
-  return [ target === 'quality' ? BILKONTROLL_MAIL : TEST_MAIL ];
-}
-
-
-
 type CarData = {
   regnr: string;
   brand_model: string | null;
