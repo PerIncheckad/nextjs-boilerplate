@@ -1057,17 +1057,15 @@ const fuelFull =
       : (tankniva.toLowerCase().includes('ej') ? false : null)
     : null;
 
-// Normalisera region till DB-format (kräver 'syd' | 'mitt' | 'norr')
-const regionDb =
-  (region || '').toLowerCase() === 'syd'  ? 'syd'  :
-  (region || '').toLowerCase() === 'mitt' ? 'mitt' :
-  (region || '').toLowerCase() === 'norr' ? 'norr' :
-  'syd';
+// Normalisera region till exakt 'Syd' | 'Mitt' | 'Norr'
+const region = normRegion(viewRow2?.region ?? form?.region ?? '');
+    
+
     
 // Bygg endast kolumner som finns i tabellen
 const dbData = {
   regnr: regForMail,
-  region: regionDb,           // <-- ändra från `region,` till detta
+  region,
   city: ort ?? null,
   station,
   status: 'completed',
