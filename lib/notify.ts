@@ -6,7 +6,6 @@ export async function notifyCheckin(params: {
   subjectBase: string;
   htmlBody: string;
   target: NotifyTarget;
-  // valfritt: extra info för logg
   meta?: Record<string, any>;
 }) {
   try {
@@ -15,12 +14,7 @@ export async function notifyCheckin(params: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params),
     });
-    if (!res.ok) {
-      const text = await res.text();
-      console.error('notifyCheckin failed:', res.status, text);
-      return { ok: false, status: res.status, text };
-    }
-    return { ok: true };
+    return { ok: res.ok, status: res.status, text: await res.text() };
   } catch (e) {
     console.error('notifyCheckin error:', e);
     return { ok: false, error: String(e) };
