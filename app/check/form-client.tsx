@@ -40,11 +40,12 @@ const BILKONTROLL_MAIL = process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontrol
 function recipientsFor(region: 'NORR'|'MITT'|'SYD', target: 'station'|'quality') {
     const FORCE = process.env.NEXT_PUBLIC_FORCE_DEBUG_EMAIL;
   if (FORCE) return [FORCE];
-  const REGION_MAIL: Record<'NORR'|'MITT'|'SYD', string> = {
-    NORR: 'norr@mabi.se',
-    MITT: 'mitt@mabi.se',
-    SYD:  'syd@mabi.se',
-  };
+const REGION_MAIL: Record<'NORR'|'MITT'|'SYD', string> = {
+  NORR: process.env.NEXT_PUBLIC_MAIL_REGION_NORR || 'norr@mabi.se',
+  MITT: process.env.NEXT_PUBLIC_MAIL_REGION_MITT || 'mitt@mabi.se',
+  SYD:  process.env.NEXT_PUBLIC_MAIL_REGION_SYD  || 'syd@mabi.se',
+};
+
   return [ target === 'quality' ? BILKONTROLL_MAIL : REGION_MAIL[region] ];
 }
 type CarData = {
