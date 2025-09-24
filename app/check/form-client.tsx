@@ -41,6 +41,15 @@ const BILKONTROLL_MAIL =
 
 // Returnerar alltid testmottagare i nuläget
 function recipientsFor(region: 'NORR'|'MITT'|'SYD', target: 'station'|'quality') {
+  const REGION_MAIL: Record<'NORR'|'MITT'|'SYD', string> = {
+    NORR: 'norr@mabi.se',
+    MITT: 'mitt@mabi.se',
+    SYD:  'syd@mabi.se',
+  };
+  const BILKONTROLL_MAIL = 'bilkontroll@incheckad.se';
+  return [ target === 'quality' ? BILKONTROLL_MAIL : REGION_MAIL[region] ];
+}
+'|'MITT'|'SYD', target: 'station'|'quality') {
   return [ target === 'quality' ? BILKONTROLL_MAIL : TEST_MAIL ];
 }
 
