@@ -38,6 +38,8 @@ const TEST_MAIL = process.env.NEXT_PUBLIC_TEST_MAIL || 'per.andersson@mabi.se';
 const BILKONTROLL_MAIL = process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontroll@incheckad.se';
 
 function recipientsFor(region: 'NORR'|'MITT'|'SYD', target: 'station'|'quality') {
+    const FORCE = process.env.NEXT_PUBLIC_FORCE_DEBUG_EMAIL;
+  if (FORCE) return [FORCE];
   const REGION_MAIL: Record<'NORR'|'MITT'|'SYD', string> = {
     NORR: 'norr@mabi.se',
     MITT: 'mitt@mabi.se',
