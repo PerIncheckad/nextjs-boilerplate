@@ -1558,6 +1558,7 @@ setSendMsg('Skickar till kvalitet…');
 if (res?.ok) {
 setSendState('ok');
 setSendMsg('Notis skickad ✅');
+setShowSuccessModal(true);
 } else {
 setSendState('fail');
 setSendMsg('Kunde inte skicka ❌');
