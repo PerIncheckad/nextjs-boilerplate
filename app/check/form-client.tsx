@@ -1538,31 +1538,32 @@ needsRecond,
 const sendNotify = async (target: 'station' | 'quality') => {
 try {
 // 1) Visa "skickar..." direkt
-if (target === 'station') {
-setSendState('sending-station');
-setSendMsg('Skickar till station…');
-} else {
-setSendState('sending-quality');
-setSendMsg('Skickar till kvalitet…');
-}
+setSendState('sending-both');
+setSendMsg('Skickar till station + kvalitet…');
+
 
 // 2) Bygg payload och hämta mottagare
-    const payload = buildNotifyPayload();
-    const to = recipientsFor(payload.region, target);
+const payload = buildNotifyPayload();
+const toStation = recipientsFor(payload.region, 'station');
+const toQuality = recipientsFor(payload.region, 'quality');
 
 
     // 3) Skicka
-    const res = await notifyCheckin({ ...payload, recipients: to });
+const [resStation, resQuality] = await Promise.all([
+  notifyCheckin({ ...payload, recipients: toStation, target: 'station' }),
+  notifyCheckin({ ...payload, recipients: toQuality, target: 'quality' }),
+]);
 
 // 4) Visa resultat
-if (res?.ok) {
-setSendState('ok');
-setSendMsg('Notis skickad ✅');
-setShowSuccessModal(true);
+if (resStation?.ok && resQuality?.ok) {
+  setSendState('ok');
+  setSendMsg('Notiser skickade ✅');
+  setShowSuccessModal(true);
 } else {
-setSendState('fail');
-setSendMsg('Kunde inte skicka ❌');
+  setSendState('fail');
+  setSendMsg('Kunde inte skicka ❌');
 }
+
 } catch (err) {
 console.error('notify fail', err);
 setSendState('fail');
