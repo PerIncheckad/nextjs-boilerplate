@@ -1154,6 +1154,7 @@ if (checkin && checkin.id) {
   }
 } // <-- exakt EN stängning för if-blocket här
 
+setShowSuccessModal(true); // mejlet skickas senare via sendTo(); undvik dublett + htmlBody-fel
 
   } catch (e) {
     console.error('Fel vid sparande:', e);
@@ -1163,7 +1164,6 @@ if (checkin && checkin.id) {
 
 
 
-setShowSuccessModal(true); // mejlet skickas senare via sendTo(); undvik dublett + htmlBody-fel
 
   // Autocomplete från 2 tecken
   const handleRegInputChange = (value: string) => {
