@@ -1166,7 +1166,6 @@ return;
 
 
 
-setShowSuccessModal(true);
 };
 
 
