@@ -1544,18 +1544,13 @@ setSendMsg('Skickar till station + kvalitet…');
 
 // 2) Bygg payload och hämta mottagare
 const payload = buildNotifyPayload();
-const toStation = recipientsFor(payload.region, 'station');
-const toQuality = recipientsFor(payload.region, 'quality');
-
 
     // 3) Skicka
-const [resStation, resQuality] = await Promise.all([
-  notifyCheckin({ ...payload, recipients: toStation, target: 'station' }),
-  notifyCheckin({ ...payload, recipients: toQuality, target: 'quality' }),
-]);
+// 3) Skicka – låt servern sköta båda mejlen internt
+const res = await notifyCheckin({ ...payload });
 
 // 4) Visa resultat
-if (resStation?.ok && resQuality?.ok) {
+if (res?.ok) {
   setSendState('ok');
   setSendMsg('Notiser skickade ✅');
   setShowSuccessModal(true);
