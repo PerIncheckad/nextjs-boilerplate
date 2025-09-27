@@ -1559,13 +1559,7 @@ setSendMsg('Skickar till kvalitet…');
 // 2) Bygg payload och hämta mottagare
     const payload = buildNotifyPayload();
     const to = recipientsFor(payload.region, target);
-const payload = buildNotifyPayload();
 
-// Bestäm regionnyckel från ort (NORR|MITT|SYD) – använd samma källa överallt
-const _rawRegion = ((ORT_TILL_REGION?.[ort] ?? 'SYD') as 'NORR'|'MITT'|'SYD');
-
-const to = recipientsFor(_rawRegion, target);
-const res = await notifyCheckin({ ...payload, recipients: to });
 
     // 3) Skicka
     const res = await notifyCheckin({ ...payload, recipients: to });
