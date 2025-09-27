@@ -1,131 +1,61 @@
-// app/api/notify/route.ts
-export const runtime = 'nodejs';
-
 import { NextResponse } from 'next/server';
+import { Resend } from 'resend';
 
-type MailPayload = {
-  to?: string | string[];
-  region?: 'Syd' | 'Mitt' | 'Norr';
-  subjectBase?: string;
-  htmlBody?: string;
-};
+const resend = new Resend(process.env.RESEND_API_KEY!);
 
-function normRecipients(input?: string | string[]): string[] {
-  const raw = Array.isArray(input) ? input : (input ? [input] : []);
-  const cleaned = raw.map(s => String(s || '').trim()).filter(Boolean);
-  return Array.from(new Set(cleaned));
-}
+type Region = 'NORR' | 'MITT' | 'SYD';
 
-async function send(apiKey: string, body: {
-  from: string; to: string[]; subject: string; html: string;
-}) {
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: body.from,
-      to: body.to,
-      subject: body.subject,
-      html: body.html,
-    }),
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    return { ok: false as const, status: res.status, error: data };
-  }
-  return { ok: true as const, status: res.status, id: data?.id ?? null, data };
+function recipients(region: Region, target: 'station' | 'quality', force?: string | null) {
+  if (force) return [force];
+  const REGION_MAIL: Record<Region, string> = {
+    NORR: process.env.NEXT_PUBLIC_MAIL_REGION_NORR || 'norr@mabi.se',
+    MITT: process.env.NEXT_PUBLIC_MAIL_REGION_MITT || 'mitt@mabi.se',
+    SYD:  process.env.NEXT_PUBLIC_MAIL_REGION_SYD  || 'syd@mabi.se',
+  };
+  const BILKONTROLL = process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontroll@incheckad.se';
+  return [target === 'quality' ? BILKONTROLL : REGION_MAIL[region]];
 }
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as MailPayload;
+    const body = await req.json();
 
-    // --- mottagare ---
+    const region: Region = body?.region ?? 'SYD';
+    const regionTitle: string =
+      body?.regionTitle ?? (region === 'NORR' ? 'Norr' : region === 'MITT' ? 'Mitt' : 'Syd');
+    const subjectBase: string = body?.subjectBase ?? 'Incheckning';
+    const htmlBody: string = body?.htmlBody ?? `<pre>${JSON.stringify(body, null, 2)}</pre>`;
 
-    // Bilkontroll → TEST om satt, annars BILKONTROLL
-    const toQuality = normRecipients(
-      process.env.NEXT_PUBLIC_TEST_MAIL
-        ?? process.env.NEXT_PUBLIC_BILKONTROLL_MAIL
-        ?? ''
-    );
-    if (toQuality.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: 'NO_RECIPIENTS_QUALITY' },
-        { status: 400 }
-      );
-    }
+    // FORCE → allt till per@incheckad.se i test
+    const FORCE =
+      process.env.NEXT_PUBLIC_FORCE_DEBUG_EMAIL ||
+      process.env.NEXT_PUBLIC_TEST_MAIL ||
+      null;
 
-    // Region (syd@/mitt@/norr@) → TEST om satt, annars regions-env
-    const region = (body.region ?? 'Syd') as 'Syd' | 'Mitt' | 'Norr';
-    const toRegion = normRecipients(
-      process.env.NEXT_PUBLIC_TEST_MAIL
-        ?? (region === 'Syd'
-              ? process.env.NEXT_PUBLIC_MAIL_REGION_SYD
-              : region === 'Mitt'
-                ? process.env.NEXT_PUBLIC_MAIL_REGION_MITT
-                : process.env.NEXT_PUBLIC_MAIL_REGION_NORR)
-        ?? ''
-    );
-    if (toRegion.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: 'NO_RECIPIENTS_REGION', region },
-        { status: 400 }
-      );
-    }
+    const toStation = recipients(region, 'station', FORCE);
+    const toQuality = recipients(region, 'quality', FORCE);
 
-    // --- ämnen + html ---
-    const subjectBase = body.subjectBase ?? 'Incheckning';
-    const htmlBody = body.htmlBody ?? '';
+    // Skicka sekventiellt (minskar risk för 429)
+    const sent1 = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: toStation,
+      subject: `${subjectBase} – Region ${regionTitle}`,
+      html: htmlBody,
+    });
 
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ ok: false, error: 'MISSING_RESEND_API_KEY' }, { status: 500 });
-    }
-    const from = process.env.RESEND_FROM ?? 'onboarding@resend.dev';
+    await new Promise((r) => setTimeout(r, 400)); // liten paus
 
-    // 1) Bilkontroll
-    const r1 = await send(apiKey, {
-      from,
+    const sent2 = await resend.emails.send({
+      from: 'onboarding@resend.dev',
       to: toQuality,
-      subject: `${subjectBase} - Bilkontroll`,
-      html: `<p>Hej Bilkontroll!</p>${htmlBody}`,
+      subject: `${subjectBase} – Bilkontroll`,
+      html: htmlBody,
     });
-    if (!r1.ok) {
-      return NextResponse.json(
-        { ok: false, where: 'send1', status: r1.status, error: r1.error, payload: { from, to: toQuality } },
-        { status: 500 }
-      );
-    }
 
-    // 2) Region
-    const r2 = await send(apiKey, {
-      from,
-      to: toRegion,
-      subject: `${subjectBase} - Region ${region}`,
-      html: `<p>Hej Region ${region}!</p>${htmlBody}`,
-    });
-    if (!r2.ok) {
-      return NextResponse.json(
-        { ok: false, where: 'send2', status: r2.status, error: r2.error, payload: { from, to: toRegion } },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      ids: [r1.id, r2.id],
-      from,
-      recipients: { quality: toQuality, region: toRegion },
-      keyPrefix: (process.env.RESEND_API_KEY ?? '').slice(0, 7),
-    });
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: String(err?.message ?? err) },
-      { status: 500 }
-    );
+    const ok = Boolean(sent1?.id) && Boolean(sent2?.id);
+    return NextResponse.json({ ok, where: 'server-both', toStation, toQuality });
+  } catch (e: any) {
+    const status = e?.statusCode || 500;
+    return NextResponse.json({ ok: false, where: 'route', status, error: e }, { status });
   }
 }
