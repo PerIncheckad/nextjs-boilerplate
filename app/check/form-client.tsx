@@ -1163,16 +1163,7 @@ return;
 
   // Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
 // Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
-const _rawRegion = ((ORT_TILL_REGION?.[ort] ?? 'SYD') as 'NORR'|'MITT'|'SYD');
-const _regionTitle = _rawRegion === 'NORR' ? 'Norr' : _rawRegion === 'MITT' ? 'Mitt' : 'Syd';
 
-await notifyCheckin({
-subjectBase: 'Incheckning',
-  region,     // samma region-variabel du redan använder
-  htmlBody,   // den färdiga HTML du redan bygger till mejlet
-  region: _regionTitle,   // <-- skicka titelcase till servern
-  htmlBody,
-});
 
 
 setShowSuccessModal(true);
