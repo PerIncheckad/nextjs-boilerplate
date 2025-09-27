@@ -1161,9 +1161,7 @@ if (checkin && checkin.id) {
     return;
   }
 
-// Skicka mejl (servern väljer mottagare: Bilkontroll + Region)  
-const _rawRegion = ((ORT_TILL_REGION?.[ort] ?? 'SYD') as 'NORR'|'MITT'|'SYD');
-const _regionTitle = _rawRegion === 'NORR' ? 'Norr' : _rawRegion === 'MITT' ? 'Mitt' : 'Syd';
+
 
 setShowSuccessModal(true); // mejlet skickas senare via sendTo(); undvik dublett + htmlBody-fel
 
