@@ -2507,7 +2507,10 @@ Spara utkast
 <button
 id="btn-final"
 type="button"
-onClick={handleSubmitFinal}
+onClick={async () => {
+  await handleSubmitFinal();     // gör klart DB-spar/”slutför”
+  await sendNotify('station');   // skickar två mejl (station + kvalitet)
+}}
 disabled={isFinalSaving}
 style={{
 padding: '12px 24px',
