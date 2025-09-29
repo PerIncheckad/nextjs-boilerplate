@@ -1617,36 +1617,7 @@ setTimeout(() => setSendState('idle'), 4000);
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 // --- Hjälpare: uppdatera befintlig skada + kort confirm ---
-function markExistingWithConfirm(
-  id: string,
-  newStatus: 'documented' | 'fixed' | 'not_found'
-) {
-  // Fråga bara när vi sätter till 'fixed' eller 'not_found'
-  if (newStatus !== 'documented') {
-    if (!confirm('Är du säker? (Detta går att ångra.)')) return;
-  }
 
-  // Uppdatera Mapen så att UI rerenderar direkt
-  setDocumentedExisting((prev) => {
-    const m = new Map(prev);
-    const key = String(id);
-    const row =
-      m.get(key) ??
-      ({
-        id: key,
-        status: null,
-        media: [],
-      } as {
-        id: string;
-        status: 'documented' | 'resolved' | 'not_found' | null;
-        media: MediaFile[];
-      });
-
-    row.status = newStatus;
-    m.set(key, row);
-    return m;
-  });
-}
   
 const canSend = isRegComplete() && isLocationComplete();
 
