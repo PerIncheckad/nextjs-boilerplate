@@ -1616,15 +1616,7 @@ setTimeout(() => setSendState('idle'), 4000);
 // Små wrappers – enkla att koppla på knappar
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
-// --- Hjälpare: uppdatera befintlig skada + kort confirm ---
-function markExistingWithConfirm(
-id: string,
-newStatus: 'documented' | 'fixed' | 'not_found'
-) {
-// Fråga bara när vi sätter till 'fixed' eller 'not_found'
-if (newStatus !== 'documented') {
-if (!confirm('Är du säker? (Detta går att ångra.)')) return;
-}
+
 
 // Uppdatera Mapen så att UI rerenderar direkt
 setDocumentedExisting((prev) => {
