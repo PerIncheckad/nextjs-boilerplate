@@ -1646,7 +1646,7 @@ function markExistingWithConfirm(
     m.set(key, row);
     return m;
   });
-}
+
   
 const canSend = isRegComplete() && isLocationComplete();
 
@@ -2091,7 +2091,7 @@ backgroundColor: status === 'documented' ? '#f0fdf4' : '#f9fafb'
       marginLeft: '8px',
     }}
   >
-    {status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+    {damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
   </button>
 </div>
 
@@ -2105,14 +2105,14 @@ Foto krävs, video frivilligt
 </p>
 {/* Här kommer MediaUpload-komponenten senare */}
 <MediaUpload
-
-damageId={damage.id}
-isOld={true}
-onMediaUpdate={updateExistingDamageMedia}
-hasImage={hasPhoto(media)}
-hasVideo={hasVideo(media)}
-videoRequired={false}
+  damageId={damage.id}
+  isOld={true}
+  onMediaUpdate={updateExistingDamageMedia}
+  hasImage={hasPhoto(damage.media)}
+  hasVideo={hasVideo(damage.media)}
+  videoRequired={false}
 />
+
 
 {media && media.length > 0 && (
 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
