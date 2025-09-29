@@ -805,7 +805,8 @@ if (isNaN(laddnivaParsed) || laddnivaParsed < 0 || laddnivaParsed > 100) return 
 return insynsskydd !== null && hjultyp !== null;
 };
 
-const isCleaningComplete = () => tvatt !== null && inre !== null;
+// Tillfälligt: tvätt/inre-frågor borttagna → blockera inte
+const isCleaningComplete = () => true;
 
 const isDamagesComplete = () => {
 if (!skadekontroll) return false;
@@ -899,8 +900,7 @@ setInsynsskydd(null);
 setAntalLaddkablar(null);
 setHjultyp(null);
 setAdblue(null);
-setTvatt(null);
-setInre(null);
+
 setSkadekontroll(null);
 setNewDamages([]);
 setUthyrningsstatus(null);
@@ -991,7 +991,7 @@ const regForMail = String(regInput || '').toUpperCase();
 
 // Kontrollera om mejl ska skickas
 const hasNewDamages = skadekontroll === 'nya_skador' && newDamages.length > 0;
-const needsRecond = tvatt !== 'behover_inte_tvattas' || inre === 'behover_rengoras_inuti';
+const needsRecond = Boolean(behoverRekond);
 const hasIssues = !insynsskydd || spolarvatska === false || (drivmedelstyp === 'bensin_diesel' && adblue === false);
 
 // Dokumenterade befintliga skador (första gången de dokumenteras)
@@ -1519,8 +1519,8 @@ const stationName = annanPlats
 const hasNewDamages =
 skadekontroll === 'nya_skador' || newDamages.length > 0;
 
-// Behöver rekond/tvätt? (om inte uttryckligen rent)
-const needsRecond = tvatt === 'behover_tvattas';
+// Behöver rekond? – styrs nu av radiovalet (Ja/Nej)
+const needsRecond = Boolean(behoverRekond);
 
 
 return {
