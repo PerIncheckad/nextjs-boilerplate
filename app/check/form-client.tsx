@@ -2039,30 +2039,30 @@ backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
   </button>
 
   {/* 2) Åtgärdad/hittar inte – med bekräftelse när man sätter till åtgärdad */}
-  <button
-    onClick={() => {
-      if (damage.status === 'fixed') {
-        // Tillåt att ta bort åtgärdad-markeringen utan bekräftelse
-        toggleExistingDamageStatus(damage.id, 'fixed');
-      } else {
-        if (confirm('Är du säker på att markera skadan som "Åtgärdad/hittar inte"? (Detta går att ångra)')) {
-          toggleExistingDamageStatus(damage.id, 'fixed');
-        }
+<button
+  onClick={() => {
+    if (damage.status === 'resolved') {
+      // ta bort "åtgärdad" utan confirm
+      toggleExistingDamageStatus(damage.id, 'resolved');
+    } else {
+      if (confirm('Är du säker? (Detta går att ångra.)')) {
+        toggleExistingDamageStatus(damage.id, 'resolved');
       }
-    }}
-    style={{
-      padding: '8px 16px',
-      backgroundColor: damage.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
-      color: damage.status === 'fixed' ? '#ffffff' : '#374151',
-      border: 'none',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      marginLeft: '8px',
-    }}
-  >
-    {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdat/hittar inte'}
-  </button>
-</div>
+    }
+  }}
+  style={{
+    padding: '8px 16px',
+    backgroundColor: damage.status === 'resolved' ? '#f59e0b' : '#e5e7eb',
+    color: damage.status === 'resolved' ? '#ffffff' : '#374151',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    marginLeft: '8px',
+  }}
+>
+  {damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdat/hittar inte'}
+</button>
+
 
 
 {damage.status === 'documented' && (
