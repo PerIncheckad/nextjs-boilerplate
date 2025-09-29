@@ -2436,31 +2436,78 @@ border: '2px solid #3b82f6'
 }}>
 <h2 style={{ color: '#3b82f6', marginBottom: '16px' }}>Kontrollista - Allt måste vara OK</h2>
 <div style={{ display: 'grid', gap: '12px' }}>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ Insynsskydd OK
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ Dekal djur OK
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ Dekal rökning OK
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ Isskrapa OK
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ P-skiva OK
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ Skylt reg.plåt OK
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ Dekal GPS OK
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-<input type="checkbox" /> ✓ Bilen tvättad
-</label>
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
+    ✓ Insynsskydd OK
+  </label>
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={dekalDjurOK} onChange={e => setDekalDjurOK(e.target.checked)} />
+    ✓ Dekal djur OK
+  </label>
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={dekalRokningOK} onChange={e => setDekalRokningOK(e.target.checked)} />
+    ✓ Dekal rökning OK
+  </label>
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
+    ✓ Isskrapa OK
+  </label>
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
+    ✓ P-skiva OK
+  </label>
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
+    ✓ Skylt reg.plåt OK
+  </label>
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
+    ✓ Dekal GPS OK
+  </label>
+
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={washed} onChange={e => setWashed(e.target.checked)} />
+    ✓ Bilen tvättad
+  </label>
 </div>
+
+{/* Rekond (radio: Ja/Nej med confirm på Ja) */}
+<div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #dc2626' }}>
+  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#dc2626', fontWeight: 'bold' }}>
+    <span>⚠️ Behöver rekond</span>
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <input
+        type="radio"
+        name="rekond"
+        checked={behoverRekond === false}
+        onChange={() => setBehoverRekond(false)}
+      />
+      Nej
+    </label>
+    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+      <input
+        type="radio"
+        name="rekond"
+        checked={behoverRekond === true}
+        onChange={() => {
+          if (behoverRekond !== true) {
+            const ok = confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)');
+            if (!ok) return;
+          }
+          setBehoverRekond(true);
+        }}
+      />
+      Ja
+    </label>
+  </div>
+</div>
+
 
 <div style={{ 
 marginTop: '16px', 
@@ -2506,7 +2553,7 @@ onClick={async () => {
   await handleSubmitFinal();     // gör klart DB-spar/”slutför”
   await sendNotify('station');   // skickar två mejl (station + kvalitet)
 }}
-disabled={isFinalSaving}
+disabled={isFinalSaving || !isChecklistComplete}
 style={{
 padding: '12px 24px',
 backgroundColor: isFinalSaving ? '#16a34a80' : '#16a34a',
