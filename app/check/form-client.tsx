@@ -88,19 +88,7 @@ const hasVideo = (files?: MediaFile[]) =>
 // === Checklist state (allt måste vara OK för slutför) ===
 
 
-// Rekond: Ja/Nej (med confirm på Ja)
-const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
 
-// Summering för “Slutför incheckning”
-const isChecklistComplete =
-  insynsskyddOK &&
-  dekalDjurOK &&
-  dekalRokningOK &&
-  isskrapaOK &&
-  pskivaOK &&
-  skyltRegplatOK &&
-  dekalGpsOK &&
-  washed;
 
 Array.isArray(files) && files.some(f => f && f.type === 'video');
 
@@ -492,6 +480,17 @@ const [pskivaOK, setPskivaOK] = useState(false);
 const [skyltRegplatOK, setSkyltRegplatOK] = useState(false);
 const [dekalGpsOK, setDekalGpsOK] = useState(false);
 const [washed, setWashed] = useState(false);
+  // Summering för “Slutför incheckning”
+const isChecklistComplete =
+  insynsskyddOK &&
+  dekalDjurOK &&
+  dekalRokningOK &&
+  isskrapaOK &&
+  pskivaOK &&
+  skyltRegplatOK &&
+  dekalGpsOK &&
+  washed;
+
 // Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
 const [documentedExisting, setDocumentedExisting] = useState<
 { id: string; status: 'documented' | 'resolved' | null; media: MediaFile[] }[]
