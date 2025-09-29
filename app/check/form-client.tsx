@@ -84,6 +84,7 @@ const hasPhoto = (files?: MediaFile[]) =>
 Array.isArray(files) && files.some(f => f && f.type === 'image');
 
 const hasVideo = (files?: MediaFile[]) =>
+  Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
 // === Checklist state (allt måste vara OK för slutför) ===
 const [insynsskyddOK, setInsynsskyddOK] = useState(false);
 const [dekalDjurOK, setDekalDjurOK] = useState(false);
