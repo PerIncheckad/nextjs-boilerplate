@@ -84,6 +84,30 @@ const hasPhoto = (files?: MediaFile[]) =>
 Array.isArray(files) && files.some(f => f && f.type === 'image');
 
 const hasVideo = (files?: MediaFile[]) =>
+// === Checklist state (allt måste vara OK för slutför) ===
+const [insynsskyddOK, setInsynsskyddOK] = useState(false);
+const [dekalDjurOK, setDekalDjurOK] = useState(false);
+const [dekalRokningOK, setDekalRokningOK] = useState(false);
+const [isskrapaOK, setIsskrapaOK] = useState(false);
+const [pskivaOK, setPskivaOK] = useState(false);
+const [skyltRegplatOK, setSkyltRegplatOK] = useState(false);
+const [dekalGpsOK, setDekalGpsOK] = useState(false);
+const [washed, setWashed] = useState(false);
+
+// Rekond: Ja/Nej (med confirm på Ja)
+const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
+
+// Summering för “Slutför incheckning”
+const isChecklistComplete =
+  insynsskyddOK &&
+  dekalDjurOK &&
+  dekalRokningOK &&
+  isskrapaOK &&
+  pskivaOK &&
+  skyltRegplatOK &&
+  dekalGpsOK &&
+  washed;
+
 Array.isArray(files) && files.some(f => f && f.type === 'video');
 
 // KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
