@@ -84,26 +84,26 @@ const hasPhoto = (files?: MediaFile[]) =>
 Array.isArray(files) && files.some(f => f && f.type === 'image');
 
 const hasVideo = (files?: MediaFile[]) =>
-  Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
+Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
 // === Checklist state (allt måste vara OK för slutför) ===
 
 // --- Helpers: uppdatera befintlig skada med confirm ---
 function markExistingWithConfirm(
-  id: string,
-  newStatus: 'documented' | 'resolved' | 'not_found'
+id: string,
+newStatus: 'documented' | 'resolved' | 'not_found'
 ) {
 if (newStatus !== 'documented') {
-  const msg = 'Är du säker? (Detta går att ångra.)';
-  if (!confirm(msg)) return;
+const msg = 'Är du säker? (Detta går att ångra.)';
+if (!confirm(msg)) return;
 }
 
-  setDocumentedExisting(prev => {
-    const m = new Map(prev);
-    const row = m.get(String(id)) ?? { id: String(id), status: null, media: [] };
-    row.status = newStatus;
-    m.set(String(id), row);
-    return m;
-  });
+setDocumentedExisting(prev => {
+const m = new Map(prev);
+const row = m.get(String(id)) ?? { id: String(id), status: null, media: [] };
+row.status = newStatus;
+m.set(String(id), row);
+return m;
+});
 }
 
 
@@ -489,7 +489,7 @@ const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
 
 // Skador
 const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
-  const [insynsskyddOK, setInsynsskyddOK] = useState(false);
+const [insynsskyddOK, setInsynsskyddOK] = useState(false);
 const [dekalDjurOK, setDekalDjurOK] = useState(false);
 const [dekalRokningOK, setDekalRokningOK] = useState(false);
 const [isskrapaOK, setIsskrapaOK] = useState(false);
@@ -497,20 +497,20 @@ const [pskivaOK, setPskivaOK] = useState(false);
 const [skyltRegplatOK, setSkyltRegplatOK] = useState(false);
 const [dekalGpsOK, setDekalGpsOK] = useState(false);
 const [washed, setWashed] = useState(false);
-  // Summering för “Slutför incheckning”
+// Summering för “Slutför incheckning”
 const isChecklistComplete =
-  insynsskyddOK &&
-  dekalDjurOK &&
-  dekalRokningOK &&
-  isskrapaOK &&
-  pskivaOK &&
-  skyltRegplatOK &&
-  dekalGpsOK &&
-  washed;
+insynsskyddOK &&
+dekalDjurOK &&
+dekalRokningOK &&
+isskrapaOK &&
+pskivaOK &&
+skyltRegplatOK &&
+dekalGpsOK &&
+washed;
 
 // Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
 const [documentedExisting, setDocumentedExisting] = useState<
-  { id: string; status: 'documented' | 'resolved' | 'not_found' | null; media: MediaFile[] }[]
+{ id: string; status: 'documented' | 'resolved' | 'not_found' | null; media: MediaFile[] }[]
 >([]);
 
 useEffect(() => {
@@ -1053,42 +1053,42 @@ const sendToStation = hasNewDamages || needsRecond;
 
 // Bygg mejlinnehåll
 const htmlBody = `
-     <h2>Incheckning ${regForMail}</h2>
-     <p><b>Bilmodell:</b> ${carModel || 'Okänd'}</p>
-     <p><b>Ort/Station:</b> ${ort} / ${station}</p>
-     <p><b>Incheckare:</b> ${firstName}</p>
-     <p><b>Mätarställning:</b> ${matarstallning} km</p>
-     
-     <h3>Tankstatus</h3>
-     <p>${drivmedelstyp === 'elbil' 
-       ? `Laddning: ${laddniva}%` 
-       : `Tank: ${tankniva === 'fulltankad' ? 'Fulltankad' : 
-           tankniva === 'pafylld_nu' ? `Påfylld ${liters}L ${bransletyp} (${literpris} kr/L)` : 
-           'Tankas senare'}`}</p>
-     
-     ${hasNewlyDocumented ? `
-       <h3>Befintliga skador (nyligen dokumenterade)</h3>
-       <ul>
-         ${documentedExisting.map(d => `
-           <li>${d.userType || d.fullText} - ${d.userCarPart || ''} ${d.userPosition || ''}</li>
-         `).join('')}
-       </ul>
-     ` : ''}
-     
-     ${hasNewDamages ? `
-       <h3>NYA SKADOR</h3>
-       <ul>
-         ${newDamages.map(d => `
-           <li><b>${d.type}</b> - ${d.carPart} ${d.position} - ${d.text}</li>
-         `).join('')}
-       </ul>
-     ` : ''}
-     
-     ${needsRecond ? '<p><b>⚠️ BEHÖVER REKOND/TVÄTT</b></p>' : ''}
-     ${hasIssues ? '<p><b>⚠️ AVVIKELSER: Kontrollera insynsskydd/vätskor</b></p>' : ''}
-     
-     <p><b>Kommentarer:</b> ${preliminarAvslutNotering || 'Inga'}</p>
-   `;
+    <h2>Incheckning ${regForMail}</h2>
+    <p><b>Bilmodell:</b> ${carModel || 'Okänd'}</p>
+    <p><b>Ort/Station:</b> ${ort} / ${station}</p>
+    <p><b>Incheckare:</b> ${firstName}</p>
+    <p><b>Mätarställning:</b> ${matarstallning} km</p>
+    
+    <h3>Tankstatus</h3>
+    <p>${drivmedelstyp === 'elbil' 
+      ? `Laddning: ${laddniva}%` 
+      : `Tank: ${tankniva === 'fulltankad' ? 'Fulltankad' : 
+          tankniva === 'pafylld_nu' ? `Påfylld ${liters}L ${bransletyp} (${literpris} kr/L)` : 
+          'Tankas senare'}`}</p>
+    
+    ${hasNewlyDocumented ? `
+      <h3>Befintliga skador (nyligen dokumenterade)</h3>
+      <ul>
+        ${documentedExisting.map(d => `
+          <li>${d.userType || d.fullText} - ${d.userCarPart || ''} ${d.userPosition || ''}</li>
+        `).join('')}
+      </ul>
+    ` : ''}
+    
+    ${hasNewDamages ? `
+      <h3>NYA SKADOR</h3>
+      <ul>
+        ${newDamages.map(d => `
+          <li><b>${d.type}</b> - ${d.carPart} ${d.position} - ${d.text}</li>
+        `).join('')}
+      </ul>
+    ` : ''}
+    
+    ${needsRecond ? '<p><b>⚠️ BEHÖVER REKOND/TVÄTT</b></p>' : ''}
+    ${hasIssues ? '<p><b>⚠️ AVVIKELSER: Kontrollera insynsskydd/vätskor</b></p>' : ''}
+    
+    <p><b>Kommentarer:</b> ${preliminarAvslutNotering || 'Inga'}</p>
+  `;
 
 
 
@@ -1204,7 +1204,7 @@ alert('Något gick fel vid sparandet.');
 return;
 }
 
-  // Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
+// Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
 // Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
 
 
@@ -1588,18 +1588,18 @@ setSendMsg('Skickar till station + kvalitet…');
 // 2) Bygg payload och hämta mottagare
 const payload = buildNotifyPayload();
 
-    // 3) Skicka
+// 3) Skicka
 // 3) Skicka – låt servern sköta båda mejlen internt
 const res = await notifyCheckin({ ...payload });
 
 // 4) Visa resultat
 if (res?.ok) {
-  setSendState('ok');
-  setSendMsg('Notiser skickade ✅');
-  setShowSuccessModal(true);
+setSendState('ok');
+setSendMsg('Notiser skickade ✅');
+setShowSuccessModal(true);
 } else {
-  setSendState('fail');
-  setSendMsg('Kunde inte skicka ❌');
+setSendState('fail');
+setSendMsg('Kunde inte skicka ❌');
 }
 
 } catch (err) {
@@ -1617,8 +1617,39 @@ setTimeout(() => setSendState('idle'), 4000);
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 // --- Hjälpare: uppdatera befintlig skada + kort confirm ---
+function markExistingWithConfirm(
+id: string,
+newStatus: 'documented' | 'fixed' | 'not_found'
+) {
+// Fråga bara när vi sätter till 'fixed' eller 'not_found'
+if (newStatus !== 'documented') {
+if (!confirm('Är du säker? (Detta går att ångra.)')) return;
+}
 
-  
+// Uppdatera Mapen så att UI rerenderar direkt
+setDocumentedExisting((prev) => {
+const m = new Map(prev);
+const key = String(id);
+const row =
+m.get(key) ??
+({
+id: key,
+status: null,
+media: [],
+} as {
+id: string;
+        status: 'documented' | 'fixed' | 'not_found' | null;
+        status: 'documented' | 'resolved' | 'not_found' | null;
+media: MediaFile[];
+});
+
+row.status = newStatus;
+m.set(key, row);
+return m;
+});
+
+}
+
 const canSend = isRegComplete() && isLocationComplete();
 
 return ( 
@@ -2013,11 +2044,11 @@ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
 Dessa skador finns redan registrerade. Dokumentera dem med foto.
 </p>
 {existingDamages.map((damage) => {
-  const ui = documentedExisting.get(String(damage.id));
-  const status = ui?.status ?? damage.status;
-  const media = ui?.media ?? damage.media ?? [];
+const ui = documentedExisting.get(String(damage.id));
+const status = ui?.status ?? damage.status;
+const media = ui?.media ?? damage.media ?? [];
 
-  return (
+return (
 <div key={damage.id} style={{
 padding: '16px',
 marginBottom: '12px',
@@ -2030,40 +2061,40 @@ backgroundColor: status === 'documented' ? '#f0fdf4' : '#f9fafb'
 </div>
 
 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-  {/* 1) Dokumentera / Dokumenterad */}
-  <button
-    onClick={() =>
-      markExistingWithConfirm(damage.id, 'documented')
-    }
-    style={{
-      padding: '8px 16px',
-      backgroundColor: status === 'documented' ? '#10b981' : '#e5e7eb',
-      color: status === 'documented' ? '#ffffff' : '#374151',
-      border: 'none',
-      borderRadius: '6px',
-      cursor: 'pointer',
-    }}
-  >
-    {status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
-  </button>
+{/* 1) Dokumentera / Dokumenterad */}
+<button
+onClick={() =>
+markExistingWithConfirm(damage.id, 'documented')
+}
+style={{
+padding: '8px 16px',
+backgroundColor: status === 'documented' ? '#10b981' : '#e5e7eb',
+color: status === 'documented' ? '#ffffff' : '#374151',
+border: 'none',
+borderRadius: '6px',
+cursor: 'pointer',
+}}
+>
+{status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
+</button>
 
-  {/* 2) Åtgärdad/hittar inte – med bekräftelse */}
-  <button
-    onClick={() =>
-      markExistingWithConfirm(damage.id, 'resolved')
-    }
-    style={{
-      padding: '8px 16px',
-      backgroundColor: status === 'resolved' ? '#f59e0b' : '#e5e7eb',
-      color: status === 'resolved' ? '#ffffff' : '#374151',
-      border: 'none',
-      borderRadius: '6px',
-      cursor: 'pointer',
-      marginLeft: '8px',
-    }}
-  >
-    {damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
-  </button>
+{/* 2) Åtgärdad/hittar inte – med bekräftelse */}
+<button
+onClick={() =>
+markExistingWithConfirm(damage.id, 'resolved')
+}
+style={{
+padding: '8px 16px',
+backgroundColor: status === 'resolved' ? '#f59e0b' : '#e5e7eb',
+color: status === 'resolved' ? '#ffffff' : '#374151',
+border: 'none',
+borderRadius: '6px',
+cursor: 'pointer',
+marginLeft: '8px',
+}}
+>
+{damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+</button>
 </div>
 
 
@@ -2076,12 +2107,12 @@ Foto krävs, video frivilligt
 </p>
 {/* Här kommer MediaUpload-komponenten senare */}
 <MediaUpload
-  damageId={damage.id}
-  isOld={true}
-  onMediaUpdate={updateExistingDamageMedia}
-  hasImage={hasPhoto(damage.media)}
-  hasVideo={hasVideo(damage.media)}
-  videoRequired={false}
+damageId={damage.id}
+isOld={true}
+onMediaUpdate={updateExistingDamageMedia}
+hasImage={hasPhoto(damage.media)}
+hasVideo={hasVideo(damage.media)}
+videoRequired={false}
 />
 
 
@@ -2497,76 +2528,76 @@ border: '2px solid #3b82f6'
 }}>
 <h2 style={{ color: '#3b82f6', marginBottom: '16px' }}>Kontrollista - Allt måste vara OK</h2>
 <div style={{ display: 'grid', gap: '12px' }}>
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
-    ✓ Insynsskydd OK
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
+✓ Insynsskydd OK
+</label>
 
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={dekalDjurOK} onChange={e => setDekalDjurOK(e.target.checked)} />
-    ✓ Dekal djur OK
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={dekalDjurOK} onChange={e => setDekalDjurOK(e.target.checked)} />
+✓ Dekal djur OK
+</label>
 
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={dekalRokningOK} onChange={e => setDekalRokningOK(e.target.checked)} />
-    ✓ Dekal rökning OK
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={dekalRokningOK} onChange={e => setDekalRokningOK(e.target.checked)} />
+✓ Dekal rökning OK
+</label>
 
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
-    ✓ Isskrapa OK
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
+✓ Isskrapa OK
+</label>
 
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
-    ✓ P-skiva OK
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
+✓ P-skiva OK
+</label>
 
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
-    ✓ Skylt reg.plåt OK
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
+✓ Skylt reg.plåt OK
+</label>
 
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
-    ✓ Dekal GPS OK
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
+✓ Dekal GPS OK
+</label>
 
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={washed} onChange={e => setWashed(e.target.checked)} />
-    ✓ Bilen tvättad
-  </label>
+<label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+<input type="checkbox" checked={washed} onChange={e => setWashed(e.target.checked)} />
+✓ Bilen tvättad
+</label>
 </div>
 
 {/* Rekond (radio: Ja/Nej med confirm på Ja) */}
 <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #dc2626' }}>
-  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#dc2626', fontWeight: 'bold' }}>
-    <span>⚠️ Behöver rekond</span>
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <input
-        type="radio"
-        name="rekond"
-        checked={behoverRekond === false}
-        onChange={() => setBehoverRekond(false)}
-      />
-      Nej
-    </label>
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <input
-        type="radio"
-        name="rekond"
-        checked={behoverRekond === true}
-        onChange={() => {
-          if (behoverRekond !== true) {
-            const ok = confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)');
-            if (!ok) return;
-          }
-          setBehoverRekond(true);
-        }}
-      />
-      Ja
-    </label>
-  </div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#dc2626', fontWeight: 'bold' }}>
+<span>⚠️ Behöver rekond</span>
+<label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+<input
+type="radio"
+name="rekond"
+checked={behoverRekond === false}
+onChange={() => setBehoverRekond(false)}
+/>
+Nej
+</label>
+<label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+<input
+type="radio"
+name="rekond"
+checked={behoverRekond === true}
+onChange={() => {
+if (behoverRekond !== true) {
+const ok = confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)');
+if (!ok) return;
+}
+setBehoverRekond(true);
+}}
+/>
+Ja
+</label>
+</div>
 </div>
 
 
@@ -2611,8 +2642,8 @@ Spara utkast
 id="btn-final"
 type="button"
 onClick={async () => {
-  await handleSubmitFinal();     // gör klart DB-spar/”slutför”
-  await sendNotify('station');   // skickar två mejl (station + kvalitet)
+await handleSubmitFinal();     // gör klart DB-spar/”slutför”
+await sendNotify('station');   // skickar två mejl (station + kvalitet)
 }}
 disabled={isFinalSaving || !isChecklistComplete}
 style={{
