@@ -462,7 +462,6 @@ const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(n
 const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterhjul' | null>(null);
 const [adblue, setAdblue] = useState<boolean | null>(null);
 const [tvatt, setTvatt] = useState<'behover_tvattas' | 'behover_grovtvattas' | 'behover_inte_tvattas' | null>(null);
-const [inre, setInre] = useState<'behover_rengoras_inuti' | 'ren_inuti' | null>(null);
 
 // Skador
 const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
@@ -1520,8 +1519,8 @@ const hasNewDamages =
 skadekontroll === 'nya_skador' || newDamages.length > 0;
 
 // Behöver rekond/tvätt? (om inte uttryckligen rent)
-const needsRecond =
-tvatt !== 'behover_inte_tvattas' || inre === 'behover_rengoras_inuti';
+const needsRecond = tvatt === 'behover_tvattas';
+
 
 return {
 regnr: normalizeReg(regInput || ''),
