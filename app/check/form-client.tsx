@@ -87,6 +87,26 @@ const hasVideo = (files?: MediaFile[]) =>
   Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
 // === Checklist state (allt måste vara OK för slutför) ===
 
+// --- Helpers: uppdatera befintlig skada med confirm ---
+function markExistingWithConfirm(
+  id: string,
+  newStatus: 'documented' | 'resolved' | 'not_found'
+) {
+  if (newStatus !== 'documented') {
+    const msg =
+      newStatus === 'resolved'
+        ? 'Markera som åtgärdad – är du säker?'
+        : 'Markera som hittas inte – är du säker?';
+    if (!confirm(msg)) return;
+  }
+  setDocumentedExisting(prev => {
+    const m = new Map(prev);
+    const row = m.get(String(id)) ?? { id: String(id), status: null, media: [] };
+    row.status = newStatus;
+    m.set(String(id), row);
+    return m;
+  });
+}
 
 
 
@@ -2003,34 +2023,47 @@ backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
 </div>
 
 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-<button
-onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
-style={{
-padding: '8px 16px',
-backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
-color: damage.status === 'documented' ? '#ffffff' : '#374151',
-border: 'none',
-borderRadius: '6px',
-cursor: 'pointer'
-}}
->
-{damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
-</button>
-<button
-onClick={() => toggleExistingDamageStatus(damage.id, 'fixed')}
-style={{
-padding: '8px 16px',
-backgroundColor: damage.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
-color: damage.status === 'fixed' ? '#ffffff' : '#374151',
-border: 'none',
-borderRadius: '6px',
-cursor: 'pointer',
-marginLeft: '8px'
-}}
->
-{damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
-</button>
+  {/* 1) Dokumentera / Dokumenterad */}
+  <button
+    onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
+    style={{
+      padding: '8px 16px',
+      backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
+      color: damage.status === 'documented' ? '#ffffff' : '#374151',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+    }}
+  >
+    {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
+  </button>
+
+  {/* 2) Åtgärdad/hittar inte – med bekräftelse när man sätter till åtgärdad */}
+  <button
+    onClick={() => {
+      if (damage.status === 'fixed') {
+        // Tillåt att ta bort åtgärdad-markeringen utan bekräftelse
+        toggleExistingDamageStatus(damage.id, 'fixed');
+      } else {
+        if (confirm('Är du säker på att markera skadan som "Åtgärdad/hittar inte"? (Detta går att ångra)')) {
+          toggleExistingDamageStatus(damage.id, 'fixed');
+        }
+      }
+    }}
+    style={{
+      padding: '8px 16px',
+      backgroundColor: damage.status === 'fixed' ? '#f59e0b' : '#e5e7eb',
+      color: damage.status === 'fixed' ? '#ffffff' : '#374151',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      marginLeft: '8px',
+    }}
+  >
+    {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdat/hittar inte'}
+  </button>
 </div>
+
 
 {damage.status === 'documented' && (
 <div style={{ marginTop: '12px' }}>
