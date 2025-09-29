@@ -90,7 +90,6 @@ const hasVideo = (files?: MediaFile[]) =>
 
 
 
-Array.isArray(files) && files.some(f => f && f.type === 'video');
 
 // KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
