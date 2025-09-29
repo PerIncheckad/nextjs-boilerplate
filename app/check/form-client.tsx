@@ -1618,27 +1618,6 @@ const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 
 
-// Uppdatera Mapen så att UI rerenderar direkt
-setDocumentedExisting((prev) => {
-const m = new Map(prev);
-const key = String(id);
-const row =
-m.get(key) ??
-({
-id: key,
-status: null,
-media: [],
-} as {
-id: string;
-        status: 'documented' | 'fixed' | 'not_found' | null;
-        status: 'documented' | 'resolved' | 'not_found' | null;
-media: MediaFile[];
-});
-
-row.status = newStatus;
-m.set(key, row);
-return m;
-});
 
 }
 
