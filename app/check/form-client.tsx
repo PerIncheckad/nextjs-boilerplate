@@ -1638,7 +1638,7 @@ function markExistingWithConfirm(
         media: [],
       } as {
         id: string;
-        status: 'documented' | 'fixed' | 'not_found' | null;
+        status: 'documented' | 'resolved' | 'not_found' | null;
         media: MediaFile[];
       });
 
@@ -1646,7 +1646,7 @@ function markExistingWithConfirm(
     m.set(key, row);
     return m;
   });
-
+}
   
 const canSend = isRegComplete() && isLocationComplete();
 
