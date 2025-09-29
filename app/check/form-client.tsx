@@ -86,14 +86,7 @@ Array.isArray(files) && files.some(f => f && f.type === 'image');
 const hasVideo = (files?: MediaFile[]) =>
   Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
 // === Checklist state (allt måste vara OK för slutför) ===
-const [insynsskyddOK, setInsynsskyddOK] = useState(false);
-const [dekalDjurOK, setDekalDjurOK] = useState(false);
-const [dekalRokningOK, setDekalRokningOK] = useState(false);
-const [isskrapaOK, setIsskrapaOK] = useState(false);
-const [pskivaOK, setPskivaOK] = useState(false);
-const [skyltRegplatOK, setSkyltRegplatOK] = useState(false);
-const [dekalGpsOK, setDekalGpsOK] = useState(false);
-const [washed, setWashed] = useState(false);
+
 
 // Rekond: Ja/Nej (med confirm på Ja)
 const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
@@ -491,6 +484,14 @@ const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
 
 // Skador
 const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
+  const [insynsskyddOK, setInsynsskyddOK] = useState(false);
+const [dekalDjurOK, setDekalDjurOK] = useState(false);
+const [dekalRokningOK, setDekalRokningOK] = useState(false);
+const [isskrapaOK, setIsskrapaOK] = useState(false);
+const [pskivaOK, setPskivaOK] = useState(false);
+const [skyltRegplatOK, setSkyltRegplatOK] = useState(false);
+const [dekalGpsOK, setDekalGpsOK] = useState(false);
+const [washed, setWashed] = useState(false);
 // Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
 const [documentedExisting, setDocumentedExisting] = useState<
 { id: string; status: 'documented' | 'resolved' | null; media: MediaFile[] }[]
