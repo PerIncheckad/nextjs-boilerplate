@@ -2041,13 +2041,18 @@ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
 <p style={{ marginBottom: '16px', color: '#6b7280' }}>
 Dessa skador finns redan registrerade. Dokumentera dem med foto.
 </p>
-{existingDamages.map((damage) => (
+{existingDamages.map((damage) => {
+  const ui = documentedExisting.get(String(damage.id));
+  const status = ui?.status ?? damage.status;
+  const media = ui?.media ?? damage.media ?? [];
+
+  return (
 <div key={damage.id} style={{
 padding: '16px',
 marginBottom: '12px',
 border: '1px solid #e5e7eb',
 borderRadius: '8px',
-backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
+backgroundColor: status === 'documented' ? '#f0fdf4' : '#f9fafb'
 }}>
 <div style={{ fontWeight: '600', marginBottom: '8px' }}>
 {damage.fullText || damage.shortText}
@@ -2061,14 +2066,14 @@ backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
     }
     style={{
       padding: '8px 16px',
-      backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
-      color: damage.status === 'documented' ? '#ffffff' : '#374151',
+      backgroundColor: status === 'documented' ? '#10b981' : '#e5e7eb',
+      color: status === 'documented' ? '#ffffff' : '#374151',
       border: 'none',
       borderRadius: '6px',
       cursor: 'pointer',
     }}
   >
-    {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
+    {status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
   </button>
 
   {/* 2) Åtgärdad/hittar inte – med bekräftelse */}
@@ -2078,22 +2083,22 @@ backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
     }
     style={{
       padding: '8px 16px',
-      backgroundColor: damage.status === 'resolved' ? '#f59e0b' : '#e5e7eb',
-      color: damage.status === 'resolved' ? '#ffffff' : '#374151',
+      backgroundColor: status === 'resolved' ? '#f59e0b' : '#e5e7eb',
+      color: status === 'resolved' ? '#ffffff' : '#374151',
       border: 'none',
       borderRadius: '6px',
       cursor: 'pointer',
       marginLeft: '8px',
     }}
   >
-    {damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+    {status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
   </button>
 </div>
 
 
 
 
-{damage.status === 'documented' && (
+{status === 'documented' && (
 <div style={{ marginTop: '12px' }}>
 <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
 Foto krävs, video frivilligt
@@ -2104,14 +2109,14 @@ Foto krävs, video frivilligt
 damageId={damage.id}
 isOld={true}
 onMediaUpdate={updateExistingDamageMedia}
-hasImage={hasPhoto(damage.media)}
-hasVideo={hasVideo(damage.media)}
+hasImage={hasPhoto(media)}
+hasVideo={hasVideo(media)}
 videoRequired={false}
 />
 
-{damage.media && damage.media.length > 0 && (
+{media && media.length > 0 && (
 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-{damage.media.map((m, i) => (
+{media.map((m, i) => (
 <div key={i} style={{ position: 'relative' }}>
 {m.type === 'image' && (
 <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
@@ -2384,14 +2389,14 @@ minHeight: '60px'
 damageId={damage.id}
 isOld={false}
 onMediaUpdate={updateDamageMedia}
-hasImage={hasPhoto(damage.media)}
-hasVideo={hasVideo(damage.media)}
+hasImage={hasPhoto(media)}
+hasVideo={hasVideo(media)}
 videoRequired={true}
 />
 
-{damage.media && damage.media.length > 0 && (
+{media && media.length > 0 && (
 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-{damage.media.map((m, i) => (
+{media.map((m, i) => (
 <div key={i} style={{ position: 'relative' }}>
 {m.type === 'image' && (
 <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
