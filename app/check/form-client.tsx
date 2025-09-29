@@ -1616,11 +1616,6 @@ setTimeout(() => setSendState('idle'), 4000);
 // Små wrappers – enkla att koppla på knappar
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
-
-
-
-}
-
 const canSend = isRegComplete() && isLocationComplete();
 
 return ( 
