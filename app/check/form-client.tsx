@@ -92,13 +92,11 @@ function markExistingWithConfirm(
   id: string,
   newStatus: 'documented' | 'resolved' | 'not_found'
 ) {
-  if (newStatus !== 'documented') {
-    const msg =
-      newStatus === 'resolved'
-        ? 'Markera som åtgärdad – är du säker?'
-        : 'Markera som hittas inte – är du säker?';
-    if (!confirm(msg)) return;
-  }
+if (newStatus !== 'documented') {
+  const msg = 'Är du säker? (Detta går att ångra.)';
+  if (!confirm(msg)) return;
+}
+
   setDocumentedExisting(prev => {
     const m = new Map(prev);
     const row = m.get(String(id)) ?? { id: String(id), status: null, media: [] };
@@ -512,8 +510,9 @@ const isChecklistComplete =
 
 // Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
 const [documentedExisting, setDocumentedExisting] = useState<
-{ id: string; status: 'documented' | 'resolved' | null; media: MediaFile[] }[]
+  { id: string; status: 'documented' | 'resolved' | 'not_found' | null; media: MediaFile[] }[]
 >([]);
+
 useEffect(() => {
 // Behåll tidigare status om den finns, annars initiera till null
 setDocumentedExisting(prev => {
@@ -1617,6 +1616,38 @@ setTimeout(() => setSendState('idle'), 4000);
 // Små wrappers – enkla att koppla på knappar
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
+// --- Hjälpare: uppdatera befintlig skada + kort confirm ---
+function markExistingWithConfirm(
+  id: string,
+  newStatus: 'documented' | 'fixed' | 'not_found'
+) {
+  // Fråga bara när vi sätter till 'fixed' eller 'not_found'
+  if (newStatus !== 'documented') {
+    if (!confirm('Är du säker? (Detta går att ångra.)')) return;
+  }
+
+  // Uppdatera Mapen så att UI rerenderar direkt
+  setDocumentedExisting((prev) => {
+    const m = new Map(prev);
+    const key = String(id);
+    const row =
+      m.get(key) ??
+      ({
+        id: key,
+        status: null,
+        media: [],
+      } as {
+        id: string;
+        status: 'documented' | 'fixed' | 'not_found' | null;
+        media: MediaFile[];
+      });
+
+    row.status = newStatus;
+    m.set(key, row);
+    return m;
+  });
+}
+  
 const canSend = isRegComplete() && isLocationComplete();
 
 return ( 
@@ -2025,7 +2056,9 @@ backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
   {/* 1) Dokumentera / Dokumenterad */}
   <button
-    onClick={() => toggleExistingDamageStatus(damage.id, 'documented')}
+    onClick={() =>
+      markExistingWithConfirm(damage.id, 'documented')
+    }
     style={{
       padding: '8px 16px',
       backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
@@ -2038,30 +2071,25 @@ backgroundColor: damage.status === 'documented' ? '#f0fdf4' : '#f9fafb'
     {damage.status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
   </button>
 
-  {/* 2) Åtgärdad/hittar inte – med bekräftelse när man sätter till åtgärdad */}
-<button
-  onClick={() => {
-    if (damage.status === 'resolved') {
-      // ta bort "åtgärdad" utan confirm
-      toggleExistingDamageStatus(damage.id, 'resolved');
-    } else {
-      if (confirm('Är du säker? (Detta går att ångra.)')) {
-        toggleExistingDamageStatus(damage.id, 'resolved');
-      }
+  {/* 2) Åtgärdad/hittar inte – med bekräftelse */}
+  <button
+    onClick={() =>
+      markExistingWithConfirm(damage.id, 'resolved')
     }
-  }}
-  style={{
-    padding: '8px 16px',
-    backgroundColor: damage.status === 'resolved' ? '#f59e0b' : '#e5e7eb',
-    color: damage.status === 'resolved' ? '#ffffff' : '#374151',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    marginLeft: '8px',
-  }}
->
-  {damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdat/hittar inte'}
-</button>
+    style={{
+      padding: '8px 16px',
+      backgroundColor: damage.status === 'resolved' ? '#f59e0b' : '#e5e7eb',
+      color: damage.status === 'resolved' ? '#ffffff' : '#374151',
+      border: 'none',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      marginLeft: '8px',
+    }}
+  >
+    {damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+  </button>
+</div>
+
 
 
 
