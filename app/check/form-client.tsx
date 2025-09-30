@@ -1575,7 +1575,6 @@ hasNewDamages,
 needsRecond,
 } as const;
 
-}
 
 // --- Steg 3: Hjälpare för att skicka notifiering ---
 const sendNotify = async (target: 'station' | 'quality') => {
