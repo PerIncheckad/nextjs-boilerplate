@@ -1616,8 +1616,7 @@ const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
 const canSend = isRegComplete() && isLocationComplete();
 
-return ( 
-<div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
+return <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
 {!!sendMsg && (
 <span
 style={{
@@ -2644,6 +2643,4 @@ Avbryt
 </button>
 </div>
 </div>
-);
-
 }
