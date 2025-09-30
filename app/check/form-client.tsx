@@ -84,31 +84,6 @@ Array.isArray(files) && files.some(f => f && f.type === 'image');
 
 const hasVideo = (files?: MediaFile[]) =>
   Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
-// === Checklist state (allt måste vara OK för slutför) ===
-
-let setDocumentedExisting: any;
-
-// --- Helpers: uppdatera befintlig skada med confirm ---
-function markExistingWithConfirm(
-  id: string,
-  newStatus: 'documented' | 'resolved' | 'not_found'
-) {
-if (newStatus !== 'documented') {
-  const msg = 'Är du säker? (Detta går att ångra.)';
-  if (!confirm(msg)) return;
-}
-
-  setDocumentedExisting(prev => {
-    const m = new Map(prev);
-    const row = m.get(String(id)) ?? { id: String(id), status: null, media: [] };
-    row.status = newStatus;
-    m.set(String(id), row);
-    return m;
-  });
-}
-
-
-
 
 // KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
@@ -490,7 +465,7 @@ const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
 
 // Skador
 const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
-  const [insynsskyddOK, setInsynsskyddOK] = useState(false);
+const [insynsskyddOK, setInsynsskyddOK] = useState(false);
 const [dekalDjurOK, setDekalDjurOK] = useState(false);
 const [dekalRokningOK, setDekalRokningOK] = useState(false);
 const [isskrapaOK, setIsskrapaOK] = useState(false);
@@ -510,15 +485,13 @@ const isChecklistComplete =
   washed;
 
 // Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
-const [_documentedExisting, _setDocumentedExisting] = useState<
+const [documentedExisting, setDocumentedExisting] = useState<
   Map<string, { id: string; status: 'documented' | 'resolved' | 'not_found' | null; media: MediaFile[] }>
 >(new Map());
-setDocumentedExisting = _setDocumentedExisting;
-
 
 useEffect(() => {
 // Behåll tidigare status om den finns, annars initiera till null
-_setDocumentedExisting(prev => {
+setDocumentedExisting(prev => {
 const newMap = new Map(prev);
 (existingDamages ?? []).forEach(d => {
   const id = String((d as any).id);
@@ -883,7 +856,7 @@ if (documentedOldDamages.some(damage => !damage.media?.some(m => m.type === 'ima
 return true;
 };
 
-const isStatusCompleteCheck = () => {
+const isStatusComplete = () => {
 const statusSet = String(uthyrningsstatus ?? '').trim().length > 0;
 const noteSet   = String(preliminarAvslutNotering ?? '').trim().length > 0;
 return statusSet && noteSet;
@@ -963,7 +936,7 @@ setShowSuccessModal(false);
 };
 
 function markExistingAsDocumented(id: string | number) {
-_setDocumentedExisting(curr => {
+setDocumentedExisting(curr => {
   const newMap = new Map(curr);
   const item = newMap.get(String(id));
   if (item) {
@@ -974,7 +947,7 @@ _setDocumentedExisting(curr => {
 }
 
 function markExistingAsResolved(id: string | number) {
-_setDocumentedExisting(curr => {
+setDocumentedExisting(curr => {
   const newMap = new Map(curr);
   const item = newMap.get(String(id));
   if (item) {
@@ -985,7 +958,7 @@ _setDocumentedExisting(curr => {
 }
 
 function getExistingStatus(id: string | number): 'documented' | 'resolved' | null {
-return _documentedExisting.get(String(id))?.status ?? null;
+return documentedExisting.get(String(id))?.status ?? null;
 }
 
 const handleSave = () => {
@@ -1602,7 +1575,7 @@ needsRecond,
 const sendNotify = async (target: 'station' | 'quality') => {
 try {
 // 1) Visa "skickar..." direkt
-setSendState('sending-station'); // Changed from 'sending-both'
+setSendState('sending-station');
 setSendMsg('Skickar till station + kvalitet…');
 
 
@@ -1637,20 +1610,18 @@ setTimeout(() => setSendState('idle'), 4000);
 // Små wrappers – enkla att koppla på knappar
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
-const [documentedExistingFromMap, setDocumentedExistingFromMap] = useState(new Map());
-
 // --- Hjälpare: uppdatera befintlig skada + kort confirm ---
-const markExistingWithConfirm = (
+function markExistingWithConfirm(
   id: string,
   newStatus: 'documented' | 'fixed' | 'not_found'
-) => {
+) {
   // Fråga bara när vi sätter till 'fixed' eller 'not_found'
   if (newStatus !== 'documented') {
     if (!confirm('Är du säker? (Detta går att ångra.)')) return;
   }
 
   // Uppdatera Mapen så att UI rerenderar direkt
-  setDocumentedExistingFromMap((prev) => {
+  setDocumentedExisting((prev) => {
     const m = new Map(prev);
     const key = String(id);
     const row =
@@ -2065,7 +2036,7 @@ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
 Dessa skador finns redan registrerade. Dokumentera dem med foto.
 </p>
 {existingDamages.map((damage) => {
-  const ui = documentedExistingFromMap.get(String(damage.id));
+  const ui = documentedExisting.get(String(damage.id));
   const status = ui?.status ?? damage.status;
   const media = ui?.media ?? damage.media ?? [];
 
@@ -2700,6 +2671,7 @@ cursor: 'pointer'
 >
 Avbryt
 </button>
+</div>
 </div>
 </div>
 );
