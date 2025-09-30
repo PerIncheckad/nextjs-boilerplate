@@ -87,28 +87,6 @@ const hasVideo = (files?: MediaFile[]) =>
 Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
 // === Checklist state (allt måste vara OK för slutför) ===
 
-// --- Helpers: uppdatera befintlig skada med confirm ---
-function markExistingWithConfirm(
-id: string,
-newStatus: 'documented' | 'resolved' | 'not_found'
-) {
-if (newStatus !== 'documented') {
-const msg = 'Är du säker? (Detta går att ångra.)';
-if (!confirm(msg)) return;
-}
-
-setDocumentedExisting(prev => {
-const m = new Map(prev);
-const row = m.get(String(id)) ?? { id: String(id), status: null, media: [] };
-row.status = newStatus;
-m.set(String(id), row);
-return m;
-});
-}
-
-
-
-
 // KORRIGERADE stationer från "Stationer o Depåer Albarone" (exakta namn)
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'];
 
