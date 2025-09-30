@@ -1546,7 +1546,7 @@ color: '#2563eb',
 </div>
 );         // end: return of MediaUpload
 };           // end: const MediaUpload = (...) => { ... }
-
+}  // <-- DENNA } SAKNAS!
 function buildNotifyPayload() {
 // 1) Region
 const region =
