@@ -86,6 +86,8 @@ const hasVideo = (files?: MediaFile[]) =>
   Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
 // === Checklist state (allt måste vara OK för slutför) ===
 
+let setDocumentedExisting: any;
+
 // --- Helpers: uppdatera befintlig skada med confirm ---
 function markExistingWithConfirm(
   id: string,
@@ -307,7 +309,7 @@ resolve(thumbnail);
 });
 
 video.addEventListener('error', () => {
-resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0P[...]
+resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNlNWU3ZWIiLz48cGF0aCBkPSJNNjAgMTUuNzVDMzUuMTYgMTUuNzUgMTUuNzUgMzUuMTYgMTUuNzUgNjBDMTUuNzUgODQuODQgMzUuMTYgMTA0LjI1IDYwIDEwNC4yNUM4NC44NCAxMDQuMjUgMTA0LjI1IDg0Ljg0IDEwNC4yNSA2MEMxMDQuMjUgMzUuMTYgODQuODQgMTUuNzUgNjAgMTUuNzVaTTg1LjMxIDEwMi4yN0wzMy4wOSAzMy4wOUwzNy43MyAyOS4xN0w4OS45NSAxMDAuMzRMNjAgNzEuNDdMNTIuNjMgNjUuMjJMNjAuMDEgNTkuMDJMODUuMzEgMTAyLjI3WiIgZmlsbD0iI2RjMjYyNiIvPjwvc3ZnPg==');
 });
 
 video.src = URL.createObjectURL(file);
@@ -355,13 +357,13 @@ return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
 // FÖRBÄTTRAD kolumnhantering för svenska tecken
 const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] = []): string | null => {
 // Prova huvudnyckeln först
-if (row[primaryKey] !== undefined && row[primaryKey] !== null && row[primaryKey] !== '') {
+if (row && row[primaryKey] !== undefined && row[primaryKey] !== null && row[primaryKey] !== '') {
 return String(row[primaryKey]).trim();
 }
 
 // Prova alternativa nycklar
 for (const altKey of alternativeKeys) {
-if (row[altKey] !== undefined && row[altKey] !== null && row[altKey] !== '') {
+if (row && row[altKey] !== undefined && row[altKey] !== null && row[altKey] !== '') {
 return String(row[altKey]).trim();
 }
 }
@@ -508,17 +510,23 @@ const isChecklistComplete =
   washed;
 
 // Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
-const [documentedExisting, setDocumentedExisting] = useState<
-  { id: string; status: 'documented' | 'resolved' | 'not_found' | null; media: MediaFile[] }[]
->([]);
+const [_documentedExisting, _setDocumentedExisting] = useState<
+  Map<string, { id: string; status: 'documented' | 'resolved' | 'not_found' | null; media: MediaFile[] }>
+>(new Map());
+setDocumentedExisting = _setDocumentedExisting;
+
 
 useEffect(() => {
 // Behåll tidigare status om den finns, annars initiera till null
-setDocumentedExisting(prev => {
-const prevMap = new Map(prev.map(p => [String(p.id), p]));
-return (existingDamages ?? []).map(d =>
-prevMap.get(String((d as any).id)) ?? { id: String((d as any).id), status: null, media: [] }
-);
+_setDocumentedExisting(prev => {
+const newMap = new Map(prev);
+(existingDamages ?? []).forEach(d => {
+  const id = String((d as any).id);
+  if (!newMap.has(id)) {
+    newMap.set(id, { id: id, status: null, media: [] });
+  }
+});
+return newMap;
 });
 }, [existingDamages]);
 
@@ -613,10 +621,11 @@ if (cancelled) return;
 
 let useData: CarData[] = [];
 let damages: ExistingDamage[] = [];
+let viewRow: any = null;
 
 if (!mabiResult.error && mabiResult.data && mabiResult.data.length > 0) {
 // Läs rad ur vyn (kan vara array eller single) och sätt kortet
-const viewRow: any = !mabiResult.error
+viewRow = !mabiResult.error
 ? (Array.isArray(mabiResult.data) ? mabiResult.data[0] : mabiResult.data)
 : null;
 console.log('DEBUG viewRow keys:', Object.keys(viewRow || {}));
@@ -658,6 +667,8 @@ skadetyp: name,
 plats: '',
 notering: '',
 fullText: name,
+shortText: name, 
+status: 'not_selected',
 }));
 
 // 6) Lägg in i state
@@ -769,6 +780,7 @@ damages = useData
 if (!item.damage_text) return null;
 
 const shortText = item.damage_text;
+// @ts-ignore
 const detailText = item.damage_detail || null;
 const fullText = detailText ? `${shortText} - ${detailText}` : shortText;
 
@@ -871,7 +883,7 @@ if (documentedOldDamages.some(damage => !damage.media?.some(m => m.type === 'ima
 return true;
 };
 
-const isStatusComplete = () => {
+const isStatusCompleteCheck = () => {
 const statusSet = String(uthyrningsstatus ?? '').trim().length > 0;
 const noteSet   = String(preliminarAvslutNotering ?? '').trim().length > 0;
 return statusSet && noteSet;
@@ -951,19 +963,29 @@ setShowSuccessModal(false);
 };
 
 function markExistingAsDocumented(id: string | number) {
-setDocumentedExisting(curr =>
-curr.map(x => String(x.id) === String(id) ? { ...x, status: 'documented' } : x)
-);
+_setDocumentedExisting(curr => {
+  const newMap = new Map(curr);
+  const item = newMap.get(String(id));
+  if (item) {
+    newMap.set(String(id), { ...item, status: 'documented' });
+  }
+  return newMap;
+});
 }
 
 function markExistingAsResolved(id: string | number) {
-setDocumentedExisting(curr =>
-curr.map(x => String(x.id) === String(id) ? { ...x, status: 'resolved' } : x)
-);
+_setDocumentedExisting(curr => {
+  const newMap = new Map(curr);
+  const item = newMap.get(String(id));
+  if (item) {
+    newMap.set(String(id), { ...item, status: 'resolved' });
+  }
+  return newMap;
+});
 }
 
 function getExistingStatus(id: string | number): 'documented' | 'resolved' | null {
-return documentedExisting.find(x => String(x.id) === String(id))?.status ?? null;
+return _documentedExisting.get(String(id))?.status ?? null;
 }
 
 const handleSave = () => {
@@ -999,9 +1021,9 @@ if (isFinalSaving) return;
 setIsFinalSaving(true);
 console.log('[UI] Slutför incheckning klickad');
 
-const regOk     = !!String((regInput ?? viewRow?.regnr ?? '')).trim();
-const placeOk   = !!String((ort ?? viewRow?.ort ?? '')).trim();
-const stationOk = !!String((station ?? viewRow?.station ?? '')).trim();
+const regOk     = !!String((regInput || '')).trim();
+const placeOk   = !!String((ort || '')).trim();
+const stationOk = !!String((station || '')).trim();
 
 if (!regOk || !placeOk || !stationOk) {
 setIsFinalSaving(false);
@@ -1037,8 +1059,8 @@ const needsRecond = Boolean(behoverRekond);
 const hasIssues = !insynsskydd || spolarvatska === false || (drivmedelstyp === 'bensin_diesel' && adblue === false);
 
 // Dokumenterade befintliga skador (första gången de dokumenteras)
-const documentedExisting = existingDamages.filter(d => d.status === 'documented');
-const hasNewlyDocumented = documentedExisting.length > 0;
+const documentedExistingList = existingDamages.filter(d => getExistingStatus(d.id) === 'documented');
+const hasNewlyDocumented = documentedExistingList.length > 0;
 
 // Skicka till Bilkontroll ENDAST om:
 // - Nya skador finns
@@ -1068,7 +1090,7 @@ const htmlBody = `
      ${hasNewlyDocumented ? `
        <h3>Befintliga skador (nyligen dokumenterade)</h3>
        <ul>
-         ${documentedExisting.map(d => `
+         ${documentedExistingList.map(d => `
            <li>${d.userType || d.fullText} - ${d.userCarPart || ''} ${d.userPosition || ''}</li>
          `).join('')}
        </ul>
@@ -1144,7 +1166,7 @@ return;
 // Spara skador om de finns
 if (checkin && checkin.id) {
 // Befintliga dokumenterade skador
-for (const damage of documentedExisting) {
+for (const damage of documentedExistingList) {
 let photo_urls: string[] = [];
 let video_urls: string[] = [];
 
@@ -1580,7 +1602,7 @@ needsRecond,
 const sendNotify = async (target: 'station' | 'quality') => {
 try {
 // 1) Visa "skickar..." direkt
-setSendState('sending-both');
+setSendState('sending-station'); // Changed from 'sending-both'
 setSendMsg('Skickar till station + kvalitet…');
 
 
@@ -1615,18 +1637,20 @@ setTimeout(() => setSendState('idle'), 4000);
 // Små wrappers – enkla att koppla på knappar
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
+const [documentedExistingFromMap, setDocumentedExistingFromMap] = useState(new Map());
+
 // --- Hjälpare: uppdatera befintlig skada + kort confirm ---
-function markExistingWithConfirm(
+const markExistingWithConfirm = (
   id: string,
   newStatus: 'documented' | 'fixed' | 'not_found'
-) {
+) => {
   // Fråga bara när vi sätter till 'fixed' eller 'not_found'
   if (newStatus !== 'documented') {
     if (!confirm('Är du säker? (Detta går att ångra.)')) return;
   }
 
   // Uppdatera Mapen så att UI rerenderar direkt
-  setDocumentedExisting((prev) => {
+  setDocumentedExistingFromMap((prev) => {
     const m = new Map(prev);
     const key = String(id);
     const row =
@@ -1777,7 +1801,7 @@ border: '1px solid #bfdbfe'
 )}
 </div>
 )} 
-</div>    </div>
+</div>
 {/* 2. PLATS FÖR INCHECKNING */}
 <div style={{
 backgroundColor: '#ffffff',
@@ -1884,7 +1908,7 @@ Hjul som sitter på *
 </label>
 <select
 value={hjultyp || ''}
-onChange={(e) => setHjultyp(e.target.value as 'Sommardäck' | 'Vinterdäck' | null)}
+onChange={(e) => setHjultyp(e.target.value as 'Sommarthjul' | 'Vinterhjul' | null)}
 style={{
 width: '100%',
 padding: '12px',
@@ -1894,8 +1918,8 @@ fontSize: '16px'
 }}
 >
 <option value="">Välj hjultyp</option>
-<option value="Sommardäck">Sommardäck</option>
-<option value="Vinterdäck">Vinterdäck</option>
+<option value="Sommarthjul">Sommarthjul</option>
+<option value="Vinterhjul">Vinterhjul</option>
 </select>
 </div>
 </div>
@@ -2041,7 +2065,7 @@ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
 Dessa skador finns redan registrerade. Dokumentera dem med foto.
 </p>
 {existingDamages.map((damage) => {
-  const ui = documentedExisting.get(String(damage.id));
+  const ui = documentedExistingFromMap.get(String(damage.id));
   const status = ui?.status ?? damage.status;
   const media = ui?.media ?? damage.media ?? [];
 
@@ -2078,19 +2102,19 @@ backgroundColor: status === 'documented' ? '#f0fdf4' : '#f9fafb'
   {/* 2) Åtgärdad/hittar inte – med bekräftelse */}
   <button
     onClick={() =>
-      markExistingWithConfirm(damage.id, 'resolved')
+      markExistingWithConfirm(damage.id, 'fixed')
     }
     style={{
       padding: '8px 16px',
-      backgroundColor: status === 'resolved' ? '#f59e0b' : '#e5e7eb',
-      color: status === 'resolved' ? '#ffffff' : '#374151',
+      backgroundColor: status === 'fixed' ? '#f59e0b' : '#e5e7eb',
+      color: status === 'fixed' ? '#ffffff' : '#374151',
       border: 'none',
       borderRadius: '6px',
       cursor: 'pointer',
       marginLeft: '8px',
     }}
   >
-    {damage.status === 'resolved' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+    {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
   </button>
 </div>
 
@@ -2113,11 +2137,11 @@ Foto krävs, video frivilligt
 />
 
 
-{media && media.length > 0 && (
+{damage.media && damage.media.length > 0 && (
 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-{media.map((m, i) => (
+{damage.media.map((m, i) => (
 <div key={i} style={{ position: 'relative' }}>
-{m.type === 'image' && (
+{m.type === 'image' && m.preview && (
 <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
 )}
 {m.type === 'video' && (
@@ -2145,6 +2169,8 @@ fontSize: '12px'
 </button>
 </div>
 ))}
+</div>
+)}
 <div style={{ marginBottom: '12px' }}>
 <label style={{ display: 'block', marginBottom: '4px' }}>Typ av skada *</label>
 <select
@@ -2185,7 +2211,7 @@ borderRadius: '4px'
 </div>
 )}
 
-{damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && (
+{damage.userCarPart && CAR_PARTS[damage.userCarPart] && CAR_PARTS[damage.userCarPart].length > 0 && (
 <div style={{ marginBottom: '12px' }}>
 <label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
 <select
@@ -2224,9 +2250,8 @@ minHeight: '60px'
 </div>
 )}
 </div>
-)}
-</div>
-))}
+);
+})}
 </div>
 ) : (
 <p style={{ color: '#6b7280' }}>Inga befintliga skador registrerade för detta fordon.</p>
@@ -2347,7 +2372,7 @@ borderRadius: '4px'
 </div>
 )}
 
-{damage.carPart && CAR_PARTS[damage.carPart].length > 0 && (
+{damage.carPart && CAR_PARTS[damage.carPart] && CAR_PARTS[damage.carPart].length > 0 && (
 <div style={{ marginBottom: '12px' }}>
 <label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
 <select
@@ -2388,16 +2413,16 @@ minHeight: '60px'
 damageId={damage.id}
 isOld={false}
 onMediaUpdate={updateDamageMedia}
-hasImage={hasPhoto(media)}
-hasVideo={hasVideo(media)}
+hasImage={hasPhoto(damage.media)}
+hasVideo={hasVideo(damage.media)}
 videoRequired={true}
 />
 
-{media && media.length > 0 && (
+{damage.media && damage.media.length > 0 && (
 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-{media.map((m, i) => (
+{damage.media.map((m, i) => (
 <div key={i} style={{ position: 'relative' }}>
-{m.type === 'image' && (
+{m.type === 'image' && m.preview && (
 <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
 )}
 {m.type === 'video' && (
