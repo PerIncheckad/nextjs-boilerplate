@@ -547,8 +547,13 @@ const Field: React.FC<React.PropsWithChildren<{ label?: string }>> = ({ label, c
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => (<div className="info-row"><span>{label}</span><span>{value}</span></div>);
 const RadioGroup: React.FC<React.PropsWithChildren<{}>> = ({ children }) => <div className="radio-group">{children}</div>;
 const Radio: React.FC<any> = ({ label, ...props }) => (<label className="radio-label"><input type="radio" {...props} />{label}</label>);
-const Checkbox: React.FC<any> = ({ label, className, ...props }) => (<label className={`checkbox-label ${className || ''}`}><input type="checkbox" {...props} />{label}</label>);
-
+const Checkbox: React.FC<any> = ({ label, className, ...props }) => (
+    <label className={`checkbox-label ${className || ''}`}>
+        <input type="checkbox" {...props} />
+        <span className="checkbox-custom"></span>
+        <span>{label}</span>
+    </label>
+);
 const Button: React.FC<React.PropsWithChildren<any>> = ({ children, onClick, variant = 'primary', style, ...props }) => {
     const variantClasses: Record<string, string> = {
         primary: 'btn-primary', secondary: 'btn-secondary', success: 'btn-success',
@@ -691,7 +696,12 @@ const GlobalStyles = () => (
           --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
           --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); margin: 0; }
+        body { 
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--color-bg); 
+            color: var(--color-text); /* FIX: Sätter en mörk grundfärg för text */
+            margin: 0; 
+        }
         .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
         .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; }
         .card[data-error="true"] { border: 2px solid var(--color-danger); }
@@ -701,7 +711,7 @@ const GlobalStyles = () => (
         .sub-section-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-text); margin:0; }
         .field { margin-bottom: 1rem; }
         .field label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; }
-        .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; }
+        .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; color: var(--color-text); }
         .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
         .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
         .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; }
@@ -715,12 +725,56 @@ const GlobalStyles = () => (
         .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
         .grid-3-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem; }
         .radio-group { display: flex; gap: 1.5rem; align-items: center; }
-        .radio-label { display: flex; align-items: center; gap: 0.5rem; }
-        .checkbox-label { display: flex; align-items: center; gap: 0.75rem; font-size: 1rem; padding: 0.5rem; border-radius: 6px; cursor: pointer; transition: background-color 0.2s; }
-        .checkbox-label:hover { background-color: var(--color-disabled-light); }
-        .checkbox-label input[type="checkbox"] { width: 1rem; height: 1rem; }
+        .radio-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+
+        /* FIX: Korrekt styling för custom checkboxes */
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: var(--color-card);
+        }
+        .checkbox-label:hover {
+            background-color: var(--color-primary-light);
+            border-color: var(--color-primary);
+        }
+        .checkbox-label input[type="checkbox"] {
+            display: none; /* Dölj den fula original-checkboxen */
+        }
+        .checkbox-label .checkbox-custom {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--color-border);
+            border-radius: 6px;
+            display: inline-block;
+            position: relative;
+            background-color: var(--color-bg);
+            transition: all 0.2s;
+        }
+        .checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+            background-color: var(--color-success);
+            border-color: var(--color-success);
+        }
+        .checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+            content: '✔';
+            font-size: 18px;
+            color: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
         .rekond-box { padding: 1rem; background-color: var(--color-danger-light); border-radius: 8px; border: 1px solid var(--color-danger); margin-bottom: 1.5rem; }
-        .rekond-checkbox { font-weight: bold; color: var(--color-danger); font-size: 1.1rem; }
+        .rekond-checkbox { border-color: transparent; background-color: transparent; }
+        .rekond-checkbox:hover { background-color: rgba(220, 38, 38, 0.1); }
+        .rekond-checkbox .checkbox-custom { border-color: var(--color-danger); }
+        .rekond-checkbox span { font-weight: bold; color: var(--color-danger); }
         .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 3rem; }
-      `}</style>
+    `}</style>
 )
