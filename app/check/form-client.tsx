@@ -490,10 +490,18 @@ export default function CheckInForm() {
           <SubSectionHeader title="Mätarställning" />
           <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
           <SubSectionHeader title="Däck som sitter på" />
-          <Field label="Däcktyp *"><select value={hjultyp || ''} onChange={e => setHjultyp(e.target.value as any)}><option value="">Välj däcktyp</option><option value="Sommardäck">Sommardäck</option><option value="Vinterdäck">Vinterdäck</option></select></Field>
-          <SubSectionHeader title="Tankning/Laddning" />
-          <Field label="Drivmedelstyp *"><RadioGroup><Radio label="Bensin/Diesel" name="drivmedel" checked={drivmedelstyp === 'bensin_diesel'} onChange={() => setDrivmedelstyp('bensin_diesel')} /><Radio label="Elbil" name="drivmedel" checked={drivmedelstyp === 'elbil'} onChange={() => setDrivmedelstyp('elbil')} /></RadioGroup></Field>
-          {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><select value={tankniva || ''} onChange={e => setTankniva(e.target.value as any)}><option value="">Välj tankstatus</option><option value="återlämnades_fulltankad">Återlämnades fulltankad</option><option value="tankad_nu">Tankad nu</option></select></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><select value={bransletyp || ''} onChange={e => setBransletyp(e.target.value as any)}><option value="">Välj</option><option value="Bensin">Bensin</option><option value="Diesel">Diesel</option></select></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
+<Field label="Däcktyp *">
+    <div className="grid-2-col">
+        <ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'}>Sommardäck</ChoiceButton>
+        <ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'}>Vinterdäck</ChoiceButton>
+    </div>
+</Field>          <SubSectionHeader title="Tankning/Laddning" />
+<Field label="Drivmedelstyp *">
+    <div className="grid-2-col">
+        <ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'}>Bensin/Diesel</ChoiceButton>
+        <ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'}>Elbil</ChoiceButton>
+    </div>
+</Field>          {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><select value={tankniva || ''} onChange={e => setTankniva(e.target.value as any)}><option value="">Välj tankstatus</option><option value="återlämnades_fulltankad">Återlämnades fulltankad</option><option value="tankad_nu">Tankad nu</option></select></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><select value={bransletyp || ''} onChange={e => setBransletyp(e.target.value as any)}><option value="">Välj</option><option value="Bensin">Bensin</option><option value="Diesel">Diesel</option></select></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
           {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field><Field label="Antal laddkablar *"><select value={antalLaddkablar || ''} onChange={e => setAntalLaddkablar(e.target.value as any)}><option value="">Välj antal</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></Field></>)}
         </Card>
 
@@ -502,28 +510,38 @@ export default function CheckInForm() {
             <SubSectionHeader title="Befintliga skador från skadekort" />
             {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={(id, field, val) => updateDamageField(id, field, val, true)} onMediaUpdate={(id, files) => updateDamageMedia(id, files, true)} onMediaRemove={(id, index) => removeDamageMedia(id, index, true)} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador registrerade på skadekortet.</p>}
             <SubSectionHeader title="Skadekontroll" />
-            <Field label="Har bilen några nya skador? *"><RadioGroup>
-                <Radio label="Inga nya skador" name="skadekontroll" checked={skadekontroll === 'inga_nya_skador'} onChange={() => setSkadekontroll('inga_nya_skador')} />
-                <Radio label="Nya skador finns" name="skadekontroll" checked={skadekontroll === 'nya_skador'} onChange={() => setSkadekontroll('nya_skador')} />
-            </RadioGroup></Field>
+<Field label="Har bilen några nya skador? *">
+    <div className="grid-2-col">
+        <ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'}>Inga nya skador</ChoiceButton>
+        <ChoiceButton onClick={() => setSkadekontroll('nya_skador')} isActive={skadekontroll === 'nya_skador'}>Nya skador finns</ChoiceButton>
+    </div>
+</Field>
             {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={(id, field, val) => updateDamageField(id, field, val, false)} onMediaUpdate={(id, files) => updateDamageMedia(id, files, false)} onMediaRemove={(id, index) => removeDamageMedia(id, index, false)} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="primary" style={{ marginTop: '1rem' }}>+ Lägg till ny skada</Button></>)}
         </Card>
 
         <Card data-error={showFieldErrors && !isChecklistComplete}>
             <SectionHeader title="Checklista" />
-            <div className="rekond-box"><Checkbox label="⚠️ Behöver rekond" checked={behoverRekond} onChange={e => { if (e.target.checked && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return; setBehoverRekond(e.target.checked); }} className="rekond-checkbox" /></div>
-            <SubSectionHeader title="Allt måste vara OK för att slutföra" />
-            <div className="grid-2-col">
-                <Checkbox label="✓ Insynsskydd" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
-                <Checkbox label="✓ Dekal djur/rökning" checked={dekalDjurRokningOK} onChange={e => setDekalDjurRokningOK(e.target.checked)} />
-                <Checkbox label="✓ Isskrapa" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
-                <Checkbox label="✓ P-skiva" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
-                <Checkbox label="✓ Skylt reg.plåt" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
-                <Checkbox label="✓ Dekal GPS" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
-                <Checkbox label="✓ Spolarvätska" checked={spolarvatskaOK} onChange={e => setSpolarvatskaOK(e.target.checked)} />
-                {drivmedelstyp === 'bensin_diesel' && <Checkbox label="✓ AdBlue" checked={adblueOK} onChange={e => setAdblueOK(e.target.checked)} />}
-                <Checkbox label="✓ Bilen tvättad" checked={washed} onChange={e => setWashed(e.target.checked)} />
-            </div>
+ <ChoiceButton 
+     onClick={() => {
+         if (!behoverRekond && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return;
+         setBehoverRekond(!behoverRekond);
+     }} 
+     isActive={behoverRekond}
+     className="rekond-checkbox"
+ >
+     ⚠️ Behöver rekond
+ </ChoiceButton>            <SubSectionHeader title="Allt måste vara OK för att slutföra" />
+<div className="grid-2-col">
+    <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd OK</ChoiceButton>
+    <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal Djur/Rökning OK</ChoiceButton>
+    <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa OK</ChoiceButton>
+    <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva OK</ChoiceButton>
+    <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>Skylt Reg.plåt OK</ChoiceButton>
+    <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS OK</ChoiceButton>
+    <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
+    {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
+    <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Bilen tvättad OK</ChoiceButton>
+</div>
         </Card>
 
         <Card><Field label="Kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea></Field></Card>
@@ -677,7 +695,47 @@ const MediaUpload: React.FC<{onMediaUpdate: (files: FileList | null) => void, on
         </div>
     );
 };
-
+const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string}> = ({ onClick, isActive, children, className }) => {
+    return (
+        <>
+            <button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${className || ''}`}>
+                {children}
+            </button>
+            <style jsx>{`
+                .choice-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    padding: 0.85rem 1rem;
+                    border-radius: 8px;
+                    border: 2px solid var(--color-border);
+                    background-color: var(--color-card);
+                    color: var(--color-text-secondary);
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    text-align: center;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+                .choice-btn:hover {
+                    border-color: var(--color-primary);
+                    color: var(--color-primary);
+                }
+                .choice-btn.active {
+                    border-color: var(--color-success);
+                    background-color: var(--color-success-light);
+                    color: var(--color-success);
+                }
+                .rekond-checkbox.active {
+                    border-color: var(--color-danger);
+                    background-color: var(--color-danger-light);
+                    color: var(--color-danger);
+                }
+            `}</style>
+        </>
+    );
+};
 const MediaButton: React.FC<React.PropsWithChildren<any>> = ({ htmlFor, hasFile, required, children }) => {
     const baseStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.75rem', borderRadius: '6px', fontSize: '0.875rem', textAlign: 'center', cursor: 'pointer', transition: 'background-color 0.2s', border: '1px dashed' };
     const color = hasFile ? 'var(--color-success)' : (required ? 'var(--color-danger)' : 'var(--color-text-secondary)');
