@@ -207,6 +207,7 @@ export default function CheckInForm() {
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [isFinalSaving, setIsFinalSaving] = useState(false);
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [damageToFix, setDamageToFix] = useState<string | null>(null);
@@ -342,6 +343,10 @@ if (drivmedelstyp === 'elbil' && !laddniva) return false;
 
   const handleCancel = () => { if (window.confirm('Är du säker? Alla ifyllda data kommer att raderas.')) resetForm(); };
 
+  const handleSaveDraft = async () => {
+    // Logik för att spara utkast kommer här i nästa steg
+    console.log("Ska spara utkast...");
+};
   const handleSubmitFinal = async () => {
     if (isFinalSaving || !formIsValidState) return handleShowErrors();
     setIsFinalSaving(true);
@@ -549,10 +554,17 @@ if (drivmedelstyp === 'elbil' && !laddniva) return false;
 
         <Card><Field label="Kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea></Field></Card>
 
-        <div className="form-actions">
-            <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
-            <Button onClick={formIsValidState ? handleSubmitFinal : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>{!formIsValidState ? 'Visa saknad information' : (isFinalSaving ? 'Skickar in...' : 'Slutför incheckning')}</Button>
-        </div>
+<div className="form-actions">
+    <Button onClick={handleSaveDraft} variant="primary" disabled={isDraftSaving || isFinalSaving || !regInput}>
+        {isDraftSaving ? 'Sparar utkast...' : 'Spara utkast'}
+    </Button>
+    <Button onClick={handleCancel} variant="secondary" disabled={isDraftSaving || isFinalSaving}>
+        Avbryt
+    </Button>
+    <Button onClick={formIsValidState ? handleSubmitFinal : handleShowErrors} disabled={isDraftSaving || isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>
+        {!formIsValidState ? 'Visa saknad information' : (isFinalSaving ? 'Slutför...' : 'Slutför incheckning')}
+    </Button>
+</div>
     </div>
   );
 }
@@ -863,6 +875,15 @@ const GlobalStyles = () => (
             background-color: var(--color-danger);
             border-color: var(--color-danger);
         }
-        .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 3rem; }
-    `}</style>
+.form-actions {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between; /* Ändrad från flex-end */
+    align-items: center;
+    padding-bottom: 3rem;
+}
+`}</style>
 )
