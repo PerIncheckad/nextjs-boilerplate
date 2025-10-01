@@ -365,7 +365,7 @@ const handleSaveDraft = async () => {
             fuel_price_per_liter: literpris || null,
             charge_level_at_return: laddniva || null,
             tire_type: hjultyp,
-            rekond_behov: behovRekond,
+            rekond_behov: behoverRekond,
             has_new_damages: skadekontroll === 'nya_skador',
             privacy_cover_ok: insynsskyddOK,
             dekal_djur_rokning_ok: dekalDjurRokningOK,
@@ -470,7 +470,7 @@ if (deleteError) {
         notes: preliminarAvslutNotering.trim() || null, odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
         fuel_full: tankniva === 'återlämnades_fulltankad' ? true : null, washer_ok: spolarvatskaOK,
         adblue_ok: drivmedelstyp === 'bensin_diesel' ? adblueOK : null, privacy_cover_ok: insynsskyddOK,
-        rekond_behov: behovRekond, has_new_damages: skadekontroll === 'nya_skador', completed_at: new Date().toISOString(),
+        rekond_behov: behoverRekond, has_new_damages: skadekontroll === 'nya_skador', completed_at: new Date().toISOString(),
     }).select().single();
     if (checkinError) throw checkinError;
 
@@ -511,9 +511,19 @@ if (deleteError) {
     setShowSuggestions(false);
   };
 
-  const handleExistingDamageAction = (id: string, action: 'document' | 'resolve') => {
-    setExistingDamages(prev => prev.map(d => d.id === id ? { ...d, status: d.status === action ? 'not_selected' : action } : d));
-  };
+const handleExistingDamageAction = (id: string, action: 'document' | 'resolve') => {
+    setExistingDamages(prev => prev.map(d => {
+        if (d.id === id) {
+            // Om vi klickar på samma knapp igen, återgå till "not_selected".
+            // Annars, byt till den nya statusen.
+            const newStatus = d.status === (action === 'document' ? 'documented' : 'resolved')
+                ? 'not_selected'
+                : (action === 'document' ? 'documented' : 'resolved');
+            return { ...d, status: newStatus };
+        }
+        return d;
+    }));
+};
 
   const updateDamageField = (id: string, field: string, value: any, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
