@@ -446,7 +446,7 @@ const [matarstallning, setMatarstallning] = useState('');
 const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
 
 // För bensin/diesel
-const [tankniva, setTankniva] = useState<'fulltankad' | 'tankas_senare' | 'pafylld_nu' | null>(null);
+const [tankniva, setTankniva] = useState<'återlämnades_fulltankad' | 'tankad_nu' | null>(null);
 const [liters, setLiters] = useState('');
 const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
 const [literpris, setLiterpris] = useState('');
@@ -457,8 +457,8 @@ const [laddniva, setLaddniva] = useState('');
 // Övriga fält
 const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
 const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
-const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterhjul' | null>(null);
-const [behoverRekond, setBehoverRekond] = useState(false); // Ändrad till boolean
+const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
+const [behoverRekond, setBehoverRekond] = useState(false);
 
 
 // Skador
@@ -799,7 +799,7 @@ const isFormValid = () => {
 
     if (drivmedelstyp === 'bensin_diesel') {
         if (!tankniva) return false;
-        if (tankniva === 'pafylld_nu' && (!liters || !bransletyp || !literpris)) return false;
+        if (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) return false;
     }
 
     if (drivmedelstyp === 'elbil') {
@@ -962,9 +962,9 @@ const htmlBody = `
      <h3>Tankstatus</h3>
      <p>${drivmedelstyp === 'elbil' 
        ? `Laddning: ${laddniva}%` 
-       : `Tank: ${tankniva === 'fulltankad' ? 'Fulltankad' : 
-           tankniva === 'pafylld_nu' ? `Påfylld ${liters}L ${bransletyp} (${literpris} kr/L)` : 
-           'Tankas senare'}`}</p>
+       : `Tank: ${tankniva === 'återlämnades_fulltankad' ? 'Återlämnades fulltankad' : 
+           tankniva === 'tankad_nu' ? `Tankad nu: ${liters}L ${bransletyp} (${literpris} kr/L)` : 
+           'Okänd'}`}</p>
      
      ${hasNewlyDocumented ? `
        <h3>Befintliga skador (nyligen dokumenterade)</h3>
@@ -1008,14 +1008,7 @@ station,
 status: 'checked_in',
 notes: (preliminarAvslutNotering ?? '').trim() || null,
 odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
-fuel_full:
-typeof tankniva === 'string'
-? (tankniva.toLowerCase().includes('full') && !tankniva.toLowerCase().includes('ej')
-? true
-: tankniva.toLowerCase().includes('ej')
-? false
-: null)
-: null,
+fuel_full: tankniva === 'återlämnades_fulltankad' ? true : null,
 washer_ok: spolarvatskaOK,
 adblue_ok: drivmedelstyp === 'bensin_diesel' ? adblueOK : null,
 privacy_cover_ok: insynsskyddOK,
@@ -1275,15 +1268,12 @@ return d;
 };
 
 // Visuella komponenter
-const SectionHeader = ({ title, isComplete }: { title: string; isComplete?: boolean }) => (
+const SectionHeader = ({ title }: { title: string; }) => (
 <div style={{
 marginTop: '40px',
 marginBottom: '20px',
 paddingBottom: '12px',
 borderBottom: '2px solid #e5e7eb',
-display: 'flex',
-alignItems: 'center',
-gap: '12px'
 }}>
 <h2 style={{
 fontSize: '22px',
@@ -1292,26 +1282,9 @@ margin: 0,
 color: '#1f2937',
 letterSpacing: '0.05em',
 textTransform: 'uppercase',
-flex: 1
 }}>
 {title}
 </h2>
-{isComplete !== undefined && (
-<div style={{
-width: '24px',
-height: '24px',
-borderRadius: '50%',
-backgroundColor: isComplete ? '#10b981' : '#dc2626',
-color: '#ffffff',
-display: 'flex',
-alignItems: 'center',
-justifyContent: 'center',
-fontSize: '14px',
-fontWeight: 'bold'
-}}>
-{isComplete ? '✓' : '!'}
-</div>
-)}
 </div>
 );
 
@@ -1504,772 +1477,733 @@ margin: '0 auto',
 padding: '0 20px',
 fontFamily: 'system-ui, -apple-system, sans-serif'
 }}>
-{/* 1. REGISTRERINGSNUMMER */}
+{/* ==================== 1. FORDON ==================== */}
 <div data-error={showFieldErrors && !regInput} style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-marginTop: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-position: 'relative',
-border: showFieldErrors && !regInput ? '2px solid #dc2626' : '2px solid transparent'
-}}>
-<h2 style={{
-fontSize: '22px',
-fontWeight: '700',
-marginBottom: '20px',
-color: '#1f2937',
-textTransform: 'uppercase',
-borderBottom: '2px solid #e5e7eb',
-paddingBottom: '12px'
-}}>
-Fordon
-</h2>
-<label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
-Registreringsnummer *
-</label>
-<input
-type="text"
-value={regInput}
-onChange={(e) => handleRegInputChange(e.target.value)}
-placeholder="Skriv reg.nr"
-spellCheck={false}
-autoComplete="off"
-style={{
-width: '100%',
-padding: '14px',
-border: showFieldErrors && !regInput ? '2px solid #dc2626' : '2px solid #e5e7eb',
-borderRadius: '8px',
-fontSize: '18px',
-fontWeight: '600',
-backgroundColor: '#ffffff',
-textAlign: 'center',
-letterSpacing: '2px'
-}}
-/>
-{showSuggestions && suggestions.length > 0 && (
-<div style={{
-position: 'absolute',
-top: '100%',
-left: 0,
-right: 0,
-backgroundColor: '#ffffff',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-marginTop: '4px',
-boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-zIndex: 10
-}}>
-{suggestions.map(suggestion => (
-<div
-key={suggestion}
-onClick={() => selectSuggestion(suggestion)}
-style={{
-padding: '10px 14px',
-cursor: 'pointer',
-borderBottom: '1px solid #f3f4f6',
-fontSize: '16px',
-fontWeight: '500'
-}}
-onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
->
-{suggestion}
-</div>
-))}
-</div>
-)}
-{carModel && (
-<div style={{
-marginTop: '16px',
-padding: '16px',
-backgroundColor: '#f0f9ff',
-borderRadius: '8px',
-border: '1px solid #bfdbfe'
-}}>
-<div style={{ marginBottom: '8px' }}>
-<span style={{ fontWeight: '600' }}>Bilmodell:</span> {carModel}
-</div>
-{wheelStorage && wheelStorage !== '---' && (
-<div style={{ marginBottom: '8px' }}>
-<span style={{ fontWeight: '600' }}>Hjulförvaring:</span> {wheelStorage}
-</div>
-)}
-{damages && damages.length > 0 && (
-<div>
-<span style={{ fontWeight: '600' }}>Befintliga skador:</span>
-<ul style={{ marginTop: '8px', marginLeft: '20px' }}>
-{damages.map((damage, idx) => (
-<li key={idx} style={{ marginBottom: '4px' }}>{damage}</li>
-))}
-</ul>
-</div>
-)}
-</div>
-)} 
-</div>
-{/* 2. PLATS FÖR INCHECKNING */}
-<div data-error={showFieldErrors && (!ort || !station)} style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-border: showFieldErrors && (!ort || !station) ? '2px solid #dc2626' : '2px solid transparent'
-}}>
-<h2 style={{
-fontSize: '22px',
-fontWeight: '700',
-marginBottom: '20px',
-color: '#1f2937',
-textTransform: 'uppercase',
-borderBottom: '2px solid #e5e7eb',
-paddingBottom: '12px'
-}}>
-Plats för incheckning
-</h2>
-<div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-<div style={{ flex: 1 }}>
-<label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-Ort *
-</label>
-<select
-value={ort}
-onChange={(e) => {
-setOrt(e.target.value);
-setStation('');
-}}
-style={{
-width: '100%',
-padding: '12px',
-border: showFieldErrors && !ort ? '2px solid #dc2626' : '2px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px',
-backgroundColor: '#ffffff'
-}}
->
-<option value="">Välj ort</option>
-{ORTER.map(ortOption => (
-<option key={ortOption} value={ortOption}>{ortOption}</option>
-))}
-</select>
-</div>
-<div style={{ flex: 1 }}>
-<label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
-Station *
-</label>
-<select
-value={station}
-onChange={(e) => setStation(e.target.value)}
-disabled={!ort}
-style={{
-width: '100%',
-padding: '12px',
-border: showFieldErrors && !station ? '2px solid #dc2626' : '2px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px',
-backgroundColor: ort ? '#ffffff' : '#f9fafb',
-opacity: ort ? 1 : 0.6
-}}
->
-<option value="">Välj station</option>
-{availableStations.map(stationOption => (
-<option key={stationOption} value={stationOption}>{stationOption}</option>
-))}
-</select>
-</div>
-</div>
-</div>
-
-<div data-error={showFieldErrors && (!matarstallning || !hjultyp)} style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-border: showFieldErrors && (!matarstallning || !hjultyp) ? '2px solid #dc2626' : '2px solid transparent'
-}}>
-<h2>Fordonsstatus</h2>
-<div style={{ marginBottom: '16px' }}>
-<label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-Mätarställning *
-</label>
-<input
-type="number"
-value={matarstallning}
-onChange={(e) => setMatarstallning(e.target.value)}
-placeholder="Ange mätarställning"
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px'
-}}
-/>
-</div>
-
-<div style={{ marginBottom: '16px' }}>
-<label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
-Hjul som sitter på *
-</label>
-<select
-value={hjultyp || ''}
-onChange={(e) => setHjultyp(e.target.value as 'Sommarthjul' | 'Vinterhjul' | null)}
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px'
-}}
->
-<option value="">Välj hjultyp</option>
-<option value="Sommarthjul">Sommarthjul</option>
-<option value="Vinterhjul">Vinterhjul</option>
-</select>
-</div>
-</div>
-<div data-error={showFieldErrors && !drivmedelstyp} style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-border: showFieldErrors && !drivmedelstyp ? '2px solid #dc2626' : '2px solid transparent'
-}}>
-<h2>Tankning/Laddning</h2>
-
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Drivmedelstyp *
-</label>
-<div style={{ display: 'flex', gap: '16px' }}>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-<input
-type="radio"
-name="drivmedel"
-checked={drivmedelstyp === 'bensin_diesel'}
-onChange={() => setDrivmedelstyp('bensin_diesel')}
-/>
-Bensin/Diesel
-</label>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-<input
-type="radio"
-name="drivmedel"
-checked={drivmedelstyp === 'elbil'}
-onChange={() => setDrivmedelstyp('elbil')}
-/>
-Elbil
-</label>
-</div>
-</div>
-
-{drivmedelstyp === 'bensin_diesel' && (
-<div>
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Tankstatus *
-</label>
-<select
-value={tankniva || ''}
-onChange={(e) => setTankniva(e.target.value as any)}
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px'
-}}
->
-<option value="">Välj tankstatus</option>
-<option value="fulltankad">Fulltankad</option>
-<option value="tankas_senare">Tankas senare</option>
-<option value="pafylld_nu">Påfylld nu</option>
-</select>
-</div>
-
-{tankniva === 'pafylld_nu' && (
-<>
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Antal liter *
-</label>
-<input
-type="number"
-step="0.1"
-value={liters}
-onChange={(e) => setLiters(e.target.value)}
-placeholder="0.0"
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px'
-}}
-/>
-</div>
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Literpris *
-</label>
-<input
-type="number"
-step="0.01"
-value={literpris}
-onChange={(e) => setLiterpris(e.target.value)}
-placeholder="0.00"
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px'
-}}
-/>
-</div>
-</>
-)}
-</div>
-)}
-
-{drivmedelstyp === 'elbil' && (
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Laddningsnivå (%) *
-</label>
-<input
-type="number"
-min="0"
-max="100"
-value={laddniva}
-onChange={(e) => setLaddniva(e.target.value)}
-placeholder="0-100"
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px'
-}}
-/>
-</div>
-)}
-</div>
-<div data-error={showFieldErrors && skadekontroll === null} style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-border: showFieldErrors && skadekontroll === null ? '2px solid #dc2626' : '2px solid transparent'
-}}>
-<h2>Befintliga skador</h2>
-
-{existingDamages && existingDamages.length > 0 ? (
-<div>
-<p style={{ marginBottom: '16px', color: '#6b7280' }}>
-Dessa skador finns redan registrerade. Dokumentera dem med foto.
-</p>
-{existingDamages.map((damage) => (
-<div key={damage.id} style={{
-padding: '16px',
-marginBottom: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '8px',
-backgroundColor: damage.status === 'documented' ? '#f0fdf4' : (damage.status === 'resolved' ? '#fefce8' : '#f9fafb')
-}}>
-<div style={{ fontWeight: '600', marginBottom: '8px' }}>
-{damage.fullText || damage.shortText}
-</div>
-
-<div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-  <button
-    onClick={() => handleExistingDamageAction(damage.id, 'document')}
-    style={{
-      padding: '8px 16px',
-      backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
-      color: damage.status === 'documented' ? '#ffffff' : '#374151',
-      border: 'none',
-      borderRadius: '6px',
-      cursor: 'pointer',
-    }}
-  >
-    {damage.status === 'documented' ? 'Dokumenterad ✓' : 'Dokumentera'}
-  </button>
-
-  <button
-    onClick={() => handleExistingDamageAction(damage.id, 'resolve')}
-    style={{
-      padding: '8px 16px',
-      backgroundColor: damage.status === 'resolved' ? '#f59e0b' : '#e5e7eb',
-      color: damage.status === 'resolved' ? '#ffffff' : '#374151',
-      border: 'none',
-      borderRadius: '6px',
-      cursor: 'pointer',
-    }}
-  >
-    {damage.status === 'resolved' ? 'Åtgärdad/Hittas ej ✓' : 'Åtgärdad/Hittas ej'}
-  </button>
-</div>
-
-{damage.status === 'documented' && (
-<div style={{ marginTop: '12px' }}>
-<p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
-Foto krävs, video frivilligt
-</p>
-<MediaUpload
-  damageId={damage.id}
-  isOld={true}
-  onMediaUpdate={updateExistingDamageMedia}
-  hasImage={hasPhoto(damage.media)}
-  hasVideo={hasVideo(damage.media)}
-  videoRequired={false}
-/>
-
-
-{damage.media && damage.media.length > 0 && (
-<div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-{damage.media.map((m, i) => (
-<div key={i} style={{ position: 'relative' }}>
-{m.type === 'image' && m.preview && (
-<img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
-)}
-{m.type === 'video' && (
-m.thumbnail ? 
-<img src={m.thumbnail} alt="video" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} /> : 
-<div style={{ width: '80px', height: '80px', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>🎥</div>
-)}
-<button
-onClick={() => removeExistingDamageMedia(damage.id, i)}
-style={{
-position: 'absolute',
-top: '-8px',
-right: '-8px',
-width: '24px',
-height: '24px',
-borderRadius: '50%',
-backgroundColor: '#dc2626',
-color: '#ffffff',
-border: 'none',
-cursor: 'pointer',
-fontSize: '12px'
-}}
->
-×
-</button>
-</div>
-))}
-</div>
-)}
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Typ av skada *</label>
-<select
-value={damage.userType || ''}
-onChange={(e) => updateExistingDamageType(damage.id, e.target.value)}
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px'
-}}
->
-<option value="">Välj typ</option>
-{DAMAGE_TYPES.map(type => (
-<option key={type} value={type}>{type}</option>
-))}
-</select>
-</div>
-
-{damage.userType && (
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Placering *</label>
-<select
-value={damage.userCarPart || ''}
-onChange={(e) => updateExistingDamageCarPart(damage.id, e.target.value)}
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px'
-}}
->
-<option value="">Välj placering</option>
-{getRelevantCarParts(damage.userType).map(part => (
-<option key={part} value={part}>{part}</option>
-))}
-</select>
-</div>
-)}
-
-{damage.userCarPart && CAR_PARTS[damage.userCarPart] && CAR_PARTS[damage.userCarPart].length > 0 && (
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
-<select
-value={damage.userPosition || ''}
-onChange={(e) => updateExistingDamagePosition(damage.id, e.target.value)}
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px'
-}}
->
-<option value="">Välj position</option>
-{CAR_PARTS[damage.userCarPart].map(pos => (
-<option key={pos} value={pos}>{pos}</option>
-))}
-</select>
-</div>
-)}
-
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning</label>
-<textarea
-value={damage.userDescription || ''}
-onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
-placeholder="Beskriv skadan..."
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px',
-minHeight: '60px'
-}}
-/>
-</div>
-</div>
-)}
-</div>
-))}
-</div>
-) : (
-<p style={{ color: '#6b7280' }}>Inga befintliga skador registrerade för detta fordon.</p>
-)}
-</div>
-<div style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-}}>
-<h2>Nya skador</h2>
-
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600' }}>
-<input
-type="radio"
-name="skadekontroll"
-checked={skadekontroll === 'inga_nya_skador'}
-onChange={() => setSkadekontroll('inga_nya_skador')}
-/>
-Inga nya skador
-</label>
-</div>
-
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600' }}>
-<input
-type="radio"
-name="skadekontroll"
-checked={skadekontroll === 'nya_skador'}
-onChange={() => setSkadekontroll('nya_skador')}
-/>
-Nya skador
-</label>
-</div>
-
-{skadekontroll === 'nya_skador' && (
-<div>
-<button
-onClick={addDamage}
-style={{
-padding: '8px 16px',
-backgroundColor: '#3b82f6',
-color: '#ffffff',
-border: 'none',
-borderRadius: '6px',
-cursor: 'pointer',
-marginBottom: '16px'
-}}
->
-Lägg till ny skada
-</button>
-
-{newDamages.map((damage) => (
-<div key={damage.id} style={{
-padding: '16px',
-marginBottom: '16px',
-border: '2px solid #dc2626',
-borderRadius: '8px',
-backgroundColor: '#fef2f2'
-}}>
-<button
-onClick={() => removeDamage(damage.id)}
-style={{
-float: 'right',
-padding: '4px 8px',
-backgroundColor: '#dc2626',
-color: '#ffffff',
-border: 'none',
-borderRadius: '4px',
-cursor: 'pointer'
-}}
->
-Ta bort
-</button>
-
-<h4 style={{ marginBottom: '12px' }}>Ny skada</h4>
-
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Typ av skada *</label>
-<select
-value={damage.type}
-onChange={(e) => updateDamageType(damage.id, e.target.value)}
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px'
-}}
->
-<option value="">Välj typ</option>
-{DAMAGE_TYPES.map(type => (
-<option key={type} value={type}>{type}</option>
-))}
-</select>
-</div>
-
-{damage.type && (
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Placering *</label>
-<select
-value={damage.carPart}
-onChange={(e) => updateDamageCarPart(damage.id, e.target.value)}
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px'
-}}
->
-<option value="">Välj placering</option>
-{getRelevantCarParts(damage.type).map(part => (
-<option key={part} value={part}>{part}</option>
-))}
-</select>
-</div>
-)}
-
-{damage.carPart && CAR_PARTS[damage.carPart] && CAR_PARTS[damage.carPart].length > 0 && (
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
-<select
-value={damage.position}
-onChange={(e) => updateDamagePosition(damage.id, e.target.value)}
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px'
-}}
->
-<option value="">Välj position</option>
-{CAR_PARTS[damage.carPart].map(pos => (
-<option key={pos} value={pos}>{pos}</option>
-))}
-</select>
-</div>
-)}
-
-<div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning</label>
-<textarea
-value={damage.text}
-onChange={(e) => updateDamageText(damage.id, e.target.value)}
-placeholder="Beskriv skadan..."
-style={{
-width: '100%',
-padding: '8px',
-border: '1px solid #e5e7eb',
-borderRadius: '4px',
-minHeight: '60px'
-}}
-/>
-</div>
-
-<MediaUpload
-damageId={damage.id}
-isOld={false}
-onMediaUpdate={updateDamageMedia}
-hasImage={hasPhoto(damage.media)}
-hasVideo={hasVideo(damage.media)}
-videoRequired={true}
-/>
-
-{damage.media && damage.media.length > 0 && (
-<div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
-{damage.media.map((m, i) => (
-<div key={i} style={{ position: 'relative' }}>
-{m.type === 'image' && m.preview && (
-<img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
-)}
-{m.type === 'video' && (
-m.thumbnail ? 
-<img src={m.thumbnail} alt="video" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} /> : 
-<div style={{ width: '80px', height: '80px', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>🎥</div>
-)}
-<button
-onClick={() => removeDamageMedia(damage.id, i)}
-style={{
-position: 'absolute',
-top: '-8px',
-right: '-8px',
-width: '24px',
-height: '24px',
-borderRadius: '50%',
-backgroundColor: '#dc2626',
-color: '#ffffff',
-border: 'none',
-cursor: 'pointer',
-fontSize: '12px'
-}}
->
-×
-</button>
-</div>
-))}
-</div>
-)}
-</div>
-))}
-</div>
-)}
-</div>
-{/* --- Ny sektion för Rekond --- */}
-<div style={{
     backgroundColor: '#ffffff',
     padding: '24px',
     borderRadius: '12px',
     marginBottom: '24px',
-    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    marginTop: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    position: 'relative',
+    border: showFieldErrors && !regInput ? '2px solid #dc2626' : '2px solid transparent'
 }}>
-    <h2 style={{
-        fontSize: '22px',
-        fontWeight: '700',
-        marginBottom: '20px',
-        color: '#1f2937',
-        textTransform: 'uppercase',
-        borderBottom: '2px solid #e5e7eb',
-        paddingBottom: '12px'
-    }}>
-        Städning & Rekond
-    </h2>
-    <div style={{ padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #dc2626' }}>
+    <SectionHeader title="Fordon" />
+    <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '16px' }}>
+        Registreringsnummer *
+    </label>
+    <input
+        type="text"
+        value={regInput}
+        onChange={(e) => handleRegInputChange(e.target.value)}
+        placeholder="Skriv reg.nr"
+        spellCheck={false}
+        autoComplete="off"
+        style={{
+            width: '100%',
+            padding: '14px',
+            border: showFieldErrors && !regInput ? '2px solid #dc2626' : '2px solid #e5e7eb',
+            borderRadius: '8px',
+            fontSize: '18px',
+            fontWeight: '600',
+            backgroundColor: '#ffffff',
+            textAlign: 'center',
+            letterSpacing: '2px'
+        }}
+    />
+    {showSuggestions && suggestions.length > 0 && (
+        <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            backgroundColor: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: '6px',
+            marginTop: '4px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            zIndex: 10
+        }}>
+            {suggestions.map(suggestion => (
+                <div
+                    key={suggestion}
+                    onClick={() => selectSuggestion(suggestion)}
+                    style={{
+                        padding: '10px 14px',
+                        cursor: 'pointer',
+                        borderBottom: '1px solid #f3f4f6',
+                        fontSize: '16px',
+                        fontWeight: '500'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                >
+                    {suggestion}
+                </div>
+            ))}
+        </div>
+    )}
+    {carModel && (
+        <div style={{
+            marginTop: '16px',
+            padding: '16px',
+            backgroundColor: '#f0f9ff',
+            borderRadius: '8px',
+            border: '1px solid #bfdbfe'
+        }}>
+            <div style={{ marginBottom: '8px' }}>
+                <span style={{ fontWeight: '600' }}>Bilmodell:</span> {carModel}
+            </div>
+            {wheelStorage && wheelStorage !== '---' && (
+                <div style={{ marginBottom: '8px' }}>
+                    <span style={{ fontWeight: '600' }}>Hjulförvaring:</span> {wheelStorage}
+                </div>
+            )}
+            {damages && damages.length > 0 && (
+                <div>
+                    <span style={{ fontWeight: '600' }}>Befintliga skador:</span>
+                    <ul style={{ marginTop: '8px', marginLeft: '20px' }}>
+                        {damages.map((damage, idx) => (
+                            <li key={idx} style={{ marginBottom: '4px' }}>{damage}</li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    )}
+</div>
+
+{/* ==================== 2. PLATS FÖR INCHECKNING ==================== */}
+<div data-error={showFieldErrors && (!ort || !station)} style={{
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: showFieldErrors && (!ort || !station) ? '2px solid #dc2626' : '2px solid transparent'
+}}>
+    <SectionHeader title="Plats för incheckning" />
+    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+        <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Ort *
+            </label>
+            <select
+                value={ort}
+                onChange={(e) => {
+                    setOrt(e.target.value);
+                    setStation('');
+                }}
+                style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: showFieldErrors && !ort ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: '#ffffff'
+                }}
+            >
+                <option value="">Välj ort</option>
+                {ORTER.map(ortOption => (
+                    <option key={ortOption} value={ortOption}>{ortOption}</option>
+                ))}
+            </select>
+        </div>
+        <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: '500' }}>
+                Station *
+            </label>
+            <select
+                value={station}
+                onChange={(e) => setStation(e.target.value)}
+                disabled={!ort}
+                style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: showFieldErrors && !station ? '2px solid #dc2626' : '2px solid #e5e7eb',
+                    borderRadius: '6px',
+                    fontSize: '16px',
+                    backgroundColor: ort ? '#ffffff' : '#f9fafb',
+                    opacity: ort ? 1 : 0.6
+                }}
+            >
+                <option value="">Välj station</option>
+                {availableStations.map(stationOption => (
+                    <option key={stationOption} value={stationOption}>{stationOption}</option>
+                ))}
+            </select>
+        </div>
+    </div>
+</div>
+
+{/* ==================== 3. FORDONSSTATUS ==================== */}
+<div data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp)} style={{
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp) ? '2px solid #dc2626' : '2px solid transparent'
+}}>
+    <SectionHeader title="Fordonsstatus" />
+
+    <SubSectionHeader title="Mätarställning" />
+    <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+            Mätarställning *
+        </label>
+        <input
+            type="number"
+            value={matarstallning}
+            onChange={(e) => setMatarstallning(e.target.value)}
+            placeholder="Ange mätarställning"
+            style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                fontSize: '16px'
+            }}
+        />
+    </div>
+
+    <SubSectionHeader title="Däck som sitter på" />
+    <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600' }}>
+            Däcktyp *
+        </label>
+        <select
+            value={hjultyp || ''}
+            onChange={(e) => setHjultyp(e.target.value as 'Sommardäck' | 'Vinterdäck' | null)}
+            style={{
+                width: '100%',
+                padding: '12px',
+                border: '1px solid #e5e7eb',
+                borderRadius: '6px',
+                fontSize: '16px'
+            }}
+        >
+            <option value="">Välj däcktyp</option>
+            <option value="Sommardäck">Sommardäck</option>
+            <option value="Vinterdäck">Vinterdäck</option>
+        </select>
+    </div>
+
+    <SubSectionHeader title="Tankning/Laddning" />
+    <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+            Drivmedelstyp *
+        </label>
+        <div style={{ display: 'flex', gap: '16px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                    type="radio"
+                    name="drivmedel"
+                    checked={drivmedelstyp === 'bensin_diesel'}
+                    onChange={() => setDrivmedelstyp('bensin_diesel')}
+                />
+                Bensin/Diesel
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                    type="radio"
+                    name="drivmedel"
+                    checked={drivmedelstyp === 'elbil'}
+                    onChange={() => setDrivmedelstyp('elbil')}
+                />
+                Elbil
+            </label>
+        </div>
+    </div>
+
+    {drivmedelstyp === 'bensin_diesel' && (
+        <div>
+            <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                    Tankstatus *
+                </label>
+                <select
+                    value={tankniva || ''}
+                    onChange={(e) => setTankniva(e.target.value as any)}
+                    style={{
+                        width: '100%',
+                        padding: '12px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        fontSize: '16px'
+                    }}
+                >
+                    <option value="">Välj tankstatus</option>
+                    <option value="återlämnades_fulltankad">Återlämnades fulltankad</option>
+                    <option value="tankad_nu">Tankad nu</option>
+                </select>
+            </div>
+
+            {tankniva === 'tankad_nu' && (
+                <>
+                    <div style={{ marginBottom: '16px' }}>
+                        <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                            Antal liter *
+                        </label>
+                        <input
+                            type="number"
+                            step="0.1"
+                            value={liters}
+                            onChange={(e) => setLiters(e.target.value)}
+                            placeholder="0.0"
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '6px',
+                                fontSize: '16px'
+                            }}
+                        />
+                    </div>
+                    <div style={{ marginBottom: '16px' }}>
+                        <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                            Literpris *
+                        </label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            value={literpris}
+                            onChange={(e) => setLiterpris(e.target.value)}
+                            placeholder="0.00"
+                            style={{
+                                width: '100%',
+                                padding: '12px',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '6px',
+                                fontSize: '16px'
+                            }}
+                        />
+                    </div>
+                </>
+            )}
+        </div>
+    )}
+
+    {drivmedelstyp === 'elbil' && (
+        <div style={{ marginBottom: '16px' }}>
+            <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                Laddningsnivå (%) *
+            </label>
+            <input
+                type="number"
+                min="0"
+                max="100"
+                value={laddniva}
+                onChange={(e) => setLaddniva(e.target.value)}
+                placeholder="0-100"
+                style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '6px',
+                    fontSize: '16px'
+                }}
+            />
+        </div>
+    )}
+</div>
+
+{/* ==================== 4. SKADOR ==================== */}
+<div data-error={showFieldErrors && skadekontroll === null} style={{
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: showFieldErrors && skadekontroll === null ? '2px solid #dc2626' : '2px solid transparent'
+}}>
+    <SectionHeader title="Skador" />
+
+    <SubSectionHeader title="Befintliga skador" />
+    {existingDamages && existingDamages.length > 0 ? (
+        <div>
+            <p style={{ marginBottom: '16px', color: '#6b7280' }}>
+                Dessa skador finns redan registrerade. Dokumentera dem med foto.
+            </p>
+            {existingDamages.map((damage) => (
+                <div key={damage.id} style={{
+                    padding: '16px',
+                    marginBottom: '12px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    backgroundColor: damage.status === 'documented' ? '#f0fdf4' : (damage.status === 'resolved' ? '#fefce8' : '#f9fafb')
+                }}>
+                    <div style={{ fontWeight: '600', marginBottom: '8px' }}>
+                        {damage.fullText || damage.shortText}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                        <button
+                            onClick={() => handleExistingDamageAction(damage.id, 'document')}
+                            style={{
+                                padding: '8px 16px',
+                                backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
+                                color: damage.status === 'documented' ? '#ffffff' : '#374151',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            {damage.status === 'documented' ? 'Dokumenterad ✓' : 'Dokumentera'}
+                        </button>
+
+                        <button
+                            onClick={() => handleExistingDamageAction(damage.id, 'resolve')}
+                            style={{
+                                padding: '8px 16px',
+                                backgroundColor: damage.status === 'resolved' ? '#f59e0b' : '#e5e7eb',
+                                color: damage.status === 'resolved' ? '#ffffff' : '#374151',
+                                border: 'none',
+                                borderRadius: '6px',
+                                cursor: 'pointer',
+                            }}
+                        >
+                            {damage.status === 'resolved' ? 'Åtgärdad/Hittas ej ✓' : 'Åtgärdad/Hittas ej'}
+                        </button>
+                    </div>
+
+                    {damage.status === 'documented' && (
+                        <div style={{ marginTop: '12px' }}>
+                            <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
+                                Foto krävs, video frivilligt
+                            </p>
+                            <MediaUpload
+                                damageId={damage.id}
+                                isOld={true}
+                                onMediaUpdate={updateExistingDamageMedia}
+                                hasImage={hasPhoto(damage.media)}
+                                hasVideo={hasVideo(damage.media)}
+                                videoRequired={false}
+                            />
+
+                            {damage.media && damage.media.length > 0 && (
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                                    {damage.media.map((m, i) => (
+                                        <div key={i} style={{ position: 'relative' }}>
+                                            {m.type === 'image' && m.preview && (
+                                                <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                            )}
+                                            {m.type === 'video' && (
+                                                m.thumbnail ?
+                                                    <img src={m.thumbnail} alt="video" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} /> :
+                                                    <div style={{ width: '80px', height: '80px', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>🎥</div>
+                                            )}
+                                            <button
+                                                onClick={() => removeExistingDamageMedia(damage.id, i)}
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: '-8px',
+                                                    right: '-8px',
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#dc2626',
+                                                    color: '#ffffff',
+                                                    border: 'none',
+                                                    cursor: 'pointer',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', marginBottom: '4px' }}>Typ av skada *</label>
+                                <select
+                                    value={damage.userType || ''}
+                                    onChange={(e) => updateExistingDamageType(damage.id, e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px'
+                                    }}
+                                >
+                                    <option value="">Välj typ</option>
+                                    {DAMAGE_TYPES.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {damage.userType && (
+                                <div style={{ marginBottom: '12px' }}>
+                                    <label style={{ display: 'block', marginBottom: '4px' }}>Placering *</label>
+                                    <select
+                                        value={damage.userCarPart || ''}
+                                        onChange={(e) => updateExistingDamageCarPart(damage.id, e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '8px',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '4px'
+                                        }}
+                                    >
+                                        <option value="">Välj placering</option>
+                                        {getRelevantCarParts(damage.userType).map(part => (
+                                            <option key={part} value={part}>{part}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            {damage.userCarPart && CAR_PARTS[damage.userCarPart] && CAR_PARTS[damage.userCarPart].length > 0 && (
+                                <div style={{ marginBottom: '12px' }}>
+                                    <label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
+                                    <select
+                                        value={damage.userPosition || ''}
+                                        onChange={(e) => updateExistingDamagePosition(damage.id, e.target.value)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '8px',
+                                            border: '1px solid #e5e7eb',
+                                            borderRadius: '4px'
+                                        }}
+                                    >
+                                        <option value="">Välj position</option>
+                                        {CAR_PARTS[damage.userCarPart].map(pos => (
+                                            <option key={pos} value={pos}>{pos}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning</label>
+                                <textarea
+                                    value={damage.userDescription || ''}
+                                    onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
+                                    placeholder="Beskriv skadan..."
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '4px',
+                                        minHeight: '60px'
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    ) : (
+        <p style={{ color: '#6b7280' }}>Inga befintliga skador registrerade för detta fordon.</p>
+    )}
+
+    <SubSectionHeader title="Nya skador" />
+    <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontWeight: '600' }}>
+            <input
+                type="radio"
+                name="skadekontroll"
+                checked={skadekontroll === 'inga_nya_skador'}
+                onChange={() => setSkadekontroll('inga_nya_skador')}
+            />
+            Inga nya skador
+        </label>
+    </div>
+
+    <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontWeight: '600' }}>
+            <input
+                type="radio"
+                name="skadekontroll"
+                checked={skadekontroll === 'nya_skador'}
+                onChange={() => setSkadekontroll('nya_skador')}
+            />
+            Nya skador
+        </label>
+    </div>
+
+    {skadekontroll === 'nya_skador' && (
+        <div>
+            <button
+                onClick={addDamage}
+                style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#3b82f6',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    marginBottom: '16px'
+                }}
+            >
+                Lägg till ny skada
+            </button>
+
+            {newDamages.map((damage) => (
+                <div key={damage.id} style={{
+                    padding: '16px',
+                    marginBottom: '16px',
+                    border: '2px solid #dc2626',
+                    borderRadius: '8px',
+                    backgroundColor: '#fef2f2'
+                }}>
+                    <button
+                        onClick={() => removeDamage(damage.id)}
+                        style={{
+                            float: 'right',
+                            padding: '4px 8px',
+                            backgroundColor: '#dc2626',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Ta bort
+                    </button>
+
+                    <h4 style={{ marginBottom: '12px' }}>Ny skada</h4>
+
+                    <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', marginBottom: '4px' }}>Typ av skada *</label>
+                        <select
+                            value={damage.type}
+                            onChange={(e) => updateDamageType(damage.id, e.target.value)}
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '4px'
+                            }}
+                        >
+                            <option value="">Välj typ</option>
+                            {DAMAGE_TYPES.map(type => (
+                                <option key={type} value={type}>{type}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {damage.type && (
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', marginBottom: '4px' }}>Placering *</label>
+                            <select
+                                value={damage.carPart}
+                                onChange={(e) => updateDamageCarPart(damage.id, e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                <option value="">Välj placering</option>
+                                {getRelevantCarParts(damage.type).map(part => (
+                                    <option key={part} value={part}>{part}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {damage.carPart && CAR_PARTS[damage.carPart] && CAR_PARTS[damage.carPart].length > 0 && (
+                        <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', marginBottom: '4px' }}>Detalj *</label>
+                            <select
+                                value={damage.position}
+                                onChange={(e) => updateDamagePosition(damage.id, e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '4px'
+                                }}
+                            >
+                                <option value="">Välj position</option>
+                                {CAR_PARTS[damage.carPart].map(pos => (
+                                    <option key={pos} value={pos}>{pos}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning</label>
+                        <textarea
+                            value={damage.text}
+                            onChange={(e) => updateDamageText(damage.id, e.target.value)}
+                            placeholder="Beskriv skadan..."
+                            style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #e5e7eb',
+                                borderRadius: '4px',
+                                minHeight: '60px'
+                            }}
+                        />
+                    </div>
+
+                    <MediaUpload
+                        damageId={damage.id}
+                        isOld={false}
+                        onMediaUpdate={updateDamageMedia}
+                        hasImage={hasPhoto(damage.media)}
+                        hasVideo={hasVideo(damage.media)}
+                        videoRequired={true}
+                    />
+
+                    {damage.media && damage.media.length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' }}>
+                            {damage.media.map((m, i) => (
+                                <div key={i} style={{ position: 'relative' }}>
+                                    {m.type === 'image' && m.preview && (
+                                        <img src={m.preview} alt="" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                    )}
+                                    {m.type === 'video' && (
+                                        m.thumbnail ?
+                                            <img src={m.thumbnail} alt="video" style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} /> :
+                                            <div style={{ width: '80px', height: '80px', backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}>🎥</div>
+                                    )}
+                                    <button
+                                        onClick={() => removeDamageMedia(damage.id, i)}
+                                        style={{
+                                            position: 'absolute',
+                                            top: '-8px',
+                                            right: '-8px',
+                                            width: '24px',
+                                            height: '24px',
+                                            borderRadius: '50%',
+                                            backgroundColor: '#dc2626',
+                                            color: '#ffffff',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            fontSize: '12px'
+                                        }}
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    )}
+</div>
+
+{/* ==================== 5. KONTROLL ==================== */}
+<div data-error={showFieldErrors && !isChecklistComplete} style={{
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+    border: showFieldErrors && !isChecklistComplete ? '2px solid #dc2626' : '2px solid transparent'
+}}>
+    <SectionHeader title="Kontroll" />
+    <div style={{ padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #dc2626', marginBottom: '24px' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 'bold', fontSize: '16px' }}>
             <input
                 type="checkbox"
@@ -2283,153 +2217,147 @@ fontSize: '12px'
                     }
                 }}
             />
-            ⚠️ Behöver rekond (JA)
+            ⚠️ Behöver rekond
         </label>
+    </div>
+
+    <SubSectionHeader title="Kontrollista - Allt måste vara OK" />
+    <div style={{ display: 'grid', gap: '12px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
+            ✓ Insynsskydd
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={dekalDjurRokningOK} onChange={e => setDekalDjurRokningOK(e.target.checked)} />
+            ✓ Dekal djur/rökning
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
+            ✓ Isskrapa
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
+            ✓ P-skiva
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
+            ✓ Skylt reg.plåt
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
+            ✓ Dekal GPS
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={washed} onChange={e => setWashed(e.target.checked)} />
+            ✓ Bilen tvättad
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            <input type="checkbox" checked={spolarvatskaOK} onChange={e => setSpolarvatskaOK(e.target.checked)} />
+            ✓ Spolarvätska
+        </label>
+
+        {drivmedelstyp === 'bensin_diesel' && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+                <input type="checkbox" checked={adblueOK} onChange={e => setAdblueOK(e.target.checked)} />
+                ✓ AdBlue
+            </label>
+        )}
     </div>
 </div>
 
-<div data-error={showFieldErrors && !isChecklistComplete} style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-border: showFieldErrors && !isChecklistComplete ? '2px solid #dc2626' : '2px solid #3b82f6'
-}}>
-<h2 style={{ color: '#3b82f6', marginBottom: '16px' }}>Kontrollista - Allt måste vara OK</h2>
-<div style={{ display: 'grid', gap: '12px' }}>
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
-    ✓ Insynsskydd
-  </label>
-
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={dekalDjurRokningOK} onChange={e => setDekalDjurRokningOK(e.target.checked)} />
-    ✓ Dekal djur/rökning
-  </label>
-
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
-    ✓ Isskrapa
-  </label>
-
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
-    ✓ P-skiva
-  </label>
-
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
-    ✓ Skylt reg.plåt
-  </label>
-
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
-    ✓ Dekal GPS
-  </label>
-
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={washed} onChange={e => setWashed(e.target.checked)} />
-    ✓ Bilen tvättad
-  </label>
-  
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={spolarvatskaOK} onChange={e => setSpolarvatskaOK(e.target.checked)} />
-    ✓ Spolarvätska
-  </label>
-  
-  {drivmedelstyp === 'bensin_diesel' && (
-      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-        <input type="checkbox" checked={adblueOK} onChange={e => setAdblueOK(e.target.checked)} />
-        ✓ AdBlue
-      </label>
-  )}
-</div>
-</div>
 <div style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
 }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Kommentarer (frivilligt)
-</label>
-<textarea
-value={preliminarAvslutNotering || ''}
-onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
-placeholder="Övrig info"
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px',
-minHeight: '80px'
-}}
-/>
+    <label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+        Kommentarer (frivilligt)
+    </label>
+    <textarea
+        value={preliminarAvslutNotering || ''}
+        onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
+        placeholder="Övrig info"
+        style={{
+            width: '100%',
+            padding: '12px',
+            border: '1px solid #e5e7eb',
+            borderRadius: '6px',
+            fontSize: '16px',
+            minHeight: '80px'
+        }}
+    />
 </div>
+
+{/* ==================== KNAPPAR ==================== */}
 <div style={{
-marginTop: '40px',
-paddingTop: '24px',
-borderTop: '2px solid #e5e7eb',
-display: 'flex',
-gap: '12px',
-justifyContent: 'center',
-paddingBottom: '40px'
+    marginTop: '40px',
+    paddingTop: '24px',
+    borderTop: '2px solid #e5e7eb',
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+    paddingBottom: '40px'
 }}>
-<button
-    onClick={saveDraft}
-    style={{
-        padding: '12px 24px',
-        backgroundColor: '#6b7280',
-        color: '#ffffff',
-        border: 'none',
-        borderRadius: '6px',
-        fontSize: '16px',
-        fontWeight: '600',
-        cursor: 'pointer'
-    }}
->
-    Spara utkast
-</button>
+    <button
+        onClick={saveDraft}
+        style={{
+            padding: '12px 24px',
+            backgroundColor: '#6b7280',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+        }}
+    >
+        Spara utkast
+    </button>
 
-<button
-id="btn-final"
-type="button"
-onClick={formIsValid ? handleSubmitFinal : handleShowErrors}
-disabled={isFinalSaving}
-style={{
-padding: '12px 24px',
-backgroundColor: !formIsValid ? '#a1a1aa' : (isFinalSaving ? '#16a34a80' : '#16a34a'),
-color: '#ffffff',
-border: 'none',
-borderRadius: '6px',
-fontSize: '16px',
-fontWeight: '600',
-cursor: !formIsValid ? 'pointer' : (isFinalSaving ? 'not-allowed' : 'pointer'),
-opacity: isFinalSaving ? 0.85 : 1,
-}}
->
-{!formIsValid ? 'Visa saknad information' : (isFinalSaving ? 'Skickar in...' : 'Slutför incheckning')}
-</button>
+    <button
+        id="btn-final"
+        type="button"
+        onClick={formIsValid ? handleSubmitFinal : handleShowErrors}
+        disabled={isFinalSaving}
+        style={{
+            padding: '12px 24px',
+            backgroundColor: !formIsValid ? '#a1a1aa' : (isFinalSaving ? '#16a34a80' : '#16a34a'),
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: !formIsValid ? 'pointer' : (isFinalSaving ? 'not-allowed' : 'pointer'),
+            opacity: isFinalSaving ? 0.85 : 1,
+        }}
+    >
+        {!formIsValid ? 'Visa saknad information' : (isFinalSaving ? 'Skickar in...' : 'Slutför incheckning')}
+    </button>
 
-<button
-onClick={handleCancel}
-style={{
-padding: '12px 24px',
-backgroundColor: '#dc2626',
-color: '#ffffff',
-border: 'none',
-borderRadius: '6px',
-fontSize: '16px',
-fontWeight: '600',
-cursor: 'pointer'
-}}
->
-Avbryt
-</button>
+    <button
+        onClick={handleCancel}
+        style={{
+            padding: '12px 24px',
+            backgroundColor: '#dc2626',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '6px',
+            fontSize: '16px',
+            fontWeight: '600',
+            cursor: 'pointer'
+        }}
+    >
+        Avbryt
+    </button>
 </div>
 </div>
 </div>
