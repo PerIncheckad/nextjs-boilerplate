@@ -454,20 +454,16 @@ const [literpris, setLiterpris] = useState('');
 // För elbil
 const [laddniva, setLaddniva] = useState('');
 
-// Övriga fält (tas bort från här)
-// const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
+// Övriga fält
 const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
 const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
 const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterhjul' | null>(null);
-// const [adblue, setAdblue] = useState<boolean | null>(null);
-const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
+const [behoverRekond, setBehoverRekond] = useState(false); // Ändrad till boolean
 
 
 // Skador
 const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
 const [insynsskyddOK, setInsynsskyddOK] = useState(false);
-// const [dekalDjurOK, setDekalDjurOK] = useState(false);
-// const [dekalRokningOK, setDekalRokningOK] = useState(false);
 const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
 const [isskrapaOK, setIsskrapaOK] = useState(false);
 const [pskivaOK, setPskivaOK] = useState(false);
@@ -833,46 +829,71 @@ const handleShowErrors = () => {
 };
 
 const resetForm = () => {
-setRegInput('');
-setCarData([]);
-setExistingDamages([]);
-setShowSuggestions(false);
-setShowConfirmDialog(false);
-setDamageToFix(null);
-setShowFinalConfirmation(false);
-setShowFieldErrors(false);
-setNotFound(false);
-setOrt('');
-setStation('');
-setAnnanPlats(false);
-setAnnanPlatsText('');
-setMatarstallning('');
-setDrivmedelstyp(null);
-setTankniva(null);
-setLiters('');
-setBransletyp(null);
-setLiterpris('');
-setLaddniva('');
-setInsynsskydd(null);
-setAntalLaddkablar(null);
-setHjultyp(null);
-setBehoverRekond(null);
-setSkadekontroll(null);
-setNewDamages([]);
-setUthyrningsstatus(null);
-setPreliminarAvslutNotering('');
-setShowSuccessModal(false);
-// Reset checklist
-setInsynsskyddOK(false);
-setDekalDjurRokningOK(false);
-setIsskrapaOK(false);
-setPskivaOK(false);
-setSkyltRegplatOK(false);
-setDekalGpsOK(false);
-setWashed(false);
-setSpolarvatskaOK(false);
-setAdblueOK(false);
+    setRegInput('');
+    setCarData([]);
+    setExistingDamages([]);
+    setDamages([]); // Nollställ även denna
+    setCarModel(''); // Nollställ bilmodell
+    setShowSuggestions(false);
+    setShowConfirmDialog(false);
+    setDamageToFix(null);
+    setShowFinalConfirmation(false);
+    setShowFieldErrors(false);
+    setNotFound(false);
+    setOrt('');
+    setStation('');
+    setAnnanPlats(false);
+    setAnnanPlatsText('');
+    setMatarstallning('');
+    setDrivmedelstyp(null);
+    setTankniva(null);
+    setLiters('');
+    setBransletyp(null);
+    setLiterpris('');
+    setLaddniva('');
+    setInsynsskydd(null);
+    setAntalLaddkablar(null);
+    setHjultyp(null);
+    setBehoverRekond(false);
+    setSkadekontroll(null);
+    setNewDamages([]);
+    setUthyrningsstatus(null);
+    setPreliminarAvslutNotering('');
+    setShowSuccessModal(false);
+    // Reset checklist
+    setInsynsskyddOK(false);
+    setDekalDjurRokningOK(false);
+    setIsskrapaOK(false);
+    setPskivaOK(false);
+    setSkyltRegplatOK(false);
+    setDekalGpsOK(false);
+    setWashed(false);
+    setSpolarvatskaOK(false);
+    setAdblueOK(false);
 };
+
+const handleCancel = () => {
+    if (window.confirm('Är du säker? Alla ifyllda data kommer att raderas.')) {
+        resetForm();
+    }
+};
+
+const saveDraft = async () => {
+    const reg = (regInput || '').toUpperCase().trim();
+    if (!reg) { alert('Ange registreringsnummer först.'); return; }
+
+    try {
+        const { error } = await supabase
+            .from('checkin_drafts')
+            .upsert({ regnr: reg, data: {} }); // Just nu sparas en tom draft
+        if (error) throw error;
+        alert('Utkast sparat.');
+    } catch (e) {
+        console.error(e);
+        alert('Kunde inte spara utkast.');
+    }
+};
+
 
 const handleSubmitFinal = async () => {
     if (isFinalSaving) return;
@@ -1430,78 +1451,6 @@ color: '#2563eb',
 );         // end: return of MediaUpload
 };           // end: const MediaUpload = (...) => { ... }
 
-function buildNotifyPayload() {
-// 1) Region
-const region =
-ORT_TILL_REGION[ort as keyof typeof ORT_TILL_REGION] ?? 'SYD';
-
-// 2) Stationnamn
-const stationName = annanPlats
-? (annanPlatsText || '').trim()
-: (station || '').trim();
-
-// 3) Härled flaggor
-// Nya skador? (om du valt "nya skador" eller lagt in minst en ny skada)
-const hasNewDamages =
-skadekontroll === 'nya_skador' || newDamages.length > 0;
-
-// Behöver rekond? – styrs nu av radiovalet (Ja/Nej)
-const needsRecond = Boolean(behoverRekond);
-
-
-return {
-regnr: normalizeReg(regInput || ''),
-region,
-station: stationName,
-time: new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }),
-hasNewDamages,
-needsRecond,
-} as const;
-
-}
-
-// --- Steg 3: Hjälpare för att skicka notifiering ---
-const sendNotify = async (target: 'station' | 'quality') => {
-try {
-// 1) Visa "skickar..." direkt
-setSendState('sending-station');
-setSendMsg('Skickar till station + kvalitet…');
-
-
-// 2) Bygg payload och hämta mottagare
-const payload = buildNotifyPayload();
-
-    // 3) Skicka
-// 3) Skicka – låt servern sköta båda mejlen internt
-const res = await notifyCheckin({ ...payload });
-
-// 4) Visa resultat
-if (res?.ok) {
-  setSendState('ok');
-  setSendMsg('Notiser skickade ✅');
-} else {
-  setSendState('fail');
-  setSendMsg('Kunde inte skicka ❌');
-  throw new Error("Notify failed");
-}
-
-} catch (err) {
-console.error('notify fail', err);
-setSendState('fail');
-setSendMsg('Kunde inte skicka ❌');
-throw err; // Kasta vidare så handleSubmitFinal vet
-} finally {
-// 5) Städning efter ~4s
-setTimeout(() => setSendMsg(''), 4000);
-setTimeout(() => setSendState('idle'), 4000);
-}
-}; // ⬅⬅ VIKTIGT: semikolon här, eftersom detta är en const-funktion
-
-// Små wrappers – enkla att koppla på knappar
-const notifyStation = () => sendNotify('station');
-const notifyQuality = () => sendNotify('quality');
-  
-const canSend = !!regInput && !!ort && !! station;
 const formIsValid = isFormValid();
 
 return ( 
@@ -2301,6 +2250,44 @@ fontSize: '12px'
 </div>
 )}
 </div>
+{/* --- Ny sektion för Rekond --- */}
+<div style={{
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRadius: '12px',
+    marginBottom: '24px',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+}}>
+    <h2 style={{
+        fontSize: '22px',
+        fontWeight: '700',
+        marginBottom: '20px',
+        color: '#1f2937',
+        textTransform: 'uppercase',
+        borderBottom: '2px solid #e5e7eb',
+        paddingBottom: '12px'
+    }}>
+        Städning & Rekond
+    </h2>
+    <div style={{ padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #dc2626' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 'bold', fontSize: '16px' }}>
+            <input
+                type="checkbox"
+                checked={behoverRekond}
+                onChange={(e) => {
+                    if (e.target.checked) {
+                        const ok = confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)');
+                        if (ok) setBehoverRekond(true);
+                    } else {
+                        setBehoverRekond(false);
+                    }
+                }}
+            />
+            ⚠️ Behöver rekond (JA)
+        </label>
+    </div>
+</div>
+
 <div data-error={showFieldErrors && !isChecklistComplete} style={{
 backgroundColor: '#ffffff',
 padding: '24px',
@@ -2358,37 +2345,6 @@ border: showFieldErrors && !isChecklistComplete ? '2px solid #dc2626' : '2px sol
       </label>
   )}
 </div>
-
-{/* Rekond (radio: Ja/Nej med confirm på Ja) */}
-<div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#fef2f2', borderRadius: '6px', border: '1px solid #dc2626' }}>
-  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', color: '#dc2626', fontWeight: 'bold' }}>
-    <span>⚠️ Behöver rekond</span>
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <input
-        type="radio"
-        name="rekond"
-        checked={behoverRekond === false}
-        onChange={() => setBehoverRekond(false)}
-      />
-      Nej
-    </label>
-    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <input
-        type="radio"
-        name="rekond"
-        checked={behoverRekond === true}
-        onChange={() => {
-          if (behoverRekond !== true) {
-            const ok = confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)');
-            if (!ok) return;
-          }
-          setBehoverRekond(true);
-        }}
-      />
-      Ja
-    </label>
-  </div>
-</div>
 </div>
 <div style={{
 backgroundColor: '#ffffff',
@@ -2403,7 +2359,7 @@ Kommentarer (frivilligt)
 <textarea
 value={preliminarAvslutNotering || ''}
 onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
-placeholder="Beskriv bilens status och eventuella kommentarer..."
+placeholder="Övrig info"
 style={{
 width: '100%',
 padding: '12px',
@@ -2423,6 +2379,21 @@ gap: '12px',
 justifyContent: 'center',
 paddingBottom: '40px'
 }}>
+<button
+    onClick={saveDraft}
+    style={{
+        padding: '12px 24px',
+        backgroundColor: '#6b7280',
+        color: '#ffffff',
+        border: 'none',
+        borderRadius: '6px',
+        fontSize: '16px',
+        fontWeight: '600',
+        cursor: 'pointer'
+    }}
+>
+    Spara utkast
+</button>
 
 <button
 id="btn-final"
@@ -2437,7 +2408,7 @@ border: 'none',
 borderRadius: '6px',
 fontSize: '16px',
 fontWeight: '600',
-cursor: isFinalSaving ? 'not-allowed' : 'pointer',
+cursor: !formIsValid ? 'pointer' : (isFinalSaving ? 'not-allowed' : 'pointer'),
 opacity: isFinalSaving ? 0.85 : 1,
 }}
 >
@@ -2445,7 +2416,7 @@ opacity: isFinalSaving ? 0.85 : 1,
 </button>
 
 <button
-onClick={resetForm}
+onClick={handleCancel}
 style={{
 padding: '12px 24px',
 backgroundColor: '#dc2626',
