@@ -473,9 +473,9 @@ export default function CheckInForm() {
             <div className="info-box">
               <InfoRow label="Bilmodell:" value={carModel} />
               <InfoRow label="Hjulförvaring:" value={viewWheelStorage} />
+              {existingDamages.length > 0 && <InfoRow label="Skador enl. skadekort:" value={existingDamages.map(d => d.shortText).join(', ')} />}
             </div>
-          )}
-        </Card>
+          )}        </Card>
 
         <Card data-error={showFieldErrors && (!ort || !station)}>
           <SectionHeader title="Plats för incheckning" />
