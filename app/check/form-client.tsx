@@ -629,12 +629,17 @@ const DamageItem: React.FC<{damage: ExistingDamage | NewDamage, isExisting: bool
           <h4>{isExisting ? (damage as ExistingDamage).fullText : 'Ny skada'}</h4>
           {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger" style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem'}}>Ta bort</Button>}
         </div>
-        {isExisting && onAction && (
-          <div className="damage-item-actions">
-            <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{flex: 1}}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve')} variant={(damage as ExistingDamage).status === 'resolved' ? 'warning' : 'secondary'} style={{flex: 1}}>Åtgärdad/Hittas ej</Button>
-          </div>
-        )}
+// Ersätt med detta block
+{isExisting && onAction && (
+  <div className="damage-item-actions">
+    <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{flex: 1}}>
+      Dokumentera
+    </Button>
+    <Button onClick={() => onAction(damage.id, 'resolve')} variant={(damage as ExistingDamage).status === 'resolved' ? 'warning' : 'secondary'} style={{flex: 1}}>
+      Åtgärdad/Hittas ej
+    </Button>
+  </div>
+)}
         {(isDocumented || !isExisting) && (
           <div className="damage-item-details">
             <div className="grid-2-col">
