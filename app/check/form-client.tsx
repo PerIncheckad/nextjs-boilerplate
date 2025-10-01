@@ -547,13 +547,14 @@ const Field: React.FC<React.PropsWithChildren<{ label?: string }>> = ({ label, c
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => (<div className="info-row"><span>{label}</span><span>{value}</span></div>);
 const RadioGroup: React.FC<React.PropsWithChildren<{}>> = ({ children }) => <div className="radio-group">{children}</div>;
 const Radio: React.FC<any> = ({ label, ...props }) => (<label className="radio-label"><input type="radio" {...props} />{label}</label>);
-const Checkbox: React.FC<any> = ({ label, className, ...props }) => (
-    <label className={`checkbox-label ${className || ''}`}>
-        <input type="checkbox" {...props} />
-        <span className="checkbox-custom"></span>
-        <span>{label}</span>
-    </label>
-);
+const Checkbox: React.FC<any> = ({ label, className, ...props }) => {
+    return (
+        <label className={`checkbox-label ${className || ''}`}>
+            <input type="checkbox" {...props} />
+            {label}
+        </label>
+    );
+};
 const Button: React.FC<React.PropsWithChildren<any>> = ({ children, onClick, variant = 'primary', style, ...props }) => {
     const variantClasses: Record<string, string> = {
         primary: 'btn-primary', secondary: 'btn-secondary', success: 'btn-success',
