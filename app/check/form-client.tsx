@@ -746,54 +746,6 @@ const MediaButton: React.FC<React.PropsWithChildren<any>> = ({ htmlFor, hasFile,
     return <label htmlFor={htmlFor} style={{ ...baseStyle, color, backgroundColor: bgColor, borderColor, fontWeight }}>{children}</label>;
 };
 
-const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string}> = ({ onClick, isActive, children, className }) => {
-    return (
-        <>
-            <button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${className || ''}`}>
-                {children}
-            </button>
-            <style jsx>{`
-                .choice-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 100%;
-                    padding: 0.85rem 1rem;
-                    border-radius: 8px;
-                    /* Standard är röd */
-                    border: 2px solid var(--color-danger);
-                    background-color: var(--color-danger-light);
-                    color: var(--color-danger);
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    text-align: center;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-                .choice-btn:hover {
-                    filter: brightness(1.05);
-                }
-                /* Aktiv är grön */
-                .choice-btn.active {
-                    border-color: var(--color-success);
-                    background-color: var(--color-success-light);
-                    color: var(--color-success);
-                }
-                /* Särskild stil för rekond-knappen */
-                .rekond-checkbox {
-                    border-color: var(--color-danger) !important;
-                    background-color: var(--color-danger-light) !important;
-                    color: var(--color-danger) !important;
-                }
-                .rekond-checkbox.active {
-                    border-color: var(--color-danger) !important;
-                    background-color: var(--color-danger) !important;
-                    color: white !important;
-                }
-            `}</style>
-        </>
-    );
-};
 const GlobalStyles = () => (
     <style jsx global>{`
         :root {
