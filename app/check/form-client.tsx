@@ -224,7 +224,6 @@ export default function CheckInForm() {
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
   const [literpris, setLiterpris] = useState('');
   const [laddniva, setLaddniva] = useState('');
-  const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   const [behoverRekond, setBehoverRekond] = useState(false);
 
@@ -311,7 +310,7 @@ export default function CheckInForm() {
     if (!regInput || !ort || !station || !matarstallning || !drivmedelstyp || !hjultyp || skadekontroll === null || skadekontroll === 'ej_skadekontrollerad') return false;
     if (drivmedelstyp === 'bensin_diesel' && !tankniva) return false;
     if (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) return false;
-    if (drivmedelstyp === 'elbil' && (!laddniva || !antalLaddkablar)) return false;
+if (drivmedelstyp === 'elbil' && !laddniva) return false;
     if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
     const documentedDamages = existingDamages.filter(d => d.status === 'documented');
     if (documentedDamages.some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
@@ -334,7 +333,7 @@ export default function CheckInForm() {
     setOrt(''); setStation('');
     setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null); setLiters('');
     setBransletyp(null); setLiterpris(''); setLaddniva('');
-    setAntalLaddkablar(null); setHjultyp(null); setBehoverRekond(false);
+    setHjultyp(null); setBehoverRekond(false);
     setSkadekontroll(null); setNewDamages([]); setPreliminarAvslutNotering('');
     setShowSuccessModal(false); setInsynsskyddOK(false); setDekalDjurRokningOK(false);
     setIsskrapaOK(false); setPskivaOK(false); setSkyltRegplatOK(false);
@@ -507,7 +506,7 @@ export default function CheckInForm() {
         <ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'}>Elbil</ChoiceButton>
     </div>
 </Field>          {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><select value={tankniva || ''} onChange={e => setTankniva(e.target.value as any)}><option value="">Välj tankstatus</option><option value="återlämnades_fulltankad">Återlämnades fulltankad</option><option value="tankad_nu">Tankad nu</option></select></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><select value={bransletyp || ''} onChange={e => setBransletyp(e.target.value as any)}><option value="">Välj</option><option value="Bensin">Bensin</option><option value="Diesel">Diesel</option></select></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
-          {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field><Field label="Antal laddkablar *"><select value={antalLaddkablar || ''} onChange={e => setAntalLaddkablar(e.target.value as any)}><option value="">Välj antal</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></Field></>)}
+          {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
         </Card>
 
         <Card data-error={showFieldErrors && (skadekontroll === null || skadekontroll === 'ej_skadekontrollerad' || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d=>d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
