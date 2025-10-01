@@ -64,7 +64,7 @@ plats: string;
 notering: string;
 fullText: string;
 shortText: string;
-status: 'not_selected' | 'documented' | 'fixed';
+status: 'not_selected' | 'documented' | 'resolved'; // 'fixed' har bytts mot 'resolved'
 userType?: string;
 userCarPart?: string;
 userPosition?: string;
@@ -483,26 +483,6 @@ const isChecklistComplete =
   skyltRegplatOK &&
   dekalGpsOK &&
   washed;
-
-// Status per befintlig skada (om den dokumenterats eller markerats som åtgärdad/hittar inte)
-const [documentedExisting, setDocumentedExisting] = useState<
-  Map<string, { id: string; status: 'documented' | 'resolved' | 'not_found' | null; media: MediaFile[] }>
->(new Map());
-
-useEffect(() => {
-// Behåll tidigare status om den finns, annars initiera till null
-setDocumentedExisting(prev => {
-const newMap = new Map(prev);
-(existingDamages ?? []).forEach(d => {
-  const id = String((d as any).id);
-  if (!newMap.has(id)) {
-    newMap.set(id, { id: id, status: null, media: [] });
-  }
-});
-return newMap;
-});
-}, [existingDamages]);
-
 
 const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
 const [newDamages, setNewDamages] = useState<{
@@ -935,32 +915,6 @@ setPreliminarAvslutNotering('');
 setShowSuccessModal(false);
 };
 
-function markExistingAsDocumented(id: string | number) {
-setDocumentedExisting(curr => {
-  const newMap = new Map(curr);
-  const item = newMap.get(String(id));
-  if (item) {
-    newMap.set(String(id), { ...item, status: 'documented' });
-  }
-  return newMap;
-});
-}
-
-function markExistingAsResolved(id: string | number) {
-setDocumentedExisting(curr => {
-  const newMap = new Map(curr);
-  const item = newMap.get(String(id));
-  if (item) {
-    newMap.set(String(id), { ...item, status: 'resolved' });
-  }
-  return newMap;
-});
-}
-
-function getExistingStatus(id: string | number): 'documented' | 'resolved' | null {
-return documentedExisting.get(String(id))?.status ?? null;
-}
-
 const handleSave = () => {
 if (canSave()) {
 setShowFinalConfirmation(true);
@@ -1032,7 +986,7 @@ const needsRecond = Boolean(behoverRekond);
 const hasIssues = !insynsskydd || spolarvatska === false || (drivmedelstyp === 'bensin_diesel' && adblue === false);
 
 // Dokumenterade befintliga skador (första gången de dokumenteras)
-const documentedExistingList = existingDamages.filter(d => getExistingStatus(d.id) === 'documented');
+const documentedExistingList = existingDamages.filter(d => d.status === 'documented');
 const hasNewlyDocumented = documentedExistingList.length > 0;
 
 // Skicka till Bilkontroll ENDAST om:
@@ -1227,31 +1181,38 @@ setShowSuggestions(false);
 };
 
 // Skadehantering funktioner
-const toggleExistingDamageStatus = (id: string, newStatus: 'documented' | 'fixed') => {
-if (newStatus === 'fixed') {
-setDamageToFix(id);
-setShowConfirmDialog(true);
-} else {
-setExistingDamages(prev => prev.map(d =>
-d.id === id ? {
-...d,
-status: d.status === 'documented' ? 'not_selected' : 'documented',
-userDescription: d.status === 'documented' ? '' : d.userDescription,
-userType: d.status === 'documented' ? '' : d.userType,
-userCarPart: d.status === 'documented' ? '' : d.userCarPart,
-userPosition: d.status === 'documented' ? '' : d.userPosition,
-media: d.status === 'documented' ? [] : d.media
-} : d
-));
-}
+const toggleExistingDamageStatus = (id: string, newStatus: 'documented' | 'resolved') => {
+  setExistingDamages(prev => prev.map(d => {
+    if (d.id === id) {
+      // Om man klickar på en redan aktiv knapp, av-aktivera den (återgå till not_selected)
+      if (d.status === newStatus) {
+        return { ...d, status: 'not_selected' };
+      }
+      // Annars, sätt den nya statusen
+      return { ...d, status: newStatus };
+    }
+    return d;
+  }));
 };
+
+const handleExistingDamageAction = (id: string, action: 'document' | 'resolve') => {
+  if (action === 'resolve') {
+    const ok = confirm('Är du säker? Detta markerar skadan som åtgärdad eller ej funnen.');
+    if (ok) {
+      toggleExistingDamageStatus(id, 'resolved');
+    }
+  } else {
+    toggleExistingDamageStatus(id, 'documented');
+  }
+};
+
 
 const confirmFixDamage = () => {
 if (damageToFix) {
 setExistingDamages(prev => prev.map(d =>
 d.id === damageToFix ? {
 ...d,
-status: 'fixed',
+status: 'resolved',
 userDescription: '',
 userType: '',
 userCarPart: '',
@@ -1610,37 +1571,6 @@ setTimeout(() => setSendState('idle'), 4000);
 // Små wrappers – enkla att koppla på knappar
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
-// --- Hjälpare: uppdatera befintlig skada + kort confirm ---
-function markExistingWithConfirm(
-  id: string,
-  newStatus: 'documented' | 'fixed' | 'not_found'
-) {
-  // Fråga bara när vi sätter till 'fixed' eller 'not_found'
-  if (newStatus !== 'documented') {
-    if (!confirm('Är du säker? (Detta går att ångra.)')) return;
-  }
-
-  // Uppdatera Mapen så att UI rerenderar direkt
-  setDocumentedExisting((prev) => {
-    const m = new Map(prev);
-    const key = String(id);
-    const row =
-      m.get(key) ??
-      ({
-        id: key,
-        status: null,
-        media: [],
-      } as {
-        id: string;
-        status: 'documented' | 'resolved' | 'not_found' | null;
-        media: MediaFile[];
-      });
-
-    row.status = newStatus;
-    m.set(key, row);
-    return m;
-  });
-}
   
 const canSend = isRegComplete() && isLocationComplete();
 
@@ -2035,69 +1965,53 @@ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
 <p style={{ marginBottom: '16px', color: '#6b7280' }}>
 Dessa skador finns redan registrerade. Dokumentera dem med foto.
 </p>
-{existingDamages.map((damage) => {
-  const ui = documentedExisting.get(String(damage.id));
-  const status = ui?.status ?? damage.status;
-  const media = ui?.media ?? damage.media ?? [];
-
-  return (
+{existingDamages.map((damage) => (
 <div key={damage.id} style={{
 padding: '16px',
 marginBottom: '12px',
 border: '1px solid #e5e7eb',
 borderRadius: '8px',
-backgroundColor: status === 'documented' ? '#f0fdf4' : '#f9fafb'
+backgroundColor: damage.status === 'documented' ? '#f0fdf4' : (damage.status === 'resolved' ? '#fefce8' : '#f9fafb')
 }}>
 <div style={{ fontWeight: '600', marginBottom: '8px' }}>
 {damage.fullText || damage.shortText}
 </div>
 
 <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
-  {/* 1) Dokumentera / Dokumenterad */}
   <button
-    onClick={() =>
-      markExistingWithConfirm(damage.id, 'documented')
-    }
+    onClick={() => handleExistingDamageAction(damage.id, 'document')}
     style={{
       padding: '8px 16px',
-      backgroundColor: status === 'documented' ? '#10b981' : '#e5e7eb',
-      color: status === 'documented' ? '#ffffff' : '#374151',
+      backgroundColor: damage.status === 'documented' ? '#10b981' : '#e5e7eb',
+      color: damage.status === 'documented' ? '#ffffff' : '#374151',
       border: 'none',
       borderRadius: '6px',
       cursor: 'pointer',
     }}
   >
-    {status === 'documented' ? 'Dokumenterad' : 'Dokumentera'}
+    {damage.status === 'documented' ? 'Dokumenterad ✓' : 'Dokumentera'}
   </button>
 
-  {/* 2) Åtgärdad/hittar inte – med bekräftelse */}
   <button
-    onClick={() =>
-      markExistingWithConfirm(damage.id, 'fixed')
-    }
+    onClick={() => handleExistingDamageAction(damage.id, 'resolve')}
     style={{
       padding: '8px 16px',
-      backgroundColor: status === 'fixed' ? '#f59e0b' : '#e5e7eb',
-      color: status === 'fixed' ? '#ffffff' : '#374151',
+      backgroundColor: damage.status === 'resolved' ? '#f59e0b' : '#e5e7eb',
+      color: damage.status === 'resolved' ? '#ffffff' : '#374151',
       border: 'none',
       borderRadius: '6px',
       cursor: 'pointer',
-      marginLeft: '8px',
     }}
   >
-    {damage.status === 'fixed' ? 'Åtgärdad ✓' : 'Åtgärdad/hittar inte'}
+    {damage.status === 'resolved' ? 'Åtgärdad/Hittas ej ✓' : 'Åtgärdad/Hittas ej'}
   </button>
 </div>
 
-
-
-
-{status === 'documented' && (
+{damage.status === 'documented' && (
 <div style={{ marginTop: '12px' }}>
 <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '8px' }}>
 Foto krävs, video frivilligt
 </p>
-{/* Här kommer MediaUpload-komponenten senare */}
 <MediaUpload
   damageId={damage.id}
   isOld={true}
@@ -2221,8 +2135,7 @@ minHeight: '60px'
 </div>
 )}
 </div>
-);
-})}
+))}
 </div>
 ) : (
 <p style={{ color: '#6b7280' }}>Inga befintliga skador registrerade för detta fordon.</p>
