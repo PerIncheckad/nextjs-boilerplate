@@ -469,13 +469,18 @@ export default function CheckInForm() {
           </div>
           {loading && <p>Hämtar fordonsdata...</p>}
           {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
-          {carModel && (
-            <div className="info-box">
-              <InfoRow label="Bilmodell:" value={carModel} />
-              <InfoRow label="Hjulförvaring:" value={viewWheelStorage} />
-              {existingDamages.length > 0 && <InfoRow label="Skador enl. skadekort:" value={existingDamages.map(d => d.shortText).join(', ')} />}
-            </div>
-          )}        </Card>
+{carModel && (
+  <div className="info-box">
+    <InfoRow label="Bilmodell:" value={carModel} />
+    <InfoRow label="Hjulförvaring:" value={viewWheelStorage} />
+    {existingDamages.length > 0 && (
+      <div className="damage-list-info">
+        <span className="damage-list-label">Befintliga skador:</span>
+        {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
+      </div>
+    )}
+  </div>
+)}        </Card>
 
         <Card data-error={showFieldErrors && (!ort || !station)}>
           <SectionHeader title="Plats för incheckning" />
@@ -793,6 +798,10 @@ const GlobalStyles = () => (
         .info-box { margin-top: 1rem; padding: 1rem; background-color: var(--color-primary-light); border-radius: 8px; }
         .info-row { display: flex; justify-content: space-between; font-size: 0.875rem; padding: 0.25rem 0; }
         .info-row span:first-child { font-weight: 600; }
+        .damage-list-info { margin-top: 0.75rem; }
+.damage-list-label { font-weight: 600; display: block; margin-bottom: 0.25rem; }
+.damage-list-item { padding-left: 1rem; line-height: 1.4; }
+.rekond-checkbox { margin-bottom: 1.5rem; }
         .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
         .grid-3-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem; }
         
