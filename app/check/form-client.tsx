@@ -454,35 +454,40 @@ const [literpris, setLiterpris] = useState('');
 // För elbil
 const [laddniva, setLaddniva] = useState('');
 
-// Övriga fält
-const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
+// Övriga fält (tas bort från här)
+// const [spolarvatska, setSpolarvatska] = useState<boolean | null>(null);
 const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
 const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
 const [hjultyp, setHjultyp] = useState<'Sommarthjul' | 'Vinterhjul' | null>(null);
-const [adblue, setAdblue] = useState<boolean | null>(null);
+// const [adblue, setAdblue] = useState<boolean | null>(null);
 const [behoverRekond, setBehoverRekond] = useState<boolean | null>(null);
 
 
 // Skador
 const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
 const [insynsskyddOK, setInsynsskyddOK] = useState(false);
-const [dekalDjurOK, setDekalDjurOK] = useState(false);
-const [dekalRokningOK, setDekalRokningOK] = useState(false);
+// const [dekalDjurOK, setDekalDjurOK] = useState(false);
+// const [dekalRokningOK, setDekalRokningOK] = useState(false);
+const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
 const [isskrapaOK, setIsskrapaOK] = useState(false);
 const [pskivaOK, setPskivaOK] = useState(false);
 const [skyltRegplatOK, setSkyltRegplatOK] = useState(false);
 const [dekalGpsOK, setDekalGpsOK] = useState(false);
 const [washed, setWashed] = useState(false);
+const [spolarvatskaOK, setSpolarvatskaOK] = useState(false);
+const [adblueOK, setAdblueOK] = useState(false);
+
   // Summering för “Slutför incheckning”
 const isChecklistComplete =
   insynsskyddOK &&
-  dekalDjurOK &&
-  dekalRokningOK &&
+  dekalDjurRokningOK &&
   isskrapaOK &&
   pskivaOK &&
   skyltRegplatOK &&
   dekalGpsOK &&
-  washed;
+  washed &&
+  spolarvatskaOK &&
+  (drivmedelstyp !== 'bensin_diesel' || adblueOK); // AdBlue är bara relevant för diesel
 
 const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
 const [newDamages, setNewDamages] = useState<{
@@ -792,93 +797,39 @@ const availableStations = ort ? STATIONER[ort] || [] : [];
 const wheelStorage = viewWheelStorage ?? carWheelStorage ?? '---';
 const saludatum    = viewSaludatum    ?? carSaludatum    ?? null;
 
-// KORRIGERAD validering - mer noggrann kontroll
-const isRegComplete = () => regInput.trim().length > 0;
-const isLocationComplete = () => annanPlats ? annanPlatsText.trim().length > 0 : (ort && station);
-const isVehicleStatusComplete = () => {
-if (!matarstallning.trim() || !drivmedelstyp) return false;
+const isFormValid = () => {
+    if (!regInput || !ort || !station) return false;
+    if (!matarstallning || !drivmedelstyp || !hjultyp) return false;
 
-if (drivmedelstyp === 'bensin_diesel') {
-if (!tankniva || adblue === null || spolarvatska === null) return false;
-if (tankniva === 'pafylld_nu' && (!liters.trim() || !bransletyp || !literpris.trim())) return false;
-}
+    if (drivmedelstyp === 'bensin_diesel') {
+        if (!tankniva) return false;
+        if (tankniva === 'pafylld_nu' && (!liters || !bransletyp || !literpris)) return false;
+    }
 
-if (drivmedelstyp === 'elbil') {
-if (!laddniva.trim() || antalLaddkablar === null || spolarvatska === null) return false;
-const laddnivaParsed = parseInt(laddniva);
-if (isNaN(laddnivaParsed) || laddnivaParsed < 0 || laddnivaParsed > 100) return false;
-}
+    if (drivmedelstyp === 'elbil') {
+        if (!laddniva || !antalLaddkablar) return false;
+    }
+    
+    if (skadekontroll === null) return false;
 
-return insynsskydd !== null && hjultyp !== null;
+    if (skadekontroll === 'nya_skador') {
+        if (newDamages.length === 0) return false;
+        if (newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media))) return false;
+    }
+
+    if (!isChecklistComplete) return false;
+
+    return true;
 };
 
-// Tillfälligt: tvätt/inre-frågor borttagna → blockera inte
-const isCleaningComplete = () => true;
-
-const isDamagesComplete = () => {
-if (!skadekontroll) return false;
-
-if (skadekontroll === 'nya_skador') {
-if (newDamages.length === 0) return false;
-// Kontrollera att alla nya skador har obligatoriska fält
-if (newDamages.some(damage => !damage.type || !damage.carPart)) return false;
-if (newDamages.some(damage => damage.carPart && CAR_PARTS[damage.carPart].length > 0 && !damage.position)) return false;
-if (newDamages.some(damage => !damage.media.some(m => m.type === 'image') || !damage.media.some(m => m.type === 'video'))) return false;
-}
-
-// Kontrollera dokumenterade gamla skador
-const documentedOldDamages = existingDamages.filter(d => d.status === 'documented');
-// Beskrivning är nu frivillig - ta bort denna rad helt
-if (documentedOldDamages.some(damage => !damage.userType || !damage.userCarPart)) return false;
-if (documentedOldDamages.some(damage => damage.userCarPart && CAR_PARTS[damage.userCarPart].length > 0 && !damage.userPosition)) return false;
-if (documentedOldDamages.some(damage => !damage.media?.some(m => m.type === 'image') || !damage.media?.some(m => m.type === 'video'))) return false;
-
-return true;
-};
-
-const isStatusComplete = () => {
-const statusSet = String(uthyrningsstatus ?? '').trim().length > 0;
-const noteSet   = String(preliminarAvslutNotering ?? '').trim().length > 0;
-return statusSet && noteSet;
-};
-
-// KORRIGERAD canSave - mer omfattande kontroll
-const canSave = () => {
-const regOk = isRegComplete();
-const locationOk = isLocationComplete();
-const vehicleOk = isVehicleStatusComplete();
-const cleaningOk = isCleaningComplete();
-// Befintliga skador: foto krävs, video frivilligt
-const existingOk =
-(existingDamages ?? [])
-.filter(d => d.status !== 'not_selected')   // ignorera tomma/placeholder-rader
-.every(d => hasPhoto(d.media));
-
-// Nya skador: både foto och video krävs för varje ny skada
-const newOk =
-newDamages.length === 0
-? true
-: newDamages.every(d => hasPhoto(d.media) && hasVideo(d.media));
-
-const isStatusComplete = () => {
-const statusSet = String(uthyrningsstatus ?? '').trim().length > 0;
-// Kommentarer är frivilligt
-return statusSet;
-};
-const damagesOk = existingOk && newOk;
-const statusOk = isStatusComplete();
-
-console.log('Validation check:', {
-regOk,
-locationOk,
-vehicleOk,
-cleaningOk,
-damagesOk,
-statusOk,
-overall: regOk && locationOk && vehicleOk && cleaningOk && damagesOk && statusOk
-});
-
-return regOk && locationOk && vehicleOk && cleaningOk && damagesOk && statusOk;
+const handleShowErrors = () => {
+    setShowFieldErrors(true);
+    setTimeout(() => {
+        const firstError = document.querySelector('[data-error="true"]');
+        if (firstError) {
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 100);
 };
 
 const resetForm = () => {
@@ -902,71 +853,51 @@ setLiters('');
 setBransletyp(null);
 setLiterpris('');
 setLaddniva('');
-setSpolarvatska(null);
 setInsynsskydd(null);
 setAntalLaddkablar(null);
 setHjultyp(null);
-setAdblue(null);
-
+setBehoverRekond(null);
 setSkadekontroll(null);
 setNewDamages([]);
 setUthyrningsstatus(null);
 setPreliminarAvslutNotering('');
 setShowSuccessModal(false);
+// Reset checklist
+setInsynsskyddOK(false);
+setDekalDjurRokningOK(false);
+setIsskrapaOK(false);
+setPskivaOK(false);
+setSkyltRegplatOK(false);
+setDekalGpsOK(false);
+setWashed(false);
+setSpolarvatskaOK(false);
+setAdblueOK(false);
 };
 
-const handleSave = () => {
-if (canSave()) {
-setShowFinalConfirmation(true);
-} else {
-setShowFieldErrors(true);
-setTimeout(() => {
-const firstIncomplete = document.querySelector('.section-incomplete');
-if (firstIncomplete) {
-firstIncomplete.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-}, 100);
-}
-};
-const saveDraft = async () => {
-const reg = (regInput || '').toUpperCase().trim();
-if (!reg) { alert('Ange registreringsnummer först.'); return; }
-
-try {
-const { error } = await supabase
-.from('checkin_drafts')
-.upsert({ regnr: reg, data: {} }); // vi börjar minimalt
-if (error) throw error;
-alert('Utkast sparat.');
-} catch (e) {
-console.error(e);
-alert('Kunde inte spara utkast.');
-}
-};
 const handleSubmitFinal = async () => {
-if (isFinalSaving) return;
-setIsFinalSaving(true);
-console.log('[UI] Slutför incheckning klickad');
+    if (isFinalSaving) return;
 
-const regOk     = !!String((regInput || '')).trim();
-const placeOk   = !!String((ort || '')).trim();
-const stationOk = !!String((station || '')).trim();
+    if (!isFormValid()) {
+        handleShowErrors();
+        return;
+    }
 
-if (!regOk || !placeOk || !stationOk) {
-setIsFinalSaving(false);
-alert('Fyll i registreringsnr, ort och station.');
-return;
-}
+    setIsFinalSaving(true);
+    console.log('[UI] Slutför incheckning klickad');
 
-try {
-await confirmFinalSave();
-// valfritt: visa egen modal/success-toast här
-} catch (e) {
-console.error('Final save failed:', e);
-alert('Något gick fel vid sparandet.');
-} finally {
-setIsFinalSaving(false);
-}
+    try {
+        await confirmFinalSave();
+        setShowSuccessModal(true); // Visa success-modal
+        setTimeout(() => {
+            setShowSuccessModal(false);
+            resetForm(); // Töm formuläret efter att modalen visats
+        }, 3000); // vänta 3 sekunder
+    } catch (e) {
+        console.error('Final save failed:', e);
+        alert('Något gick fel vid sparandet.');
+    } finally {
+        setIsFinalSaving(false);
+    }
 };
 
 
@@ -983,7 +914,7 @@ const regForMail = String(regInput || '').toUpperCase();
 // Kontrollera om mejl ska skickas
 const hasNewDamages = skadekontroll === 'nya_skador' && newDamages.length > 0;
 const needsRecond = Boolean(behoverRekond);
-const hasIssues = !insynsskydd || spolarvatska === false || (drivmedelstyp === 'bensin_diesel' && adblue === false);
+const hasIssues = !insynsskyddOK || !spolarvatskaOK || (drivmedelstyp === 'bensin_diesel' && !adblueOK);
 
 // Dokumenterade befintliga skador (första gången de dokumenteras)
 const documentedExistingList = existingDamages.filter(d => d.status === 'documented');
@@ -1064,9 +995,9 @@ typeof tankniva === 'string'
 ? false
 : null)
 : null,
-washer_ok: spolarvatska ?? null,
-adblue_ok: drivmedelstyp === 'bensin_diesel' ? (adblue ?? null) : null,
-privacy_cover_ok: insynsskydd ?? null,
+washer_ok: spolarvatskaOK,
+adblue_ok: drivmedelstyp === 'bensin_diesel' ? adblueOK : null,
+privacy_cover_ok: insynsskyddOK,
 rekond_behov: Boolean(needsRecond),
 has_new_damages: skadekontroll !== 'inga_nya_skador',
 completed_at: new Date().toISOString(),
@@ -1086,7 +1017,7 @@ const { data: checkin, error: checkinError } = await supabase
 if (checkinError) {
 console.error('CHECKIN insert error ->', checkinError);
 alert('Något gick fel vid sparandet.');
-return;
+throw checkinError; // Se till att vi avbryter här
 }
 
 
@@ -1143,19 +1074,16 @@ photo_urls,
 video_urls
 });
 }
-} // <-- exakt EN stängning för if-blocket här
+}
 
+// Skicka mejl efter att allt har sparats
+await sendNotify('station');
 
 } catch (e) {
 console.error('Fel vid sparande:', e);
-alert('Något gick fel vid sparandet.');
-return;
+// Kasta felet vidare så att anropande funktion vet att det misslyckades
+throw e;
 }
-
-  // Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
-// Skicka mejl (servern väljer mottagare: Bilkontroll + Region)
-
-
 
 };
 
@@ -1551,16 +1479,17 @@ const res = await notifyCheckin({ ...payload });
 if (res?.ok) {
   setSendState('ok');
   setSendMsg('Notiser skickade ✅');
-  setShowSuccessModal(true);
 } else {
   setSendState('fail');
   setSendMsg('Kunde inte skicka ❌');
+  throw new Error("Notify failed");
 }
 
 } catch (err) {
 console.error('notify fail', err);
 setSendState('fail');
 setSendMsg('Kunde inte skicka ❌');
+throw err; // Kasta vidare så handleSubmitFinal vet
 } finally {
 // 5) Städning efter ~4s
 setTimeout(() => setSendMsg(''), 4000);
@@ -1572,7 +1501,8 @@ setTimeout(() => setSendState('idle'), 4000);
 const notifyStation = () => sendNotify('station');
 const notifyQuality = () => sendNotify('quality');
   
-const canSend = isRegComplete() && isLocationComplete();
+const canSend = !!regInput && !!ort && !! station;
+const formIsValid = isFormValid();
 
 return ( 
 <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc', color: '#111827' }}>
@@ -1592,6 +1522,33 @@ sendState === 'fail' ? '#dc2626' :
 </span>
 )}
 
+{showSuccessModal && (
+    <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 100
+    }}>
+        <div style={{
+            backgroundColor: 'white',
+            padding: '40px',
+            borderRadius: '12px',
+            textAlign: 'center',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
+        }}>
+            <h2 style={{ color: '#10b981' }}>✓ Incheckning slutförd!</h2>
+            <p>Formuläret kommer nu att återställas.</p>
+        </div>
+    </div>
+)}
+
+
 <div style={{
 maxWidth: '600px',
 margin: '0 auto',
@@ -1599,7 +1556,7 @@ padding: '0 20px',
 fontFamily: 'system-ui, -apple-system, sans-serif'
 }}>
 {/* 1. REGISTRERINGSNUMMER */}
-<div style={{
+<div data-error={showFieldErrors && !regInput} style={{
 backgroundColor: '#ffffff',
 padding: '24px',
 borderRadius: '12px',
@@ -1607,7 +1564,7 @@ marginBottom: '24px',
 marginTop: '24px',
 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
 position: 'relative',
-border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid transparent'
+border: showFieldErrors && !regInput ? '2px solid #dc2626' : '2px solid transparent'
 }}>
 <h2 style={{
 fontSize: '22px',
@@ -1633,7 +1590,7 @@ autoComplete="off"
 style={{
 width: '100%',
 padding: '14px',
-border: showFieldErrors && !isRegComplete() ? '2px solid #dc2626' : '2px solid #e5e7eb',
+border: showFieldErrors && !regInput ? '2px solid #dc2626' : '2px solid #e5e7eb',
 borderRadius: '8px',
 fontSize: '18px',
 fontWeight: '600',
@@ -1704,13 +1661,13 @@ border: '1px solid #bfdbfe'
 )} 
 </div>
 {/* 2. PLATS FÖR INCHECKNING */}
-<div style={{
+<div data-error={showFieldErrors && (!ort || !station)} style={{
 backgroundColor: '#ffffff',
 padding: '24px',
 borderRadius: '12px',
 marginBottom: '24px',
 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-border: showFieldErrors && !isLocationComplete() ? '2px solid #dc2626' : '2px solid transparent'
+border: showFieldErrors && (!ort || !station) ? '2px solid #dc2626' : '2px solid transparent'
 }}>
 <h2 style={{
 fontSize: '22px',
@@ -1776,12 +1733,13 @@ opacity: ort ? 1 : 0.6
 </div>
 </div>
 
-<div style={{
+<div data-error={showFieldErrors && (!matarstallning || !hjultyp)} style={{
 backgroundColor: '#ffffff',
 padding: '24px',
 borderRadius: '12px',
 marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+border: showFieldErrors && (!matarstallning || !hjultyp) ? '2px solid #dc2626' : '2px solid transparent'
 }}>
 <h2>Fordonsstatus</h2>
 <div style={{ marginBottom: '16px' }}>
@@ -1824,12 +1782,13 @@ fontSize: '16px'
 </select>
 </div>
 </div>
-<div style={{
+<div data-error={showFieldErrors && !drivmedelstyp} style={{
 backgroundColor: '#ffffff',
 padding: '24px',
 borderRadius: '12px',
 marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+border: showFieldErrors && !drivmedelstyp ? '2px solid #dc2626' : '2px solid transparent'
 }}>
 <h2>Tankning/Laddning</h2>
 
@@ -1951,12 +1910,13 @@ fontSize: '16px'
 </div>
 )}
 </div>
-<div style={{
+<div data-error={showFieldErrors && skadekontroll === null} style={{
 backgroundColor: '#ffffff',
 padding: '24px',
 borderRadius: '12px',
 marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+border: showFieldErrors && skadekontroll === null ? '2px solid #dc2626' : '2px solid transparent'
 }}>
 <h2>Befintliga skador</h2>
 
@@ -2118,7 +2078,7 @@ borderRadius: '4px'
 )}
 
 <div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning *</label>
+<label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning</label>
 <textarea
 value={damage.userDescription || ''}
 onChange={(e) => updateExistingDamageDescription(damage.id, e.target.value)}
@@ -2278,7 +2238,7 @@ borderRadius: '4px'
 )}
 
 <div style={{ marginBottom: '12px' }}>
-<label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning *</label>
+<label style={{ display: 'block', marginBottom: '4px' }}>Beskrivning</label>
 <textarea
 value={damage.text}
 onChange={(e) => updateDamageText(damage.id, e.target.value)}
@@ -2341,138 +2301,62 @@ fontSize: '12px'
 </div>
 )}
 </div>
-<div style={{
-backgroundColor: '#ffffff',
-padding: '24px',
-borderRadius: '12px',
-marginBottom: '24px',
-boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-}}>
-<h2>Övriga detaljer</h2>
-
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Spolarvätska påfylld?
-</label>
-<div style={{ display: 'flex', gap: '16px' }}>
-<label>
-<input
-type="radio"
-checked={spolarvatska === true}
-onChange={() => setSpolarvatska(true)}
-/>
-Ja
-</label>
-<label>
-<input
-type="radio"
-checked={spolarvatska === false}
-onChange={() => setSpolarvatska(false)}
-/>
-Nej
-</label>
-</div>
-</div>
-
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-AdBlue påfylld? (för dieselbilar)
-</label>
-<div style={{ display: 'flex', gap: '16px' }}>
-<label>
-<input
-type="radio"
-checked={adblue === true}
-onChange={() => setAdblue(true)}
-/>
-Ja
-</label>
-<label>
-<input
-type="radio"
-checked={adblue === false}
-onChange={() => setAdblue(false)}
-/>
-Nej
-</label>
-<label>
-<input
-type="radio"
-checked={adblue === null}
-onChange={() => setAdblue(null)}
-/>
-Ej tillämpligt
-</label>
-</div>
-</div>
-
-<div style={{ marginBottom: '16px' }}>
-<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
-Kommentarer (frivilligt)
-</label>
-<textarea
-value={preliminarAvslutNotering || ''}
-onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
-placeholder="Beskriv bilens status och eventuella kommentarer..."
-style={{
-width: '100%',
-padding: '12px',
-border: '1px solid #e5e7eb',
-borderRadius: '6px',
-fontSize: '16px',
-minHeight: '80px'
-}}
-/>
-</div>
-<div style={{
+<div data-error={showFieldErrors && !isChecklistComplete} style={{
 backgroundColor: '#ffffff',
 padding: '24px',
 borderRadius: '12px',
 marginBottom: '24px',
 boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-border: '2px solid #3b82f6'
+border: showFieldErrors && !isChecklistComplete ? '2px solid #dc2626' : '2px solid #3b82f6'
 }}>
 <h2 style={{ color: '#3b82f6', marginBottom: '16px' }}>Kontrollista - Allt måste vara OK</h2>
 <div style={{ display: 'grid', gap: '12px' }}>
   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
     <input type="checkbox" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
-    ✓ Insynsskydd OK
+    ✓ Insynsskydd
   </label>
 
   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={dekalDjurOK} onChange={e => setDekalDjurOK(e.target.checked)} />
-    ✓ Dekal djur OK
-  </label>
-
-  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-    <input type="checkbox" checked={dekalRokningOK} onChange={e => setDekalRokningOK(e.target.checked)} />
-    ✓ Dekal rökning OK
+    <input type="checkbox" checked={dekalDjurRokningOK} onChange={e => setDekalDjurRokningOK(e.target.checked)} />
+    ✓ Dekal djur/rökning
   </label>
 
   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
     <input type="checkbox" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
-    ✓ Isskrapa OK
+    ✓ Isskrapa
   </label>
 
   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
     <input type="checkbox" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
-    ✓ P-skiva OK
+    ✓ P-skiva
   </label>
 
   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
     <input type="checkbox" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
-    ✓ Skylt reg.plåt OK
+    ✓ Skylt reg.plåt
   </label>
 
   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
     <input type="checkbox" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
-    ✓ Dekal GPS OK
+    ✓ Dekal GPS
   </label>
 
   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
     <input type="checkbox" checked={washed} onChange={e => setWashed(e.target.checked)} />
     ✓ Bilen tvättad
   </label>
+  
+  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+    <input type="checkbox" checked={spolarvatskaOK} onChange={e => setSpolarvatskaOK(e.target.checked)} />
+    ✓ Spolarvätska
+  </label>
+  
+  {drivmedelstyp === 'bensin_diesel' && (
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+        <input type="checkbox" checked={adblueOK} onChange={e => setAdblueOK(e.target.checked)} />
+        ✓ AdBlue
+      </label>
+  )}
 </div>
 
 {/* Rekond (radio: Ja/Nej med confirm på Ja) */}
@@ -2505,20 +2389,30 @@ border: '2px solid #3b82f6'
     </label>
   </div>
 </div>
-
-
-<div style={{ 
-marginTop: '16px', 
-padding: '12px', 
-backgroundColor: '#fef2f2', 
-borderRadius: '6px',
-border: '1px solid #dc2626'
+</div>
+<div style={{
+backgroundColor: '#ffffff',
+padding: '24px',
+borderRadius: '12px',
+marginBottom: '24px',
+boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
 }}>
-<label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#dc2626', fontWeight: 'bold' }}>
-<input type="checkbox" /> ⚠️ Behöver rekond (straffavgift kan tillkomma)
+<label style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+Kommentarer (frivilligt)
 </label>
-</div>
-</div>
+<textarea
+value={preliminarAvslutNotering || ''}
+onChange={(e) => setPreliminarAvslutNotering(e.target.value)}
+placeholder="Beskriv bilens status och eventuella kommentarer..."
+style={{
+width: '100%',
+padding: '12px',
+border: '1px solid #e5e7eb',
+borderRadius: '6px',
+fontSize: '16px',
+minHeight: '80px'
+}}
+/>
 </div>
 <div style={{
 marginTop: '40px',
@@ -2526,35 +2420,18 @@ paddingTop: '24px',
 borderTop: '2px solid #e5e7eb',
 display: 'flex',
 gap: '12px',
-justifyContent: 'center'
+justifyContent: 'center',
+paddingBottom: '40px'
 }}>
-<button
-onClick={saveDraft}
-style={{
-padding: '12px 24px',
-backgroundColor: '#6b7280',
-color: '#ffffff',
-border: 'none',
-borderRadius: '6px',
-fontSize: '16px',
-fontWeight: '600',
-cursor: 'pointer'
-}}
->
-Spara utkast
-</button>
 
 <button
 id="btn-final"
 type="button"
-onClick={async () => {
-  await handleSubmitFinal();     // gör klart DB-spar/”slutför”
-  await sendNotify('station');   // skickar två mejl (station + kvalitet)
-}}
-disabled={isFinalSaving || !isChecklistComplete}
+onClick={formIsValid ? handleSubmitFinal : handleShowErrors}
+disabled={isFinalSaving}
 style={{
 padding: '12px 24px',
-backgroundColor: isFinalSaving ? '#16a34a80' : '#16a34a',
+backgroundColor: !formIsValid ? '#a1a1aa' : (isFinalSaving ? '#16a34a80' : '#16a34a'),
 color: '#ffffff',
 border: 'none',
 borderRadius: '6px',
@@ -2564,10 +2441,8 @@ cursor: isFinalSaving ? 'not-allowed' : 'pointer',
 opacity: isFinalSaving ? 0.85 : 1,
 }}
 >
-{isFinalSaving ? 'Sparar…' : 'Slutför incheckning'}
+{!formIsValid ? 'Visa saknad information' : (isFinalSaving ? 'Skickar in...' : 'Slutför incheckning')}
 </button>
-
-
 
 <button
 onClick={resetForm}
