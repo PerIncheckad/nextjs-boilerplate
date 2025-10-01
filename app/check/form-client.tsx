@@ -540,8 +540,7 @@ export default function CheckInForm() {
     <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS OK</ChoiceButton>
     <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
     {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
-    <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Bilen tvättad OK</ChoiceButton>
-</div>
+<ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Bilen tvättad</ChoiceButton></div>
         </Card>
 
         <Card><Field label="Kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea></Field></Card>
@@ -706,38 +705,46 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
             <button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${className || ''}`}>
                 {children}
             </button>
-            <style jsx>{`
-                .choice-btn {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    width: 100%;
-                    padding: 0.85rem 1rem;
-                    border-radius: 8px;
-                    border: 2px solid var(--color-border);
-                    background-color: var(--color-card);
-                    color: var(--color-text-secondary);
-                    font-size: 0.9rem;
-                    font-weight: 600;
-                    text-align: center;
-                    cursor: pointer;
-                    transition: all 0.2s ease;
-                }
-                .choice-btn:hover {
-                    border-color: var(--color-primary);
-                    color: var(--color-primary);
-                }
-                .choice-btn.active {
-                    border-color: var(--color-success);
-                    background-color: var(--color-success-light);
-                    color: var(--color-success);
-                }
-                .rekond-checkbox.active {
-                    border-color: var(--color-danger);
-                    background-color: var(--color-danger-light);
-                    color: var(--color-danger);
-                }
-            `}</style>
+<style jsx>{`
+    .choice-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 0.85rem 1rem;
+        border-radius: 8px;
+        /* FIX: Standard är röd */
+        border: 2px solid var(--color-danger);
+        background-color: var(--color-danger-light);
+        color: var(--color-danger);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .choice-btn:hover {
+        filter: brightness(1.05);
+    }
+    /* FIX: Aktiv är grön */
+    .choice-btn.active {
+        border-color: var(--color-success);
+        background-color: var(--color-success-light);
+        color: var(--color-success);
+    }
+    /* FIX: Särskild stil för rekond-knappen */
+    .rekond-checkbox {
+        margin-bottom: 1.5rem;
+        border-color: var(--color-danger) !important;
+        background-color: var(--color-danger-light) !important;
+        color: var(--color-danger) !important;
+    }
+    .rekond-checkbox.active {
+        border-color: var(--color-danger) !important;
+        background-color: var(--color-danger) !important;
+        color: white !important;
+    }
+`}</style>
         </>
     );
 };
