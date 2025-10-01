@@ -617,10 +617,10 @@ const DamageItem: React.FC<{damage: ExistingDamage | NewDamage, isExisting: bool
     const handleMediaUpdate = (files: FileList | null) => onMediaUpdate(damage.id, files);
     const handleMediaRemove = (index: number) => onMediaRemove(damage.id, index);
 
-    const typeValue = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
-    const carPartValue = isExisting ? (damage as ExistingDamage).userCarPart : (damage as NewDamage).carPart;
-    const positionValue = isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position;
-    const descriptionValue = isExisting ? (damage as ExistingDamage).userDescription : (damage as NewDamage).text;
+    const typeValue = isExisting ? (damage as ExistingDamage).userType || '' : (damage as NewDamage).type;
+    const carPartValue = isExisting ? (damage as ExistingDamage).userCarPart || '' : (damage as NewDamage).carPart;
+    const positionValue = isExisting ? (damage as ExistingDamage).userPosition || '' : (damage as NewDamage).position;
+    const descriptionValue = isExisting ? (damage as ExistingDamage).userDescription || '' : (damage as NewDamage).text;
     
     const typeField = isExisting ? 'userType' : 'type';
     const carPartField = isExisting ? 'userCarPart' : 'carPart';
@@ -632,22 +632,17 @@ const DamageItem: React.FC<{damage: ExistingDamage | NewDamage, isExisting: bool
           <h4>{isExisting ? (damage as ExistingDamage).fullText : 'Ny skada'}</h4>
           {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger" style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem'}}>Ta bort</Button>}
         </div>
-// Ersätt med detta block
-{isExisting && onAction && (
-  <div className="damage-item-actions">
-    <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{flex: 1}}>
-      Dokumentera
-    </Button>
-    <Button onClick={() => onAction(damage.id, 'resolve')} variant={(damage as ExistingDamage).status === 'resolved' ? 'warning' : 'secondary'} style={{flex: 1}}>
-      Åtgärdad/Hittas ej
-    </Button>
-  </div>
-)}
+        {isExisting && onAction && (
+          <div className="damage-item-actions">
+            <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{flex: 1}}>Dokumentera</Button>
+            <Button onClick={() => onAction(damage.id, 'resolve')} variant={(damage as ExistingDamage).status === 'resolved' ? 'warning' : 'secondary'} style={{flex: 1}}>Åtgärdad/Hittas ej</Button>
+          </div>
+        )}
         {(isDocumented || !isExisting) && (
           <div className="damage-item-details">
             <div className="grid-2-col">
               <Field label="Typ av skada *"><select value={typeValue} onChange={(e) => onUpdate(damage.id, typeField, e.target.value)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-              <Field label="Placering *"><select value={carPartValue} onChange={(e) => onUpdate(damage.id, carPartField, e.target.value)}><option value="">Välj placering</option>{getRelevantCarParts(typeValue || '').map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+              <Field label="Placering *"><select value={carPartValue} onChange={(e) => onUpdate(damage.id, carPartField, e.target.value)}><option value="">Välj placering</option>{getRelevantCarParts(typeValue).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
             </div>
             {carPartValue && CAR_PARTS[carPartValue]?.length > 0 &&
                 <Field label="Position"><select value={positionValue} onChange={(e) => onUpdate(damage.id, positionField, e.target.value)}><option value="">Välj position</option>{CAR_PARTS[carPartValue].map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
@@ -661,7 +656,7 @@ const DamageItem: React.FC<{damage: ExistingDamage | NewDamage, isExisting: bool
             .damage-item--not_selected { background-color: var(--color-card); }
             .damage-item--documented { background-color: var(--color-success-light); }
             .damage-item--resolved { background-color: var(--color-warning-light); }
-            .damage-item--new { background-color: var(--color-danger-light); border-color: var(--color-danger); }
+            .damage-item--new { background-color: #fff5f5; border-color: var(--color-danger); }
             .damage-item-header { display: flex; justify-content: space-between; align-items: center; }
             .damage-item-header h4 { font-weight: 600; margin: 0; }
             .damage-item-actions { display: flex; gap: 0.5rem; margin: 1rem 0; }
