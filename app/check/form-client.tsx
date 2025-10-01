@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
-import { notifyCheckin, renderCheckinEmail } from '@/lib/notify';
+import { notifyCheckin } from '@/lib/notify';
 
 
 // =================================================================
@@ -69,6 +69,7 @@ const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f =
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
 
 function slugify(s: string) {
+  if (!s) return '';
   return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 }
 
@@ -92,8 +93,9 @@ function partitionMediaByType(files: MediaFile[]) {
   return { photos, videos };
 }
 
-async function uploadAllForDamage(damage: { id: string; media: MediaFile[] }, reg: string): Promise<{ photo_urls: string[]; video_urls: string[] }> {
-    const { photos, videos } = partitionMediaByType(damage.media || []);
+async function uploadAllForDamage(damage: { id: string; media?: MediaFile[] }, reg: string): Promise<{ photo_urls: string[]; video_urls: string[] }> {
+    if (!damage.media) return { photo_urls: [], video_urls: [] };
+    const { photos, videos } = partitionMediaByType(damage.media);
     const photo_urls = await Promise.all(photos.map(f => uploadOne(f, reg, damage.id)));
     const video_urls = await Promise.all(videos.map(f => uploadOne(f, reg, damage.id)));
     return { photo_urls, video_urls };
@@ -123,21 +125,26 @@ const createVideoThumbnail = (file: File): Promise<string> => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return resolve('');
     video.addEventListener('loadedmetadata', () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
       video.currentTime = 0.5;
     });
     video.addEventListener('seeked', () => {
-      ctx.drawImage(video, 0, 0);
-      resolve(canvas.toDataURL('image/jpeg', 0.8));
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      URL.revokeObjectURL(video.src);
+      resolve(dataUrl);
     });
-    video.addEventListener('error', () => resolve(''));
+    video.addEventListener('error', () => {
+      URL.revokeObjectURL(video.src);
+      resolve('');
+    });
     video.src = URL.createObjectURL(file);
   });
 };
 
 const processFiles = async (files: File[]): Promise<MediaFile[]> => {
-  return Promise.all(files.map(async file => {
+  return Promise.all(Array.from(files).map(async file => {
     const type = getFileType(file);
     const mediaFile: MediaFile = { file, type };
     if (type === 'image') {
@@ -166,12 +173,10 @@ const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] 
 
 
 // =================================================================
-// HUVUDKOMPONENT (med logik)
+// HUVUDKOMPONENT
 // =================================================================
 
 export default function CheckInForm() {
-  // --- All logik från originalfilen inklistrad här ---
-
   const [firstName, setFirstName] = useState('');
   useEffect(() => {
     (async () => {
@@ -188,24 +193,6 @@ export default function CheckInForm() {
   const [viewSaludatum, setViewSaludatum] = useState<string | null>(null);
   const [damages, setDamages] = useState<string[]>([]);
   const [loadingDamage, setLoadingDamage] = useState(false);
-
-  async function lookupDamages(regInput: string) {
-    const plate = normalizeReg(regInput || '');
-    if (plate.length !== 6) return;
-    setLoadingDamage(true);
-    try {
-      const view = await fetchDamageCard(plate);
-      const skador = view?.skador ?? [];
-      setDamages(skador);
-      setViewSaludatum(view?.saludatum ?? null);
-    } catch (err) {
-      console.error('lookupDamages error:', err);
-      setDamages([]);
-      setViewSaludatum(null);
-    } finally {
-      setLoadingDamage(false);
-    }
-  }
 
   const [regInput, setRegInput] = useState('');
   useEffect(() => {
@@ -228,12 +215,7 @@ export default function CheckInForm() {
 
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
-  const [annanPlats, setAnnanPlats] = useState(false);
-  const [annanPlatsText, setAnnanPlatsText] = useState('');
   const [carModel, setCarModel] = useState<string>('');
-  useEffect(() => {
-    if (!carModel && carData?.length) setCarModel((carData[0]?.brand_model || '').trim());
-  }, [carModel, carData]);
 
   const [matarstallning, setMatarstallning] = useState('');
   const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
@@ -242,7 +224,6 @@ export default function CheckInForm() {
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
   const [literpris, setLiterpris] = useState('');
   const [laddniva, setLaddniva] = useState('');
-  const [insynsskydd, setInsynsskydd] = useState<boolean | null>(null);
   const [antalLaddkablar, setAntalLaddkablar] = useState<'0' | '1' | '2' | null>(null);
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   const [behoverRekond, setBehoverRekond] = useState(false);
@@ -290,40 +271,29 @@ export default function CheckInForm() {
   }, [regInput, allRegistrations]);
 
   useEffect(() => {
-    if (!normalizedReg || normalizedReg.length < 3) {
-      setCarData([]); setExistingDamages([]); setNotFound(false);
+    if (!normalizedReg || normalizedReg.length < 6) {
+      setCarData([]); setExistingDamages([]); setNotFound(false); setCarModel('');
       return;
     }
     let cancelled = false;
     const fetchCarData = async () => {
       setLoading(true); setNotFound(false);
       try {
-        const [mabiResult, carResult] = await Promise.all([
-          supabase.from('mabi_damage_view').select('*').eq('regnr', normalizedReg),
-          supabase.from('car_data').select('*').eq('regnr', normalizedReg).order('created_at', { ascending: false }),
-        ]);
+        const view = await fetchDamageCard(normalizedReg);
         if (cancelled) return;
 
-        let useData: CarData[] = [];
-        let damages: ExistingDamage[] = [];
-
-        if (mabiResult.data && mabiResult.data.length > 0) {
-            const parsedDamages = mabiResult.data.map((row, index) => {
-                const skadetyp = getColumnValue(row, 'Skadetyp', ['damage_type', 'damage_text']) || '';
-                const plats = getColumnValue(row, 'Skadeanmälan', ['damage_location', 'plats']) || '';
-                const notering = getColumnValue(row, 'Intern notering', ['internal_notes', 'damage_notes', 'notering']) || '';
-                if (!skadetyp && !plats && !notering) return null;
-                const fullText = createCombinedDamageText(skadetyp, plats, notering);
-                return {
-                    id: `mabi-${index}`, skadetyp, plats, notering, fullText,
-                    shortText: skadetyp || plats || 'Okänd skada', status: 'not_selected' as const,
-                };
-            }).filter((d): d is ExistingDamage => d !== null);
+        if (view) {
+            setCarModel(view.brand_model || 'Okänd modell');
+            setViewWheelStorage(view.wheelstorage || 'Ingen info');
+            const parsedDamages = (view.skador || []).map((text, index) => ({
+                id: `mabi-${index}`, skadetyp: '', plats: '', notering: '', fullText: text,
+                shortText: text.substring(0, 50), status: 'not_selected' as const,
+            }));
             setExistingDamages(parsedDamages);
-            const viewRow = mabiResult.data[0];
-            const brandModel = (getColumnValue(viewRow, 'Modell', ['brand_model', 'Bilmodell']) || carResult.data?.[0]?.brand_model || '').toString().trim();
-            setCarModel(brandModel);
         } else {
+            setNotFound(true);
+            setCarModel('');
+            setViewWheelStorage('---');
             setExistingDamages([]);
         }
       } catch (err) {
@@ -338,13 +308,16 @@ export default function CheckInForm() {
   const availableStations = ort ? STATIONER[ort] || [] : [];
   
   const isFormValid = () => {
-    if (!regInput || !ort || !station || !matarstallning || !drivmedelstyp || !hjultyp || skadekontroll === null) return false;
+    if (!regInput || !ort || !station || !matarstallning || !drivmedelstyp || !hjultyp || skadekontroll === null || skadekontroll === 'ej_skadekontrollerad') return false;
     if (drivmedelstyp === 'bensin_diesel' && !tankniva) return false;
     if (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) return false;
     if (drivmedelstyp === 'elbil' && (!laddniva || !antalLaddkablar)) return false;
     if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
+    const documentedDamages = existingDamages.filter(d => d.status === 'documented');
+    if (documentedDamages.some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
     return isChecklistComplete;
   };
+  const formIsValidState = isFormValid();
 
   const handleShowErrors = () => {
     setShowFieldErrors(true);
@@ -358,9 +331,9 @@ export default function CheckInForm() {
     setRegInput(''); setCarData([]); setExistingDamages([]); setDamages([]); setCarModel('');
     setShowSuggestions(false); setShowConfirmDialog(false); setDamageToFix(null);
     setShowFinalConfirmation(false); setShowFieldErrors(false); setNotFound(false);
-    setOrt(''); setStation(''); setAnnanPlats(false); setAnnanPlatsText('');
+    setOrt(''); setStation('');
     setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null); setLiters('');
-    setBransletyp(null); setLiterpris(''); setLaddniva(''); setInsynsskydd(null);
+    setBransletyp(null); setLiterpris(''); setLaddniva('');
     setAntalLaddkablar(null); setHjultyp(null); setBehoverRekond(false);
     setSkadekontroll(null); setNewDamages([]); setPreliminarAvslutNotering('');
     setShowSuccessModal(false); setInsynsskyddOK(false); setDekalDjurRokningOK(false);
@@ -371,7 +344,7 @@ export default function CheckInForm() {
   const handleCancel = () => { if (window.confirm('Är du säker? Alla ifyllda data kommer att raderas.')) resetForm(); };
 
   const handleSubmitFinal = async () => {
-    if (isFinalSaving || !isFormValid()) return handleShowErrors();
+    if (isFinalSaving || !formIsValidState) return handleShowErrors();
     setIsFinalSaving(true);
     try {
       await confirmFinalSave();
@@ -379,7 +352,7 @@ export default function CheckInForm() {
       setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
     } catch (e) {
       console.error('Final save failed:', e);
-      alert('Något gick fel vid sparandet.');
+      alert(`Något gick fel vid sparandet: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setIsFinalSaving(false);
     }
@@ -396,20 +369,30 @@ export default function CheckInForm() {
     }).select().single();
     if (checkinError) throw checkinError;
 
-    const documentedExistingList = existingDamages.filter(d => d.status === 'documented');
-    for (const damage of [...documentedExistingList, ...newDamages]) {
+    const allDamagesToSave = [
+        ...existingDamages.filter(d => d.status === 'documented'),
+        ...newDamages
+    ];
+
+    for (const damage of allDamagesToSave) {
         const isExisting = 'fullText' in damage;
         const { photo_urls, video_urls } = await uploadAllForDamage({ id: damage.id, media: damage.media || [] }, normalizedReg);
         await supabase.from('checkin_damages').insert({
-            checkin_id: checkin.id, type: isExisting ? 'existing' : 'new',
-            damage_type: isExisting ? damage.userType || damage.fullText : damage.type,
+            checkin_id: checkin.id,
+            type: isExisting ? 'existing' : 'new',
+            damage_type_from_card: isExisting ? damage.fullText : null,
+            damage_type: isExisting ? damage.userType : damage.type,
             car_part: isExisting ? damage.userCarPart : damage.carPart,
             position: isExisting ? damage.userPosition : damage.position,
             description: isExisting ? damage.userDescription : damage.text,
             photo_urls, video_urls
         });
     }
-    // E-postlogik kan läggas till här om det behövs
+
+    await notifyCheckin({
+        regnr: normalizedReg, region: dbRegion, station, time: new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }),
+        hasNewDamages: skadekontroll === 'nya_skador', needsRecond: behovRekond,
+    });
   };
 
   const handleRegInputChange = (value: string) => {
@@ -427,66 +410,128 @@ export default function CheckInForm() {
     setExistingDamages(prev => prev.map(d => d.id === id ? { ...d, status: d.status === action ? 'not_selected' : action } : d));
   };
 
-  const updateExistingDamageField = (id: string, field: 'userType' | 'userCarPart' | 'userPosition' | 'userDescription', value: string) => {
-    setExistingDamages(prev => prev.map(d => {
+  const updateDamageField = (id: string, field: string, value: any, isExisting: boolean) => {
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    updater((prev: any[]) => prev.map(d => {
         if (d.id === id) {
             const updatedDamage = { ...d, [field]: value };
-            if (field === 'userType') { updatedDamage.userCarPart = ''; updatedDamage.userPosition = ''; }
-            if (field === 'userCarPart') { updatedDamage.userPosition = ''; }
+            const typeField = isExisting ? 'userType' : 'type';
+            const carPartField = isExisting ? 'userCarPart' : 'carPart';
+            const positionField = isExisting ? 'userPosition' : 'position';
+
+            if (field === typeField) { updatedDamage[carPartField] = ''; updatedDamage[positionField] = ''; }
+            if (field === carPartField) { updatedDamage[positionField] = ''; }
             return updatedDamage;
         }
         return d;
     }));
   };
 
-  const updateExistingDamageMedia = async (id: string, files: FileList | null) => {
-    if (!files) return;
+  const updateDamageMedia = async (id: string, files: FileList | null, isExisting: boolean) => {
+    if (!files || files.length === 0) return;
     const newMediaFiles = await processFiles(Array.from(files));
-    setExistingDamages(prev => prev.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...newMediaFiles] } : d));
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    updater((prev: any[]) => prev.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...newMediaFiles] } : d));
   };
 
-  const removeExistingDamageMedia = (damageId: string, mediaIndex: number) => {
-    setExistingDamages(prev => prev.map(d => d.id === damageId ? { ...d, media: d.media?.filter((_, i) => i !== mediaIndex) } : d));
+  const removeDamageMedia = (damageId: string, mediaIndex: number, isExisting: boolean) => {
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    updater((prev: any[]) => prev.map(d => {
+        if (d.id === damageId) {
+            const newMedia = [...d.media];
+            const removedMedia = newMedia.splice(mediaIndex, 1)[0];
+            if (removedMedia.preview) URL.revokeObjectURL(removedMedia.preview);
+            if (removedMedia.thumbnail) URL.revokeObjectURL(removedMedia.thumbnail);
+            return { ...d, media: newMedia };
+        }
+        return d;
+    }));
   };
 
   const addDamage = () => setNewDamages(prev => [...prev, { id: `new-${Date.now()}`, type: '', carPart: '', position: '', text: '', media: [] }]);
   const removeDamage = (id: string) => setNewDamages(prev => prev.filter(d => d.id !== id));
-  
-  const updateNewDamageField = (id: string, field: 'type' | 'carPart' | 'position' | 'text', value: string) => {
-    setNewDamages(prev => prev.map(d => {
-        if (d.id === id) {
-            const updatedDamage = { ...d, [field]: value };
-            if (field === 'type') { updatedDamage.carPart = ''; updatedDamage.position = ''; }
-            if (field === 'carPart') { updatedDamage.position = ''; }
-            return updatedDamage;
-        }
-        return d;
-    }));
-  };
 
-  const updateNewDamageMedia = async (id: string, files: FileList | null) => {
-    if (!files) return;
-    const newMediaFiles = await processFiles(Array.from(files));
-    setNewDamages(prev => prev.map(d => d.id === id ? { ...d, media: [...d.media, ...newMediaFiles] } : d));
-  };
-
-  const removeNewDamageMedia = (damageId: string, mediaIndex: number) => {
-    setNewDamages(prev => prev.map(d => d.id === damageId ? { ...d, media: d.media.filter((_, i) => i !== mediaIndex) } : d));
-  };
-
-  const formIsValidState = isFormValid();
-
-
-  // STEG 3: Den nya JSX-strukturen kommer att placeras här.
   return (
     <div className="checkin-form">
       <GlobalStyles />
-      <h1>Formulär (under uppbyggnad)</h1>
-      <p>Detta är ett skal med all logik på plats. Rendering av komponenter kommer i nästa steg.</p>
-      <p>Reg.nr: {regInput}</p>
-      <p>Modell: {loading ? "Laddar..." : carModel || "Okänd"}</p>
-      <p>Är formulär giltigt? {formIsValidState ? "Ja" : "Nej"}</p>
-      <Button onClick={() => alert('Test')} variant="primary">Testknapp</Button>
+      {showSuccessModal && <SuccessModal />}
+        <Card data-error={showFieldErrors && !regInput}>
+          <SectionHeader title="Fordon" />
+          <div style={{position: 'relative'}}>
+            <Field label="Registreringsnummer *">
+              <input type="text" value={regInput} onChange={(e) => handleRegInputChange(e.target.value)} placeholder="ABC 123" autoComplete="off" className="reg-input" onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} />
+            </Field>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="suggestions-dropdown">
+                {suggestions.map(s => <div key={s} onMouseDown={() => selectSuggestion(s)} className="suggestion-item">{s}</div>)}
+              </div>
+            )}
+          </div>
+          {loading && <p>Hämtar fordonsdata...</p>}
+          {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
+          {carModel && (
+            <div className="info-box">
+              <InfoRow label="Bilmodell:" value={carModel} />
+              <InfoRow label="Hjulförvaring:" value={viewWheelStorage} />
+            </div>
+          )}
+        </Card>
+
+        <Card data-error={showFieldErrors && (!ort || !station)}>
+          <SectionHeader title="Plats för incheckning" />
+          <div className="grid-2-col">
+            <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
+            <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
+          </div>
+        </Card>
+
+        <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && (!laddniva || !antalLaddkablar)))}>
+          <SectionHeader title="Fordonsstatus" />
+          <SubSectionHeader title="Mätarställning" />
+          <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
+          <SubSectionHeader title="Däck som sitter på" />
+          <Field label="Däcktyp *"><select value={hjultyp || ''} onChange={e => setHjultyp(e.target.value as any)}><option value="">Välj däcktyp</option><option value="Sommardäck">Sommardäck</option><option value="Vinterdäck">Vinterdäck</option></select></Field>
+          <SubSectionHeader title="Tankning/Laddning" />
+          <Field label="Drivmedelstyp *"><RadioGroup><Radio label="Bensin/Diesel" name="drivmedel" checked={drivmedelstyp === 'bensin_diesel'} onChange={() => setDrivmedelstyp('bensin_diesel')} /><Radio label="Elbil" name="drivmedel" checked={drivmedelstyp === 'elbil'} onChange={() => setDrivmedelstyp('elbil')} /></RadioGroup></Field>
+          {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><select value={tankniva || ''} onChange={e => setTankniva(e.target.value as any)}><option value="">Välj tankstatus</option><option value="återlämnades_fulltankad">Återlämnades fulltankad</option><option value="tankad_nu">Tankad nu</option></select></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><select value={bransletyp || ''} onChange={e => setBransletyp(e.target.value as any)}><option value="">Välj</option><option value="Bensin">Bensin</option><option value="Diesel">Diesel</option></select></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
+          {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field><Field label="Antal laddkablar *"><select value={antalLaddkablar || ''} onChange={e => setAntalLaddkablar(e.target.value as any)}><option value="">Välj antal</option><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></Field></>)}
+        </Card>
+
+        <Card data-error={showFieldErrors && (skadekontroll === null || skadekontroll === 'ej_skadekontrollerad' || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d=>d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
+            <SectionHeader title="Skador" />
+            <SubSectionHeader title="Befintliga skador från skadekort" />
+            {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={(id, field, val) => updateDamageField(id, field, val, true)} onMediaUpdate={(id, files) => updateDamageMedia(id, files, true)} onMediaRemove={(id, index) => removeDamageMedia(id, index, true)} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador registrerade på skadekortet.</p>}
+            <SubSectionHeader title="Skadekontroll" />
+            <Field label="Har bilen några nya skador? *"><RadioGroup>
+                <Radio label="Inga nya skador" name="skadekontroll" checked={skadekontroll === 'inga_nya_skador'} onChange={() => setSkadekontroll('inga_nya_skador')} />
+                <Radio label="Nya skador finns" name="skadekontroll" checked={skadekontroll === 'nya_skador'} onChange={() => setSkadekontroll('nya_skador')} />
+            </RadioGroup></Field>
+            {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={(id, field, val) => updateDamageField(id, field, val, false)} onMediaUpdate={(id, files) => updateDamageMedia(id, files, false)} onMediaRemove={(id, index) => removeDamageMedia(id, index, false)} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="primary" style={{ marginTop: '1rem' }}>+ Lägg till ny skada</Button></>)}
+        </Card>
+
+        <Card data-error={showFieldErrors && !isChecklistComplete}>
+            <SectionHeader title="Checklista" />
+            <div className="rekond-box"><Checkbox label="⚠️ Behöver rekond" checked={behoverRekond} onChange={e => { if (e.target.checked && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return; setBehoverRekond(e.target.checked); }} className="rekond-checkbox" /></div>
+            <SubSectionHeader title="Allt måste vara OK för att slutföra" />
+            <div className="grid-2-col">
+                <Checkbox label="✓ Insynsskydd" checked={insynsskyddOK} onChange={e => setInsynsskyddOK(e.target.checked)} />
+                <Checkbox label="✓ Dekal djur/rökning" checked={dekalDjurRokningOK} onChange={e => setDekalDjurRokningOK(e.target.checked)} />
+                <Checkbox label="✓ Isskrapa" checked={isskrapaOK} onChange={e => setIsskrapaOK(e.target.checked)} />
+                <Checkbox label="✓ P-skiva" checked={pskivaOK} onChange={e => setPskivaOK(e.target.checked)} />
+                <Checkbox label="✓ Skylt reg.plåt" checked={skyltRegplatOK} onChange={e => setSkyltRegplatOK(e.target.checked)} />
+                <Checkbox label="✓ Dekal GPS" checked={dekalGpsOK} onChange={e => setDekalGpsOK(e.target.checked)} />
+                <Checkbox label="✓ Spolarvätska" checked={spolarvatskaOK} onChange={e => setSpolarvatskaOK(e.target.checked)} />
+                {drivmedelstyp === 'bensin_diesel' && <Checkbox label="✓ AdBlue" checked={adblueOK} onChange={e => setAdblueOK(e.target.checked)} />}
+                <Checkbox label="✓ Bilen tvättad" checked={washed} onChange={e => setWashed(e.target.checked)} />
+            </div>
+        </Card>
+
+        <Card><Field label="Kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea></Field></Card>
+
+        <div className="form-actions">
+            <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
+            <Button onClick={formIsValidState ? handleSubmitFinal : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>{!formIsValidState ? 'Visa saknad information' : (isFinalSaving ? 'Skickar in...' : 'Slutför incheckning')}</Button>
+        </div>
     </div>
   );
 }
@@ -538,34 +583,44 @@ const SuccessModal = () => (
     </div>
 );
 
-const DamageItem: React.FC<any> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onRemove, onAction }) => {
-    const isDocumented = isExisting && damage.status === 'documented';
-    const statusClass = isExisting ? `damage-item--${damage.status}` : 'damage-item--new';
+const DamageItem: React.FC<{damage: ExistingDamage | NewDamage, isExisting: boolean, onUpdate: (id: string, field: string, value: string) => void, onMediaUpdate: (id: string, files: FileList | null) => void, onMediaRemove: (id: string, index: number) => void, onRemove?: (id: string) => void, onAction?: (id: string, action: 'document' | 'resolve') => void}> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onRemove, onAction }) => {
+    const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
+    const statusClass = isExisting ? `damage-item--${(damage as ExistingDamage).status}` : 'damage-item--new';
     
     const handleMediaUpdate = (files: FileList | null) => onMediaUpdate(damage.id, files);
     const handleMediaRemove = (index: number) => onMediaRemove(damage.id, index);
 
+    const typeValue = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
+    const carPartValue = isExisting ? (damage as ExistingDamage).userCarPart : (damage as NewDamage).carPart;
+    const positionValue = isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position;
+    const descriptionValue = isExisting ? (damage as ExistingDamage).userDescription : (damage as NewDamage).text;
+    
+    const typeField = isExisting ? 'userType' : 'type';
+    const carPartField = isExisting ? 'userCarPart' : 'carPart';
+    const positionField = isExisting ? 'userPosition' : 'position';
+    const descriptionField = isExisting ? 'userDescription' : 'text';
+
     return (<div className={`damage-item ${statusClass}`}>
         <div className="damage-item-header">
-          <h4>{isExisting ? damage.fullText : 'Ny skada'}</h4>
+          <h4>{isExisting ? (damage as ExistingDamage).fullText : 'Ny skada'}</h4>
           {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger" style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem'}}>Ta bort</Button>}
         </div>
         {isExisting && onAction && (
           <div className="damage-item-actions">
             <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{flex: 1}}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve')} variant={damage.status === 'resolved' ? 'warning' : 'secondary'} style={{flex: 1}}>Åtgärdad/Hittas ej</Button>
+            <Button onClick={() => onAction(damage.id, 'resolve')} variant={(damage as ExistingDamage).status === 'resolved' ? 'warning' : 'secondary'} style={{flex: 1}}>Åtgärdad/Hittas ej</Button>
           </div>
         )}
         {(isDocumented || !isExisting) && (
           <div className="damage-item-details">
             <div className="grid-2-col">
-              <Field label="Typ av skada *"><select value={isExisting ? damage.userType : damage.type} onChange={(e: any) => onUpdate(damage.id, isExisting ? 'userType' : 'type', e.target.value)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-              <Field label="Placering *"><select value={isExisting ? damage.userCarPart : damage.carPart} onChange={(e: any) => onUpdate(damage.id, isExisting ? 'userCarPart' : 'carPart', e.target.value)}><option value="">Välj placering</option>{getRelevantCarParts(isExisting ? damage.userType || '' : damage.type).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+              <Field label="Typ av skada *"><select value={typeValue} onChange={(e) => onUpdate(damage.id, typeField, e.target.value)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
+              <Field label="Placering *"><select value={carPartValue} onChange={(e) => onUpdate(damage.id, carPartField, e.target.value)}><option value="">Välj placering</option>{getRelevantCarParts(typeValue || '').map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
             </div>
-            {(isExisting ? damage.userCarPart : damage.carPart) && CAR_PARTS[isExisting ? damage.userCarPart! : damage.carPart!]?.length > 0 &&
-                <Field label="Position"><select value={isExisting ? damage.userPosition : damage.position} onChange={(e: any) => onUpdate(damage.id, isExisting ? 'userPosition' : 'position', e.target.value)}><option value="">Välj position</option>{CAR_PARTS[isExisting ? damage.userCarPart! : damage.carPart!].map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+            {carPartValue && CAR_PARTS[carPartValue]?.length > 0 &&
+                <Field label="Position"><select value={positionValue} onChange={(e) => onUpdate(damage.id, positionField, e.target.value)}><option value="">Välj position</option>{CAR_PARTS[carPartValue].map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
             }
-            <Field label="Beskrivning (frivilligt)"><textarea value={isExisting ? damage.userDescription : damage.text} onChange={(e: any) => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value)} placeholder="Mer detaljer om skadan..." rows={3}></textarea></Field>
+            <Field label="Beskrivning (frivilligt)"><textarea value={descriptionValue} onChange={(e) => onUpdate(damage.id, descriptionField, e.target.value)} placeholder="Mer detaljer om skadan..." rows={3}></textarea></Field>
             <MediaUpload onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} media={damage.media || []} videoRequired={!isExisting} photoRequired={true} />
           </div>
         )}
@@ -583,7 +638,7 @@ const DamageItem: React.FC<any> = ({ damage, isExisting, onUpdate, onMediaUpdate
     </div>);
 };
 
-const MediaUpload: React.FC<any> = ({ onMediaUpdate, onMediaRemove, media, videoRequired, photoRequired }) => {
+const MediaUpload: React.FC<{onMediaUpdate: (files: FileList | null) => void, onMediaRemove: (index: number) => void, media: MediaFile[], videoRequired: boolean, photoRequired: boolean}> = ({ onMediaUpdate, onMediaRemove, media, videoRequired, photoRequired }) => {
     const hasImage = hasPhoto(media);
     const hasVideoFile = hasVideo(media);
     const photoInputId = `photo-${React.useId()}`;
@@ -599,7 +654,7 @@ const MediaUpload: React.FC<any> = ({ onMediaUpdate, onMediaRemove, media, video
             </div>
             {media.length > 0 && (
                 <div className="media-preview-grid">
-                    {media.map((m: any, i: number) => (
+                    {media.map((m, i) => (
                         <div key={i} className="media-preview-item">
                             <img src={m.preview || m.thumbnail} alt="media" />
                             <button onClick={() => onMediaRemove(i)} className="media-remove-btn">×</button>
@@ -619,9 +674,9 @@ const MediaUpload: React.FC<any> = ({ onMediaUpdate, onMediaRemove, media, video
 
 const MediaButton: React.FC<React.PropsWithChildren<any>> = ({ htmlFor, hasFile, required, children }) => {
     const baseStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.75rem', borderRadius: '6px', fontSize: '0.875rem', textAlign: 'center', cursor: 'pointer', transition: 'background-color 0.2s', border: '1px dashed' };
-    const color = hasFile ? '#16a34a' : (required ? '#dc2626' : '#6b7280');
-    const bgColor = hasFile ? '#f0fdf4' : (required ? '#fef2f2' : 'transparent');
-    const borderColor = hasFile ? '#16a34a' : (required ? '#dc2626' : '#e5e7eb');
+    const color = hasFile ? 'var(--color-success)' : (required ? 'var(--color-danger)' : 'var(--color-text-secondary)');
+    const bgColor = hasFile ? 'var(--color-success-light)' : (required ? 'var(--color-danger-light)' : 'transparent');
+    const borderColor = hasFile ? 'var(--color-success)' : (required ? 'var(--color-danger)' : 'var(--color-border)');
     const fontWeight = hasFile ? 500 : 600;
 
     return <label htmlFor={htmlFor} style={{ ...baseStyle, color, backgroundColor: bgColor, borderColor, fontWeight }}>{children}</label>;
