@@ -343,9 +343,99 @@ if (drivmedelstyp === 'elbil' && !laddniva) return false;
 
   const handleCancel = () => { if (window.confirm('Är du säker? Alla ifyllda data kommer att raderas.')) resetForm(); };
 
-  const handleSaveDraft = async () => {
-    // Logik för att spara utkast kommer här i nästa steg
-    console.log("Ska spara utkast...");
+const handleSaveDraft = async () => {
+    if (!regInput.trim()) {
+        alert('Registreringsnummer måste fyllas i för att kunna spara ett utkast.');
+        return;
+    }
+    setIsDraftSaving(true);
+    try {
+        const dbRegion = ORT_TILL_REGION[ort as keyof typeof ORT_TILL_REGION] ?? null;
+
+        // Data som ska sparas, med null om värdet saknas
+        const draftData = {
+            region: dbRegion,
+            city: ort || null,
+            station: station || null,
+            odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
+            fuel_type: drivmedelstyp,
+            fuel_level_at_return: tankniva,
+            fuel_liters_added: liters || null,
+            fuel_type_added: bransletyp,
+            fuel_price_per_liter: literpris || null,
+            charge_level_at_return: laddniva || null,
+            tire_type: hjultyp,
+            rekond_behov: behovRekond,
+            has_new_damages: skadekontroll === 'nya_skador',
+            privacy_cover_ok: insynsskyddOK,
+            dekal_djur_rokning_ok: dekalDjurRokningOK,
+            ice_scraper_ok: isskrapaOK,
+            parking_disc_ok: pskivaOK,
+            reg_plate_holder_ok: skyltRegplatOK,
+            gps_decal_ok: dekalGpsOK,
+            car_washed: washed,
+            washer_ok: spolarvatskaOK,
+            adblue_ok: adblueOK,
+            notes: preliminarAvslutNotering.trim() || null,
+        };
+
+        // Steg 1: Hitta befintligt utkast eller skapa ett nytt checkin-objekt
+        let checkinId;
+        const { data: existingDraft } = await supabase
+            .from('checkins')
+            .select('id')
+            .eq('regnr', normalizedReg)
+            .eq('status', 'draft')
+            .single();
+
+        if (existingDraft) {
+            checkinId = existingDraft.id;
+            const { error } = await supabase.from('checkins').update(draftData).eq('id', checkinId);
+            if (error) throw error;
+        } else {
+            const { data: newCheckin, error } = await supabase.from('checkins').insert({
+                ...draftData,
+                regnr: normalizedReg,
+                status: 'draft',
+            }).select('id').single();
+            if (error) throw error;
+            checkinId = newCheckin.id;
+        }
+
+        // Steg 2: Ta bort gamla skador kopplade till utkastet för att undvika dubbletter
+        await supabase.from('checkin_damages').delete().eq('checkin_id', checkinId);
+
+        // Steg 3: Ladda upp media och spara alla nuvarande skador
+        const allDamagesToSave = [
+            ...existingDamages.filter(d => d.status === 'documented'),
+            ...newDamages
+        ];
+
+        for (const damage of allDamagesToSave) {
+            const isExisting = 'fullText' in damage;
+            const { photo_urls, video_urls } = await uploadAllForDamage({ id: damage.id, media: damage.media || [] }, normalizedReg);
+            
+            await supabase.from('checkin_damages').insert({
+                checkin_id: checkinId,
+                type: isExisting ? 'existing' : 'new',
+                damage_type_from_card: isExisting ? (damage as ExistingDamage).fullText : null,
+                damage_type: isExisting ? (damage as ExistingDamage).userType || null : damage.type || null,
+                car_part: isExisting ? (damage as ExistingDamage).userCarPart || null : damage.carPart || null,
+                position: isExisting ? (damage as ExistingDamage).userPosition || null : damage.position || null,
+                description: isExisting ? (damage as ExistingDamage).userDescription || null : damage.text || null,
+                photo_urls,
+                video_urls
+            });
+        }
+
+        alert('Utkast sparat!'); // Bekräftelse till användaren
+
+    } catch (e) {
+        console.error('Draft save failed:', e);
+        alert(`Något gick fel när utkastet skulle sparas: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+        setIsDraftSaving(false);
+    }
 };
   const handleSubmitFinal = async () => {
     if (isFinalSaving || !formIsValidState) return handleShowErrors();
@@ -363,6 +453,17 @@ if (drivmedelstyp === 'elbil' && !laddniva) return false;
   };
 
   const confirmFinalSave = async () => {
+    // Lägg till detta block först i confirmFinalSave
+const { error: deleteError } = await supabase
+    .from('checkins')
+    .delete()
+    .eq('regnr', normalizedReg)
+    .eq('status', 'draft');
+
+if (deleteError) {
+    console.error("Could not delete old draft:", deleteError);
+    // Vi väljer att inte kasta ett fel här, för att inte blockera huvudflödet.
+}
     const dbRegion = ORT_TILL_REGION[ort as keyof typeof ORT_TILL_REGION] ?? 'SYD';
     const { data: checkin, error: checkinError } = await supabase.from('checkins').insert({
         regnr: normalizedReg, region: dbRegion, city: ort, station, status: 'checked_in',
