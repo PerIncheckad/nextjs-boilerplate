@@ -261,7 +261,7 @@ export default function CheckInForm() {
     setExistingDamages([]);
     try {
         const data = await fetchDamageCard(reg);
-        if (data && data.carModel) {
+        if (data) { // BUGFIX: Changed from `if (data && data.carModel)`
             setCarModel(data.carModel);
             const damagesArray = Array.isArray(data.skador) ? data.skador : [];
             setExistingDamages(damagesArray.map(d_text => ({ 
@@ -479,9 +479,9 @@ export default function CheckInForm() {
         </div>
         {loading && <p>Hämtar fordonsdata...</p>}
         {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
-        {carModel && (
+        {carModel !== null && (
           <div className="info-box">
-            <InfoRow label="Bilmodell:" value={carModel} />
+            <InfoRow label="Bilmodell:" value={carModel || "Okänd"} />
             <InfoRow label="Hjulförvaring:" value={viewWheelStorage ? 'Ja' : 'Nej'} />
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
@@ -530,7 +530,7 @@ export default function CheckInForm() {
       <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador att visa.</p>}
+        {carModel !== null && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>{carModel !== null ? 'Inga befintliga skador att visa.' : 'Fyll i reg.nr för att se befintliga skador.'}</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
@@ -793,8 +793,8 @@ const GlobalStyles = () => (
         .btn.warning { background-color: var(--color-warning); color: white; }
         .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
         .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text-secondary); font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .choice-btn:hover { filter: brightness(0.95); }
+        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .choice-btn:hover { filter: brightness(1.05); }
         .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
         .rekond-checkbox { margin-bottom: 1.5rem; border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
@@ -805,7 +805,7 @@ const GlobalStyles = () => (
         .damage-item-actions { display: flex; gap: 0.5rem; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-border); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--color-text-secondary); background-color: white; }
+        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-danger); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--color-danger); background-color: var(--color-danger-light); }
         .media-label:hover { filter: brightness(0.95); }
         .media-label.active { border-style: solid; border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
