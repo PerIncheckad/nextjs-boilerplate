@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
@@ -10,7 +10,14 @@ import { notifyCheckin } from '@/lib/notify';
 // 1. DATA, TYPES & HELPERS
 // =================================================================
 
-const MABI_LOGO_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAbFBMVEX////u7u43NzeampoAAAApKSn39/f7+/tOTk7b29vExMQrKyuLi4vAwMDf39+ysrLAwMCurq7Ozs4ZGRmcnJx/f3+9vb0SEhJaWlqgoKBISEjV1dVmZmaSkpJxcXEuLi53d3ePj49ISEg+Pj7ZkR7RAAADq0lEQVR4nO2d63aqMBCFRwNBQUVBUVDc3vX9n/JkG5mEvcASaU7n/H6cTcJkPzOZTCaCIAiCIAiCIAiCIAiCIAiCIAiCIAiCMIhA+9/0tG07mG40rY2ZbzXN6bT/mN76s+V2m43u0Gq3fJqE4z+l/m2eL6/X65f6g2f/Y4n/S+l32tK2bVubpc/9NTeZXC4Xf9h/X/mP6d/aXq/Xb6vV6s/6d9/pdDqZzeY/1e/1+vU3t9vtV2/11/TP6b/aPq/X76/X66/p3/P5fDabzT/U7/X6t7m9Xn9b+U/pv9t+v/9s/U/p39v+ff1v7T+m//f7/X6/3z+X/vP5fLlcLn9U/z/9d9v/Nf1/ut3u9/v9/um/v/9s/d/t9vv9fr/fP5/+8/l8NpvN/+73+/1+v38u/Xf5fD6bzWbzf7v9fr9/Lv3n8/lcLpd/qN/r9fv9fv9c+s/lcvmn+v3+uXSfz+dzudx+v9+/p3/P5/O5XO4/1O/3y+Xy+/1+/57+uVwuf6jf7/dv6Z/L5fJv9bv9fv+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/v9/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/u8+n8/n8/l8Pp/P5/P5fD6fz+fz+Xw+n8/n8/l8Pp/P5/P5fD6fz+f/lU8IgiAIgiAIgiAIgiAIgiAIgiAIgiAY4D/L1hF33j3gdwAAAABJRU5ErkJggg==";
+const MabiLogo = () => (
+    <svg width="150" height="40" viewBox="0 0 230 61" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12.384 48.72V12H20.352V22.44L27.648 12H36.432L28.224 23.4L37.056 48.72H28.512L21.6 34.92L14.736 48.72H12.384ZM57.9358 48.72V12H65.9038V48.72H57.9358ZM88.0311 48.72V12H96.3831L104.255 34.92V12H111.887V48.72H103.535L95.6631 25.8V48.72H88.0311Z" fill="#E30613"/>
+        <path d="M131.745 34.9199C131.745 42.5999 125.793 48.9599 117.729 48.9599C109.665 48.9599 103.713 42.5999 103.713 34.9199C103.713 27.2399 109.665 20.8799 117.729 20.8799C125.793 20.8799 131.745 27.2399 131.745 34.9199ZM123.777 34.9199C123.777 31.4399 121.089 28.5599 117.729 28.5599C114.369 28.5599 111.681 31.4399 111.681 34.9199C111.681 38.3999 114.369 41.2799 117.729 41.2799C121.089 41.2799 123.777 38.3999 123.777 34.9199Z" fill="#E30613"/>
+        <path d="M149.338 48.72V12H157.306V48.72H149.338ZM175.787 48.72V12H183.755V48.72H175.787Z" fill="#0A0A0A"/>
+        <path d="M211.391 34.9199C211.391 42.5999 205.439 48.9599 197.375 48.9599C189.311 48.9599 183.359 42.5999 183.359 34.9199C183.359 27.2399 189.311 20.8799 197.375 20.8799C205.439 20.8799 211.391 27.2399 211.391 34.9199ZM203.423 34.9199C203.423 31.4399 200.735 28.5599 197.375 28.5599C194.015 28.5599 191.327 31.4399 191.327 34.9199C191.327 38.3999 194.015 41.2799 197.375 41.2799C200.735 41.2799 203.423 38.3999 203.423 34.9199Z" fill="#0A0A0A"/>
+    </svg>
+);
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR', Falkenberg: 'NORR', Halmstad: 'NORR',
@@ -219,6 +226,7 @@ export default function CheckInForm() {
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
+      timestamp: new Date().toISOString(),
   }), [normalizedReg, carModel, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, hjultyp, behoverRekond, preliminarAvslutNotering, firstName, newDamages, existingDamages]);
 
 
@@ -246,41 +254,41 @@ export default function CheckInForm() {
     fetchAllRegistrations();
   }, []);
 
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      if (normalizedReg.length >= 6) {
-        setLoading(true);
-        setNotFound(false);
-        fetchDamageCard(normalizedReg)
-          .then(data => {
-            if (data) {
-              setCarModel(data.carModel);
-              setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
-              setViewWheelStorage(data.viewWheelStorage);
-            } else {
-              setNotFound(true);
-              setCarModel(null);
-              setExistingDamages([]);
-            }
-          })
-          .catch(error => {
-            console.error(error);
-            setNotFound(true);
-          })
-          .finally(() => {
-            setLoading(false);
-          });
-      } else {
+  const fetchVehicleData = useCallback(async (reg: string) => {
+    if (reg.length < 6) {
         setCarModel(null);
         setExistingDamages([]);
         setNotFound(false);
-      }
-    }, 500); // Debounce time
+        return;
+    }
+    setLoading(true);
+    setNotFound(false);
+    try {
+        const data = await fetchDamageCard(reg);
+        if (data) {
+            setCarModel(data.carModel);
+            setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
+            setViewWheelStorage(data.viewWheelStorage);
+        } else {
+            setNotFound(true);
+            setCarModel(null);
+            setExistingDamages([]);
+        }
+    } catch (error) {
+        console.error(error);
+        setNotFound(true);
+    } finally {
+        setLoading(false);
+    }
+  }, []);
 
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [normalizedReg]);
+  useEffect(() => {
+      const debouncedFetch = setTimeout(() => {
+          fetchVehicleData(normalizedReg);
+      }, 500);
+
+      return () => clearTimeout(debouncedFetch);
+  }, [normalizedReg, fetchVehicleData]);
 
   // Handlers
   const handleShowErrors = () => {
@@ -407,7 +415,7 @@ export default function CheckInForm() {
       {showConfirmModal && <ConfirmModal payload={finalPayload} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
       
       <div className="main-header">
-        <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+        <MabiLogo />
         {firstName && <p className="user-info">Inloggad: {firstName}</p>}
       </div>
 
@@ -644,7 +652,7 @@ const GlobalStyles = () => (
         body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; }
         .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
         .main-header { text-align: center; margin-bottom: 1.5rem; }
-        .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
+        .main-header svg { margin: 0 auto 1rem auto; display: block; }
         .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
         .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; }
         .card[data-error="true"] { border: 2px solid var(--color-danger); }
