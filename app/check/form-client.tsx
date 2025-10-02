@@ -63,7 +63,7 @@ type NewDamage = {
 };
 
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
-const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some((f: any) => f?.kind === 'video' || f?.mime?.startsWith?.('video'));
+const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
 function slugify(s: string) {
   if (!s) return '';
@@ -136,6 +136,13 @@ const processFiles = async (files: FileList): Promise<MediaFile[]> => {
     return { file, type, preview: URL.createObjectURL(file) };
   }));
 };
+
+const getFirstNameFromEmail = (email: string): string => {
+    if (!email) return 'Okänd';
+    const namePart = email.split('@')[0];
+    const firstName = namePart.split('.')[0];
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+};
 // =================================================================
 // 2. MAIN COMPONENT
 // =================================================================
@@ -207,7 +214,7 @@ export default function CheckInForm() {
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva }, hjultyp, rekond: behoverRekond,
       notering: preliminarAvslutNotering, incheckare: firstName,
-      region: ORT_TILL_REGION[ort] || 'Okänd', // <<< FIX: ORT_TILL_REGION
+      region: ORT_TILL_REGION[ort] || 'Okänd',
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
@@ -218,7 +225,7 @@ export default function CheckInForm() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setFirstName(user?.user_metadata?.first_name || user?.email || 'Okänd');
+      setFirstName(getFirstNameFromEmail(user?.email || ''));
     };
     getUser();
   }, []);
@@ -240,9 +247,10 @@ export default function CheckInForm() {
 
   useEffect(() => {
     if (normalizedReg.length < 6) {
-      setCarModel(null); setExistingDamages([]); setNotFound(false); return;
+      setCarModel(null); setExistingDamages([]); setNotFound(false);
+      return; // Return early, but don't clear timeout
     }
-    const fetch = async () => {
+    const timer = setTimeout(async () => {
       setLoading(true); setNotFound(false);
       try {
         const data = await fetchDamageCard(normalizedReg);
@@ -258,9 +266,8 @@ export default function CheckInForm() {
       } finally {
         setLoading(false);
       }
-    };
-    const timer = setTimeout(fetch, 300);
-    return () => clearTimeout(timer);
+    }, 300);
+    return () => clearTimeout(timer); // Correctly clear timeout on re-render
   }, [normalizedReg]);
 
   // Handlers
@@ -288,21 +295,30 @@ export default function CheckInForm() {
 
   const handleSubmitFinal = async () => {
     if (!formIsValidState) { handleShowErrors(); return; }
-    
-    const summary = `
-      Fordon: ${finalPayload.reg} (${finalPayload.carModel})
-      Plats: ${finalPayload.ort} - ${finalPayload.station}
-      Mätarställning: ${finalPayload.matarstallning} km
-      Hjul: ${finalPayload.hjultyp}
-      Drivmedel: ${finalPayload.drivmedel}
-      ${finalPayload.drivmedel === 'bensin_diesel' ? `Tankning: ${finalPayload.tankning.tankniva}${finalPayload.tankning.tankniva === 'tankad_nu' ? ` (${finalPayload.tankning.liters}L ${finalPayload.tankning.bransletyp} @ ${finalPayload.tankning.literpris} kr/L)` : ''}` : ''}
-      ${finalPayload.drivmedel === 'elbil' ? `Laddning: ${finalPayload.laddning.laddniva}%` : ''}
-      Nya skador: ${finalPayload.nya_skador.length > 0 ? finalPayload.nya_skador.map(d => d.type).join(', ') : 'Inga'}
-      Dokumenterade skador: ${finalPayload.dokumenterade_skador.length > 0 ? finalPayload.dokumenterade_skador.map(d => d.shortText).join(', ') : 'Inga'}
-      Åtgärdade skador: ${finalPayload.åtgärdade_skador.length > 0 ? finalPayload.åtgärdade_skador.map(d => d.shortText).join(', ') : 'Inga'}
-    `;
 
-    if (!window.confirm(`Vänligen bekräfta incheckning:\n\n${summary}`)) return;
+    const getSummary = () => {
+        let summary = `
+          <p>🚗 <strong>Fordon:</strong> ${finalPayload.reg} (${finalPayload.carModel})</p>
+          <p>📍 <strong>Plats:</strong> ${finalPayload.ort} - ${finalPayload.station}</p>
+          <p>🛣️ <strong>Mätarställning:</strong> ${finalPayload.matarstallning} km</p>
+          <p>🛞 <strong>Hjul:</strong> ${finalPayload.hjultyp}</p>
+        `;
+        if (finalPayload.drivmedel === 'bensin_diesel') {
+            const tankText = finalPayload.tankning.tankniva === 'tankad_nu' 
+                ? `Upptankad av MABI (${finalPayload.tankning.liters}L ${finalPayload.tankning.bransletyp} @ ${finalPayload.tankning.literpris} kr/L)`
+                : 'Återlämnades fulltankad';
+            summary += `<p>⛽ <strong>Tankning:</strong> ${tankText}</p>`;
+        }
+        if (finalPayload.drivmedel === 'elbil') {
+            summary += `<p>⚡ <strong>Laddning:</strong> ${finalPayload.laddning.laddniva}%</p>`;
+        }
+        summary += `<p>💥 <strong>Nya skador:</strong> ${finalPayload.nya_skador.length > 0 ? finalPayload.nya_skador.map(d => d.type).join(', ') : 'Inga'}</p>`;
+        summary += `<p>📋 <strong>Dokumenterade skador:</strong> ${finalPayload.dokumenterade_skador.length > 0 ? finalPayload.dokumenterade_skador.map(d => d.shortText).join(', ') : 'Inga'}</p>`;
+        summary += `<p>✅ <strong>Åtgärdade skador:</strong> ${finalPayload.åtgärdade_skador.length > 0 ? finalPayload.åtgärdade_skador.map(d => d.shortText).join(', ') : 'Inga'}</p>`;
+        return summary;
+    };
+
+    if (!window.confirm("Vänligen bekräfta att du vill slutföra incheckningen.")) return;
 
     setIsFinalSaving(true);
     try {
@@ -447,15 +463,15 @@ export default function CheckInForm() {
         <Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'}>Vinterdäck</ChoiceButton></div></Field>
         <SubSectionHeader title="Tankning/Laddning" />
         <Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'}>Elbil</ChoiceButton></div></Field>
-        {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><select value={tankniva || ''} onChange={e => setTankniva(e.target.value as any)}><option value="">Välj tankstatus</option><option value="återlämnades_fulltankad">Återlämnades fulltankad</option><option value="tankad_nu">Tankad nu</option></select></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><div className="grid-2-col"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'}>Diesel</ChoiceButton></div></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
+        {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-2-col"><ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'}>Återlämnades fulltankad</ChoiceButton><ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'}>Upptankad av MABI</ChoiceButton></div></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><div className="grid-2-col"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'}>Diesel</ChoiceButton></div></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
         {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
       </Card>
 
       <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
         <SectionHeader title="Skador" />
-        <SubSectionHeader title="Befintliga skador från skadekort" />
+        <SubSectionHeader title="Befintliga skador" />
         {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador registrerade på skadekortet.</p>}
-        <SubSectionHeader title="Skadekontroll" />
+        <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col"><ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'}>Inga nya skador</ChoiceButton><ChoiceButton onClick={() => setSkadekontroll('nya_skador')} isActive={skadekontroll === 'nya_skador'}>Nya skador finns</ChoiceButton></div></Field>
         {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="primary" style={{ marginTop: '1rem' }}>+ Lägg till ny skada</Button></>)}
       </Card>
@@ -558,11 +574,11 @@ const DamageItem: React.FC<{
           </div>
           <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Mer detaljer om skadan..." rows={3}></textarea></Field>
           <div className="media-section">
-            <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} required={true} label="Foto *" />
-            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} required={!isExisting} label={isExisting ? "Video (frivilligt)" : "Video *"} />
+            <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto med både skada och reg.nr*" />
+            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label="Video med både skada och reg.nr*" />
           </div>
           <div className="media-previews">
-            {damage.media?.map((m, i) => <MediaButton key={i} hasFile={true} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
+            {damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
           </div>
         </div>
       )}
@@ -570,15 +586,15 @@ const DamageItem: React.FC<{
   );
 };
 
-const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, required: boolean, label: string }> = ({ id, onUpload, required, label }) => (
+const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string }> = ({ id, onUpload, hasFile, fileType, label }) => (
   <div className="media-upload">
-    <label htmlFor={id} className="media-label">{label}</label>
-    <input id={id} type="file" accept="image/*,video/*" capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
+    <label htmlFor={id} className={`media-label ${hasFile ? 'active' : ''}`}>{label}</label>
+    <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
   </div>
 );
 
-const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void, hasFile: boolean }>> = ({ children, onRemove, hasFile }) => (
-  <div className={`media-btn ${hasFile ? 'has-file' : ''}`}>
+const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (
+  <div className="media-btn">
     {children}
     {onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}
   </div>
@@ -600,7 +616,7 @@ const GlobalStyles = () => (
         body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; }
         .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
         .main-header { text-align: center; margin-bottom: 1.5rem; }
-        .main-logo { max-width: 150px; height: auto; margin-bottom: 1rem; }
+        .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
         .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
         .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; }
         .card[data-error="true"] { border: 2px solid var(--color-danger); }
@@ -646,8 +662,8 @@ const GlobalStyles = () => (
         .damage-item-actions { display: flex; gap: 0.5rem; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-        .media-label:hover { border-color: var(--color-primary); background-color: var(--color-primary-light); }
+        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-danger); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--color-danger); }
+        .media-label.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
