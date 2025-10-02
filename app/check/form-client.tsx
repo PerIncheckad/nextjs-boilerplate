@@ -10,7 +10,7 @@ import { notifyCheckin } from '@/lib/notify';
 // 1. DATA, TYPES & HELPERS
 // =================================================================
 
-const MABI_LOGO_URL = "https://axmjqmsqjsbigajgrjqc.supabase.co/storage/v1/object/public/assets/mabi_logo.png";
+const MABI_LOGO_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAAAbFBMVEX////u7u43NzeampoAAAApKSn39/f7+/tOTk7b29vExMQrKyuLi4vAwMDf39+ysrLAwMCurq7Ozs4ZGRmcnJx/f3+9vb0SEhJaWlqgoKBISEjV1dVmZmaSkpJxcXEuLi53d3ePj49ISEg+Pj7ZkR7RAAADq0lEQVR4nO2d63aqMBCFRwNBQUVBUVDc3vX9n/JkG5mEvcASaU7n/H6cTcJkPzOZTCaCIAiCIAiCIAiCIAiCIAiCIAiCIAiCMIhA+9/0tG07mG40rY2ZbzXN6bT/mN76s+V2m43u0Gq3fJqE4z+l/m2eL6/X65f6g2f/Y4n/S+l32tK2bVubpc/9NTeZXC4Xf9h/X/mP6d/aXq/Xb6vV6s/6d9/pdDqZzeY/1e/1+vU3t9vtV2/11/TP6b/aPq/X76/X66/p3/P5fDabzT/U7/X6t7m9Xn9b+U/pv9t+v/9s/U/p39v+ff1v7T+m//f7/X6/3z+X/vP5fLlcLn9U/z/9d9v/Nf1/ut3u9/v9/um/v/9s/d/t9vv9fr/fP5/+8/l8NpvN/+73+/1+v38u/Xf5fD6bzWbzf7v9fr9/Lv3n8/lcLpd/qN/r9fv9fv9c+s/lcvmn+v3+uXSfz+dzudx+v9+/p3/P5/O5XO4/1O/3y+Xy+/1+/57+uVwuf6jf7/dv6Z/L5fJv9bv9fv+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/v9/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/rlcLn+o3+93/5b+uVwuf6jf73f/lv65XC5/qN/vd/+W/u8+n8/n8/l8Pp/P5/P5fD6fz+fz+Xw+n8/n8/l8Pp/P5/P5fD6fz+f/lU8IgiAIgiAIgiAIgiAIgiAIgiAIgiAY4D/L1hF33j3gdwAAAABJRU5ErkJggg==";
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR', Falkenberg: 'NORR', Halmstad: 'NORR',
@@ -158,6 +158,7 @@ export default function CheckInForm() {
   const [notFound, setNotFound] = useState(false);
   const [isFinalSaving, setIsFinalSaving] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
@@ -246,28 +247,39 @@ export default function CheckInForm() {
   }, []);
 
   useEffect(() => {
-    if (normalizedReg.length < 6) {
-      setCarModel(null); setExistingDamages([]); setNotFound(false);
-      return; // Return early, but don't clear timeout
-    }
-    const timer = setTimeout(async () => {
-      setLoading(true); setNotFound(false);
-      try {
-        const data = await fetchDamageCard(normalizedReg);
-        if (data) {
-          setCarModel(data.carModel);
-          setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
-          setViewWheelStorage(data.viewWheelStorage);
-        } else {
-          setNotFound(true); setCarModel(null); setExistingDamages([]);
-        }
-      } catch (error) {
-        console.error(error); setNotFound(true);
-      } finally {
-        setLoading(false);
+    const handler = setTimeout(() => {
+      if (normalizedReg.length >= 6) {
+        setLoading(true);
+        setNotFound(false);
+        fetchDamageCard(normalizedReg)
+          .then(data => {
+            if (data) {
+              setCarModel(data.carModel);
+              setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
+              setViewWheelStorage(data.viewWheelStorage);
+            } else {
+              setNotFound(true);
+              setCarModel(null);
+              setExistingDamages([]);
+            }
+          })
+          .catch(error => {
+            console.error(error);
+            setNotFound(true);
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      } else {
+        setCarModel(null);
+        setExistingDamages([]);
+        setNotFound(false);
       }
-    }, 300);
-    return () => clearTimeout(timer); // Correctly clear timeout on re-render
+    }, 500); // Debounce time
+
+    return () => {
+      clearTimeout(handler);
+    };
   }, [normalizedReg]);
 
   // Handlers
@@ -293,33 +305,8 @@ export default function CheckInForm() {
     if (window.confirm("Är du säker? Alla ifyllda data kommer att raderas.")) resetForm();
   };
 
-  const handleSubmitFinal = async () => {
-    if (!formIsValidState) { handleShowErrors(); return; }
-
-    const getSummary = () => {
-        let summary = `
-          <p>🚗 <strong>Fordon:</strong> ${finalPayload.reg} (${finalPayload.carModel})</p>
-          <p>📍 <strong>Plats:</strong> ${finalPayload.ort} - ${finalPayload.station}</p>
-          <p>🛣️ <strong>Mätarställning:</strong> ${finalPayload.matarstallning} km</p>
-          <p>🛞 <strong>Hjul:</strong> ${finalPayload.hjultyp}</p>
-        `;
-        if (finalPayload.drivmedel === 'bensin_diesel') {
-            const tankText = finalPayload.tankning.tankniva === 'tankad_nu' 
-                ? `Upptankad av MABI (${finalPayload.tankning.liters}L ${finalPayload.tankning.bransletyp} @ ${finalPayload.tankning.literpris} kr/L)`
-                : 'Återlämnades fulltankad';
-            summary += `<p>⛽ <strong>Tankning:</strong> ${tankText}</p>`;
-        }
-        if (finalPayload.drivmedel === 'elbil') {
-            summary += `<p>⚡ <strong>Laddning:</strong> ${finalPayload.laddning.laddniva}%</p>`;
-        }
-        summary += `<p>💥 <strong>Nya skador:</strong> ${finalPayload.nya_skador.length > 0 ? finalPayload.nya_skador.map(d => d.type).join(', ') : 'Inga'}</p>`;
-        summary += `<p>📋 <strong>Dokumenterade skador:</strong> ${finalPayload.dokumenterade_skador.length > 0 ? finalPayload.dokumenterade_skador.map(d => d.shortText).join(', ') : 'Inga'}</p>`;
-        summary += `<p>✅ <strong>Åtgärdade skador:</strong> ${finalPayload.åtgärdade_skador.length > 0 ? finalPayload.åtgärdade_skador.map(d => d.shortText).join(', ') : 'Inga'}</p>`;
-        return summary;
-    };
-
-    if (!window.confirm("Vänligen bekräfta att du vill slutföra incheckningen.")) return;
-
+  const confirmAndSubmit = async () => {
+    setShowConfirmModal(false);
     setIsFinalSaving(true);
     try {
       const documentedExisting = await Promise.all(
@@ -354,7 +341,11 @@ export default function CheckInForm() {
 
   const handleRegInputChange = (value: string) => {
     setRegInput(value.toUpperCase());
-    setShowSuggestions(value.length >= 2);
+    if (value.length >= 2) {
+        setShowSuggestions(true);
+    } else {
+        setShowSuggestions(false);
+    }
   };
 
   const selectSuggestion = (reg: string) => {
@@ -413,6 +404,7 @@ export default function CheckInForm() {
     <div className="checkin-form">
       <GlobalStyles />
       {showSuccessModal && <SuccessModal firstName={firstName} />}
+      {showConfirmModal && <ConfirmModal payload={finalPayload} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
       
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
@@ -423,7 +415,7 @@ export default function CheckInForm() {
         <SectionHeader title="Fordon" />
         <div style={{ position: 'relative' }}>
           <Field label="Registreringsnummer *">
-            <input type="text" value={regInput} onChange={(e) => handleRegInputChange(e.target.value)} placeholder="ABC 123" autoComplete="off" className="reg-input" onFocus={() => setShowSuggestions(regInput.length >= 2)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} />
+            <input type="text" value={regInput} onChange={(e) => handleRegInputChange(e.target.value)} placeholder="ABC 123" autoComplete="off" className="reg-input" onFocus={() => regInput.length >= 2 && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} />
           </Field>
           {showSuggestions && suggestions.length > 0 && (
             <div className="suggestions-dropdown">
@@ -501,7 +493,7 @@ export default function CheckInForm() {
 
       <div className="form-actions">
         <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
-        <Button onClick={formIsValidState ? handleSubmitFinal : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>
+        <Button onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>
           {!formIsValidState ? 'Visa saknad information' : (isFinalSaving ? 'Skickar in...' : 'Slutför incheckning')}
         </Button>
       </div>
@@ -532,6 +524,42 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
     </div>
   </>
 );
+
+const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
+    let summary = `
+        <p>🚗 <strong>Fordon:</strong> ${payload.reg} (${payload.carModel || 'Okänd modell'})</p>
+        <p>📍 <strong>Plats:</strong> ${payload.ort} - ${payload.station}</p>
+        <p>🛣️ <strong>Mätarställning:</strong> ${payload.matarstallning} km</p>
+        <p>🛞 <strong>Hjul:</strong> ${payload.hjultyp}</p>
+    `;
+    if (payload.drivmedel === 'bensin_diesel') {
+        const tankText = payload.tankning.tankniva === 'tankad_nu'
+            ? `Upptankad av MABI (${payload.tankning.liters}L ${payload.tankning.bransletyp} @ ${payload.tankning.literpris} kr/L)`
+            : 'Återlämnades fulltankad';
+        summary += `<p>⛽ <strong>Tankning:</strong> ${tankText}</p>`;
+    }
+    if (payload.drivmedel === 'elbil') {
+        summary += `<p>⚡ <strong>Laddning:</strong> ${payload.laddning.laddniva}%</p>`;
+    }
+    summary += `<p>💥 <strong>Nya skador:</strong> ${payload.nya_skador.length > 0 ? payload.nya_skador.map((d:any) => d.type).join(', ') : 'Inga'}</p>`;
+    summary += `<p>📋 <strong>Dokumenterade skador:</strong> ${payload.dokumenterade_skador.length > 0 ? payload.dokumenterade_skador.map((d:any) => d.shortText).join(', ') : 'Inga'}</p>`;
+    summary += `<p>✅ <strong>Åtgärdade skador:</strong> ${payload.åtgärdade_skador.length > 0 ? payload.åtgärdade_skador.map((d:any) => d.shortText).join(', ') : 'Inga'}</p>`;
+    
+    return (
+        <>
+            <div className="modal-overlay" />
+            <div className="modal-content confirm-modal">
+                <h3>Bekräfta incheckning</h3>
+                <div className="confirm-summary" dangerouslySetInnerHTML={{ __html: summary }} />
+                <div className="modal-actions">
+                    <Button onClick={onCancel} variant="secondary">Avbryt</Button>
+                    <Button onClick={onConfirm} variant="success">Bekräfta och skicka</Button>
+                </div>
+            </div>
+        </>
+    );
+};
+
 
 const DamageItem: React.FC<{
   damage: ExistingDamage | NewDamage; isExisting: boolean;
@@ -574,7 +602,7 @@ const DamageItem: React.FC<{
           </div>
           <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Mer detaljer om skadan..." rows={3}></textarea></Field>
           <div className="media-section">
-            <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto med både skada och reg.nr*" />
+            <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
             <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label="Video med både skada och reg.nr*" />
           </div>
           <div className="media-previews">
@@ -662,14 +690,18 @@ const GlobalStyles = () => (
         .damage-item-actions { display: flex; gap: 0.5rem; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-danger); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--color-danger); }
-        .media-label.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
+        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-danger); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--color-danger); background-color: var(--color-danger-light); }
+        .media-label:hover { filter: brightness(0.95); }
+        .media-label.active { border-style: solid; border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
         .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(0,0,0,0.6); color: white; border: none; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; line-height: 20px; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem 3rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); }
+        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); max-width: 90%; width: 600px; }
         .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
+        .confirm-modal .confirm-summary { text-align: left; margin: 1.5rem 0; }
+        .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
+        .confirm-modal .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
     `}</style>
 )
