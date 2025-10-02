@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
@@ -22,7 +22,7 @@ const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 
 
 const STATIONER: Record<string, string[]> = {
   'Malmö': ['Ford Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
-  'Helsingborg': ['HBSC Helsingborg', 'Ford Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B/S Helsingborg', 'Werksta Helsingborg', 'Båstad'],
+  'Helsingborg': ['HBSC Helsingborg', 'Ford Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B[...]
   'Lund': ['Ford Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
   'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
   'Falkenberg': ['Falkenberg'],
@@ -187,14 +187,17 @@ export default function CheckInForm() {
   const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Derived State & Memos
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
   const suggestions = useMemo(() => {
-    if (regInput.length < 2) return [];
-    return allRegistrations.filter(r => r.toUpperCase().includes(regInput.toUpperCase())).slice(0, 5);
-  }, [regInput, allRegistrations]);
+    if (regInput.length < 2 || !showSuggestions) return [];
+    const upperInput = regInput.toUpperCase();
+    return allRegistrations.filter(r => r.toUpperCase().includes(upperInput)).slice(0, 5);
+  }, [regInput, allRegistrations, showSuggestions]);
 
   const otherChecklistItemsOK = useMemo(() => {
      const common = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK;
@@ -236,8 +239,13 @@ export default function CheckInForm() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const reg = params.get('reg');
-    if (reg) { setRegInput(reg.toUpperCase()); }
-  }, []);
+    if (reg) { 
+        const upperReg = reg.toUpperCase();
+        setRegInput(upperReg);
+        // Directly trigger fetch for reg from URL
+        fetchVehicleData(normalizeReg(upperReg));
+    }
+  }, []); // Runs only once on mount
 
   useEffect(() => {
     async function fetchAllRegistrations() {
@@ -249,27 +257,31 @@ export default function CheckInForm() {
   }, []);
 
   const fetchVehicleData = useCallback(async (reg: string) => {
-    if (reg.length < 6) {
-        setCarModel(null);
-        setExistingDamages([]);
-        setNotFound(false);
-        return;
-    }
     setLoading(true);
     setNotFound(false);
+    setCarModel(null);
+    setExistingDamages([]);
     try {
         const data = await fetchDamageCard(reg);
         if (data) {
             setCarModel(data.carModel);
-            setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
+            // Ensure `skador` is an array before mapping
+            const damagesArray = Array.isArray(data.skador) ? data.skador : [];
+            setExistingDamages(damagesArray.map(d_text => ({ 
+                id: Math.random().toString(36).substring(2, 15), 
+                fullText: d_text,
+                shortText: d_text,
+                status: 'not_selected',
+                skadetyp: '', // These are populated if user documents the damage
+                plats: '',
+                notering: ''
+            })));
             setViewWheelStorage(data.viewWheelStorage);
         } else {
             setNotFound(true);
-            setCarModel(null);
-            setExistingDamages([]);
         }
     } catch (error) {
-        console.error(error);
+        console.error("Fetch vehicle data error:", error);
         setNotFound(true);
     } finally {
         setLoading(false);
@@ -277,12 +289,41 @@ export default function CheckInForm() {
   }, []);
 
   useEffect(() => {
-      const debouncedFetch = setTimeout(() => {
-          fetchVehicleData(normalizedReg);
-      }, 500);
+    // Clear previous timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // Always clear old vehicle data when input changes
+    setCarModel(null);
+    setExistingDamages([]);
+    setNotFound(false);
 
-      return () => clearTimeout(debouncedFetch);
-  }, [normalizedReg, fetchVehicleData]);
+    const reg = normalizeReg(regInput);
+
+    if (reg.length >= 2) {
+      setShowSuggestions(true);
+    } else {
+      setShowSuggestions(false);
+    }
+    
+    if (reg.length === 6) {
+      // Hide suggestions when we have a full regnr
+      setShowSuggestions(false);
+      // Debounce the fetch call
+      debounceTimeoutRef.current = setTimeout(() => {
+        fetchVehicleData(reg);
+      }, 300); // 300ms delay
+    }
+
+    // Cleanup function to clear timeout if component unmounts
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [regInput, fetchVehicleData]);
+
 
   // Handlers
   const handleShowErrors = () => {
@@ -355,15 +396,11 @@ export default function CheckInForm() {
 
   const handleRegInputChange = (value: string) => {
     setRegInput(value.toUpperCase());
-    if (value.length >= 2) {
-        setShowSuggestions(true);
-    } else {
-        setShowSuggestions(false);
-    }
   };
 
   const selectSuggestion = (reg: string) => {
-    setRegInput(reg); setShowSuggestions(false);
+    setRegInput(reg); 
+    setShowSuggestions(false);
   };
 
   const handleExistingDamageAction = (id: string, action: 'document' | 'resolve') => {
@@ -432,7 +469,7 @@ export default function CheckInForm() {
           <Field label="Registreringsnummer *">
             <input type="text" value={regInput} onChange={(e) => handleRegInputChange(e.target.value)} placeholder="ABC 123" autoComplete="off" className="reg-input" onFocus={() => regInput.length >= 2 && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} />
           </Field>
-          {showSuggestions && suggestions.length > 0 && (
+          {suggestions.length > 0 && (
             <div className="suggestions-dropdown">
               {suggestions.map(s => <div key={s} onMouseDown={() => selectSuggestion(s)} className="suggestion-item">{s}</div>)}
             </div>
@@ -450,6 +487,7 @@ export default function CheckInForm() {
                 {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
               </div>
             )}
+            {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="damage-list-label">Befintliga skador:</span><div>- Inga kända skador</div></div>}
           </div>
         )}
       </Card>
@@ -457,35 +495,35 @@ export default function CheckInForm() {
       <Card data-error={showFieldErrors && (!ort || !station)}>
         <SectionHeader title="Plats för incheckning" />
         <div className="grid-2-col">
-          <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
-          <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
+          <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>[...]
+          <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s}[...]
         </div>
       </Card>
 
-      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && !laddniva))}>
+      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp ||[...]
         <SectionHeader title="Fordonsstatus" />
         <SubSectionHeader title="Mätarställning" />
         <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
         <SubSectionHeader title="Däck som sitter på" />
-        <Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'}>Vinterdäck</ChoiceButton></div></Field>
+        <Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'}>Sommardäck</ChoiceButton><ChoiceButton onCli[...]
         <SubSectionHeader title="Tankning/Laddning" />
-        <Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'}>Elbil</ChoiceButton></div></Field>
-        {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-2-col"><ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'}>Återlämnades fulltankad</ChoiceButton><ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'}>Upptankad av MABI</ChoiceButton></div></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><div className="grid-2-col"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'}>Diesel</ChoiceButton></div></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
-        {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
+        <Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'}>Bensin/Diesel</ChoiceBut[...]
+        {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-2-col"><ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === '[...]
+        {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /><[...]
       </Card>
 
-      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
+      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) ||[...]
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador registrerade på skadekortet.</p>}
+        {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeD[...]
         <SubSectionHeader title="Nya skador" />
-        <Field label="Har bilen några nya skador? *"><div className="grid-2-col"><ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'}>Inga nya skador</ChoiceButton><ChoiceButton onClick={() => setSkadekontroll('nya_skador')} isActive={skadekontroll === 'nya_skador'}>Nya skador finns</ChoiceButton></div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="primary" style={{ marginTop: '1rem' }}>+ Lägg till ny skada</Button></>)}
+        <Field label="Har bilen några nya skador? *"><div className="grid-2-col"><ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'}>Inga [...]
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={re[...]
       </Card>
 
       <Card data-error={showFieldErrors && !isChecklistComplete}>
         <SectionHeader title="Checklista" />
-        <ChoiceButton onClick={() => { if (!behoverRekond && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return; setBehoverRekond(!behoverRekond); }} isActive={behoverRekond} className="rekond-checkbox">⚠️ Behöver rekond</ChoiceButton>
+        <ChoiceButton onClick={() => { if (!behoverRekond && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return; setBehoverRekond(!behoverRekond); }} isActiv[...]
         <SubSectionHeader title="Allt måste vara OK för att slutföra" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
@@ -654,14 +692,14 @@ const DamageItem: React.FC<{
       {(isDocumented || !isExisting) && !resolved && (
         <div className="damage-details">
           <div className="grid-3-col">
-            <Field label="Typ av skada *"><select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, fieldKey('type'), e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-            <Field label="Placering *"><select value={commonProps.carPart || ''} onChange={e => onUpdate(damage.id, fieldKey('carPart'), e.target.value, isExisting)}><option value="">Välj del</option>{getRelevantCarParts(commonProps.type || '').map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.carPart] || CAR_PARTS[commonProps.carPart].length === 0}><option value="">Välj pos.</option>{(CAR_PARTS[commonProps.carPart] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+            <Field label="Typ av skada *"><select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, fieldKey('type'), e.target.value, isExisting)}><option value="">Välj typ</option>{D[...]
+            <Field label="Placering *"><select value={commonProps.carPart || ''} onChange={e => onUpdate(damage.id, fieldKey('carPart'), e.target.value, isExisting)}><option value="">Välj del</option[...]
+            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.ca[...]
           </div>
-          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Mer detaljer om skadan..." rows={3}></textarea></Field>
+          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting[...]
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
-            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label="Video med både skada och reg.nr*" />
+            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label="Video med både skada och re[...]
           </div>
           <div className="media-previews">
             {damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
@@ -699,12 +737,12 @@ const GlobalStyles = () => (
           --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
           --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: [...]
         .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
         .main-header { text-align: center; margin-bottom: 1.5rem; }
         .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
         .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-        .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; }
+        .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; [...]
         .card[data-error="true"] { border: 2px solid var(--color-danger); }
         .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
         .section-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; margin:0; }
@@ -712,11 +750,11 @@ const GlobalStyles = () => (
         .sub-section-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-text); margin:0; }
         .field { margin-bottom: 1rem; }
         .field label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; }
-        .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; color: var(--color-text); }
+        .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: b[...]
         .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
         .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
         .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; }
-        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
+        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--sha[...]
         .suggestion-item { padding: 0.75rem; cursor: pointer; }
         .suggestion-item:hover { background-color: var(--color-primary-light); }
         .error-text { color: var(--color-danger); }
@@ -737,7 +775,7 @@ const GlobalStyles = () => (
         .btn.warning { background-color: var(--color-warning); color: white; }
         .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
         .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); font-size: 0.9rem; font-weight: 600; text-align: center; cursor: pointer; transition: all 0.2s ease; }
+        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-danger); background-color: var([...]
         .choice-btn:hover { filter: brightness(1.05); }
         .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .rekond-checkbox { margin-bottom: 1.5rem; border-color: var(--color-danger) !important; background-color: var(--color-danger-light) !important; color: var(--color-danger) !important; }
@@ -748,16 +786,16 @@ const GlobalStyles = () => (
         .damage-item-actions { display: flex; gap: 0.5rem; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-danger); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--color-danger); background-color: var(--color-danger-light); }
+        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-danger); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; co[...]
         .media-label:hover { filter: brightness(0.95); }
         .media-label.active { border-style: solid; border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(0,0,0,0.6); color: white; border: none; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; line-height: 20px; }
+        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(0,0,0,0.6); color: white; border: none; display: flex; align[...]
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); max-width: 90%; width: 600px; }
-        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
+        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shad[...]
+        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2re[...]
         .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-modal .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
         .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
