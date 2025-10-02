@@ -150,7 +150,7 @@ const getFirstNameFromEmail = (email: string): string => {
 export default function CheckInForm() {
   // State
   const [firstName, setFirstName] = useState('');
-  const [viewWheelStorage, setViewWheelStorage] = useState(false);
+  const [viewWheelStorage, setViewWheelStorage] = useState<boolean | null>(null);
   const [regInput, setRegInput] = useState('');
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -221,11 +221,13 @@ export default function CheckInForm() {
       reg: normalizedReg, carModel, matarstallning, hjultyp, rekond: behoverRekond,
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva },
+      ort,
+      station,
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
-  }), [normalizedReg, carModel, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, newDamages, existingDamages, washed, otherChecklistItemsOK]);
+  }), [normalizedReg, carModel, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   // Effects
   useEffect(() => {
@@ -259,9 +261,10 @@ export default function CheckInForm() {
     setNotFound(false);
     setCarModel(null);
     setExistingDamages([]);
+    setViewWheelStorage(null);
     try {
         const data = await fetchDamageCard(reg);
-        if (data) { // BUGFIX: Changed from `if (data && data.carModel)`
+        if (data) {
             setCarModel(data.carModel);
             const damagesArray = Array.isArray(data.skador) ? data.skador : [];
             setExistingDamages(damagesArray.map(d_text => ({ 
@@ -313,7 +316,7 @@ export default function CheckInForm() {
     }
     
     if (reg.length === 6) {
-      setShowSuggestions(false);
+      // setShowSuggestions(false); // BUGFIX: Removed this line to allow suggestions to persist
       debounceTimeoutRef.current = setTimeout(() => {
         fetchVehicleData(reg);
       }, 300);
@@ -481,8 +484,8 @@ export default function CheckInForm() {
         {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
         {carModel !== null && (
           <div className="info-box">
-            <InfoRow label="Bilmodell:" value={carModel || "Okänd"} />
-            <InfoRow label="Hjulförvaring:" value={viewWheelStorage ? 'Ja' : 'Nej'} />
+            <InfoRow label="Bilmodell:" value={carModel || '---'} />
+            <InfoRow label="Hjulförvaring:" value={viewWheelStorage === null ? '---' : (viewWheelStorage ? 'Ja' : 'Nej')} />
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
                 <span className="damage-list-label">Befintliga skador:</span>
@@ -545,12 +548,12 @@ export default function CheckInForm() {
         <SubSectionHeader title="Allt måste vara OK för att slutföra" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
-          <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd OK</ChoiceButton>
-          <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal Djur/Rökning OK</ChoiceButton>
-          <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa OK</ChoiceButton>
-          <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva OK</ChoiceButton>
-          <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>Skylt Reg.plåt OK</ChoiceButton>
-          <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS OK</ChoiceButton>
+          <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd finns</ChoiceButton>
+          <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal "Djur/rökning" finns</ChoiceButton>
+          <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa finns</ChoiceButton>
+          <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva finns</ChoiceButton>
+          <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>MABI-skylt reg.plåt finns</ChoiceButton>
+          <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS finns</ChoiceButton>
           <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
           {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK (endast diesel)</ChoiceButton>}
         </div>
@@ -646,14 +649,18 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             <div className="modal-content confirm-modal">
                 <h3>Bekräfta incheckning</h3>
                 <div className="confirm-summary">
-                    <p>🚗 <strong>Fordon:</strong> {payload.reg} ({payload.carModel || 'Okänd modell'})</p>
+                    <p>🚗 <strong>Fordon:</strong> {payload.reg} ({payload.carModel || '---'})</p>
+                </div>
+
+                <div className="confirm-summary">
+                    <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
                 </div>
                 
                 {renderDamageList(payload.nya_skador, true)}
                 
                 {payload.rekond && (
                     <div className="confirm-summary">
-                        <p className="rekond-highlight">⚠️ <strong>Rekond:</strong> Behövs</p>
+                        <p className="rekond-highlight">Rekond behövs!</p>
                     </div>
                 )}
                 
@@ -823,7 +830,7 @@ const GlobalStyles = () => (
         .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1rem; }
         .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
         .confirm-damage-section li { margin-bottom: 0.25rem; }
-        .rekond-highlight { background-color: var(--color-warning-light); color: #92400e; font-weight: bold; padding: 0.25rem 0.5rem; border-radius: 4px; display: inline-block; }
+        .rekond-highlight { background-color: var(--color-danger); color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; }
         .spinner-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: 600; }
         .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--color-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
