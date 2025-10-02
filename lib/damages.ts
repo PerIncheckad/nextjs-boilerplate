@@ -35,19 +35,22 @@ const supabase = createClient(
  * Now includes carModel and viewWheelStorage.
  */
 export async function fetchDamageCard(plate: string): Promise<DamageCardData | null> {
+  // Use .limit(1).single() to be robust against duplicates.
+  // It fetches the first row and errors if no row is found.
   const { data, error } = await supabase
     .from('mabi_damage_view')
     .select('regnr, carModel, saludatum, viewWheelStorage, skador')
     .eq('regnr', plate)
-    .maybeSingle();
+    .limit(1)
+    .single();
 
   if (error) {
-    console.error('fetchDamageCard error:', error);
+    // Log the error but return null to the component, which will handle the "not found" state.
+    console.error(`fetchDamageCard error for plate ${plate}:`, error);
     return null;
   }
 
-  const row = data as ViewRow | null;
-  if (!row) return null;
+  const row = data as ViewRow; // No need to check for null, .single() would have thrown an error.
 
   // Normalize the 'skador' field
   const rawSkador = row.skador;
