@@ -207,7 +207,7 @@ export default function CheckInForm() {
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva }, hjultyp, rekond: behoverRekond,
       notering: preliminarAvslutNotering, incheckare: firstName,
-      region: ORT_Till_REGION[ort] || 'Okänd',
+      region: ORT_TILL_REGION[ort] || 'Okänd', // <<< FIX: ORT_TILL_REGION
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
