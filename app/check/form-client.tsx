@@ -192,7 +192,6 @@ export default function CheckInForm() {
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   
-  // A flag to prevent the debounced fetch from running on the initial render if a URL param is present.
   const [initialUrlLoadHandled, setInitialUrlLoadHandled] = useState(false);
 
   // Derived State & Memos
@@ -230,10 +229,12 @@ export default function CheckInForm() {
   }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   const fetchVehicleData = useCallback(async (reg: string) => {
+    console.log(`%c[DEBUG] Step 3: Calling fetchVehicleData for '${reg}'`, 'color: blue; font-weight: bold;');
     setLoading(true);
     setNotFound(false);
     try {
         const data = await fetchDamageCard(reg);
+        console.log(`%c[DEBUG] Step 4: fetchDamageCard returned:`, 'color: blue; font-weight: bold;', data);
         setVehicleData(data);
         if (data) {
             setExistingDamages(data.skador.map(d_text => ({ 
@@ -247,7 +248,7 @@ export default function CheckInForm() {
             setExistingDamages([]);
         }
     } catch (error) {
-        console.error("Fetch vehicle data error:", error);
+        console.error("[DEBUG] Step 4 FAILED: fetchDamageCard threw an error:", error);
         setNotFound(true);
         setVehicleData(null);
         setExistingDamages([]);
@@ -268,18 +269,23 @@ export default function CheckInForm() {
   useEffect(() => {
     async function fetchAllRegistrations() {
       const { data, error } = await supabase.from('regnr').select('reg');
-      if (error) console.error("Could not fetch registrations", error);
-      else setAllRegistrations(data.map(item => item.reg));
+      if (error) {
+        console.error("[DEBUG] Step 1 FAILED: Could not fetch registrations", error);
+      } else {
+        console.log(`%c[DEBUG] Step 1: Fetched ${data.length} total registrations.`, 'color: green; font-weight: bold;');
+        setAllRegistrations(data.map(item => item.reg));
+      }
     }
     fetchAllRegistrations();
   }, []);
 
-  // Autocomplete suggestion logic. This is separate and only cares about input text.
+  // Autocomplete suggestion logic.
   useEffect(() => {
     if (regInput.length >= 2) {
       const filteredSuggestions = allRegistrations
         .filter(r => r.toUpperCase().includes(regInput.toUpperCase()))
         .slice(0, 5);
+      console.log(`%c[DEBUG] Step 2: Input '${regInput}' generated ${filteredSuggestions.length} suggestions.`, 'color: orange; font-weight: bold;');
       setSuggestions(filteredSuggestions);
     } else {
       setSuggestions([]);
@@ -288,21 +294,19 @@ export default function CheckInForm() {
 
   // UNIFIED useEffect for handling data fetching from either URL or manual input.
   useEffect(() => {
-    // This part runs only once when the component mounts
     if (!initialUrlLoadHandled) {
       const params = new URLSearchParams(window.location.search);
       const regFromUrl = params.get('reg');
       if (regFromUrl) {
         const normalized = normalizeReg(regFromUrl);
-        setRegInput(normalized); // Set the input field
-        fetchVehicleData(normalized); // Fetch data immediately
-        setInitialUrlLoadHandled(true); // Mark as handled
-        return; // Exit the hook to prevent debounce logic from running
+        setRegInput(normalized); 
+        fetchVehicleData(normalized);
+        setInitialUrlLoadHandled(true);
+        return; 
       }
-      setInitialUrlLoadHandled(true); // Mark as handled even if no param
+      setInitialUrlLoadHandled(true);
     }
 
-    // This part handles manual user input with a debounce
     const normalized = normalizeReg(regInput);
 
     if (normalized.length !== 6) {
@@ -336,7 +340,7 @@ export default function CheckInForm() {
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
     setSpolarvatskaOK(false); setAdblueOK(false); setSkadekontroll(null);
     setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
-    window.history.pushState({}, '', window.location.pathname); // Clear URL params
+    window.history.pushState({}, '', window.location.pathname); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
