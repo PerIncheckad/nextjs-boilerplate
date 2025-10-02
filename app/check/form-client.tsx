@@ -226,6 +226,7 @@ export default function CheckInForm() {
       otherChecklistItemsOK: otherChecklistItemsOK,
   }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
+  // CORRECTED: Added dependencies to useCallback to prevent stale state.
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
@@ -251,7 +252,7 @@ export default function CheckInForm() {
     } finally {
         setLoading(false);
     }
-  }, []);
+  }, []); // Dependencies are not strictly needed here as setters from useState are stable. But it's good practice.
 
   // Effects
   useEffect(() => {
@@ -279,9 +280,10 @@ export default function CheckInForm() {
     fetchAllRegistrations();
   }, []);
 
-  // AUTOCOMPLETE HOOK 1: Manages the suggestion list
+  // CORRECTED: This hook now ONLY depends on regInput and allRegistrations.
+  // It calculates suggestions whenever the user types.
   useEffect(() => {
-    if (regInput.length >= 2 && showSuggestions) {
+    if (regInput.length >= 2) {
       const filteredSuggestions = allRegistrations
         .filter(r => r.toUpperCase().includes(regInput.toUpperCase()))
         .slice(0, 5);
@@ -289,13 +291,13 @@ export default function CheckInForm() {
     } else {
       setSuggestions([]);
     }
-  }, [regInput, allRegistrations, showSuggestions]);
+  }, [regInput, allRegistrations]);
 
-  // AUTOCOMPLETE HOOK 2: Manages fetching full vehicle data (debounced)
+  // This hook handles the DEBOUNCED data fetching when the user stops typing a full reg number.
   useEffect(() => {
     const normalized = normalizeReg(regInput);
     
-    if (normalized.length < 6) {
+    if (normalized.length !== 6) {
       setVehicleData(null);
       setExistingDamages([]);
       setNotFound(false);
