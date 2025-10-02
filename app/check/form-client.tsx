@@ -10,7 +10,7 @@ import { notifyCheckin } from '@/lib/notify';
 // 1. DATA, TYPES & HELPERS
 // =================================================================
 
-const MABI_LOGO_URL = "https://axmjqmsqjsbigajgrjqc.supabase.co/storage/v1/object/public/assets/mabi_logo.png";
+const MABI_LOGO_URL = "https://www.mabi.se/images/mabi_logo.svg";
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
   Varberg: 'NORR', Falkenberg: 'NORR', Halmstad: 'NORR',
@@ -215,12 +215,12 @@ export default function CheckInForm() {
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva }, hjultyp, rekond: behoverRekond,
       notering: preliminarAvslutNotering, incheckare: firstName,
-      region: ORT_TILL_REGION[ort] || 'Okänd',
       nya_skador: newDamages.map(d => ({ ...d, media: undefined })),
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented').map(d => ({ ...d, media: undefined })),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved').map(d => ({ ...d, media: undefined })),
       timestamp: new Date().toISOString(),
-  }), [normalizedReg, carModel, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, hjultyp, behoverRekond, preliminarAvslutNotering, firstName, newDamages, existingDamages]);
+      isChecklistComplete: isChecklistComplete,
+  }), [normalizedReg, carModel, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, hjultyp, behoverRekond, preliminarAvslutNotering, firstName, newDamages, existingDamages, isChecklistComplete]);
 
 
   // Effects
@@ -530,56 +530,65 @@ const SpinnerOverlay = () => (
 );
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
-    const renderDamage = (d: any, isNew: boolean) => {
-        const type = isNew ? d.type : d.userType;
-        const carPart = isNew ? d.carPart : d.userCarPart;
-        const position = isNew ? d.position : d.userPosition;
-        const text = isNew ? d.text : d.userDescription;
+    const renderDamageList = (damages: any[], isNew: boolean) => {
+        if (!damages || damages.length === 0) return null;
         
-        let damageString = [type, carPart, position].filter(Boolean).join(' - ');
-        if (text) damageString += ` (${text})`;
+        const title = isNew ? "💥 Nya skador" : "📋 Dokumenterade befintliga skador";
         
-        return <li key={d.id}>{damageString}</li>;
+        return (
+            <div className="confirm-damage-section">
+                <h4>{title}</h4>
+                <ul>
+                    {damages.map((d: any) => {
+                        const type = isNew ? d.type : d.userType;
+                        const carPart = isNew ? d.carPart : d.userCarPart;
+                        const position = isNew ? d.position : d.userPosition;
+                        const text = isNew ? d.text : d.userDescription;
+                        let damageString = [type, carPart, position].filter(Boolean).join(' - ');
+                        if (text) damageString += ` (${text})`;
+                        return <li key={d.id}>{damageString}</li>;
+                    })}
+                </ul>
+            </div>
+        );
     };
 
-    let summary = `
-        <p>🚗 <strong>Fordon:</strong> ${payload.reg} (${payload.carModel || 'Okänd modell'})</p>
-        <p>📍 <strong>Plats:</strong> ${payload.ort} - ${payload.station}</p>
-        <p>🛣️ <strong>Mätarställning:</strong> ${payload.matarstallning} km</p>
-        <p>🛞 <strong>Hjul:</strong> ${payload.hjultyp}</p>
-    `;
-    if (payload.drivmedel === 'bensin_diesel') {
-        const tankText = payload.tankning.tankniva === 'tankad_nu'
-            ? `Upptankad av MABI (${payload.tankning.liters}L ${payload.tankning.bransletyp} @ ${payload.tankning.literpris} kr/L)`
-            : 'Återlämnades fulltankad';
-        summary += `<p>⛽ <strong>Tankning:</strong> ${tankText}</p>`;
-    }
-    if (payload.drivmedel === 'elbil') {
-        summary += `<p>⚡ <strong>Laddning:</strong> ${payload.laddning.laddniva}%</p>`;
-    }
-    if (payload.rekond) {
-        summary += `<p class="rekond-highlight">⚠️ <strong>Rekond:</strong> Behövs</p>`;
-    }
-    
+    const getTankningText = () => {
+        if (payload.drivmedel === 'bensin_diesel') {
+            const tankText = payload.tankning.tankniva === 'tankad_nu'
+                ? `Upptankad av MABI (${payload.tankning.liters}L ${payload.tankning.bransletyp} @ ${payload.tankning.literpris} kr/L)`
+                : 'Återlämnades fulltankad';
+            return `<p>⛽ <strong>Tankning:</strong> ${tankText}</p>`;
+        }
+        if (payload.drivmedel === 'elbil') {
+            return `<p>⚡ <strong>Laddning:</strong> ${payload.laddning.laddniva}%</p>`;
+        }
+        return '';
+    };
+
     return (
         <>
             <div className="modal-overlay" />
             <div className="modal-content confirm-modal">
                 <h3>Bekräfta incheckning</h3>
-                <div className="confirm-summary" dangerouslySetInnerHTML={{ __html: summary }} />
+                <div className="confirm-summary">
+                    <p>🚗 <strong>Fordon:</strong> ${payload.reg} (${payload.carModel || 'Okänd modell'})</p>
+                </div>
                 
-                {payload.nya_skador.length > 0 && (
-                    <div className="confirm-damage-section">
-                        <h4>💥 Nya skador</h4>
-                        <ul>{payload.nya_skador.map((d: any) => renderDamage(d, true))}</ul>
+                {renderDamageList(payload.nya_skador, true)}
+                {renderDamageList(payload.dokumenterade_skador, false)}
+
+                {payload.rekond && (
+                    <div className="confirm-summary">
+                        <p className="rekond-highlight">⚠️ <strong>Rekond:</strong> Behövs</p>
                     </div>
                 )}
-                {payload.dokumenterade_skador.length > 0 && (
-                    <div className="confirm-damage-section">
-                        <h4>📋 Dokumenterade befintliga skador</h4>
-                        <ul>{payload.dokumenterade_skador.map((d: any) => renderDamage(d, false))}</ul>
-                    </div>
-                )}
+                
+                <div className="confirm-summary">
+                    <p>🛣️ <strong>Mätarställning:</strong> ${payload.matarstallning} km</p>
+                    <div dangerouslySetInnerHTML={{ __html: getTankningText() }} />
+                    {payload.isChecklistComplete && <p>✅ Tvättad och kontrollerad - allt OK!</p>}
+                </div>
 
                 <div className="modal-actions">
                     <Button onClick={onCancel} variant="secondary">Avbryt</Button>
@@ -667,7 +676,7 @@ const GlobalStyles = () => (
         :root {
           --color-bg: #f8fafc; --color-card: #ffffff; --color-text: #1f2937; --color-text-secondary: #6b7280;
           --color-primary: #2563eb; --color-primary-light: #eff6ff; --color-success: #16a34a; --color-success-light: #f0fdf4;
-          --color-danger: #dc2626; --color-danger-light: #fef2f2; --color-warning: #f59e0b; --color-warning-light: #fefce8;
+          --color-danger: #dc2626; --color-danger-light: #fef2f2; --color-warning: #f59e0b; --color-warning-light: #fffbeb;
           --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
           --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
@@ -733,11 +742,11 @@ const GlobalStyles = () => (
         .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; }
         .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
         .confirm-modal .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
-        .confirm-damage-section { text-align: left; margin-top: 1rem; }
+        .confirm-damage-section { text-align: left; margin-bottom: 1rem; border-top: 1px solid var(--color-border); padding-top: 1rem; }
         .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1rem; }
         .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
         .confirm-damage-section li { margin-bottom: 0.25rem; }
-        .rekond-highlight { background-color: var(--color-warning-light); color: var(--color-warning); font-weight: bold; padding: 0.25rem 0.5rem; border-radius: 4px; }
+        .rekond-highlight { background-color: var(--color-warning-light); color: #92400e; font-weight: bold; padding: 0.25rem 0.5rem; border-radius: 4px; display: inline-block; }
         .spinner-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: 600; }
         .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--color-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
