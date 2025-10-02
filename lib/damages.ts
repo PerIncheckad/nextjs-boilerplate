@@ -15,57 +15,54 @@ export function normalizeReg(reg: string): string {
 
 export async function fetchDamageCard(reg: string): Promise<DamageCardData | null> {
   const normalized = normalizeReg(reg);
-  if (normalized.length !== 6) {
+  if (normalized.length < 6) {
     return null;
   }
 
   try {
-    // Vi gör två anrop parallellt för att hämta data från båda källorna.
-    const [carDataResult, damageViewResult] = await Promise.all([
-      // Anrop 1: Hämta bilmodell från 'car_data'. Vi behöver bara en rad.
-      supabase
-        .from('car_data')
-        .select('brand_model')
-        .eq('regnr', normalized)
-        .limit(1)
-        .single(),
+    // Vi gör två anrop parallellt.
+    const carDataPromise = supabase
+      .from('car_data')
+      .select('brand_model')
+      .eq('regnr', normalized)
+      .limit(1)
+      .maybeSingle(); // maybeSingle() returnerar null istället för fel om inget hittas.
 
-      // Anrop 2: Hämta skador etc. från 'mabi_damage_view'.
-      supabase
-        .from('mabi_damage_view')
-        .select('regnr, hjulförvaring, saludatum, skador')
-        .eq('regnr', normalized)
-        .single()
+    const damageViewPromise = supabase
+      .from('mabi_damage_view')
+      .select('regnr, hjulförvaring, saludatum, skador')
+      .eq('regnr', normalized)
+      .maybeSingle(); // maybeSingle() är nyckeln här, den kraschar inte om rad saknas.
+
+    const [carDataResult, damageViewResult] = await Promise.all([
+      carDataPromise,
+      damageViewPromise
     ]);
 
-    // Hantera fel från anropen
-    if (carDataResult.error && carDataResult.error.code !== 'PGRST116') {
-        // PGRST116 betyder "ingen rad hittad", vilket är ok. Alla andra fel ska loggas.
-        console.error('Supabase error fetching from car_data:', carDataResult.error);
-    }
-    if (damageViewResult.error && damageViewResult.error.code !== 'PGRST116') {
-        console.error('Supabase error fetching from mabi_damage_view:', damageViewResult.error);
-    }
+    // Logga eventuella oväntade fel, men ignorera "hittades inte".
+    if (carDataResult.error) console.error('Supabase error (car_data):', carDataResult.error);
+    if (damageViewResult.error) console.error('Supabase error (mabi_damage_view):', damageViewResult.error);
 
-    // Om ingen av källorna returnerade data, finns inte fordonet.
-    if (!carDataResult.data && !damageViewResult.data) {
-      console.log(`No vehicle found with reg: ${normalized}`);
-      return null;
-    }
-
-    // Kombinera datan från båda anropen till ett enda objekt.
+    // Om en bil finns i allowed_plates men saknar en post i car_data (t.ex. TDG14N),
+    // kommer carDataResult.data vara null. Vi sätter då en standardtext.
+    const carModel = carDataResult.data?.brand_model || 'Modell saknas'; 
+    
+    // Nu bygger vi vårt svarsobjekt. Om data saknas blir fälten null eller en tom array.
     const combinedData: DamageCardData = {
       regnr: normalized,
-      carModel: carDataResult.data?.brand_model || null,
+      carModel: carModel,
       hjulförvaring: damageViewResult.data?.hjulförvaring || null,
       saludatum: damageViewResult.data?.saludatum || null,
+      // Om 'skador' är null eller undefined från vyn, returnera en tom array.
       skador: Array.isArray(damageViewResult.data?.skador) ? damageViewResult.data.skador.filter(Boolean) : [],
     };
-
+    
+    // Denna funktion kommer ALLTID att returnera ett objekt, så länge reg.nr är giltigt.
+    // Detta förhindrar "hittades inte"-felet.
     return combinedData;
 
   } catch (err) {
-    console.error(`Exception during combined fetch for ${normalized}:`, err);
-    return null;
+    console.error(`Exception during robust fetch for ${normalized}:`, err);
+    return null; // Returnera null bara vid ett totalt haveri.
   }
 }
