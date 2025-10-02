@@ -7,7 +7,7 @@ import { notifyCheckin } from '@/lib/notify';
 
 
 // =================================================================
-// 1. DATA, TYPES & HELPERS (från originalfilen)
+// 1. DATA, TYPES & HELPERS
 // =================================================================
 
 const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
@@ -43,11 +43,6 @@ const CAR_PARTS: Record<string, string[]> = {
   'Glas': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'], 'Grill': [], 'Motorhuv': ['Utsida'],
   'Skärm': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'], 'Stötfångare fram': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
   'Tak': [], 'Tröskel': ['Höger', 'Vänster'], 'Yttre backspegel': ['Höger', 'Vänster']
-};
-
-type CarData = {
-  regnr: string; brand_model: string | null; damage_text: string | null; damage_location: string | null;
-  damage_notes: string | null; wheelstorage: string | null; saludatum: string | null;
 };
 
 type MediaFile = {
@@ -96,128 +91,78 @@ function partitionMediaByType(files: MediaFile[]) {
 async function uploadAllForDamage(damage: { id: string; media?: MediaFile[] }, reg: string): Promise<{ photo_urls: string[]; video_urls: string[] }> {
     if (!damage.media) return { photo_urls: [], video_urls: [] };
     const { photos, videos } = partitionMediaByType(damage.media);
-    const photo_urls = await Promise.all(photos.map(f => uploadOne(f, reg, damage.id)));
-    const video_urls = await Promise.all(videos.map(f => uploadOne(f, reg, damage.id)));
-    return { photo_urls, video_urls };
+    const [photoUploads, videoUploads] = await Promise.all([
+        Promise.all(photos.map(p => uploadOne(p, reg, damage.id))),
+        Promise.all(videos.map(v => uploadOne(v, reg, damage.id))),
+    ]);
+    return { photo_urls: photoUploads, video_urls: videoUploads };
 }
 
-const getRelevantCarParts = (damageType: string): string[] => {
-  if (!damageType) return Object.keys(CAR_PARTS).sort();
-  const lowerType = damageType.toLowerCase();
-  if (lowerType.includes('däckskada') || lowerType.includes('punktering')) return ['Däck'];
-  if (lowerType.includes('fälgskada')) return ['Fälg'];
-  if (lowerType.includes('ruta') || lowerType.includes('stenskott')) return ['Glas', 'Motorhuv', 'Tak'].sort();
-  if (lowerType.includes('krock')) return ['Stötfångare fram', 'Skärm', 'Dörr utsida', 'Bagagelucka', 'Motorhuv'].sort();
-  if (lowerType.includes('höjdled')) return ['Tak', 'Motorhuv', 'Bagagelucka'].sort();
-  return Object.keys(CAR_PARTS).sort();
-};
+function getRelevantCarParts(damageType: string): string[] {
+    const lowerCaseDamage = damageType.toLowerCase();
+    if (lowerCaseDamage.includes('fälg')) return ['Fälg'];
+    if (lowerCaseDamage.includes('däck')) return ['Däck'];
+    if (lowerCaseDamage.includes('ruta')) return ['Glas'];
+    return Object.keys(CAR_PARTS);
+}
 
-const getFileType = (file: File): 'image' | 'video' => {
-  if (file.type.startsWith('image/')) return 'image';
-  if (file.type.startsWith('video/')) return 'video';
-  return 'image';
-};
+const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
 
-const createVideoThumbnail = (file: File): Promise<string> => {
-  return new Promise((resolve) => {
-    const video = document.createElement('video');
+const createVideoThumbnail = (file: File): Promise<string> => new Promise(resolve => {
+  const video = document.createElement('video');
+  video.src = URL.createObjectURL(file);
+  video.onloadeddata = () => {
+    video.currentTime = 1;
+  };
+  video.onseeked = () => {
     const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return resolve('');
-    video.addEventListener('loadedmetadata', () => {
-      video.currentTime = 0.5;
-    });
-    video.addEventListener('seeked', () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      URL.revokeObjectURL(video.src);
-      resolve(dataUrl);
-    });
-    video.addEventListener('error', () => {
-      URL.revokeObjectURL(video.src);
-      resolve('');
-    });
-    video.src = URL.createObjectURL(file);
-  });
-};
+    if (!ctx) {
+      resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNlNWU3ZWIiLz48cGF0aCBkPSJNNTAgNDBMMzUgNTUgTDUwIDcwWiIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjYjdiN2I3IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNNzAgNDBMODUgNTUgTDcwIDcwWiIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjYjdiN2I3IiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=');
+      return;
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    resolve(canvas.toDataURL());
+    URL.revokeObjectURL(video.src);
+  };
+  video.onerror = () => {
+    resolve('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgdmlld0JveD0iMCAwIDEyMCAxMjAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjEyMCIgaGVpZ2h0PSIxMjAiIGZpbGw9IiNlNWU3ZWIiLz48cGF0aCBkPSJNNTAgNDBMMzUgNTUgTDUwIDcwWiIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjYjdiN2I3IiBzdHJva2Utd2lkdGg9IjIiLz48cGF0aCBkPSJNNzAgNDBMODUgNTUgTDcwIDcwWiIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjYjdiN2I3IiBzdHJva2Utd2lkdGg9IjIiLz48L3N2Zz4=');
+    URL.revokeObjectURL(video.src);
+  };
+});
 
-const processFiles = async (files: File[]): Promise<MediaFile[]> => {
-  return Promise.all(Array.from(files).map(async file => {
+const processFiles = async (files: FileList): Promise<MediaFile[]> => {
+  const processed = await Promise.all(Array.from(files).map(async file => {
     const type = getFileType(file);
-    const mediaFile: MediaFile = { file, type };
-    if (type === 'image') {
-      mediaFile.preview = URL.createObjectURL(file);
-    } else if (type === 'video') {
-      mediaFile.thumbnail = await createVideoThumbnail(file).catch(() => undefined);
+    if (type === 'video') {
+      const thumbnail = await createVideoThumbnail(file);
+      return { file, type, thumbnail };
     }
-    return mediaFile;
+    return { file, type, preview: URL.createObjectURL(file) };
   }));
+  return processed;
 };
-
-const createCombinedDamageText = (skadetyp: string, plats: string, notering: string): string => {
-    const parts = [skadetyp?.trim(), plats?.trim(), notering?.trim() ? `(${notering.trim()})` : '']
-        .filter(p => p && p !== skadetyp?.trim() || parts.length === 0)
-        .filter(Boolean);
-    return parts.length > 0 ? parts.join(' - ') : 'Okänd skada';
-};
-
-const getColumnValue = (row: any, primaryKey: string, alternativeKeys: string[] = []): string | null => {
-    if (row && row[primaryKey] != null && row[primaryKey] !== '') return String(row[primaryKey]).trim();
-    for (const altKey of alternativeKeys) {
-        if (row && row[altKey] != null && row[altKey] !== '') return String(row[altKey]).trim();
-    }
-    return null;
-};
-
-
 // =================================================================
-// HUVUDKOMPONENT
+// 2. MAIN COMPONENT
 // =================================================================
 
 export default function CheckInForm() {
+  // State
   const [firstName, setFirstName] = useState('');
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        const email = user?.email || '';
-        const raw = (email.split('@')[0] || '').split('.')[0] || '';
-        setFirstName(raw ? raw[0].toUpperCase() + raw.slice(1).toLowerCase() : 'du');
-      } catch { setFirstName('du'); }
-    })();
-  }, []);
-
-  const [viewWheelStorage, setViewWheelStorage] = useState<string>('---');
-  const [viewSaludatum, setViewSaludatum] = useState<string | null>(null);
-  const [damages, setDamages] = useState<string[]>([]);
-  const [loadingDamage, setLoadingDamage] = useState(false);
-
+  const [viewWheelStorage, setViewWheelStorage] = useState(false);
   const [regInput, setRegInput] = useState('');
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const reg = params.get('reg');
-    if (reg) setRegInput(reg.toUpperCase());
-  }, []);
-
-  const [carData, setCarData] = useState<CarData[]>([]);
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [isFinalSaving, setIsFinalSaving] = useState(false);
-  const [isDraftSaving, setIsDraftSaving] = useState(false);
-
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [damageToFix, setDamageToFix] = useState<string | null>(null);
-  const [showFinalConfirmation, setShowFinalConfirmation] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
-  const [carModel, setCarModel] = useState<string>('');
-
+  const [carModel, setCarModel] = useState<string | null>(null);
   const [matarstallning, setMatarstallning] = useState('');
   const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
   const [tankniva, setTankniva] = useState<'återlämnades_fulltankad' | 'tankad_nu' | null>(null);
@@ -227,7 +172,6 @@ export default function CheckInForm() {
   const [laddniva, setLaddniva] = useState('');
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   const [behoverRekond, setBehoverRekond] = useState(false);
-
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [insynsskyddOK, setInsynsskyddOK] = useState(false);
   const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
@@ -239,645 +183,484 @@ export default function CheckInForm() {
   const [spolarvatskaOK, setSpolarvatskaOK] = useState(false);
   const [adblueOK, setAdblueOK] = useState(false);
 
-  const isChecklistComplete = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && washed && spolarvatskaOK && (drivmedelstyp !== 'bensin_diesel' || adblueOK);
-
-  const [skadekontroll, setSkadekontroll] = useState<'ej_skadekontrollerad' | 'nya_skador' | 'inga_nya_skador' | null>(null);
+  const [skadekontroll, setSkadekontroll] = useState<'inga_nya_skador' | 'nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // Derived State & Memos
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
+  const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
+  const suggestions = useMemo(() => {
+    if (regInput.length < 2) return [];
+    return allRegistrations.filter(r => r.toUpperCase().includes(regInput.toUpperCase())).slice(0, 5);
+  }, [regInput, allRegistrations]);
+
+  const isChecklistComplete = useMemo(() => {
+    const commonChecks = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && washed && spolarvatskaOK;
+    return drivmedelstyp === 'bensin_diesel' ? commonChecks && adblueOK : commonChecks;
+  }, [insynsskyddOK, dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, washed, spolarvatskaOK, adblueOK, drivmedelstyp]);
+
+  const formIsValidState = useMemo(() => {
+    if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null) return false;
+    if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
+    if (drivmedelstyp === 'elbil' && !laddniva) return false;
+    if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
+    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
+    return isChecklistComplete;
+  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete]);
+
+  // Effects
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setFirstName(user?.user_metadata?.first_name || user?.email || 'Okänd');
+    };
+    getUser();
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reg = params.get('reg');
+    if (reg) {
+      setRegInput(reg.toUpperCase());
+    }
+  }, []);
 
   useEffect(() => {
     async function fetchAllRegistrations() {
-      try {
-        const [viewResult, carResult] = await Promise.all([
-          supabase.from('mabi_damage_view').select('regnr').order('regnr'),
-          supabase.from('car_data').select('regnr').order('regnr'),
-        ]);
-        const allRegs = new Set<string>();
-        if (!viewResult.error) viewResult.data?.forEach((item: any) => item.regnr && allRegs.add(String(item.regnr).toUpperCase()));
-        if (!carResult.error) carResult.data?.forEach((item: any) => item.regnr && allRegs.add(String(item.regnr).toUpperCase()));
-        setAllRegistrations(Array.from(allRegs).sort());
-      } catch (err) { console.warn('Could not fetch registrations:', err); }
+      const { data, error } = await supabase.from('regnr').select('reg');
+      if (error) console.error("Could not fetch registrations", error);
+      else setAllRegistrations(data.map(item => item.reg));
     }
     fetchAllRegistrations();
   }, []);
 
-  const suggestions = useMemo(() => {
-    if (!regInput.trim() || regInput.trim().length < 2) return [];
-    const input = regInput.toUpperCase();
-    return allRegistrations.filter(reg => reg.includes(input)).slice(0, 5);
-  }, [regInput, allRegistrations]);
-
   useEffect(() => {
-    if (!normalizedReg || normalizedReg.length < 6) {
-      setCarData([]); setExistingDamages([]); setNotFound(false); setCarModel('');
+    if (normalizedReg.length < 6) {
+      setCarModel(null);
+      setExistingDamages([]);
       return;
     }
-    let cancelled = false;
-    const fetchCarData = async () => {
-      setLoading(true); setNotFound(false);
+    const fetch = async () => {
+      setLoading(true);
+      setNotFound(false);
       try {
-        const view = await fetchDamageCard(normalizedReg);
-        if (cancelled) return;
-
-        if (view) {
-            setCarModel(view.brand_model || 'Okänd modell');
-            setViewWheelStorage(view.wheelstorage || 'Ingen info');
-            const parsedDamages = (view.skador || []).map((text, index) => ({
-                id: `mabi-${index}`, skadetyp: '', plats: '', notering: '', fullText: text,
-                shortText: text.substring(0, 50), status: 'not_selected' as const,
-            }));
-            setExistingDamages(parsedDamages);
+        const data = await fetchDamageCard(normalizedReg);
+        if (data) {
+          setCarModel(data.carModel);
+          setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
+          setViewWheelStorage(data.viewWheelStorage);
         } else {
-            setNotFound(true);
-            setCarModel('');
-            setViewWheelStorage('---');
-            setExistingDamages([]);
+          setNotFound(true);
+          setCarModel(null);
+          setExistingDamages([]);
         }
-      } catch (err) {
-        if (!cancelled) { console.error('Fetch error:', err); setNotFound(true); setCarData([]); setExistingDamages([]); }
+      } catch (error) {
+        console.error(error);
+        setNotFound(true);
+      } finally {
+        setLoading(false);
       }
-      if (!cancelled) setLoading(false);
     };
-    const timeout = setTimeout(fetchCarData, 300);
-    return () => { cancelled = true; clearTimeout(timeout); };
+    const timer = setTimeout(fetch, 300);
+    return () => clearTimeout(timer);
   }, [normalizedReg]);
 
-  const availableStations = ort ? STATIONER[ort] || [] : [];
-  
-  const isFormValid = () => {
-    if (!regInput || !ort || !station || !matarstallning || !drivmedelstyp || !hjultyp || skadekontroll === null || skadekontroll === 'ej_skadekontrollerad') return false;
-    if (drivmedelstyp === 'bensin_diesel' && !tankniva) return false;
-    if (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) return false;
-if (drivmedelstyp === 'elbil' && !laddniva) return false;
-    if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
-    const documentedDamages = existingDamages.filter(d => d.status === 'documented');
-    if (documentedDamages.some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
-    return isChecklistComplete;
-  };
-  const formIsValidState = isFormValid();
-
+  // Handlers
   const handleShowErrors = () => {
     setShowFieldErrors(true);
-    setTimeout(() => {
-      const firstError = document.querySelector('[data-error="true"]');
-      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
+    const firstError = document.querySelector('.card[data-error="true"]');
+    if (firstError) {
+      firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   };
 
   const resetForm = () => {
-    setRegInput(''); setCarData([]); setExistingDamages([]); setDamages([]); setCarModel('');
-    setShowSuggestions(false); setShowConfirmDialog(false); setDamageToFix(null);
-    setShowFinalConfirmation(false); setShowFieldErrors(false); setNotFound(false);
-    setOrt(''); setStation('');
-    setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null); setLiters('');
-    setBransletyp(null); setLiterpris(''); setLaddniva('');
-    setHjultyp(null); setBehoverRekond(false);
-    setSkadekontroll(null); setNewDamages([]); setPreliminarAvslutNotering('');
-    setShowSuccessModal(false); setInsynsskyddOK(false); setDekalDjurRokningOK(false);
-    setIsskrapaOK(false); setPskivaOK(false); setSkyltRegplatOK(false);
-    setDekalGpsOK(false); setWashed(false); setSpolarvatskaOK(false); setAdblueOK(false);
+    setRegInput('');
+    setCarModel(null);
+    setExistingDamages([]);
+    setOrt('');
+    setStation('');
+    setMatarstallning('');
+    setDrivmedelstyp(null);
+    setTankniva(null);
+    setLiters('');
+    setBransletyp(null);
+    setLiterpris('');
+    setLaddniva('');
+    setHjultyp(null);
+    setBehoverRekond(false);
+    setInsynsskyddOK(false);
+    setDekalDjurRokningOK(false);
+    setIsskrapaOK(false);
+    setPskivaOK(false);
+    setSkyltRegplatOK(false);
+    setDekalGpsOK(false);
+    setWashed(false);
+    setSpolarvatskaOK(false);
+    setAdblueOK(false);
+    setSkadekontroll(null);
+    setNewDamages([]);
+    setPreliminarAvslutNotering('');
+    setShowFieldErrors(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCancel = () => { if (window.confirm('Är du säker? Alla ifyllda data kommer att raderas.')) resetForm(); };
-
-const handleSaveDraft = async () => {
-    if (!regInput.trim()) {
-        alert('Registreringsnummer måste fyllas i för att kunna spara ett utkast.');
-        return;
+  const handleCancel = () => {
+    if (window.confirm("Är du säker? Alla ifyllda data kommer att raderas.")) {
+      resetForm();
     }
-    setIsDraftSaving(true);
-    try {
-        const dbRegion = ORT_TILL_REGION[ort as keyof typeof ORT_TILL_REGION] ?? null;
+  };
 
-        // Data som ska sparas, med null om värdet saknas
-        const draftData = {
-            region: dbRegion,
-            city: ort || null,
-            station: station || null,
-            odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
-            fuel_type: drivmedelstyp,
-            fuel_level_at_return: tankniva,
-            fuel_liters_added: liters || null,
-            fuel_type_added: bransletyp,
-            fuel_price_per_liter: literpris || null,
-            charge_level_at_return: laddniva || null,
-            tire_type: hjultyp,
-            rekond_behov: behoverRekond,
-            has_new_damages: skadekontroll === 'nya_skador',
-            privacy_cover_ok: insynsskyddOK,
-            dekal_djur_rokning_ok: dekalDjurRokningOK,
-            ice_scraper_ok: isskrapaOK,
-            parking_disc_ok: pskivaOK,
-            reg_plate_holder_ok: skyltRegplatOK,
-            gps_decal_ok: dekalGpsOK,
-            car_washed: washed,
-            washer_ok: spolarvatskaOK,
-            adblue_ok: adblueOK,
-            notes: preliminarAvslutNotering.trim() || null,
-        };
-
-        // Steg 1: Hitta befintligt utkast eller skapa ett nytt checkin-objekt
-        let checkinId;
-        const { data: existingDraft } = await supabase
-            .from('checkins')
-            .select('id')
-            .eq('regnr', normalizedReg)
-            .eq('status', 'draft')
-            .single();
-
-        if (existingDraft) {
-            checkinId = existingDraft.id;
-            const { error } = await supabase.from('checkins').update(draftData).eq('id', checkinId);
-            if (error) throw error;
-        } else {
-            const { data: newCheckin, error } = await supabase.from('checkins').insert({
-                ...draftData,
-                regnr: normalizedReg,
-                status: 'draft',
-            }).select('id').single();
-            if (error) throw error;
-            checkinId = newCheckin.id;
-        }
-
-        // Steg 2: Ta bort gamla skador kopplade till utkastet för att undvika dubbletter
-        await supabase.from('checkin_damages').delete().eq('checkin_id', checkinId);
-
-        // Steg 3: Ladda upp media och spara alla nuvarande skador
-        const allDamagesToSave = [
-            ...existingDamages.filter(d => d.status === 'documented'),
-            ...newDamages
-        ];
-
-        for (const damage of allDamagesToSave) {
-            const isExisting = 'fullText' in damage;
-            const { photo_urls, video_urls } = await uploadAllForDamage({ id: damage.id, media: damage.media || [] }, normalizedReg);
-            
-            await supabase.from('checkin_damages').insert({
-                checkin_id: checkinId,
-                type: isExisting ? 'existing' : 'new',
-                damage_type_from_card: isExisting ? (damage as ExistingDamage).fullText : null,
-                damage_type: isExisting ? (damage as ExistingDamage).userType || null : damage.type || null,
-                car_part: isExisting ? (damage as ExistingDamage).userCarPart || null : damage.carPart || null,
-                position: isExisting ? (damage as ExistingDamage).userPosition || null : damage.position || null,
-                description: isExisting ? (damage as ExistingDamage).userDescription || null : damage.text || null,
-                photo_urls,
-                video_urls
-            });
-        }
-
-        alert('Utkast sparat!'); // Bekräftelse till användaren
-
-    } catch (e) {
-        console.error('Draft save failed:', e);
-        alert(`Något gick fel när utkastet skulle sparas: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-        setIsDraftSaving(false);
-    }
-};
   const handleSubmitFinal = async () => {
-    if (isFinalSaving || !formIsValidState) return handleShowErrors();
+    if (!formIsValidState) {
+      handleShowErrors();
+      return;
+    }
+    if (!confirmFinalSave()) return;
+
     setIsFinalSaving(true);
     try {
-      await confirmFinalSave();
+      const documentedExisting = await Promise.all(
+        existingDamages.filter(d => d.status === 'documented').map(async d => ({
+          ...d,
+          uploads: await uploadAllForDamage(d, normalizedReg)
+        }))
+      );
+
+      const createdNew = await Promise.all(
+        newDamages.map(async d => ({
+          ...d,
+          uploads: await uploadAllForDamage(d, normalizedReg)
+        }))
+      );
+
+      const payload = {
+        reg: normalizedReg, carModel, ort, station, matarstallning,
+        drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
+        laddning: { laddniva }, hjultyp, rekond: behoverRekond,
+        notering: preliminarAvslutNotering, incheckare: firstName,
+        region: ORT_TILL_REGION[ort] || 'Okänd',
+        nya_skador: createdNew,
+        dokumenterade_skador: documentedExisting,
+        åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
+      };
+      await notifyCheckin(payload);
+
       setShowSuccessModal(true);
-      setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
-    } catch (e) {
-      console.error('Final save failed:', e);
-      alert(`Något gick fel vid sparandet: ${e instanceof Error ? e.message : String(e)}`);
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        resetForm();
+      }, 3000);
+    } catch (error) {
+      console.error("Final save failed:", error);
+      alert("Något gick fel vid inskickningen. Vänligen försök igen.");
     } finally {
       setIsFinalSaving(false);
     }
   };
 
-  const confirmFinalSave = async () => {
-    // Lägg till detta block först i confirmFinalSave
-const { error: deleteError } = await supabase
-    .from('checkins')
-    .delete()
-    .eq('regnr', normalizedReg)
-    .eq('status', 'draft');
-
-if (deleteError) {
-    console.error("Could not delete old draft:", deleteError);
-    // Vi väljer att inte kasta ett fel här, för att inte blockera huvudflödet.
-}
-    const dbRegion = ORT_TILL_REGION[ort as keyof typeof ORT_TILL_REGION] ?? 'SYD';
-    const { data: checkin, error: checkinError } = await supabase.from('checkins').insert({
-        regnr: normalizedReg, region: dbRegion, city: ort, station, status: 'checked_in',
-        notes: preliminarAvslutNotering.trim() || null, odometer_km: Number.isFinite(parseInt(matarstallning)) ? parseInt(matarstallning) : null,
-        fuel_full: tankniva === 'återlämnades_fulltankad' ? true : null, washer_ok: spolarvatskaOK,
-        adblue_ok: drivmedelstyp === 'bensin_diesel' ? adblueOK : null, privacy_cover_ok: insynsskyddOK,
-        rekond_behov: behoverRekond, has_new_damages: skadekontroll === 'nya_skador', completed_at: new Date().toISOString(),
-    }).select().single();
-    if (checkinError) throw checkinError;
-
-    const allDamagesToSave = [
-        ...existingDamages.filter(d => d.status === 'documented'),
-        ...newDamages
-    ];
-
-    for (const damage of allDamagesToSave) {
-        const isExisting = 'fullText' in damage;
-        const { photo_urls, video_urls } = await uploadAllForDamage({ id: damage.id, media: damage.media || [] }, normalizedReg);
-        await supabase.from('checkin_damages').insert({
-            checkin_id: checkin.id,
-            type: isExisting ? 'existing' : 'new',
-            damage_type_from_card: isExisting ? damage.fullText : null,
-            damage_type: isExisting ? damage.userType : damage.type,
-            car_part: isExisting ? damage.userCarPart : damage.carPart,
-            position: isExisting ? damage.userPosition : damage.position,
-            description: isExisting ? damage.userDescription : damage.text,
-            photo_urls, video_urls
-        });
-    }
-
-    await notifyCheckin({
-        regnr: normalizedReg, region: dbRegion, station, time: new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }),
-        hasNewDamages: skadekontroll === 'nya_skador', needsRecond: behovRekond,
-    });
-  };
+  const confirmFinalSave = () => confirm("Är du säker på att du vill slutföra incheckningen? Informationen kommer att skickas och kan inte ändras.");
 
   const handleRegInputChange = (value: string) => {
-    const upperValue = value.toUpperCase();
-    setRegInput(upperValue);
-    setShowSuggestions(upperValue.length >= 2);
+    setRegInput(value.toUpperCase());
+    if (value.length > 1) setShowSuggestions(true);
   };
 
-  const selectSuggestion = (suggestion: string) => {
-    setRegInput(suggestion);
+  const selectSuggestion = (reg: string) => {
+    setRegInput(reg);
     setShowSuggestions(false);
   };
 
-const handleExistingDamageAction = (id: string, action: 'document' | 'resolve') => {
-    setExistingDamages(prev => prev.map(d => {
-        if (d.id === id) {
-            // Om vi klickar på samma knapp igen, återgå till "not_selected".
-            // Annars, byt till den nya statusen.
-            const newStatus = d.status === (action === 'document' ? 'documented' : 'resolved')
-                ? 'not_selected'
-                : (action === 'document' ? 'documented' : 'resolved');
-            return { ...d, status: newStatus };
+  const handleExistingDamageAction = (id: string, action: 'document' | 'resolve') => {
+    setExistingDamages(damages => damages.map(d => {
+      if (d.id !== id) return d;
+      if (action === 'resolve') {
+        if (d.status === 'resolved') return { ...d, status: 'not_selected' };
+        if (confirm(`Är du säker på att du vill markera skadan "${d.shortText}" som åtgärdad/hittas ej?`)) {
+          return { ...d, status: 'resolved' };
         }
         return d;
+      }
+      if (action === 'document') {
+        return { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' };
+      }
+      return d;
     }));
-};
+  };
 
   const updateDamageField = (id: string, field: string, value: any, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((prev: any[]) => prev.map(d => {
-        if (d.id === id) {
-            const updatedDamage = { ...d, [field]: value };
-            const typeField = isExisting ? 'userType' : 'type';
-            const carPartField = isExisting ? 'userCarPart' : 'carPart';
-            const positionField = isExisting ? 'userPosition' : 'position';
+    updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, [field]: value } : d));
+  };
 
-            if (field === typeField) { updatedDamage[carPartField] = ''; updatedDamage[positionField] = ''; }
-            if (field === carPartField) { updatedDamage[positionField] = ''; }
-            return updatedDamage;
-        }
-        return d;
+  const updateDamageMedia = async (id: string, files: FileList, isExisting: boolean) => {
+    const processed = await processFiles(files);
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
+  };
+
+  const removeDamageMedia = (id: string, index: number, isExisting: boolean) => {
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    updater((damages: any[]) => damages.map(d => {
+      if (d.id !== id) return d;
+      const newMedia = [...d.media];
+      newMedia.splice(index, 1);
+      return { ...d, media: newMedia };
     }));
   };
 
-  const updateDamageMedia = async (id: string, files: FileList | null, isExisting: boolean) => {
-    if (!files || files.length === 0) return;
-    const newMediaFiles = await processFiles(Array.from(files));
-    const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((prev: any[]) => prev.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...newMediaFiles] } : d));
+  const addDamage = () => {
+    setNewDamages(prev => [...prev, { id: `new_${Date.now()}`, type: '', carPart: '', position: '', text: '', media: [] }]);
   };
 
-  const removeDamageMedia = (damageId: string, mediaIndex: number, isExisting: boolean) => {
-    const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((prev: any[]) => prev.map(d => {
-        if (d.id === damageId) {
-            const newMedia = [...d.media];
-            const removedMedia = newMedia.splice(mediaIndex, 1)[0];
-            if (removedMedia.preview) URL.revokeObjectURL(removedMedia.preview);
-            if (removedMedia.thumbnail) URL.revokeObjectURL(removedMedia.thumbnail);
-            return { ...d, media: newMedia };
-        }
-        return d;
-    }));
+  const removeDamage = (id: string) => {
+    if (confirm("Är du säker på att du vill ta bort denna nya skada?")) {
+      setNewDamages(prev => prev.filter(d => d.id !== id));
+    }
   };
-
-  const addDamage = () => setNewDamages(prev => [...prev, { id: `new-${Date.now()}`, type: '', carPart: '', position: '', text: '', media: [] }]);
-  const removeDamage = (id: string) => setNewDamages(prev => prev.filter(d => d.id !== id));
 
   return (
     <div className="checkin-form">
       <GlobalStyles />
       {showSuccessModal && <SuccessModal />}
-        <Card data-error={showFieldErrors && !regInput}>
-          <SectionHeader title="Fordon" />
-          <div style={{position: 'relative'}}>
-            <Field label="Registreringsnummer *">
-              <input type="text" value={regInput} onChange={(e) => handleRegInputChange(e.target.value)} placeholder="ABC 123" autoComplete="off" className="reg-input" onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} />
-            </Field>
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="suggestions-dropdown">
-                {suggestions.map(s => <div key={s} onMouseDown={() => selectSuggestion(s)} className="suggestion-item">{s}</div>)}
+
+      <Card data-error={showFieldErrors && !regInput}>
+        <SectionHeader title="Fordon" />
+        <div style={{ position: 'relative' }}>
+          <Field label="Registreringsnummer *">
+            <input type="text" value={regInput} onChange={(e) => handleRegInputChange(e.target.value)} placeholder="ABC 123" autoComplete="off" className="reg-input" onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} />
+          </Field>
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="suggestions-dropdown">
+              {suggestions.map(s => <div key={s} onMouseDown={() => selectSuggestion(s)} className="suggestion-item">{s}</div>)}
+            </div>
+          )}
+        </div>
+        {loading && <p>Hämtar fordonsdata...</p>}
+        {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
+        {carModel && (
+          <div className="info-box">
+            <InfoRow label="Bilmodell:" value={carModel} />
+            <InfoRow label="Hjulförvaring:" value={viewWheelStorage ? 'Ja' : 'Nej'} />
+            {existingDamages.length > 0 && (
+              <div className="damage-list-info">
+                <span className="damage-list-label">Befintliga skador:</span>
+                {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
               </div>
             )}
           </div>
-          {loading && <p>Hämtar fordonsdata...</p>}
-          {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
-{carModel && (
-  <div className="info-box">
-    <InfoRow label="Bilmodell:" value={carModel} />
-    <InfoRow label="Hjulförvaring:" value={viewWheelStorage} />
-    {existingDamages.length > 0 && (
-      <div className="damage-list-info">
-        <span className="damage-list-label">Befintliga skador:</span>
-        {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
+        )}
+      </Card>
+
+      <Card data-error={showFieldErrors && (!ort || !station)}>
+        <SectionHeader title="Plats för incheckning" />
+        <div className="grid-2-col">
+          <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
+          <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
+        </div>
+      </Card>
+
+      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && !laddniva))}>
+        <SectionHeader title="Fordonsstatus" />
+        <SubSectionHeader title="Mätarställning" />
+        <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
+        <SubSectionHeader title="Däck som sitter på" />
+        <Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'}>Vinterdäck</ChoiceButton></div></Field>
+        <SubSectionHeader title="Tankning/Laddning" />
+        <Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'}>Elbil</ChoiceButton></div></Field>
+        {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><select value={tankniva || ''} onChange={e => setTankniva(e.target.value as any)}><option value="">Välj tankstatus</option><option value="återlämnades_fulltankad">Återlämnades fulltankad</option><option value="tankad_nu">Tankad nu</option></select></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><select value={bransletyp || ''} onChange={e => setBransletyp(e.target.value as any)}><option value="">Välj</option><option value="Bensin">Bensin</option><option value="Diesel">Diesel</option></select></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
+        {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
+      </Card>
+
+      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
+        <SectionHeader title="Skador" />
+        <SubSectionHeader title="Befintliga skador från skadekort" />
+        {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador registrerade på skadekortet.</p>}
+        <SubSectionHeader title="Skadekontroll" />
+        <Field label="Har bilen några nya skador? *"><div className="grid-2-col"><ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'}>Inga nya skador</ChoiceButton><ChoiceButton onClick={() => setSkadekontroll('nya_skador')} isActive={skadekontroll === 'nya_skador'}>Nya skador finns</ChoiceButton></div></Field>
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="primary" style={{ marginTop: '1rem' }}>+ Lägg till ny skada</Button></>)}
+      </Card>
+
+      <Card data-error={showFieldErrors && !isChecklistComplete}>
+        <SectionHeader title="Checklista" />
+        <ChoiceButton onClick={() => { if (!behoverRekond && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return; setBehoverRekond(!behoverRekond); }} isActive={behoverRekond} className="rekond-checkbox">⚠️ Behöver rekond</ChoiceButton>
+        <SubSectionHeader title="Allt måste vara OK för att slutföra" />
+        <div className="grid-2-col">
+          <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd OK</ChoiceButton>
+          <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal Djur/Rökning OK</ChoiceButton>
+          <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa OK</ChoiceButton>
+          <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva OK</ChoiceButton>
+          <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>Skylt Reg.plåt OK</ChoiceButton>
+          <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS OK</ChoiceButton>
+          <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
+          {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
+          <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Bilen tvättad</ChoiceButton>
+        </div>
+      </Card>
+
+      <Card>
+        <Field label="Kommentarer (frivilligt)">
+          <textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea>
+        </Field>
+      </Card>
+
+      <div className="form-actions">
+        <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
+        <Button onClick={formIsValidState ? handleSubmitFinal : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>
+          {!formIsValidState ? 'Visa saknad information' : (isFinalSaving ? 'Skickar in...' : 'Slutför incheckning')}
+        </Button>
       </div>
-    )}
-  </div>
-)}        </Card>
-
-        <Card data-error={showFieldErrors && (!ort || !station)}>
-          <SectionHeader title="Plats för incheckning" />
-          <div className="grid-2-col">
-            <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
-            <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
-          </div>
-        </Card>
-
-        <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && (!laddniva || !antalLaddkablar)))}>
-          <SectionHeader title="Fordonsstatus" />
-          <SubSectionHeader title="Mätarställning" />
-          <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
-          <SubSectionHeader title="Däck som sitter på" />
-<Field label="Däcktyp *">
-    <div className="grid-2-col">
-        <ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'}>Sommardäck</ChoiceButton>
-        <ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'}>Vinterdäck</ChoiceButton>
-    </div>
-</Field>          <SubSectionHeader title="Tankning/Laddning" />
-<Field label="Drivmedelstyp *">
-    <div className="grid-2-col">
-        <ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'}>Bensin/Diesel</ChoiceButton>
-        <ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'}>Elbil</ChoiceButton>
-    </div>
-</Field>          {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><select value={tankniva || ''} onChange={e => setTankniva(e.target.value as any)}><option value="">Välj tankstatus</option><option value="återlämnades_fulltankad">Återlämnades fulltankad</option><option value="tankad_nu">Tankad nu</option></select></Field>{tankniva === 'tankad_nu' && (<div className="grid-3-col"><Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="0.0" /></Field><Field label="Bränsle *"><select value={bransletyp || ''} onChange={e => setBransletyp(e.target.value as any)}><option value="">Välj</option><option value="Bensin">Bensin</option><option value="Diesel">Diesel</option></select></Field><Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="0.00" /></Field></div>)}</>)}
-          {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
-        </Card>
-
-        <Card data-error={showFieldErrors && (skadekontroll === null || skadekontroll === 'ej_skadekontrollerad' || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d=>d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
-            <SectionHeader title="Skador" />
-            <SubSectionHeader title="Befintliga skador från skadekort" />
-            {existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={(id, field, val) => updateDamageField(id, field, val, true)} onMediaUpdate={(id, files) => updateDamageMedia(id, files, true)} onMediaRemove={(id, index) => removeDamageMedia(id, index, true)} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador registrerade på skadekortet.</p>}
-            <SubSectionHeader title="Skadekontroll" />
-<Field label="Har bilen några nya skador? *">
-    <div className="grid-2-col">
-        <ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'}>Inga nya skador</ChoiceButton>
-        <ChoiceButton onClick={() => setSkadekontroll('nya_skador')} isActive={skadekontroll === 'nya_skador'}>Nya skador finns</ChoiceButton>
-    </div>
-</Field>
-            {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={(id, field, val) => updateDamageField(id, field, val, false)} onMediaUpdate={(id, files) => updateDamageMedia(id, files, false)} onMediaRemove={(id, index) => removeDamageMedia(id, index, false)} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="primary" style={{ marginTop: '1rem' }}>+ Lägg till ny skada</Button></>)}
-        </Card>
-
-        <Card data-error={showFieldErrors && !isChecklistComplete}>
-            <SectionHeader title="Checklista" />
- <ChoiceButton 
-     onClick={() => {
-         if (!behoverRekond && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return;
-         setBehoverRekond(!behoverRekond);
-     }} 
-     isActive={behoverRekond}
-     className="rekond-checkbox"
- >
-     ⚠️ Behöver rekond
- </ChoiceButton>            <SubSectionHeader title="Allt måste vara OK för att slutföra" />
-<div className="grid-2-col">
-    <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd OK</ChoiceButton>
-    <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal Djur/Rökning OK</ChoiceButton>
-    <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa OK</ChoiceButton>
-    <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva OK</ChoiceButton>
-    <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>Skylt Reg.plåt OK</ChoiceButton>
-    <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS OK</ChoiceButton>
-    <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
-    {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
-<ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Bilen tvättad</ChoiceButton></div>
-        </Card>
-
-        <Card><Field label="Kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea></Field></Card>
-
-<div className="form-actions">
-    <Button onClick={handleSaveDraft} variant="primary" disabled={isDraftSaving || isFinalSaving || !regInput}>
-        {isDraftSaving ? 'Sparar utkast...' : 'Spara utkast'}
-    </Button>
-    <Button onClick={handleCancel} variant="secondary" disabled={isDraftSaving || isFinalSaving}>
-        Avbryt
-    </Button>
-    <Button onClick={formIsValidState ? handleSubmitFinal : handleShowErrors} disabled={isDraftSaving || isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>
-        {!formIsValidState ? 'Visa saknad information' : (isFinalSaving ? 'Slutför...' : 'Slutför incheckning')}
-    </Button>
-</div>
     </div>
   );
 }
-
 // =================================================================
-// 4. ÅTERANVÄNDBARA KOMPONENTER (Struktur & Styling)
+// 3. REUSABLE SUB-COMPONENTS & STYLES
 // =================================================================
 
-const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) => (<div className="card" {...props}>{children}</div>);
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (<div className="section-header"><h2>{title}</h2></div>);
-const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => (<div className="sub-section-header"><h3>{title}</h3></div>);
-const Field: React.FC<React.PropsWithChildren<{ label?: string }>> = ({ label, children }) => (<div className="field">{label && <label>{label}</label>}{children}</div>);
-const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => (<div className="info-row"><span>{label}</span><span>{value}</span></div>);
-const RadioGroup: React.FC<React.PropsWithChildren<{}>> = ({ children }) => <div className="radio-group">{children}</div>;
-const Radio: React.FC<any> = ({ label, ...props }) => (<label className="radio-label"><input type="radio" {...props} />{label}</label>);
-const Checkbox: React.FC<any> = ({ label, className, ...props }) => {
-    return (
-        <label className={`checkbox-label ${className || ''}`}>
-            <input type="checkbox" {...props} />
-            {label}
-        </label>
-    );
-};
-const Button: React.FC<React.PropsWithChildren<any>> = ({ children, onClick, variant = 'primary', style, ...props }) => {
-    const variantClasses: Record<string, string> = {
-        primary: 'btn-primary', secondary: 'btn-secondary', success: 'btn-success',
-        danger: 'btn-danger', warning: 'btn-warning', disabled: 'btn-disabled',
-    };
-    return (<>
-        <button onClick={onClick} className={`btn ${variantClasses[variant]}`} style={style} {...props}>{children}</button>
-        <style jsx>{`
-          .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-          .btn-primary { background-color: var(--color-primary); color: white; }
-          .btn-secondary { background-color: var(--color-text-secondary); color: white; }
-          .btn-success { background-color: var(--color-success); color: white; }
-          .btn-danger { background-color: var(--color-danger); color: white; }
-          .btn-warning { background-color: var(--color-warning); color: var(--color-text); }
-          .btn-disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
-          .btn:hover:not(.btn-disabled) { filter: brightness(1.1); }
-        `}</style>
-    </>);
-};
+const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) => <div className="card" {...props}>{children}</div>;
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="section-header"><h2>{title}</h2></div>;
+const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
+const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
+const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <div className="info-row"><span>{label}</span><span>{value}</span></div>;
 
-const SuccessModal = () => (
-    <div className="modal-overlay">
-        <div className="modal-content">
-            <h2 className="modal-title">✓ Incheckning slutförd!</h2>
-            <p>Formuläret kommer nu att återställas.</p>
-        </div>
-        <style jsx>{`
-          .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100; }
-          .modal-content { background-color: white; padding: 2.5rem; border-radius: 12px; text-align: center; box-shadow: var(--shadow-md); }
-          .modal-title { color: var(--color-success); font-size: 1.5rem; margin-top:0; }
-        `}</style>
-    </div>
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object }>> = ({ onClick, variant = 'primary', disabled, children, style }) => (
+  <button onClick={onClick} className={`btn ${variant}`} disabled={disabled} style={style}>
+    {children}
+    <style jsx>{`
+      .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+      .btn.primary { background-color: var(--color-primary); color: white; }
+      .btn.secondary { background-color: var(--color-border); color: var(--color-text); }
+      .btn.success { background-color: var(--color-success); color: white; }
+      .btn.danger { background-color: var(--color-danger); color: white; }
+      .btn.warning { background-color: var(--color-warning); color: white; }
+      .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
+      .btn:not(:disabled):hover { filter: brightness(1.1); }
+    `}</style>
+  </button>
 );
 
-const DamageItem: React.FC<{damage: ExistingDamage | NewDamage, isExisting: boolean, onUpdate: (id: string, field: string, value: string) => void, onMediaUpdate: (id: string, files: FileList | null) => void, onMediaRemove: (id: string, index: number) => void, onRemove?: (id: string) => void, onAction?: (id: string, action: 'document' | 'resolve') => void}> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onRemove, onAction }) => {
-    const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
-    const statusClass = isExisting ? `damage-item--${(damage as ExistingDamage).status}` : 'damage-item--new';
-    
-    const handleMediaUpdate = (files: FileList | null) => onMediaUpdate(damage.id, files);
-    const handleMediaRemove = (index: number) => onMediaRemove(damage.id, index);
+const SuccessModal: React.FC = () => (
+  <>
+    <div className="modal-overlay" />
+    <div className="modal-content">
+      <div className="success-icon">✓</div>
+      <h3>Klart!</h3>
+      <p>Incheckningen har skickats.</p>
+    </div>
+    <style jsx>{`
+      .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
+      .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem 3rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); }
+      .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
+    `}</style>
+  </>
+);
 
-    const typeValue = isExisting ? (damage as ExistingDamage).userType || '' : (damage as NewDamage).type;
-    const carPartValue = isExisting ? (damage as ExistingDamage).userCarPart || '' : (damage as NewDamage).carPart;
-    const positionValue = isExisting ? (damage as ExistingDamage).userPosition || '' : (damage as NewDamage).position;
-    const descriptionValue = isExisting ? (damage as ExistingDamage).userDescription || '' : (damage as NewDamage).text;
-    
-    const typeField = isExisting ? 'userType' : 'type';
-    const carPartField = isExisting ? 'userCarPart' : 'carPart';
-    const positionField = isExisting ? 'userPosition' : 'position';
-    const descriptionField = isExisting ? 'userDescription' : 'text';
+const DamageItem: React.FC<{
+  damage: ExistingDamage | NewDamage;
+  isExisting: boolean;
+  onUpdate: (id: string, field: string, value: any, isExisting: boolean) => void;
+  onMediaUpdate: (id: string, files: FileList, isExisting: boolean) => void;
+  onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
+  onAction?: (id: string, action: 'document' | 'resolve') => void;
+  onRemove?: (id: string) => void;
+}> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove }) => {
+  const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
+  const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
 
-    return (<div className={`damage-item ${statusClass}`}>
-        <div className="damage-item-header">
-          <h4>{isExisting ? (damage as ExistingDamage).fullText : 'Ny skada'}</h4>
-          {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger" style={{padding: '0.25rem 0.5rem', fontSize: '0.75rem'}}>Ta bort</Button>}
-        </div>
+  return (
+    <div className={`damage-item ${resolved ? 'resolved' : ''}`}>
+      <div className="damage-item-header">
+        <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
         {isExisting && onAction && (
           <div className="damage-item-actions">
-            <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{flex: 1}}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve')} variant={(damage as ExistingDamage).status === 'resolved' ? 'warning' : 'secondary'} style={{flex: 1}}>Åtgärdad/Hittas ej</Button>
+            <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{ flex: 1 }}>Dokumentera</Button>
+            <Button onClick={() => onAction(damage.id, 'resolve')} variant={resolved ? 'warning' : 'secondary'} style={{ flex: 1 }}>Åtgärdad/Hittas ej</Button>
           </div>
         )}
-        {(isDocumented || !isExisting) && (
-          <div className="damage-item-details">
-            <div className="grid-2-col">
-              <Field label="Typ av skada *"><select value={typeValue} onChange={(e) => onUpdate(damage.id, typeField, e.target.value)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-              <Field label="Placering *"><select value={carPartValue} onChange={(e) => onUpdate(damage.id, carPartField, e.target.value)}><option value="">Välj placering</option>{getRelevantCarParts(typeValue).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            </div>
-            {carPartValue && CAR_PARTS[carPartValue]?.length > 0 &&
-                <Field label="Position"><select value={positionValue} onChange={(e) => onUpdate(damage.id, positionField, e.target.value)}><option value="">Välj position</option>{CAR_PARTS[carPartValue].map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            }
-            <Field label="Beskrivning (frivilligt)"><textarea value={descriptionValue} onChange={(e) => onUpdate(damage.id, descriptionField, e.target.value)} placeholder="Mer detaljer om skadan..." rows={3}></textarea></Field>
-            <MediaUpload onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} media={damage.media || []} videoRequired={!isExisting} photoRequired={true} />
+        {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}
+      </div>
+      {isDocumented && !resolved && (
+        <div className="damage-details">
+          <div className="grid-3-col">
+            <Field label="Typ av skada *"><select value={(damage as any).userType || ''} onChange={e => onUpdate(damage.id, 'userType', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
+            <Field label="Placering *"><select value={(damage as any).userCarPart || ''} onChange={e => onUpdate(damage.id, 'userCarPart', e.target.value, isExisting)}><option value="">Välj del</option>{getRelevantCarParts((damage as any).userType || '').map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+            <Field label="Position"><select value={(damage as any).userPosition || ''} onChange={e => onUpdate(damage.id, 'userPosition', e.target.value, isExisting)} disabled={!CAR_PARTS[(damage as any).userCarPart] || CAR_PARTS[(damage as any).userCarPart].length === 0}><option value="">Välj pos.</option>{(CAR_PARTS[(damage as any).userCarPart] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
           </div>
-        )}
-        <style jsx>{`
-            .damage-item { padding: 1rem; margin-bottom: 1rem; border: 1px solid var(--color-border); border-radius: 8px; transition: background-color 0.3s; }
-            .damage-item--not_selected { background-color: var(--color-card); }
-            .damage-item--documented { background-color: var(--color-success-light); }
-            .damage-item--resolved { background-color: var(--color-warning-light); }
-            .damage-item--new { background-color: #fff5f5; border-color: var(--color-danger); }
-            .damage-item-header { display: flex; justify-content: space-between; align-items: center; }
-            .damage-item-header h4 { font-weight: 600; margin: 0; }
-            .damage-item-actions { display: flex; gap: 0.5rem; margin: 1rem 0; }
-            .damage-item-details { margin-top: 1rem; border-top: 1px solid var(--color-border); padding-top: 1rem; }
-        `}</style>
-    </div>);
-};
-
-const MediaUpload: React.FC<{onMediaUpdate: (files: FileList | null) => void, onMediaRemove: (index: number) => void, media: MediaFile[], videoRequired: boolean, photoRequired: boolean}> = ({ onMediaUpdate, onMediaRemove, media, videoRequired, photoRequired }) => {
-    const hasImage = hasPhoto(media);
-    const hasVideoFile = hasVideo(media);
-    const photoInputId = `photo-${React.useId()}`;
-    const videoInputId = `video-${React.useId()}`;
-
-    return (
-        <div>
-            <div className="grid-2-col" style={{gap: '0.5rem', marginTop: '1rem'}}>
-                <MediaButton htmlFor={photoInputId} hasFile={hasImage} required={photoRequired}>📷 Ta foto *</MediaButton>
-                <MediaButton htmlFor={videoInputId} hasFile={hasVideoFile} required={videoRequired}>🎥 Spela in video{videoRequired ? ' *' : ''}</MediaButton>
-                <input type="file" accept="image/*" multiple capture="environment" id={photoInputId} onChange={e => onMediaUpdate(e.target.files)} style={{ display: 'none' }} />
-                <input type="file" accept="video/*" capture="environment" id={videoInputId} onChange={e => onMediaUpdate(e.target.files)} style={{ display: 'none' }} />
-            </div>
-            {media.length > 0 && (
-                <div className="media-preview-grid">
-                    {media.map((m, i) => (
-                        <div key={i} className="media-preview-item">
-                            <img src={m.preview || m.thumbnail} alt="media" />
-                            <button onClick={() => onMediaRemove(i)} className="media-remove-btn">×</button>
-                        </div>
-                    ))}
-                </div>
-            )}
-            <style jsx>{`
-                .media-preview-grid { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
-                .media-preview-item { position: relative; }
-                .media-preview-item img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; background-color: var(--color-disabled-light); }
-                .media-remove-btn { position: absolute; top: -5px; right: -5px; width: 20px; height: 20px; border-radius: 50%; background-color: var(--color-danger); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 20px; }
-            `}</style>
+          <Field label="Beskrivning (frivilligt)"><textarea value={(damage as any).userDescription || ''} onChange={e => onUpdate(damage.id, 'userDescription', e.target.value, isExisting)} placeholder="Mer detaljer om skadan..." rows={3}></textarea></Field>
+          <div className="media-section">
+            <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} required={true} label="Foto *" />
+            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} required={!isExisting} label={isExisting ? "Video (frivilligt)" : "Video *"} />
+          </div>
+          <div className="media-previews">
+            {damage.media?.map((m, i) => <MediaButton key={i} hasFile={true} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
+
+const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, required: boolean, label: string }> = ({ id, onUpload, required, label }) => (
+  <div className="media-upload">
+    <label htmlFor={id} className="media-label">{label}</label>
+    <input id={id} type="file" accept="image/*,video/*" capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} />
+  </div>
+);
+
+const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void, hasFile: boolean }>> = ({ children, onRemove, hasFile }) => (
+  <div className={`media-btn ${hasFile ? 'has-file' : ''}`}>
+    {children}
+    {onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}
+  </div>
+);
+
 const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string}> = ({ onClick, isActive, children, className }) => {
     return (
         <>
             <button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${className || ''}`}>
                 {children}
             </button>
-<style jsx>{`
-    .choice-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        padding: 0.85rem 1rem;
-        border-radius: 8px;
-        /* FIX: Standard är röd */
-        border: 2px solid var(--color-danger);
-        background-color: var(--color-danger-light);
-        color: var(--color-danger);
-        font-size: 0.9rem;
-        font-weight: 600;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-    .choice-btn:hover {
-        filter: brightness(1.05);
-    }
-    /* FIX: Aktiv är grön */
-    .choice-btn.active {
-        border-color: var(--color-success);
-        background-color: var(--color-success-light);
-        color: var(--color-success);
-    }
-    /* FIX: Särskild stil för rekond-knappen */
-    .rekond-checkbox {
-        margin-bottom: 1.5rem;
-        border-color: var(--color-danger) !important;
-        background-color: var(--color-danger-light) !important;
-        color: var(--color-danger) !important;
-    }
-    .rekond-checkbox.active {
-        border-color: var(--color-danger) !important;
-        background-color: var(--color-danger) !important;
-        color: white !important;
-    }
-`}</style>
+            <style jsx>{`
+                .choice-btn {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    padding: 0.85rem 1rem;
+                    border-radius: 8px;
+                    border: 2px solid var(--color-danger);
+                    background-color: var(--color-danger-light);
+                    color: var(--color-danger);
+                    font-size: 0.9rem;
+                    font-weight: 600;
+                    text-align: center;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                }
+                .choice-btn:hover {
+                    filter: brightness(1.05);
+                }
+                .choice-btn.active {
+                    border-color: var(--color-success);
+                    background-color: var(--color-success-light);
+                    color: var(--color-success);
+                }
+                .rekond-checkbox {
+                    margin-bottom: 1.5rem;
+                    border-color: var(--color-danger) !important;
+                    background-color: var(--color-danger-light) !important;
+                    color: var(--color-danger) !important;
+                }
+                .rekond-checkbox.active {
+                    border-color: var(--color-danger) !important;
+                    background-color: var(--color-danger) !important;
+                    color: white !important;
+                }
+            `}</style>
         </>
     );
-};
-const MediaButton: React.FC<React.PropsWithChildren<any>> = ({ htmlFor, hasFile, required, children }) => {
-    const baseStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%', padding: '0.75rem', borderRadius: '6px', fontSize: '0.875rem', textAlign: 'center', cursor: 'pointer', transition: 'background-color 0.2s', border: '1px dashed' };
-    const color = hasFile ? 'var(--color-success)' : (required ? 'var(--color-danger)' : 'var(--color-text-secondary)');
-    const bgColor = hasFile ? 'var(--color-success-light)' : (required ? 'var(--color-danger-light)' : 'transparent');
-    const borderColor = hasFile ? 'var(--color-success)' : (required ? 'var(--color-danger)' : 'var(--color-border)');
-    const fontWeight = hasFile ? 500 : 600;
-
-    return <label htmlFor={htmlFor} style={{ ...baseStyle, color, backgroundColor: bgColor, borderColor, fontWeight }}>{children}</label>;
 };
 
 const GlobalStyles = () => (
@@ -916,85 +699,22 @@ const GlobalStyles = () => (
         .info-row { display: flex; justify-content: space-between; font-size: 0.875rem; padding: 0.25rem 0; }
         .info-row span:first-child { font-weight: 600; }
         .damage-list-info { margin-top: 0.75rem; }
-.damage-list-label { font-weight: 600; display: block; margin-bottom: 0.25rem; }
-.damage-list-item { padding-left: 1rem; line-height: 1.4; }
-.rekond-checkbox { margin-bottom: 1.5rem; }
+        .damage-list-label { font-weight: 600; display: block; margin-bottom: 0.25rem; }
+        .damage-list-item { padding-left: 1rem; line-height: 1.4; font-size: 0.875rem;}
         .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
         .grid-3-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem; }
-        
-        .radio-group { display: flex; gap: 1.5rem; align-items: center; }
-        .radio-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
-
-        /* --- START: NY CSS FÖR CHECKBOX --- */
-        .checkbox-label {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
-            border: 2px solid var(--color-border);
-            background-color: var(--color-card);
-            cursor: pointer;
-            transition: all 0.2s ease-in-out;
-            font-weight: 500;
-        }
-        .checkbox-label:hover {
-            border-color: var(--color-primary);
-        }
-        .checkbox-label input[type="checkbox"] {
-            appearance: none;
-            -webkit-appearance: none;
-            margin: 0;
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--color-text-secondary);
-            border-radius: 4px;
-            display: grid;
-            place-content: center;
-            transition: all 0.1s ease-in-out;
-        }
-        .checkbox-label input[type="checkbox"]::before {
-            content: "";
-            width: 12px;
-            height: 12px;
-            transform: scale(0);
-            transition: 0.12s transform ease-in-out;
-            background-color: white;
-            -webkit-clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-        }
-        .checkbox-label input[type="checkbox"]:checked {
-            background-color: var(--color-success);
-            border-color: var(--color-success);
-        }
-        .checkbox-label input[type="checkbox"]:checked::before {
-            transform: scale(1);
-        }
-        /* --- SLUT: NY CSS FÖR CHECKBOX --- */
-
-        .rekond-box { padding: 1rem; background-color: var(--color-danger-light); border-radius: 8px; border: 1px solid var(--color-danger); margin-bottom: 1.5rem; }
-        .rekond-checkbox { 
-            border-color: var(--color-danger);
-            background-color: transparent;
-            color: var(--color-danger);
-            font-weight: 700;
-        }
-        .rekond-checkbox input[type="checkbox"] {
-            border-color: var(--color-danger);
-        }
-        .rekond-checkbox input[type="checkbox"]:checked {
-            background-color: var(--color-danger);
-            border-color: var(--color-danger);
-        }
-.form-actions {
-    margin-top: 2rem;
-    padding-top: 1.5rem;
-    border-top: 1px solid var(--color-border);
-    display: flex;
-    gap: 1rem;
-    justify-content: space-between; /* Ändrad från flex-end */
-    align-items: center;
-    padding-bottom: 3rem;
-}
-`}</style>
+        .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 3rem; }
+        .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
+        .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
+        .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; }
+        .damage-item-actions { display: flex; gap: 0.5rem; }
+        .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
+        .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-border); border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+        .media-label:hover { border-color: var(--color-primary); background-color: var(--color-primary-light); }
+        .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+        .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
+        .media-btn img { width: 100%; height: 100%; object-fit: cover; }
+        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(0,0,0,0.6); color: white; border: none; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; line-height: 20px; }
+    `}</style>
 )
