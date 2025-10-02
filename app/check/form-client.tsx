@@ -266,11 +266,13 @@ export default function CheckInForm() {
 
   useEffect(() => {
     async function fetchAllRegistrations() {
-      // *** KORRIGERING: Använder kolumnen 'regnr' från tabellen 'allowed_plates'. ***
-      const { data, error } = await supabase.from('allowed_plates').select('regnr');
+      // *** KORRIGERING: Anropar den säkra RPC-funktionen istället för att läsa tabellen direkt. ***
+      const { data, error } = await supabase.rpc('get_all_allowed_plates');
+
       if (error) {
-        console.error("Could not fetch registrations from 'allowed_plates'", error);
+        console.error("Could not fetch registrations via RPC:", error);
       } else if (data) {
+        // Mappa resultatet från RPC-anropet.
         setAllRegistrations(data.map(item => item.regnr));
       }
     }
@@ -281,7 +283,7 @@ export default function CheckInForm() {
   useEffect(() => {
     if (regInput.length >= 2 && allRegistrations.length > 0) {
       const filteredSuggestions = allRegistrations
-        .filter(r => r.toUpperCase().includes(regInput.toUpperCase()))
+        .filter(r => r && r.toUpperCase().includes(regInput.toUpperCase())) // Extra null-check för säkerhets skull
         .slice(0, 5);
       setSuggestions(filteredSuggestions);
     } else {
@@ -507,7 +509,6 @@ export default function CheckInForm() {
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              {/* *** KORRIGERING: Visar carModel igen. *** */}
               <InfoRow label="Bilmodell" value={vehicleData.carModel || '---'} />
               <InfoRow label="Hjulförvaring" value={vehicleData.hjulförvaring || '---'} />
               <InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
