@@ -62,6 +62,13 @@ type NewDamage = {
   id: string; type: string; carPart: string; position: string; text: string; media: MediaFile[];
 };
 
+type ConfirmDialogState = {
+    isOpen: boolean;
+    title: string;
+    text: string;
+    onConfirm: () => void;
+}
+
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
@@ -154,11 +161,13 @@ export default function CheckInForm() {
   const [regInput, setRegInput] = useState('');
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [isFinalSaving, setIsFinalSaving] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, title: '', text: '', onConfirm: () => {} });
 
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
@@ -187,18 +196,11 @@ export default function CheckInForm() {
   const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Derived State & Memos
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
-  const suggestions = useMemo(() => {
-    if (regInput.length < 2 || !showSuggestions) return [];
-    const upperInput = regInput.toUpperCase();
-    return allRegistrations.filter(r => r.toUpperCase().includes(upperInput)).slice(0, 5);
-  }, [regInput, allRegistrations, showSuggestions]);
-
+  
   const otherChecklistItemsOK = useMemo(() => {
      const common = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK;
      return drivmedelstyp === 'bensin_diesel' ? common && adblueOK : common;
@@ -229,45 +231,14 @@ export default function CheckInForm() {
       otherChecklistItemsOK: otherChecklistItemsOK,
   }), [normalizedReg, carModel, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
-  // Effects
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setFirstName(getFirstNameFromEmail(user?.email || ''));
-    };
-    getUser();
-  }, []);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const reg = params.get('reg');
-    if (reg) { 
-        const upperReg = reg.toUpperCase();
-        setRegInput(upperReg);
-    }
-  }, []); 
-
-  useEffect(() => {
-    async function fetchAllRegistrations() {
-      const { data, error } = await supabase.from('regnr').select('reg');
-      if (error) console.error("Could not fetch registrations", error);
-      else setAllRegistrations(data.map(item => item.reg));
-    }
-    fetchAllRegistrations();
-  }, []);
-
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
-    setCarModel(null);
-    setExistingDamages([]);
-    setViewWheelStorage(null);
     try {
         const data = await fetchDamageCard(reg);
         if (data) {
             setCarModel(data.carModel);
-            const damagesArray = Array.isArray(data.skador) ? data.skador : [];
-            setExistingDamages(damagesArray.map(d_text => ({ 
+            setExistingDamages(data.skador.map(d_text => ({ 
                 id: Math.random().toString(36).substring(2, 15), 
                 fullText: d_text,
                 shortText: d_text,
@@ -288,45 +259,61 @@ export default function CheckInForm() {
     }
   }, []);
 
+  // Effects
   useEffect(() => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    
-    const reg = normalizeReg(regInput);
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setFirstName(getFirstNameFromEmail(user?.email || ''));
+    };
+    getUser();
+  }, []);
 
-    if (reg.length === 0) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const reg = params.get('reg');
+    if (reg) { 
+        setRegInput(reg.toUpperCase());
+    }
+  }, []); 
+
+  useEffect(() => {
+    async function fetchAllRegistrations() {
+      const { data, error } = await supabase.from('regnr').select('reg');
+      if (error) console.error("Could not fetch registrations", error);
+      else setAllRegistrations(data.map(item => item.reg));
+    }
+    fetchAllRegistrations();
+  }, []);
+
+  // AUTOCOMPLETE HOOK 1: Manages the suggestion list
+  useEffect(() => {
+    if (regInput.length >= 2) {
+      const filteredSuggestions = allRegistrations
+        .filter(r => r.toUpperCase().includes(regInput.toUpperCase()))
+        .slice(0, 5);
+      setSuggestions(filteredSuggestions);
+    } else {
+      setSuggestions([]);
+    }
+  }, [regInput, allRegistrations]);
+
+  // AUTOCOMPLETE HOOK 2: Manages fetching full vehicle data (debounced)
+  useEffect(() => {
+    const normalized = normalizeReg(regInput);
+    
+    if (normalized.length < 6) {
       setCarModel(null);
       setExistingDamages([]);
       setNotFound(false);
-      setShowSuggestions(false);
+      setViewWheelStorage(null);
       return;
     }
-    
-    if (reg.length > 0 && reg.length < 6) {
-        setCarModel(null);
-        setExistingDamages([]);
-        setNotFound(false);
-    }
 
-    if (reg.length >= 2) {
-      setShowSuggestions(true);
-    } else {
-      setShowSuggestions(false);
-    }
-    
-    if (reg.length === 6) {
-      // setShowSuggestions(false); // BUGFIX: Removed this line to allow suggestions to persist
-      debounceTimeoutRef.current = setTimeout(() => {
-        fetchVehicleData(reg);
-      }, 300);
-    }
+    const timer = setTimeout(() => {
+      fetchVehicleData(normalized);
+    }, 300);
 
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
+    return () => clearTimeout(timer);
   }, [regInput, fetchVehicleData]);
 
 
@@ -350,7 +337,12 @@ export default function CheckInForm() {
   };
 
   const handleCancel = () => {
-    if (window.confirm("Är du säker? Alla ifyllda data kommer att raderas.")) resetForm();
+    setConfirmDialog({
+        isOpen: true,
+        title: 'Avbryt incheckning',
+        text: 'Är du säker? Alla ifyllda data kommer att raderas.',
+        onConfirm: resetForm
+    });
   };
 
   const confirmAndSubmit = async () => {
@@ -369,18 +361,11 @@ export default function CheckInForm() {
       );
       
       const submissionPayload = {
-          reg: normalizedReg,
-          carModel,
-          ort,
-          station,
-          matarstallning,
+          reg: normalizedReg, carModel, ort, station, matarstallning,
           drivmedel: drivmedelstyp,
           tankning: { tankniva, liters, bransletyp, literpris },
           laddning: { laddniva },
-          hjultyp,
-          rekond: behoverRekond,
-          notering: preliminarAvslutNotering,
-          incheckare: firstName,
+          hjultyp, rekond: behoverRekond, notering: preliminarAvslutNotering, incheckare: firstName,
           timestamp: new Date().toISOString(),
           dokumenterade_skador: documentedForUpload.map((d, i) => ({ ...d, uploads: documentedUploads[i], media: undefined })),
           nya_skador: newForUpload.map((d, i) => ({ ...d, uploads: newUploads[i], media: undefined })),
@@ -399,30 +384,35 @@ export default function CheckInForm() {
     }
   };
 
-  const handleRegInputChange = (value: string) => {
-    setRegInput(value.toUpperCase());
+  const handleExistingDamageAction = (id: string, action: 'document' | 'resolve', shortText: string) => {
+    if (action === 'resolve') {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Bekräfta åtgärd',
+            text: `Är du säker på att du vill markera skadan "${shortText}" som åtgärdad/hittas ej?`,
+            onConfirm: () => {
+                setExistingDamages(damages => damages.map(d => {
+                    if (d.id !== id) return d;
+                    return d.status === 'resolved' ? { ...d, status: 'not_selected' } : { ...d, status: 'resolved' };
+                }));
+            }
+        });
+    } else {
+        setExistingDamages(damages => damages.map(d => d.id === id ? { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' } : d));
+    }
   };
 
-  const selectSuggestion = (reg: string) => {
-    setRegInput(reg); 
-    setShowSuggestions(false);
-  };
-
-  const handleExistingDamageAction = (id: string, action: 'document' | 'resolve') => {
-    setExistingDamages(damages => damages.map(d => {
-      if (d.id !== id) return d;
-      if (action === 'resolve') {
-        if (d.status === 'resolved') return { ...d, status: 'not_selected' };
-        if (confirm(`Är du säker på att du vill markera skadan "${d.shortText}" som åtgärdad/hittas ej?`)) {
-          return { ...d, status: 'resolved' };
-        }
-        return d;
-      }
-      if (action === 'document') {
-        return { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' };
-      }
-      return d;
-    }));
+  const handleRekondClick = () => {
+    if (!behoverRekond) {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Bekräfta rekond',
+            text: 'Är du säker på att bilen behöver rekond? En extra avgift kan tillkomma.',
+            onConfirm: () => setBehoverRekond(true)
+        });
+    } else {
+        setBehoverRekond(false);
+    }
   };
 
   const updateDamageField = (id: string, field: string, value: any, isExisting: boolean) => {
@@ -451,9 +441,12 @@ export default function CheckInForm() {
   };
 
   const removeDamage = (id: string) => {
-    if (confirm("Är du säker på att du vill ta bort denna nya skada?")) {
-      setNewDamages(prev => prev.filter(d => d.id !== id));
-    }
+    setConfirmDialog({
+        isOpen: true,
+        title: 'Ta bort skada',
+        text: 'Är du säker på att du vill ta bort denna nya skada?',
+        onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id))
+    });
   };
 
   return (
@@ -462,6 +455,10 @@ export default function CheckInForm() {
       {isFinalSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
       {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
+      <ActionConfirmDialog
+        state={confirmDialog}
+        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
       
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
@@ -472,11 +469,31 @@ export default function CheckInForm() {
         <SectionHeader title="Fordon" />
         <div style={{ position: 'relative' }}>
           <Field label="Registreringsnummer *">
-            <input type="text" value={regInput} onChange={(e) => handleRegInputChange(e.target.value)} placeholder="ABC 123" autoComplete="off" className="reg-input" onFocus={() => regInput.length >= 2 && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} />
+            <input 
+              type="text" 
+              value={regInput} 
+              onChange={(e) => setRegInput(e.target.value.toUpperCase())}
+              onFocus={() => regInput.length >= 2 && setShowSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              placeholder="ABC 123" 
+              autoComplete="off" 
+              className="reg-input" 
+            />
           </Field>
-          {suggestions.length > 0 && (
+          {showSuggestions && suggestions.length > 0 && (
             <div className="suggestions-dropdown">
-              {suggestions.map(s => <div key={s} onMouseDown={() => selectSuggestion(s)} className="suggestion-item">{s}</div>)}
+              {suggestions.map(s => 
+                <div 
+                  key={s} 
+                  className="suggestion-item"
+                  onMouseDown={() => {
+                    setRegInput(s);
+                    setShowSuggestions(false);
+                  }}
+                >
+                  {s}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -484,15 +501,18 @@ export default function CheckInForm() {
         {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
         {carModel !== null && (
           <div className="info-box">
-            <InfoRow label="Bilmodell:" value={carModel || '---'} />
-            <InfoRow label="Hjulförvaring:" value={viewWheelStorage === null ? '---' : (viewWheelStorage ? 'Ja' : 'Nej')} />
+            <div className='info-grid'>
+              <InfoRow label="Bilmodell" value={carModel || '---'} />
+              <InfoRow label="Hjulförvaring" value={viewWheelStorage ? 'Ja' : '---'} />
+              <InfoRow label="Saludatum" value={'---'} />
+            </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
-                <span className="damage-list-label">Befintliga skador:</span>
+                <span className="info-label">Befintliga skador</span>
                 {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
               </div>
             )}
-            {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="damage-list-label">Befintliga skador:</span><div>- Inga kända skador</div></div>}
+            {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
           </div>
         )}
       </Card>
@@ -544,7 +564,7 @@ export default function CheckInForm() {
 
       <Card data-error={showFieldErrors && !isChecklistComplete}>
         <SectionHeader title="Checklista" />
-        <ChoiceButton onClick={() => { if (!behoverRekond && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return; setBehoverRekond(!behoverRekond); }} isActive={behoverRekond} className="rekond-checkbox">Behöver Rekond</ChoiceButton>
+        <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver Rekond</ChoiceButton>
         <SubSectionHeader title="Allt måste vara OK för att slutföra" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
@@ -582,7 +602,7 @@ const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) =>
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="section-header"><h2>{title}</h2></div>;
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
-const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <div className="info-row"><span>{label}</span><span>{value}</span></div>;
+const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
 
 const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object }>> = ({ onClick, variant = 'primary', disabled, children, style }) => (
   <button onClick={onClick} className={`btn ${variant}`} disabled={disabled} style={style}>{children}</button>
@@ -651,7 +671,6 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 <div className="confirm-summary">
                     <p>🚗 <strong>Fordon:</strong> {payload.reg} ({payload.carModel || '---'})</p>
                 </div>
-
                 <div className="confirm-summary">
                     <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
                 </div>
@@ -687,7 +706,7 @@ const DamageItem: React.FC<{
   onUpdate: (id: string, field: string, value: any, isExisting: boolean) => void;
   onMediaUpdate: (id: string, files: FileList, isExisting: boolean) => void;
   onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
-  onAction?: (id: string, action: 'document' | 'resolve') => void;
+  onAction?: (id: string, action: 'document' | 'resolve', shortText: string) => void;
   onRemove?: (id: string) => void;
 }> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove }) => {
   const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
@@ -708,8 +727,8 @@ const DamageItem: React.FC<{
         <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
         {isExisting && onAction && (
           <div className="damage-item-actions">
-            <Button onClick={() => onAction(damage.id, 'document')} variant={isDocumented ? 'success' : 'secondary'} style={{ flex: 1 }}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve')} variant={resolved ? 'warning' : 'secondary'} style={{ flex: 1 }}>Åtgärdad/Hittas ej</Button>
+            <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).shortText)} variant={isDocumented ? 'success' : 'secondary'} style={{ flex: 1 }}>Dokumentera</Button>
+            <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).shortText)} variant={resolved ? 'warning' : 'secondary'} style={{ flex: 1 }}>Åtgärdad/Hittas ej</Button>
           </div>
         )}
         {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}
@@ -753,6 +772,29 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
     <button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${isSet && !isActive ? 'disabled-choice' : ''} ${className || ''}`}>{children}</button>
 );
 
+const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
+    if (!state.isOpen) return null;
+
+    const handleConfirm = () => {
+        state.onConfirm();
+        onClose();
+    };
+
+    return (
+        <>
+            <div className="modal-overlay" onClick={onClose} />
+            <div className="modal-content confirm-modal">
+                <h3>{state.title}</h3>
+                <p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
+                <div className="modal-actions">
+                    <Button onClick={onClose} variant="secondary">Avbryt</Button>
+                    <Button onClick={handleConfirm} variant="danger">Bekräfta</Button>
+                </div>
+            </div>
+        </>
+    );
+};
+
 const GlobalStyles = () => (
     <style jsx global>{`
         :root {
@@ -784,10 +826,11 @@ const GlobalStyles = () => (
         .suggestion-item:hover { background-color: var(--color-primary-light); }
         .error-text { color: var(--color-danger); }
         .info-box { margin-top: 1rem; padding: 1rem; background-color: var(--color-primary-light); border-radius: 8px; }
-        .info-row { display: flex; justify-content: space-between; font-size: 0.875rem; padding: 0.25rem 0; }
-        .info-row span:first-child { font-weight: 600; }
-        .damage-list-info { margin-top: 0.75rem; }
-        .damage-list-label { font-weight: 600; display: block; margin-bottom: 0.25rem; }
+        .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; }
+        .info-label { font-weight: 600; font-size: 0.875rem; color: #1e3a8a; }
+        .info-row > span { font-size: 0.875rem; }
+        .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
+        .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
         .damage-list-item { padding-left: 1rem; line-height: 1.4; font-size: 0.875rem;}
         .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
         .grid-3-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem; }
@@ -800,12 +843,12 @@ const GlobalStyles = () => (
         .btn.warning { background-color: var(--color-warning); color: white; }
         .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
         .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
         .choice-btn:hover { filter: brightness(1.05); }
         .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
-        .rekond-checkbox { margin-bottom: 1.5rem; border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
-        .rekond-checkbox.active { border-color: var(--color-warning) !important; background-color: var(--color-warning) !important; color: white !important; }
+        .rekond-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
+        .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
         .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
         .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
         .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; }
