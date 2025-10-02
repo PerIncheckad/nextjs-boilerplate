@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { fetchDamageCard, normalizeReg } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
@@ -196,10 +196,14 @@ export default function CheckInForm() {
     return allRegistrations.filter(r => r.toUpperCase().includes(regInput.toUpperCase())).slice(0, 5);
   }, [regInput, allRegistrations]);
 
+  const otherChecklistItemsOK = useMemo(() => {
+     const common = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK;
+     return drivmedelstyp === 'bensin_diesel' ? common && adblueOK : common;
+  }, [insynsskyddOK, dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, adblueOK, drivmedelstyp]);
+
   const isChecklistComplete = useMemo(() => {
-    const commonChecks = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && washed && spolarvatskaOK;
-    return drivmedelstyp === 'bensin_diesel' ? commonChecks && adblueOK : commonChecks;
-  }, [insynsskyddOK, dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, washed, spolarvatskaOK, adblueOK, drivmedelstyp]);
+    return washed && otherChecklistItemsOK;
+  }, [washed, otherChecklistItemsOK]);
 
   const formIsValidState = useMemo(() => {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null) return false;
@@ -210,18 +214,15 @@ export default function CheckInForm() {
     return isChecklistComplete;
   }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete]);
 
-  const finalPayload = useMemo(() => ({
-      reg: normalizedReg, carModel, ort, station, matarstallning,
+  const finalPayloadForUI = useMemo(() => ({
+      reg: normalizedReg, carModel, matarstallning, hjultyp, rekond: behoverRekond,
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
-      laddning: { laddniva }, hjultyp, rekond: behoverRekond,
-      notering: preliminarAvslutNotering, incheckare: firstName,
-      nya_skador: newDamages.map(d => ({ ...d, media: undefined })),
-      dokumenterade_skador: existingDamages.filter(d => d.status === 'documented').map(d => ({ ...d, media: undefined })),
-      åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved').map(d => ({ ...d, media: undefined })),
-      timestamp: new Date().toISOString(),
-      isChecklistComplete: isChecklistComplete,
-  }), [normalizedReg, carModel, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, hjultyp, behoverRekond, preliminarAvslutNotering, firstName, newDamages, existingDamages, isChecklistComplete]);
-
+      laddning: { laddniva },
+      nya_skador: newDamages,
+      dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
+      washed: washed,
+      otherChecklistItemsOK: otherChecklistItemsOK,
+  }), [normalizedReg, carModel, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   // Effects
   useEffect(() => {
@@ -247,38 +248,41 @@ export default function CheckInForm() {
     fetchAllRegistrations();
   }, []);
 
-  useEffect(() => {
-    if (normalizedReg.length < 6) {
-      setCarModel(null);
-      setExistingDamages([]);
-      setNotFound(false);
-      return;
+  const fetchVehicleData = useCallback(async (reg: string) => {
+    if (reg.length < 6) {
+        setCarModel(null);
+        setExistingDamages([]);
+        setNotFound(false);
+        return;
     }
-
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      setNotFound(false);
-      try {
-        const data = await fetchDamageCard(normalizedReg);
+    setLoading(true);
+    setNotFound(false);
+    try {
+        const data = await fetchDamageCard(reg);
         if (data) {
-          setCarModel(data.carModel);
-          setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
-          setViewWheelStorage(data.viewWheelStorage);
+            setCarModel(data.carModel);
+            setExistingDamages(data.damages.map(d => ({ ...d, id: Math.random().toString(), status: 'not_selected' })));
+            setViewWheelStorage(data.viewWheelStorage);
         } else {
-          setNotFound(true);
-          setCarModel(null);
-          setExistingDamages([]);
+            setNotFound(true);
+            setCarModel(null);
+            setExistingDamages([]);
         }
-      } catch (error) {
+    } catch (error) {
         console.error(error);
         setNotFound(true);
-      } finally {
+    } finally {
         setLoading(false);
-      }
-    }, 300);
+    }
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [normalizedReg]);
+  useEffect(() => {
+      const debouncedFetch = setTimeout(() => {
+          fetchVehicleData(normalizedReg);
+      }, 500);
+
+      return () => clearTimeout(debouncedFetch);
+  }, [normalizedReg, fetchVehicleData]);
 
   // Handlers
   const handleShowErrors = () => {
@@ -309,6 +313,7 @@ export default function CheckInForm() {
     try {
       const documentedForUpload = existingDamages.filter(d => d.status === 'documented');
       const newForUpload = [...newDamages];
+      const resolvedDamages = existingDamages.filter(d => d.status === 'resolved');
 
       const documentedUploads = await Promise.all(
         documentedForUpload.map(d => uploadAllForDamage(d, normalizedReg))
@@ -318,9 +323,22 @@ export default function CheckInForm() {
       );
       
       const submissionPayload = {
-        ...finalPayload,
-        dokumenterade_skador: finalPayload.dokumenterade_skador.map((d, i) => ({ ...d, uploads: documentedUploads[i] })),
-        nya_skador: finalPayload.nya_skador.map((d, i) => ({ ...d, uploads: newUploads[i] })),
+          reg: normalizedReg,
+          carModel,
+          ort,
+          station,
+          matarstallning,
+          drivmedel: drivmedelstyp,
+          tankning: { tankniva, liters, bransletyp, literpris },
+          laddning: { laddniva },
+          hjultyp,
+          rekond: behoverRekond,
+          notering: preliminarAvslutNotering,
+          incheckare: firstName,
+          timestamp: new Date().toISOString(),
+          dokumenterade_skador: documentedForUpload.map((d, i) => ({ ...d, uploads: documentedUploads[i], media: undefined })),
+          nya_skador: newForUpload.map((d, i) => ({ ...d, uploads: newUploads[i], media: undefined })),
+          åtgärdade_skador: resolvedDamages.map(d => ({...d, media: undefined})),
       };
       
       await notifyCheckin(submissionPayload);
@@ -401,7 +419,7 @@ export default function CheckInForm() {
       <GlobalStyles />
       {isFinalSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
-      {showConfirmModal && <ConfirmModal payload={finalPayload} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
+      {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
       
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
@@ -470,6 +488,7 @@ export default function CheckInForm() {
         <ChoiceButton onClick={() => { if (!behoverRekond && !confirm('Är du säker på att bilen behöver rekond? (extra avgift kan tillkomma)')) return; setBehoverRekond(!behoverRekond); }} isActive={behoverRekond} className="rekond-checkbox">⚠️ Behöver rekond</ChoiceButton>
         <SubSectionHeader title="Allt måste vara OK för att slutföra" />
         <div className="grid-2-col">
+          <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
           <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd OK</ChoiceButton>
           <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal Djur/Rökning OK</ChoiceButton>
           <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa OK</ChoiceButton>
@@ -478,7 +497,6 @@ export default function CheckInForm() {
           <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS OK</ChoiceButton>
           <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
           {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
-          <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Bilen tvättad</ChoiceButton>
         </div>
       </Card>
 
@@ -537,7 +555,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
         
         return (
             <div className="confirm-damage-section">
-                <h4>{title}</h4>
+                <h4>{isNew ? <strong>{title}</strong> : title}</h4>
                 <ul>
                     {damages.map((d: any) => {
                         const type = isNew ? d.type : d.userType;
@@ -576,8 +594,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 </div>
                 
                 {renderDamageList(payload.nya_skador, true)}
-                {renderDamageList(payload.dokumenterade_skador, false)}
-
+                
                 {payload.rekond && (
                     <div className="confirm-summary">
                         <p className="rekond-highlight">⚠️ <strong>Rekond:</strong> Behövs</p>
@@ -587,7 +604,9 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 <div className="confirm-summary">
                     <p>🛣️ <strong>Mätarställning:</strong> ${payload.matarstallning} km</p>
                     <div dangerouslySetInnerHTML={{ __html: getTankningText() }} />
-                    {payload.isChecklistComplete && <p>✅ Tvättad och kontrollerad - allt OK!</p>}
+                    <p>🛞 <strong>Hjul:</strong> ${payload.hjultyp}</p>
+                    {payload.washed && <p><strong>✅ Tvättad</strong></p>}
+                    {payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
                 </div>
 
                 <div className="modal-actions">
@@ -739,10 +758,11 @@ const GlobalStyles = () => (
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
         .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); max-width: 90%; width: 600px; }
         .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
-        .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; }
+        .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+        .confirm-modal .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
         .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
         .confirm-modal .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
-        .confirm-damage-section { text-align: left; margin-bottom: 1rem; border-top: 1px solid var(--color-border); padding-top: 1rem; }
+        .confirm-damage-section { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1rem; }
         .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
         .confirm-damage-section li { margin-bottom: 0.25rem; }
