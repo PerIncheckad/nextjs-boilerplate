@@ -191,6 +191,9 @@ export default function CheckInForm() {
   const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
+  // A flag to prevent the debounced fetch from running on the initial render if a URL param is present.
+  const [initialUrlLoadHandled, setInitialUrlLoadHandled] = useState(false);
 
   // Derived State & Memos
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
@@ -226,7 +229,6 @@ export default function CheckInForm() {
       otherChecklistItemsOK: otherChecklistItemsOK,
   }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
-  // CORRECTED: Added dependencies to useCallback to prevent stale state.
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
@@ -252,7 +254,7 @@ export default function CheckInForm() {
     } finally {
         setLoading(false);
     }
-  }, []); // Dependencies are not strictly needed here as setters from useState are stable. But it's good practice.
+  }, []);
 
   // Effects
   useEffect(() => {
@@ -264,14 +266,6 @@ export default function CheckInForm() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const reg = params.get('reg');
-    if (reg) { 
-        setRegInput(reg.toUpperCase());
-    }
-  }, []); 
-
-  useEffect(() => {
     async function fetchAllRegistrations() {
       const { data, error } = await supabase.from('regnr').select('reg');
       if (error) console.error("Could not fetch registrations", error);
@@ -280,8 +274,7 @@ export default function CheckInForm() {
     fetchAllRegistrations();
   }, []);
 
-  // CORRECTED: This hook now ONLY depends on regInput and allRegistrations.
-  // It calculates suggestions whenever the user types.
+  // Autocomplete suggestion logic. This is separate and only cares about input text.
   useEffect(() => {
     if (regInput.length >= 2) {
       const filteredSuggestions = allRegistrations
@@ -293,10 +286,25 @@ export default function CheckInForm() {
     }
   }, [regInput, allRegistrations]);
 
-  // This hook handles the DEBOUNCED data fetching when the user stops typing a full reg number.
+  // UNIFIED useEffect for handling data fetching from either URL or manual input.
   useEffect(() => {
+    // This part runs only once when the component mounts
+    if (!initialUrlLoadHandled) {
+      const params = new URLSearchParams(window.location.search);
+      const regFromUrl = params.get('reg');
+      if (regFromUrl) {
+        const normalized = normalizeReg(regFromUrl);
+        setRegInput(normalized); // Set the input field
+        fetchVehicleData(normalized); // Fetch data immediately
+        setInitialUrlLoadHandled(true); // Mark as handled
+        return; // Exit the hook to prevent debounce logic from running
+      }
+      setInitialUrlLoadHandled(true); // Mark as handled even if no param
+    }
+
+    // This part handles manual user input with a debounce
     const normalized = normalizeReg(regInput);
-    
+
     if (normalized.length !== 6) {
       setVehicleData(null);
       setExistingDamages([]);
@@ -309,7 +317,7 @@ export default function CheckInForm() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [regInput, fetchVehicleData]);
+  }, [regInput, fetchVehicleData, initialUrlLoadHandled]);
 
 
   // Handlers
@@ -328,6 +336,7 @@ export default function CheckInForm() {
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
     setSpolarvatskaOK(false); setAdblueOK(false); setSkadekontroll(null);
     setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
+    window.history.pushState({}, '', window.location.pathname); // Clear URL params
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
