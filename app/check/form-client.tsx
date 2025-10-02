@@ -229,12 +229,10 @@ export default function CheckInForm() {
   }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   const fetchVehicleData = useCallback(async (reg: string) => {
-    console.log(`%c[DEBUG] Step 3: Calling fetchVehicleData for '${reg}'`, 'color: blue; font-weight: bold;');
     setLoading(true);
     setNotFound(false);
     try {
         const data = await fetchDamageCard(reg);
-        console.log(`%c[DEBUG] Step 4: fetchDamageCard returned:`, 'color: blue; font-weight: bold;', data);
         setVehicleData(data);
         if (data) {
             setExistingDamages(data.skador.map(d_text => ({ 
@@ -248,7 +246,7 @@ export default function CheckInForm() {
             setExistingDamages([]);
         }
     } catch (error) {
-        console.error("[DEBUG] Step 4 FAILED: fetchDamageCard threw an error:", error);
+        console.error("Fetch vehicle data error:", error);
         setNotFound(true);
         setVehicleData(null);
         setExistingDamages([]);
@@ -268,11 +266,11 @@ export default function CheckInForm() {
 
   useEffect(() => {
     async function fetchAllRegistrations() {
-      const { data, error } = await supabase.from('regnr').select('reg');
+      // *** KORRIGERING: Anropar 'allowed_plates' istället för 'regnr'. ***
+      const { data, error } = await supabase.from('allowed_plates').select('reg');
       if (error) {
-        console.error("[DEBUG] Step 1 FAILED: Could not fetch registrations", error);
+        console.error("Could not fetch registrations from 'allowed_plates'", error);
       } else {
-        console.log(`%c[DEBUG] Step 1: Fetched ${data.length} total registrations.`, 'color: green; font-weight: bold;');
         setAllRegistrations(data.map(item => item.reg));
       }
     }
@@ -281,11 +279,10 @@ export default function CheckInForm() {
 
   // Autocomplete suggestion logic.
   useEffect(() => {
-    if (regInput.length >= 2) {
+    if (regInput.length >= 2 && allRegistrations.length > 0) {
       const filteredSuggestions = allRegistrations
         .filter(r => r.toUpperCase().includes(regInput.toUpperCase()))
         .slice(0, 5);
-      console.log(`%c[DEBUG] Step 2: Input '${regInput}' generated ${filteredSuggestions.length} suggestions.`, 'color: orange; font-weight: bold;');
       setSuggestions(filteredSuggestions);
     } else {
       setSuggestions([]);
