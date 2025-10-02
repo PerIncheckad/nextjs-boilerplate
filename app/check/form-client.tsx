@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { fetchDamageCard, normalizeReg } from '@/lib/damages';
+import { fetchDamageCard, normalizeReg, DamageCardData } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
 
@@ -10,13 +10,7 @@ import { notifyCheckin } from '@/lib/notify';
 // 1. DATA, TYPES & HELPERS
 // =================================================================
 
-const MABI_LOGO_URL = "/mabi-logo.png"; // Använder lokal fil
-
-const ORT_TILL_REGION: Record<string, 'NORR' | 'MITT' | 'SYD'> = {
-  Varberg: 'NORR', Falkenberg: 'NORR', Halmstad: 'NORR',
-  Helsingborg: 'MITT', Ängelholm: 'MITT', Lund: 'SYD',
-  Sturup: 'SYD', Malmö: 'SYD', Trelleborg: 'SYD',
-};
+const MABI_LOGO_URL = "/mabi-logo.png";
 
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
@@ -52,7 +46,7 @@ type MediaFile = {
 };
 
 type ExistingDamage = {
-  id: string; skadetyp: string; plats: string; notering: string; fullText: string; shortText: string;
+  id: string; fullText: string; shortText: string;
   status: 'not_selected' | 'documented' | 'resolved';
   userType?: string; userCarPart?: string; userPosition?: string; userDescription?: string;
   media?: MediaFile[];
@@ -108,7 +102,7 @@ async function uploadAllForDamage(damage: { id: string; media?: MediaFile[] }, r
 }
 
 function getRelevantCarParts(damageType: string): string[] {
-    const lowerCaseDamage = damageType.toLowerCase();
+    const lowerCaseDamage = (damageType || '').toLowerCase();
     if (lowerCaseDamage.includes('fälg')) return ['Fälg'];
     if (lowerCaseDamage.includes('däck')) return ['Däck'];
     if (lowerCaseDamage.includes('ruta')) return ['Glas'];
@@ -157,7 +151,6 @@ const getFirstNameFromEmail = (email: string): string => {
 export default function CheckInForm() {
   // State
   const [firstName, setFirstName] = useState('');
-  const [viewWheelStorage, setViewWheelStorage] = useState<boolean | null>(null);
   const [regInput, setRegInput] = useState('');
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -169,9 +162,11 @@ export default function CheckInForm() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, title: '', text: '', onConfirm: () => {} });
 
+  // Vehicle data state
+  const [vehicleData, setVehicleData] = useState<DamageCardData | null>(null);
+
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
-  const [carModel, setCarModel] = useState<string | null>(null);
   const [matarstallning, setMatarstallning] = useState('');
   const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
   const [tankniva, setTankniva] = useState<'återlämnades_fulltankad' | 'tankad_nu' | null>(null);
@@ -220,7 +215,7 @@ export default function CheckInForm() {
   }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete]);
 
   const finalPayloadForUI = useMemo(() => ({
-      reg: normalizedReg, carModel, matarstallning, hjultyp, rekond: behoverRekond,
+      reg: normalizedReg, carModel: vehicleData?.carModel, matarstallning, hjultyp, rekond: behoverRekond,
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva },
       ort,
@@ -229,31 +224,30 @@ export default function CheckInForm() {
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
-  }), [normalizedReg, carModel, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
+  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
     try {
         const data = await fetchDamageCard(reg);
+        setVehicleData(data);
         if (data) {
-            setCarModel(data.carModel);
             setExistingDamages(data.skador.map(d_text => ({ 
                 id: Math.random().toString(36).substring(2, 15), 
                 fullText: d_text,
                 shortText: d_text,
                 status: 'not_selected',
-                skadetyp: '', 
-                plats: '',
-                notering: ''
             })));
-            setViewWheelStorage(data.viewWheelStorage);
         } else {
             setNotFound(true);
+            setExistingDamages([]);
         }
     } catch (error) {
         console.error("Fetch vehicle data error:", error);
         setNotFound(true);
+        setVehicleData(null);
+        setExistingDamages([]);
     } finally {
         setLoading(false);
     }
@@ -287,7 +281,7 @@ export default function CheckInForm() {
 
   // AUTOCOMPLETE HOOK 1: Manages the suggestion list
   useEffect(() => {
-    if (regInput.length >= 2) {
+    if (regInput.length >= 2 && showSuggestions) {
       const filteredSuggestions = allRegistrations
         .filter(r => r.toUpperCase().includes(regInput.toUpperCase()))
         .slice(0, 5);
@@ -295,17 +289,16 @@ export default function CheckInForm() {
     } else {
       setSuggestions([]);
     }
-  }, [regInput, allRegistrations]);
+  }, [regInput, allRegistrations, showSuggestions]);
 
   // AUTOCOMPLETE HOOK 2: Manages fetching full vehicle data (debounced)
   useEffect(() => {
     const normalized = normalizeReg(regInput);
     
     if (normalized.length < 6) {
-      setCarModel(null);
+      setVehicleData(null);
       setExistingDamages([]);
       setNotFound(false);
-      setViewWheelStorage(null);
       return;
     }
 
@@ -325,7 +318,7 @@ export default function CheckInForm() {
   };
 
   const resetForm = () => {
-    setRegInput(''); setCarModel(null); setExistingDamages([]); setOrt('');
+    setRegInput(''); setVehicleData(null); setExistingDamages([]); setOrt('');
     setStation(''); setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null);
     setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva('');
     setHjultyp(null); setBehoverRekond(false); setInsynsskyddOK(false);
@@ -361,7 +354,7 @@ export default function CheckInForm() {
       );
       
       const submissionPayload = {
-          reg: normalizedReg, carModel, ort, station, matarstallning,
+          reg: normalizedReg, carModel: vehicleData?.carModel, ort, station, matarstallning,
           drivmedel: drivmedelstyp,
           tankning: { tankniva, liters, bransletyp, literpris },
           laddning: { laddniva },
@@ -473,7 +466,7 @@ export default function CheckInForm() {
               type="text" 
               value={regInput} 
               onChange={(e) => setRegInput(e.target.value.toUpperCase())}
-              onFocus={() => regInput.length >= 2 && setShowSuggestions(true)}
+              onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="ABC 123" 
               autoComplete="off" 
@@ -499,12 +492,12 @@ export default function CheckInForm() {
         </div>
         {loading && <p>Hämtar fordonsdata...</p>}
         {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
-        {carModel !== null && (
+        {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={carModel || '---'} />
-              <InfoRow label="Hjulförvaring" value={viewWheelStorage ? 'Ja' : '---'} />
-              <InfoRow label="Saludatum" value={'---'} />
+              <InfoRow label="Bilmodell" value={vehicleData.carModel || '---'} />
+              <InfoRow label="Hjulförvaring" value={vehicleData.viewWheelStorage ? 'Ja' : '---'} />
+              <InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
             </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
@@ -553,7 +546,7 @@ export default function CheckInForm() {
       <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {carModel !== null && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>{carModel !== null ? 'Inga befintliga skador att visa.' : 'Fyll i reg.nr för att se befintliga skador.'}</p>}
+        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>{regInput.length >= 6 && !loading ? 'Inga befintliga skador att visa.' : 'Fyll i reg.nr för att se befintliga skador.'}</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
@@ -828,7 +821,7 @@ const GlobalStyles = () => (
         .info-box { margin-top: 1rem; padding: 1rem; background-color: var(--color-primary-light); border-radius: 8px; }
         .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; }
         .info-label { font-weight: 600; font-size: 0.875rem; color: #1e3a8a; }
-        .info-row > span { font-size: 0.875rem; }
+        .info-grid > span { font-size: 0.875rem; align-self: center; }
         .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
         .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
         .damage-list-item { padding-left: 1rem; line-height: 1.4; font-size: 0.875rem;}
