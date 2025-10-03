@@ -231,8 +231,11 @@ export async function POST(req: Request) {
         const bilkontrollHtml = createBilkontrollEmail(body);
         
         // --- Send Emails ---
+        // **ÅTERSTÄLLD AVSÄNDARE**
+        const fromAddress = 'onboarding@resend.dev'; 
+
         const sentToRegion = await resend.emails.send({
-            from: 'incheckning@incheckad.se',
+            from: fromAddress,
             to: regionEmail,
             subject: regionSubject,
             html: regionHtml,
@@ -246,7 +249,7 @@ export async function POST(req: Request) {
         await new Promise((r) => setTimeout(r, 400));
 
         const sentToBilkontroll = await resend.emails.send({
-            from: 'incheckning@incheckad.se',
+            from: fromAddress,
             to: bilkontrollEmail,
             subject: bilkontrollSubject,
             html: bilkontrollHtml,
