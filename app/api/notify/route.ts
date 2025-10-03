@@ -61,10 +61,8 @@ const ORT_TO_REGION: Record<string, RegionName> = {
     'Varberg': 'NORR', 'Falkenberg': 'NORR', 'Halmstad': 'NORR',
 };
 
-// =================================================================
-// PASTE LOGO URL HERE
-// =================================================================
-const INCHECKAD_LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/INcheckad%20logo/INCHECKAD%20LOGO%20DRAFT.png'; // <-- KLISTRA IN DEN KORREKTA, PUBLIKA URL:en HÄR
+// **VIKTIGT**: Klistra in den publika URL:en till er logotyp här.
+const INCHECKAD_LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/INcheckad%20logo/INCHECKAD%20LOGO%20DRAFT.png'; // EXEMPEL: 'https://xyz.supabase.co/storage/v1/object/public/assets/logo.png'
 
 
 // =================================================================
@@ -138,8 +136,8 @@ function createBaseLayout(content: string): string {
         .info-grid dd { margin: 0; color: #111827; }
         .highlight-box { padding: 16px; border-radius: 6px; margin-bottom: 16px; border: 1px solid; }
         .highlight-box strong { font-size: 1.1em; }
-        .highlight-rekond { background-color: #fffbeb; border-color: #f59e0b; color: #92400e; }
-        .highlight-damage { background-color: #fef2f2; border-color: #dc2626; color: #991b1b; }
+        .highlight-rekond { background-color: #fffbeb; border-color: #f59e0b; color: #92400e !important; }
+        .highlight-damage { background-color: #fef2f2; border-color: #dc2626; color: #991b1b !important; }
         .damage-section-title { font-size: 16px; color: #374151; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid #e5e7eb; }
         .damage-list { list-style-type: none; padding-left: 0; margin: 0; }
         .damage-item { padding: 8px 0; }
@@ -155,8 +153,8 @@ function createBaseLayout(content: string): string {
             .section h2, .damage-title, .info-grid dd { color: #f9fafb; }
             .info-grid dt, .damage-desc { color: #9ca3af; }
             .section, .damage-section-title { border-color: #4b5563; }
-            .highlight-rekond { background-color: #452c0d; border-color: #b45309; color: #fef3c7; }
-            .highlight-damage { background-color: #5c1a1a; border-color: #b91c1c; color: #fecaca; }
+            .highlight-rekond { background-color: #452c0d; border-color: #b45309; color: #fef3c7 !important; }
+            .highlight-damage { background-color: #5c1a1a; border-color: #b91c1c; color: #fecaca !important; }
             .footer { background-color: #111827; color: #9ca3af; }
         }
     `;
