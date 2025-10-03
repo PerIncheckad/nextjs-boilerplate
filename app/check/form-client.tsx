@@ -58,8 +58,9 @@ type NewDamage = {
 
 type ConfirmDialogState = {
     isOpen: boolean;
-    title: string;
+    title?: string; // Rubrik är nu frivillig
     text: string;
+    confirmButtonVariant?: 'success' | 'danger' | 'primary';
     onConfirm: () => void;
 }
 
@@ -160,7 +161,7 @@ export default function CheckInForm() {
   const [isFinalSaving, setIsFinalSaving] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, title: '', text: '', onConfirm: () => {} });
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, text: '', onConfirm: () => {} });
 
   // Vehicle data state
   const [vehicleData, setVehicleData] = useState<DamageCardData | null>(null);
@@ -231,10 +232,12 @@ export default function CheckInForm() {
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
+    setVehicleData(null);
+    setExistingDamages([]);
     try {
         const data = await fetchDamageCard(reg);
-        setVehicleData(data);
         if (data) {
+            setVehicleData(data);
             setExistingDamages(data.skador.map(d_text => ({ 
                 id: Math.random().toString(36).substring(2, 15), 
                 fullText: d_text,
@@ -243,7 +246,6 @@ export default function CheckInForm() {
             })));
         } else {
             setNotFound(true);
-            setExistingDamages([]);
         }
     } catch (error) {
         console.error("Fetch vehicle data error:", error);
@@ -266,24 +268,20 @@ export default function CheckInForm() {
 
   useEffect(() => {
     async function fetchAllRegistrations() {
-      // *** KORRIGERING: Anropar den säkra RPC-funktionen istället för att läsa tabellen direkt. ***
       const { data, error } = await supabase.rpc('get_all_allowed_plates');
-
       if (error) {
         console.error("Could not fetch registrations via RPC:", error);
       } else if (data) {
-        // Mappa resultatet från RPC-anropet.
         setAllRegistrations(data.map(item => item.regnr));
       }
     }
     fetchAllRegistrations();
   }, []);
 
-  // Autocomplete suggestion logic.
   useEffect(() => {
     if (regInput.length >= 2 && allRegistrations.length > 0) {
       const filteredSuggestions = allRegistrations
-        .filter(r => r && r.toUpperCase().includes(regInput.toUpperCase())) // Extra null-check för säkerhets skull
+        .filter(r => r && r.toUpperCase().includes(regInput.toUpperCase()))
         .slice(0, 5);
       setSuggestions(filteredSuggestions);
     } else {
@@ -291,7 +289,6 @@ export default function CheckInForm() {
     }
   }, [regInput, allRegistrations]);
 
-  // UNIFIED useEffect for handling data fetching from either URL or manual input.
   useEffect(() => {
     if (!initialUrlLoadHandled) {
       const params = new URLSearchParams(window.location.search);
@@ -308,7 +305,7 @@ export default function CheckInForm() {
 
     const normalized = normalizeReg(regInput);
 
-    if (normalized.length !== 6) {
+    if (normalized.length < 6) {
       setVehicleData(null);
       setExistingDamages([]);
       setNotFound(false);
@@ -348,6 +345,7 @@ export default function CheckInForm() {
         isOpen: true,
         title: 'Avbryt incheckning',
         text: 'Är du säker? Alla ifyllda data kommer att raderas.',
+        confirmButtonVariant: 'danger',
         onConfirm: resetForm
     });
   };
@@ -395,8 +393,9 @@ export default function CheckInForm() {
     if (action === 'resolve') {
         setConfirmDialog({
             isOpen: true,
-            title: 'Bekräfta åtgärd',
+            // Ingen rubrik
             text: `Är du säker på att du vill markera skadan "${shortText}" som åtgärdad/hittas ej?`,
+            confirmButtonVariant: 'success', // Grön bekräfta-knapp
             onConfirm: () => {
                 setExistingDamages(damages => damages.map(d => {
                     if (d.id !== id) return d;
@@ -415,6 +414,7 @@ export default function CheckInForm() {
             isOpen: true,
             title: 'Bekräfta rekond',
             text: 'Är du säker på att bilen behöver rekond? En extra avgift kan tillkomma.',
+            confirmButtonVariant: 'danger', // Röd bekräfta-knapp
             onConfirm: () => setBehoverRekond(true)
         });
     } else {
@@ -452,6 +452,7 @@ export default function CheckInForm() {
         isOpen: true,
         title: 'Ta bort skada',
         text: 'Är du säker på att du vill ta bort denna nya skada?',
+        confirmButtonVariant: 'danger',
         onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id))
     });
   };
@@ -515,7 +516,7 @@ export default function CheckInForm() {
             </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
-                <span className="info-label">Befintliga skador</span>
+                <span className="info-label">Befintliga skador ({existingDamages.length})</span>
                 {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
               </div>
             )}
@@ -571,7 +572,8 @@ export default function CheckInForm() {
 
       <Card data-error={showFieldErrors && !isChecklistComplete}>
         <SectionHeader title="Checklista" />
-        <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver Rekond</ChoiceButton>
+        {/* Ändrat till liten bokstav */}
+        <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
         <SubSectionHeader title="Allt måste vara OK för att slutföra" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
@@ -611,8 +613,8 @@ const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div classN
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
 
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object }>> = ({ onClick, variant = 'primary', disabled, children, style }) => (
-  <button onClick={onClick} className={`btn ${variant}`} disabled={disabled} style={style}>{children}</button>
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => (
+  <button onClick={onClick} className={`btn ${variant} ${className || ''}`} disabled={disabled} style={style}>{children}</button>
 );
 
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
@@ -686,7 +688,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 
                 {payload.rekond && (
                     <div className="confirm-summary">
-                        <p className="rekond-highlight">Rekond behövs!</p>
+                        <p className="rekond-highlight">Behöver rekond!</p>
                     </div>
                 )}
                 
@@ -734,8 +736,8 @@ const DamageItem: React.FC<{
         <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
         {isExisting && onAction && (
           <div className="damage-item-actions">
-            <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).shortText)} variant={isDocumented ? 'success' : 'secondary'} style={{ flex: 1 }}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).shortText)} variant={resolved ? 'warning' : 'secondary'} style={{ flex: 1 }}>Åtgärdad/Hittas ej</Button>
+            <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).shortText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
+            <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).shortText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
           </div>
         )}
         {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}
@@ -750,7 +752,8 @@ const DamageItem: React.FC<{
           <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Mer detaljer om skadan..." rows={2}></textarea></Field>
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
-            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video med både skada och reg.nr *"} />
+            {/* Ändrad färg för video-knappen */}
+            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video med både skada och reg.nr *"} isOptional={isExisting} />
           </div>
           <div className="media-previews">
             {damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
@@ -761,12 +764,23 @@ const DamageItem: React.FC<{
   );
 };
 
-const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string }> = ({ id, onUpload, hasFile, fileType, label }) => (
-  <div className="media-upload">
-    <label htmlFor={id} className={`media-label ${hasFile ? 'active' : ''}`}>{label}</label>
-    <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
-  </div>
-);
+const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string, isOptional?: boolean }> = ({ id, onUpload, hasFile, fileType, label, isOptional }) => {
+    let className = 'media-label';
+    if (hasFile) {
+        className += ' active'; // Alltid grön om fil finns
+    } else if (isOptional) {
+        className += ' optional'; // Orange om den är frivillig och tom
+    } else {
+        className += ' mandatory'; // Röd om den är obligatorisk och tom
+    }
+
+    return (
+      <div className="media-upload">
+        <label htmlFor={id} className={className}>{label}</label>
+        <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
+      </div>
+    );
+};
 
 const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (
   <div className="media-btn">
@@ -791,11 +805,13 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         <>
             <div className="modal-overlay" onClick={onClose} />
             <div className="modal-content confirm-modal">
-                <h3>{state.title}</h3>
+                {/* Rubrik visas bara om den finns */}
+                {state.title && <h3>{state.title}</h3>}
                 <p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
                 <div className="modal-actions">
                     <Button onClick={onClose} variant="secondary">Avbryt</Button>
-                    <Button onClick={handleConfirm} variant="danger">Bekräfta</Button>
+                    {/* Knappens färg styrs av state */}
+                    <Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'}>Bekräfta</Button>
                 </div>
             </div>
         </>
@@ -858,13 +874,15 @@ const GlobalStyles = () => (
         .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
         .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
         .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
-        .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; }
-        .damage-item-actions { display: flex; gap: 0.5rem; }
+        .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
+        .damage-item-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed var(--color-danger); border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; color: var(--color-danger); background-color: var(--color-danger-light); }
+        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
         .media-label:hover { filter: brightness(0.95); }
         .media-label.active { border-style: solid; border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
+        .media-label.mandatory { border-color: var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); }
+        .media-label.optional { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #92400e; }
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
