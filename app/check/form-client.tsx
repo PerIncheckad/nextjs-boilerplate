@@ -1,792 +1,955 @@
 'use client';
-
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
-import { fetchDamageCard, normalizeReg, DamageCardData } from '@/lib/damages';
-import { notifyCheckin } from '@/lib/notify';
-
-
-// =================================================================
-// 1. DATA, TYPES & HELPERS
-// =================================================================
-
-const MABI_LOGO_URL = "/mabi-logo.png";
-
-const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
-
-const STATIONER: Record<string, string[]> = {
-  'Malmö': ['Ford Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
-  'Helsingborg': ['HBSC Helsingborg', 'Ford Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby'],
-  'Lund': ['Ford Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
-  'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
-  'Falkenberg': ['Falkenberg'],
-  'Halmstad': ['Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
-  'Trelleborg': ['Trelleborg'],
-  'Varberg': ['Ford Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
-};
-
-const DAMAGE_TYPES = [
-  'Buckla', 'Däckskada', 'Däckskada sommarhjul', 'Däckskada vinterhjul', 'Fälgskada sommarhjul',
-  'Fälgskada vinterhjul', 'Feltankning', 'Höjdledsskada', 'Intryck', 'Invändig skada',
-  'Jack', 'Krockskada', 'Krossad ruta', 'Oaktsamhet', 'Punktering', 'Repa', 'Repor',
-  'Saknas', 'Skrapad', 'Skrapad fälg', 'Spricka', 'Stenskott', 'Trasig', 'Övrigt'
-].sort();
-
-const CAR_PARTS: Record<string, string[]> = {
-  'Annan del': [], 'Bagagelucka': ['Insida', 'Utsida'], 'Däck': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
-  'Dörr insida': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'], 'Dörr utsida': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
-  'Front läpp': ['Höger', 'Mitten', 'Vänster'], 'Fälg': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
-  'Glas': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'], 'Grill': [], 'Motorhuv': ['Utsida'],
-  'Skärm': ['Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'], 'Stötfångare fram': ['Bak', 'Fram', 'Höger bak', 'Höger fram', 'Vänster bak', 'Vänster fram'],
-  'Tak': [], 'Tröskel': ['Höger', 'Vänster'], 'Yttre backspegel': ['Höger', 'Vänster']
-};
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { Autocomplete } from '@mui/material';
+import TextField from '@mui/material/TextField';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { fetchDamageCard, normalizeReg } from '@/lib/damages';
+import { STATIONS } from '@/lib/stations';
 
 type MediaFile = {
-  file: File; type: 'image' | 'video'; preview?: string; thumbnail?: string;
+    file: File;
+    type: 'image' | 'video';
+    preview?: string; // for images
+    thumbnail?: string; // for videos
 };
 
 type ExistingDamage = {
-  id: string; fullText: string; shortText: string;
-  status: 'not_selected' | 'documented' | 'resolved';
-  userType?: string; userCarPart?: string; userPosition?: string; userDescription?: string;
-  media?: MediaFile[];
+    id: string;
+    text: string;
+    status: 'unseen' | 'documented' | 'resolved';
+    userText?: string;
+    media?: MediaFile[];
 };
 
 type NewDamage = {
-  id: string; type: string; carPart: string; position: string; text: string; media: MediaFile[];
+    id: string;
+    type: string;
+    carPart: string;
+    position: string;
+    text: string;
+    media: MediaFile[];
 };
 
 type ConfirmDialogState = {
     isOpen: boolean;
-    title?: string; // Rubrik är nu frivillig
     text: string;
-    confirmButtonVariant?: 'success' | 'danger' | 'primary';
+    title?: string;
     onConfirm: () => void;
-}
+    confirmText?: string;
+    confirmVariant?: 'primary' | 'secondary' | 'danger' | 'success';
+    theme?: 'default' | 'warning' | 'danger'; // För att styra stilen på dialogen
+};
 
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
 function slugify(s: string) {
-  if (!s) return '';
-  return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+    if (!s) return '';
+    return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 }
 
 async function uploadOne(file: File, reg: string, damageId: string): Promise<string> {
-    const BUCKET = "damage-photos";
-    const ext = file.name.split(".").pop() || "bin";
-    const path = `${slugify(reg)}/${slugify(damageId)}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+    const supabase = createClientComponentClient();
+    const timestamp = Math.floor(Date.now() / 1000);
+    const fileExt = file.name.split('.').pop() || 'tmp';
+    const filePath = `${reg}/${damageId}_${timestamp}.${fileExt}`;
+
+    const { error } = await supabase.storage.from('damage-media').upload(filePath, file);
     if (error) throw error;
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+
+    const { data } = supabase.storage.from('damage-media').getPublicUrl(filePath);
     return data.publicUrl;
 }
 
 function partitionMediaByType(files: MediaFile[]) {
-  const photos: File[] = [];
-  const videos: File[] = [];
-  for (const mediaFile of files ?? []) {
-    if (mediaFile.type === 'image') photos.push(mediaFile.file);
-    else if (mediaFile.type === 'video') videos.push(mediaFile.file);
-  }
-  return { photos, videos };
+    return files.reduce((acc, file) => {
+        if (file.type === 'image') acc.images.push(file);
+        else acc.videos.push(file);
+        return acc;
+    }, { images: [] as MediaFile[], videos: [] as MediaFile[] });
 }
 
 async function uploadAllForDamage(damage: { id: string; media?: MediaFile[] }, reg: string): Promise<{ photo_urls: string[]; video_urls: string[] }> {
-    if (!damage.media) return { photo_urls: [], video_urls: [] };
-    const { photos, videos } = partitionMediaByType(damage.media);
-    const [photoUploads, videoUploads] = await Promise.all([
-        Promise.all(photos.map(p => uploadOne(p, reg, damage.id))),
-        Promise.all(videos.map(v => uploadOne(v, reg, damage.id))),
-    ]);
-    return { photo_urls: photoUploads, video_urls: videoUploads };
+    if (!damage.media || damage.media.length === 0) {
+        return { photo_urls: [], video_urls: [] };
+    }
+
+    const { images, videos } = partitionMediaByType(damage.media);
+
+    const uploadPromises = [
+        ...images.map(f => uploadOne(f.file, reg, slugify(damage.id))),
+        ...videos.map(f => uploadOne(f.file, reg, slugify(damage.id)))
+    ];
+
+    const results = await Promise.all(uploadPromises);
+    const photo_urls = results.slice(0, images.length);
+    const video_urls = results.slice(images.length);
+
+    return { photo_urls, video_urls };
 }
 
 function getRelevantCarParts(damageType: string): string[] {
-    const lowerCaseDamage = (damageType || '').toLowerCase();
-    if (lowerCaseDamage.includes('fälg')) return ['Fälg'];
-    if (lowerCaseDamage.includes('däck')) return ['Däck'];
-    if (lowerCaseDamage.includes('ruta')) return ['Glas'];
-    return Object.keys(CAR_PARTS);
+    const map: Record<string, string[]> = {
+        "Inredning": ["Stol", "Dörrsida", "Handskfack", "Innertak", "Lastutrymme", "Matta", "Annat"],
+        "Exteriör": ["Stötfångare", "Dörr", "Skärm", "Motorhuv", "Tröskel", "Tak", "Backspegel", "Grill", "List", "Annat"],
+        "Glas": ["Vindruta", "Sidoruta", "Bakruta", "Annat"],
+        "Däck/Fälg": ["Däck", "Fälg", "Hjulsida", "Annat"],
+    };
+    return map[damageType] || [];
 }
 
 const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
 
 const createVideoThumbnail = (file: File): Promise<string> => new Promise(resolve => {
-  const video = document.createElement('video');
-  video.src = URL.createObjectURL(file);
-  video.onloadeddata = () => { video.currentTime = 1; };
-  video.onseeked = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) { resolve(''); return; }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    resolve(canvas.toDataURL());
-    URL.revokeObjectURL(video.src);
-  };
-  video.onerror = () => { resolve(''); URL.revokeObjectURL(video.src); };
+    const video = document.createElement('video');
+    video.src = URL.createObjectURL(file);
+    video.onloadeddata = () => { video.currentTime = 1; };
+    video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg'));
+        URL.revokeObjectURL(video.src);
+    };
+    video.onerror = () => { resolve(''); URL.revokeObjectURL(video.src); };
 });
 
 const processFiles = async (files: FileList): Promise<MediaFile[]> => {
-  return await Promise.all(Array.from(files).map(async file => {
-    const type = getFileType(file);
-    if (type === 'video') {
-      const thumbnail = await createVideoThumbnail(file);
-      return { file, type, thumbnail };
+    const processedFiles: MediaFile[] = [];
+    for (const file of Array.from(files)) {
+        const type = getFileType(file);
+        if (type === 'image') {
+            processedFiles.push({ file, type, preview: URL.createObjectURL(file) });
+        } else {
+            const thumbnail = await createVideoThumbnail(file);
+            processedFiles.push({ file, type, thumbnail });
+        }
     }
-    return { file, type, preview: URL.createObjectURL(file) };
-  }));
+    return processedFiles;
 };
 
 const getFirstNameFromEmail = (email: string): string => {
-    if (!email) return 'Okänd';
+    if (!email) return '';
     const namePart = email.split('@')[0];
-    const firstName = namePart.split('.')[0];
-    return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    const names = namePart.split('.');
+    if (names.length > 0) {
+        const firstName = names[0];
+        return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    }
+    return '';
 };
-// =================================================================
-// 2. MAIN COMPONENT
-// =================================================================
 
 export default function CheckInForm() {
-  // State
-  const [firstName, setFirstName] = useState('');
-  const [regInput, setRegInput] = useState('');
-  const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [notFound, setNotFound] = useState(false);
-  const [isFinalSaving, setIsFinalSaving] = useState(false);
-  const [showFieldErrors, setShowFieldErrors] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, text: '', onConfirm: () => {} });
+    const router = useRouter();
+    const supabase = createClientComponentClient();
 
-  // Vehicle data state
-  const [vehicleData, setVehicleData] = useState<DamageCardData | null>(null);
+    const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
+    const [regnr, setRegnr] = useState('');
+    const [carData, setCarData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [showSuccess, setShowSuccess] = useState(false);
+    const [firstName, setFirstName] = useState('');
 
-  const [ort, setOrt] = useState('');
-  const [station, setStation] = useState('');
-  const [matarstallning, setMatarstallning] = useState('');
-  const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
-  const [tankniva, setTankniva] = useState<'återlämnades_fulltankad' | 'tankad_nu' | null>(null);
-  const [liters, setLiters] = useState('');
-  const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
-  const [literpris, setLiterpris] = useState('');
-  const [laddniva, setLaddniva] = useState('');
-  const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
-  const [behoverRekond, setBehoverRekond] = useState(false);
-  const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
-  const [insynsskyddOK, setInsynsskyddOK] = useState(false);
-  const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
-  const [isskrapaOK, setIsskrapaOK] = useState(false);
-  const [pskivaOK, setPskivaOK] = useState(false);
-  const [skyltRegplatOK, setSkyltRegplatOK] = useState(false);
-  const [dekalGpsOK, setDekalGpsOK] = useState(false);
-  const [washed, setWashed] = useState(false);
-  const [spolarvatskaOK, setSpolarvatskaOK] = useState(false);
-  const [adblueOK, setAdblueOK] = useState(false);
+    // Form state
+    const [ort, setOrt] = useState('');
+    const [station, setStation] = useState('');
+    const [matarstallning, setMatarstallning] = useState('');
+    const [drivmedel, setDrivmedel] = useState('');
+    const [tankstatus, setTankstatus] = useState('');
+    const [tankadLiter, setTankadLiter] = useState('');
+    const [literpris, setLiterpris] = useState('');
+    const [bransletyp, setBransletyp] = useState('');
+    const [laddstatus, setLaddstatus] = useState('');
+    const [dack, setDack] = useState('');
+    const [behoverRekond, setBehoverRekond] = useState(false);
+    const [isTvattad, setIsTvattad] = useState(false);
+    const [isInsynsskyddOk, setIsInsynsskyddOk] = useState(false);
+    const [isDekalOk, setIsDekalOk] = useState(false);
+    const [isIsskrapaOk, setIsIsskrapaOk] = useState(false);
 
-  const [skadekontroll, setSkadekontroll] = useState<'inga_nya_skador' | 'nya_skador' | null>(null);
-  const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
-  const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  
-  const [initialUrlLoadHandled, setInitialUrlLoadHandled] = useState(false);
+    const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
+    const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
 
-  // Derived State & Memos
-  const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
-  const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
-  
-  const otherChecklistItemsOK = useMemo(() => {
-     const common = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK;
-     return drivmedelstyp === 'bensin_diesel' ? common && adblueOK : common;
-  }, [insynsskyddOK, dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, adblueOK, drivmedelstyp]);
+    const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, text: '', onConfirm: () => {} });
+    const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+    const [formErrors, setFormErrors] = useState<string[]>([]);
 
-  const isChecklistComplete = useMemo(() => {
-    return washed && otherChecklistItemsOK;
-  }, [washed, otherChecklistItemsOK]);
+    const startAtRef = useRef<string | null>(null);
 
-  const formIsValidState = useMemo(() => {
-    if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null) return false;
-    if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
-    if (drivmedelstyp === 'elbil' && !laddniva) return false;
-    if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
-    return isChecklistComplete;
-  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete]);
+    useEffect(() => {
+        getUser();
+        fetchAllRegistrations();
+        startAtRef.current = new Date().toISOString();
+    }, []);
 
-  const finalPayloadForUI = useMemo(() => ({
-      reg: normalizedReg, carModel: vehicleData?.carModel, matarstallning, hjultyp, rekond: behoverRekond,
-      drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
-      laddning: { laddniva },
-      ort,
-      station,
-      nya_skador: newDamages,
-      dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
-      washed: washed,
-      otherChecklistItemsOK: otherChecklistItemsOK,
-  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
-
-  const fetchVehicleData = useCallback(async (reg: string) => {
-    setLoading(true);
-    setNotFound(false);
-    setVehicleData(null);
-    setExistingDamages([]);
-    try {
-        const data = await fetchDamageCard(reg);
-        if (data) {
-            setVehicleData(data);
-            setExistingDamages(data.skador.map(d_text => ({ 
-                id: Math.random().toString(36).substring(2, 15), 
-                fullText: d_text,
-                shortText: d_text,
-                status: 'not_selected',
-            })));
-        } else {
-            setNotFound(true);
-        }
-    } catch (error) {
-        console.error("Fetch vehicle data error:", error);
-        setNotFound(true);
-        setVehicleData(null);
-        setExistingDamages([]);
-    } finally {
-        setLoading(false);
-    }
-  }, []);
-
-  // Effects
-  useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setFirstName(getFirstNameFromEmail(user?.email || ''));
+        const { data: { user } } = await supabase.auth.getUser();
+        setFirstName(getFirstNameFromEmail(user?.email || ''));
     };
-    getUser();
-  }, []);
 
-  useEffect(() => {
     async function fetchAllRegistrations() {
-      const { data, error } = await supabase.rpc('get_all_allowed_plates');
-      if (error) {
-        console.error("Could not fetch registrations via RPC:", error);
-      } else if (data) {
-        setAllRegistrations(data.map(item => item.regnr));
-      }
-    }
-    fetchAllRegistrations();
-  }, []);
-
-  useEffect(() => {
-    if (regInput.length >= 2 && allRegistrations.length > 0) {
-      const filteredSuggestions = allRegistrations
-        .filter(r => r && r.toUpperCase().includes(regInput.toUpperCase()))
-        .slice(0, 5);
-      setSuggestions(filteredSuggestions);
-    } else {
-      setSuggestions([]);
-    }
-  }, [regInput, allRegistrations]);
-
-  useEffect(() => {
-    if (!initialUrlLoadHandled) {
-      const params = new URLSearchParams(window.location.search);
-      const regFromUrl = params.get('reg');
-      if (regFromUrl) {
-        const normalized = normalizeReg(regFromUrl);
-        setRegInput(normalized); 
-        fetchVehicleData(normalized);
-        setInitialUrlLoadHandled(true);
-        return; 
-      }
-      setInitialUrlLoadHandled(true);
+        const { data, error } = await supabase.rpc('get_all_allowed_plates');
+        if (data) setAllRegistrations(data);
+        if (error) console.error("Error fetching registrations:", error);
     }
 
-    const normalized = normalizeReg(regInput);
+    const handleRegnrSubmit = async (value: string | null) => {
+        const finalReg = normalizeReg(value || '');
+        if (finalReg.length < 6) {
+            setError('Ange ett giltigt registreringsnummer (minst 6 tecken).');
+            return;
+        }
+        setRegnr(finalReg);
+        setIsLoading(true);
+        setError(null);
+        setCarData(null);
+        setExistingDamages([]);
 
-    if (normalized.length < 6) {
-      setVehicleData(null);
-      setExistingDamages([]);
-      setNotFound(false);
-      return;
+        try {
+            const data = await fetchDamageCard(finalReg);
+            if (data) {
+                setCarData(data);
+                setExistingDamages(data.skador.map((text, i) => ({ id: `existing_${i}`, text, status: 'unseen' })));
+            } else {
+                setError(`Kunde inte hitta bilen med registreringsnummer ${finalReg}.`);
+            }
+        } catch (e: any) {
+            setError(`Ett fel uppstod: ${e.message}`);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    const validationRules = [
+        { field: 'Ort', value: ort },
+        { field: 'Station', value: station },
+        { field: 'Mätarställning', value: matarstallning },
+        { field: 'Drivmedelstyp', value: drivmedel },
+        { field: 'Däck', value: dack },
+    ];
+    
+    if (drivmedel === 'Bensin/Diesel') {
+        validationRules.push({ field: 'Tankstatus', value: tankstatus });
+        if (tankstatus === 'Tanka nu') {
+            validationRules.push({ field: 'Antal liter', value: tankadLiter });
+            validationRules.push({ field: 'Literpris', value: literpris });
+            validationRules.push({ field: 'Bränsletyp', value: bransletyp });
+        }
+    } else if (drivmedel === 'Elbil') {
+        validationRules.push({ field: 'Laddstatus', value: laddstatus });
     }
 
-    const timer = setTimeout(() => {
-      fetchVehicleData(normalized);
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [regInput, fetchVehicleData, initialUrlLoadHandled]);
-
-
-  // Handlers
-  const handleShowErrors = () => {
-    setShowFieldErrors(true);
-    const firstError = document.querySelector('.card[data-error="true"]');
-    if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  };
-
-  const resetForm = () => {
-    setRegInput(''); setVehicleData(null); setExistingDamages([]); setOrt('');
-    setStation(''); setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null);
-    setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva('');
-    setHjultyp(null); setBehoverRekond(false); setInsynsskyddOK(false);
-    setDekalDjurRokningOK(false); setIsskrapaOK(false); setPskivaOK(false);
-    setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
-    setSpolarvatskaOK(false); setAdblueOK(false); setSkadekontroll(null);
-    setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
-    window.history.pushState({}, '', window.location.pathname); 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleCancel = () => {
-    setConfirmDialog({
-        isOpen: true,
-        title: 'Avbryt incheckning',
-        text: 'Är du säker? Alla ifyllda data kommer att raderas.',
-        confirmButtonVariant: 'danger',
-        onConfirm: resetForm
+    newDamages.forEach((d, i) => {
+        validationRules.push({ field: `Ny skada #${i+1}: Typ`, value: d.type });
+        validationRules.push({ field: `Ny skada #${i+1}: Bildel`, value: d.carPart });
+        validationRules.push({ field: `Ny skada #${i+1}: Position`, value: d.position });
+        validationRules.push({ field: `Ny skada #${i+1}: Foto`, value: hasPhoto(d.media) ? 'true' : '' });
+        validationRules.push({ field: `Ny skada #${i+1}: Video`, value: hasVideo(d.media) ? 'true' : '' });
     });
-  };
 
-  const confirmAndSubmit = async () => {
-    setShowConfirmModal(false);
-    setIsFinalSaving(true);
-    try {
-      const documentedForUpload = existingDamages.filter(d => d.status === 'documented');
-      const newForUpload = [...newDamages];
-      const resolvedDamages = existingDamages.filter(d => d.status === 'resolved');
+    const isFormComplete = useMemo(() => {
+        const hasUnresolved = existingDamages.some(d => d.status === 'unseen');
+        const checklistOk = isTvattad && isInsynsskyddOk && isDekalOk && isIsskrapaOk;
+        const baseFieldsValid = validationRules.every(rule => !!rule.value);
+        return !hasUnresolved && checklistOk && baseFieldsValid;
+    }, [existingDamages, isTvattad, isInsynsskyddOk, isDekalOk, isIsskrapaOk, validationRules]);
+    
+    const handleShowErrors = () => {
+        const errors: string[] = [];
+        if (existingDamages.some(d => d.status === 'unseen')) {
+            errors.push('Alla befintliga skador måste hanteras (antingen "Dokumentera" eller "Åtgärdad/hittar ej").');
+        }
+        if (!isTvattad) errors.push('Bilen måste vara markerad som "Tvättad".');
+        if (!isInsynsskyddOk) errors.push('"Insynsskydd finns" måste vara markerat.');
+        if (!isDekalOk) errors.push('"Dekal Djur/rökning finns" måste vara markerat.');
+        if (!isIsskrapaOk) errors.push('"Isskrapa finns" måste vara markerat.');
 
-      const documentedUploads = await Promise.all(
-        documentedForUpload.map(d => uploadAllForDamage(d, normalizedReg))
-      );
-      const newUploads = await Promise.all(
-        newForUpload.map(d => uploadAllForDamage(d, normalizedReg))
-      );
-      
-      const submissionPayload = {
-          reg: normalizedReg, carModel: vehicleData?.carModel, ort, station, matarstallning,
-          drivmedel: drivmedelstyp,
-          tankning: { tankniva, liters, bransletyp, literpris },
-          laddning: { laddniva },
-          hjultyp, rekond: behoverRekond, notering: preliminarAvslutNotering, incheckare: firstName,
-          timestamp: new Date().toISOString(),
-          dokumenterade_skador: documentedForUpload.map((d, i) => ({ ...d, uploads: documentedUploads[i], media: undefined })),
-          nya_skador: newForUpload.map((d, i) => ({ ...d, uploads: newUploads[i], media: undefined })),
-          åtgärdade_skador: resolvedDamages.map(d => ({...d, media: undefined})),
-      };
-      
-      await notifyCheckin(submissionPayload);
-
-      setShowSuccessModal(true);
-      setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
-    } catch (error) {
-      console.error("Final save failed:", error);
-      alert("Något gick fel vid inskickningen. Vänligen försök igen.");
-    } finally {
-      setIsFinalSaving(false);
-    }
-  };
-
-  const handleExistingDamageAction = (id: string, action: 'document' | 'resolve', shortText: string) => {
-    if (action === 'resolve') {
-        setConfirmDialog({
-            isOpen: true,
-            // Ingen rubrik
-            text: `Är du säker på att du vill markera skadan "${shortText}" som åtgärdad/hittas ej?`,
-            confirmButtonVariant: 'success', // Grön bekräfta-knapp
-            onConfirm: () => {
-                setExistingDamages(damages => damages.map(d => {
-                    if (d.id !== id) return d;
-                    return d.status === 'resolved' ? { ...d, status: 'not_selected' } : { ...d, status: 'resolved' };
-                }));
+        validationRules.forEach(rule => {
+            if (!rule.value) {
+                errors.push(`Fältet "${rule.field}" måste vara ifyllt.`);
             }
         });
-    } else {
-        setExistingDamages(damages => damages.map(d => d.id === id ? { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' } : d));
-    }
-  };
+        setFormErrors(errors);
+    };
 
-  const handleRekondClick = () => {
-    if (!behoverRekond) {
+    const resetForm = () => {
+        setRegnr('');
+        setCarData(null);
+        setError(null);
+        setIsLoading(false);
+        setOrt('');
+        setStation('');
+        setMatarstallning('');
+        setDrivmedel('');
+        setTankstatus('');
+        setTankadLiter('');
+        setLiterpris('');
+        setBransletyp('');
+        setLaddstatus('');
+        setDack('');
+        setBehoverRekond(false);
+        setIsTvattad(false);
+        setIsInsynsskyddOk(false);
+        setIsDekalOk(false);
+        setIsIsskrapaOk(false);
+        setExistingDamages([]);
+        setNewDamages([]);
+        setShowConfirmSubmit(false);
+        setFormErrors([]);
+        startAtRef.current = new Date().toISOString();
+    };
+
+    const handleCancel = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Avbryt incheckning',
+            text: 'Är du säker? Alla ifyllda uppgifter kommer att raderas.',
+            confirmText: 'Ja, avbryt',
+            confirmVariant: 'danger',
+            theme: 'danger',
+            onConfirm: () => {
+                resetForm();
+                router.push('/');
+            }
+        });
+    };
+    
+    const confirmAndSubmit = async () => {
+        setIsSubmitting(true);
+        const endAt = new Date().toISOString();
+
+        try {
+            const allUploadedMedia = await Promise.all([
+                ...existingDamages.filter(d => d.status === 'documented').map(d => uploadAllForDamage(d, regnr)),
+                ...newDamages.map(d => uploadAllForDamage(d, regnr))
+            ]);
+
+            const [documentedDamagesMedia, newDamagesMedia] = [
+                allUploadedMedia.slice(0, existingDamages.filter(d => d.status === 'documented').length),
+                allUploadedMedia.slice(existingDamages.filter(d => d.status === 'documented').length)
+            ];
+
+            const checkinData = {
+                regnr,
+                car_model: carData.carModel,
+                station_city: ort,
+                station_name: station,
+                mileage: parseInt(matarstallning, 10),
+                fuel_type: drivmedel,
+                fuel_status: tankstatus,
+                fuel_liters_added: tankadLiter ? parseInt(tankadLiter, 10) : null,
+                fuel_price_per_liter: literpris ? parseFloat(literpris) : null,
+                fuel_added_type: bransletyp,
+                charge_status: laddstatus,
+                tire_type: dack,
+                needs_recond: behoverRekond,
+                is_washed: isTvattad,
+                has_privacy_cover: isInsynsskyddOk,
+                has_animal_decal: isDekalOk,
+                has_ice_scraper: isIsskrapaOk,
+                start_at: startAtRef.current,
+                end_at: endAt,
+            };
+
+            const { data: checkinResult, error: checkinError } = await supabase
+                .from('checkins')
+                .insert(checkinData)
+                .select('id')
+                .single();
+
+            if (checkinError) throw checkinError;
+            const checkinId = checkinResult.id;
+
+            const damagePromises = [];
+
+            // Befintliga, dokumenterade skador
+            existingDamages.forEach((damage, index) => {
+                if (damage.status === 'documented') {
+                    damagePromises.push(
+                        supabase.from('checkin_damages').insert({
+                            checkin_id: checkinId,
+                            is_existing: true,
+                            original_text: damage.text,
+                            user_notes: damage.userText,
+                        }).select('id').single()
+                        .then(res => {
+                            if (res.error) throw res.error;
+                            const media = documentedDamagesMedia[existingDamages.filter(d => d.status === 'documented').findIndex(d => d.id === damage.id)];
+                            const photoInserts = (media.photo_urls || []).map(url => ({ damage_id: res.data.id, url, type: 'image' }));
+                            const videoInserts = (media.video_urls || []).map(url => ({ damage_id: res.data.id, url, type: 'video' }));
+                            return supabase.from('checkin_damage_photos').insert([...photoInserts, ...videoInserts]);
+                        })
+                    );
+                }
+            });
+
+            // Nya skador
+            newDamages.forEach((damage, index) => {
+                damagePromises.push(
+                    supabase.from('checkin_damages').insert({
+                        checkin_id: checkinId,
+                        is_existing: false,
+                        damage_type: damage.type,
+                        car_part: damage.carPart,
+                        position: damage.position,
+                        user_notes: damage.text,
+                    }).select('id').single()
+                    .then(res => {
+                        if (res.error) throw res.error;
+                        const media = newDamagesMedia[index];
+                        const photoInserts = (media.photo_urls || []).map(url => ({ damage_id: res.data.id, url, type: 'image' }));
+                        const videoInserts = (media.video_urls || []).map(url => ({ damage_id: res.data.id, url, type: 'video' }));
+                        return supabase.from('checkin_damage_photos').insert([...photoInserts, ...videoInserts]);
+                    })
+                );
+            });
+
+            await Promise.all(damagePromises);
+            
+            // Send notification email
+            const regionMap: { [key: string]: 'Norr' | 'Mitt' | 'Syd' } = {
+                'Ängelholm': 'Syd', 'Falkenberg': 'Syd', 'Halmstad': 'Syd', 'Helsingborg': 'Syd',
+                'Lund': 'Syd', 'Malmö': 'Syd', 'Trelleborg': 'Syd', 'Varberg': 'Syd',
+            };
+
+            const emailPayload = {
+                regnr,
+                station: `${ort} / ${station}`,
+                time: new Date().toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }),
+                hasNewDamages: newDamages.length > 0,
+                needsRecond: behoverRekond,
+                region: regionMap[ort] || 'Syd',
+            };
+
+            await fetch('/api/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(emailPayload),
+            });
+
+
+            setShowSuccess(true);
+        } catch (e: any) {
+            setError(`Ett allvarligt fel uppstod vid sparandet: ${e.message}`);
+        } finally {
+            setIsSubmitting(false);
+            setShowConfirmSubmit(false);
+        }
+    };
+
+    const handleExistingDamageAction = (id: string, action: 'document' | 'resolve', shortText: string) => {
+        if (action === 'document') {
+            setExistingDamages(prev => prev.map(d => d.id === id ? { ...d, status: 'documented' } : d));
+        } else {
+            setConfirmDialog({
+                isOpen: true,
+                title: 'Bekräfta åtgärd',
+                text: `Är du säker på att du vill markera skadan "${shortText}" som åtgärdad eller ej hittad?`,
+                confirmText: 'Ja, bekräfta',
+                confirmVariant: 'success',
+                onConfirm: () => {
+                    setExistingDamages(prev => prev.map(d => d.id === id ? { ...d, status: 'resolved' } : d));
+                }
+            });
+        }
+    };
+
+    const handleRekondClick = () => {
         setConfirmDialog({
             isOpen: true,
             title: 'Bekräfta rekond',
             text: 'Är du säker på att bilen behöver rekond? En extra avgift kan tillkomma.',
-            confirmButtonVariant: 'danger', // Röd bekräfta-knapp
+            confirmText: 'Bekräfta',
+            confirmVariant: 'danger',
+            theme: 'warning',
             onConfirm: () => setBehoverRekond(true)
         });
-    } else {
-        setBehoverRekond(false);
+    };
+
+    const updateDamageField = (id: string, field: string, value: any, isExisting: boolean) => {
+        const updater = isExisting ? setExistingDamages : setNewDamages;
+        updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, [field]: value } : d));
+    };
+
+    const updateDamageMedia = async (id: string, files: FileList, isExisting: boolean) => {
+        const processed = await processFiles(files);
+        const updater = isExisting ? setExistingDamages : setNewDamages;
+        updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
+    };
+
+    const removeDamageMedia = (id: string, index: number, isExisting: boolean) => {
+        const updater = isExisting ? setExistingDamages : setNewDamages;
+        updater((damages: any[]) => damages.map(d => {
+            if (d.id === id) {
+                const newMedia = [...d.media];
+                const removed = newMedia.splice(index, 1)[0];
+                if (removed.preview) URL.revokeObjectURL(removed.preview);
+                if (removed.thumbnail) URL.revokeObjectURL(removed.thumbnail);
+                return { ...d, media: newMedia };
+            }
+            return d;
+        }));
+    };
+
+    const addDamage = () => {
+        setNewDamages(prev => [...prev, { id: `new_${Date.now()}`, type: '', carPart: '', position: '', text: '', media: [] }]);
+    };
+
+    const removeDamage = (id: string) => {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Ta bort ny skada',
+            text: 'Är du säker på att du vill ta bort den här nya skadan?',
+            confirmText: 'Ja, ta bort',
+            confirmVariant: 'danger',
+            theme: 'danger',
+            onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id))
+        });
+    };
+
+    if (showSuccess) {
+        return <SuccessModal firstName={firstName} />;
     }
-  };
 
-  const updateDamageField = (id: string, field: string, value: any, isExisting: boolean) => {
-    const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, [field]: value } : d));
-  };
-
-  const updateDamageMedia = async (id: string, files: FileList, isExisting: boolean) => {
-    const processed = await processFiles(files);
-    const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
-  };
-
-  const removeDamageMedia = (id: string, index: number, isExisting: boolean) => {
-    const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((damages: any[]) => damages.map(d => {
-      if (d.id !== id) return d;
-      const newMedia = [...(d.media || [])];
-      newMedia.splice(index, 1);
-      return { ...d, media: newMedia };
-    }));
-  };
-
-  const addDamage = () => {
-    setNewDamages(prev => [...prev, { id: `new_${Date.now()}`, type: '', carPart: '', position: '', text: '', media: [] }]);
-  };
-
-  const removeDamage = (id: string) => {
-    setConfirmDialog({
-        isOpen: true,
-        title: 'Ta bort skada',
-        text: 'Är du säker på att du vill ta bort denna nya skada?',
-        confirmButtonVariant: 'danger',
-        onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id))
-    });
-  };
-
-  return (
-    <div className="checkin-form">
-      <GlobalStyles />
-      {isFinalSaving && <SpinnerOverlay />}
-      {showSuccessModal && <SuccessModal firstName={firstName} />}
-      {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
-      <ActionConfirmDialog
-        state={confirmDialog}
-        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-      />
-      
-      <div className="main-header">
-        <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
-        {firstName && <p className="user-info">Inloggad: {firstName}</p>}
-      </div>
-
-      <Card data-error={showFieldErrors && !regInput}>
-        <SectionHeader title="Fordon" />
-        <div style={{ position: 'relative' }}>
-          <Field label="Registreringsnummer *">
-            <input 
-              type="text" 
-              value={regInput} 
-              onChange={(e) => setRegInput(e.target.value.toUpperCase())}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="ABC 123" 
-              autoComplete="off" 
-              className="reg-input" 
-            />
-          </Field>
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="suggestions-dropdown">
-              {suggestions.map(s => 
-                <div 
-                  key={s} 
-                  className="suggestion-item"
-                  onMouseDown={() => {
-                    setRegInput(s);
-                    setShowSuggestions(false);
-                  }}
-                >
-                  {s}
+    if (!regnr || !carData) {
+        return (
+            <main className="container">
+                <GlobalStyles />
+                <div className="regnr-entry">
+                    <h1>MABI Check-in</h1>
+                    <p>Börja med att ange bilens registreringsnummer.</p>
+                    <Autocomplete
+                        freeSolo
+                        options={allRegistrations}
+                        onInputChange={(_, newValue) => setRegnr(newValue)}
+                        onChange={(_, newValue) => handleRegnrSubmit(newValue)}
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                label="Registreringsnummer"
+                                variant="outlined"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleRegnrSubmit(regnr);
+                                    }
+                                }}
+                            />
+                        )}
+                        className="regnr-autocomplete"
+                    />
+                    <Button onClick={() => handleRegnrSubmit(regnr)} disabled={isLoading}>
+                        {isLoading ? 'Laddar...' : 'Hämta bildata'}
+                    </Button>
+                    {error && <p className="error-message">{error}</p>}
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-        {loading && <p>Hämtar fordonsdata...</p>}
-        {notFound && <p className="error-text">Inget fordon hittades med det registreringsnumret.</p>}
-        {vehicleData && (
-          <div className="info-box">
-            <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={vehicleData.carModel || '---'} />
-              <InfoRow label="Hjulförvaring" value={vehicleData.hjulförvaring || '---'} />
-              <InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
-            </div>
-            {existingDamages.length > 0 && (
-              <div className="damage-list-info">
-                <span className="info-label">Befintliga skador ({existingDamages.length})</span>
-                {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
-              </div>
+            </main>
+        );
+    }
+    
+    const availableStations = STATIONS[ort] || [];
+    
+    return (
+        <main className="container">
+            <GlobalStyles />
+            {isSubmitting && <SpinnerOverlay />}
+            <ActionConfirmDialog state={confirmDialog} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
+            {showConfirmSubmit && (
+                <ConfirmModal
+                    payload={{
+                        regnr, carModel: carData.carModel, ort, station,
+                        matarstallning, drivmedel, tankstatus, tankadLiter, literpris, bransletyp,
+                        laddstatus, dack, behoverRekond, isTvattad, isInsynsskyddOk, isDekalOk, isIsskrapaOk,
+                        newDamages,
+                    }}
+                    onConfirm={confirmAndSubmit}
+                    onCancel={() => setShowConfirmSubmit(false)}
+                />
             )}
-            {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
-          </div>
-        )}
-      </Card>
 
-      <Card data-error={showFieldErrors && (!ort || !station)}>
-        <SectionHeader title="Plats för incheckning" />
-        <div className="grid-2-col">
-          <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
-          <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
-        </div>
-      </Card>
+            <header className="page-header">
+                <h1>Incheckning av {regnr}</h1>
+                <p>{carData.carModel}</p>
+            </header>
 
-      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris))) }>
-        <SectionHeader title="Fordonsstatus" />
-        <SubSectionHeader title="Mätarställning" />
-        <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
-        <SubSectionHeader title="Däck som sitter på" />
-        <Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
-        <SubSectionHeader title="Tankning/Laddning" />
-        <Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
-        {drivmedelstyp === 'bensin_diesel' && (<>
-            <Field label="Tankstatus *"><div className="grid-2-col">
-                <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
-                <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
-            </div></Field>
-            {tankniva === 'tankad_nu' && <div className="grid-3-col">
-                <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
-                <Field label="Bränsletyp *"><div className="grid-2-col">
-                    <ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton>
-                    <ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} isSet={bransletyp !== null}>Diesel</ChoiceButton>
-                </div></Field>
-                <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
-            </div>}
-        </>)}
-        {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
-      </Card>
+            {/* Form sections */}
+            <Card>
+                <SectionHeader title="Plats & Tid" />
+                <Field label="Ort *">
+                    <select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}>
+                        <option value="">Välj ort...</option>
+                        {Object.keys(STATIONS).map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                </Field>
+                {ort && (
+                    <Field label="Station *">
+                        <select value={station} onChange={e => setStation(e.target.value)}>
+                            <option value="">Välj station...</option>
+                            {availableStations.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                        </select>
+                    </Field>
+                )}
+            </Card>
 
-      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))))}>
-        <SectionHeader title="Skador" />
-        <SubSectionHeader title="Befintliga skador" />
-        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>{regInput.length >= 6 && !loading ? 'Inga befintliga skador att visa.' : 'Fyll i reg.nr för att se befintliga skador.'}</p>}
-        <SubSectionHeader title="Nya skador" />
-        <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
-            <ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
-            <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, nya skador finns</ChoiceButton>
-        </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)}<Button onClick={addDamage}>+ Lägg till ytterligare en skada</Button></>)}
-      </Card>
+            <Card>
+                <SectionHeader title="Status vid återlämning" />
+                <Field label="Mätarställning (km) *">
+                    <input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="Ange mätarställning" />
+                </Field>
 
-      <Card data-error={showFieldErrors && !isChecklistComplete}>
-        <SectionHeader title="Checklista" />
-        {/* Ändrat till liten bokstav */}
-        <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
-        <SubSectionHeader title="Allt måste vara OK för att slutföra" />
-        <div className="grid-2-col">
-          <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
-          <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd finns</ChoiceButton>
-          <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal "Djur/rökning" finns</ChoiceButton>
-          <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa finns</ChoiceButton>
-          <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva finns</ChoiceButton>
-          <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>MABI-skylt reg.plåt finns</ChoiceButton>
-          <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS finns</ChoiceButton>
-          <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
-          {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK (endast diesel)</ChoiceButton>}
-        </div>
-      </Card>
+                <SubSectionHeader title="Tankning/Laddning" />
+                <Field label="Drivmedelstyp *">
+                    <div className="choice-group">
+                        <ChoiceButton onClick={() => setDrivmedel('Bensin/Diesel')} isActive={drivmedel === 'Bensin/Diesel'} isSet={!!drivmedel}>Bensin/Diesel</ChoiceButton>
+                        <ChoiceButton onClick={() => setDrivmedel('Elbil')} isActive={drivmedel === 'Elbil'} isSet={!!drivmedel}>Elbil</ChoiceButton>
+                    </div>
+                </Field>
 
-      <Card>
-        <Field label="Kommentarer (frivilligt)">
-          <textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea>
-        </Field>
-      </Card>
+                {drivmedel === 'Bensin/Diesel' && (
+                    <>
+                        <Field label="Tankstatus *">
+                            <div className="choice-group">
+                                <ChoiceButton onClick={() => setTankstatus('Återlämnades fulltankad')} isActive={tankstatus === 'Återlämnades fulltankad'} isSet={!!tankstatus}>Återlämnades fulltankad</ChoiceButton>
+                                <ChoiceButton onClick={() => setTankstatus('Tanka nu')} isActive={tankstatus === 'Tanka nu'} isSet={!!tankstatus}>Tankad nu av MABI</ChoiceButton>
+                            </div>
+                        </Field>
+                        {tankstatus === 'Tanka nu' && (
+                            <div className="tankning-details">
+                                <Field label="Antal liter *">
+                                    <input type="number" value={tankadLiter} onChange={e => setTankadLiter(e.target.value)} placeholder="t.ex. 50" />
+                                </Field>
+                                <Field label="Bränsletyp *">
+                                    <div className="choice-group fuel-type-buttons">
+                                        <ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} className="fuel-btn" isSet={!!bransletyp}>Bensin</ChoiceButton>
+                                        <ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} className="fuel-btn" isSet={!!bransletyp}>Diesel</ChoiceButton>
+                                    </div>
+                                </Field>
+                                <Field label="Literpris *">
+                                    <input type="number" step="0.01" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="t.ex. 20.50" />
+                                </Field>
+                            </div>
+                        )}
+                    </>
+                )}
 
-      <div className="form-actions">
-        <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
-        <Button onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>
-          {!formIsValidState ? 'Visa saknad information' : 'Slutför incheckning'}
-        </Button>
-      </div>
-    </div>
-  );
+                {drivmedel === 'Elbil' && (
+                    <Field label="Laddstatus *">
+                        <div className="choice-group">
+                            <ChoiceButton onClick={() => setLaddstatus('Fulladdad')} isActive={laddstatus === 'Fulladdad'} isSet={!!laddstatus}>Återlämnades fulladdad (80-100%)</ChoiceButton>
+                            <ChoiceButton onClick={() => setLaddstatus('Laddas nu')} isActive={laddstatus === 'Laddas nu'} isSet={!!laddstatus}>Laddas nu av MABI</ChoiceButton>
+                        </div>
+                    </Field>
+                )}
+                
+                <SubSectionHeader title="Hjul" />
+                <Field label="Däck *">
+                    <div className="choice-group">
+                        <ChoiceButton onClick={() => setDack('Sommardäck')} isActive={dack === 'Sommardäck'} isSet={!!dack}>Sommardäck</ChoiceButton>
+                        <ChoiceButton onClick={() => setDack('Vinterdäck')} isActive={dack === 'Vinterdäck'} isSet={!!dack}>Vinterdäck</ChoiceButton>
+                    </div>
+                </Field>
+                {carData.hjulförvaring && <p className="info-text">Information från systemet: {carData.hjulförvaring}</p>}
+            </Card>
+
+            <Card>
+                <SectionHeader title="Skador" />
+                <SubSectionHeader title="Befintliga skador" />
+                {existingDamages.length > 0 ? (
+                    <div className="damage-list">
+                        {existingDamages.map(d => (
+                            <DamageItem
+                                key={d.id}
+                                damage={d}
+                                isExisting={true}
+                                onAction={handleExistingDamageAction}
+                                onUpdateField={updateDamageField}
+                                onUpdateMedia={updateDamageMedia}
+                                onRemoveMedia={removeDamageMedia}
+                            />
+                        ))}
+                    </div>
+                ) : <p>Inga befintliga skador registrerade på denna bil.</p>}
+
+                <SubSectionHeader title="Nya skador" />
+                <div className="damage-list">
+                    {newDamages.map(d => (
+                        <DamageItem
+                            key={d.id}
+                            damage={d}
+                            isExisting={false}
+                            onRemove={removeDamage}
+                            onUpdateField={updateDamageField}
+                            onUpdateMedia={updateDamageMedia}
+                            onRemoveMedia={removeDamageMedia}
+                        />
+                    ))}
+                </div>
+                <Button onClick={addDamage} variant="secondary">Lägg till ny skada</Button>
+            </Card>
+
+            <Card>
+                <SectionHeader title="Rekonditionering" />
+                <Button onClick={handleRekondClick} variant={behoverRekond ? 'success' : 'warning'}>
+                    {behoverRekond ? '✓ Behov av rekond bekräftat' : 'Behöver rekond'}
+                </Button>
+            </Card>
+
+            <Card>
+                <SectionHeader title="Slutlig checklista" />
+                <p>Allt måste vara OK för att slutföra.</p>
+                <div className="checklist">
+                    <ChoiceButton onClick={() => setIsTvattad(!isTvattad)} isActive={isTvattad}>Tvättad</ChoiceButton>
+                    <ChoiceButton onClick={() => setIsInsynsskyddOk(!isInsynsskyddOk)} isActive={isInsynsskyddOk}>Insynsskydd finns</ChoiceButton>
+                    <ChoiceButton onClick={() => setIsDekalOk(!isDekalOk)} isActive={isDekalOk}>Dekal "Djur/rökning" finns</ChoiceButton>
+                    <ChoiceButton onClick={() => setIsIsskrapaOk(!isIsskrapaOk)} isActive={isIsskrapaOk}>Isskrapa finns</ChoiceButton>
+                </div>
+            </Card>
+
+            <div className="form-actions">
+                <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
+                <Button onClick={() => isFormComplete ? setShowConfirmSubmit(true) : handleShowErrors()} disabled={isSubmitting}>
+                    {isSubmitting ? 'Sparar...' : 'Slutför incheckning'}
+                </Button>
+            </div>
+            
+            {formErrors.length > 0 && (
+                <div className="error-summary">
+                    <h4>Incheckningen kan inte slutföras:</h4>
+                    <ul>
+                        {formErrors.map((err, i) => <li key={i}>{err}</li>)}
+                    </ul>
+                    <Button onClick={() => setFormErrors([])} variant="secondary">Stäng</Button>
+                </div>
+            )}
+
+        </main>
+    );
 }
-// =================================================================
-// 3. REUSABLE SUB-COMPONENTS & STYLES
-// =================================================================
 
 const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) => <div className="card" {...props}>{children}</div>;
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="section-header"><h2>{title}</h2></div>;
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
-const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
+const InfoRow: React.FC<{ label: string; value: string | number | null | undefined }> = ({ label, value }) => <div className="info-row"><span className="info-label">{label}:</span><span>{value || '–'}</span></div>;
 
 const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => (
-  <button onClick={onClick} className={`btn ${variant} ${className || ''}`} disabled={disabled} style={style}>{children}</button>
+    <button onClick={onClick} className={`btn ${variant} ${className || ''}`} disabled={disabled} style={style}>{children}</button>
 );
 
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
-  <>
-    <div className="modal-overlay" />
-    <div className="modal-content">
-      <div className="success-icon">✓</div>
-      <h3>Tack {firstName}!</h3>
-      <p>Incheckningen har skickats.</p>
-    </div>
-  </>
+    <main className="container">
+        <GlobalStyles />
+        <div className="success-modal">
+            <h2>Tack, {firstName}!</h2>
+            <p>Incheckningen är slutförd och har sparats.</p>
+            <p>Du kan nu stänga detta fönster eller starta en ny incheckning.</p>
+            <Button onClick={() => window.location.reload()}>Ny incheckning</Button>
+        </div>
+    </main>
 );
 
 const SpinnerOverlay = () => (
-    <div className="modal-overlay spinner-overlay">
+    <div className="spinner-overlay">
         <div className="spinner"></div>
-        <p>Skickar in...</p>
+        <p>Sparar data, laddar upp media...</p>
     </div>
 );
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
-    const renderDamageList = (damages: any[], isNew: boolean) => {
+    const renderDamageList = (damages: NewDamage[], isNew: boolean) => {
         if (!damages || damages.length === 0) return null;
-        
-        const title = isNew ? "💥 Nya skador" : "📋 Dokumenterade befintliga skador";
-        
         return (
-            <div className="confirm-damage-section">
-                <h4>{isNew ? <strong>{title}</strong> : title}</h4>
-                <ul>
-                    {damages.map((d: any) => {
-                        const type = isNew ? d.type : d.userType;
-                        const carPart = isNew ? d.carPart : d.userCarPart;
-                        const position = isNew ? d.position : d.userPosition;
-                        const text = isNew ? d.text : d.userDescription;
-                        let damageString = [type, carPart, position].filter(Boolean).join(' - ');
-                        if (text) damageString += ` (${text})`;
-                        return <li key={d.id}>{damageString}</li>;
-                    })}
+            <>
+                <SubSectionHeader title={isNew ? 'Nya skador' : 'Dokumenterade skador'} />
+                <ul className="summary-list">
+                    {damages.map(d => <li key={d.id}>{d.type} - {d.carPart} - {d.position}</li>)}
                 </ul>
-            </div>
+            </>
         );
     };
 
     const getTankningText = () => {
-        if (payload.drivmedel === 'bensin_diesel') {
-            const tankText = payload.tankning.tankniva === 'tankad_nu'
-                ? `Upptankad av MABI (${payload.tankning.liters}L ${payload.tankning.bransletyp} @ ${payload.tankning.literpris} kr/L)`
-                : 'Återlämnades fulltankad';
-            return <p>⛽ <strong>Tankning:</strong> {tankText}</p>;
+        if (payload.drivmedel === 'Elbil') {
+            return payload.laddstatus === 'Fulladdad' ? 'Fulladdad' : 'Laddas nu';
         }
-        if (payload.drivmedel === 'elbil') {
-            return <p>⚡ <strong>Laddning:</strong> {payload.laddning.laddniva}%</p>;
-        }
-        return null;
+        if (payload.tankstatus === 'Återlämnades fulltankad') return 'Fulltankad';
+        return `Upptankad av MABI (${payload.tankadLiter}L ${payload.bransletyp} @ ${payload.literpris} kr/L)`;
     };
 
+    const newDamagesList = payload.newDamages || [];
+
     return (
-        <>
-            <div className="modal-overlay" />
-            <div className="modal-content confirm-modal">
-                <h3>Bekräfta incheckning</h3>
-                <div className="confirm-summary">
-                    <p>🚗 <strong>Fordon:</strong> {payload.reg} ({payload.carModel || '---'})</p>
-                </div>
-                <div className="confirm-summary">
-                    <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
-                </div>
+        <div className="confirm-dialog-overlay">
+            <div className="confirm-dialog wide">
+                <h3 className="confirm-dialog-title large-title">Bekräfta incheckning</h3>
                 
-                {renderDamageList(payload.nya_skador, true)}
+                <InfoRow label="Fordon" value={`${payload.regnr} (${payload.carModel})`} />
+                <InfoRow label="Plats" value={`${payload.ort} / ${payload.station}`} />
                 
-                {payload.rekond && (
-                    <div className="confirm-summary">
-                        <p className="rekond-highlight">Behöver rekond!</p>
+                {newDamagesList.length > 0 && (
+                    <div className="summary-section">
+                        <InfoRow label="💥 Nya skador" value={newDamagesList.map((d:NewDamage) => `${d.type} - ${d.carPart}`).join(', ')} />
                     </div>
                 )}
-                
-                <div className="confirm-summary">
-                    <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>
-                    {getTankningText()}
-                    <p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
-                    {payload.washed && <p><strong>✅ Tvättad</strong></p>}
-                    {payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
+                {payload.behoverRekond && (
+                     <div className="summary-section">
+                        <InfoRow label="⚠️ Behöver rekond" value="Ja" />
+                    </div>
+                )}
+
+                <div className="summary-grid">
+                    <InfoRow label="Mätarställning" value={`${payload.matarstallning} km`} />
+                    <InfoRow label="Tankning" value={getTankningText()} />
+                    <InfoRow label="Hjul" value={payload.dack} />
+                    <InfoRow label="Tvättad" value="✓ Ja" />
+                    <InfoRow label="Övriga kontroller" value="✓ OK" />
                 </div>
 
-                <div className="modal-actions">
+                <div className="confirm-dialog-actions">
                     <Button onClick={onCancel} variant="secondary">Avbryt</Button>
                     <Button onClick={onConfirm} variant="success">Bekräfta och skicka</Button>
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 
 
 const DamageItem: React.FC<{
-  damage: ExistingDamage | NewDamage; isExisting: boolean;
-  onUpdate: (id: string, field: string, value: any, isExisting: boolean) => void;
-  onMediaUpdate: (id: string, files: FileList, isExisting: boolean) => void;
-  onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
-  onAction?: (id: string, action: 'document' | 'resolve', shortText: string) => void;
-  onRemove?: (id: string) => void;
-}> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove }) => {
-  const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
-  const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
+    damage: ExistingDamage | NewDamage;
+    isExisting: boolean;
+    onAction?: (id: string, action: 'document' | 'resolve', text: string) => void;
+    onRemove?: (id: string) => void;
+    onUpdateField: (id: string, field: string, value: any, isExisting: boolean) => void;
+    onUpdateMedia: (id: string, files: FileList, isExisting: boolean) => void;
+    onRemoveMedia: (id: string, index: number, isExisting: boolean) => void;
+}> = ({ damage, isExisting, onAction, onRemove, onUpdateField, onUpdateMedia, onRemoveMedia }) => {
 
-  const commonProps = {
-    type: isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type,
-    carPart: isExisting ? (damage as ExistingDamage).userCarPart : (damage as NewDamage).carPart,
-    position: isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position,
-    description: isExisting ? (damage as ExistingDamage).userDescription : (damage as NewDamage).text,
-  };
+    const damageText = (damage as ExistingDamage).text;
+    const shortText = damageText?.length > 40 ? `${damageText.substring(0, 40)}...` : damageText;
+    const status = (damage as ExistingDamage).status;
 
-  const fieldKey = (f: string) => isExisting ? `user${f.charAt(0).toUpperCase() + f.slice(1)}` : f;
+    const fieldKey = (f: string) => isExisting ? `user${f.charAt(0).toUpperCase() + f.slice(1)}` : f;
+    const textValue = isExisting ? (damage as ExistingDamage).userText : (damage as NewDamage).text;
 
-  return (
-    <div className={`damage-item ${resolved ? 'resolved' : ''}`}>
-      <div className="damage-item-header">
-        <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
-        {isExisting && onAction && (
-          <div className="damage-item-actions">
-            <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).shortText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).shortText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
-          </div>
-        )}
-        {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}
-      </div>
-      {(isDocumented || !isExisting) && !resolved && (
-        <div className="damage-details">
-          <div className="grid-3-col">
-            <Field label="Typ av skada *"><select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, fieldKey('type'), e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-            <Field label="Placering *"><select value={commonProps.carPart || ''} onChange={e => onUpdate(damage.id, fieldKey('carPart'), e.target.value, isExisting)}><option value="">Välj del</option>{getRelevantCarParts(commonProps.type || '').map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.carPart || ''] || CAR_PARTS[commonProps.carPart || ''].length === 0}><option value="">Välj position</option>{CAR_PARTS[commonProps.carPart || '']?.map(pos => <option key={pos} value={pos}>{pos}</option>)}</select></Field>
-          </div>
-          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Mer detaljer om skadan..." rows={2}></textarea></Field>
-          <div className="media-section">
-            <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
-            {/* Ändrad färg för video-knappen */}
-            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video med både skada och reg.nr *"} isOptional={isExisting} />
-          </div>
-          <div className="media-previews">
-            {damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
-          </div>
+    if (isExisting && status === 'resolved') {
+        return (
+            <div className="damage-item resolved">
+                <p><s>{damageText}</s> (Åtgärdad/hittas ej)</p>
+            </div>
+        );
+    }
+    
+    const damageType = (damage as NewDamage).type;
+    const carPart = (damage as NewDamage).carPart;
+    const relevantParts = getRelevantCarParts(damageType);
+    
+    return (
+        <div className={`damage-item ${status === 'documented' ? 'documented' : ''}`}>
+            {isExisting && <p className="damage-text-original">"{damageText}"</p>}
+
+            {!isExisting && (
+                <div className="damage-selectors">
+                    <select value={damageType} onChange={(e) => onUpdateField(damage.id, 'type', e.target.value, false)}>
+                        <option value="">Välj typ...</option>
+                        <option>Inredning</option>
+                        <option>Exteriör</option>
+                        <option>Glas</option>
+                        <option>Däck/Fälg</option>
+                    </select>
+                    {damageType && (
+                        <select value={carPart} onChange={(e) => onUpdateField(damage.id, 'carPart', e.target.value, false)}>
+                            <option value="">Välj bildel...</option>
+                            {relevantParts.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                    )}
+                    {carPart && (
+                         <select value={(damage as NewDamage).position} onChange={(e) => onUpdateField(damage.id, 'position', e.target.value, false)}>
+                            <option value="">Välj position...</option>
+                            <option>Vänster fram</option>
+                            <option>Höger fram</option>
+                            <option>Vänster bak</option>
+                            <option>Höger bak</option>
+                             <option>Mitten</option>
+                             <option>Utsida</option>
+                             <option>Insida</option>
+                        </select>
+                    )}
+                </div>
+            )}
+            
+            <textarea
+                value={textValue || ''}
+                onChange={(e) => onUpdateField(damage.id, fieldKey('Text'), e.target.value, isExisting)}
+                placeholder={isExisting ? 'Mer detaljer om skadan... (frivilligt)' : 'Beskriv den nya skadan här...'}
+            />
+
+            <div className="media-uploads">
+                <MediaUpload id={`${damage.id}-photo`} onUpload={(files) => onUpdateMedia(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto" />
+                <MediaUpload id={`${damage.id}-video`} onUpload={(files) => onUpdateMedia(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label="Video" isOptional />
+            </div>
+
+            {damage.media && damage.media.length > 0 && (
+                <div className="media-preview-list">
+                    {damage.media.map((media, index) => (
+                        <MediaButton key={index} onRemove={() => onRemoveMedia(damage.id, index, isExisting)}>
+                            {media.type === 'image' ?
+                                <img src={media.preview} alt="Förhandsvisning" className="media-preview-thumb" /> :
+                                <img src={media.thumbnail} alt="Videominiatyr" className="media-preview-thumb" />
+                            }
+                        </MediaButton>
+                    ))}
+                </div>
+            )}
+
+            <div className="damage-item-actions">
+                {isExisting ? (
+                    <>
+                        <Button onClick={() => onAction!(damage.id, 'resolve', shortText)} variant="secondary" disabled={status === 'documented'}>Åtgärdad/hittar ej</Button>
+                        <Button onClick={() => onAction!(damage.id, 'document', shortText)} variant={status === 'documented' ? 'success' : 'primary'}>
+                            {status === 'documented' ? '✓ Dokumenterad' : 'Dokumentera'}
+                        </Button>
+                    </>
+                ) : (
+                    <Button onClick={() => onRemove!(damage.id)} variant="danger">Ta bort</Button>
+                )}
+            </div>
         </div>
-      )}
-    </div>
-  );
+    );
 };
 
 const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string, isOptional?: boolean }> = ({ id, onUpload, hasFile, fileType, label, isOptional }) => {
-    let className = 'media-label';
-    if (hasFile) {
-        className += ' active'; // Alltid grön om fil finns
-    } else if (isOptional) {
-        className += ' optional'; // Orange om den är frivillig och tom
-    } else {
-        className += ' mandatory'; // Röd om den är obligatorisk och tom
-    }
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const variant = hasFile ? 'success' : (isOptional ? 'warning' : 'primary');
+    const symbol = fileType === 'image' ? '📷' : '📹';
+    const text = `${label}${isOptional ? ' (frivilligt)' : ' *'}`;
 
     return (
-      <div className="media-upload">
-        <label htmlFor={id} className={className}>{label}</label>
-        <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
-      </div>
+        <>
+            <input
+                type="file"
+                id={id}
+                ref={fileInputRef}
+                multiple
+                accept={fileType === 'image' ? 'image/*' : 'video/*'}
+                onChange={(e) => e.target.files && onUpload(e.target.files)}
+                style={{ display: 'none' }}
+            />
+            <Button onClick={() => fileInputRef.current?.click()} variant={variant}>
+                {hasFile ? `✓ ${symbol}` : `${symbol} ${text}`}
+            </Button>
+        </>
     );
 };
 
 const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (
-  <div className="media-btn">
-    {children}
-    {onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}
-  </div>
+    <div className="media-preview-btn">
+        {children}
+        <button onClick={onRemove} className="remove-media-btn">×</button>
+    </div>
 );
 
 const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean}> = ({ onClick, isActive, children, className, isSet }) => (
@@ -800,107 +963,398 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         state.onConfirm();
         onClose();
     };
+    
+    const themeClass = `theme-${state.theme || 'default'}`;
 
     return (
-        <>
-            <div className="modal-overlay" onClick={onClose} />
-            <div className="modal-content confirm-modal">
-                {/* Rubrik visas bara om den finns */}
-                {state.title && <h3>{state.title}</h3>}
-                <p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
-                <div className="modal-actions">
+        <div className="confirm-dialog-overlay">
+            <div className={`confirm-dialog ${themeClass}`}>
+                {state.title && (
+                    <h3 className="confirm-dialog-title">
+                        {state.title === 'Bekräfta rekond' ? <strong>Bekräfta rekond ⚠️</strong> : state.title}
+                    </h3>
+                )}
+                <p>{state.text}</p>
+                <div className="confirm-dialog-actions">
                     <Button onClick={onClose} variant="secondary">Avbryt</Button>
-                    {/* Knappens färg styrs av state */}
-                    <Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'}>Bekräfta</Button>
+                    <Button onClick={handleConfirm} variant={state.confirmVariant || 'primary'}>{state.confirmText || 'Bekräfta'}</Button>
                 </div>
             </div>
-        </>
+        </div>
     );
 };
 
 const GlobalStyles = () => (
     <style jsx global>{`
         :root {
-          --color-bg: #f8fafc; --color-card: #ffffff; --color-text: #1f2937; --color-text-secondary: #6b7280;
-          --color-primary: #2563eb; --color-primary-light: #eff6ff; --color-success: #16a34a; --color-success-light: #f0fdf4;
-          --color-danger: #dc2626; --color-danger-light: #fef2f2; --color-warning: #f59e0b; --color-warning-light: #fffbeb;
-          --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
-          --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --primary-color: #4a90e2; /* Blue */
+            --success-color: #4CAF50; /* Green */
+            --danger-color: #f44336; /* Red */
+            --warning-color: #f5a623; /* Orange */
+            --secondary-color: #6c757d; /* Gray */
+            --light-gray: #f8f9fa;
+            --border-color: #dee2e6;
+            --text-color: #212529;
+            --text-light: #6c757d;
+            --card-bg: #ffffff;
+            --body-bg: #f4f7f6;
         }
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
-        .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
-        .main-header { text-align: center; margin-bottom: 1.5rem; }
-        .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
-        .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-        .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; }
-        .card[data-error="true"] { border: 2px solid var(--color-danger); }
-        .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
-        .section-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; margin:0; }
-        .sub-section-header { margin-top: 2rem; margin-bottom: 1rem; }
-        .sub-section-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-text); margin:0; }
-        .field { margin-bottom: 1rem; }
-        .field label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; }
-        .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; transition: all 0.2s; }
-        .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
-        .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
-        .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; }
-        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); max-height: 250px; overflow-y: auto; }
-        .suggestion-item { padding: 0.75rem; cursor: pointer; }
-        .suggestion-item:hover { background-color: var(--color-primary-light); }
-        .error-text { color: var(--color-danger); }
-        .info-box { margin-top: 1rem; padding: 1rem; background-color: var(--color-primary-light); border-radius: 8px; }
-        .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; }
-        .info-label { font-weight: 600; font-size: 0.875rem; color: #1e3a8a; }
-        .info-grid > span { font-size: 0.875rem; align-self: center; }
-        .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
-        .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
-        .damage-list-item { padding-left: 1rem; line-height: 1.4; font-size: 0.875rem;}
-        .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-        .grid-3-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem; }
-        .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 3rem; }
-        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .btn.primary { background-color: var(--color-primary); color: white; }
-        .btn.secondary { background-color: var(--color-border); color: var(--color-text); }
-        .btn.success { background-color: var(--color-success); color: white; }
-        .btn.danger { background-color: var(--color-danger); color: white; }
-        .btn.warning { background-color: var(--color-warning); color: white; }
-        .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
-        .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
-        .choice-btn:hover { filter: brightness(1.05); }
-        .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
-        .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
-        .rekond-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
-        .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
-        .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
-        .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
-        .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
-        .damage-item-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
-        .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
-        .media-label:hover { filter: brightness(0.95); }
-        .media-label.active { border-style: solid; border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
-        .media-label.mandatory { border-color: var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); }
-        .media-label.optional { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #92400e; }
-        .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
-        .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
-        .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(0,0,0,0.6); color: white; border: none; display: flex; align-items: center; justify-content: center; line-height: 1; cursor: pointer; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
-        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
-        .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
-        .confirm-modal .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
-        .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
-        .confirm-modal .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
-        .confirm-damage-section { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
-        .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1rem; }
-        .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
-        .confirm-damage-section li { margin-bottom: 0.25rem; }
-        .rekond-highlight { background-color: var(--color-danger); color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; }
-        .spinner-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: 600; }
-        .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--color-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .regnr-entry {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80vh;
+            text-align: center;
+        }
+        .regnr-entry h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        .regnr-entry p {
+            margin-bottom: 1.5rem;
+            color: var(--text-light);
+        }
+        .regnr-autocomplete {
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 1rem;
+        }
+        .page-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .page-header h1 {
+            font-size: 2rem;
+            margin: 0;
+        }
+        .page-header p {
+            color: var(--text-light);
+            margin: 0;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .section-header {
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .section-header h2 {
+            font-size: 1.5rem;
+            margin: 0;
+        }
+        .sub-section-header {
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+        .sub-section-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-light);
+            margin: 0;
+        }
+        .field {
+            margin-bottom: 20px;
+        }
+        .field label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .field input, .field select, .field textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        .field textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn.primary { background-color: var(--primary-color); color: white; }
+        .btn.primary:hover:not(:disabled) { background-color: #3a80d2; }
+        .btn.secondary { background-color: transparent; color: var(--secondary-color); border: 1px solid var(--border-color); }
+        .btn.secondary:hover:not(:disabled) { background-color: var(--light-gray); }
+        .btn.success { background-color: var(--success-color); color: white; }
+        .btn.success:hover:not(:disabled) { background-color: #45a049; }
+        .btn.danger { background-color: var(--danger-color); color: white; }
+        .btn.danger:hover:not(:disabled) { background-color: #d32f2f; }
+        .btn.warning { background-color: var(--warning-color); color: white; }
+        .btn.warning:hover:not(:disabled) { background-color: #e59613; }
+
+        .choice-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .fuel-type-buttons {
+            flex-wrap: wrap;
+        }
+        .choice-btn {
+            flex-grow: 1;
+            padding: 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: transparent;
+            cursor: pointer;
+            font-size: 1rem;
+            text-align: center;
+        }
+        .choice-btn.active {
+            background-color: var(--success-color);
+            color: white;
+            border-color: var(--success-color);
+        }
+        .choice-btn.disabled-choice {
+            background-color: #f1f1f1;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+        .fuel-btn {
+            flex-basis: calc(50% - 5px);
+        }
+        .fuel-btn.active {
+            background-color: var(--danger-color);
+            border-color: var(--danger-color);
+            color: white;
+        }
+        .tankning-details {
+            border-left: 3px solid var(--border-color);
+            padding-left: 20px;
+            margin-top: 20px;
+            margin-left: 10px;
+        }
+        .info-text {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-top: 10px;
+        }
+        .damage-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .damage-item {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 16px;
+        }
+        .damage-item.resolved {
+            background-color: var(--light-gray);
+            color: var(--text-light);
+        }
+        .damage-item.documented {
+            border-left: 4px solid var(--success-color);
+        }
+        .damage-text-original {
+            font-style: italic;
+            color: var(--text-light);
+            border-left: 3px solid #eee;
+            padding-left: 10px;
+        }
+        .damage-selectors {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .damage-selectors select {
+            flex: 1;
+            min-width: 150px;
+        }
+        .media-uploads {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+        .media-preview-list {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .media-preview-btn {
+            position: relative;
+        }
+        .media-preview-thumb {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+        .remove-media-btn {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 14px;
+            line-height: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .damage-item-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .checklist {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .form-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 2rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .error-summary {
+            background-color: #ffebee;
+            border: 1px solid var(--danger-color);
+            color: #c62828;
+            border-radius: 4px;
+            padding: 16px;
+            margin-top: 20px;
+        }
+        .error-summary h4 { margin: 0 0 10px 0; }
+        .error-summary ul { margin: 0; padding-left: 20px; }
+        .error-summary button { margin-top: 10px; }
+        
+        .confirm-dialog-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .confirm-dialog {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .confirm-dialog.wide { max-width: 650px; }
+        .confirm-dialog.theme-warning {
+            background-color: #fffaf0;
+            border: 1px solid var(--warning-color);
+        }
+        .confirm-dialog.theme-danger {
+            background-color: #ffebee;
+            border: 1px solid var(--danger-color);
+        }
+        .confirm-dialog-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0 0 10px 0;
+        }
+        .confirm-dialog-title.large-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .confirm-dialog p { margin: 0 0 20px 0; }
+        .confirm-dialog-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .summary-section {
+            margin: 16px 0;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 16px;
+            margin: 20px 0;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        .info-row {
+            display: flex;
+            flex-direction: column;
+        }
+        .info-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .summary-list {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .success-modal {
+            text-align: center;
+            padding: 40px;
+        }
+        .spinner-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        .spinner {
+            border: 4px solid rgba(0,0,0,0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: var(--primary-color);
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     `}</style>
-)
+);
