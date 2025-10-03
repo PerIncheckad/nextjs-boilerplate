@@ -203,20 +203,30 @@ export async function POST(req: Request) {
     try {
         const body = (await req.json()) as CheckinPayload;
 
-        const region = ORT_TO_REGION[body.ort] || 'SYD'; // Fallback to SYD
+        const region = ORT_TO_REGION[body.ort] || 'SYD';
         const location = `${body.ort} / ${body.station}`;
 
-        // --- Email Addresses (from ENV vars with fallbacks) ---
-        const FORCE_DEBUG_EMAIL = process.env.NEXT_PUBLIC_FORCE_DEBUG_EMAIL || null;
+        // --- Email Addresses ---
+        const FORCE_DEBUG_EMAIL = process.env.NEXT_PUBLIC_FORCE_DEBUG_EMAIL;
 
-        const REGION_MAIL_ADDRESSES: Record<RegionName, string> = {
-            SYD: process.env.NEXT_PUBLIC_MAIL_REGION_SYD || 'syd@incheckad.se',
-            MITT: process.env.NEXT_PUBLIC_MAIL_REGION_MITT || 'mitt@incheckad.se',
-            NORR: process.env.NEXT_PUBLIC_MAIL_REGION_NORR || 'norr@incheckad.se',
-        };
-        
-        const bilkontrollEmail = FORCE_DEBUG_EMAIL || process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontroll@incheckad.se';
-        const regionEmail = FORCE_DEBUG_EMAIL || REGION_MAIL_ADDRESSES[region];
+        // **NY LOGIK HÄR**
+        // Om FORCE_DEBUG_EMAIL är satt (och inte är en tom sträng), använd den för ALLA mejl.
+        // Annars, använd de vanliga produktionsadresserna.
+        let regionEmail: string;
+        let bilkontrollEmail: string;
+
+        if (FORCE_DEBUG_EMAIL) {
+            regionEmail = FORCE_DEBUG_EMAIL;
+            bilkontrollEmail = FORCE_DEBUG_EMAIL;
+        } else {
+            const REGION_MAIL_ADDRESSES: Record<RegionName, string> = {
+                SYD: process.env.NEXT_PUBLIC_MAIL_REGION_SYD || 'syd@incheckad.se',
+                MITT: process.env.NEXT_PUBLIC_MAIL_REGION_MITT || 'mitt@incheckad.se',
+                NORR: process.env.NEXT_PUBLIC_MAIL_REGION_NORR || 'norr@incheckad.se',
+            };
+            regionEmail = REGION_MAIL_ADDRESSES[region];
+            bilkontrollEmail = process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontroll@incheckad.se';
+        }
 
         // --- Subjects ---
         const baseSubject = `INCHECKAD: ${body.regnr} - ${location}`;
@@ -227,7 +237,7 @@ export async function POST(req: Request) {
         const regionHtml = createRegionEmail(body);
         const bilkontrollHtml = createBilkontrollEmail(body);
         
-        // --- Send Emails (sequentially to be safe) ---
+        // --- Send Emails ---
         const sentToRegion = await resend.emails.send({
             from: 'incheckning@incheckad.se',
             to: regionEmail,
@@ -236,11 +246,10 @@ export async function POST(req: Request) {
         });
 
         if (sentToRegion.error) {
-            console.error("Resend error (Region):", sentToRegion.error);
+            console.error("Resend error (Region):", { error: sentToRegion.error, recipient: regionEmail });
             throw new Error(`Failed to send email to Region: ${sentToRegion.error.message}`);
         }
         
-        // Optional small pause
         await new Promise((r) => setTimeout(r, 200));
 
         const sentToBilkontroll = await resend.emails.send({
@@ -251,7 +260,7 @@ export async function POST(req: Request) {
         });
 
         if (sentToBilkontroll.error) {
-            console.error("Resend error (Bilkontroll):", sentToBilkontroll.error);
+            console.error("Resend error (Bilkontroll):", { error: sentToBilkontroll.error, recipient: bilkontrollEmail });
             throw new Error(`Failed to send email to Bilkontroll: ${sentToBilkontroll.error.message}`);
         }
 
