@@ -62,7 +62,7 @@ type ConfirmDialogState = {
     text: string;
     confirmButtonVariant?: 'success' | 'danger' | 'primary';
     onConfirm: () => void;
-    theme?: 'default' | 'warning'; // Ny egenskap för att styra färgtemat
+    theme?: 'default' | 'warning';
 }
 
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
@@ -73,12 +73,27 @@ function slugify(s: string) {
   return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
 }
 
-async function uploadOne(file: File, reg: string, damageId: string): Promise<string> {
+function createDamageFolderName(damage: ExistingDamage | NewDamage): string {
+    const isExisting = 'fullText' in damage;
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    
+    const type = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
+    const part = isExisting ? (damage as ExistingDamage).userCarPart : (damage as NewDamage).carPart;
+    const pos = isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position;
+
+    const folderName = [date, type, part, pos].filter(Boolean).map(s => slugify(s!)).join('_');
+    return folderName || `${date}_okand-skada`;
+}
+
+async function uploadOne(file: File, reg: string, damageFolder: string): Promise<string> {
     const BUCKET = "damage-photos";
     const ext = file.name.split(".").pop() || "bin";
-    const path = `${slugify(reg)}/${slugify(damageId)}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const randomString = Math.random().toString(36).slice(2, 7);
+    const path = `${slugify(reg)}/${damageFolder}/${Date.now()}-${randomString}.${ext}`;
+    
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
     if (error) throw error;
+    
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
 }
@@ -93,14 +108,18 @@ function partitionMediaByType(files: MediaFile[]) {
   return { photos, videos };
 }
 
-async function uploadAllForDamage(damage: { id: string; media?: MediaFile[] }, reg: string): Promise<{ photo_urls: string[]; video_urls: string[] }> {
-    if (!damage.media) return { photo_urls: [], video_urls: [] };
+async function uploadAllForDamage(damage: ExistingDamage | NewDamage, reg: string): Promise<{ photo_urls: string[]; video_urls: string[]; folder: string }> {
+    const damageFolder = createDamageFolderName(damage);
+    if (!damage.media) return { photo_urls: [], video_urls: [], folder: damageFolder };
+    
     const { photos, videos } = partitionMediaByType(damage.media);
+    
     const [photoUploads, videoUploads] = await Promise.all([
-        Promise.all(photos.map(p => uploadOne(p, reg, damage.id))),
-        Promise.all(videos.map(v => uploadOne(v, reg, damage.id))),
+        Promise.all(photos.map(p => uploadOne(p, reg, damageFolder))),
+        Promise.all(videos.map(v => uploadOne(v, reg, damageFolder))),
     ]);
-    return { photo_urls: photoUploads, video_urls: videoUploads };
+
+    return { photo_urls: photoUploads, video_urls: videoUploads, folder: damageFolder };
 }
 
 function getRelevantCarParts(damageType: string): string[] {
@@ -367,11 +386,18 @@ export default function CheckInForm() {
       );
       
       const submissionPayload = {
-          reg: normalizedReg, carModel: vehicleData?.carModel, ort, station, matarstallning,
+          regnr: normalizedReg,
+          carModel: vehicleData?.carModel,
+          ort,
+          station,
+          matarstallning,
           drivmedel: drivmedelstyp,
           tankning: { tankniva, liters, bransletyp, literpris },
           laddning: { laddniva },
-          hjultyp, rekond: behoverRekond, notering: preliminarAvslutNotering, incheckare: firstName,
+          hjultyp,
+          rekond: behoverRekond,
+          notering: preliminarAvslutNotering,
+          incheckare: firstName,
           timestamp: new Date().toISOString(),
           dokumenterade_skador: documentedForUpload.map((d, i) => ({ ...d, uploads: documentedUploads[i], media: undefined })),
           nya_skador: newForUpload.map((d, i) => ({ ...d, uploads: newUploads[i], media: undefined })),
@@ -416,7 +442,7 @@ export default function CheckInForm() {
             text: 'Är du säker på att bilen behöver rekond? En extra avgift kan tillkomma.',
             confirmButtonVariant: 'danger',
             onConfirm: () => setBehoverRekond(true),
-            theme: 'warning' // Sätter temat för att göra dialogen orange
+            theme: 'warning'
         });
     } else {
         setBehoverRekond(false);
