@@ -245,6 +245,7 @@ export default function CheckInForm() {
       station,
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
+      åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
   }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
@@ -662,22 +663,23 @@ const SpinnerOverlay = () => (
 );
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
-    const renderDamageList = (damages: any[], isNew: boolean) => {
+    const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
-        
-        const title = isNew ? "💥 Nya skador" : "📋 Dokumenterade befintliga skador";
         
         return (
             <div className="confirm-damage-section">
-                <h4>{isNew ? <strong>{title}</strong> : title}</h4>
+                <h4>{title}</h4>
                 <ul>
                     {damages.map((d: any) => {
-                        const type = isNew ? d.type : d.userType;
-                        const carPart = isNew ? d.carPart : d.userCarPart;
-                        const position = isNew ? d.position : d.userPosition;
-                        const text = isNew ? d.text : d.userDescription;
+                        const type = d.type || d.userType;
+                        const carPart = d.carPart || d.userCarPart;
+                        const position = d.position || d.userPosition;
+                        const text = d.text || d.userDescription || d.fullText;
+                        
                         let damageString = [type, carPart, position].filter(Boolean).join(' - ');
-                        if (text) damageString += ` (${text})`;
+                        if (!damageString) damageString = text;
+                        else if (text && damageString !== text) damageString += ` (${text})`;
+
                         return <li key={d.id}>{damageString}</li>;
                     })}
                 </ul>
@@ -710,7 +712,9 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                     <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
                 </div>
                 
-                {renderDamageList(payload.nya_skador, true)}
+                {renderDamageList(payload.nya_skador, '💥 Nya skador')}
+                {renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}
+                {renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
                 
                 {payload.rekond && (
                     <div className="confirm-summary">
@@ -799,9 +803,13 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
         className += ' mandatory';
     }
 
+    const buttonText = hasFile
+        ? `Lägg till ${fileType === 'image' ? 'fler foton' : 'fler videor'}`
+        : label;
+
     return (
       <div className="media-upload">
-        <label htmlFor={id} className={className}>{label}</label>
+        <label htmlFor={id} className={className}>{buttonText}</label>
         <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
       </div>
     );
@@ -914,7 +922,8 @@ const GlobalStyles = () => (
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; border-radius: 50%; background-color: rgba(0,0,0,0.6); color: white; border: none; display: flex; align-items: center; justify-content: center; line-height: 1; cursor: pointer; }
+        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; line-height: 1; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.2s; }
+        .remove-media-btn:hover { background-color: #b91c1c; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
         .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
         .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); }
@@ -925,7 +934,7 @@ const GlobalStyles = () => (
         .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
         .confirm-modal .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
         .confirm-damage-section { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
-        .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1rem; }
+        .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
         .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
         .confirm-damage-section li { margin-bottom: 0.25rem; }
         .rekond-highlight { background-color: var(--color-danger); color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; }
