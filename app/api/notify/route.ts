@@ -206,27 +206,20 @@ export async function POST(req: Request) {
         const region = ORT_TO_REGION[body.ort] || 'SYD';
         const location = `${body.ort} / ${body.station}`;
 
-        // --- Email Addresses ---
-        const FORCE_DEBUG_EMAIL = process.env.NEXT_PUBLIC_FORCE_DEBUG_EMAIL;
+        // --- Email Addresses (Reverted to old, safe logic) ---
+        const FORCE_EMAIL_TO =
+            process.env.NEXT_PUBLIC_FORCE_DEBUG_EMAIL ||
+            process.env.NEXT_PUBLIC_TEST_MAIL ||
+            null;
 
-        // **NY LOGIK HÄR**
-        // Om FORCE_DEBUG_EMAIL är satt (och inte är en tom sträng), använd den för ALLA mejl.
-        // Annars, använd de vanliga produktionsadresserna.
-        let regionEmail: string;
-        let bilkontrollEmail: string;
-
-        if (FORCE_DEBUG_EMAIL) {
-            regionEmail = FORCE_DEBUG_EMAIL;
-            bilkontrollEmail = FORCE_DEBUG_EMAIL;
-        } else {
-            const REGION_MAIL_ADDRESSES: Record<RegionName, string> = {
-                SYD: process.env.NEXT_PUBLIC_MAIL_REGION_SYD || 'syd@incheckad.se',
-                MITT: process.env.NEXT_PUBLIC_MAIL_REGION_MITT || 'mitt@incheckad.se',
-                NORR: process.env.NEXT_PUBLIC_MAIL_REGION_NORR || 'norr@incheckad.se',
-            };
-            regionEmail = REGION_MAIL_ADDRESSES[region];
-            bilkontrollEmail = process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontroll@incheckad.se';
-        }
+        const REGION_MAIL_ADDRESSES: Record<RegionName, string> = {
+            SYD: process.env.NEXT_PUBLIC_MAIL_REGION_SYD || 'syd@incheckad.se',
+            MITT: process.env.NEXT_PUBLIC_MAIL_REGION_MITT || 'mitt@incheckad.se',
+            NORR: process.env.NEXT_PUBLIC_MAIL_REGION_NORR || 'norr@incheckad.se',
+        };
+        
+        const regionEmail = FORCE_EMAIL_TO || REGION_MAIL_ADDRESSES[region];
+        const bilkontrollEmail = FORCE_EMAIL_TO || process.env.NEXT_PUBLIC_BILKONTROLL_MAIL || 'bilkontroll@incheckad.se';
 
         // --- Subjects ---
         const baseSubject = `INCHECKAD: ${body.regnr} - ${location}`;
@@ -250,7 +243,7 @@ export async function POST(req: Request) {
             throw new Error(`Failed to send email to Region: ${sentToRegion.error.message}`);
         }
         
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 400));
 
         const sentToBilkontroll = await resend.emails.send({
             from: 'incheckning@incheckad.se',
