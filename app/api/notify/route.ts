@@ -61,8 +61,8 @@ const ORT_TO_REGION: Record<string, RegionName> = {
     'Varberg': 'NORR', 'Falkenberg': 'NORR', 'Halmstad': 'NORR',
 };
 
-// **VIKTIGT**: Klistra in den publika URL:en till er logotyp här.
-const INCHECKAD_LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/INcheckad%20logo/INCHECKAD%20LOGO%20DRAFT.png'; // EXEMPEL: 'https://xyz.supabase.co/storage/v1/object/pub[...]
+// Uppdaterad URL till logotyp med inbränd bakgrund
+const INCHECKAD_LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/INcheckad%20logo/INCHECKAD%20LOGO%20yellow%20DRAFT.png';
 
 
 // =================================================================
@@ -125,8 +125,7 @@ function createBaseLayout(content: string): string {
         .body-wrap { background-color: #f0f2f5; margin: 0; padding: 20px; color: #111827; }
         .container { max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; }
         .header { background-color: #111827; color: white; padding: 20px; text-align: center; }
-        .header .logo-wrapper { display: inline-block; background-color: white; padding: 10px; border-radius: 8px; line-height: 0; }
-        .header img { max-height: 50px; }
+        .header img { max-height: 60px; border-radius: 8px; } /* Ökad storlek och rundade hörn */
         .header-title { margin: 10px 0 0; font-size: 24px; color: #ffffff; }
         .content { padding: 24px; }
         .section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
@@ -174,7 +173,7 @@ function createBaseLayout(content: string): string {
         <div class="body-wrap">
             <div class="container">
                 <div class="header">
-                    ${INCHECKAD_LOGO_URL ? `<span class="logo-wrapper"><img src="${INCHECKAD_LOGO_URL}" alt="Incheckad Logotyp"></span>` : `<h1 class="header-title">INCHECKAD</h1>`}
+                    ${INCHECKAD_LOGO_URL ? `<img src="${INCHECKAD_LOGO_URL}" alt="Incheckad Logotyp">` : `<h1 class="header-title">INCHECKAD</h1>`}
                 </div>
                 <div class="content">${content}</div>
                 <div class="footer">Detta mejl skickades automatiskt från incheckad.se</div>
@@ -317,6 +316,6 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error('API Notify Route Error:', error);
-        return NextResponse.json({ ok: false, error: message }, { status: 500 });
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 }
