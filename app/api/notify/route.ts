@@ -124,10 +124,9 @@ function createBaseLayout(content: string): string {
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         .body-wrap { background-color: #f0f2f5; margin: 0; padding: 20px; color: #111827; }
         .container { max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e5e7eb; }
-        .header { background-color: #111827; color: white; padding: 24px; text-align: center; }
-        .header img { max-height: 50px; }
+        .header { background-color: #111827; color: white; padding: 20px; text-align: center; }
+        .header img { max-height: 40px; }
         .header-title { margin: 10px 0 0; font-size: 24px; color: #ffffff; }
-        .logo-container { background: white; padding: 10px; border-radius: 50%; display: inline-block; line-height: 0; }
         .content { padding: 24px; }
         .section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
         .section:last-child { margin-bottom: 0; border-bottom: none; }
@@ -151,6 +150,7 @@ function createBaseLayout(content: string): string {
         @media (prefers-color-scheme: dark) {
             .body-wrap { background-color: #000000; color: #e5e7eb; }
             .container { background-color: #1f2937; border-color: #4b5563; }
+            .header { background-color: #111827; } /* Ensures header is dark in dark mode */
             .section h2, .damage-title, .info-grid dd { color: #f9fafb; }
             .info-grid dt, .damage-desc { color: #9ca3af; }
             .section, .damage-section-title { border-color: #4b5563; }
@@ -173,7 +173,7 @@ function createBaseLayout(content: string): string {
         <div class="body-wrap">
             <div class="container">
                 <div class="header">
-                    ${INCHECKAD_LOGO_URL ? `<span class="logo-container"><img src="${INCHECKAD_LOGO_URL}" alt="Incheckad Logotyp"></span>` : `<h1 class="header-title">INCHECKAD</h1>`}
+                    ${INCHECKAD_LOGO_URL ? `<img src="${INCHECKAD_LOGO_URL}" alt="Incheckad Logotyp">` : `<h1 class="header-title">INCHECKAD</h1>`}
                 </div>
                 <div class="content">${content}</div>
                 <div class="footer">Detta mejl skickades automatiskt från incheckad.se</div>
