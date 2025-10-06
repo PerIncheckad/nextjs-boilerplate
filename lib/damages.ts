@@ -36,8 +36,9 @@ function formatDamages(damages: ExternalDamage[]): string[] {
     ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
     const uniqueParts = [...new Set(parts)];
     const damageString = uniqueParts.join(' - ');
+    if (!damageString) return null; // Hoppa över helt tomma skador
     return `${index + 1}. ${damageString}`;
-  });
+  }).filter(Boolean) as string[]; // Filtrera bort null-värden
 }
 
 function formatModel(brand: string | null, model: string | null): string {
@@ -55,32 +56,26 @@ function formatSaludatum(dateStr: string | null | undefined): string {
     if (cleaned.length === 8 && /^\d{8}$/.test(cleaned)) {
         return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
     }
-    // Returnera det ursprungliga värdet om det inte matchar YYYYMMDD, ifall det redan är korrekt formaterat.
-    return dateStr;
+    return dateStr; // Returnera som den är om formatet är okänt
 }
 
 // =================================================================
-// 3. CORE DATA FETCHING FUNCTION (FINAL VERSION)
+// 3. CORE DATA FETCHING FUNCTION (FINAL-FINAL VERSION)
 // =================================================================
 
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
-  // --- Steg 1: Hämta fordonsdata och skadedata parallellt ---
+  // --- Steg 1: Använd RPC-funktioner för BÅDA anropen ---
   const [vehicleResponse, damagesResponse] = await Promise.all([
-    // Anrop 1: Hämta från 'vehicles'-tabellen, trimma regnr i databasen.
     supabase
-      .from('vehicles')
-      .select('brand, model, wheel_storage_location')
-      .filter('trim(regnr)', 'eq', cleanedRegnr)
-      .single(),
-      
-    // Anrop 2: Använd vår nya, "toleranta" funktion för att hämta skador.
+      .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr })
   ]);
 
-  const vehicleData = vehicleResponse.data;
+  // Hämta första (och enda) bilen om den finns
+  const vehicleData = vehicleResponse.data?.[0] || null; 
   const damagesData = damagesResponse.data || [];
 
   // --- Steg 2: Bearbeta den hämtade datan ---
@@ -90,8 +85,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
 
   // --- Steg 3: Bestäm scenario och returnera korrekt data ---
 
-  // Scenario A: Full träff
-  if (vehicleData) {
+  if (vehicleData) { // Scenario A: Bilen hittades i `vehicles`
     return {
       regnr: cleanedRegnr,
       model: formatModel(vehicleData.brand, vehicleData.model),
@@ -102,8 +96,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     };
   }
 
-  // Scenario B: Endast skadehistorik finns
-  if (damagesData.length > 0) {
+  if (damagesData.length > 0) { // Scenario B: Endast skadehistorik finns
     return {
       regnr: cleanedRegnr,
       model: 'Modell saknas',
