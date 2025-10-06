@@ -1,68 +1,138 @@
-import { supabase } from './supabase';
+import { createClient } from '@/utils/supabase/server';
 
-export type DamageCardData = {
-  regnr: string;
-  carModel: string | null;
-  hjulförvaring: string | null;
-  saludatum: string | null;
-  skador: string[];
+// =================================================================
+// 1. TYPE DEFINITIONS
+// =================================================================
+
+// Definierar datastrukturen för en extern skada från databasen
+type ExternalDamage = {
+  damage_type_raw: string | null;
+  note_customer: string | null;
+  note_internal: string | null;
 };
 
-export function normalizeReg(reg: string): string {
-  if (!reg) return '';
-  return reg.toUpperCase().replace(/\s/g, '');
+// Definierar den kompletta informationsstrukturen för ett fordon
+export type VehicleInfo = {
+  regnr: string;
+  model: string;
+  wheel_storage_location: string;
+  existing_damages: string[];
+  status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
+};
+
+// =================================================================
+// 2. HELPER FUNCTIONS
+// =================================================================
+
+/**
+ * Formaterar en lista av skadeobjekt till en läsbar, numrerad lista av strängar.
+ * Tar bort dubbletter och tomma fält för varje skada.
+ * @param damages - En array av skadeobjekt från databasen.
+ * @returns En array av formaterade strängar, t.ex. ["1. Repa - Stötfångare fram - Polerbar"].
+ */
+function formatDamages(damages: ExternalDamage[]): string[] {
+  if (!damages || damages.length === 0) {
+    return [];
+  }
+
+  return damages.map((damage, index) => {
+    const parts = [
+      damage.damage_type_raw,
+      damage.note_customer,
+      damage.note_internal,
+    ];
+
+    // Filtrera bort null/tomma strängar och ta sedan bort dubbletter
+    const uniqueParts = [...new Set(parts.filter(p => p && p.trim() !== '-'))];
+
+    // Skapa den slutgiltiga strängen och lägg till numrering
+    const damageString = uniqueParts.join(' - ');
+    return `${index + 1}. ${damageString}`;
+  });
 }
 
-export async function fetchDamageCard(reg: string): Promise<DamageCardData | null> {
-  const normalized = normalizeReg(reg);
-  if (normalized.length < 6) {
-    return null;
-  }
+/**
+ * Formaterar bilmodell baserat på märke och modell.
+ * @param brand - Märke från databasen.
+ * @param model - Modell från databasen.
+ * @returns En formaterad sträng, t.ex. "Ford Puma", "Ford -", eller "Modell saknas".
+ */
+function formatModel(brand: string | null, model: string | null): string {
+    const cleanBrand = brand?.trim();
+    const cleanModel = model?.trim();
 
-  try {
-    // Vi gör två anrop parallellt.
-    const carDataPromise = supabase
-      .from('car_data')
-      .select('brand_model')
-      .eq('regnr', normalized)
-      .limit(1)
-      .maybeSingle(); // maybeSingle() returnerar null istället för fel om inget hittas.
+    if (cleanBrand && cleanModel) {
+        return `${cleanBrand} ${cleanModel}`;
+    }
+    if (cleanBrand) {
+        return `${cleanBrand} -`;
+    }
+    if (cleanModel) {
+        return `- ${cleanModel}`;
+    }
+    return "Modell saknas";
+}
 
-    const damageViewPromise = supabase
-      .from('mabi_damage_view')
-      .select('regnr, hjulförvaring, saludatum, skador')
-      .eq('regnr', normalized)
-      .maybeSingle(); // maybeSingle() är nyckeln här, den kraschar inte om rad saknas.
 
-    const [carDataResult, damageViewResult] = await Promise.all([
-      carDataPromise,
-      damageViewPromise
-    ]);
+// =================================================================
+// 3. CORE DATA FETCHING FUNCTION
+// =================================================================
 
-    // Logga eventuella oväntade fel, men ignorera "hittades inte".
-    if (carDataResult.error) console.error('Supabase error (car_data):', carDataResult.error);
-    if (damageViewResult.error) console.error('Supabase error (mabi_damage_view):', damageViewResult.error);
+/**
+ * Hämtar all information för ett givet registreringsnummer.
+ * Implementerar logiken för "Standardbil", "Egenägd bil" och "Spökbil".
+ * @param regnr - Registreringsnumret att slå upp.
+ * @returns Ett VehicleInfo-objekt.
+ */
+export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
+  const supabase = createClient();
+  const cleanedRegnr = regnr.toUpperCase().trim();
 
-    // Om en bil finns i allowed_plates men saknar en post i car_data (t.ex. TDG14N),
-    // kommer carDataResult.data vara null. Vi sätter då en standardtext.
-    const carModel = carDataResult.data?.brand_model || 'Modell saknas'; 
-    
-    // Nu bygger vi vårt svarsobjekt. Om data saknas blir fälten null eller en tom array.
-    const combinedData: DamageCardData = {
-      regnr: normalized,
-      carModel: carModel,
-      hjulförvaring: damageViewResult.data?.hjulförvaring || null,
-      saludatum: damageViewResult.data?.saludatum || null,
-      // Om 'skador' är null eller undefined från vyn, returnera en tom array.
-      skador: Array.isArray(damageViewResult.data?.skador) ? damageViewResult.data.skador.filter(Boolean) : [],
+  // --- Steg 1: Leta i huvudlistan (vehicles) ---
+  const { data: vehicleData } = await supabase
+    .from('vehicles')
+    .select('brand, model, wheel_storage_location')
+    .eq('regnr', cleanedRegnr)
+    .single();
+
+  // --- Steg 2: Hämta alltid skador, oavsett om bilen hittades i vehicles ---
+  const { data: damagesData } = await supabase
+    .from('damages_external')
+    .select('damage_type_raw, note_customer, note_internal')
+    .eq('regnr', cleanedRegnr);
+
+  const formattedDamages = formatDamages(damagesData || []);
+
+  // --- Steg 3: Bestäm scenario och returnera korrekt data ---
+
+  // Scenario A: "Standardbilen" - Full träff i vagnparkslistan.
+  if (vehicleData) {
+    return {
+      regnr: cleanedRegnr,
+      model: formatModel(vehicleData.brand, vehicleData.model),
+      wheel_storage_location: vehicleData.wheel_storage_location || 'Ingen information',
+      existing_damages: formattedDamages,
+      status: 'FULL_MATCH',
     };
-    
-    // Denna funktion kommer ALLTID att returnera ett objekt, så länge reg.nr är giltigt.
-    // Detta förhindrar "hittades inte"-felet.
-    return combinedData;
-
-  } catch (err) {
-    console.error(`Exception during robust fetch for ${normalized}:`, err);
-    return null; // Returnera null bara vid ett totalt haveri.
   }
+
+  // Scenario B: "Den Egenägda Bilen" - Ingen träff i vagnpark, men har skadehistorik.
+  if (damagesData && damagesData.length > 0) {
+    return {
+      regnr: cleanedRegnr,
+      model: 'Modell saknas',
+      wheel_storage_location: 'Ingen information',
+      existing_damages: formattedDamages,
+      status: 'PARTIAL_MATCH_DAMAGE_ONLY',
+    };
+  }
+
+  // Scenario C: "Spökbilen" - Ingen träff någonstans.
+  return {
+    regnr: cleanedRegnr,
+    model: 'Modell saknas',
+    wheel_storage_location: 'Ingen information',
+    existing_damages: [],
+    status: 'NO_MATCH',
+  };
 }
