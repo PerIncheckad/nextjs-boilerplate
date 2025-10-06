@@ -1,4 +1,4 @@
-import { createClient } from './supabase';
+import { supabase } from './supabase'; // <-- ÄNDRING 1: Importera den färdiga klienten
 
 // =================================================================
 // 1. TYPE DEFINITIONS
@@ -89,7 +89,7 @@ function formatModel(brand: string | null, model: string | null): string {
  * @returns Ett VehicleInfo-objekt.
  */
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
-  const supabase = createClient();
+  // const supabase = createClient(); <-- ÄNDRING 2: Radera denna rad
   const cleanedRegnr = regnr.toUpperCase().trim();
 
   // --- Steg 1: Leta i huvudlistan (vehicles) ---
