@@ -2,15 +2,13 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-// STEG 1: ÄNDRA IMPORTS
-import { getVehicleInfo, VehicleInfo } from '@/lib/damages'; // Ändrad från fetchDamageCard och DamageCardData
+import { getVehicleInfo, VehicleInfo } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
-// Åtgärd från företrädaren: Lägg till normalizeReg lokalt
 const normalizeReg = (reg: string) => reg.toUpperCase().replace(/\s/g, '');
 
 // =================================================================
-// 1. DATA, TYPES & HELPERS (Mestadels oförändrat)
+// 1. DATA, TYPES & HELPERS (Oförändrat)
 // =================================================================
 
 const MABI_LOGO_URL = "/mabi-logo.png";
@@ -172,15 +170,12 @@ export default function CheckInForm() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [notFound, setNotFound] = useState(false); // Åtgärd: Verifierad att denna finns
+  const [notFound, setNotFound] = useState(false);
   const [isFinalSaving, setIsFinalSaving] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({ isOpen: false, text: '', onConfirm: () => {} });
-
-  // STEG 2: UPPDATERA STATE-VARIABEL FÖR FORDONSDATA
   const [vehicleData, setVehicleData] = useState<VehicleInfo | null>(null);
-
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
   const [matarstallning, setMatarstallning] = useState('');
@@ -202,12 +197,10 @@ export default function CheckInForm() {
   const [washed, setWashed] = useState(false);
   const [spolarvatskaOK, setSpolarvatskaOK] = useState(false);
   const [adblueOK, setAdblueOK] = useState(false);
-
   const [skadekontroll, setSkadekontroll] = useState<'inga_nya_skador' | 'nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  
   const [initialUrlLoadHandled, setInitialUrlLoadHandled] = useState(false);
 
   // Derived State & Memos
@@ -245,7 +238,7 @@ export default function CheckInForm() {
       otherChecklistItemsOK: otherChecklistItemsOK,
   }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
-  // STEG 3: SKRIV OM DATAHÄMTNINGSFUNKTIONEN
+  // Datahämtningsfunktion med utökad felhantering
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
@@ -255,23 +248,19 @@ export default function CheckInForm() {
       const normalized = normalizeReg(reg);
       const info = await getVehicleInfo(normalized);
   
-      // Scenario C: Helt okänd bil
       if (info.status === 'NO_MATCH') {
-        // ÄNDRING: Uppdaterad varningstext
         const proceed = window.confirm(
           '⚠️ Är du säker på att du skrivit in korrekt reg.nr?'
         );
         if (!proceed) {
-          setRegInput(''); // Rensa input
+          setRegInput('');
           setLoading(false);
-          return; // Avbryt
+          return;
         }
       }
   
-      // Fortsätt för alla scenarier (A, B, och C efter bekräftelse)
       setVehicleData(info);
       
-      // Fyll på befintliga skador från den nya datastrukturen
       if (info.existing_damages.length > 0) {
           setExistingDamages(info.existing_damages.map(d_text => ({ 
               id: Math.random().toString(36).substring(2, 15), 
@@ -281,13 +270,18 @@ export default function CheckInForm() {
           })));
       }
   
-      // Sätt notFound-flaggan om bilen saknas i masterlistan, för att ev. visa meddelande i UI
       if (info.status === 'PARTIAL_MATCH_DAMAGE_ONLY' || info.status === 'NO_MATCH') {
-          setNotFound(true); // Återanvänd denna flagga för att visa "Modell saknas" etc.
+          setNotFound(true);
       }
   
-    } catch (error) {
+    } catch (error: any) {
+      // UPPDATERING: Utökad felhantering för att logga mer information
       console.error("Fetch vehicle data error:", error);
+      if (error.message.includes('fetch failed') || error.message.includes('NetworkError')) {
+        console.error("Network-related error. Check Supabase connection and RLS policies.");
+      } else if (error.message.includes('JSON')) {
+        console.error("Possible RLS policy issue. The server returned data that couldn't be parsed, often an empty response due to permissions.");
+      }
       setNotFound(true);
       setVehicleData(null);
       setExistingDamages([]);
@@ -404,10 +398,9 @@ export default function CheckInForm() {
         newForUpload.map(d => uploadAllForDamage(d, normalizedReg))
       );
       
-      // STEG 5: UPPDATERA HANDLESUBMIT
       const submissionPayload = {
           regnr: normalizedReg,
-          status: vehicleData?.status, // <-- LÄGG TILL DENNA RAD
+          status: vehicleData?.status,
           carModel: vehicleData?.model,
           ort,
           station,
@@ -425,7 +418,6 @@ export default function CheckInForm() {
           åtgärdade_skador: resolvedDamages.map(d => ({...d, media: undefined})),
       };
       
-      // STEG 6: MODIFIERA ANROPET TILL NOTIFYCHECKIN
       await notifyCheckin(submissionPayload);
 
       setShowSuccessModal(true);
@@ -529,7 +521,8 @@ export default function CheckInForm() {
             <input 
               type="text" 
               value={regInput} 
-              onChange={(e) => setRegInput(e.target.value)}
+              // UPPDATERING: Återställer toUpperCase() här
+              onChange={(e) => setRegInput(e.target.value.toUpperCase())}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
               placeholder="ABC 123" 
@@ -559,10 +552,8 @@ export default function CheckInForm() {
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              {/* STEG 4: UPPDATERA JSX FÖR ATT VISA NY DATA */}
               <InfoRow label="Bilmodell" value={vehicleData.model || '---'} />
               <InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} />
-              {/* ÄNDRING: Raden för Saludatum är tillbaka */}
               <InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
             </div>
             {existingDamages.length > 0 && (
@@ -900,7 +891,7 @@ const GlobalStyles = () => (
         .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; }
         .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
         .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
-        .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; }
+        .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
         .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
         .suggestion-item { padding: 0.75rem; cursor: pointer; }
         .suggestion-item:hover { background-color: var(--color-primary-light); }
