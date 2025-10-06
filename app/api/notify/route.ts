@@ -8,6 +8,29 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const toAddress = process.env.EMAIL_TO_ADDRESS;
 const bilkontrollAddress = process.env.EMAIL_BILKONTROLL_ADDRESS;
 
+// Helper för att formatera skador till HTML
+const formatDamagesToHtml = (damages: any[], title: string): string => {
+  if (!damages || damages.length === 0) return '';
+  
+  const items = damages.map(d => {
+    const type = d.type || d.userType;
+    const carPart = d.carPart || d.userCarPart;
+    const position = d.position || d.userPosition;
+    const description = d.text || d.userDescription || d.fullText || '';
+    
+    let damageString = [type, carPart, position].filter(Boolean).join(' - ');
+    if (description && description !== damageString) {
+      damageString += ` (${description})`;
+    }
+    return `<li>${damageString}</li>`;
+  }).join('');
+
+  return `
+    <h3 style="font-size: 18px; margin-top: 20px; margin-bottom: 10px;">${title}</h3>
+    <ul>${items}</ul>
+  `;
+};
+
 export async function POST(request: Request) {
   // Kontrollera att mottagaradresser är konfigurerade
   if (!toAddress || !bilkontrollAddress) {
@@ -19,22 +42,26 @@ export async function POST(request: Request) {
   }
 
   try {
-    const formData = await request.formData();
+    // Läs in JSON-body istället för FormData
+    const payload = await request.json();
 
-    // Hämta all data från formuläret
-    const regnr = (formData.get('regnr') as string) || 'Okänt regnr';
-    const mileage = (formData.get('mileage') as string) || 'Ej angivet';
-    const fuel = (formData.get('fuel') as string) || 'Ej angivet';
-    const station = (formData.get('station') as string) || 'Okänd station';
-    const newDamages = (formData.get('new_damages') as string) || 'Inga nya skador';
-    const smoking = formData.get('smoking') === 'on' ? 'Ja' : 'Nej';
-    const pets = formData.get('pets') === 'on' ? 'Ja' : 'Nej';
-    const otherNotes = (formData.get('other_notes') as string) || 'Inga övriga noteringar';
-    
-    // Hämta den kritiska status-flaggan
-    const status = formData.get('status') as string;
+    const {
+      regnr,
+      status, // Den kritiska status-flaggan
+      carModel,
+      ort,
+      station,
+      matarstallning,
+      hjultyp,
+      rekond,
+      notering,
+      incheckare,
+      dokumenterade_skador = [],
+      nya_skador = [],
+      åtgärdade_skador = []
+    } = payload;
 
-    // --- NY LOGIK FÖR VARNING TILL BILKONTROLL ---
+    // --- Logik för varning till Bilkontroll baserat på status ---
     let bilkontrollWarning = '';
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       bilkontrollWarning = `
@@ -43,7 +70,6 @@ export async function POST(request: Request) {
         </p>
       `;
     }
-    // --- SLUT PÅ NY LOGIK ---
 
     const subject = `Incheckning för ${regnr} - ${station}`;
 
@@ -52,36 +78,42 @@ export async function POST(request: Request) {
       <div style="font-family: sans-serif; line-height: 1.6;">
         ${bilkontrollWarning}
         <h1 style="font-size: 24px;">Incheckning för ${regnr}</h1>
+        <p>Incheckare: ${incheckare || 'Okänd'}</p>
         <table style="width: 100%; border-collapse: collapse;">
           <tr style="border-bottom: 1px solid #ddd;">
+            <td style="padding: 8px; font-weight: bold;">Bilmodell:</td>
+            <td style="padding: 8px;">${carModel || '---'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #ddd;">
             <td style="padding: 8px; font-weight: bold;">Station:</td>
-            <td style="padding: 8px;">${station}</td>
+            <td style="padding: 8px;">${ort} / ${station}</td>
           </tr>
           <tr style="border-bottom: 1px solid #ddd;">
             <td style="padding: 8px; font-weight: bold;">Mätarställning:</td>
-            <td style="padding: 8px;">${mileage} km</td>
+            <td style="padding: 8px;">${matarstallning} km</td>
           </tr>
           <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 8px; font-weight: bold;">Bränsle:</td>
-            <td style="padding: 8px;">${fuel}</td>
+            <td style="padding: 8px; font-weight: bold;">Däck:</td>
+            <td style="padding: 8px;">${hjultyp || '---'}</td>
           </tr>
-          <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 8px; font-weight: bold;">Nya skador:</td>
-            <td style="padding: 8px;">${newDamages.replace(/\n/g, '<br>')}</td>
+          ${rekond ? `
+          <tr style="border-bottom: 1px solid #ddd; background-color: #fef2f2;">
+            <td style="padding: 8px; font-weight: bold; color: #dc2626;">Behöver rekond:</td>
+            <td style="padding: 8px; color: #dc2626;">Ja</td>
           </tr>
-          <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 8px; font-weight: bold;">Rökning i bil:</td>
-            <td style="padding: 8px;">${smoking}</td>
-          </tr>
-          <tr style="border-bottom: 1px solid #ddd;">
-            <td style="padding: 8px; font-weight: bold;">Djur i bil:</td>
-            <td style="padding: 8px;">${pets}</td>
-          </tr>
+          ` : ''}
+          ${notering ? `
           <tr style="border-bottom: 1px solid #ddd;">
             <td style="padding: 8px; font-weight: bold;">Övriga noteringar:</td>
-            <td style="padding: 8px;">${otherNotes.replace(/\n/g, '<br>')}</td>
+            <td style="padding: 8px;">${notering.replace(/\n/g, '<br>')}</td>
           </tr>
+          ` : ''}
         </table>
+
+        ${formatDamagesToHtml(nya_skador, '💥 Nya skador')}
+        ${formatDamagesToHtml(dokumenterade_skador, '📋 Dokumenterade befintliga skador')}
+        ${formatDamagesToHtml(åtgärdade_skador, '✅ Åtgärdade/Ej funna skador')}
+
       </div>
     `;
 
@@ -96,6 +128,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Notification sent successfully' });
   } catch (error) {
     console.error('Failed to send notification:', error);
+    // Om felet är ett JSON-parsningsfel, ge ett mer specifikt meddelande
+    if (error instanceof SyntaxError) {
+        return NextResponse.json(
+            { error: 'Invalid JSON body' },
+            { status: 400 }
+        );
+    }
     return NextResponse.json(
       { error: 'Failed to send notification' },
       { status: 500 }
