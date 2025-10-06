@@ -9,6 +9,8 @@ type ExternalDamage = {
   damage_type_raw: string | null;
   note_customer: string | null;
   note_internal: string | null;
+  // ÄNDRING: Lägg till saludatum i typen
+  saludatum: string | null; 
 };
 
 // Definierar den kompletta informationsstrukturen för ett fordon
@@ -16,6 +18,8 @@ export type VehicleInfo = {
   regnr: string;
   model: string;
   wheel_storage_location: string;
+  // ÄNDRING: Lägg till saludatum i typen
+  saludatum: string;
   existing_damages: string[];
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
 };
@@ -98,10 +102,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // --- Steg 2: Hämta alltid skador, oavsett om bilen hittades i vehicles ---
   const { data: damagesData } = await supabase
     .from('damages_external')
-    .select('damage_type_raw, note_customer, note_internal')
+    // ÄNDRING: Hämta även 'saludatum'
+    .select('damage_type_raw, note_customer, note_internal, saludatum')
     .eq('regnr', cleanedRegnr);
 
   const formattedDamages = formatDamages(damagesData || []);
+  // ÄNDRING: Hämta första bästa saludatum från skadehistoriken
+  const saludatumFromDamages = damagesData?.find(d => d.saludatum)?.saludatum || 'Ingen information';
 
   // --- Steg 3: Bestäm scenario och returnera korrekt data ---
 
@@ -111,6 +118,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       regnr: cleanedRegnr,
       model: formatModel(vehicleData.brand, vehicleData.model),
       wheel_storage_location: vehicleData.wheel_storage_location || 'Ingen information',
+      saludatum: saludatumFromDamages, // Lägg till saludatum här
       existing_damages: formattedDamages,
       status: 'FULL_MATCH',
     };
@@ -122,6 +130,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       regnr: cleanedRegnr,
       model: 'Modell saknas',
       wheel_storage_location: 'Ingen information',
+      saludatum: saludatumFromDamages, // Lägg till saludatum här
       existing_damages: formattedDamages,
       status: 'PARTIAL_MATCH_DAMAGE_ONLY',
     };
@@ -132,6 +141,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     regnr: cleanedRegnr,
     model: 'Modell saknas',
     wheel_storage_location: 'Ingen information',
+    saludatum: 'Ingen information', // Fallback-värde
     existing_damages: [],
     status: 'NO_MATCH',
   };
