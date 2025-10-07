@@ -86,6 +86,8 @@ const formatTankning = (tankning: any): string => {
     return '---';
 };
 
+const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+
 const createBaseLayout = (regnr: string, content: string): string => `
   <!DOCTYPE html>
   <html>
@@ -104,12 +106,12 @@ const createBaseLayout = (regnr: string, content: string): string => `
           <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
         </div>
         <div style="text-align: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
-          <h1 style="font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 2px; color: #111827;">${regnr}</h1>
+          <h1 style="font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 2px; color: #111827 !important;">${regnr}</h1>
         </div>
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
           ${content}
         </table>
-        <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #9ca3af;">
+        <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #9ca3af !important;">
           Detta mejl skickades automatiskt från incheckad.se
         </div>
       </div>
@@ -123,7 +125,8 @@ const createBaseLayout = (regnr: string, content: string): string => `
 // =================================================================
 
 const buildRegionEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, bilder_url, nya_skador = [] } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, nya_skador = [] } = payload;
+  const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
 
   const content = `
     ${createAlertBanner(rekond, 'Behöver rekond')}
@@ -131,21 +134,21 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
+        <h2 style="font-size: 16px; color: #374151 !important; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
         <table class="info-grid">
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #111827; padding: 4px 0;">${regnr}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #111827; padding: 4px 0;">${carModel || '---'}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #111827; padding: 4px 0;">${ort} / ${station}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #111827; padding: 4px 0;">${date}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #111827; padding: 4px 0;">${time}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #111827; padding: 4px 0;">${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #111827 !important; padding: 4px 0;">${regnr}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #111827 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #111827 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #111827 !important; padding: 4px 0;">${date}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #111827 !important; padding: 4px 0;">${time}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #111827 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
+        <h2 style="font-size: 16px; color: #374151 !important; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
         <table class="info-grid">
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #111827; padding: 4px 0;">${matarstallning} km</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #111827; padding: 4px 0;">${formatTankning(tankning)}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #111827 !important; padding: 4px 0;">${matarstallning} km</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #111827 !important; padding: 4px 0;">${formatTankning(tankning)}</td></tr>
         </table>
       </div>
       ${nya_skador.length > 0 ? `
@@ -153,7 +156,7 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
           ${formatDamagesToHtml(nya_skador, 'Nya skador')}
         </div>
       ` : ''}
-      ${bilder_url ? `<div style="padding-top: 10px;"><a href="${bilder_url}" style="color: #2563EB; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
+      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #2563EB !important; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>
     </td></tr>
   `;
 
@@ -161,8 +164,9 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, bilder_url, notering,
+  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, notering,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
+  const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
           
   const content = `
     ${createAlertBanner(rekond, 'Behöver rekond')}
@@ -170,35 +174,35 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
+        <h2 style="font-size: 16px; color: #374151 !important; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
         <table class="info-grid">
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #111827; padding: 4px 0;">${regnr}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #111827; padding: 4px 0;">${carModel || '---'}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Däck:</td><td style="color: #111827; padding: 4px 0;">${hjultyp || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #111827 !important; padding: 4px 0;">${regnr}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #111827 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Däck:</td><td style="color: #111827 !important; padding: 4px 0;">${hjultyp || '---'}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
+        <h2 style="font-size: 16px; color: #374151 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table class="info-grid">
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #111827; padding: 4px 0;">${ort} / ${station}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #111827; padding: 4px 0;">${date}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #111827; padding: 4px 0;">${time}</td></tr>
-          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #111827; padding: 4px 0;">${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #111827 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #111827 !important; padding: 4px 0;">${date}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #111827 !important; padding: 4px 0;">${time}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #111827 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Skadeöversikt</h2>
+        <h2 style="font-size: 16px; color: #374151 !important; font-weight: 600; margin-bottom: 15px;">Skadeöversikt</h2>
         ${formatDamagesToHtml(åtgärdade_skador, 'Åtgärdade / Hittas ej')}
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador')}
         ${formatDamagesToHtml(nya_skador, 'Nya skador')}
       </div>
       ${notering ? `
         <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-          <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>
-          <p style="margin:0; color: #4b5563;">${notering}</p>
+          <h2 style="font-size: 16px; color: #374151 !important; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>
+          <p style="margin:0; color: #4b5563 !important;">${notering}</p>
         </div>
       ` : ''}
-      ${bilder_url ? `<div style="padding-top: 10px;"><a href="${bilder_url}" style="color: #2563EB; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
+      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #2563EB !important; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>
     </td></tr>
   `;
 
