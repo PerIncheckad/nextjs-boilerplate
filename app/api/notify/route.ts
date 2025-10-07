@@ -34,7 +34,7 @@ const createAlertBanner = (condition: boolean, text: string): string => {
   return `
     <tr>
       <td style="padding: 12px 0;">
-        <div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #B45309 !important; border-radius: 5px;">
+        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #B45309 !important; border-radius: 5px;">
           ⚠️ ${text}
         </div>
       </td>
@@ -90,32 +90,66 @@ const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u030
 
 const createBaseLayout = (regnr: string, content: string): string => `
   <!DOCTYPE html>
-  <html>
+  <html lang="sv" xmlns:v="urn:schemas-microsoft-com:vml">
   <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="color-scheme" content="light">
     <meta name="supported-color-schemes" content="light">
+    <!--[if !mso]><!-->
     <style>
-      body { margin: 0; padding: 0; background-color: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif; }
+      :root {
+        color-scheme: light;
+        supported-color-schemes: light;
+      }
+      body {
+        background-color: #ffffff !important;
+        background-image: linear-gradient(#ffffff, #ffffff) !important;
+      }
+      h1, h2, h3, h4, h5, h6, p, a, li, span, td, div {
+        color: #111827 !important;
+      }
+      a, a:visited {
+        color: #005A9C !important;
+        text-decoration: none !important;
+      }
     </style>
+    <!--<![endif]-->
   </head>
-  <body style="background-color: #f0f2f5 !important;">
-    <div style="background-color: #f0f2f5 !important; padding: 20px;">
-      <div style="max-width: 640px; margin: auto; background-color: #ffffff !important; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #111827 !important;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
-        </div>
-        <div style="text-align: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
-          <h1 style="font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 2px; color: #111827 !important;">${regnr}</h1>
-        </div>
+  <body class="body" style="margin: 0; padding: 0; width: 100%; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
+    <center>
+      <!--[if mso]>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="680">
+        <tr>
+        <td>
+      <![endif]-->
+      <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-          ${content}
+          <tr>
+            <td style="padding: 20px 40px; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
+              </div>
+              <div style="text-align: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+                <h1 style="font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 2px; color: #111827 !important;">${regnr}</h1>
+              </div>
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                ${content}
+              </table>
+              <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #9ca3af !important;">
+                Detta mejl skickades automatiskt från incheckad.se
+              </div>
+            </td>
+          </tr>
         </table>
-        <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #9ca3af !important;">
-          Detta mejl skickades automatiskt från incheckad.se
-        </div>
       </div>
-    </div>
+      <!--[if mso]>
+        </td>
+        </tr>
+        </table>
+      <![endif]-->
+    </center>
   </body>
   </html>
 `;
@@ -156,7 +190,7 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
           ${formatDamagesToHtml(nya_skador, 'Nya skador')}
         </div>
       ` : ''}
-      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #2563EB !important; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>
+      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #005A9C !important; text-decoration: none !important;">Öppna bildgalleri för ${regnr} →</a></div>
     </td></tr>
   `;
 
@@ -202,7 +236,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
           <p style="margin:0; color: #4b5563 !important;">${notering}</p>
         </div>
       ` : ''}
-      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #2563EB !important; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>
+      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #005A9C !important; text-decoration: none !important;">Öppna bildgalleri för ${regnr} →</a></div>
     </td></tr>
   `;
 
@@ -248,7 +282,7 @@ export async function POST(request: Request) {
 
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = `<p style="color: #111827 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i det centrala bilregistret. Vänligen lägg till fordonet manuellt.</p>`;
+      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #111827 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i det centrala bilregistret. Vänligen lägg till fordonet manuellt.</p></td></tr>`);
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
 
