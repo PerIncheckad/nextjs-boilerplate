@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// Initiera e-postklienten (använder RESEND_API_KEY, som du har)
+// Initiera e-postklienten (använder RESEND_API_KEY, som är korrekt utan prefix)
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Hämta e-postadresser från dina befintliga miljövariabler
-const bilkontrollAddress = process.env.NEXT_PUBLIC_BILKONTROLL_MAIL;
-const regionSydAddress = process.env.NEXT_PUBLIC_MAIL_REGION_SYD;
-const regionMittAddress = process.env.NEXT_PUBLIC_MAIL_REGION_MITT;
-const regionNorrAddress = process.env.NEXT_PUBLIC_MAIL_REGION_NORR;
-const fallbackAddress = process.env.NEXT_PUBLIC_TEST_MAIL; // Perfekt som fallback
+// Hämta e-postadresser från SERVER-variabler (UTAN NEXT_PUBLIC_)
+const bilkontrollAddress = process.env.BILKONTROLL_MAIL;
+const regionSydAddress = process.env.MAIL_REGION_SYD;
+const regionMittAddress = process.env.MAIL_REGION_MITT;
+const regionNorrAddress = process.env.MAIL_REGION_NORR;
+const fallbackAddress = process.env.TEST_MAIL; // Använder server-versionen
 
 // Karta för att koppla en ort till rätt REGIONS-variabel
 const regionMapping: { [ort: string]: string | undefined } = {
@@ -21,7 +21,7 @@ const regionMapping: { [ort: string]: string | undefined } = {
   'Trelleborg': regionSydAddress,
   'Varberg': regionSydAddress,
   'Lund': regionSydAddress,
-  // Lägg till orter för 'mitt' och 'norr' här, de kommer automatiskt att peka på rätt adress
+  // Lägg till orter för 'mitt' och 'norr' här
 };
 
 // Helper för att formatera skador (oförändrad)
@@ -42,33 +42,25 @@ const formatDamagesToHtml = (damages: any[], title: string): string => {
 };
 
 export async function POST(request: Request) {
-  // Kontrollera att de mest kritiska adresserna finns
   if (!bilkontrollAddress || !fallbackAddress) {
-    console.error('Required email addresses (BILKONTROLL or TEST/FALLBACK) are not configured.');
-    return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
+    console.error('Required email server variables (BILKONTROLL_MAIL or TEST_MAIL) are not configured.');
+    return NextResponse.json({ error: 'Server configuration error: Email variables missing.' }, { status: 500 });
   }
 
   try {
     const payload = await request.json();
     const { ort, station, regnr, status, carModel, matarstallning, hjultyp, rekond, notering, incheckare, dokumenterade_skador = [], nya_skador = [], åtgärdade_skador = [] } = payload;
 
-    // --- ANPASSAD LOGIK: Bestäm mottagaradress baserat på din setup ---
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
-    
-    // Bygg mottagarlistan och säkerställ att inga är tomma/null
     const recipients = [regionalAddress, bilkontrollAddress].filter(Boolean) as string[];
-    // Använd en Set för att ta bort eventuella dubbletter (om t.ex. test-adressen är samma som bilkontroll)
     const uniqueRecipients = Array.from(new Set(recipients));
 
-    // Varningslogik (oförändrad)
     let bilkontrollWarning = '';
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       bilkontrollWarning = `<p style="padding: 12px; border-left: 4px solid #f59e0b; background-color: #fffbeb; font-weight: bold; margin-bottom: 20px;">OBS! Registreringsnumret saknas i filen "MABISYD Bilkontroll 2024-2025" och behöver läggas till.</p>`;
     }
 
     const subject = `Incheckning för ${regnr} - ${station}`;
-    
-    // Fullständig HTML för e-post (oförändrad)
     const emailHtml = `
       <div style="font-family: sans-serif; line-height: 1.6;">
         ${bilkontrollWarning}
@@ -88,7 +80,6 @@ export async function POST(request: Request) {
       </div>
     `;
 
-    // Skicka mejlet
     await resend.emails.send({
       from: 'incheckning@mabisyd.se',
       to: uniqueRecipients,
