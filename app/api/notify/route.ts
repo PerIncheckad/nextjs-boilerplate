@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// Initiera e-postklienten
+// =================================================================
+// 1. INITIALIZATION & CONFIGURATION
+// =================================================================
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Hämta e-postadresser från SERVER-variabler
 const bilkontrollAddress = process.env.BILKONTROLL_MAIL;
 const regionSydAddress = process.env.MAIL_REGION_SYD;
 const regionMittAddress = process.env.MAIL_REGION_MITT;
 const regionNorrAddress = process.env.MAIL_REGION_NORR;
 const fallbackAddress = process.env.TEST_MAIL;
 
-// Karta för att koppla en ort till rätt REGIONS-variabel
 const regionMapping: { [ort: string]: string | undefined } = {
   'Malmö': regionSydAddress,
   'Helsingborg': regionSydAddress,
@@ -23,74 +23,104 @@ const regionMapping: { [ort: string]: string | undefined } = {
   'Lund': regionSydAddress,
 };
 
-// Helper för att formatera skador (oförändrad)
+// =================================================================
+// 2. HELPER TO FORMAT DAMAGES (för Bilkontroll-mejlet)
+// =================================================================
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
-  const items = damages.map(d => {
-    const type = d.type || d.userType;
-    const carPart = d.carPart || d.userCarPart;
-    const position = d.position || d.userPosition;
-    const description = d.text || d.userDescription || d.fullText || '';
-    let damageString = [type, carPart, position].filter(Boolean).join(' - ');
-    if (description && description !== damageString) {
-      damageString += ` (${description})`;
-    }
-    return `<li>${damageString}</li>`;
-  }).join('');
-  return `<h3 style="font-size: 18px; margin-top: 20px; margin-bottom: 10px;">${title}</h3><ul>${items}</ul>`;
+  const items = damages.map(d => `<li>${d.fullText || d.text}</li>`).join('');
+  return `<h4 style="margin-bottom: 5px; margin-top: 15px; color: #555;">${title}</h4><ul>${items}</ul>`;
 };
 
+// =================================================================
+// 3. MAIN API FUNCTION
+// =================================================================
 export async function POST(request: Request) {
   if (!bilkontrollAddress || !fallbackAddress) {
-    console.error('Required email server variables (BILKONTROLL_MAIL or TEST_MAIL) are not configured.');
-    return NextResponse.json({ error: 'Server configuration error: Email variables missing.' }, { status: 500 });
+    console.error('SERVER ERROR: BILKONTROLL_MAIL or TEST_MAIL is not configured.');
+    return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
   }
 
   try {
     const payload = await request.json();
-    const { ort, station, regnr, status, carModel, matarstallning, hjultyp, rekond, notering, incheckare, dokumenterade_skador = [], nya_skador = [], åtgärdade_skador = [] } = payload;
+    const { 
+        regnr, status, carModel, ort, station, matarstallning, hjultyp, rekond, notering, incheckare, 
+        dokumenterade_skador = [], nya_skador = [], åtgärdade_skador = [], bilder_url,
+        datum, tid, tankning // Inkluderar alla fält från dina mallar
+    } = payload;
 
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
-    const recipients = [regionalAddress, bilkontrollAddress].filter(Boolean) as string[];
-    const uniqueRecipients = Array.from(new Set(recipients));
+    const emailPromises = []; // En lista för att samla alla mejl som ska skickas
 
-    let bilkontrollWarning = '';
-    if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
-      bilkontrollWarning = `<p style="padding: 12px; border-left: 4px solid #f59e0b; background-color: #fffbeb; font-weight: bold; margin-bottom: 20px;">OBS! Registreringsnumret saknas i filen "MABISYD Bilkontroll 2024-2025" och behöver läggas till.</p>`;
-    }
-
-    const subject = `Incheckning för ${regnr} - ${station}`;
-    const emailHtml = `
-      <div style="font-family: sans-serif; line-height: 1.6;">
-        ${bilkontrollWarning}
-        <h1 style="font-size: 24px;">Incheckning för ${regnr}</h1>
-        <p>Incheckare: ${incheckare || 'Okänd'}</p>
-        <table style="width: 100%; border-collapse: collapse;">
-          <tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px; font-weight: bold;">Bilmodell:</td><td style="padding: 8px;">${carModel || '---'}</td></tr>
-          <tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px; font-weight: bold;">Station:</td><td style="padding: 8px;">${ort} / ${station}</td></tr>
-          <tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px; font-weight: bold;">Mätarställning:</td><td style="padding: 8px;">${matarstallning} km</td></tr>
-          <tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px; font-weight: bold;">Däck:</td><td style="padding: 8px;">${hjultyp || '---'}</td></tr>
-          ${rekond ? `<tr style="border-bottom: 1px solid #ddd; background-color: #fef2f2;"><td style="padding: 8px; font-weight: bold; color: #dc2626;">Behöver rekond:</td><td style="padding: 8px; color: #dc2626;">Ja</td></tr>` : ''}
-          ${notering ? `<tr style="border-bottom: 1px solid #ddd;"><td style="padding: 8px; font-weight: bold;">Övriga noteringar:</td><td style="padding: 8px;">${notering.replace(/\n/g, '<br>')}</td></tr>` : ''}
-        </table>
-        ${formatDamagesToHtml(nya_skador, '💥 Nya skador')}
-        ${formatDamagesToHtml(dokumenterade_skador, '📋 Dokumenterade befintliga skador')}
-        ${formatDamagesToHtml(åtgärdade_skador, '✅ Åtgärdade/Ej funna skador')}
+    // --- Bygg och lägg till Email 1: Region-mejlet (Sammanfattning) ---
+    const regionSubject = `INCHECKAD: ${regnr} - ${ort} / ${station} - REGION`;
+    const regionHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif; background-color: #f0f2f5; padding: 20px;">
+        <div style="max-width: 680px; margin: auto; background-color: white; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://incheckad.se/incheckad-logo-pin.png" alt="Incheckad" style="width: 60px; height: auto;">
+          </div>
+          ${rekond ? `<div style="background-color: #FFFBEB; border: 1px solid #FDE68A; padding: 12px; margin-bottom: 20px; text-align: center; font-weight: bold; color: #B45309; border-radius: 5px;">⚠️ Behöver rekond</div>` : ''}
+          <h2 style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; font-size: 16px; color: #374151;">Sammanfattning</h2>
+          <p style="margin: 4px 0;"><strong>Reg.nr:</strong> ${regnr}</p>
+          <p style="margin: 4px 0;"><strong>Bilmodell:</strong> ${carModel || '---'}</p>
+          <p style="margin: 4px 0;"><strong>Plats:</strong> ${ort} / ${station}</p>
+          <p style="margin: 4px 0;"><strong>Datum:</strong> ${datum || '---'}</p>
+          <p style="margin: 4px 0;"><strong>Tid:</strong> ${tid || '---'}</p>
+          <p style="margin: 4px 0;"><strong>Incheckare:</strong> ${incheckare || '---'}</p>
+          <h2 style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-top: 30px; font-size: 16px; color: #374151;">Fordonsstatus</h2>
+          <p style="margin: 4px 0;"><strong>Mätarställning:</strong> ${matarstallning} km</p>
+          <p style="margin: 4px 0;"><strong>Tankning:</strong> ${tankning || '---'}</p>
+          ${bilder_url ? `<div style="margin-top: 30px;"><a href="${bilder_url}" style="color: #005A9C; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
+        </div>
       </div>
     `;
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: regionSubject, html: regionHtml }));
 
-    await resend.emails.send({
-      from: `incheckning@incheckad.se`, // <-- KORRIGERAD DOMÄN
-      to: uniqueRecipients,
-      subject: subject,
-      html: emailHtml,
-    });
+    // --- Bygg och lägg till Email 2: Bilkontroll-mejlet (Detaljerad skaderapport) ---
+    const bilkontrollSubject = `INCHECKAD: ${regnr} - ${ort} / ${station} - BILKONTROLL`;
+    const bilkontrollHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif; background-color: #f0f2f5; padding: 20px;">
+        <div style="max-width: 680px; margin: auto; background-color: white; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://incheckad.se/incheckad-logo-pin.png" alt="Incheckad" style="width: 60px; height: auto;">
+          </div>
+          ${rekond ? `<div style="background-color: #FFFBEB; border: 1px solid #FDE68A; padding: 12px; margin-bottom: 20px; text-align: center; font-weight: bold; color: #B45309; border-radius: 5px;">⚠️ Behöver rekond</div>` : ''}
+          <h2 style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; font-size: 16px; color: #374151;">Fordonsinformation</h2>
+          <p style="margin: 4px 0;"><strong>Reg.nr:</strong> ${regnr}</p>
+          <p style="margin: 4px 0;"><strong>Bilmodell:</strong> ${carModel || '---'}</p>
+          <p style="margin: 4px 0;"><strong>Däck:</strong> ${hjultyp || '---'}</p>
+          <h2 style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-top: 30px; font-size: 16px; color: #374151;">Incheckningsdetaljer</h2>
+          <p style="margin: 4px 0;"><strong>Plats:</strong> ${ort} / ${station}</p>
+          <p style="margin: 4px 0;"><strong>Datum:</strong> ${datum || '---'}</p>
+          <p style="margin: 4px 0;"><strong>Tid:</strong> ${tid || '---'}</p>
+          <p style="margin: 4px 0;"><strong>Incheckare:</strong> ${incheckare || '---'}</p>
+          <h2 style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-top: 30px; font-size: 16px; color: #374151;">Skadeöversikt</h2>
+          ${formatDamagesToHtml(åtgärdade_skador, 'Åtgärdade / Hittas ej')}
+          ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador')}
+          ${formatDamagesToHtml(nya_skador, 'Nya skador')}
+          ${bilder_url ? `<div style="margin-top: 30px;"><a href="${bilder_url}" style="color: #005A9C; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
+        </div>
+      </div>
+    `;
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: bilkontrollSubject, html: bilkontrollHtml }));
 
-    return NextResponse.json({ message: 'Notification sent successfully' });
+    // --- Bygg och lägg till Email 3: Villkorligt Varningsmejl till Bilkontroll ---
+    if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
+      const warningSubject = `VARNING: ${regnr} saknas i bilkontrollfilen`;
+      const warningHtml = `<p>Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i den centrala bilkontrollfilen. Vänligen lägg till fordonet.</p>`;
+      emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
+    }
+
+    // Skicka alla mejl parallellt
+    await Promise.all(emailPromises);
+
+    return NextResponse.json({ message: 'Notifications processed.' });
+
   } catch (error) {
-    console.error('Failed to send notification:', error);
-    if (error instanceof SyntaxError) {
-        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    console.error('FATAL: Failed to send notification:', error);
+    if (error instanceof Error) {
+        console.error(error.message);
     }
     return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 });
   }
