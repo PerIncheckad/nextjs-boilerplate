@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// Initiera e-postklienten (använder RESEND_API_KEY, som är korrekt utan prefix)
+// Initiera e-postklienten
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Hämta e-postadresser från SERVER-variabler (UTAN NEXT_PUBLIC_)
+// Hämta e-postadresser från SERVER-variabler
 const bilkontrollAddress = process.env.BILKONTROLL_MAIL;
 const regionSydAddress = process.env.MAIL_REGION_SYD;
 const regionMittAddress = process.env.MAIL_REGION_MITT;
 const regionNorrAddress = process.env.MAIL_REGION_NORR;
-const fallbackAddress = process.env.TEST_MAIL; // Använder server-versionen
+const fallbackAddress = process.env.TEST_MAIL;
 
 // Karta för att koppla en ort till rätt REGIONS-variabel
 const regionMapping: { [ort: string]: string | undefined } = {
@@ -21,7 +21,6 @@ const regionMapping: { [ort: string]: string | undefined } = {
   'Trelleborg': regionSydAddress,
   'Varberg': regionSydAddress,
   'Lund': regionSydAddress,
-  // Lägg till orter för 'mitt' och 'norr' här
 };
 
 // Helper för att formatera skador (oförändrad)
@@ -81,7 +80,7 @@ export async function POST(request: Request) {
     `;
 
     await resend.emails.send({
-      from: 'incheckning@mabisyd.se',
+      from: `incheckning@incheckad.se`, // <-- KORRIGERAD DOMÄN
       to: uniqueRecipients,
       subject: subject,
       html: emailHtml,
