@@ -34,7 +34,7 @@ const createAlertBanner = (condition: boolean, text: string): string => {
   return `
     <tr>
       <td style="padding: 12px 0;">
-        <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #B45309; border-radius: 5px;">
+        <div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #B45309 !important; border-radius: 5px;">
           ⚠️ ${text}
         </div>
       </td>
@@ -60,15 +60,15 @@ const getDamageString = (damage: any): string => {
     }
 
     if (comment) {
-        return `${baseString}<br><small style="color: #4b5563;"><strong>Kommentar:</strong> ${comment}</small>`;
+        return `${baseString}<br><small style="color: #4b5563 !important;"><strong>Kommentar:</strong> ${comment}</small>`;
     }
     return baseString;
 };
 
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
-  const items = damages.map(d => `<li style="margin-bottom: 8px; color: #4b5563;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #374151; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 5px 0;">${items}</ul>`;
+  const items = damages.map(d => `<li style="margin-bottom: 8px; color: #4b5563 !important;">${getDamageString(d)}</li>`).join('');
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #374151 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 5px 0;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
@@ -99,9 +99,9 @@ const createBaseLayout = (regnr: string, content: string): string => `
       body { margin: 0; padding: 0; background-color: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif; }
     </style>
   </head>
-  <body style="background-color: #f0f2f5;">
-    <div style="background-color: #f0f2f5; padding: 20px;">
-      <div style="max-width: 640px; margin: auto; background-color: #ffffff; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #111827;">
+  <body style="background-color: #f0f2f5 !important;">
+    <div style="background-color: #f0f2f5 !important; padding: 20px;">
+      <div style="max-width: 640px; margin: auto; background-color: #ffffff !important; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #111827 !important;">
         <div style="text-align: center; margin-bottom: 20px;">
           <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
         </div>
@@ -248,7 +248,7 @@ export async function POST(request: Request) {
 
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = `<p>Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i det centrala bilregistret. Vänligen lägg till fordonet manuellt.</p>`;
+      const warningHtml = `<p style="color: #111827 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i det centrala bilregistret. Vänligen lägg till fordonet manuellt.</p>`;
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
 
