@@ -42,39 +42,46 @@ const createAlertBanner = (condition: boolean, text: string): string => {
   `;
 };
 
-/**
- * Bygger en detaljerad sträng från ett skadeobjekt.
- */
 const getDamageString = (damage: any): string => {
-    // För nya skador
-    if (damage.type || damage.carPart) {
-        const parts = [damage.type, damage.carPart, damage.position].filter(Boolean).join(' - ');
-        return damage.text ? `${parts} (${damage.text})` : parts;
-    }
-    // För dokumenterade befintliga skador
-    if (damage.userType || damage.userCarPart) {
+    let baseString = '';
+    let comment = '';
+
+    if (damage.type || damage.carPart) { // Ny skada
+        baseString = [damage.type, damage.carPart, damage.position].filter(Boolean).join(' - ');
+        comment = damage.text;
+    } else if (damage.userType || damage.userCarPart) { // Dokumenterad befintlig skada
         const mainInfo = (damage.fullText || '').split(' - ').map((s:string) => s.trim()).filter(Boolean);
         const userParts = [damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean);
-        // Kombinera och ta bort dubbletter för en renare sträng
         const combined = [...new Set([...mainInfo, ...userParts])];
-        const parts = combined.join(' - ');
-        return damage.userDescription ? `${parts} (${damage.userDescription})` : parts;
+        baseString = combined.join(' - ');
+        comment = damage.userDescription;
+    } else { // Fallback (åtgärdade skador)
+        baseString = damage.fullText || damage.text || String(damage);
     }
-    // Fallback för enkla text-skador (som åtgärdade)
-    return damage.fullText || damage.text || String(damage);
+
+    if (comment) {
+        return `${baseString}<br><small style="color: #4b5563;"><strong>Kommentar:</strong> ${comment}</small>`;
+    }
+    return baseString;
 };
 
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
-  const items = damages.map(d => `<li>${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 5px; margin-top: 20px; font-size: 14px; color: #374151; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul>${items}</ul>`;
+  const items = damages.map(d => `<li style="margin-bottom: 8px; color: #4b5563;">${getDamageString(d)}</li>`).join('');
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #374151; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 5px 0;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
     if (!tankning) return '---';
     if (tankning.tankniva === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
     if (tankning.tankniva === 'tankad_nu') {
-        return `Tankad nu av MABI (${tankning.liters || '?'}L ${tankning.bransletyp || ''} @ ${tankning.literpris || '?'} kr/L)`;
+        const parts = [
+            'Tankad nu av MABI',
+            tankning.liters ? `(${tankning.liters}L` : null,
+            tankning.bransletyp ? `${tankning.bransletyp}` : null,
+            tankning.literpris ? `@ ${tankning.literpris} kr/L)` : (tankning.liters ? ')' : null)
+        ].filter(Boolean).join(' ');
+        return parts;
     }
     return '---';
 };
@@ -84,39 +91,25 @@ const createBaseLayout = (regnr: string, content: string): string => `
   <html>
   <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
     <style>
       body { margin: 0; padding: 0; background-color: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Ubuntu, sans-serif; }
-      .body-wrapper { background-color: #f0f2f5; padding: 20px; }
-      .container { max-width: 640px; margin: auto; background-color: #ffffff; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #111827; }
-      .reg-header { text-align: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
-      .reg-header h1 { font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 2px; color: #111827; }
-      .logo { text-align: center; margin-bottom: 20px; }
-      .section { border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px; }
-      .section:last-of-type { border-bottom: none; }
-      .section-title { font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px; }
-      .info-grid { width: 100%; color: #111827; }
-      .info-grid td { padding: 4px 0; color: #111827; }
-      .info-grid .label { font-weight: bold; color: #374151; width: 120px; }
-      .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #9ca3af; }
-      ul { padding-left: 20px; margin: 5px 0; }
-      li { margin-bottom: 4px; color: #4b5563; }
-      a { color: #2563EB; text-decoration: none; }
-      p { color: #4b5563; }
     </style>
   </head>
-  <body>
-    <div class="body-wrapper">
-      <div class="container">
-        <div class="logo">
+  <body style="background-color: #f0f2f5;">
+    <div style="background-color: #f0f2f5; padding: 20px;">
+      <div style="max-width: 640px; margin: auto; background-color: #ffffff; padding: 20px 40px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); color: #111827;">
+        <div style="text-align: center; margin-bottom: 20px;">
           <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
         </div>
-        <div class="reg-header">
-          <h1>${regnr}</h1>
+        <div style="text-align: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb;">
+          <h1 style="font-size: 28px; font-weight: bold; margin: 0; letter-spacing: 2px; color: #111827;">${regnr}</h1>
         </div>
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
           ${content}
         </table>
-        <div class="footer">
+        <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #9ca3af;">
           Detta mejl skickades automatiskt från incheckad.se
         </div>
       </div>
@@ -130,32 +123,37 @@ const createBaseLayout = (regnr: string, content: string): string => `
 // =================================================================
 
 const buildRegionEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, bilder_url, nya_skador } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, bilder_url, nya_skador = [] } = payload;
 
   const content = `
     ${createAlertBanner(rekond, 'Behöver rekond')}
-    ${createAlertBanner(nya_skador?.length > 0, 'Nya skador har rapporterats')}
+    ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0;">
-      <div class="section">
-        <h2 class="section-title">Sammanfattning</h2>
+      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
         <table class="info-grid">
-          <tr><td class="label">Reg.nr:</td><td>${regnr}</td></tr>
-          <tr><td class="label">Bilmodell:</td><td>${carModel || '---'}</td></tr>
-          <tr><td class="label">Plats:</td><td>${ort} / ${station}</td></tr>
-          <tr><td class="label">Datum:</td><td>${date}</td></tr>
-          <tr><td class="label">Tid:</td><td>${time}</td></tr>
-          <tr><td class="label">Incheckare:</td><td>${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #111827; padding: 4px 0;">${regnr}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #111827; padding: 4px 0;">${carModel || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #111827; padding: 4px 0;">${ort} / ${station}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #111827; padding: 4px 0;">${date}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #111827; padding: 4px 0;">${time}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #111827; padding: 4px 0;">${incheckare || '---'}</td></tr>
         </table>
       </div>
-      <div class="section">
-        <h2 class="section-title">Fordonsstatus</h2>
+      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
         <table class="info-grid">
-          <tr><td class="label">Mätarställning:</td><td>${matarstallning} km</td></tr>
-          <tr><td class="label">Tankning:</td><td>${formatTankning(tankning)}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #111827; padding: 4px 0;">${matarstallning} km</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #111827; padding: 4px 0;">${formatTankning(tankning)}</td></tr>
         </table>
       </div>
-      ${bilder_url ? `<div><a href="${bilder_url}">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
+      ${nya_skador.length > 0 ? `
+        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+          ${formatDamagesToHtml(nya_skador, 'Nya skador')}
+        </div>
+      ` : ''}
+      ${bilder_url ? `<div style="padding-top: 10px;"><a href="${bilder_url}" style="color: #2563EB; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
     </td></tr>
   `;
 
@@ -168,39 +166,39 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
           
   const content = `
     ${createAlertBanner(rekond, 'Behöver rekond')}
-    ${createAlertBanner(nya_skador?.length > 0, 'Nya skador har rapporterats')}
+    ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0;">
-      <div class="section">
-        <h2 class="section-title">Fordonsinformation</h2>
+      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
         <table class="info-grid">
-          <tr><td class="label">Reg.nr:</td><td>${regnr}</td></tr>
-          <tr><td class="label">Bilmodell:</td><td>${carModel || '---'}</td></tr>
-          <tr><td class="label">Däck:</td><td>${hjultyp || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #111827; padding: 4px 0;">${regnr}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #111827; padding: 4px 0;">${carModel || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Däck:</td><td style="color: #111827; padding: 4px 0;">${hjultyp || '---'}</td></tr>
         </table>
       </div>
-      <div class="section">
-        <h2 class="section-title">Incheckningsdetaljer</h2>
+      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table class="info-grid">
-          <tr><td class="label">Plats:</td><td>${ort} / ${station}</td></tr>
-          <tr><td class="label">Datum:</td><td>${date}</td></tr>
-          <tr><td class="label">Tid:</td><td>${time}</td></tr>
-          <tr><td class="label">Incheckare:</td><td>${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #111827; padding: 4px 0;">${ort} / ${station}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #111827; padding: 4px 0;">${date}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #111827; padding: 4px 0;">${time}</td></tr>
+          <tr><td style="font-weight: bold; color: #374151; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #111827; padding: 4px 0;">${incheckare || '---'}</td></tr>
         </table>
       </div>
-      <div class="section">
-        <h2 class="section-title">Skadeöversikt</h2>
+      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+        <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Skadeöversikt</h2>
         ${formatDamagesToHtml(åtgärdade_skador, 'Åtgärdade / Hittas ej')}
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador')}
         ${formatDamagesToHtml(nya_skador, 'Nya skador')}
       </div>
       ${notering ? `
-        <div class="section">
-          <h2 class="section-title">Kommentarer</h2>
-          <p style="margin:0;">${notering}</p>
+        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+          <h2 style="font-size: 16px; color: #374151; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>
+          <p style="margin:0; color: #4b5563;">${notering}</p>
         </div>
       ` : ''}
-      ${bilder_url ? `<div style="padding-top: 10px;"><a href="${bilder_url}">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
+      ${bilder_url ? `<div style="padding-top: 10px;"><a href="${bilder_url}" style="color: #2563EB; text-decoration: none;">Öppna bildgalleri för ${regnr} →</a></div>` : ''}
     </td></tr>
   `;
 
@@ -220,7 +218,6 @@ export async function POST(request: Request) {
     const payload = await request.json();
     const { regnr, ort, station, status } = payload;
 
-    // Generera datum och tid i svensk tidszon
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
     const date = now.toLocaleDateString('sv-SE', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -229,24 +226,28 @@ export async function POST(request: Request) {
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
 
-    // --- Bygg och lägg till Email 1: Region-mejlet ---
-    const regionSubject = `INCHECKAD: ${regnr} - ${ort} / ${station} - REGION`;
     const regionHtml = buildRegionEmail(payload, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: regionSubject, html: regionHtml }));
+    emailPromises.push(resend.emails.send({
+      from: 'incheckning@incheckad.se',
+      to: regionalAddress,
+      subject: `INCHECKAD: ${regnr} - ${ort} / ${station} - REGION`,
+      html: regionHtml
+    }));
 
-    // --- Bygg och lägg till Email 2: Bilkontroll-mejlet ---
-    const bilkontrollSubject = `INCHECKAD: ${regnr} - ${ort} / ${station} - BILKONTROLL`;
     const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: bilkontrollSubject, html: bilkontrollHtml }));
+    emailPromises.push(resend.emails.send({
+      from: 'incheckning@incheckad.se',
+      to: bilkontrollAddress,
+      subject: `INCHECKAD: ${regnr} - ${ort} / ${station} - BILKONTROLL`,
+      html: bilkontrollHtml
+    }));
 
-    // --- Bygg och lägg till Email 3: Villkorligt Varningsmejl till Bilkontroll ---
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
       const warningHtml = `<p>Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i det centrala bilregistret. Vänligen lägg till fordonet manuellt.</p>`;
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
 
-    // Skicka alla mejl parallellt
     await Promise.all(emailPromises);
 
     return NextResponse.json({ message: 'Notifications processed.' });
