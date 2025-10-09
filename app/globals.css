@@ -436,3 +436,145 @@ body {
   font-size: 0.93em;
   margin-top: 2px;
 }
+:root {
+  --background: #f8fafc;
+  --foreground: #1f2937;
+  --card-bg: #f3f4f6;
+  --main-blue: #005A9C;
+  --main-green: #16a34a;
+  --main-border: #b0b4b8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #f8fafc;
+    --foreground: #1f2937;
+    --card-bg: #eeeeee;
+  }
+}
+
+.welcome-main {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+  position: relative;
+}
+
+.main-logo {
+  width: 330px;
+  height: auto;
+  margin: 70px auto 0 auto;
+  display: block;
+  z-index: 2;
+}
+
+.welcome-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  margin-top: 110px;
+  text-align: center;
+  padding: 2.4rem 2rem 2.2rem 2rem;
+  background: var(--card-bg);
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.welcome-title {
+  font-size: 2.3rem;
+  font-weight: 700;
+  margin: 0 0 2.1rem 0;
+  color: var(--foreground);
+}
+
+.btn-group {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: center;
+  margin-bottom: 2.1rem;
+}
+
+.btn {
+  min-width: 190px;
+  height: 64px;
+  padding: 0;
+  border: none;
+  border-radius: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  font-size: 1.09rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  margin-bottom: 0;
+  background: var(--main-blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.btn.incheckning {
+  background: var(--main-blue);
+  color: #fff;
+}
+.btn.incheckning:hover {
+  background: #003a6f;
+}
+
+.divider-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.divider {
+  width: 50%;
+  border: none;
+  border-top: 3px solid var(--main-border);
+  margin: 0.8rem 0 1.8rem 0;
+}
+
+.report-section {
+  margin-top: 0.2rem;
+}
+
+.btn.report-btn {
+  background: var(--main-green);
+  color: #fff;
+  font-size: 1.09rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  min-width: 190px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn.report-btn:hover {
+  background: #0d7a2b;
+}
+
+.copyright-footer {
+  width: 100vw;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #777;
+  padding: 30px 0 16px 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: none;
+  z-index: 10;
+  letter-spacing: 0.5px;
+}
