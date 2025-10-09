@@ -6,6 +6,8 @@ export const metadata: Metadata = {
 };
 
 const MABI_LOGO_URL = "/mabi-logo.png";
+const BG_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif";
+
 const REPORT_WHITELIST = [
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
@@ -21,16 +23,18 @@ export default function HomePage() {
 
   return (
     <main className="welcome-main">
-      <div className="welcome-content">
+      <div className="background-img" />
+      <div className="welcome-card">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
-        <h1 className="welcome-title">Välkommen</h1>
+        <h1 className="welcome-title">Välkommen!</h1>
         <div className="btn-group">
-          <a href="/check" className="btn primary">Ny incheckning</a>
-          <a href="/check/drafts" className="btn secondary">Fortsätt påbörjad incheckning</a>
+          <a href="/check" className="btn incheckning">Ny incheckning</a>
+          <a href="/check/drafts" className="btn incheckning">Fortsätt påbörjad incheckning</a>
         </div>
+        <hr className="divider" />
         {showReport && (
           <div className="report-section">
-            <a href="/rapport" className="report-btn">Rapport</a>
+            <a href="/rapport" className="btn report-btn">Rapport</a>
           </div>
         )}
       </div>
