@@ -6,7 +6,7 @@ const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/objec
 
 const stats = {
   period: "Oktober 2025",
-  location: "Total",
+  location: "Total", // TODO: Byt ut mot "MABI Syd TOTAL" när platsfilter är på plats!
   totalCheckins: 123,
   totalDamages: 45,
   damagePercent: "36%",
@@ -25,6 +25,7 @@ export default function RapportPage() {
       </div>
       <div className="rapport-card">
         <h1 className="rapport-title">Rapport & Statistik</h1>
+        <div className="rapport-divider" />
         <div className="rapport-stats">
           <div>
             <strong>Period:</strong> {stats.period} &nbsp;|&nbsp;
