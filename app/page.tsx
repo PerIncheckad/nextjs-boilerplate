@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
 
+// Dynamiskt år, alltid aktuellt
+const currentYear = new Date().getFullYear();
+
 export const metadata: Metadata = {
   title: 'Incheckad',
   description: 'Startsida',
 };
 
-const MABI_LOGO_URL = "/mabi-logo.png";
+const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga.png";
 const REPORT_WHITELIST = [
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
@@ -22,7 +25,7 @@ export default function HomePage() {
   return (
     <main className="welcome-main">
       <div className="background-img" />
-      <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+      <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
       <div className="welcome-card">
         <h1 className="welcome-title">Välkommen!</h1>
         <div className="btn-group">
@@ -38,6 +41,9 @@ export default function HomePage() {
           </div>
         )}
       </div>
+      <footer className="copyright-footer">
+        &copy; Albarone AB {currentYear} &mdash; All rights reserved
+      </footer>
     </main>
   );
 }
