@@ -5,189 +5,174 @@ body {
   margin: 0;
 }
 
-.rapport-logo-row {
+.rapport-table-wrap {
   width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  margin-top: 42px;
-  margin-bottom: 22px;
-}
-.rapport-logo-centered {
-  width: 210px;
-  height: auto;
-  display: block;
-  z-index: 10;
+  overflow-x: auto;
+  margin-top: 1.2rem;
 }
 
-.rapport-main {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  background: var(--background);
-  position: relative;
-}
-
-.rapport-card {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  margin-top: 0;
-  text-align: center;
-  padding: 2.5rem 2rem 2.2rem 2rem;
-  background: var(--card-bg);
-  border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.rapport-title {
-  font-size: 2.1rem;
-  font-weight: 700;
-  margin: 0 0 1.3rem 0;
-  color: var(--foreground);
-  text-align: center;
-}
-
-.rapport-divider {
-  width: 240px;
-  height: 0;
-  border-bottom: 3px solid #b0b4b8;
-  margin: 0 auto 2rem auto;
-  border-radius: 2px;
-}
-
-.rapport-stats {
-  width: 100%;
-  margin-bottom: 1.2rem;
-  font-size: 1.07rem;
-}
-
-.rapport-stats-row {
-  display: flex;
-  gap: 2.5rem;
-  margin: 0.3rem 0;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.rapport-filter {
-  margin: 1.5rem 0 1.5rem 0;
-  font-size: 1.05rem;
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  justify-content: center;
-}
-
-.rapport-filter select {
-  font-size: 1rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 7px;
-  border: 1px solid var(--main-border);
-  background: #fff;
-  color: var(--foreground);
-}
-
-.rapport-graf {
-  width: 100%;
-  text-align: center;
-  margin: 1.3rem 0 2rem 0;
-}
-
-.graf-placeholder {
-  background: #e5e7eb;
-  padding: 2.2rem;
-  border-radius: 12px;
-  color: #555;
-  font-size: 1.13rem;
-  text-align: center;
-}
-
-/* Tabell */
 .rapport-table {
   width: 100%;
-  margin-top: 1.2rem;
-  overflow-x: auto;
-}
-
-.table-header, .table-row {
-  display: grid;
-  grid-template-columns:
-    1.2fr   /* Regnr */
-    1.1fr   /* NY/Gammal */
-    1.2fr   /* Datum */
-    1fr     /* Region */
-    1fr     /* Ort */
-    1.2fr   /* Station */
-    1.5fr   /* Skada */
-    2.2fr   /* Kommentar */
-    1fr     /* Anteckning finns */
-    0.9fr   /* Media */
-    1fr;    /* Incheckare */
-  gap: 0.7rem;
-  padding: 0.5rem 0;
-  align-items: stretch;
-  border-bottom: 1.5px solid #b0b4b8;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 1.02rem;
 }
 
-.table-header {
-  font-weight: 700;
-  background: #f8fafc;
-  border-radius: 8px 8px 0 0;
-  cursor: pointer;
+.rapport-table th,
+.rapport-table td {
+  padding: 0.7em 0.3em;
+  vertical-align: middle;
+  border-bottom: 1.5px solid #c5c9ce;
+  border-right: 1px solid #e9e9ea;
 }
 
-.table-row {
-  background: #fff;
-  border-radius: 0 0 8px 8px;
-}
-
-.table-row span, .table-header span {
-  border-right: 1px solid #b0b4b8;
-  padding: 0.45rem 0.2rem;
-}
-.table-row span:last-child, .table-header span:last-child {
+.rapport-table th:last-child,
+.rapport-table td:last-child {
   border-right: none;
 }
 
-.centered-cell {
+.rapport-table th {
+  font-weight: 700;
+  background: #f8fafc;
   text-align: center;
-  justify-content: center;
-  align-items: center;
-  display: flex;
+  letter-spacing: 0.04em;
+}
+
+.rapport-table td {
+  background: #fff;
+  text-align: left;
+}
+
+.regnr-col {
+  background: #f7f7fa;
+  font-weight: bold;
+  text-align: left;
+  border-left: 3px solid #b0b4b8;
 }
 
 .region-section {
   background: #eaf4fd;
-  border-radius: 6px;
+  border-radius: 8px 0 0 8px;
+  text-align: center;
 }
 
-.damage-list {
-  margin: 0;
-  padding-left: 1.1em;
-  list-style-type: disc;
+.rapport-table th.region-section {
+  background: #eaf4fd;
+}
+
+.kommentar-col {
+  min-width: 120px;
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: left;
+}
+
+.centered-cell {
+  text-align: center !important;
+  justify-content: center;
+  align-items: center;
+}
+
+.skada-cell {
+  text-align: center;
+  font-size: 1.07em;
+  background: #f5fbff;
+}
+
+.skada-hierarki {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3em;
   font-size: 1em;
   color: #234d6b;
 }
+.skada-arrow {
+  color: #b0b4b8;
+  font-size: 1.17em;
+}
+
+.cell-dash {
+  color: #b0b4b8;
+  font-size: 1.12em;
+}
+
+.incheckare-cell {
+  text-align: left;
+}
+
+.datum-klocka {
+  color: #2a3f57;
+  font-size: 0.93em;
+}
 
 .media-thumb {
-  width: 36px;
-  height: 36px;
+  width: 33px;
+  height: 33px;
   object-fit: contain;
   border-radius: 7px;
   border: 1px solid #b0b4b8;
   background: #f8fafc;
 }
 
-.table-row span[style*="minWidth"] {
-  white-space: normal;
-  overflow-wrap: break-word;
+.rapport-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1.1rem;
+  margin-top: 0.5rem;
+  justify-content: center;
+}
+
+.rapport-search-input {
+  font-size: 1.09em;
+  padding: 0.45em 1em;
+  border-radius: 8px;
+  border: 1.5px solid #b0b4b8;
+  background: #fff;
+  color: #1f2937;
+}
+
+.rapport-search-btn,
+.rapport-reset-btn {
+  background: #005A9C;
+  color: #fff;
+  border-radius: 8px;
+  border: none;
+  padding: 0.46em 1.2em;
+  font-weight: 600;
+  font-size: 1em;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.rapport-search-btn:disabled {
+  background: #b0b4b8;
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.rapport-reset-btn {
+  background: #b0b4b8;
+  color: #fff;
+}
+
+.rapport-search-active {
+  margin-bottom: 1.1rem;
+  text-align: center;
+}
+
+.search-regnr-big {
+  font-size: 2.1em;
+  font-weight: bold;
+  color: #005A9C;
+  letter-spacing: 0.08em;
+}
+
+.search-status {
+  font-size: 1.23em;
+  color: #b0b4b8;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
