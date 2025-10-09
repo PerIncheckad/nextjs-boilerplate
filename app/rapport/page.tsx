@@ -1,17 +1,17 @@
 'use client';
 import { useState } from "react";
 
-// Dummy-data för demo
+// Demo-data
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
-const stats = {
-  period: "Oktober 2025",
-  location: "MABI Syd TOTAL",
-  totalCheckins: 123,
-  totalDamages: 45,
-  damagePercent: "36%",
-  lastCheckin: "2025-10-08 14:20",
-  lastDamage: "2025-10-08 13:50 - P7 Revinge",
-};
+const regions = ["Syd", "Mitt"];
+const orter = ["Lund", "Trelleborg", "Malmö"];
+const stationer = ["P7 Revinge", "Werksta hamn", "Trelleborgs central"];
+const platser = [
+  "MABI Syd TOTAL",
+  ...regions.map(r => `Region ${r}`),
+  ...orter,
+  ...stationer
+];
 
 const tableData = [
   {
@@ -26,7 +26,7 @@ const tableData = [
     media: MABI_LOGO_URL,
     anteckning: "Skada är dokumenterad, synlig under besiktning.",
     anteckningFinns: true,
-    incheckare: "Per"
+    godkandAv: "Per"
   },
   {
     regnr: "DEF456",
@@ -35,16 +35,39 @@ const tableData = [
     klockslag: "10:41",
     region: "Syd",
     ort: "Malmö",
-    station: "Werksta Hamn",
+    station: "Werksta hamn",
     skada: ["Repa", "Fälg", "Vänster bak"],
     media: MABI_LOGO_URL,
     anteckning: "",
     anteckningFinns: false,
-    incheckare: "Ingemar"
+    godkandAv: "Ingemar"
   }
 ];
 
-// Sökfunktion: filtrera på reg.nr (case-insensitive, enkel demo)
+// Generera periodtext baserat på valt värde
+function getPeriodText(period: string) {
+  const year = "2025";
+  switch (period) {
+    case "year":
+      return year;
+    case "month":
+      return "Oktober " + year;
+    case "week":
+      return "v. 41, 6–12 okt";
+    case "ytd":
+      return "YTD (" + year + ")";
+    case "7days":
+      return "Rullande 7 dagar";
+    case "30days":
+      return "Rullande 30 dagar";
+    case "rollingyear":
+      return "Rullande år";
+    default:
+      return year;
+  }
+}
+
+// Sökfunktion: filtrera på reg.nr
 function filterRows(rows, search) {
   if (!search) return rows;
   const foundRows = rows.filter(row => row.regnr.toLowerCase() === search.toLowerCase());
@@ -54,7 +77,7 @@ function filterRows(rows, search) {
 
 export default function RapportPage() {
   const [period, setPeriod] = useState("year");
-  const [plats, setPlats] = useState("total");
+  const [plats, setPlats] = useState(platser[0]);
   const [searchRegnr, setSearchRegnr] = useState("");
   const [activeRegnr, setActiveRegnr] = useState("");
 
@@ -87,17 +110,17 @@ export default function RapportPage() {
           <div className="rapport-divider" />
           <div className="rapport-stats rapport-stats-centered">
             <div>
-              <strong>Period:</strong> {stats.period} &nbsp;|&nbsp;
-              <strong>Vald plats:</strong> {stats.location}
+              <strong>Period:</strong> {getPeriodText(period)} &nbsp;|&nbsp;
+              <strong>Vald plats:</strong> {plats}
             </div>
             <div className="rapport-stats-row">
-              <div><strong>Totalt incheckningar:</strong> {stats.totalCheckins}</div>
-              <div><strong>Totalt skador:</strong> {stats.totalDamages}</div>
-              <div><strong>Skadeprocent:</strong> {stats.damagePercent}</div>
+              <div><strong>Totalt incheckningar:</strong> {filteredRows.length > 0 ? filteredRows.length : 0}</div>
+              <div><strong>Totalt skador:</strong> {filteredRows.reduce((acc, row) => acc + 1, 0)}</div>
+              <div><strong>Skadeprocent:</strong> 36%</div>
             </div>
             <div className="rapport-stats-row">
-              <div><strong>Senaste incheckning:</strong> {stats.lastCheckin}</div>
-              <div><strong>Senaste skada:</strong> {stats.lastDamage}</div>
+              <div><strong>Senaste incheckning:</strong> 2025-10-08 14:20</div>
+              <div><strong>Senaste skada:</strong> 2025-10-08 13:50 - P7 Revinge</div>
             </div>
           </div>
           <div className="rapport-filter">
@@ -113,10 +136,7 @@ export default function RapportPage() {
             </select>
             <label htmlFor="plats-select">Vald plats:</label>
             <select id="plats-select" value={plats} onChange={e => setPlats(e.target.value)}>
-              <option value="total">MABI Syd TOTAL</option>
-              <option value="region">Region</option>
-              <option value="ort">Ort</option>
-              <option value="station">Station</option>
+              {platser.map(p => (<option key={p} value={p}>{p}</option>))}
             </select>
           </div>
           <div className="rapport-search-row">
@@ -166,30 +186,30 @@ export default function RapportPage() {
                   <th className="regnr-col">Regnr</th>
                   <th>Ny/gammal</th>
                   <th className="datum-col">Datum</th>
-                  <th className="region-section">Region</th>
-                  <th className="region-section">Ort</th>
-                  <th className="region-section">Station</th>
+                  <th className="region-section region-shadow">Region</th>
+                  <th className="region-section region-shadow">Ort</th>
+                  <th className="region-section region-shadow">Station</th>
                   <th>Skada</th>
                   <th className="kommentar-col">Kommentar</th>
                   <th>Anteckning</th>
                   <th className="centered-cell">Media</th>
-                  <th>Incheckare</th>
+                  <th>Godkänd av</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.map((row, i) => (
                   <tr key={i}>
-                    <td className="regnr-col"><strong>{row.regnr}</strong></td>
-                    <td className="centered-cell">{row.ny ? "NY" : "Gammal"}</td>
+                    <td className="regnr-col">{row.regnr}</td>
+                    <td className="centered-cell">{row.ny ? "Ny" : "Gammal"}</td>
                     <td className="datum-col">
                       <div>{row.datum}</div>
                       <div className="datum-klocka">kl. {row.klockslag}</div>
                     </td>
-                    <td className="region-section centered-cell region-shadow">{row.region}</td>
-                    <td className="region-section centered-cell region-shadow">{row.ort}</td>
-                    <td className="region-section centered-cell region-shadow">{row.station}</td>
+                    <td className="region-section region-shadow centered-cell">{row.region}</td>
+                    <td className="region-section region-shadow centered-cell">{row.ort}</td>
+                    <td className="region-section region-shadow centered-cell">{row.station}</td>
                     <td className="skada-cell">
-                      <div className="skada-hierarki">
+                      <div className="skada-hierarki" style={{ color: "#222" }}>
                         <span>{row.skada[0]}</span>
                         <span className="skada-arrow">{'>'}</span>
                         <span>{row.skada[1]}</span>
@@ -202,7 +222,7 @@ export default function RapportPage() {
                     <td className="centered-cell">
                       <img src={row.media} alt="media" className="media-thumb" />
                     </td>
-                    <td className="incheckare-cell">{row.incheckare}</td>
+                    <td className="incheckare-cell">{row.godkandAv}</td>
                   </tr>
                 ))}
               </tbody>
