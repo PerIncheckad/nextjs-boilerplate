@@ -253,3 +253,89 @@ body {
   margin: 0 auto 2rem auto;
   border-radius: 2px;
 }
+/* Rapportkortet högre upp på sidan */
+.rapport-center-content {
+  margin-top: 26px;
+}
+
+/* Summering under Rapport & Statistik: vänsterställd, större radavstånd */
+.rapport-stats {
+  width: 100%;
+  margin-bottom: 1.2rem;
+  font-size: 1.07rem;
+  text-align: left;
+  line-height: 1.7;
+  padding-left: 0.4rem;
+}
+
+/* "Vald period" med luft ovanför och under, större font */
+.rapport-filter {
+  margin: 2.3rem 0 2.3rem 0;
+  font-size: 1.12rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  justify-content: flex-start;
+  font-weight: 600;
+}
+
+.rapport-filter select {
+  font-size: 1rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 7px;
+  border: 1px solid #b0b4b8;
+  background: #fff;
+  color: var(--foreground);
+  margin-left: 0.7rem;
+}
+
+/* Sökruta: alla bokstäver blir versaler */
+.rapport-search-input {
+  text-transform: uppercase;
+}
+
+/* Reg.nr: fet, men INTE större än tabelltext */
+.regnr-col {
+  font-weight: bold;
+  background: #f7f7fa;
+  text-align: left;
+  border-left: 3px solid #b0b4b8;
+  font-size: 1em; /* Samma som övriga celler */
+}
+
+/* Tabellrubriker */
+.rapport-table th {
+  font-weight: 700;
+  background: #f8fafc;
+  text-align: center;
+  letter-spacing: 0.04em;
+  font-size: 1em;
+}
+.rapport-table th.kommentar-col {
+  text-align: left;
+}
+.rapport-table th.centered-cell {
+  text-align: center;
+}
+
+/* Region/Ort/Station: ljusblå bakgrund och subtil skugga på cellerna i raderna */
+.region-section {
+  background: #eaf4fd;
+  border-radius: 8px 0 0 8px;
+  text-align: center;
+  box-shadow: 0 2px 9px 0 #eaf4fd99;
+}
+.rapport-table th.region-section {
+  background: #eaf4fd;
+  box-shadow: none;
+}
+
+/* Övriga justeringar */
+.rapport-table th:nth-child(2) {
+  /* Ny/gammal */
+  text-transform: capitalize;
+}
+.rapport-table th:nth-child(9) {
+  /* Anteckning */
+  text-transform: capitalize;
+}
