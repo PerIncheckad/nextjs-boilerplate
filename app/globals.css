@@ -5,7 +5,6 @@ body {
   margin: 0;
 }
 
-/* Rapport-logga centrerad och större */
 .rapport-logo-row {
   width: 100%;
   display: flex;
@@ -15,7 +14,7 @@ body {
   margin-bottom: 22px;
 }
 .rapport-logo-centered {
-  width: 210px; /* 50% större än tidigare */
+  width: 210px;
   height: auto;
   display: block;
   z-index: 10;
@@ -35,7 +34,7 @@ body {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 900px;
+  max-width: 1200px;
   margin: 0 auto;
   margin-top: 0;
   text-align: center;
@@ -56,9 +55,8 @@ body {
   text-align: center;
 }
 
-/* Snygg avskiljare under rubriken */
 .rapport-divider {
-  width: 80px;
+  width: 240px;  /* Tre gånger så lång */
   height: 0;
   border-bottom: 3px solid #b0b4b8;
   margin: 0 auto 2rem auto;
@@ -112,14 +110,26 @@ body {
   text-align: center;
 }
 
+/* Tabell */
 .rapport-table {
   width: 100%;
   margin-top: 1.2rem;
+  overflow-x: auto;
 }
 
 .table-header, .table-row {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 1fr 1fr 2.2fr 1fr 0.8fr;
+  grid-template-columns:
+    1.2fr   /* Regnr */
+    1.2fr   /* Datum */
+    1.2fr   /* Region */
+    1fr     /* Ort */
+    1.1fr   /* Station */
+    1.5fr   /* Skada */
+    2.2fr   /* Kommentar */
+    1fr     /* Anteckning finns */
+    0.9fr   /* Media */
+    1fr;    /* Incheckare */
   gap: 0.7rem;
   padding: 0.5rem 0;
   align-items: center;
@@ -131,6 +141,7 @@ body {
   font-weight: 700;
   background: #f8fafc;
   border-radius: 8px 8px 0 0;
+  cursor: pointer; /* Kan utökas till sortering! */
 }
 
 .table-row {
@@ -145,4 +156,14 @@ body {
   border-radius: 7px;
   border: 1px solid #eee;
   background: #f8fafc;
+}
+
+.table-row span {
+  text-align: left;
+}
+
+/* Kommentar-kolumn bredare */
+.table-row span[style*="minWidth"] {
+  white-space: normal;
+  overflow-wrap: break-word;
 }
