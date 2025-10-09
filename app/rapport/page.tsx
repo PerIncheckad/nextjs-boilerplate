@@ -19,6 +19,7 @@ const tableData = [
     regnr: "ABC123",
     ny: true,
     datum: "2025-10-08",
+    klockslag: "14:22",
     region: "Syd",
     ort: "Lund",
     station: "P7 Revinge",
@@ -32,6 +33,7 @@ const tableData = [
     regnr: "DEF456",
     ny: false,
     datum: "2025-10-07",
+    klockslag: "10:41",
     region: "Syd",
     ort: "Malmö",
     station: "Werksta Hamn",
@@ -43,8 +45,35 @@ const tableData = [
   }
 ];
 
+// Sökfunktion: filtrera på reg.nr (case-insensitive, enkel demo)
+function filterRows(rows, search) {
+  if (!search) return rows;
+  const foundRows = rows.filter(row => row.regnr.toLowerCase() === search.toLowerCase());
+  if (foundRows.length === 0) return "NOT_FOUND";
+  return foundRows;
+}
+
 export default function RapportPage() {
   const [period, setPeriod] = useState("month");
+  const [searchRegnr, setSearchRegnr] = useState("");
+  const [activeRegnr, setActiveRegnr] = useState("");
+
+  let filteredRows = tableData;
+  let searchStatus = "";
+
+  if (activeRegnr) {
+    const result = filterRows(tableData, activeRegnr);
+    if (result === "NOT_FOUND") {
+      searchStatus = "Okänt reg.nr";
+      filteredRows = [];
+    } else if (result.length === 0) {
+      searchStatus = "Inga skador inlagda";
+      filteredRows = [];
+    } else {
+      filteredRows = result;
+      searchStatus = "";
+    }
+  }
 
   return (
     <main className="rapport-main">
@@ -80,6 +109,39 @@ export default function RapportPage() {
             <option value="12m">12 mån</option>
           </select>
         </div>
+        {/* Sökfält */}
+        <div className="rapport-search-row">
+          <input
+            type="text"
+            placeholder="Sök reg.nr"
+            value={searchRegnr}
+            onChange={e => setSearchRegnr(e.target.value)}
+            className="rapport-search-input"
+          />
+          <button
+            className="rapport-search-btn"
+            onClick={() => setActiveRegnr(searchRegnr.trim())}
+            disabled={!searchRegnr.trim()}
+          >
+            Sök
+          </button>
+          {activeRegnr && (
+            <button
+              className="rapport-reset-btn"
+              onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}
+            >
+              Rensa
+            </button>
+          )}
+        </div>
+        {activeRegnr && (
+          <div className="rapport-search-active">
+            {searchStatus
+              ? <span className="search-status">{searchStatus}</span>
+              : <span className="search-regnr-big">{activeRegnr.toUpperCase()}</span>
+            }
+          </div>
+        )}
         {/* Grafer */}
         <div className="rapport-graf">
           <div className="graf-placeholder">[Graf/tidslinje kommer här]</div>
@@ -88,43 +150,54 @@ export default function RapportPage() {
           <div className="graf-placeholder">[Jämförelse av skadeprocent mellan enheter – kommer senare!]</div>
         </div>
         {/* Tabell */}
-        <div className="rapport-table">
-          <div className="table-header">
-            <span>Regnr</span>
-            <span>NY/Gammal</span>
-            <span>Datum</span>
-            <span className="region-section">Region</span>
-            <span className="region-section">Ort</span>
-            <span className="region-section">Station</span>
-            <span>Skada</span>
-            <span style={{minWidth: "120px"}}>Kommentar</span>
-            <span>Anteckning finns</span>
-            <span className="centered-cell">Media</span>
-            <span>Incheckare</span>
-          </div>
-          {tableData.map((row, i) => (
-            <div className="table-row" key={i}>
-              <span>{row.regnr}</span>
-              <span className="centered-cell">{row.ny ? "NY" : "Gammal"}</span>
-              <span>{row.datum}</span>
-              <span className="region-section centered-cell">{row.region}</span>
-              <span className="region-section centered-cell">{row.ort}</span>
-              <span className="region-section centered-cell">{row.station}</span>
-              <span>
-                <ul className="damage-list">
-                  {row.skada.map((del, idx) => (
-                    <li key={idx}>{del}</li>
-                  ))}
-                </ul>
-              </span>
-              <span style={{minWidth: "120px"}}>{row.anteckning}</span>
-              <span className="centered-cell">{row.anteckningFinns ? "Ja" : ""}</span>
-              <span className="centered-cell">
-                <img src={row.media} alt="media" className="media-thumb" />
-              </span>
-              <span>{row.incheckare}</span>
-            </div>
-          ))}
+        <div className="rapport-table-wrap">
+          <table className="rapport-table">
+            <thead>
+              <tr>
+                <th className="regnr-col">Regnr</th>
+                <th>NY/Gammal</th>
+                <th>Datum</th>
+                <th className="region-section">Region</th>
+                <th className="region-section">Ort</th>
+                <th className="region-section">Station</th>
+                <th>Skada</th>
+                <th className="kommentar-col">Kommentar</th>
+                <th>Anteckning finns</th>
+                <th className="centered-cell">Media</th>
+                <th>Incheckare</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((row, i) => (
+                <tr key={i}>
+                  <td className="regnr-col"><strong>{row.regnr}</strong></td>
+                  <td className="centered-cell">{row.ny ? "NY" : "Gammal"}</td>
+                  <td>
+                    <div>{row.datum}</div>
+                    <div className="datum-klocka">{row.klockslag}</div>
+                  </td>
+                  <td className="region-section centered-cell">{row.region}</td>
+                  <td className="region-section centered-cell">{row.ort}</td>
+                  <td className="region-section centered-cell">{row.station}</td>
+                  <td className="skada-cell">
+                    <div className="skada-hierarki">
+                      <span>{row.skada[0]}</span>
+                      <span className="skada-arrow">{'>'}</span>
+                      <span>{row.skada[1]}</span>
+                      <span className="skada-arrow">{'>'}</span>
+                      <span>{row.skada[2]}</span>
+                    </div>
+                  </td>
+                  <td className="kommentar-col">{row.anteckning || <span className="cell-dash">--</span>}</td>
+                  <td className="centered-cell">{row.anteckningFinns ? "Ja" : <span className="cell-dash">--</span>}</td>
+                  <td className="centered-cell">
+                    <img src={row.media} alt="media" className="media-thumb" />
+                  </td>
+                  <td className="incheckare-cell">{row.incheckare}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
       <footer className="copyright-footer">
