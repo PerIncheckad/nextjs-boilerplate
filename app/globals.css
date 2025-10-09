@@ -1,10 +1,10 @@
 :root {
   --background: #f8fafc;
   --foreground: #1f2937;
-  --card-bg: #f3f4f6; /* Lite mörkare vit */
-  --main-blue: #005A9C; /* harmoniserad med formulär/mejl */
+  --card-bg: #f3f4f6;
+  --main-blue: #005A9C;
   --main-green: #16a34a;
-  --main-border: #e5e7eb;
+  --main-border: #b0b4b8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -29,27 +29,37 @@ body {
   height: 100vh;
   z-index: 0;
   background: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif') center center/cover no-repeat;
-  opacity: 0.18; /* Justera transparens här */
+  opacity: 0.18;
   pointer-events: none;
 }
 
 .welcome-main {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   background: var(--background);
   position: relative;
+}
+
+.main-logo {
+  width: 330px;
+  height: auto;
+  margin: 70px auto 0 auto;
+  display: block;
+  z-index: 2;
 }
 
 .welcome-card {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 460px;
+  max-width: 440px;
   margin: 0 auto;
+  margin-top: 38px;
   text-align: center;
-  padding: 2.8rem 2rem 2.5rem 2rem;
+  padding: 2.4rem 2rem 2.2rem 2rem;
   background: var(--card-bg);
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.10);
@@ -58,31 +68,23 @@ body {
   align-items: center;
 }
 
-.main-logo {
-  width: 220px;
-  height: auto;
-  margin: 0 auto 40px auto;
-  display: block;
-  top: -90px;
-  left: 0; right: 0;
-}
-
 .welcome-title {
   font-size: 2.3rem;
   font-weight: 700;
-  margin: 100px 0 2rem 0;
+  margin: 0 0 2.1rem 0;
   color: var(--foreground);
 }
 
 .btn-group {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.2rem;
   justify-content: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 2.1rem;
 }
 
 .btn {
-  padding: 1.1rem 1.9rem;
+  min-width: 190px;
+  padding: 1.1rem 0;
   border: none;
   border-radius: 13px;
   font-weight: 600;
@@ -94,6 +96,8 @@ body {
   margin-bottom: 0;
   background: var(--main-blue);
   color: #fff;
+  display: inline-block;
+  text-align: center;
 }
 
 .btn.incheckning {
@@ -104,11 +108,18 @@ body {
   background: #003a6f;
 }
 
+.divider-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .divider {
-  width: 80%;
-  margin: 2rem auto 2.2rem auto;
+  width: 50%;
   border: none;
-  border-top: 2px solid var(--main-border);
+  border-top: 3px solid var(--main-border);
+  margin: 0.8rem 0 1.8rem 0;
 }
 
 .report-section {
@@ -118,6 +129,10 @@ body {
 .btn.report-btn {
   background: var(--main-green);
   color: #fff;
+  font-size: 1.09rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  min-width: 190px;
 }
 .btn.report-btn:hover {
   background: #0d7a2b;
