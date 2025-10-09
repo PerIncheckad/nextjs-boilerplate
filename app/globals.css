@@ -56,7 +56,7 @@ body {
 }
 
 .rapport-divider {
-  width: 240px;  /* Tre gånger så lång */
+  width: 240px;
   height: 0;
   border-bottom: 3px solid #b0b4b8;
   margin: 0 auto 2rem auto;
@@ -121,10 +121,11 @@ body {
   display: grid;
   grid-template-columns:
     1.2fr   /* Regnr */
+    1.1fr   /* NY/Gammal */
     1.2fr   /* Datum */
-    1.2fr   /* Region */
+    1fr     /* Region */
     1fr     /* Ort */
-    1.1fr   /* Station */
+    1.2fr   /* Station */
     1.5fr   /* Skada */
     2.2fr   /* Kommentar */
     1fr     /* Anteckning finns */
@@ -132,8 +133,8 @@ body {
     1fr;    /* Incheckare */
   gap: 0.7rem;
   padding: 0.5rem 0;
-  align-items: center;
-  border-bottom: 1px solid var(--main-border);
+  align-items: stretch;
+  border-bottom: 1.5px solid #b0b4b8;
   font-size: 1.02rem;
 }
 
@@ -141,7 +142,7 @@ body {
   font-weight: 700;
   background: #f8fafc;
   border-radius: 8px 8px 0 0;
-  cursor: pointer; /* Kan utökas till sortering! */
+  cursor: pointer;
 }
 
 .table-row {
@@ -149,20 +150,43 @@ body {
   border-radius: 0 0 8px 8px;
 }
 
+.table-row span, .table-header span {
+  border-right: 1px solid #b0b4b8;
+  padding: 0.45rem 0.2rem;
+}
+.table-row span:last-child, .table-header span:last-child {
+  border-right: none;
+}
+
+.centered-cell {
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  display: flex;
+}
+
+.region-section {
+  background: #eaf4fd;
+  border-radius: 6px;
+}
+
+.damage-list {
+  margin: 0;
+  padding-left: 1.1em;
+  list-style-type: disc;
+  font-size: 1em;
+  color: #234d6b;
+}
+
 .media-thumb {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   object-fit: contain;
   border-radius: 7px;
-  border: 1px solid #eee;
+  border: 1px solid #b0b4b8;
   background: #f8fafc;
 }
 
-.table-row span {
-  text-align: left;
-}
-
-/* Kommentar-kolumn bredare */
 .table-row span[style*="minWidth"] {
   white-space: normal;
   overflow-wrap: break-word;
