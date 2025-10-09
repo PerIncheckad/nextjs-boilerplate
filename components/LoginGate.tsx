@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 
 type Props = { children: React.ReactNode };
 
-/** === HÅRD WHITELIST (lägg fler här vid behov) === */
 const EMAIL_WHITELIST = new Set<string>([
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
@@ -23,13 +22,11 @@ export default function LoginGate({ children }: Props) {
 
       const lower = user.email?.toLowerCase() ?? null;
 
-      // 1) Släpp in direkt om adressen är vitlistad
       if (lower && EMAIL_WHITELIST.has(lower)) {
         setState('ok');
         return;
       }
 
-      // 2) I övriga fall: kolla employees.is_active (din befintliga logik)
       const { data, error } = await supabase
         .from('employees')
         .select('email,is_active')
@@ -50,7 +47,7 @@ export default function LoginGate({ children }: Props) {
     e.preventDefault();
     setMsg('');
 
-    // Ändra redirect så att man hamnar på startsidan
+    // Redirect till startsidan
     const redirectTo =
       (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
 
@@ -84,7 +81,13 @@ export default function LoginGate({ children }: Props) {
               Skicka magisk länk
             </button>
           </form>
-          {msg && <p className="login-msg">{msg}</p>}
+          {msg && (
+            <div className="login-msg-wrap">
+              <h2 className="login-thanks">Tack!</h2>
+              <p className="login-msg">Kolla din mejl för inloggningslänken.</p>
+              <p className="login-close-tab">Du kan nu stänga denna flik.</p>
+            </div>
+          )}
         </div>
       </div>
     );
