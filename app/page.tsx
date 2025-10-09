@@ -6,8 +6,6 @@ export const metadata: Metadata = {
 };
 
 const MABI_LOGO_URL = "/mabi-logo.png";
-
-// Hardcoded whitelist (byt till Supabase senare)
 const REPORT_WHITELIST = [
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
@@ -18,27 +16,22 @@ function canShowReport(userEmail: string): boolean {
 }
 
 export default function HomePage() {
-  // Byt ut mot riktig epost från auth när det är dags
-  // Nu testas: visa rapport för Per
-  const userEmail = "per.andersson@mabi.se"; // <-- Här anger du aktuell användare!
-
+  const userEmail = "per.andersson@mabi.se"; // BYT till auth senare!
   const showReport = canShowReport(userEmail);
 
   return (
-    <main>
-      <div className="home-card">
+    <main className="welcome-main">
+      <div className="welcome-content">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
-        <h1>Välkommen</h1>
-        <p>Använd knappen nedan för att göra en ny incheckning.</p>
+        <h1 className="welcome-title">Välkommen</h1>
         <div className="btn-group">
           <a href="/check" className="btn primary">Ny incheckning</a>
           <a href="/check/drafts" className="btn secondary">Fortsätt påbörjad incheckning</a>
         </div>
-        <hr />
         {showReport && (
-          <a href="/rapport" className="report-btn">
-            Rapport
-          </a>
+          <div className="report-section">
+            <a href="/rapport" className="report-btn">Rapport</a>
+          </div>
         )}
       </div>
     </main>
