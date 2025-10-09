@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: 'Startsida',
 };
 
-const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga.png";
+const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const REPORT_WHITELIST = [
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
