@@ -57,7 +57,7 @@ body {
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  margin-top: 110px; /* Ökat margin-top för rutan */
+  margin-top: 110px;
   text-align: center;
   padding: 2.4rem 2rem 2.2rem 2rem;
   background: var(--card-bg);
@@ -141,6 +141,21 @@ body {
   align-items: center;
   justify-content: center;
 }
+
 .btn.report-btn:hover {
   background: #0d7a2b;
+}
+
+.copyright-footer {
+  width: 100vw;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #777;
+  padding: 30px 0 16px 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: none;
+  z-index: 10;
+  letter-spacing: 0.5px;
 }
