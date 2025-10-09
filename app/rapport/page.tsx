@@ -1,16 +1,25 @@
 'use client';
 import { useState } from "react";
 
-// Demo-data
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
-const regions = ["Syd", "Mitt"];
-const orter = ["Lund", "Trelleborg", "Malmö"];
-const stationer = ["P7 Revinge", "Werksta hamn", "Trelleborgs central"];
-const platser = [
+
+// Endast huvudstationer från skärmdumpen
+const huvudstationer = [
+  "Huvudstation Malmö Jägersro",
+  "Huvudstation Helsingborg",
+  "Huvudstation Ängelholm",
+  "Huvudstation Halmstad",
+  "Huvudstation Falkenberg",
+  "Huvudstation Trelleborg",
+  "Huvudstation Varberg",
+  "Huvudstation Lund"
+];
+const platsAlternativ = [
   "MABI Syd TOTAL",
-  ...regions.map(r => `Region ${r}`),
-  ...orter,
-  ...stationer
+  "Region Syd",
+  "Region Mitt",
+  "Region Norr",
+  ...huvudstationer
 ];
 
 const tableData = [
@@ -21,7 +30,7 @@ const tableData = [
     klockslag: "14:22",
     region: "Syd",
     ort: "Lund",
-    station: "P7 Revinge",
+    station: "Huvudstation Lund",
     skada: ["Buckla", "Dörr insida", "Höger fram"],
     media: MABI_LOGO_URL,
     anteckning: "Skada är dokumenterad, synlig under besiktning.",
@@ -35,7 +44,7 @@ const tableData = [
     klockslag: "10:41",
     region: "Syd",
     ort: "Malmö",
-    station: "Werksta hamn",
+    station: "Huvudstation Malmö Jägersro",
     skada: ["Repa", "Fälg", "Vänster bak"],
     media: MABI_LOGO_URL,
     anteckning: "",
@@ -44,7 +53,7 @@ const tableData = [
   }
 ];
 
-// Generera periodtext baserat på valt värde
+// Generera periodtext i klartext
 function getPeriodText(period: string) {
   const year = "2025";
   switch (period) {
@@ -67,7 +76,6 @@ function getPeriodText(period: string) {
   }
 }
 
-// Sökfunktion: filtrera på reg.nr
 function filterRows(rows, search) {
   if (!search) return rows;
   const foundRows = rows.filter(row => row.regnr.toLowerCase() === search.toLowerCase());
@@ -77,7 +85,7 @@ function filterRows(rows, search) {
 
 export default function RapportPage() {
   const [period, setPeriod] = useState("year");
-  const [plats, setPlats] = useState(platser[0]);
+  const [plats, setPlats] = useState(platsAlternativ[0]);
   const [searchRegnr, setSearchRegnr] = useState("");
   const [activeRegnr, setActiveRegnr] = useState("");
 
@@ -98,30 +106,26 @@ export default function RapportPage() {
     }
   }
 
+  const sammanfattning = [
+    <div key="incheckningar"><strong>Totalt incheckningar:</strong> {filteredRows.length > 0 ? filteredRows.length : 0}</div>,
+    <div key="skador"><strong>Totalt skador:</strong> {filteredRows.reduce((acc, row) => acc + 1, 0)}</div>,
+    <div key="procent"><strong>Skadeprocent:</strong> 36%</div>,
+    <div key="senaste-incheckning"><strong>Senaste incheckning:</strong> 2025-10-08 kl. 14:20</div>,
+    <div key="senaste-skada"><strong>Senaste skada:</strong> 2025-10-08 kl. 13:50 - Huvudstation Lund</div>,
+  ];
+
   return (
     <main className="rapport-main">
       <div className="background-img" />
+      <div className="rapport-logo-row rapport-logo-top">
+        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
+      </div>
       <div className="rapport-center-content">
-        <div className="rapport-logo-row">
-          <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
-        </div>
         <div className="rapport-card">
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
           <div className="rapport-stats rapport-stats-centered">
-            <div>
-              <strong>Period:</strong> {getPeriodText(period)} &nbsp;|&nbsp;
-              <strong>Vald plats:</strong> {plats}
-            </div>
-            <div className="rapport-stats-row">
-              <div><strong>Totalt incheckningar:</strong> {filteredRows.length > 0 ? filteredRows.length : 0}</div>
-              <div><strong>Totalt skador:</strong> {filteredRows.reduce((acc, row) => acc + 1, 0)}</div>
-              <div><strong>Skadeprocent:</strong> 36%</div>
-            </div>
-            <div className="rapport-stats-row">
-              <div><strong>Senaste incheckning:</strong> 2025-10-08 14:20</div>
-              <div><strong>Senaste skada:</strong> 2025-10-08 13:50 - P7 Revinge</div>
-            </div>
+            {sammanfattning}
           </div>
           <div className="rapport-filter">
             <label htmlFor="period-select">Vald period:</label>
@@ -136,13 +140,16 @@ export default function RapportPage() {
             </select>
             <label htmlFor="plats-select">Vald plats:</label>
             <select id="plats-select" value={plats} onChange={e => setPlats(e.target.value)}>
-              {platser.map(p => (<option key={p} value={p}>{p}</option>))}
+              {platsAlternativ.map(p => (<option key={p} value={p}>{p}</option>))}
             </select>
+          </div>
+          <div className="rapport-filter-periodplats">
+            <span><strong>{getPeriodText(period)}</strong> | <strong>{plats}</strong></span>
           </div>
           <div className="rapport-search-row">
             <input
               type="text"
-              placeholder="Sök reg.nr"
+              placeholder="SÖK REG.NR"
               value={searchRegnr}
               onChange={e => setSearchRegnr(e.target.value.toUpperCase())}
               className="rapport-search-input"
@@ -174,9 +181,11 @@ export default function RapportPage() {
           {/* Grafer */}
           <div className="rapport-graf">
             <div className="graf-placeholder">[Graf/tidslinje kommer här]</div>
+            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{getPeriodText(period)}</strong> | <strong>{plats}</strong></div>
           </div>
           <div className="rapport-graf">
             <div className="graf-placeholder">[Jämförelse av skadeprocent mellan enheter – kommer senare!]</div>
+            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{getPeriodText(period)}</strong> | <strong>{plats}</strong></div>
           </div>
           {/* Tabell */}
           <div className="rapport-table-wrap">
@@ -186,9 +195,9 @@ export default function RapportPage() {
                   <th className="regnr-col">Regnr</th>
                   <th>Ny/gammal</th>
                   <th className="datum-col">Datum</th>
-                  <th className="region-section region-shadow">Region</th>
-                  <th className="region-section region-shadow">Ort</th>
-                  <th className="region-section region-shadow">Station</th>
+                  <th className="region-section region-flat">Region</th>
+                  <th className="region-section region-flat">Ort</th>
+                  <th className="region-section region-flat">Station</th>
                   <th>Skada</th>
                   <th className="kommentar-col">Kommentar</th>
                   <th>Anteckning</th>
@@ -202,12 +211,11 @@ export default function RapportPage() {
                     <td className="regnr-col">{row.regnr}</td>
                     <td className="centered-cell">{row.ny ? "Ny" : "Gammal"}</td>
                     <td className="datum-col">
-                      <div>{row.datum}</div>
-                      <div className="datum-klocka">kl. {row.klockslag}</div>
+                      <div>{row.datum} <span style={{color:"#2a3f57"}}>kl. {row.klockslag}</span></div>
                     </td>
-                    <td className="region-section region-shadow centered-cell">{row.region}</td>
-                    <td className="region-section region-shadow centered-cell">{row.ort}</td>
-                    <td className="region-section region-shadow centered-cell">{row.station}</td>
+                    <td className="region-section region-flat centered-cell">{row.region}</td>
+                    <td className="region-section region-flat centered-cell">{row.ort}</td>
+                    <td className="region-section region-flat centered-cell">{row.station}</td>
                     <td className="skada-cell">
                       <div className="skada-hierarki" style={{ color: "#222" }}>
                         <span>{row.skada[0]}</span>
