@@ -1,12 +1,10 @@
 'use client';
 import { useState } from "react";
 
-// Dynamiskt år för copyright
 const currentYear = new Date().getFullYear();
-
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
-// Dummy-data – ersätt med riktig Supabase-fetch i nästa steg!
+// Dummy-data för demo
 const stats = {
   period: "Oktober 2025",
   location: "Total",
@@ -18,17 +16,14 @@ const stats = {
 };
 
 export default function RapportPage() {
-  // Filter och tabell kan byggas ut vidare
   const [period, setPeriod] = useState("month");
 
   return (
     <main className="rapport-main">
       <div className="background-img" />
-      <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo" />
-
+      <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-corner" />
       <div className="rapport-card">
         <h1 className="rapport-title">Rapport & Statistik</h1>
-        {/* Statistik/nyckeltal */}
         <div className="rapport-stats">
           <div>
             <strong>Period:</strong> {stats.period} &nbsp;|&nbsp;
@@ -44,7 +39,6 @@ export default function RapportPage() {
             <div><strong>Senaste skada:</strong> {stats.lastDamage}</div>
           </div>
         </div>
-        {/* Filter för period */}
         <div className="rapport-filter">
           <span>Visa för:</span>
           <select value={period} onChange={e => setPeriod(e.target.value)}>
@@ -55,11 +49,9 @@ export default function RapportPage() {
             <option value="12m">12 mån</option>
           </select>
         </div>
-        {/* Graf – dummy för nu */}
         <div className="rapport-graf">
           <div className="graf-placeholder">[Graf/tidslinje kommer här]</div>
         </div>
-        {/* Tabell – dummy för nu */}
         <div className="rapport-table">
           <div className="table-header">
             <span>Regnr</span>
@@ -70,7 +62,6 @@ export default function RapportPage() {
             <span>Incheckare</span>
             <span>Media</span>
           </div>
-          {/* Dummy-rad */}
           <div className="table-row">
             <span>ABC123</span>
             <span>2025-10-08</span>
@@ -78,7 +69,7 @@ export default function RapportPage() {
             <span>P7 Revinge</span>
             <span>Buckla – Dörr insida – Höger fram</span>
             <span>Per</span>
-            <span><img src="/mabi-logo.png" alt="media" className="media-thumb" /></span>
+            <span><img src={MABI_LOGO_URL} alt="media" className="media-thumb" /></span>
           </div>
         </div>
       </div>
