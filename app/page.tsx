@@ -27,7 +27,7 @@ export default function HomePage() {
         <h1 className="welcome-title">Välkommen!</h1>
         <div className="btn-group">
           <a href="/check" className="btn incheckning">Ny incheckning</a>
-          <a href="/check/drafts" className="btn incheckning">Fortsätt påbörjad incheckning</a>
+          <a href="/check/drafts" className="btn incheckning">Fortsätt påbörjad<br />incheckning</a>
         </div>
         <div className="divider-wrap">
           <hr className="divider" />
