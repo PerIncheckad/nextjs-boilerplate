@@ -4,7 +4,6 @@ import { useState } from "react";
 const currentYear = new Date().getFullYear();
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
-// Dummy-data för demo
 const stats = {
   period: "Oktober 2025",
   location: "Total",
@@ -21,7 +20,9 @@ export default function RapportPage() {
   return (
     <main className="rapport-main">
       <div className="background-img" />
-      <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-corner" />
+      <div className="rapport-logo-row">
+        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
+      </div>
       <div className="rapport-card">
         <h1 className="rapport-title">Rapport & Statistik</h1>
         <div className="rapport-stats">
