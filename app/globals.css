@@ -57,7 +57,7 @@ body {
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  margin-top: 38px;
+  margin-top: 110px; /* Ökat margin-top för rutan */
   text-align: center;
   padding: 2.4rem 2rem 2.2rem 2rem;
   background: var(--card-bg);
@@ -84,7 +84,8 @@ body {
 
 .btn {
   min-width: 190px;
-  padding: 1.1rem 0;
+  height: 64px;
+  padding: 0;
   border: none;
   border-radius: 13px;
   font-weight: 600;
@@ -96,7 +97,9 @@ body {
   margin-bottom: 0;
   background: var(--main-blue);
   color: #fff;
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
 }
 
@@ -133,6 +136,10 @@ body {
   text-transform: uppercase;
   letter-spacing: 1.5px;
   min-width: 190px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn.report-btn:hover {
   background: #0d7a2b;
