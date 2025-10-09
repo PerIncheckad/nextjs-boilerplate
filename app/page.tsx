@@ -6,76 +6,59 @@ export const metadata: Metadata = {
 };
 
 const MABI_LOGO_URL = "/mabi-logo.png";
-
-// Hardcoded whitelist for now (can be moved to Supabase later)
 const REPORT_WHITELIST = [
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
-  // Add more emails here as needed
 ];
 
-// Helper to check if user is allowed to see the report
 function canShowReport(userEmail: string): boolean {
   return REPORT_WHITELIST.includes(userEmail?.toLowerCase());
 }
 
-// This would come from session/auth in a real app
-// For demo: replace with actual user email from auth context
 const userEmail = typeof window !== "undefined"
   ? window.localStorage.getItem("user_email") || ""
   : "";
 
+// ----- Lägg till GlobalStyles -----
+const GlobalStyles = () => (
+    <style jsx global>{`
+        :root {
+          --color-bg: #f8fafc; --color-card: #ffffff; --color-text: #1f2937; --color-text-secondary: #6b7280;
+          --color-primary: #2563eb; --color-primary-light: #eff6ff; --color-success: #16a34a; --color-success-light: #f0fdf4;
+          --color-danger: #dc2626; --color-danger-light: #fef2f2; --color-warning: #f59e0b; --color-warning-light: #fffbeb;
+          --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
+        }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; }
+        .main-logo { max-width: 90px; height: auto; margin: 0 auto 24px auto; display: block; }
+        .home-card { background-color: var(--color-card); padding: 2rem; border-radius: 12px; max-width: 460px; margin: 3rem auto 0 auto; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border: 1px solid var(--color-border);}
+        h1 { font-size: 2rem; font-weight: 700; color: var(--color-text); margin:0 0 1rem 0; }
+        p { color: var(--color-text-secondary); }
+        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; margin-bottom: 8px;}
+        .btn.primary { background-color: var(--color-primary); color: white; }
+        .btn.secondary { background-color: var(--color-border); color: var(--color-text); }
+        .btn:not(:disabled):hover { filter: brightness(1.08); }
+        hr { margin: 2rem auto; border-color: var(--color-border); }
+        .report-btn { background: var(--color-primary); color: #fff; border-radius: 8px; font-weight: 600; font-size: 1.12rem; letter-spacing: 1px; border: none; padding: 0.8rem 1.8rem; margin-top: 12px;}
+        .report-btn:hover { background: #1d4ed8; }
+      `}
+    </style>
+);
+
 export default function HomePage() {
-  // For demo: you would use context/provider to get the real email
   const showReport = canShowReport(userEmail);
 
   return (
-    <main className="min-h-screen grid place-items-center p-8">
-      <div className="max-w-xl w-full text-center space-y-6">
-
-        <img src={MABI_LOGO_URL} alt="MABI Logo" style={{ width: 90, margin: "0 auto 24px auto" }} />
-
-        <h1 className="text-3xl font-semibold">Välkommen</h1>
-        <p className="opacity-80">
-          Använd knappen nedan för att göra en ny incheckning.
-        </p>
-        <a
-          href="/check"
-          className="inline-block rounded-md border px-4 py-2"
-        >
-          Ny incheckning
-        </a>
-        <a
-          href="/check/drafts"
-          style={{
-            display: 'inline-block',
-            marginTop: 12,
-            padding: '8px 14px',
-            border: '1px solid #d1d5db',
-            borderRadius: 6,
-            textDecoration: 'none',
-            color: '#222'
-          }}
-        >
-          Fortsätt påbörjad incheckning
-        </a>
-        <hr style={{ margin: "40px auto", borderColor: "#e5e7eb" }} />
+    <main>
+      <GlobalStyles />
+      <div className="home-card">
+        <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+        <h1>Välkommen</h1>
+        <p>Använd knappen nedan för att göra en ny incheckning.</p>
+        <a href="/check" className="btn primary">Ny incheckning</a>
+        <a href="/check/drafts" className="btn secondary" style={{marginLeft: 12}}>Fortsätt påbörjad incheckning</a>
+        <hr />
         {showReport && (
-          <a
-            href="/rapport"
-            style={{
-              display: 'inline-block',
-              marginTop: 12,
-              padding: '12px 20px',
-              background: "#2563eb",
-              borderRadius: 8,
-              color: "#fff",
-              fontWeight: 600,
-              textDecoration: 'none',
-              fontSize: 18,
-              letterSpacing: 1
-            }}
-          >
+          <a href="/rapport" className="report-btn">
             Rapport
           </a>
         )}
