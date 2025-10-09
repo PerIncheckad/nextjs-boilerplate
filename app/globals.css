@@ -773,3 +773,27 @@ body {
   margin-top: 1.2rem;
   color: #005A9C;
 }
+.login-msg-wrap {
+  margin-top: 2.1rem;
+}
+
+.login-thanks {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #005A9C;
+  margin-bottom: 0.8rem;
+  margin-top: 0;
+}
+
+.login-msg {
+  font-size: 1rem;
+  margin-bottom: 0.7rem;
+  color: #005A9C;
+}
+
+.login-close-tab {
+  font-size: 0.99rem;
+  color: #3b3b3b;
+  opacity: 0.85;
+  margin-bottom: 0.2rem;
+}
