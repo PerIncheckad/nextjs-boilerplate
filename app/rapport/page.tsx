@@ -4,20 +4,20 @@ import { useState } from "react";
 const currentYear = new Date().getFullYear();
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
-// Dummy-data för demo
 const stats = {
   period: "Oktober 2025",
-  location: "MABI Syd TOTAL", // Bytt ut enligt önskemål!
+  location: "MABI Syd TOTAL",
   totalCheckins: 123,
   totalDamages: 45,
   damagePercent: "36%",
   lastCheckin: "2025-10-08 14:20",
-  lastDamage: "2025-10-08 13:50 - P7 Revinge", // Station syns!
+  lastDamage: "2025-10-08 13:50 - P7 Revinge",
 };
 
 const tableData = [
   {
     regnr: "ABC123",
+    ny: true,
     datum: "2025-10-08",
     region: "Syd",
     ort: "Lund",
@@ -30,6 +30,7 @@ const tableData = [
   },
   {
     regnr: "DEF456",
+    ny: false,
     datum: "2025-10-07",
     region: "Syd",
     ort: "Malmö",
@@ -79,11 +80,10 @@ export default function RapportPage() {
             <option value="12m">12 mån</option>
           </select>
         </div>
-        {/* Graf 1 */}
+        {/* Grafer */}
         <div className="rapport-graf">
           <div className="graf-placeholder">[Graf/tidslinje kommer här]</div>
         </div>
-        {/* Graf 2 – placeholder, byggs ut senare */}
         <div className="rapport-graf">
           <div className="graf-placeholder">[Jämförelse av skadeprocent mellan enheter – kommer senare!]</div>
         </div>
@@ -91,31 +91,35 @@ export default function RapportPage() {
         <div className="rapport-table">
           <div className="table-header">
             <span>Regnr</span>
+            <span>NY/Gammal</span>
             <span>Datum</span>
-            <span>Region</span>
-            <span>Ort</span>
-            <span>Station</span>
+            <span className="region-section">Region</span>
+            <span className="region-section">Ort</span>
+            <span className="region-section">Station</span>
             <span>Skada</span>
             <span style={{minWidth: "120px"}}>Kommentar</span>
             <span>Anteckning finns</span>
-            <span>Media</span>
+            <span className="centered-cell">Media</span>
             <span>Incheckare</span>
           </div>
           {tableData.map((row, i) => (
             <div className="table-row" key={i}>
               <span>{row.regnr}</span>
+              <span className="centered-cell">{row.ny ? "NY" : "Gammal"}</span>
               <span>{row.datum}</span>
-              <span>{row.region}</span>
-              <span>{row.ort}</span>
-              <span>{row.station}</span>
+              <span className="region-section centered-cell">{row.region}</span>
+              <span className="region-section centered-cell">{row.ort}</span>
+              <span className="region-section centered-cell">{row.station}</span>
               <span>
-                {row.skada.map((del, idx) => (
-                  <div key={idx}>{del}</div>
-                ))}
+                <ul className="damage-list">
+                  {row.skada.map((del, idx) => (
+                    <li key={idx}>{del}</li>
+                  ))}
+                </ul>
               </span>
               <span style={{minWidth: "120px"}}>{row.anteckning}</span>
-              <span>{row.anteckningFinns ? "Ja" : ""}</span>
-              <span>
+              <span className="centered-cell">{row.anteckningFinns ? "Ja" : ""}</span>
+              <span className="centered-cell">
                 <img src={row.media} alt="media" className="media-thumb" />
               </span>
               <span>{row.incheckare}</span>
