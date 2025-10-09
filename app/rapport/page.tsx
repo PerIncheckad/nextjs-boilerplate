@@ -1,9 +1,8 @@
 'use client';
 import { useState } from "react";
 
-const currentYear = new Date().getFullYear();
+// Dummy-data för demo
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
-
 const stats = {
   period: "Oktober 2025",
   location: "MABI Syd TOTAL",
@@ -45,6 +44,7 @@ const tableData = [
   }
 ];
 
+// Sökfunktion: filtrera på reg.nr (case-insensitive, enkel demo)
 function filterRows(rows, search) {
   if (!search) return rows;
   const foundRows = rows.filter(row => row.regnr.toLowerCase() === search.toLowerCase());
@@ -53,7 +53,8 @@ function filterRows(rows, search) {
 }
 
 export default function RapportPage() {
-  const [period, setPeriod] = useState("month");
+  const [period, setPeriod] = useState("year");
+  const [plats, setPlats] = useState("total");
   const [searchRegnr, setSearchRegnr] = useState("");
   const [activeRegnr, setActiveRegnr] = useState("");
 
@@ -84,10 +85,10 @@ export default function RapportPage() {
         <div className="rapport-card">
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
-          <div className="rapport-stats">
+          <div className="rapport-stats rapport-stats-centered">
             <div>
               <strong>Period:</strong> {stats.period} &nbsp;|&nbsp;
-              <strong>Plats:</strong> {stats.location}
+              <strong>Vald plats:</strong> {stats.location}
             </div>
             <div className="rapport-stats-row">
               <div><strong>Totalt incheckningar:</strong> {stats.totalCheckins}</div>
@@ -100,13 +101,22 @@ export default function RapportPage() {
             </div>
           </div>
           <div className="rapport-filter">
-            <span>Visa för:</span>
-            <select value={period} onChange={e => setPeriod(e.target.value)}>
-              <option value="day">Idag</option>
-              <option value="week">Denna vecka</option>
-              <option value="month">Denna månad</option>
+            <label htmlFor="period-select">Vald period:</label>
+            <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)}>
+              <option value="year">Innevarande kalenderår</option>
+              <option value="month">Innevarande kalendermånad, År</option>
+              <option value="week">Innevarande vecka</option>
               <option value="ytd">YTD</option>
-              <option value="12m">12 mån</option>
+              <option value="7days">Rullande 7 dagar</option>
+              <option value="30days">Rullande 30 dagar</option>
+              <option value="rollingyear">Rullande år</option>
+            </select>
+            <label htmlFor="plats-select">Vald plats:</label>
+            <select id="plats-select" value={plats} onChange={e => setPlats(e.target.value)}>
+              <option value="total">MABI Syd TOTAL</option>
+              <option value="region">Region</option>
+              <option value="ort">Ort</option>
+              <option value="station">Station</option>
             </select>
           </div>
           <div className="rapport-search-row">
@@ -114,7 +124,7 @@ export default function RapportPage() {
               type="text"
               placeholder="Sök reg.nr"
               value={searchRegnr}
-              onChange={e => setSearchRegnr(e.target.value)}
+              onChange={e => setSearchRegnr(e.target.value.toUpperCase())}
               className="rapport-search-input"
             />
             <button
@@ -154,14 +164,14 @@ export default function RapportPage() {
               <thead>
                 <tr>
                   <th className="regnr-col">Regnr</th>
-                  <th>NY/Gammal</th>
-                  <th>Datum</th>
+                  <th>Ny/gammal</th>
+                  <th className="datum-col">Datum</th>
                   <th className="region-section">Region</th>
                   <th className="region-section">Ort</th>
                   <th className="region-section">Station</th>
                   <th>Skada</th>
                   <th className="kommentar-col">Kommentar</th>
-                  <th>Anteckning finns</th>
+                  <th>Anteckning</th>
                   <th className="centered-cell">Media</th>
                   <th>Incheckare</th>
                 </tr>
@@ -171,13 +181,13 @@ export default function RapportPage() {
                   <tr key={i}>
                     <td className="regnr-col"><strong>{row.regnr}</strong></td>
                     <td className="centered-cell">{row.ny ? "NY" : "Gammal"}</td>
-                    <td>
+                    <td className="datum-col">
                       <div>{row.datum}</div>
-                      <div className="datum-klocka">{row.klockslag}</div>
+                      <div className="datum-klocka">kl. {row.klockslag}</div>
                     </td>
-                    <td className="region-section centered-cell">{row.region}</td>
-                    <td className="region-section centered-cell">{row.ort}</td>
-                    <td className="region-section centered-cell">{row.station}</td>
+                    <td className="region-section centered-cell region-shadow">{row.region}</td>
+                    <td className="region-section centered-cell region-shadow">{row.ort}</td>
+                    <td className="region-section centered-cell region-shadow">{row.station}</td>
                     <td className="skada-cell">
                       <div className="skada-hierarki">
                         <span>{row.skada[0]}</span>
@@ -201,7 +211,7 @@ export default function RapportPage() {
         </div>
       </div>
       <footer className="copyright-footer">
-        &copy; Albarone AB {currentYear} &mdash; All rights reserved
+        &copy; Albarone AB 2025 &mdash; All rights reserved
       </footer>
     </main>
   );
