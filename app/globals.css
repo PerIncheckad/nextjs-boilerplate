@@ -176,3 +176,80 @@ body {
   font-weight: 600;
   letter-spacing: 0.04em;
 }
+.background-img {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  background: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif') center center/cover no-repeat;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+.rapport-main {
+  min-height: 100vh;
+  background: var(--background);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.rapport-center-content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.rapport-logo-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  margin-top: 42px;
+  margin-bottom: 22px;
+}
+
+.rapport-logo-centered {
+  width: 210px;
+  max-width: 85vw;
+  height: auto;
+  display: block;
+  z-index: 10;
+}
+
+.rapport-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 2.5rem 2rem 2.2rem 2rem;
+  background: #f3f4f6;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rapport-title {
+  font-size: 2.1rem;
+  font-weight: 700;
+  margin: 0 0 1.3rem 0;
+  color: var(--foreground);
+  text-align: center;
+}
+
+.rapport-divider {
+  width: 240px;
+  height: 0;
+  border-bottom: 3px solid #b0b4b8;
+  margin: 0 auto 2rem auto;
+  border-radius: 2px;
+}
