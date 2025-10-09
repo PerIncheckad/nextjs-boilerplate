@@ -848,3 +848,54 @@ body {
 }
 
 /* Resten av rapport-tabellen och design finns redan enligt tidigare kod */
+.rapport-table th,
+.rapport-table td {
+  font-size: 1em; /* Reg.nr exakt som rubriker */
+}
+
+.regnr-col {
+  font-weight: 500;
+  background: #f7f7fa;
+  text-align: left;
+  border-left: 3px solid #b0b4b8;
+}
+
+.region-section.region-shadow {
+  background: #d2e7fa !important;
+  box-shadow: 0 2px 12px 0 #99c2e3 !important;
+  border-radius: 4px;
+}
+
+.skada-cell .skada-hierarki {
+  color: #222 !important; /* Svart text, ingen länkfärg */
+  font-weight: 400;
+}
+
+.rapport-table th {
+  font-weight: 700;
+  background: #f8fafc;
+  text-align: center;
+  letter-spacing: 0.04em;
+  font-size: 1em;
+}
+.rapport-table th.kommentar-col {
+  text-align: left;
+}
+.rapport-table th.centered-cell {
+  text-align: center;
+}
+
+/* Datumkolumn tillräckligt bred */
+.rapport-table th.datum-col,
+.rapport-table td.datum-col {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.datum-klocka {
+  color: #2a3f57;
+  font-size: 0.93em;
+  margin-top: 2px;
+}
+
+/* Resten av rapport-tabellen och design finns redan enligt tidigare kod */
