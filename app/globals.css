@@ -899,3 +899,12 @@ body {
 }
 
 /* Resten av rapport-tabellen och design finns redan enligt tidigare kod */
+.region-section.region-flat {
+  background: #e4f1fb !important;
+  border-radius: 4px;
+  box-shadow: none !important;
+}
+
+.rapport-table th.region-section.region-flat {
+  background: #cbe4f6 !important;
+}
