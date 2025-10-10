@@ -1,60 +1,47 @@
 'use client';
 import { useEffect, useState } from "react";
+import stationer from '../../data/stationer.json'; // Justera path om du har filen på annat ställe!
 import { supabase } from "@/lib/supabase";
 
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
-// Exempelvärden för rullmenyer
-const huvudstationer = [
-  "P7 Revinge",
-  "Verksta hamn",
-  "Huvudstation Malmö Jägersro",
-  "Huvudstation Helsingborg",
-  "Huvudstation Ängelholm",
-  "Huvudstation Halmstad",
-  "Huvudstation Falkenberg",
-  "Huvudstation Trelleborg",
-  "Huvudstation Varberg",
-  "Huvudstation Lund"
-];
-const platsAlternativ = [
-  "MABI Syd TOTAL",
-  "Region Syd",
-  "Region Mitt",
-  "Region Norr",
-  ...huvudstationer
-];
-
 const periodAlternativ = [
-  { value: "year", label: "Innevarande kalenderår" },
-  { value: "month", label: "Innevarande kalendermånad, År" },
-  { value: "week", label: "Innevarande vecka" },
-  { value: "ytd", label: "YTD" },
+  { value: "year", label: "2025" },
+  { value: "month", label: "Oktober 2025" },
+  { value: "week", label: "v. 41, 6–12 okt" },
+  { value: "ytd", label: "YTD (2025)" },
   { value: "7days", label: "Rullande 7 dagar" },
   { value: "30days", label: "Rullande 30 dagar" },
   { value: "rollingyear", label: "Rullande år" }
 ];
 
-function getPeriodText(period: string) {
-  const year = new Date().getFullYear().toString();
-  switch (period) {
-    case "year":
-      return year;
-    case "month":
-      return "Oktober " + year;
-    case "week":
-      return "v. 41, 6–12 okt";
-    case "ytd":
-      return "YTD (" + year + ")";
-    case "7days":
-      return "Rullande 7 dagar";
-    case "30days":
-      return "Rullande 30 dagar";
-    case "rollingyear":
-      return "Rullande år";
-    default:
-      return year;
-  }
+// Dynamiskt generera platsAlternativ från stationer.json
+const platsAlternativ = stationer.map(st => {
+  if (st.type === "total" || st.type === "region" || st.type === "tot") return st.namn;
+  if (st.type === "station") return `${st.namn} (${st.station_id})`;
+  return st.namn;
+});
+
+function filterDamagesByPlats(damages, plats) {
+  // Hitta valt objekt i stationer.json
+  const st = stationer.find(s =>
+    plats === s.namn ||
+    (s.type === "station" && plats === `${s.namn} (${s.station_id})`)
+  );
+  if (!st || st.type === "total") return damages; // Visa allt
+  if (st.type === "region") return damages.filter(d => d.region === st.namn.split(" ")[1]);
+  if (st.type === "tot") return damages.filter(d => d.huvudstation_id === st.huvudstation_id);
+  if (st.type === "station") return damages.filter(d => d.station_id === st.station_id);
+  return damages;
+}
+
+// Hjälpfunktion för Ny/Gammal (kan förbättras utifrån din logik)
+function getNyGammal(saludatum) {
+  if (!saludatum) return "Ny";
+  const d = new Date(saludatum);
+  const nu = new Date();
+  const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
+  return diff < 30 ? "Ny" : "Gammal";
 }
 
 export default function RapportPage() {
@@ -65,6 +52,7 @@ export default function RapportPage() {
   const [activeRegnr, setActiveRegnr] = useState("");
   const [period, setPeriod] = useState("year");
   const [plats, setPlats] = useState(platsAlternativ[0]);
+  const [autocomplete, setAutocomplete] = useState([]);
 
   useEffect(() => {
     async function fetchDamages() {
@@ -86,17 +74,30 @@ export default function RapportPage() {
     fetchDamages();
   }, []);
 
-  // Filtrera på regnr om sökning är aktiv
-  const filteredRows = damages.filter(row =>
-    !activeRegnr || row.regnr?.toLowerCase() === activeRegnr.toLowerCase()
-  );
+  // Filtrera på plats och regnr
+  let filteredRows = filterDamagesByPlats(damages, plats);
+  if (activeRegnr) {
+    filteredRows = filteredRows.filter(row => row.regnr?.toLowerCase() === activeRegnr.toLowerCase());
+  }
 
   // Sammanfattning
-  const totIncheckningar = damages.length; // Justera logik om incheckningar != skador
+  const totIncheckningar = damages.length; // uppdatera om du vill särskilja incheckningar/skador
   const totSkador = damages.length;
   const skadeprocent = totIncheckningar ? Math.round((totSkador / totIncheckningar) * 100) : 0;
   const senasteIncheckning = damages.length > 0 ? damages[0].damage_date : "--";
   const senasteSkada = damages.length > 0 ? damages[0].damage_date : "--";
+
+  // Autocomplete för sökfält
+  useEffect(() => {
+    if (searchRegnr.length >= 2) {
+      const regnrList = Array.from(new Set(damages.map(row => row.regnr).filter(Boolean)));
+      setAutocomplete(
+        regnrList.filter(r => r.toLowerCase().startsWith(searchRegnr.toLowerCase()))
+      );
+    } else {
+      setAutocomplete([]);
+    }
+  }, [searchRegnr, damages]);
 
   return (
     <main className="rapport-main">
@@ -109,7 +110,7 @@ export default function RapportPage() {
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
           <div className="rapport-stats rapport-stats-centered">
-            <div><strong>Period:</strong> {getPeriodText(period)} <strong>| Vald plats:</strong> {plats}</div>
+            <div><strong>Period:</strong> {periodAlternativ.find(p => p.value === period)?.label} <strong>| Vald plats:</strong> {plats}</div>
             <div><strong>Totalt incheckningar:</strong> {totIncheckningar}</div>
             <div><strong>Totalt skador:</strong> {totSkador}</div>
             <div><strong>Skadeprocent:</strong> {skadeprocent}%</div>
@@ -129,25 +130,26 @@ export default function RapportPage() {
             </select>
           </div>
           <div className="rapport-filter-periodplats">
-            <span><strong>{getPeriodText(period)}</strong> | <strong>{plats}</strong></span>
+            <span><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></span>
           </div>
           {/* Grafer */}
           <div className="rapport-graf">
             <div className="graf-placeholder">[Graf/tidslinje kommer här]</div>
-            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{getPeriodText(period)}</strong> | <strong>{plats}</strong></div>
+            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></div>
           </div>
           <div className="rapport-graf">
             <div className="graf-placeholder">[Jämförelse av skadeprocent mellan enheter – kommer senare!]</div>
-            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{getPeriodText(period)}</strong> | <strong>{plats}</strong></div>
+            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></div>
           </div>
-          {/* Sökfält */}
-          <div className="rapport-search-row">
+          {/* Sökfält med autocomplete */}
+          <div className="rapport-search-row" style={{position: "relative"}}>
             <input
               type="text"
               placeholder="SÖK REG.NR"
               value={searchRegnr}
               onChange={e => setSearchRegnr(e.target.value.toUpperCase())}
               className="rapport-search-input"
+              autoComplete="off"
             />
             <button
               className="rapport-search-btn"
@@ -159,10 +161,39 @@ export default function RapportPage() {
             {activeRegnr && (
               <button
                 className="rapport-reset-btn"
+                style={{
+                  background: "#2a7ae4",
+                  color: "#fff",
+                  border: "none",
+                  marginLeft: "8px",
+                  cursor: "pointer"
+                }}
                 onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}
               >
                 Rensa
               </button>
+            )}
+            {autocomplete.length > 0 && (
+              <ul style={{
+                position: "absolute",
+                top: "36px",
+                left: "0",
+                background: "#fff",
+                border: "1px solid #ddd",
+                width: "180px",
+                zIndex: 10,
+                listStyle: "none",
+                padding: "4px",
+                margin: "0"
+              }}>
+                {autocomplete.map(regnr => (
+                  <li key={regnr}
+                      style={{padding: "4px", cursor: "pointer"}}
+                      onClick={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }}>
+                    {regnr}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
           {/* Tabell */}
@@ -197,11 +228,17 @@ export default function RapportPage() {
                     filteredRows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.regnr}</td>
-                        <td>{/* getNyGammal(row.saludatum) */ "Ny"}</td>
+                        <td>{getNyGammal(row.saludatum)}</td>
                         <td>{row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}</td>
                         <td>{row.region || "--"}</td>
                         <td>{row.ort || "--"}</td>
-                        <td>{row.station_namn || "--"}</td>
+                        <td>
+                          {/* Visa station_namn + stationsnummer, om de finns */}
+                          {row.station_namn
+                            ? `${row.station_namn}${row.station_id ? ` (${row.station_id})` : ""}`
+                            : (row.station_id ? row.station_id : "--")
+                          }
+                        </td>
                         <td>{row.damage_type_raw || "--"}</td>
                         <td>{row.note_customer || row.kommentar || "--"}</td>
                         <td>{row.note_internal || row.anteckning || "--"}</td>
