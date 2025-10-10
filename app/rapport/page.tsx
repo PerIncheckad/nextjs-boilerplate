@@ -4,6 +4,28 @@ import { supabase } from "@/lib/supabase";
 
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
+// Hjälpfunktion för att tolka "Ny/Gammal"
+function getNyGammal(saludatum) {
+  // Exempel: Om saludatum är inom senaste 30 dagar = "Ny", annars "Gammal"
+  if (!saludatum) return "Gammal";
+  const d = new Date(saludatum);
+  const nu = new Date();
+  const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
+  return diff < 30 ? "Ny" : "Gammal";
+}
+
+// Hjälpfunktion för att skapa skada-hierarki
+function getSkadaHierarki(row) {
+  // Antingen parsar du från flera fält, eller splittar en sträng
+  if (row.damage_type_raw) {
+    return row.damage_type_raw.split(">").map((del, i) => (
+      <span key={i} style={{marginRight:4}}>{del.trim()}{i < 2 ? " > " : ""}</span>
+    ));
+  }
+  // Eller använd flera fält: damage_type, car_part, position
+  return [row.damage_type, row.car_part, row.position].filter(Boolean).join(" > ");
+}
+
 export default function RapportPage() {
   const [damages, setDamages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,25 +53,9 @@ export default function RapportPage() {
     fetchDamages();
   }, []);
 
-  // Filtrera på regnr om sökning är aktiv
   const filteredRows = damages.filter(row =>
     !activeRegnr || row.regnr?.toLowerCase() === activeRegnr.toLowerCase()
   );
-
-  // Sammanfattning
-  const sammanfattning = [
-    <div key="totalt-skador"><strong>Totalt skador:</strong> {damages.length}</div>,
-    <div key="senaste-skada"><strong>Senaste skada:</strong> {damages.length > 0 ? damages[0].damage_date : "--"}</div>,
-  ];
-
-  // Formatfunktion för datum/klockslag (om du vill dela upp)
-  function formatDate(dateStr) {
-    if (!dateStr) return "--";
-    try {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("sv-SE");
-    } catch { return dateStr; }
-  }
 
   return (
     <main className="rapport-main">
@@ -61,9 +67,8 @@ export default function RapportPage() {
         <div className="rapport-card">
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
-          <div className="rapport-stats rapport-stats-centered">
-            {sammanfattning}
-          </div>
+
+          {/* Sökfält */}
           <div className="rapport-search-row">
             <input
               type="text"
@@ -88,6 +93,8 @@ export default function RapportPage() {
               </button>
             )}
           </div>
+
+          {/* Tabell */}
           {loading ? (
             <div>Hämtar data...</div>
           ) : error ? (
@@ -98,16 +105,12 @@ export default function RapportPage() {
                 <thead>
                   <tr>
                     <th>Regnr</th>
-                    <th>Salu datum</th>
-                    <th>Skadedatum</th>
-                    <th>Skadetyp</th>
-                    <th>Kundnotering</th>
-                    <th>Intern notering</th>
-                    <th>Övrigt</th>
-                    {/* Lägg till fler kolumner nedan vid behov */}
+                    <th>Ny/Gammal</th>
+                    <th>Datum</th>
                     <th>Region</th>
                     <th>Ort</th>
                     <th>Station</th>
+                    <th>Skada</th>
                     <th>Kommentar</th>
                     <th>Anteckning</th>
                     <th>Media</th>
@@ -117,33 +120,34 @@ export default function RapportPage() {
                 <tbody>
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={14} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
+                      <td colSpan={11} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
                     </tr>
                   ) : (
                     filteredRows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.regnr}</td>
-                        <td>{formatDate(row.saludatum)}</td>
-                        <td>{formatDate(row.damage_date)}</td>
-                        <td>{row.damage_type_raw}</td>
-                        <td>{row.note_customer}</td>
-                        <td>{row.note_internal}</td>
-                        <td>{row.vehiclenote}</td>
-                        {/* Extra-fält, fyll på efter behov */}
-                        <td>{row.region || "-"}</td>
-                        <td>{row.ort || "-"}</td>
-                        <td>{row.station_namn || "-"}</td>
-                        <td>{row.description || "-"}</td>
-                        <td>{row.status || "-"}</td>
+                        <td>{getNyGammal(row.saludatum)}</td>
                         <td>
-                          {/* Media-visning kan byggas ut, t.ex. miniatyr/bildlänk */}
+                          {row.damage_date
+                            ? new Date(row.damage_date).toLocaleDateString("sv-SE") +
+                              (row.klockslag ? " kl. " + row.klockslag : "")
+                            : "--"}
+                        </td>
+                        <td>{row.region || "--"}</td>
+                        <td>{row.ort || "--"}</td>
+                        <td>{row.station_namn || "--"}</td>
+                        <td>{getSkadaHierarki(row)}</td>
+                        <td>{row.note_customer || row.kommentar || "--"}</td>
+                        <td>{row.note_internal || row.anteckning || "--"}</td>
+                        <td>
+                          {/* Visa media om du har url: row.media_url eller liknande */}
                           {row.media_url ? (
-                            <img src={row.media_url} alt="skademedia" style={{height:"32px"}} />
+                            <img src={row.media_url} style={{height:"32px"}} />
                           ) : (
-                            "-"
+                            "--"
                           )}
                         </td>
-                        <td>{row.inchecker_name || "-"}</td>
+                        <td>{row.inchecker_name || row.godkandAv || "--"}</td>
                       </tr>
                     ))
                   )}
