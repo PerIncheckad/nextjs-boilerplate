@@ -11,10 +11,8 @@
   { "namn": "Trelleborg TOT", "type": "tot", "region": "Syd", "huvudstation_id": "283" },
   { "namn": "Falkenberg TOT", "type": "tot", "region": "Syd", "huvudstation_id": "282" },
   { "namn": "Varberg TOT", "type": "tot", "region": "Syd", "huvudstation_id": "290" },
-
   { "namn": "Halmstad TOT", "type": "tot", "region": "Norr", "huvudstation_id": "274" },
 
-  // Stationer/depåer under Malmö TOT
   { "namn": "Ford Malmö", "station_id": "104", "huvudstation_id": "166", "region": "Syd", "type": "station" },
   { "namn": "Mechanum", "station_id": "107", "huvudstation_id": "166", "region": "Syd", "type": "station" },
   { "namn": "Malmö Automera", "station_id": "1661", "huvudstation_id": "166", "region": "Syd", "type": "station" },
@@ -25,7 +23,6 @@
   { "namn": "Hedin Automotive Burlöv", "station_id": "302", "huvudstation_id": "166", "region": "Syd", "type": "station" },
   { "namn": "Sturup", "station_id": "77", "huvudstation_id": "166", "region": "Syd", "type": "station" },
 
-  // Stationer/depåer under Helsingborg TOT
   { "namn": "HBSC Helsingborg", "station_id": "1701", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "Ford Helsingborg", "station_id": "1702", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "Transport Helsingborg", "station_id": "1703", "huvudstation_id": "170", "region": "Syd", "type": "station" },
@@ -39,29 +36,19 @@
   { "namn": "Werksta Helsingborg", "station_id": "174", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "Båstad", "station_id": "157", "huvudstation_id": "170", "region": "Syd", "type": "station" },
 
-  // Stationer/depåer under Ängelholm TOT
   { "namn": "FORD Ängelholm", "station_id": "1711", "huvudstation_id": "171", "region": "Syd", "type": "station" },
   { "namn": "Mekonomen Ängelholm", "station_id": "1712", "huvudstation_id": "171", "region": "Syd", "type": "station" },
   { "namn": "Flyget Ängelholm", "station_id": "154", "huvudstation_id": "171", "region": "Syd", "type": "station" },
 
-  // Stationer/depåer under Halmstad TOT (Norr)
   { "namn": "Flyget Halmstad", "station_id": "2741", "huvudstation_id": "274", "region": "Norr", "type": "station" },
   { "namn": "KIA Halmstad", "station_id": "2743", "huvudstation_id": "274", "region": "Norr", "type": "station" },
   { "namn": "FORD Halmstad", "station_id": "2744", "huvudstation_id": "274", "region": "Norr", "type": "station" },
 
-  // Stationer/depåer under Falkenberg TOT
-  // (Lägg till depåer när du har fler)
-
-  // Stationer/depåer under Trelleborg TOT
-  // (Lägg till depåer när du har fler)
-
-  // Stationer/depåer under Varberg TOT
   { "namn": "Ford Varberg", "station_id": "2901", "huvudstation_id": "290", "region": "Syd", "type": "station" },
   { "namn": "Hedin Automotive Varberg", "station_id": "2902", "huvudstation_id": "290", "region": "Syd", "type": "station" },
   { "namn": "Sällstorp lack plåt", "station_id": "2903", "huvudstation_id": "290", "region": "Syd", "type": "station" },
   { "namn": "Finnveden plåt", "station_id": "2904", "huvudstation_id": "290", "region": "Syd", "type": "station" },
 
-  // Stationer/depåer under Lund TOT
   { "namn": "Ford Lund", "station_id": "4061", "huvudstation_id": "406", "region": "Syd", "type": "station" },
   { "namn": "Hedin Lund", "station_id": "4062", "huvudstation_id": "406", "region": "Syd", "type": "station" },
   { "namn": "B/S Lund", "station_id": "4063", "huvudstation_id": "406", "region": "Syd", "type": "station" },
