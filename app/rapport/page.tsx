@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from "react";
-import stationer from '../../data/stationer.json'; // Justera path om du har filen på annat ställe!
+import stationer from '../../data/stationer.json';
 import { supabase } from "@/lib/supabase";
 
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
@@ -15,7 +15,6 @@ const periodAlternativ = [
   { value: "rollingyear", label: "Rullande år" }
 ];
 
-// Dynamiskt generera platsAlternativ från stationer.json
 const platsAlternativ = stationer.map(st => {
   if (st.type === "total" || st.type === "region" || st.type === "tot") return st.namn;
   if (st.type === "station") return `${st.namn} (${st.station_id})`;
@@ -23,19 +22,17 @@ const platsAlternativ = stationer.map(st => {
 });
 
 function filterDamagesByPlats(damages, plats) {
-  // Hitta valt objekt i stationer.json
   const st = stationer.find(s =>
     plats === s.namn ||
     (s.type === "station" && plats === `${s.namn} (${s.station_id})`)
   );
-  if (!st || st.type === "total") return damages; // Visa allt
+  if (!st || st.type === "total") return damages;
   if (st.type === "region") return damages.filter(d => d.region === st.namn.split(" ")[1]);
   if (st.type === "tot") return damages.filter(d => d.huvudstation_id === st.huvudstation_id);
   if (st.type === "station") return damages.filter(d => d.station_id === st.station_id);
   return damages;
 }
 
-// Hjälpfunktion för Ny/Gammal (kan förbättras utifrån din logik)
 function getNyGammal(saludatum) {
   if (!saludatum) return "Ny";
   const d = new Date(saludatum);
@@ -74,20 +71,17 @@ export default function RapportPage() {
     fetchDamages();
   }, []);
 
-  // Filtrera på plats och regnr
   let filteredRows = filterDamagesByPlats(damages, plats);
   if (activeRegnr) {
     filteredRows = filteredRows.filter(row => row.regnr?.toLowerCase() === activeRegnr.toLowerCase());
   }
 
-  // Sammanfattning
-  const totIncheckningar = damages.length; // uppdatera om du vill särskilja incheckningar/skador
+  const totIncheckningar = damages.length;
   const totSkador = damages.length;
   const skadeprocent = totIncheckningar ? Math.round((totSkador / totIncheckningar) * 100) : 0;
   const senasteIncheckning = damages.length > 0 ? damages[0].damage_date : "--";
   const senasteSkada = damages.length > 0 ? damages[0].damage_date : "--";
 
-  // Autocomplete för sökfält
   useEffect(() => {
     if (searchRegnr.length >= 2) {
       const regnrList = Array.from(new Set(damages.map(row => row.regnr).filter(Boolean)));
@@ -132,7 +126,6 @@ export default function RapportPage() {
           <div className="rapport-filter-periodplats">
             <span><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></span>
           </div>
-          {/* Grafer */}
           <div className="rapport-graf">
             <div className="graf-placeholder">[Graf/tidslinje kommer här]</div>
             <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></div>
@@ -141,7 +134,6 @@ export default function RapportPage() {
             <div className="graf-placeholder">[Jämförelse av skadeprocent mellan enheter – kommer senare!]</div>
             <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></div>
           </div>
-          {/* Sökfält med autocomplete */}
           <div className="rapport-search-row" style={{position: "relative"}}>
             <input
               type="text"
@@ -196,7 +188,6 @@ export default function RapportPage() {
               </ul>
             )}
           </div>
-          {/* Tabell */}
           {loading ? (
             <div>Hämtar data...</div>
           ) : error ? (
@@ -233,7 +224,6 @@ export default function RapportPage() {
                         <td>{row.region || "--"}</td>
                         <td>{row.ort || "--"}</td>
                         <td>
-                          {/* Visa station_namn + stationsnummer, om de finns */}
                           {row.station_namn
                             ? `${row.station_namn}${row.station_id ? ` (${row.station_id})` : ""}`
                             : (row.station_id ? row.station_id : "--")
