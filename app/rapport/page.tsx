@@ -4,6 +4,8 @@ import { supabase } from "@/lib/supabase";
 
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
+// TODO: Gör rapport-card och rapport-table-wrap lite transparent mot bakgrunden (design-förslag)
+
 export default function RapportPage() {
   const [damages, setDamages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +94,7 @@ export default function RapportPage() {
                     <th>Kundnotering</th>
                     <th>Intern notering</th>
                     <th>Övrigt</th>
+                    {/* Lägg till fler kolumner här om önskat */}
                   </tr>
                 </thead>
                 <tbody>
@@ -108,6 +111,7 @@ export default function RapportPage() {
                         <td>{row.note_customer}</td>
                         <td>{row.note_internal}</td>
                         <td>{row.vehiclenote}</td>
+                        {/* Lägg till fler celler här om önskat */}
                       </tr>
                     ))
                   )}
