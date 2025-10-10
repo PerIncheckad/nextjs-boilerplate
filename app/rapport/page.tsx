@@ -4,8 +4,6 @@ import { supabase } from "@/lib/supabase";
 
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
-// TODO: Gör rapport-card och rapport-table-wrap lite transparent mot bakgrunden (design-förslag)
-
 export default function RapportPage() {
   const [damages, setDamages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -33,14 +31,25 @@ export default function RapportPage() {
     fetchDamages();
   }, []);
 
+  // Filtrera på regnr om sökning är aktiv
   const filteredRows = damages.filter(row =>
     !activeRegnr || row.regnr?.toLowerCase() === activeRegnr.toLowerCase()
   );
 
+  // Sammanfattning
   const sammanfattning = [
-    <div key="incheckningar"><strong>Totalt skador:</strong> {damages.length}</div>,
+    <div key="totalt-skador"><strong>Totalt skador:</strong> {damages.length}</div>,
     <div key="senaste-skada"><strong>Senaste skada:</strong> {damages.length > 0 ? damages[0].damage_date : "--"}</div>,
   ];
+
+  // Formatfunktion för datum/klockslag (om du vill dela upp)
+  function formatDate(dateStr) {
+    if (!dateStr) return "--";
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("sv-SE");
+    } catch { return dateStr; }
+  }
 
   return (
     <main className="rapport-main">
@@ -89,29 +98,52 @@ export default function RapportPage() {
                 <thead>
                   <tr>
                     <th>Regnr</th>
+                    <th>Salu datum</th>
                     <th>Skadedatum</th>
                     <th>Skadetyp</th>
                     <th>Kundnotering</th>
                     <th>Intern notering</th>
                     <th>Övrigt</th>
-                    {/* Lägg till fler kolumner här om önskat */}
+                    {/* Lägg till fler kolumner nedan vid behov */}
+                    <th>Region</th>
+                    <th>Ort</th>
+                    <th>Station</th>
+                    <th>Kommentar</th>
+                    <th>Anteckning</th>
+                    <th>Media</th>
+                    <th>Godkänd av</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
+                      <td colSpan={14} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
                     </tr>
                   ) : (
                     filteredRows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.regnr}</td>
-                        <td>{row.damage_date}</td>
+                        <td>{formatDate(row.saludatum)}</td>
+                        <td>{formatDate(row.damage_date)}</td>
                         <td>{row.damage_type_raw}</td>
                         <td>{row.note_customer}</td>
                         <td>{row.note_internal}</td>
                         <td>{row.vehiclenote}</td>
-                        {/* Lägg till fler celler här om önskat */}
+                        {/* Extra-fält, fyll på efter behov */}
+                        <td>{row.region || "-"}</td>
+                        <td>{row.ort || "-"}</td>
+                        <td>{row.station_namn || "-"}</td>
+                        <td>{row.description || "-"}</td>
+                        <td>{row.status || "-"}</td>
+                        <td>
+                          {/* Media-visning kan byggas ut, t.ex. miniatyr/bildlänk */}
+                          {row.media_url ? (
+                            <img src={row.media_url} alt="skademedia" style={{height:"32px"}} />
+                          ) : (
+                            "-"
+                          )}
+                        </td>
+                        <td>{row.inchecker_name || "-"}</td>
                       </tr>
                     ))
                   )}
