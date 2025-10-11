@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
 
 // =================================================================
 // 1. INITIALIZATION & CONFIGURATION
 // =================================================================
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// NYTT Supabase-admin-klient för insert till 'damages'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 const bilkontrollAddress = process.env.BILKONTROLL_MAIL;
 const regionSydAddress = process.env.MAIL_REGION_SYD;
@@ -34,7 +40,7 @@ const createAlertBanner = (condition: boolean, text: string): string => {
   return `
     <tr>
       <td style="padding: 12px 0;">
-        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #000000 !important; border-radius: 5px;">
+        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold;">
           ⚠️ ${text}
         </div>
       </td>
@@ -68,7 +74,7 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 5px 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-bottom: 10px;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
@@ -282,19 +288,49 @@ export async function POST(request: Request) {
 
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i det centrala bilregistret. Vänligen lägg till fordonet manuellt.</p></td></tr>`);
+      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret.</p></td></tr>`);
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
 
     await Promise.all(emailPromises);
 
-    return NextResponse.json({ message: 'Notifications processed.' });
+    // ============================================
+    // NYTT: INSERT TILL Supabase-tabellen 'damages'
+    // ============================================
+    const insertPayload = {
+      regnr: payload.regnr,
+      damage_date: now.toISOString(),
+      region: payload.ort ? payload.ort : null,
+      ort: payload.ort || null,
+      station_namn: payload.station || null,
+      inchecker_name: payload.incheckare || null,
+      damage_type: payload.nya_skador?.[0]?.type || "clean",
+      car_part: payload.nya_skador?.[0]?.carPart || null,
+      position: payload.nya_skador?.[0]?.position || null,
+      description: payload.nya_skador?.[0]?.text || null,
+      media_url: payload.nya_skador?.[0]?.uploads?.photo_urls?.[0] || null,
+      status: "complete",
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      // Eventuella andra fält här...
+    };
+
+    const { error: insertError } = await supabaseAdmin
+      .from('damages')
+      .insert([insertPayload]);
+
+    if (insertError) {
+      console.error('FEL vid insert till Supabase damages:', insertError.message);
+      return NextResponse.json({ error: 'Failed to save to Supabase damages', details: insertError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ message: 'Notifications processed and damage saved.' });
 
   } catch (error) {
-    console.error('FATAL: Failed to send notification:', error);
+    console.error('FATAL: Failed to send notification or save damage:', error);
     if (error instanceof Error) {
         console.error(error.message);
     }
-    return NextResponse.json({ error: 'Failed to send notification' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to send notification or save damage' }, { status: 500 });
   }
 }
