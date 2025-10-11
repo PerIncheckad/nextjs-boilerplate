@@ -160,11 +160,11 @@ const createBaseLayout = (regnr: string, content: string): string => `
 `;
 
 // =================================================================
-// 3. HTML BUILDERS - SPECIFIC EMAILS
+// 3. HTML BUILDERS - SPECIFIC EMAILS (UPPDATERAD)
 // =================================================================
 
 const buildRegionEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, nya_skador = [] } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, nya_skador = [], notering } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
 
   const content = `
@@ -193,6 +193,12 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
       ${nya_skador.length > 0 ? `
         <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
           ${formatDamagesToHtml(nya_skador, 'Nya skador')}
+        </div>
+      ` : ''}
+      ${notering ? `
+        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
+          <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>
+          <p style="margin:0; color: #000000 !important;">${notering}</p>
         </div>
       ` : ''}
       <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #005A9C !important; text-decoration: none !important;">Öppna bildgalleri för ${regnr} →</a></div>
@@ -259,7 +265,7 @@ export async function POST(request: Request) {
 
   try {
     const payload = await request.json();
-    const { regnr, ort, station, status } = payload;
+    const { regnr, ort, station, status, notering } = payload;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -308,10 +314,10 @@ export async function POST(request: Request) {
       position: payload.nya_skador?.[0]?.position || null,
       description: payload.nya_skador?.[0]?.text || null,
       media_url: payload.nya_skador?.[0]?.uploads?.photo_urls?.[0] || null,
+      notering: payload.notering || null, // ← NYTT!
       status: "complete",
       created_at: now.toISOString(),
-      updated_at: now.toISOString(),
-      // Eventuella andra fält här...
+      updated_at: now.toISOString()
     };
 
     // FELSÖKNING: logga insertPayload
