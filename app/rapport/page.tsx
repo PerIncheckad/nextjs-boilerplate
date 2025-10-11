@@ -33,7 +33,8 @@ function filterDamagesByPlats(damages, plats) {
   return damages;
 }
 
-function getNyGammal(saludatum) {
+function getNyGammal(saludatum, isBUHS) {
+  if (isBUHS) return "Detta är info från BUHS. Ännu ej dokumenterad i formuläret.";
   if (!saludatum) return "Ny";
   const d = new Date(saludatum);
   const nu = new Date();
@@ -50,6 +51,8 @@ export default function RapportPage() {
   const [period, setPeriod] = useState("year");
   const [plats, setPlats] = useState(platsAlternativ[0]);
   const [autocomplete, setAutocomplete] = useState([]);
+  const [sortKey, setSortKey] = useState("damage_date");
+  const [sortOrder, setSortOrder] = useState("desc");
 
   useEffect(() => {
     async function fetchDamages() {
@@ -59,7 +62,7 @@ export default function RapportPage() {
         const { data, error: fetchError } = await supabase
           .from("damages")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("damage_date", { ascending: false });
         if (fetchError) throw fetchError;
         setDamages(data);
       } catch (e) {
@@ -75,6 +78,23 @@ export default function RapportPage() {
   if (activeRegnr) {
     filteredRows = filteredRows.filter(row => row.regnr?.toLowerCase() === activeRegnr.toLowerCase());
   }
+
+  // Sortering
+  filteredRows = [...filteredRows].sort((a, b) => {
+    let ak = a[sortKey] ?? "";
+    let bk = b[sortKey] ?? "";
+    // Datum-sortering
+    if (sortKey === "damage_date" || sortKey === "created_at" || sortKey === "updated_at") {
+      ak = new Date(ak).getTime();
+      bk = new Date(bk).getTime();
+      return sortOrder === "desc" ? bk - ak : ak - bk;
+    }
+    // Text-sortering
+    if (typeof ak === "string" && typeof bk === "string") {
+      return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
+    }
+    return 0;
+  });
 
   const totIncheckningar = damages.length;
   const totSkador = damages.length;
@@ -93,10 +113,25 @@ export default function RapportPage() {
     }
   }, [searchRegnr, damages]);
 
+  // Döljer autocomplete när regnr är valt
+  useEffect(() => {
+    if (activeRegnr) setAutocomplete([]);
+  }, [activeRegnr]);
+
+  const handleSort = (key) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortOrder("desc");
+    }
+  };
+
   return (
-    <main className="rapport-main">
+    <main className="rapport-main" style={{ paddingBottom: "60px" }}>
       <div className="background-img" />
-      <div className="rapport-logo-row rapport-logo-top">
+      <div style={{ height: "36px" }}></div>
+      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "36px" }}>
         <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
       </div>
       <div className="rapport-center-content">
@@ -197,51 +232,57 @@ export default function RapportPage() {
               <table className="rapport-table">
                 <thead>
                   <tr>
-                    <th>Regnr</th>
-                    <th>Ny/Gammal</th>
-                    <th>Datum</th>
-                    <th>Region</th>
-                    <th>Ort</th>
-                    <th>Station</th>
-                    <th>Skada</th>
-                    <th>Kommentar</th>
-                    <th>Anteckning</th>
-                    <th>Media</th>
-                    <th>Godkänd av</th>
+                    <th onClick={() => handleSort("regnr")} style={{cursor:"pointer"}}>Regnr</th>
+                    <th onClick={() => handleSort("saludatum")} style={{cursor:"pointer"}}>Ny/gammal</th>
+                    <th onClick={() => handleSort("damage_date")} style={{cursor:"pointer"}}>Datum</th>
+                    <th onClick={() => handleSort("region")} style={{cursor:"pointer"}}>Region</th>
+                    <th onClick={() => handleSort("ort")} style={{cursor:"pointer"}}>Ort</th>
+                    <th onClick={() => handleSort("station_namn")} style={{cursor:"pointer"}}>Station</th>
+                    <th onClick={() => handleSort("damage_type")} style={{cursor:"pointer"}}>Skada</th>
+                    <th onClick={() => handleSort("note_customer")} style={{cursor:"pointer"}}>Kommentar</th>
+                    <th onClick={() => handleSort("notering")} style={{cursor:"pointer"}}>Generell kommentar</th>
+                    <th onClick={() => handleSort("note_internal")} style={{cursor:"pointer"}}>Anteckning</th>
+                    <th onClick={() => handleSort("media_url")} style={{cursor:"pointer"}}>Media</th>
+                    <th onClick={() => handleSort("inchecker_name")} style={{cursor:"pointer"}}>Godkänd av</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={11} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
+                      <td colSpan={12} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
                     </tr>
                   ) : (
-                    filteredRows.map((row) => (
-                      <tr key={row.id}>
-                        <td>{row.regnr}</td>
-                        <td>{getNyGammal(row.saludatum)}</td>
-                        <td>{row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}</td>
-                        <td>{row.region || "--"}</td>
-                        <td>{row.ort || "--"}</td>
-                        <td>
-                          {row.station_namn
-                            ? `${row.station_namn}${row.station_id ? ` (${row.station_id})` : ""}`
-                            : (row.station_id ? row.station_id : "--")
-                          }
-                        </td>
-                        <td>{row.damage_type_raw || "--"}</td>
-                        <td>{row.note_customer || row.kommentar || "--"}</td>
-                        <td>{row.note_internal || row.anteckning || "--"}</td>
-                        <td>
-                          {row.media_url ? (
-                            <img src={row.media_url} style={{height:"32px"}} />
-                          ) : (
-                            "--"
-                          )}
-                        </td>
-                        <td>{row.inchecker_name || row.godkandAv || "--"}</td>
-                      </tr>
-                    ))
+                    filteredRows.map((row) => {
+                      // BUHS: Exempel – här kan du justera logik!
+                      const isBUHS = row.note_internal === "BUHS" || String(row.damage_type_raw).toLowerCase().includes("buhs");
+                      return (
+                        <tr key={row.id}>
+                          <td>{row.regnr}</td>
+                          <td>{getNyGammal(row.saludatum, isBUHS)}</td>
+                          <td>{row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}</td>
+                          <td>{row.region || "--"}</td>
+                          <td>{row.ort || "--"}</td>
+                          <td>
+                            {row.station_namn
+                              ? `${row.station_namn}${row.station_id ? ` (${row.station_id})` : ""}`
+                              : (row.station_id ? row.station_id : "--")
+                            }
+                          </td>
+                          <td>{row.damage_type || row.damage_type_raw || "--"}</td>
+                          <td>{row.note_customer || row.kommentar || "--"}</td>
+                          <td>{row.notering || "--"}</td>
+                          <td>{row.note_internal || row.anteckning || "--"}</td>
+                          <td>
+                            {row.media_url ? (
+                              <img src={row.media_url} style={{height:"32px"}} />
+                            ) : (
+                              "--"
+                            )}
+                          </td>
+                          <td>{row.inchecker_name || row.godkandAv || "--"}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -249,7 +290,7 @@ export default function RapportPage() {
           )}
         </div>
       </div>
-      <footer className="copyright-footer">
+      <footer className="copyright-footer" style={{ position: "fixed", left: 0, bottom: 0, width: "100vw" }}>
         &copy; Albarone AB 2025 &mdash; All rights reserved
       </footer>
     </main>
