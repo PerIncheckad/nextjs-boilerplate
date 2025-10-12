@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import stationer from '../../data/stationer.json';
 import { supabase } from "@/lib/supabase";
 
+// ==============================
+// Inställningar och metadata
+// ==============================
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
 const periodAlternativ = [
@@ -33,13 +36,27 @@ function filterDamagesByPlats(damages, plats) {
   return damages;
 }
 
-function getNyGammal(saludatum, isBUHS) {
-  if (isBUHS) return "Detta är info från BUHS. Ännu ej dokumenterad i formuläret.";
-  if (!saludatum) return "Ny";
-  const d = new Date(saludatum);
-  const nu = new Date();
-  const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
-  return diff < 30 ? "Ny" : "Gammal";
+// =============================================
+// BUHS/NY/GAMMAL-logik (Kristallklar enligt dig!)
+// =============================================
+function getNyGammal(row) {
+  // Om det är en BUHS-skada (ej hanterad via formulär)
+  const buhsText = "Detta är info från BUHS. Ännu ej dokumenterad i formuläret.";
+  if (
+    (row.note_internal && String(row.note_internal).toLowerCase().includes("buhs")) ||
+    (row.damage_type_raw && String(row.damage_type_raw).toLowerCase().includes("buhs"))
+  ) {
+    return buhsText;
+  }
+  // Om skadan är dokumenterad via formulär och har saludatum (skadedatum från fil)
+  if (row.saludatum) {
+    const d = new Date(row.saludatum);
+    const nu = new Date();
+    const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
+    return diff < 30 ? "Ny" : "Gammal";
+  }
+  // Annars: "Ny"
+  return "Ny";
 }
 
 export default function RapportPage() {
@@ -130,8 +147,8 @@ export default function RapportPage() {
   return (
     <main className="rapport-main" style={{ paddingBottom: "60px" }}>
       <div className="background-img" />
-      <div style={{ height: "36px" }}></div>
-      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "36px" }}>
+      <div style={{ height: "22px" }}></div>
+      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "24px" }}>
         <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
       </div>
       <div className="rapport-center-content">
@@ -239,9 +256,9 @@ export default function RapportPage() {
                     <th onClick={() => handleSort("ort")} style={{cursor:"pointer"}}>Ort</th>
                     <th onClick={() => handleSort("station_namn")} style={{cursor:"pointer"}}>Station</th>
                     <th onClick={() => handleSort("damage_type")} style={{cursor:"pointer"}}>Skada</th>
-                    <th onClick={() => handleSort("note_customer")} style={{cursor:"pointer"}}>Kommentar</th>
-                    <th onClick={() => handleSort("notering")} style={{cursor:"pointer"}}>Generell kommentar</th>
-                    <th onClick={() => handleSort("note_internal")} style={{cursor:"pointer"}}>Anteckning</th>
+                    {/* Kommentar per skada tas bort från tabellen */}
+                    <th onClick={() => handleSort("notering")} style={{cursor:"pointer"}}>Anteckning</th>
+                    <th onClick={() => handleSort("note_internal")} style={{cursor:"pointer"}}>Anteckning (intern)</th>
                     <th onClick={() => handleSort("media_url")} style={{cursor:"pointer"}}>Media</th>
                     <th onClick={() => handleSort("inchecker_name")} style={{cursor:"pointer"}}>Godkänd av</th>
                   </tr>
@@ -249,16 +266,14 @@ export default function RapportPage() {
                 <tbody>
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={12} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
+                      <td colSpan={11} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
                     </tr>
                   ) : (
                     filteredRows.map((row) => {
-                      // BUHS: Exempel – här kan du justera logik!
-                      const isBUHS = row.note_internal === "BUHS" || String(row.damage_type_raw).toLowerCase().includes("buhs");
                       return (
                         <tr key={row.id}>
                           <td>{row.regnr}</td>
-                          <td>{getNyGammal(row.saludatum, isBUHS)}</td>
+                          <td>{getNyGammal(row)}</td>
                           <td>{row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}</td>
                           <td>{row.region || "--"}</td>
                           <td>{row.ort || "--"}</td>
@@ -269,9 +284,8 @@ export default function RapportPage() {
                             }
                           </td>
                           <td>{row.damage_type || row.damage_type_raw || "--"}</td>
-                          <td>{row.note_customer || row.kommentar || "--"}</td>
                           <td>{row.notering || "--"}</td>
-                          <td>{row.note_internal || row.anteckning || "--"}</td>
+                          <td>{row.note_internal || "--"}</td>
                           <td>
                             {row.media_url ? (
                               <img src={row.media_url} style={{height:"32px"}} />
