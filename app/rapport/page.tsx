@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import stationer from '../../data/stationer.json';
 import { supabase } from "@/lib/supabase";
+import MediaGallery from "@/components/MediaGallery";
 
 // ==============================
 // Inställningar och metadata
@@ -245,7 +246,18 @@ export default function RapportPage() {
           ) : error ? (
             <div style={{ color: "red" }}>{error}</div>
           ) : (
-            <div className="rapport-table-wrap">
+      <MediaGallery
+  skador={filteredRows.map(row => ({
+    regnr: row.regnr,
+    damageType: row.damage_type || row.damage_type_raw || "--",
+    date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
+    station: row.station_namn || row.station_id || "--",
+    media: row.media_url ? [{ url: row.media_url, type: "image" }] : [],
+    isLatest: getNyGammal(row) === "Ny"
+  }))}
+  role={"admin"} // Justera till din rollhantering om du har!
+/>     
+      <div className="rapport-table-wrap">
               <table className="rapport-table">
                 <thead>
                   <tr>
