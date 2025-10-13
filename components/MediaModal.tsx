@@ -4,11 +4,14 @@ type MediaItem = {
   url: string;
   type: "image" | "video";
   metadata: {
-    regnr: string;
     date: string;
     time?: string;
     damageType: string;
     station: string;
+    note?: string;
+    inchecker?: string;
+    documentationDate?: string;
+    damageDate?: string;
   };
 };
 
@@ -67,13 +70,13 @@ export default function MediaModal({
     <div className="media-modal-overlay" ref={modalRef}>
       <div className="media-modal-content">
         <div className="media-modal-header">
-          <h2>{title}</h2>
+          <h2 style={{ textAlign: "center", width: "100%" }}>{title}</h2>
           <button className="media-modal-close" onClick={onClose}>
             ×
           </button>
         </div>
         <div className="media-modal-body">
-          <div className="media-modal-gallery">
+          <div className="media-modal-gallery" style={{ justifyContent: "center" }}>
             {hasPrev && (
               <button className="media-modal-arrow left" onClick={onPrev}>
                 ←
@@ -81,14 +84,27 @@ export default function MediaModal({
             )}
             <div
               className="media-modal-item"
-              style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}
+              style={{
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               {currentMedia.type === "image" ? (
                 <img
                   src={currentMedia.url}
-                  alt={`Skada på ${currentMedia.metadata.regnr}`}
+                  alt="Skada"
                   className="media-modal-image"
-                  style={{ cursor: "pointer", maxWidth: "320px", maxHeight: "320px", borderRadius: "8px" }}
+                  style={{
+                    cursor: "pointer",
+                    maxWidth: "480px",
+                    maxHeight: "480px",
+                    borderRadius: "14px",
+                    margin: "0 auto",
+                    display: "block",
+                  }}
                   onClick={() => setLightboxIdx(currentIdx)}
                 />
               ) : (
@@ -96,15 +112,13 @@ export default function MediaModal({
                   src={currentMedia.url}
                   controls
                   className="media-modal-video"
-                  style={{ maxWidth: "320px", maxHeight: "320px", borderRadius: "8px" }}
+                  style={{ maxWidth: "480px", maxHeight: "480px", borderRadius: "14px", margin: "0 auto" }}
                 />
               )}
-              <div className="media-modal-metadata">
+              <div className="media-modal-metadata" style={{ textAlign: "center", marginTop: "1.2rem" }}>
                 <div>
-                  <b>Reg.nr:</b> {currentMedia.metadata.regnr}
-                </div>
-                <div>
-                  <b>Datum:</b> {currentMedia.metadata.date}
+                  <b>Datum för dokumentation:</b>{" "}
+                  {currentMedia.metadata.documentationDate || currentMedia.metadata.date || "--"}
                   {currentMedia.metadata.time && (
                     <span>
                       <br />
@@ -112,12 +126,27 @@ export default function MediaModal({
                     </span>
                   )}
                 </div>
+                {currentMedia.metadata.damageDate && (
+                  <div>
+                    <b>Skadedatum:</b> {currentMedia.metadata.damageDate}
+                  </div>
+                )}
                 <div>
                   <b>Skadetyp:</b> {currentMedia.metadata.damageType}
                 </div>
                 <div>
                   <b>Station:</b> {currentMedia.metadata.station}
                 </div>
+                {currentMedia.metadata.note && (
+                  <div style={{ marginTop: "1.2rem", fontStyle: "italic", color: "#444" }}>
+                    {currentMedia.metadata.note}
+                  </div>
+                )}
+                {currentMedia.metadata.inchecker && (
+                  <div style={{ marginTop: "1.2rem" }}>
+                    <b>Incheckare:</b> {currentMedia.metadata.inchecker}
+                  </div>
+                )}
               </div>
             </div>
             {hasNext && (
@@ -132,12 +161,14 @@ export default function MediaModal({
         <div className="media-modal-lightbox" onClick={() => setLightboxIdx(null)}>
           <img
             src={media[lightboxIdx].url}
-            alt={`Skada på ${media[lightboxIdx].metadata.regnr}`}
+            alt="Skada - helskärm"
             style={{
               maxWidth: "90vw",
               maxHeight: "90vh",
               borderRadius: "16px",
               boxShadow: "0 0 24px #0007",
+              margin: "0 auto",
+              display: "block",
             }}
           />
         </div>
@@ -158,21 +189,28 @@ export default function MediaModal({
         .media-modal-content {
           background: rgba(255,255,255,0.97);
           border-radius: 18px;
-          padding: 2rem;
+          padding: 2.6rem 2rem 2.2rem 2rem;
           min-width: 350px;
           max-width: 95vw;
           max-height: 90vh;
           overflow-y: auto;
           box-shadow: 0 2px 32px #0003;
           position: relative;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
         .media-modal-header {
           display: flex;
-          justify-content: space-between;
+          justify-content: center;
           align-items: center;
-          margin-bottom: 1rem;
+          margin-bottom: 0.7rem;
+          width: 100%;
         }
         .media-modal-close {
+          position: absolute;
+          top: 18px;
+          right: 32px;
           font-size: 2rem;
           background: none;
           border: none;
@@ -183,10 +221,11 @@ export default function MediaModal({
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 1.2rem;
+          gap: 1.3rem;
+          width: 100%;
         }
         .media-modal-arrow {
-          font-size: 2rem;
+          font-size: 2.2rem;
           background: none;
           border: none;
           cursor: pointer;
@@ -196,20 +235,23 @@ export default function MediaModal({
           display: flex;
           flex-direction: column;
           align-items: center;
+          justify-content: center;
+          width: 100%;
         }
         .media-modal-image,
         .media-modal-video {
-          width: 210px;
-          height: 210px;
+          width: 96%;
+          max-width: 480px;
+          height: auto;
           object-fit: contain;
-          border-radius: 8px;
+          border-radius: 14px;
           margin-bottom: 1rem;
         }
         .media-modal-metadata {
           margin-top: 0.5rem;
-          font-size: 1rem;
+          font-size: 1.1rem;
           color: #1f2937;
-          text-align: left;
+          text-align: center;
         }
         .media-modal-lightbox {
           position: fixed;
