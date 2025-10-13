@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import stationer from '../../data/stationer.json';
 import { supabase } from "@/lib/supabase";
-import MediaGallery from "@/components/MediaGallery";
+import MediaModal from "@/components/MediaModal";
 
 // ==============================
 // Inställningar och metadata
@@ -37,11 +37,7 @@ function filterDamagesByPlats(damages, plats) {
   return damages;
 }
 
-// =============================================
-// BUHS/NY/GAMMAL-logik (Kristallklar enligt dig!)
-// =============================================
 function getNyGammal(row) {
-  // Om det är en BUHS-skada (ej hanterad via formulär)
   const buhsText = "Detta är info från BUHS. Ännu ej dokumenterad i formuläret.";
   if (
     (row.note_internal && String(row.note_internal).toLowerCase().includes("buhs")) ||
@@ -49,15 +45,24 @@ function getNyGammal(row) {
   ) {
     return buhsText;
   }
-  // Om skadan är dokumenterad via formulär och har saludatum (skadedatum från fil)
   if (row.saludatum) {
     const d = new Date(row.saludatum);
     const nu = new Date();
     const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
     return diff < 30 ? "Ny" : "Gammal";
   }
-  // Annars: "Ny"
   return "Ny";
+}
+
+// ====== Hjälpfunktion för klockslag ======
+function formatTime(dateString) {
+  try {
+    const d = new Date(dateString);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+    }
+  } catch {}
+  return "";
 }
 
 export default function RapportPage() {
@@ -71,6 +76,14 @@ export default function RapportPage() {
   const [autocomplete, setAutocomplete] = useState([]);
   const [sortKey, setSortKey] = useState("damage_date");
   const [sortOrder, setSortOrder] = useState("desc");
+
+  // Modal-state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMedia, setModalMedia] = useState([]);
+  const [modalTitle, setModalTitle] = useState("");
+  const [modalIdx, setModalIdx] = useState(0);
+  const [modalSkador, setModalSkador] = useState([]);
+  const [modalMultiSkada, setModalMultiSkada] = useState(false);
 
   useEffect(() => {
     async function fetchDamages() {
@@ -97,17 +110,14 @@ export default function RapportPage() {
     filteredRows = filteredRows.filter(row => row.regnr?.toLowerCase() === activeRegnr.toLowerCase());
   }
 
-  // Sortering
   filteredRows = [...filteredRows].sort((a, b) => {
     let ak = a[sortKey] ?? "";
     let bk = b[sortKey] ?? "";
-    // Datum-sortering
     if (sortKey === "damage_date" || sortKey === "created_at" || sortKey === "updated_at") {
       ak = new Date(ak).getTime();
       bk = new Date(bk).getTime();
       return sortOrder === "desc" ? bk - ak : ak - bk;
     }
-    // Text-sortering
     if (typeof ak === "string" && typeof bk === "string") {
       return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
     }
@@ -131,7 +141,6 @@ export default function RapportPage() {
     }
   }, [searchRegnr, damages]);
 
-  // Döljer autocomplete när regnr är valt
   useEffect(() => {
     if (activeRegnr) setAutocomplete([]);
   }, [activeRegnr]);
@@ -145,27 +154,73 @@ export default function RapportPage() {
     }
   };
 
-  // ---- GALLERI: Skador till MediaGallery-format ----
-  const skadorForGallery = filteredRows.map(row => ({
-    regnr: row.regnr,
-    damageType: row.damage_type || row.damage_type_raw || "--",
-    date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
-    station: row.station_namn || row.station_id || "--",
-    media: row.media_url ? [{ url: row.media_url, type: "image" }] : [],
-    isLatest: getNyGammal(row) === "Ny"
-  }));
-  // Rollstyrning – byt till riktig rollstyrning om du har det!
-  const currentUserRole = "admin";
+  // ----- Modalhantering -----
+  // Tumnagel-klick: öppna modal för en skada
+  const openMediaModalForRow = (row) => {
+    // Samla all media för denna skada
+    const mediaArr = [];
+    if (row.media_url) {
+      mediaArr.push({
+        url: row.media_url,
+        type: "image",
+        metadata: {
+          regnr: row.regnr,
+          date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
+          time: formatTime(row.damage_date),
+          damageType: row.damage_type || row.damage_type_raw || "--",
+          station: row.station_namn || row.station_id || "--",
+        },
+      });
+    }
+    setModalMedia(mediaArr);
+    setModalTitle(
+      `${row.regnr} - ${getNyGammal(row) === "Ny" ? "Senaste skada" : "Skada"}: ${row.damage_type || row.damage_type_raw || "--"} - ${row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}`
+    );
+    setModalIdx(0);
+    setModalSkador([]);
+    setModalMultiSkada(false);
+    setModalOpen(true);
+  };
+
+  // Klick på reg.nr: öppna modal med alla skador för det reg.nr
+  const openMediaModalForRegnr = (regnr) => {
+    const skador = filteredRows.filter(row => row.regnr === regnr);
+    const mediaArr = skador.map(row => ({
+      url: row.media_url,
+      type: "image",
+      metadata: {
+        regnr: row.regnr,
+        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
+        time: formatTime(row.damage_date),
+        damageType: row.damage_type || row.damage_type_raw || "--",
+        station: row.station_namn || row.station_id || "--",
+      },
+    })).filter(item => !!item.url);
+    setModalMedia(mediaArr);
+    setModalTitle(`Alla skador för ${regnr}`);
+    setModalIdx(0);
+    setModalSkador(skador);
+    setModalMultiSkada(true);
+    setModalOpen(true);
+  };
+
+  // Modal: bläddra vänster/höger
+  const handleModalPrev = () => {
+    setModalIdx(idx => (idx > 0 ? idx - 1 : idx));
+  };
+  const handleModalNext = () => {
+    setModalIdx(idx => (idx < modalMedia.length - 1 ? idx + 1 : idx));
+  };
 
   return (
     <main className="rapport-main" style={{ paddingBottom: "60px" }}>
       <div className="background-img" />
-      <div style={{ height: "22px" }}></div>
-      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "24px" }}>
+      <div style={{ height: "8px" }}></div>
+      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "10px" }}>
         <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
       </div>
       <div className="rapport-center-content">
-        <div className="rapport-card">
+        <div className="rapport-card" style={{ background: "rgba(255,255,255,0.92)" }}>
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
           <div className="rapport-stats rapport-stats-centered">
@@ -253,10 +308,6 @@ export default function RapportPage() {
               </ul>
             )}
           </div>
-
-          {/* === GALLERI-KOMPONENT INFÖRD HÄR === */}
-          <MediaGallery skador={skadorForGallery} role={currentUserRole} />
-
           {loading ? (
             <div>Hämtar data...</div>
           ) : error ? (
@@ -267,53 +318,65 @@ export default function RapportPage() {
                 <thead>
                   <tr>
                     <th onClick={() => handleSort("regnr")} style={{cursor:"pointer"}}>Regnr</th>
-                    <th onClick={() => handleSort("saludatum")} style={{cursor:"pointer"}}>Ny/gammal</th>
-                    <th onClick={() => handleSort("damage_date")} style={{cursor:"pointer"}}>Datum</th>
+                    <th onClick={() => handleSort("saludatum")} style={{cursor:"pointer"}}>Ny/Gammal</th>
+                    <th onClick={() => handleSort("damage_date")} style={{cursor:"pointer", minWidth:"120px"}}>Datum</th>
                     <th onClick={() => handleSort("region")} style={{cursor:"pointer"}}>Region</th>
                     <th onClick={() => handleSort("ort")} style={{cursor:"pointer"}}>Ort</th>
                     <th onClick={() => handleSort("station_namn")} style={{cursor:"pointer"}}>Station</th>
                     <th onClick={() => handleSort("damage_type")} style={{cursor:"pointer"}}>Skada</th>
-                    {/* Kommentar per skada tas bort från tabellen */}
                     <th onClick={() => handleSort("notering")} style={{cursor:"pointer"}}>Anteckning</th>
-                    <th onClick={() => handleSort("note_internal")} style={{cursor:"pointer"}}>Anteckning (intern)</th>
-                    <th onClick={() => handleSort("media_url")} style={{cursor:"pointer"}}>Media</th>
+                    <th onClick={() => handleSort("media_url")} style={{cursor:"pointer"}}>Bild/video</th>
                     <th onClick={() => handleSort("inchecker_name")} style={{cursor:"pointer"}}>Godkänd av</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.length === 0 ? (
                     <tr>
-                      <td colSpan={11} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
+                      <td colSpan={10} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller i systemet.</td>
                     </tr>
                   ) : (
-                    filteredRows.map((row) => {
-                      return (
-                        <tr key={row.id}>
-                          <td>{row.regnr}</td>
-                          <td>{getNyGammal(row)}</td>
-                          <td>{row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}</td>
-                          <td>{row.region || "--"}</td>
-                          <td>{row.ort || "--"}</td>
-                          <td>
-                            {row.station_namn
-                              ? `${row.station_namn}${row.station_id ? ` (${row.station_id})` : ""}`
-                              : (row.station_id ? row.station_id : "--")
-                            }
-                          </td>
-                          <td>{row.damage_type || row.damage_type_raw || "--"}</td>
-                          <td>{row.notering || "--"}</td>
-                          <td>{row.note_internal || "--"}</td>
-                          <td>
-                            {row.media_url ? (
-                              <img src={row.media_url} style={{height:"32px"}} />
-                            ) : (
-                              "--"
-                            )}
-                          </td>
-                          <td>{row.inchecker_name || row.godkandAv || "--"}</td>
-                        </tr>
-                      );
-                    })
+                    filteredRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>
+                          <span
+                            style={{textDecoration: "underline", cursor: "pointer", color: "#005A9C"}}
+                            onClick={() => openMediaModalForRegnr(row.regnr)}
+                          >
+                            {row.regnr}
+                          </span>
+                        </td>
+                        <td>{getNyGammal(row)}</td>
+                        <td style={{minWidth:"120px"}}>
+                          {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
+                          {row.damage_date && (
+                            <div style={{ fontSize: "0.9em", color: "#555" }}><span>kl {formatTime(row.damage_date)}</span></div>
+                          )}
+                        </td>
+                        <td>{row.region || "--"}</td>
+                        <td>{row.ort || "--"}</td>
+                        <td>
+                          {row.station_namn
+                            ? `${row.station_namn}${row.station_id ? ` (${row.station_id})` : ""}`
+                            : (row.station_id ? row.station_id : "--")
+                          }
+                        </td>
+                        <td>{row.damage_type || row.damage_type_raw || "--"}</td>
+                        <td>{row.notering || "--"}</td>
+                        <td>
+                          {row.media_url ? (
+                            <img
+                              src={row.media_url}
+                              style={{height:"32px", cursor:"pointer", borderRadius:"4px", border:"1px solid #b0b4b8"}}
+                              onClick={() => openMediaModalForRow(row)}
+                              alt="Tumnagel"
+                            />
+                          ) : (
+                            "--"
+                          )}
+                        </td>
+                        <td>{row.inchecker_name || row.godkandAv || "--"}</td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
@@ -321,9 +384,93 @@ export default function RapportPage() {
           )}
         </div>
       </div>
-      <footer className="copyright-footer" style={{ position: "fixed", left: 0, bottom: 0, width: "100vw" }}>
+      <footer className="copyright-footer" style={{ position: "fixed", left: 0, bottom: 0, width: "100vw", background: "rgba(255,255,255,0.7)" }}>
         &copy; Albarone AB 2025 &mdash; All rights reserved
       </footer>
+      {/* MODAL */}
+      <MediaModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        media={modalMedia}
+        title={modalTitle}
+        currentIdx={modalIdx}
+        onPrev={modalMedia.length > 1 ? handleModalPrev : undefined}
+        onNext={modalMedia.length > 1 ? handleModalNext : undefined}
+        hasPrev={modalIdx > 0}
+        hasNext={modalIdx < modalMedia.length - 1}
+      />
+      <style jsx global>{`
+        .background-img {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background: url('/bakgrund.jpg') center center / cover no-repeat;
+          opacity: 0.25;
+          z-index: -1;
+        }
+        .rapport-logo-row {
+          display: flex;
+          justify-content: center;
+        }
+        .rapport-logo-centered {
+          width: 160px;
+          height: auto;
+        }
+        .rapport-center-content {
+          display: flex;
+          justify-content: center;
+        }
+        .rapport-card {
+          margin-top: 0px;
+          margin-bottom: 0px;
+          padding: 36px 28px 28px 28px;
+          max-width: 900px;
+          border-radius: 18px;
+          box-shadow: 0 2px 32px #0002;
+        }
+        .rapport-title {
+          font-size: 2.1rem;
+          font-weight: 700;
+          text-align: center;
+          margin-bottom: 18px;
+        }
+        .rapport-divider {
+          height: 2px;
+          background: #e5e7eb;
+          margin: 0 0 18px 0;
+        }
+        .rapport-stats-centered {
+          text-align: center;
+        }
+        .rapport-table-wrap {
+          margin-top: 20px;
+        }
+        .rapport-table {
+          width: 100%;
+          border-collapse: collapse;
+          background: rgba(255,255,255,0.97);
+        }
+        .rapport-table th, .rapport-table td {
+          border: 1px solid #e5e7eb;
+          padding: 6px 10px;
+          font-size: 1rem;
+        }
+        .rapport-table th {
+          background: #f5f6fa;
+          font-weight: 600;
+          text-align: left;
+        }
+        .rapport-table tr:nth-child(even) {
+          background: #fafbfc;
+        }
+        .rapport-search-row {
+          margin-top: 22px;
+          margin-bottom: 12px;
+          text-align: center;
+        }
+      `}</style>
     </main>
   );
 }
