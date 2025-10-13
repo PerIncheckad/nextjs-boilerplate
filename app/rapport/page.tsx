@@ -82,7 +82,6 @@ export default function RapportPage() {
   const [modalMedia, setModalMedia] = useState([]);
   const [modalTitle, setModalTitle] = useState("");
   const [modalIdx, setModalIdx] = useState(0);
-  const [modalSkador, setModalSkador] = useState([]);
   const [modalMultiSkada, setModalMultiSkada] = useState(false);
 
   useEffect(() => {
@@ -155,7 +154,7 @@ export default function RapportPage() {
   };
 
   // ----- Modalhantering -----
-  // Tumnagel-klick: öppna modal för en skada
+  // Tumnagel-klick: öppna modal för en skada (och ev. flera bilder)
   const openMediaModalForRow = (row) => {
     // Samla all media för denna skada
     const mediaArr = [];
@@ -164,11 +163,14 @@ export default function RapportPage() {
         url: row.media_url,
         type: "image",
         metadata: {
-          regnr: row.regnr,
           date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
-          time: formatTime(row.damage_date),
+          time: row.note_internal && String(row.note_internal).toLowerCase().includes("buhs") ? undefined : formatTime(row.damage_date),
           damageType: row.damage_type || row.damage_type_raw || "--",
           station: row.station_namn || row.station_id || "--",
+          note: row.notering || "",
+          inchecker: row.inchecker_name || row.godkandAv || "",
+          documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+          damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
         },
       });
     }
@@ -177,7 +179,6 @@ export default function RapportPage() {
       `${row.regnr} - ${getNyGammal(row) === "Ny" ? "Senaste skada" : "Skada"}: ${row.damage_type || row.damage_type_raw || "--"} - ${row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}`
     );
     setModalIdx(0);
-    setModalSkador([]);
     setModalMultiSkada(false);
     setModalOpen(true);
   };
@@ -189,17 +190,19 @@ export default function RapportPage() {
       url: row.media_url,
       type: "image",
       metadata: {
-        regnr: row.regnr,
         date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
-        time: formatTime(row.damage_date),
+        time: row.note_internal && String(row.note_internal).toLowerCase().includes("buhs") ? undefined : formatTime(row.damage_date),
         damageType: row.damage_type || row.damage_type_raw || "--",
         station: row.station_namn || row.station_id || "--",
-      },
+        note: row.notering || "",
+        inchecker: row.inchecker_name || row.godkandAv || "",
+        documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+        damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+      }
     })).filter(item => !!item.url);
     setModalMedia(mediaArr);
     setModalTitle(`Alla skador för ${regnr}`);
     setModalIdx(0);
-    setModalSkador(skador);
     setModalMultiSkada(true);
     setModalOpen(true);
   };
@@ -216,8 +219,8 @@ export default function RapportPage() {
     <main className="rapport-main" style={{ paddingBottom: "60px" }}>
       <div className="background-img" />
       <div style={{ height: "8px" }}></div>
-      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "10px" }}>
-        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
+      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "4px" }}>
+        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" style={{ width: "190px", height: "auto" }} />
       </div>
       <div className="rapport-center-content">
         <div className="rapport-card" style={{ background: "rgba(255,255,255,0.92)" }}>
@@ -366,7 +369,16 @@ export default function RapportPage() {
                           {row.media_url ? (
                             <img
                               src={row.media_url}
-                              style={{height:"32px", cursor:"pointer", borderRadius:"4px", border:"1px solid #b0b4b8"}}
+                              style={{
+                                height:"48px",
+                                width: "48px",
+                                cursor:"pointer",
+                                borderRadius:"7px",
+                                border:"1.5px solid #b0b4b8",
+                                objectFit:"cover",
+                                margin: "0 auto",
+                                display: "block"
+                              }}
                               onClick={() => openMediaModalForRow(row)}
                               alt="Tumnagel"
                             />
@@ -407,7 +419,7 @@ export default function RapportPage() {
           width: 100vw;
           height: 100vh;
           background: url('/bakgrund.jpg') center center / cover no-repeat;
-          opacity: 0.25;
+          opacity: 0.19;
           z-index: -1;
         }
         .rapport-logo-row {
@@ -415,7 +427,7 @@ export default function RapportPage() {
           justify-content: center;
         }
         .rapport-logo-centered {
-          width: 160px;
+          width: 220px;
           height: auto;
         }
         .rapport-center-content {
