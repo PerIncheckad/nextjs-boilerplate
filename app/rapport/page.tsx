@@ -37,7 +37,6 @@ const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: st
   return <span style={{ fontSize: '0.8em', verticalAlign: 'middle' }}>{sortOrder === 'asc' ? ' ▲' : ' ▼'}</span>;
 };
 
-// ÅTGÄRD: Period-alternativen är återställda
 const periodAlternativ = [
   { value: "all", label: "All tid" },
   { value: "year", label: "2025" },
@@ -60,7 +59,6 @@ const platsAlternativ = stationer.map(st => {
 // Hjälpfunktioner
 // ==============================
 
-// ÅTGÄRD: Återställd till den ursprungliga, fungerande logiken för BUHS.
 function getDamageStatus(row: DamageWithVehicle) {
   if (
     (row.note_internal && String(row.note_internal).toLowerCase().includes("buhs")) ||
@@ -77,8 +75,6 @@ function getDamageStatus(row: DamageWithVehicle) {
   return "Incheckad";
 }
 
-
-// ÅTGÄRD: Återställd till den ursprungliga, fungerande logiken för klockslag.
 function formatTime(row: DamageWithVehicle) {
     const isBuhs = getDamageStatus(row) === "BUHS";
     if (isBuhs || !row.damage_date) return "";
@@ -93,11 +89,11 @@ function formatTime(row: DamageWithVehicle) {
     }
 }
 
-// ÅTGÄRD: Återställd till den ursprungliga, fungerande logiken för regioner.
+// ÅTGÄRD: Korrekt logik för att mappa ort till region, baserat på din feedback.
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
     // @ts-ignore
-    const stationData = stationer.find(s => s.ort && s.ort.toLowerCase() === ort.toLowerCase());
+    const stationData = stationer.find(st => st.namn.includes(ort));
     // @ts-ignore
     return stationData?.region || "--";
 };
@@ -121,7 +117,6 @@ export default function RapportPage() {
   const [modalTitle, setModalTitle] = useState("");
   const [modalIdx, setModalIdx] = useState(0);
 
-  // ÅTGÄRD: Korrekt och säker datahämtning
   useEffect(() => {
     async function fetchAllData() {
       setLoading(true);
@@ -197,7 +192,6 @@ export default function RapportPage() {
     });
   }, [allDamages, plats, activeRegnr, sortKey, sortOrder]);
 
-  // ÅTGÄRD: Autocomplete är tillbaka
   const [autocomplete, setAutocomplete] = useState<string[]>([]);
   useEffect(() => {
     if (searchRegnr.length >= 2) {
@@ -337,7 +331,6 @@ export default function RapportPage() {
                   ) : (
                     filteredRows.map((row) => (
                       <tr key={row.id}>
-                        {/* ÅTGÄRD: onClick är tillbaka på reg.nr */}
                         <td><span className="regnr-link" onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
                         <td>{row.brand || ""} {row.model || ""}</td>
                         <td>{getDamageStatus(row)}</td>
@@ -372,7 +365,6 @@ export default function RapportPage() {
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
       
-      {/* ÅTGÄRD: CSS för bakgrund, logotyp och layout */}
       <style jsx global>{`
         html { 
           background: url('/bakgrund.jpg') center center / cover no-repeat fixed;
@@ -417,7 +409,7 @@ export default function RapportPage() {
         .time-display { font-size: 0.9em; color: #555; }
         .thumbnail-image { cursor: pointer; border-radius: 7px; border: 1.5px solid #b0b4b8; object-fit: cover; margin: 0 auto; display: block; }
         .thumbnail-image:hover { border-color: #005A9C; }
-        .copyright-footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; padding: 10px; background: rgba(243, 244, 246, 0.8); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); font-size: 0.9rem; z-index: 100; }
+        .copyright-footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; padding: 10px; background: rgba(255,255,255,1); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); font-size: 0.9rem; z-index: 100; }
       `}</style>
     </main>
   );
