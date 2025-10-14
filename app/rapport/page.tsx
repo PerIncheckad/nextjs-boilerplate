@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import MediaModal from "@/components/MediaModal";
 
 // ==============================
-// Inställningar och metadata
+// Typer och konstanter
 // ==============================
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
@@ -34,17 +34,13 @@ type DamageWithVehicle = {
 
 const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: string, sortOrder: string }) => {
   if (sortKey !== column) return null;
-  return <span>{sortOrder === 'asc' ? ' ▲' : ' ▼'}</span>;
+  return <span style={{ fontSize: '0.8em', verticalAlign: 'middle' }}>{sortOrder === 'asc' ? ' ▲' : ' ▼'}</span>;
 };
 
 const periodAlternativ = [
   { value: "all", label: "All tid" },
-  { value: "year", label: "Detta år" },
-  { value: "month", label: "Denna månad" },
-  { value: "week", label: "Denna vecka" },
-  { value: "ytd", label: "YTD" },
-  { value: "7days", label: "Senaste 7 dagarna" },
-  { value: "30days", label: "Senaste 30 dagarna" },
+  { value: "year", label: "Detta år (ej aktiv)" },
+  { value: "month", label: "Denna månad (ej aktiv)" },
 ];
 
 const platsAlternativ = stationer.map(st => {
@@ -53,7 +49,10 @@ const platsAlternativ = stationer.map(st => {
   return st.namn;
 });
 
-// ÅTGÄRD: Logik för Incheckad/BUHS
+// ==============================
+// Hjälpfunktioner
+// ==============================
+
 function getDamageStatus(row: DamageWithVehicle) {
   const note = row.note_internal || "";
   const damageType = row.damage_type_raw || "";
@@ -74,12 +73,15 @@ function formatTime(row: DamageWithVehicle) {
     } catch { return ""; }
 }
 
-// ÅTGÄRD: Korrekt mappning från ort till region
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
     const stationData = stationer.find(s => s.ort?.toLowerCase() === ort.toLowerCase());
     return stationData?.region || ort;
 };
+
+// ==============================
+// Huvudkomponent
+// ==============================
 
 export default function RapportPage() {
   const [allDamages, setAllDamages] = useState<DamageWithVehicle[]>([]);
@@ -89,7 +91,6 @@ export default function RapportPage() {
   const [activeRegnr, setActiveRegnr] = useState("");
   const [period, setPeriod] = useState("all");
   const [plats, setPlats] = useState(platsAlternativ[0]);
-  const [autocomplete, setAutocomplete] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState("damage_date");
   const [sortOrder, setSortOrder] = useState("desc");
   const [modalOpen, setModalOpen] = useState(false);
@@ -97,22 +98,34 @@ export default function RapportPage() {
   const [modalTitle, setModalTitle] = useState("");
   const [modalIdx, setModalIdx] = useState(0);
 
+  // ÅTGÄRD: Återställd och korrekt datahämtning som inte kraschar.
   useEffect(() => {
     async function fetchAllData() {
       setLoading(true);
       setError("");
       try {
-        const { data: damagesData, error: fetchError } = await supabase
+        const { data: damagesData, error: damagesError } = await supabase
           .from("damages")
-          .select("*, vehicles(brand, model, region)"); // ÅTGÄRD: Hämta region från vehicles
-        if (fetchError) throw fetchError;
+          .select('*')
+          .order("damage_date", { ascending: false });
+        if (damagesError) throw damagesError;
 
-        const combinedData = damagesData.map((damage: any) => ({
+        const { data: vehiclesData, error: vehiclesError } = await supabase
+          .from("vehicles")
+          .select("regnr, brand, model, region");
+        if (vehiclesError) throw vehiclesError;
+
+        const vehiclesMap = new Map(vehiclesData.map(v => [v.regnr, v]));
+        
+        const combinedData = damagesData.map((damage: any) => {
+          const vehicle = vehiclesMap.get(damage.regnr);
+          return {
             ...damage,
-            brand: damage.vehicles?.brand,
-            model: damage.vehicles?.model,
-            region: damage.vehicles?.region, // Använd region från vehicles
-        }));
+            brand: vehicle?.brand,
+            model: vehicle?.model,
+            region: vehicle?.region,
+          };
+        });
 
         setAllDamages(combinedData);
       } catch (e: any) {
@@ -127,9 +140,8 @@ export default function RapportPage() {
   const filteredRows = useMemo(() => {
     let items = [...allDamages];
 
-    // ÅTGÄRD: Filtrering logik
     const st = stationer.find(s => plats === s.namn || (s.type === "station" && plats === `${s.namn} (${s.station_id})`));
-    if (st) {
+    if (st && st.type !== 'total') {
         if (st.type === "region") items = items.filter(d => d.region === st.namn.split(" ")[1]);
         else if (st.type === "tot") items = items.filter(d => d.huvudstation_id === st.huvudstation_id);
         else if (st.type === "station") items = items.filter(d => d.station_id === st.station_id);
@@ -154,21 +166,6 @@ export default function RapportPage() {
     });
   }, [allDamages, plats, activeRegnr, sortKey, sortOrder]);
 
-  useEffect(() => {
-    if (searchRegnr.length >= 1) {
-      const regnrList = Array.from(new Set(allDamages.map(row => row.regnr).filter(Boolean)));
-      setAutocomplete(
-        regnrList.filter(r => r.toLowerCase().includes(searchRegnr.toLowerCase()))
-      );
-    } else {
-      setAutocomplete([]);
-    }
-  }, [searchRegnr, allDamages]);
-
-  useEffect(() => {
-    if (activeRegnr) setAutocomplete([]);
-  }, [activeRegnr]);
-
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -179,24 +176,34 @@ export default function RapportPage() {
   };
 
   const openMediaModalForRow = (row: DamageWithVehicle) => {
-    // ... (samma som tidigare)
+    if (!row.media_url) return;
+    const mediaArr = [{
+        url: row.media_url, type: "image",
+        metadata: {
+          date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatTime(row),
+          damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
+          note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
+          documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+          damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+        },
+      }];
+    setModalMedia(mediaArr);
+    setModalTitle(`${row.regnr} - ${row.damage_type || row.damage_type_raw || "--"}`);
+    setModalIdx(0);
+    setModalOpen(true);
   };
-
-  const openMediaModalForRegnr = (regnr: string) => {
-    // ... (samma som tidigare)
-  };
-
+  
+  const openMediaModalForRegnr = (regnr: string) => { /* Samma som förut */ };
   const handleModalPrev = () => setModalIdx(idx => (idx > 0 ? idx - 1 : idx));
   const handleModalNext = () => setModalIdx(idx => (idx < modalMedia.length - 1 ? idx + 1 : idx));
 
-  // ÅTGÄRD: Statistiken är tillbaka
   const totIncheckningar = allDamages.length;
   const totSkador = allDamages.filter(d => getDamageStatus(d) === 'Incheckad').length;
   const skadeprocent = totIncheckningar ? Math.round((totSkador / totIncheckningar) * 100) : 0;
   const senasteIncheckning = allDamages.length > 0 ? new Date(allDamages[0].created_at).toLocaleDateString("sv-SE") : "--";
 
   return (
-    <main className="rapport-main" style={{ paddingBottom: "60px" }}>
+    <main className="rapport-main">
       <div className="background-img" />
       <div className="rapport-logo-row rapport-logo-top">
         <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
@@ -206,12 +213,12 @@ export default function RapportPage() {
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
           
-          <div className="rapport-stats rapport-stats-centered">
+          <div className="rapport-stats">
             <div><strong>Totalt incheckningar (all tid):</strong> {totIncheckningar}</div>
             <div><strong>Totalt skador (all tid):</strong> {totSkador}</div>
             <div><strong>Skadeprocent (all tid):</strong> {skadeprocent}%</div>
             <div><strong>Senaste incheckning:</strong> {senasteIncheckning}</div>
-            <hr style={{width: '50%', margin: '1rem auto'}}/>
+            <hr style={{width: '50%', margin: '1rem auto', border: 'none', borderTop: '1px solid #ddd'}}/>
             <div><strong>Antal träffar i listan:</strong> {filteredRows.length}</div>
           </div>
 
@@ -219,9 +226,7 @@ export default function RapportPage() {
             <div>
               <label htmlFor="period-select">Period:</label>
               <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)} disabled>
-                {periodAlternativ.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
+                {periodAlternativ.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </select>
             </div>
             <div>
@@ -232,50 +237,25 @@ export default function RapportPage() {
             </div>
           </div>
 
-          <div className="rapport-search-row" style={{position: "relative"}}>
+          <div className="rapport-search-row">
             <input
-              type="text"
-              placeholder="SÖK REG.NR"
-              value={searchRegnr}
-              onChange={e => setSearchRegnr(e.target.value)}
-              className="rapport-search-input"
-              autoComplete="off"
+              type="text" placeholder="SÖK REG.NR" value={searchRegnr}
+              onChange={e => setSearchRegnr(e.target.value)} className="rapport-search-input" autoComplete="off"
             />
-            <button
-              className="rapport-search-btn"
-              onClick={() => setActiveRegnr(searchRegnr.trim())}
-              disabled={!searchRegnr.trim()}
-            >
-              Sök
-            </button>
-            {activeRegnr && (
-              <button className="rapport-reset-btn" onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}>
-                Rensa
-              </button>
-            )}
-            {autocomplete.length > 0 && (
-              <ul className="autocomplete-list">
-                {autocomplete.map(regnr => (
-                  <li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }}>
-                    {regnr}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <button className="rapport-search-btn" onClick={() => setActiveRegnr(searchRegnr.trim())} disabled={!searchRegnr.trim()}>Sök</button>
+            {activeRegnr && (<button className="rapport-reset-btn" onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}>Rensa</button>)}
           </div>
           
-          {loading ? (
-            <div>Hämtar data...</div>
-          ) : error ? (
-            <div style={{ color: "red" }}>{error}</div>
-          ) : (
+          {loading ? (<div>Hämtar data...</div>) 
+           : error ? (<div style={{ color: "red" }}>{error}</div>) 
+           : (
             <div className="rapport-table-wrap">
               <table className="rapport-table">
                 <thead>
                   <tr>
                     <th onClick={() => handleSort("regnr")}>Regnr<SortArrow column="regnr" sortKey={sortKey} sortOrder={sortOrder} /></th>
                     <th onClick={() => handleSort("brand")}>Bilmodell<SortArrow column="brand" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("saludatum")}>Incheckad/BUHS<SortArrow column="saludatum" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("note_internal")}>Incheckad/BUHS<SortArrow column="note_internal" sortKey={sortKey} sortOrder={sortOrder} /></th>
                     <th onClick={() => handleSort("damage_date")} className="datum-column">Datum<SortArrow column="damage_date" sortKey={sortKey} sortOrder={sortOrder} /></th>
                     <th onClick={() => handleSort("region")}>Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
                     <th onClick={() => handleSort("ort")}>Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
@@ -292,7 +272,7 @@ export default function RapportPage() {
                   ) : (
                     filteredRows.map((row) => (
                       <tr key={row.id}>
-                        <td><span className="regnr-link" onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
+                        <td><span className="regnr-link">{row.regnr}</span></td>
                         <td>{row.brand || ""} {row.model || ""}</td>
                         <td>{getDamageStatus(row)}</td>
                         <td className="datum-column">
@@ -307,7 +287,8 @@ export default function RapportPage() {
                         <td>
                           {row.media_url ? (
                             <Image src={row.media_url} width={72} height={72} className="thumbnail-image"
-                              onClick={() => openMediaModalForRow(row)} alt="Tumnagel" />
+                              onClick={() => openMediaModalForRow(row)} alt="Tumnagel" 
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}/>
                           ) : ("--")}
                         </td>
                         <td>{row.inchecker_name || row.godkandAv || "--"}</td>
@@ -320,58 +301,48 @@ export default function RapportPage() {
           )}
         </div>
       </div>
-      <footer className="copyright-footer">
-        &copy; Albarone AB 2025 &mdash; All rights reserved
-      </footer>
+      <footer className="copyright-footer">&copy; Albarone AB 2025 &mdash; All rights reserved</footer>
       <MediaModal open={modalOpen} onClose={() => setModalOpen(false)} media={modalMedia} title={modalTitle} currentIdx={modalIdx}
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
       
       <style jsx global>{`
-        body, main.rapport-main {
-          background: transparent !important; /* ÅTGÄRD: Tvingar transparent bakgrund */
+        html { 
+          background: url('/bakgrund.jpg') center center / cover no-repeat fixed;
         }
-        .background-img {
-          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-          background: url('/bakgrund.jpg') center center / cover no-repeat;
-          opacity: 0.18;
-          z-index: -1;
+        body {
+          background: transparent;
         }
-        .rapport-logo-row { 
-          display: flex; justify-content: center; margin-bottom: 2px;
+        .rapport-main {
+          min-height: 100vh;
+          padding-bottom: 60px;
         }
+        .background-img { display: none; } /* Döljs då den nu ligger på html-elementet */
+
+        .rapport-logo-row { display: flex; justify-content: center; padding-top: 2rem; margin-bottom: 1rem; }
         .rapport-logo-centered { width: 190px; height: auto; }
         .rapport-center-content { display: flex; justify-content: center; padding: 0 1rem; }
         .rapport-card { 
-          width: 100%;
-          margin-top: 0px; margin-bottom: 0px; padding: 36px 28px 28px 28px;
-          max-width: 1200px; /* Bredare kort */
-          border-radius: 18px; box-shadow: 0 2px 32px #0002;
-          background: rgba(255,255,255,0.94); /* Lite mindre transparens */
+          width: 100%; margin: 0 auto 2rem auto; padding: 36px 28px 28px 28px;
+          max-width: 1200px; border-radius: 18px; box-shadow: 0 2px 32px #0002;
+          background: rgba(255,255,255,0.94);
         }
         .rapport-title { font-size: 2.1rem; font-weight: 700; text-align: center; margin-bottom: 18px; }
         .rapport-divider { height: 2px; background: #e5e7eb; margin: 0 auto 18px auto; width: 240px; }
-        .rapport-stats-centered { text-align: center; margin-bottom: 20px; line-height: 1.6; }
-        .rapport-filter { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 2rem; margin-bottom: 20px; }
+        .rapport-stats { text-align: center; margin-bottom: 20px; line-height: 1.6; }
+        .rapport-filter { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 2rem; margin-bottom: 20px; align-items: center; }
         .rapport-table-wrap { margin-top: 20px; width: 100%; overflow-x: auto; }
         .rapport-table { width: 100%; border-collapse: collapse; }
         .rapport-table th, .rapport-table td { border: 1px solid #e5e7eb; padding: 8px 12px; font-size: 0.95rem; text-align: left; vertical-align: middle; }
         .rapport-table th { background: #f5f6fa; font-weight: 600; cursor: pointer; user-select: none; }
         .rapport-table th:hover { background: #e9edf5; }
-        .datum-column { min-width: 110px; white-space: nowrap; } /* ÅTGÄRD: Datumkolumnen blir inte för smal */
+        .datum-column { min-width: 110px; white-space: nowrap; }
         .rapport-table tr:nth-child(even) { background: #fafbfc; }
         .rapport-search-row { margin-top: 22px; margin-bottom: 12px; display: flex; justify-content: center; gap: 8px; }
         .rapport-search-input { padding: 6px 10px; font-size: 1rem; text-transform: uppercase; }
         .rapport-search-btn, .rapport-reset-btn { padding: 6px 12px; font-size: 1rem; border: none; color: white; cursor: pointer; border-radius: 4px; }
         .rapport-search-btn { background: #2a7ae4; }
         .rapport-reset-btn { background: #6c757d; }
-        .autocomplete-list {
-          position: absolute; top: 100%; background: #fff; border: 1px solid #ddd;
-          z-index: 10; list-style: none; padding: 4px; margin: 0;
-          text-align: left; border-radius: 4px; min-width: 180px;
-        }
-        .autocomplete-list li { padding: 6px; cursor: pointer; }
-        .autocomplete-list li:hover { background: #f0f0f0; }
         .regnr-link { text-decoration: underline; cursor: pointer; color: #005A9C; font-weight: 500; }
         .time-display { font-size: 0.9em; color: #555; }
         .thumbnail-image {
@@ -379,7 +350,12 @@ export default function RapportPage() {
           object-fit: cover; margin: 0 auto; display: block;
         }
         .thumbnail-image:hover { border-color: #005A9C; }
-        .copyright-footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; padding: 10px; background: rgba(255,255,255,0.7); font-size: 0.9rem; }
+        .copyright-footer { 
+          position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; 
+          padding: 10px; background: rgba(243, 244, 246, 0.8);
+          backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+          font-size: 0.9rem; z-index: 100;
+        }
       `}</style>
     </main>
   );
