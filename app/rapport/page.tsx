@@ -10,9 +10,7 @@ import MediaModal from "@/components/MediaModal";
 // ==============================
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
-// NYTT: Korrekt typdefinition för den sammanslagna datan
 type DamageWithVehicle = {
-  // Alla fält från 'damages'
   id: string;
   regnr: string;
   damage_date: string;
@@ -30,9 +28,14 @@ type DamageWithVehicle = {
   region?: string;
   huvudstation_id?: string;
   station_id?: string;
-  // Fält från 'vehicles'
   brand?: string;
   model?: string;
+};
+
+// PUNKT 3: Komponent för sorteringspil
+const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: string, sortOrder: string }) => {
+  if (sortKey !== column) return null;
+  return <span>{sortOrder === 'asc' ? ' ▲' : ' ▼'}</span>;
 };
 
 const periodAlternativ = [
@@ -63,28 +66,21 @@ function filterDamagesByPlats(damages: DamageWithVehicle[], plats: string) {
   return damages;
 }
 
-// ÅTERSTÄLLD: Den ursprungliga funktionen för Ny/gammal, tills databasen är uppdaterad
-function getNyGammal(row: DamageWithVehicle) {
-  const buhsText = "Detta är info från BUHS. Ännu ej dokumenterad i formuläret.";
-  if (
-    (row.note_internal && String(row.note_internal).toLowerCase().includes("buhs")) ||
-    (row.damage_type_raw && String(row.damage_type_raw).toLowerCase().includes("buhs"))
-  ) {
-    return buhsText;
+// PUNKT 11 & Namnbyte: Korrigerad logik för "Incheckad/BUHS"
+function getDamageStatus(row: DamageWithVehicle) {
+  const note = row.note_internal || "";
+  const damageType = row.damage_type_raw || "";
+
+  if (note.toLowerCase().includes("buhs") || damageType.toLowerCase().includes("buhs")) {
+    return "BUHS";
   }
-  if (row.saludatum) {
-    const d = new Date(row.saludatum);
-    const nu = new Date();
-    const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
-    return diff < 30 ? "Ny" : "Gammal";
-  }
-  return "Ny";
+  return "Incheckad";
 }
 
-// ÅTERSTÄLLD & FÖRBÄTTRAD: Klockslagsfunktion som visar tid för "Nya" skador
+// PUNKT 9: Klockslag visas endast för "Incheckad"
 function formatTime(row: DamageWithVehicle) {
-    const isBuhs = getNyGammal(row).includes("BUHS");
-    if (isBuhs || !row.damage_date) return "";
+    const status = getDamageStatus(row);
+    if (status === "BUHS" || !row.damage_date) return "";
 
     try {
         const d = new Date(row.damage_date);
@@ -97,11 +93,10 @@ function formatTime(row: DamageWithVehicle) {
     }
 }
 
-// NYTT: Korrekt funktion för att mappa Ort till Region
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
     const stationData = stationer.find(s => s.ort && s.ort.toLowerCase() === ort.toLowerCase());
-    return stationData?.region || ort; // Returnerar orten själv om ingen region hittas
+    return stationData?.region || ort;
 };
 
 export default function RapportPage() {
@@ -115,15 +110,11 @@ export default function RapportPage() {
   const [autocomplete, setAutocomplete] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState("damage_date");
   const [sortOrder, setSortOrder] = useState("desc");
-
-  // Modal-state
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalMedia, setModalMedia] = useState([]);
+  const [modalMedia, setModalMedia] = useState<any[]>([]);
   const [modalTitle, setModalTitle] = useState("");
   const [modalIdx, setModalIdx] = useState(0);
-  const [modalMultiSkada, setModalMultiSkada] = useState(false);
 
-  // JUSTERAD: Datahämtning för att inkludera bilmodeller
   useEffect(() => {
     async function fetchAllData() {
       setLoading(true);
@@ -156,36 +147,12 @@ export default function RapportPage() {
     fetchAllData();
   }, []);
 
-  let filteredRows = filterDamagesByPlats(damages, plats);
-  if (activeRegnr) {
-    filteredRows = filteredRows.filter(row => row.regnr?.toLowerCase() === activeRegnr.toLowerCase());
-  }
-
-  filteredRows = [...filteredRows].sort((a, b) => {
-    let ak = a[sortKey] ?? "";
-    let bk = b[sortKey] ?? "";
-    if (sortKey === "damage_date" || sortKey === "created_at" || sortKey === "updated_at") {
-      ak = new Date(ak).getTime();
-      bk = new Date(bk).getTime();
-      return sortOrder === "desc" ? bk - ak : ak - bk;
-    }
-    if (typeof ak === "string" && typeof bk === "string") {
-      return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
-    }
-    return 0;
-  });
-
-  const totIncheckningar = damages.length;
-  const totSkador = damages.length;
-  const skadeprocent = totIncheckningar ? Math.round((totSkador / totIncheckningar) * 100) : 0;
-  const senasteIncheckning = damages.length > 0 ? damages[0].damage_date : "--";
-  const senasteSkada = damages.length > 0 ? damages[0].damage_date : "--";
-
+  // PUNKT 10: Autocomplete använder .includes() för att matcha delsträngar
   useEffect(() => {
     if (searchRegnr.length >= 2) {
       const regnrList = Array.from(new Set(damages.map(row => row.regnr).filter(Boolean)));
       setAutocomplete(
-        regnrList.filter(r => r.toLowerCase().startsWith(searchRegnr.toLowerCase()))
+        regnrList.filter(r => r.toLowerCase().includes(searchRegnr.toLowerCase()))
       );
     } else {
       setAutocomplete([]);
@@ -196,6 +163,25 @@ export default function RapportPage() {
     if (activeRegnr) setAutocomplete([]);
   }, [activeRegnr]);
 
+  let filteredRows = filterDamagesByPlats(damages, plats);
+  if (activeRegnr) {
+    filteredRows = filteredRows.filter(row => row.regnr?.toLowerCase() === activeRegnr.toLowerCase());
+  }
+
+  filteredRows = [...filteredRows].sort((a: any, b: any) => {
+    let ak = a[sortKey] ?? "";
+    let bk = b[sortKey] ?? "";
+    if (sortKey === "damage_date" || sortKey === "created_at") {
+      ak = new Date(ak).getTime() || 0;
+      bk = new Date(bk).getTime() || 0;
+      return sortOrder === "desc" ? bk - ak : ak - bk;
+    }
+    if (typeof ak === "string" && typeof bk === "string") {
+      return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
+    }
+    return 0;
+  });
+
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -205,13 +191,12 @@ export default function RapportPage() {
     }
   };
 
-  // ----- Modalhantering (Befintlig logik, bevarad) -----
   const openMediaModalForRow = (row: DamageWithVehicle) => {
-    const mediaArr = [];
+    const mediaArr: any[] = [];
     if (row.media_url) {
       mediaArr.push({
         url: row.media_url,
-        type: "image", // Antagande, kan behöva ett 'media_type' fält
+        type: "image",
         metadata: {
           date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
           time: formatTime(row),
@@ -226,15 +211,14 @@ export default function RapportPage() {
     }
     setModalMedia(mediaArr);
     setModalTitle(
-      `${row.regnr} - ${getNyGammal(row) === "Ny" ? "Senaste skada" : "Skada"}: ${row.damage_type || row.damage_type_raw || "--"} - ${row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : ""}`
+      `${row.regnr} - ${row.damage_type || row.damage_type_raw || "--"}`
     );
     setModalIdx(0);
-    setModalMultiSkada(false);
     setModalOpen(true);
   };
 
   const openMediaModalForRegnr = (regnr: string) => {
-    const skador = filteredRows.filter(row => row.regnr === regnr);
+    const skador = filteredRows.filter(row => row.regnr === regnr && row.media_url);
     const mediaArr = skador.map(row => ({
       url: row.media_url,
       type: "image",
@@ -249,60 +233,51 @@ export default function RapportPage() {
         damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
       }
     })).filter(item => !!item.url);
+    
     setModalMedia(mediaArr);
-    setModalTitle(`Alla skador för ${regnr}`);
+    setModalTitle(`Alla media för ${regnr}`);
     setModalIdx(0);
-    setModalMultiSkada(true);
     setModalOpen(true);
   };
 
   const handleModalPrev = () => setModalIdx(idx => (idx > 0 ? idx - 1 : idx));
   const handleModalNext = () => setModalIdx(idx => (idx < modalMedia.length - 1 ? idx + 1 : idx));
 
+  const totSkador = filteredRows.length;
+
   return (
     <main className="rapport-main" style={{ paddingBottom: "60px" }}>
       <div className="background-img" />
       <div style={{ height: "8px" }}></div>
-      <div className="rapport-logo-row rapport-logo-top" style={{ marginBottom: "4px" }}>
+      <div className="rapport-logo-row rapport-logo-top">
         <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" style={{ width: "190px", height: "auto" }} />
       </div>
       <div className="rapport-center-content">
-        <div className="rapport-card" style={{ background: "rgba(255,255,255,0.92)" }}>
+        <div className="rapport-card">
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
           
-          {/* ÅTERSTÄLLD: Hela blocket för statistik och filter */}
           <div className="rapport-stats rapport-stats-centered">
-            <div><strong>Period:</strong> {periodAlternativ.find(p => p.value === period)?.label} <strong>| Vald plats:</strong> {plats}</div>
-            <div><strong>Totalt incheckningar:</strong> {totIncheckningar}</div>
-            <div><strong>Totalt skador:</strong> {totSkador}</div>
-            <div><strong>Skadeprocent:</strong> {skadeprocent}%</div>
-            <div><strong>Senaste incheckning:</strong> {senasteIncheckning}</div>
-            <div><strong>Senaste skada:</strong> {senasteSkada}</div>
+            <div><strong>Antal skador i listan:</strong> {totSkador}</div>
           </div>
+
           <div className="rapport-filter">
-            <label htmlFor="period-select">Vald period:</label>
-            <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)}>
-              {periodAlternativ.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <label htmlFor="plats-select">Vald plats:</label>
-            <select id="plats-select" value={plats} onChange={e => setPlats(e.target.value)}>
-              {platsAlternativ.map(p => (<option key={p} value={p}>{p}</option>))}
-            </select>
+            <div>
+              <label htmlFor="period-select">Period:</label>
+              <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)}>
+                {periodAlternativ.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="plats-select">Plats:</label>
+              <select id="plats-select" value={plats} onChange={e => setPlats(e.target.value)}>
+                {platsAlternativ.map(p => (<option key={p} value={p}>{p}</option>))}
+              </select>
+            </div>
           </div>
-          <div className="rapport-filter-periodplats">
-            <span><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></span>
-          </div>
-          <div className="rapport-graf">
-            <div className="graf-placeholder">[Graf/tidslinje kommer här]</div>
-            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></div>
-          </div>
-          <div className="rapport-graf">
-            <div className="graf-placeholder">[Jämförelse av skadeprocent mellan enheter – kommer senare!]</div>
-            <div style={{marginTop: "6px", fontSize: "1rem", color: "#555"}}><strong>{periodAlternativ.find(p => p.value === period)?.label}</strong> | <strong>{plats}</strong></div>
-          </div>
+
           <div className="rapport-search-row" style={{position: "relative"}}>
             <input
               type="text"
@@ -322,27 +297,15 @@ export default function RapportPage() {
             {activeRegnr && (
               <button
                 className="rapport-reset-btn"
-                style={{
-                  background: "#2a7ae4",
-                  color: "#fff",
-                  border: "none",
-                  marginLeft: "8px",
-                  cursor: "pointer"
-                }}
                 onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}
               >
                 Rensa
               </button>
             )}
             {autocomplete.length > 0 && (
-              <ul style={{
-                position: "absolute", top: "36px", left: "0", background: "#fff",
-                border: "1px solid #ddd", width: "180px", zIndex: 10,
-                listStyle: "none", padding: "4px", margin: "0"
-              }}>
+              <ul className="autocomplete-list">
                 {autocomplete.map(regnr => (
-                  <li key={regnr} style={{padding: "4px", cursor: "pointer"}}
-                      onClick={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }}>
+                  <li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }}>
                     {regnr}
                   </li>
                 ))}
@@ -359,17 +322,19 @@ export default function RapportPage() {
               <table className="rapport-table">
                 <thead>
                   <tr>
-                    <th onClick={() => handleSort("regnr")} style={{cursor:"pointer"}}>Regnr</th>
-                    <th onClick={() => handleSort("brand")} style={{cursor:"pointer"}}>Bilmodell</th>
-                    <th onClick={() => handleSort("saludatum")} style={{cursor:"pointer"}}>Ny/gammal</th>
-                    <th onClick={() => handleSort("damage_date")} style={{cursor:"pointer", minWidth:"120px"}}>Datum</th>
-                    <th onClick={() => handleSort("region")} style={{cursor:"pointer"}}>Region</th>
-                    <th onClick={() => handleSort("ort")} style={{cursor:"pointer"}}>Ort</th>
-                    <th onClick={() => handleSort("station_namn")} style={{cursor:"pointer"}}>Station</th>
-                    <th onClick={() => handleSort("damage_type")} style={{cursor:"pointer"}}>Skada</th>
-                    <th onClick={() => handleSort("notering")} style={{cursor:"pointer"}}>Anteckning</th>
-                    <th onClick={() => handleSort("media_url")} style={{cursor:"pointer"}}>Bild/video</th>
-                    <th onClick={() => handleSort("inchecker_name")} style={{cursor:"pointer"}}>Godkänd av</th>
+                    <th onClick={() => handleSort("regnr")}>Regnr<SortArrow column="regnr" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("brand")}>Bilmodell<SortArrow column="brand" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("saludatum")}>Incheckad/BUHS<SortArrow column="saludatum" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("damage_date")}>Datum<SortArrow column="damage_date" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("region")}>Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("ort")}>Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("station_namn")}>Station<SortArrow column="station_namn" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    <th onClick={() => handleSort("damage_type")}>Skada<SortArrow column="damage_type" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    {/* PUNKT 2: Kolumnen "Anteckning" återinförd */}
+                    <th onClick={() => handleSort("notering")}>Anteckning<SortArrow column="notering" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                    {/* PUNKT 4: Kolumnen "Bild/video" återinförd */}
+                    <th>Bild/video</th>
+                    <th onClick={() => handleSort("inchecker_name")}>Godkänd av<SortArrow column="inchecker_name" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -378,21 +343,23 @@ export default function RapportPage() {
                   ) : (
                     filteredRows.map((row) => (
                       <tr key={row.id}>
-                        <td><span style={{textDecoration: "underline", cursor: "pointer", color: "#005A9C"}} onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
-                        <td>{row.brand} {row.model}</td>
-                        <td>{getNyGammal(row)}</td>
-                        <td style={{minWidth:"120px"}}>
+                        <td><span className="regnr-link" onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
+                        <td>{row.brand || ""} {row.model || ""}</td>
+                        <td>{getDamageStatus(row)}</td>
+                        <td>
                           {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
-                          <div style={{ fontSize: "0.9em", color: "#555" }}><span>{formatTime(row)}</span></div>
+                          <div className="time-display"><span>{formatTime(row)}</span></div>
                         </td>
                         <td>{mapOrtToRegion(row.ort)}</td>
                         <td>{row.ort || "--"}</td>
                         <td>{row.station_namn ? `${row.station_namn}${row.station_id ? ` (${row.station_id})` : ""}`: (row.station_id ? row.station_id : "--")}</td>
                         <td>{row.damage_type || row.damage_type_raw || "--"}</td>
+                        {/* PUNKT 2: Data för "Anteckning" återinförd */}
                         <td>{row.notering || "--"}</td>
+                        {/* PUNKT 4: Data för "Bild/video" återinförd */}
                         <td>
                           {row.media_url ? (
-                            <Image src={row.media_url} width={72} height={72} style={{cursor:"pointer", borderRadius:"7px", border:"1.5px solid #b0b4b8", objectFit:"cover", margin: "0 auto", display: "block"}}
+                            <Image src={row.media_url} width={72} height={72} className="thumbnail-image"
                               onClick={() => openMediaModalForRow(row)} alt="Tumnagel" />
                           ) : ("--")}
                         </td>
@@ -406,33 +373,71 @@ export default function RapportPage() {
           )}
         </div>
       </div>
-      <footer className="copyright-footer" style={{ position: "fixed", left: 0, bottom: 0, width: "100vw", background: "rgba(255,255,255,0.7)" }}>
+      <footer className="copyright-footer">
         &copy; Albarone AB 2025 &mdash; All rights reserved
       </footer>
       <MediaModal open={modalOpen} onClose={() => setModalOpen(false)} media={modalMedia} title={modalTitle} currentIdx={modalIdx}
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
+      
+      {/* PUNKT 1, 6, 8: Global CSS med alla justeringar */}
       <style jsx global>{`
         .background-img {
           position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
           background: url('/bakgrund.jpg') center center / cover no-repeat;
-          opacity: 0.19; z-index: -1;
+          opacity: 0.18; /* Justerad transparens */
+          z-index: -1;
         }
-        .rapport-logo-row { display: flex; justify-content: center; }
+        .rapport-logo-row { 
+          display: flex; 
+          justify-content: center;
+          margin-bottom: 2px; /* PUNKT 6: Minskat avstånd */
+        }
         .rapport-logo-centered { width: 220px; height: auto; }
         .rapport-center-content { display: flex; justify-content: center; }
-        .rapport-card { margin-top: 0px; margin-bottom: 0px; padding: 36px 28px 28px 28px;
-          max-width: 900px; border-radius: 18px; box-shadow: 0 2px 32px #0002;
+        .rapport-card { 
+          margin-top: 0px; 
+          margin-bottom: 0px; 
+          padding: 36px 28px 28px 28px;
+          max-width: 1100px; /* PUNKT 8: Bredare innehållskort */
+          border-radius: 18px; 
+          box-shadow: 0 2px 32px #0002;
+          background: rgba(255,255,255,0.92); /* Justerad transparens */
         }
         .rapport-title { font-size: 2.1rem; font-weight: 700; text-align: center; margin-bottom: 18px; }
-        .rapport-divider { height: 2px; background: #e5e7eb; margin: 0 0 18px 0; }
-        .rapport-stats-centered { text-align: center; }
-        .rapport-table-wrap { margin-top: 20px; }
-        .rapport-table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.97); }
-        .rapport-table th, .rapport-table td { border: 1px solid #e5e7eb; padding: 6px 10px; font-size: 1rem; }
-        .rapport-table th { background: #f5f6fa; font-weight: 600; text-align: left; }
+        .rapport-divider { height: 2px; background: #e5e7eb; margin: 0 auto 18px auto; width: 240px; }
+        .rapport-stats-centered { text-align: center; margin-bottom: 20px; }
+        .rapport-filter { display: flex; justify-content: center; gap: 2rem; margin-bottom: 20px; }
+        .rapport-table-wrap { margin-top: 20px; width: 100%; overflow-x: auto; }
+        .rapport-table { width: 100%; border-collapse: collapse; }
+        .rapport-table th, .rapport-table td { border: 1px solid #e5e7eb; padding: 8px 12px; font-size: 0.95rem; text-align: left; }
+        .rapport-table th { background: #f5f6fa; font-weight: 600; cursor: pointer; user-select: none; }
+        .rapport-table th:hover { background: #e9edf5; }
         .rapport-table tr:nth-child(even) { background: #fafbfc; }
-        .rapport-search-row { margin-top: 22px; margin-bottom: 12px; text-align: center; }
+        .rapport-search-row { margin-top: 22px; margin-bottom: 12px; text-align: center; display: flex; justify-content: center; gap: 8px; }
+        .rapport-search-input { padding: 6px 10px; font-size: 1rem; }
+        .rapport-search-btn, .rapport-reset-btn { padding: 6px 12px; font-size: 1rem; border: none; color: white; cursor: pointer; border-radius: 4px; }
+        .rapport-search-btn { background: #2a7ae4; }
+        .rapport-reset-btn { background: #6c757d; }
+        .autocomplete-list {
+          position: absolute; top: 38px; left: 50%; transform: translateX(-50%);
+          background: #fff; border: 1px solid #ddd; width: calc(100% - 16px); max-width: 200px;
+          z-index: 10; list-style: none; padding: 4px; margin: 0;
+          text-align: left; border-radius: 4px;
+        }
+        .autocomplete-list li { padding: 6px; cursor: pointer; }
+        .autocomplete-list li:hover { background: #f0f0f0; }
+        .regnr-link { text-decoration: underline; cursor: pointer; color: #005A9C; font-weight: 500; }
+        .time-display { font-size: 0.9em; color: #555; }
+        .thumbnail-image {
+          cursor: pointer;
+          border-radius: 7px;
+          border: 1.5px solid #b0b4b8;
+          object-fit: cover;
+          margin: 0 auto;
+          display: block;
+        }
+        .thumbnail-image:hover { border-color: #005A9C; }
       `}</style>
     </main>
   );
