@@ -180,16 +180,12 @@ body {
   font-weight: 600;
   letter-spacing: 0.04em;
 }
-
-/* ======================================= */
-/* === GLOBAL BACKGROUND CONFIGURATION === */
-/* ======================================= */
 .background-img {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: -1; 
+  z-index: -1;
   background: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif') center center/cover no-repeat;
   opacity: 0.18;
   pointer-events: none;
@@ -197,6 +193,7 @@ body {
 
 .rapport-main {
   min-height: 100vh;
+  /* background: var(--background); */ /* Borttagen för transparens */
   position: relative;
   display: flex;
   flex-direction: column;
@@ -205,22 +202,6 @@ body {
   padding: 2rem 1rem;
   box-sizing: border-box;
 }
-
-.welcome-main {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  position: relative;
-  padding: 2rem 1rem;
-  box-sizing: border-box;
-}
-
-/* ======================================= */
-/* ========= END GLOBAL CONFIG ========= */
-/* ======================================= */
-
 
 .rapport-center-content {
   width: 100%;
@@ -255,8 +236,8 @@ body {
   margin: 0 auto;
   text-align: center;
   padding: 2.5rem 2rem 2.2rem 2rem;
-  /* ÄNDRING: Genomskinlig bakgrund för "frostat glas"-effekt */
-  background: rgba(255, 255, 255, 0.94);
+  /* === ENDA ÄNDRINGEN ÄR DENNA RAD === */
+  background: rgba(243, 244, 246, 0.94); /* Ersätter den solida färgen med en transparent */
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.10);
   display: flex;
@@ -279,11 +260,98 @@ body {
   margin: 0 auto 2rem auto;
   border-radius: 2px;
 }
-
+/* Rapportkortet högre upp på sidan */
 .rapport-center-content {
   margin-top: 26px;
 }
 
+/* Summering under Rapport & Statistik: vänsterställd, större radavstånd */
+.rapport-stats {
+  width: 100%;
+  margin-bottom: 1.2rem;
+  font-size: 1.07rem;
+  text-align: left;
+  line-height: 1.7;
+  padding-left: 0.4rem;
+}
+
+/* "Vald period" med luft ovanför och under, större font */
+.rapport-filter {
+  margin: 2.3rem 0 2.3rem 0;
+  font-size: 1.12rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  justify-content: flex-start;
+  font-weight: 600;
+}
+
+.rapport-filter select {
+  font-size: 1rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 7px;
+  border: 1px solid #b0b4b8;
+  background: #fff;
+  color: var(--foreground);
+  margin-left: 0.7rem;
+}
+
+/* Sökruta: alla bokstäver blir versaler */
+.rapport-search-input {
+  text-transform: uppercase;
+}
+
+/* Reg.nr: fet, men INTE större än tabelltext */
+.regnr-col {
+  font-weight: bold;
+  background: #f7f7fa;
+  text-align: left;
+  border-left: 3px solid #b0b4b8;
+  font-size: 1em; /* Samma som övriga celler */
+}
+
+/* Tabellrubriker */
+.rapport-table th {
+  font-weight: 700;
+  background: #f8fafc;
+  text-align: center;
+  letter-spacing: 0.04em;
+  font-size: 1em;
+}
+.rapport-table th.kommentar-col {
+  text-align: left;
+}
+.rapport-table th.centered-cell {
+  text-align: center;
+}
+
+/* Region/Ort/Station: ljusblå bakgrund och subtil skugga på cellerna i raderna */
+.region-section {
+  background: #eaf4fd;
+  border-radius: 8px 0 0 8px;
+  text-align: center;
+  box-shadow: 0 2px 9px 0 #eaf4fd99;
+}
+.rapport-table th.region-section {
+  background: #eaf4fd;
+  box-shadow: none;
+}
+
+/* Övriga justeringar */
+.rapport-table th:nth-child(2) {
+  /* Ny/gammal */
+  text-transform: capitalize;
+}
+.rapport-table th:nth-child(9) {
+  /* Anteckning */
+  text-transform: capitalize;
+}
+/* Rapportkortet högre upp på sidan */
+.rapport-center-content {
+  margin-top: 26px;
+}
+
+/* Sammanfattning - centrera i sektionen, men vänsterställ texten */
 .rapport-stats {
   width: 100%;
   margin-bottom: 1.2rem;
@@ -296,13 +364,13 @@ body {
   max-width: 600px;
 }
 
+/* Vald period och plats - luft och bredvid varandra */
 .rapport-filter {
   margin: 2.3rem 0 2.3rem 0;
   font-size: 1.12rem;
   display: flex;
-  flex-wrap: wrap; 
   align-items: center;
-  gap: 1.5rem 2.2rem;
+  gap: 2.2rem;
   justify-content: center;
   font-weight: 600;
 }
@@ -321,18 +389,21 @@ body {
   margin-left: 0.7rem;
 }
 
+/* Sökruta: alla bokstäver blir versaler */
 .rapport-search-input {
   text-transform: uppercase;
 }
 
+/* Reg.nr: fet, men INTE större än tabelltext */
 .regnr-col {
   font-weight: bold;
   background: #f7f7fa;
   text-align: left;
   border-left: 3px solid #b0b4b8;
-  font-size: 1em; 
+  font-size: 1em; /* Samma som övriga celler */
 }
 
+/* Tabellrubriker */
 .rapport-table th {
   font-weight: 700;
   background: #f8fafc;
@@ -347,12 +418,14 @@ body {
   text-align: center;
 }
 
+/* Datumkolumn tillräckligt bred */
 .rapport-table th.datum-col,
 .rapport-table td.datum-col {
   min-width: 120px;
   white-space: nowrap;
 }
 
+/* Region/Ort/Station: ljusblå bakgrund och tydlig skugga */
 .region-section {
   background: #eaf4fd;
   border-radius: 8px 0 0 8px;
@@ -364,12 +437,12 @@ body {
   box-shadow: none;
 }
 
+/* Datum-klocka */
 .datum-klocka {
   color: #2a3f57;
   font-size: 0.93em;
   margin-top: 2px;
 }
-
 :root {
   --background: #f8fafc;
   --foreground: #1f2937;
@@ -385,6 +458,141 @@ body {
     --foreground: #1f2937;
     --card-bg: #eeeeee;
   }
+}
+
+.welcome-main {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* background: var(--background); */ /* Borttagen för transparens */
+  position: relative;
+}
+
+.main-logo {
+  width: 330px;
+  height: auto;
+  margin: 70px auto 0 auto;
+  display: block;
+  z-index: 2;
+}
+
+.welcome-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  margin-top: 110px;
+  text-align: center;
+  padding: 2.4rem 2rem 2.2rem 2rem;
+  background: rgba(243, 244, 246, 0.94); /* Transparent bakgrund */
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.welcome-title {
+  font-size: 2.3rem;
+  font-weight: 700;
+  margin: 0 0 2.1rem 0;
+  color: var(--foreground);
+}
+
+.btn-group {
+  display: flex;
+  gap: 1.2rem;
+  justify-content: center;
+  margin-bottom: 2.1rem;
+}
+
+.btn {
+  min-width: 190px;
+  height: 64px;
+  padding: 0;
+  border: none;
+  border-radius: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  font-size: 1.09rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  margin-bottom: 0;
+  background: var(--main-blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.btn.incheckning {
+  background: var(--main-blue);
+  color: #fff;
+}
+.btn.incheckning:hover {
+  background: #003a6f;
+}
+
+.divider-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.divider {
+  width: 50%;
+  border: none;
+  border-top: 3px solid var(--main-border);
+  margin: 0.8rem 0 1.8rem 0;
+}
+
+.report-section {
+  margin-top: 0.2rem;
+}
+
+.btn.report-btn {
+  background: var(--main-green);
+  color: #fff;
+  font-size: 1.09rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  min-width: 190px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn.report-btn:hover {
+  background: #0d7a2b;
+}
+
+.copyright-footer {
+  width: 100vw;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #777;
+  padding: 30px 0 16px 0;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: none;
+  z-index: 10;
+  letter-spacing: 0.5px;
+}
+.welcome-main {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  /* background: var(--background); */ /* Borttagen för transparens */
+  position: relative;
 }
 
 .main-logo {
@@ -404,8 +612,7 @@ body {
   margin-top: 110px;
   text-align: center;
   padding: 2.8rem 2rem 2.5rem 2rem;
-  /* ÄNDRING: Genomskinlig bakgrund för "frostat glas"-effekt */
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--card-bg, #f3f4f6);
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.10);
   display: flex;
@@ -492,19 +699,18 @@ body {
 }
 
 .copyright-footer {
-  /* ÄNDRING: Återställd till 'fixed' för att alltid vara i botten. */
-  position: fixed;
+  width: 100vw;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #777;
+  padding: 30px 0 16px 0;
+  position: absolute;
   bottom: 0;
   left: 0;
-  width: 100%;
-  text-align: center;
-  padding: 10px;
-  background: white;
-  font-size: 0.9rem;
-  z-index: 100;
-  border-top: 1px solid #e5e7eb;
+  background: none;
+  z-index: 10;
+  letter-spacing: 0.5px;
 }
-
 .login-bg {
   min-height: 100vh;
   width: 100vw;
@@ -573,7 +779,6 @@ body {
   font-size: 1rem;
   margin-top: 1.2rem;
   color: #005A9C;
-  margin-bottom: 0.7rem;
 }
 .login-msg-wrap {
   margin-top: 2.1rem;
@@ -587,9 +792,126 @@ body {
   margin-top: 0;
 }
 
+.login-msg {
+  font-size: 1rem;
+  margin-bottom: 0.7rem;
+  color: #005A9C;
+}
+
 .login-close-tab {
   font-size: 0.99rem;
   color: #3b3b3b;
   opacity: 0.85;
   margin-bottom: 0.2rem;
+}
+.rapport-stats-centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 600px;
+  text-align: left;
+}
+
+.rapport-filter {
+  margin: 2.3rem 0 2.3rem 0;
+  font-size: 1.12rem;
+  display: flex;
+  align-items: center;
+  gap: 2.2rem;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.rapport-filter label {
+  margin-right: 0.5rem;
+}
+
+.rapport-filter select {
+  font-size: 1rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 7px;
+  border: 1px solid #b0b4b8;
+  background: #fff;
+  color: var(--foreground);
+  margin-left: 0.7rem;
+}
+
+.rapport-search-input {
+  text-transform: uppercase;
+}
+
+/* Datumkolumn tillräckligt bred */
+.rapport-table th.datum-col,
+.rapport-table td.datum-col {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+/* Region/Ort/Station: ljusblå bakgrund och tydlig skugga */
+.region-section.region-shadow {
+  box-shadow: 0 4px 28px 0 #eaf4fd;
+}
+
+/* Resten av rapport-tabellen och design finns redan enligt tidigare kod */
+.rapport-table th,
+.rapport-table td {
+  font-size: 1em; /* Reg.nr exakt som rubriker */
+}
+
+.regnr-col {
+  font-weight: 500;
+  background: #f7f7fa;
+  text-align: left;
+  border-left: 3px solid #b0b4b8;
+}
+
+.region-section.region-shadow {
+  background: #d2e7fa !important;
+  box-shadow: 0 2px 12px 0 #99c2e3 !important;
+  border-radius: 4px;
+}
+
+.skada-cell .skada-hierarki {
+  color: #222 !important; /* Svart text, ingen länkfärg */
+  font-weight: 400;
+}
+
+.rapport-table th {
+  font-weight: 700;
+  background: #f8fafc;
+  text-align: center;
+  letter-spacing: 0.04em;
+  font-size: 1em;
+}
+.rapport-table th.kommentar-col {
+  text-align: left;
+}
+.rapport-table th.centered-cell {
+  text-align: center;
+}
+
+/* Datumkolumn tillräckligt bred */
+.rapport-table th.datum-col,
+.rapport-table td.datum-col {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.datum-klocka {
+  color: #2a3f57;
+  font-size: 0.93em;
+  margin-top: 2px;
+}
+
+/* Resten av rapport-tabellen och design finns redan enligt tidigare kod */
+.region-section.region-flat {
+  background: #e4f1fb !important;
+  border-radius: 4px;
+  box-shadow: none !important;
+}
+
+.rapport-table th.region-section.region-flat {
+  background: #cbe4f6 !important;
 }
