@@ -25,11 +25,11 @@ type DamageWithVehicle = {
   note_internal?: string;
   damage_type?: string;
   saludatum?: string;
-  region?: string;
   huvudstation_id?: string;
   station_id?: string;
   brand?: string;
   model?: string;
+  region?: string; // Manually added
 };
 
 const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: string, sortOrder: string }) => {
@@ -37,14 +37,21 @@ const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: st
   return <span style={{ fontSize: '0.8em', verticalAlign: 'middle' }}>{sortOrder === 'asc' ? ' ▲' : ' ▼'}</span>;
 };
 
+// ÅTGÄRD: Period-alternativen är återställda
 const periodAlternativ = [
   { value: "all", label: "All tid" },
-  { value: "year", label: "Detta år (ej aktiv)" },
-  { value: "month", label: "Denna månad (ej aktiv)" },
+  { value: "year", label: "2025" },
+  { value: "month", label: "Oktober 2025" },
+  { value: "week", label: "v. 41, 6–12 okt" },
+  { value: "ytd", label: "YTD (2025)" },
+  { value: "7days", label: "Rullande 7 dagar" },
+  { value: "30days", label: "Rullande 30 dagar" },
+  { value: "rollingyear", label: "Rullande år" }
 ];
 
 const platsAlternativ = stationer.map(st => {
   if (st.type === "total" || st.type === "region" || st.type === "tot") return st.namn;
+  // @ts-ignore
   if (st.type === "station") return `${st.namn} (${st.station_id})`;
   return st.namn;
 });
@@ -53,30 +60,44 @@ const platsAlternativ = stationer.map(st => {
 // Hjälpfunktioner
 // ==============================
 
+// ÅTGÄRD: Återställd till den ursprungliga, fungerande logiken för BUHS.
 function getDamageStatus(row: DamageWithVehicle) {
-  const note = row.note_internal || "";
-  const damageType = row.damage_type_raw || "";
-  if (note.toLowerCase().includes("buhs") || damageType.toLowerCase().includes("buhs")) {
+  if (
+    (row.note_internal && String(row.note_internal).toLowerCase().includes("buhs")) ||
+    (row.damage_type_raw && String(row.damage_type_raw).toLowerCase().includes("buhs"))
+  ) {
     return "BUHS";
+  }
+  if (row.saludatum) {
+    const d = new Date(row.saludatum);
+    const nu = new Date();
+    const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
+    return diff < 30 ? "Incheckad" : "Gammal";
   }
   return "Incheckad";
 }
 
+
+// ÅTGÄRD: Återställd till den ursprungliga, fungerande logiken för klockslag.
 function formatTime(row: DamageWithVehicle) {
-    const status = getDamageStatus(row);
-    if (status === "BUHS" || !row.damage_date) return "";
+    const isBuhs = getDamageStatus(row) === "BUHS";
+    if (isBuhs || !row.damage_date) return "";
+
     try {
         const d = new Date(row.damage_date);
         if (isNaN(d.getTime())) return "";
         if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return "";
         return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
-    } catch { return ""; }
+    } catch {
+        return "";
+    }
 }
 
+// ÅTGÄRD: Återställd till den ursprungliga, fungerande logiken för regioner.
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
     // @ts-ignore
-    const stationData = stationer.find(s => s.ort?.toLowerCase() === ort.toLowerCase());
+    const stationData = stationer.find(s => s.ort && s.ort.toLowerCase() === ort.toLowerCase());
     // @ts-ignore
     return stationData?.region || "--";
 };
@@ -100,20 +121,18 @@ export default function RapportPage() {
   const [modalTitle, setModalTitle] = useState("");
   const [modalIdx, setModalIdx] = useState(0);
 
-  // ÅTGÄRD: Korrekt datahämtning utan antaganden om relationer eller kolumner.
+  // ÅTGÄRD: Korrekt och säker datahämtning
   useEffect(() => {
     async function fetchAllData() {
       setLoading(true);
       setError("");
       try {
-        // Steg 1: Hämta alla skador
         const { data: damagesData, error: damagesError } = await supabase
           .from("damages")
           .select('*')
           .order("damage_date", { ascending: false });
         if (damagesError) throw damagesError;
 
-        // Steg 2: Hämta fordonsinformation (endast de kolumner vi vet finns)
         const { data: vehiclesData, error: vehiclesError } = await supabase
           .from("vehicles")
           .select("regnr, brand, model");
@@ -121,14 +140,12 @@ export default function RapportPage() {
 
         const vehiclesMap = new Map(vehiclesData.map(v => [v.regnr, v]));
         
-        // Steg 3: Kombinera datan på klienten
         const combinedData = damagesData.map((damage: any) => {
           const vehicle = vehiclesMap.get(damage.regnr);
           return {
             ...damage,
             brand: vehicle?.brand,
             model: vehicle?.model,
-            // NYTT: Skapa 'region' baserat på 'ort' för varje rad
             region: mapOrtToRegion(damage.ort),
           };
         });
@@ -168,7 +185,7 @@ export default function RapportPage() {
         bk = new Date(bk).getTime() || 0;
         return sortOrder === "desc" ? bk - ak : ak - bk;
       }
-      if (sortKey === 'note_internal') { // Sortera BUHS/Incheckad korrekt
+      if (sortKey === 'note_internal') {
           const aStatus = getDamageStatus(a);
           const bStatus = getDamageStatus(b);
           return sortOrder === 'desc' ? bStatus.localeCompare(aStatus) : aStatus.localeCompare(bStatus);
@@ -180,13 +197,22 @@ export default function RapportPage() {
     });
   }, [allDamages, plats, activeRegnr, sortKey, sortOrder]);
 
-  const handleSort = (key: string) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+  // ÅTGÄRD: Autocomplete är tillbaka
+  const [autocomplete, setAutocomplete] = useState<string[]>([]);
+  useEffect(() => {
+    if (searchRegnr.length >= 2) {
+      const regnrList = Array.from(new Set(allDamages.map(row => row.regnr).filter(Boolean)));
+      setAutocomplete(
+        regnrList.filter(r => r.toLowerCase().includes(searchRegnr.toLowerCase()))
+      );
     } else {
-      setSortKey(key);
-      setSortOrder("desc");
+      setAutocomplete([]);
     }
+  }, [searchRegnr, allDamages]);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortOrder("desc"); }
   };
 
   const openMediaModalForRow = (row: DamageWithVehicle) => {
@@ -207,7 +233,23 @@ export default function RapportPage() {
     setModalOpen(true);
   };
   
-  const openMediaModalForRegnr = (regnr: string) => { /* Samma som förut */ };
+  const openMediaModalForRegnr = (regnr: string) => {
+    const skador = filteredRows.filter(row => row.regnr === regnr && row.media_url);
+    const mediaArr = skador.map(row => ({
+      url: row.media_url, type: "image",
+      metadata: {
+        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatTime(row),
+        damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
+        note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
+        documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+        damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+      }
+    })).filter(item => !!item.url);
+    setModalMedia(mediaArr);
+    setModalTitle(`Alla media för ${regnr}`);
+    setModalIdx(0);
+    setModalOpen(true);
+  };
   const handleModalPrev = () => setModalIdx(idx => (idx > 0 ? idx - 1 : idx));
   const handleModalNext = () => setModalIdx(idx => (idx < modalMedia.length - 1 ? idx + 1 : idx));
 
@@ -239,7 +281,7 @@ export default function RapportPage() {
           <div className="rapport-filter">
             <div>
               <label htmlFor="period-select">Period:</label>
-              <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)} disabled>
+              <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)}>
                 {periodAlternativ.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
               </select>
             </div>
@@ -251,11 +293,20 @@ export default function RapportPage() {
             </div>
           </div>
 
-          <div className="rapport-search-row">
+          <div className="rapport-search-row" style={{position: "relative"}}>
             <input
               type="text" placeholder="SÖK REG.NR" value={searchRegnr}
-              onChange={e => setSearchRegnr(e.target.value)} className="rapport-search-input" autoComplete="off"
+              onChange={e => setSearchRegnr(e.target.value.toUpperCase())} className="rapport-search-input" autoComplete="off"
             />
+            {autocomplete.length > 0 && (
+              <ul className="autocomplete-list">
+                {autocomplete.map(regnr => (
+                  <li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }}>
+                    {regnr}
+                  </li>
+                ))}
+              </ul>
+            )}
             <button className="rapport-search-btn" onClick={() => setActiveRegnr(searchRegnr.trim())} disabled={!searchRegnr.trim()}>Sök</button>
             {activeRegnr && (<button className="rapport-reset-btn" onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}>Rensa</button>)}
           </div>
@@ -286,7 +337,8 @@ export default function RapportPage() {
                   ) : (
                     filteredRows.map((row) => (
                       <tr key={row.id}>
-                        <td><span className="regnr-link">{row.regnr}</span></td>
+                        {/* ÅTGÄRD: onClick är tillbaka på reg.nr */}
+                        <td><span className="regnr-link" onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
                         <td>{row.brand || ""} {row.model || ""}</td>
                         <td>{getDamageStatus(row)}</td>
                         <td className="datum-column">
@@ -320,6 +372,7 @@ export default function RapportPage() {
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
       
+      {/* ÅTGÄRD: CSS för bakgrund, logotyp och layout */}
       <style jsx global>{`
         html { 
           background: url('/bakgrund.jpg') center center / cover no-repeat fixed;
@@ -333,7 +386,7 @@ export default function RapportPage() {
         }
         .background-img { display: none; }
 
-        .rapport-logo-row { display: flex; justify-content: center; padding-top: 2rem; margin-bottom: 1rem; }
+        .rapport-logo-row { display: flex; justify-content: center; padding-top: 2rem; margin-bottom: 4px; }
         .rapport-logo-centered { width: 190px; height: auto; }
         .rapport-center-content { display: flex; justify-content: center; padding: 0 1rem; }
         .rapport-card { 
@@ -357,19 +410,14 @@ export default function RapportPage() {
         .rapport-search-btn, .rapport-reset-btn { padding: 6px 12px; font-size: 1rem; border: none; color: white; cursor: pointer; border-radius: 4px; }
         .rapport-search-btn { background: #2a7ae4; }
         .rapport-reset-btn { background: #6c757d; }
+        .autocomplete-list { position: absolute; top: 100%; background: #fff; border: 1px solid #ddd; z-index: 10; list-style: none; padding: 4px; margin: 0; text-align: left; border-radius: 4px; min-width: 180px; }
+        .autocomplete-list li { padding: 6px; cursor: pointer; }
+        .autocomplete-list li:hover { background: #f0f0f0; }
         .regnr-link { text-decoration: underline; cursor: pointer; color: #005A9C; font-weight: 500; }
         .time-display { font-size: 0.9em; color: #555; }
-        .thumbnail-image {
-          cursor: pointer; border-radius: 7px; border: 1.5px solid #b0b4b8;
-          object-fit: cover; margin: 0 auto; display: block;
-        }
+        .thumbnail-image { cursor: pointer; border-radius: 7px; border: 1.5px solid #b0b4b8; object-fit: cover; margin: 0 auto; display: block; }
         .thumbnail-image:hover { border-color: #005A9C; }
-        .copyright-footer { 
-          position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; 
-          padding: 10px; background: rgba(243, 244, 246, 0.8);
-          backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
-          font-size: 0.9rem; z-index: 100;
-        }
+        .copyright-footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; padding: 10px; background: rgba(243, 244, 246, 0.8); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); font-size: 0.9rem; z-index: 100; }
       `}</style>
     </main>
   );
