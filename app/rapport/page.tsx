@@ -89,7 +89,6 @@ function formatTime(row: DamageWithVehicle) {
     }
 }
 
-// ÅTGÄRD: Korrekt logik för att mappa ort till region, baserat på din explicita instruktion.
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
     const ortLower = ort.toLowerCase();
@@ -98,7 +97,7 @@ const mapOrtToRegion = (ort: string): string => {
     if (['helsingborg', 'ängelholm'].includes(ortLower)) return 'Mitt';
     if (['malmö', 'trelleborg', 'lund'].includes(ortLower)) return 'Syd';
     
-    return "--"; // Fallback om orten inte finns i listorna
+    return "--";
 };
 
 // ==============================
@@ -258,10 +257,10 @@ export default function RapportPage() {
   return (
     <main className="rapport-main">
       <div className="background-img" />
-      <div className="rapport-logo-row rapport-logo-top">
-        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
-      </div>
-      <div className="rapport-center-content">
+      <div className="rapport-content-wrapper">
+        <div className="rapport-logo-row">
+          <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
+        </div>
         <div className="rapport-card">
           <h1 className="rapport-title">Rapport & Statistik</h1>
           <div className="rapport-divider" />
@@ -368,25 +367,45 @@ export default function RapportPage() {
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
       
+      {/* ÅTGÄRD: CSS för bakgrund, logotyp och layout */}
       <style jsx global>{`
-        html { 
-          background: url('/bakgrund.jpg') center center / cover no-repeat fixed;
-        }
         body {
-          background: transparent;
+          background-color: #f8fafc; /* Fallback-färg */
+        }
+        .background-img {
+          position: fixed;
+          inset: 0;
+          width: 100vw;
+          height: 100vh;
+          z-index: -1;
+          background: url('/bakgrund.jpg') center center / cover no-repeat;
+          opacity: 0.18;
+          pointer-events: none;
         }
         .rapport-main {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
           min-height: 100vh;
-          padding-bottom: 60px;
+          padding: 0 1rem 60px 1rem; /* 60px för sidfotens höjd */
+          box-sizing: border-box;
         }
-        .background-img { display: none; }
-
-        .rapport-logo-row { display: flex; justify-content: center; padding-top: 2rem; margin-bottom: 4px; }
+        .rapport-content-wrapper {
+          width: 100%;
+          max-width: 1200px;
+          margin-top: 2rem;
+          margin-bottom: 2rem;
+        }
+        .rapport-logo-row { 
+          text-align: center;
+          margin-bottom: 1rem;
+        }
         .rapport-logo-centered { width: 190px; height: auto; }
-        .rapport-center-content { display: flex; justify-content: center; padding: 0 1rem; }
         .rapport-card { 
-          width: 100%; margin: 0 auto 2rem auto; padding: 36px 28px 28px 28px;
-          max-width: 1200px; border-radius: 18px; box-shadow: 0 2px 32px #0002;
+          width: 100%;
+          padding: 36px 28px 28px 28px;
+          border-radius: 18px;
+          box-shadow: 0 2px 32px rgba(0, 0, 0, 0.08);
           background: rgba(255,255,255,0.94);
         }
         .rapport-title { font-size: 2.1rem; font-weight: 700; text-align: center; margin-bottom: 18px; }
@@ -412,7 +431,12 @@ export default function RapportPage() {
         .time-display { font-size: 0.9em; color: #555; }
         .thumbnail-image { cursor: pointer; border-radius: 7px; border: 1.5px solid #b0b4b8; object-fit: cover; margin: 0 auto; display: block; }
         .thumbnail-image:hover { border-color: #005A9C; }
-        .copyright-footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; padding: 10px; background: rgba(255,255,255,1); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); font-size: 0.9rem; z-index: 100; }
+        .copyright-footer { 
+          position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; 
+          padding: 10px; background: white; 
+          font-size: 0.9rem; z-index: 100;
+          border-top: 1px solid #e5e7eb;
+        }
       `}</style>
     </main>
   );
