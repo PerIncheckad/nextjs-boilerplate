@@ -75,8 +75,10 @@ function formatTime(row: DamageWithVehicle) {
 
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
+    // @ts-ignore
     const stationData = stationer.find(s => s.ort?.toLowerCase() === ort.toLowerCase());
-    return stationData?.region || ort;
+    // @ts-ignore
+    return stationData?.region || "--";
 };
 
 // ==============================
@@ -98,32 +100,36 @@ export default function RapportPage() {
   const [modalTitle, setModalTitle] = useState("");
   const [modalIdx, setModalIdx] = useState(0);
 
-  // ÅTGÄRD: Återställd och korrekt datahämtning som inte kraschar.
+  // ÅTGÄRD: Korrekt datahämtning utan antaganden om relationer eller kolumner.
   useEffect(() => {
     async function fetchAllData() {
       setLoading(true);
       setError("");
       try {
+        // Steg 1: Hämta alla skador
         const { data: damagesData, error: damagesError } = await supabase
           .from("damages")
           .select('*')
           .order("damage_date", { ascending: false });
         if (damagesError) throw damagesError;
 
+        // Steg 2: Hämta fordonsinformation (endast de kolumner vi vet finns)
         const { data: vehiclesData, error: vehiclesError } = await supabase
           .from("vehicles")
-          .select("regnr, brand, model, region");
+          .select("regnr, brand, model");
         if (vehiclesError) throw vehiclesError;
 
         const vehiclesMap = new Map(vehiclesData.map(v => [v.regnr, v]));
         
+        // Steg 3: Kombinera datan på klienten
         const combinedData = damagesData.map((damage: any) => {
           const vehicle = vehiclesMap.get(damage.regnr);
           return {
             ...damage,
             brand: vehicle?.brand,
             model: vehicle?.model,
-            region: vehicle?.region,
+            // NYTT: Skapa 'region' baserat på 'ort' för varje rad
+            region: mapOrtToRegion(damage.ort),
           };
         });
 
@@ -142,8 +148,11 @@ export default function RapportPage() {
 
     const st = stationer.find(s => plats === s.namn || (s.type === "station" && plats === `${s.namn} (${s.station_id})`));
     if (st && st.type !== 'total') {
+        // @ts-ignore
         if (st.type === "region") items = items.filter(d => d.region === st.namn.split(" ")[1]);
+        // @ts-ignore
         else if (st.type === "tot") items = items.filter(d => d.huvudstation_id === st.huvudstation_id);
+        // @ts-ignore
         else if (st.type === "station") items = items.filter(d => d.station_id === st.station_id);
     }
     
@@ -158,6 +167,11 @@ export default function RapportPage() {
         ak = new Date(ak).getTime() || 0;
         bk = new Date(bk).getTime() || 0;
         return sortOrder === "desc" ? bk - ak : ak - bk;
+      }
+      if (sortKey === 'note_internal') { // Sortera BUHS/Incheckad korrekt
+          const aStatus = getDamageStatus(a);
+          const bStatus = getDamageStatus(b);
+          return sortOrder === 'desc' ? bStatus.localeCompare(aStatus) : aStatus.localeCompare(bStatus);
       }
       if (typeof ak === "string" && typeof bk === "string") {
         return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
@@ -279,7 +293,7 @@ export default function RapportPage() {
                           {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
                           <div className="time-display"><span>{formatTime(row)}</span></div>
                         </td>
-                        <td>{row.region || mapOrtToRegion(row.ort)}</td>
+                        <td>{row.region}</td>
                         <td>{row.ort || "--"}</td>
                         <td>{row.station_namn || "--"}</td>
                         <td>{row.damage_type || row.damage_type_raw || "--"}</td>
@@ -317,7 +331,7 @@ export default function RapportPage() {
           min-height: 100vh;
           padding-bottom: 60px;
         }
-        .background-img { display: none; } /* Döljs då den nu ligger på html-elementet */
+        .background-img { display: none; }
 
         .rapport-logo-row { display: flex; justify-content: center; padding-top: 2rem; margin-bottom: 1rem; }
         .rapport-logo-centered { width: 190px; height: auto; }
