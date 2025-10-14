@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import MediaModal from "@/components/MediaModal";
 
 // ==============================
-// Typer och konstanter
+// Typer och konstanter (Oförändrad)
 // ==============================
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
@@ -56,7 +56,7 @@ const platsAlternativ = stationer.map(st => {
 });
 
 // ==============================
-// Hjälpfunktioner
+// Hjälpfunktioner (Oförändrad)
 // ==============================
 
 function getDamageStatus(row: DamageWithVehicle) {
@@ -101,7 +101,7 @@ const mapOrtToRegion = (ort: string): string => {
 };
 
 // ==============================
-// Huvudkomponent
+// Huvudkomponent (Oförändrad)
 // ==============================
 
 export default function RapportPage() {
@@ -370,7 +370,8 @@ export default function RapportPage() {
       {/* ÅTGÄRD: CSS för bakgrund, logotyp och layout */}
       <style jsx global>{`
         body {
-          background-color: #f8fafc; /* Fallback-färg */
+          /* ÅTGÄRD: Använder !important för att tvinga fram rätt bakgrundsfärg. */
+          background-color: #f8fafc !important;
         }
         .background-img {
           position: fixed;
