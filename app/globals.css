@@ -1,13 +1,218 @@
+:root {
+  --background: #f8fafc;
+  --foreground: #1f2937;
+  --card-bg: #f3f4f6;
+  --main-blue: #005A9C;
+  --main-green: #16a34a;
+  --main-border: #b0b4b8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #f8fafc;
+    --foreground: #1f2937;
+    --card-bg: #eeeeee;
+  }
+}
+
 body {
-  /* background: var(--background);  <-- DENNA RAD ÄR BORTTAGEN */
   color: var(--foreground);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
-  /* Säkerställer att body kan innehålla positionerade element korrekt */
   position: relative; 
-  /* Lägger till padding i botten så att sidfoten inte täcker innehåll */
-  padding-bottom: 50px; 
+  padding-bottom: 60px; /* Ger utrymme för sidfoten */
 }
+
+.background-img {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  background: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif') center center/cover no-repeat;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
+/* ======================================= */
+/* === HUVUDLAYOUT FÖR SIDORNA         === */
+/* ======================================= */
+
+/* För startsidan - centrerar innehållet vertikalt */
+.welcome-main {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center; /* Centrerar kortet på sidan */
+  position: relative;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  background: none;
+}
+
+/* För rapportsidan - förankrar innehållet i toppen */
+.rapport-main {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* Förankrar i toppen */
+  position: relative;
+  padding: 2rem 1rem;
+  box-sizing: border-box;
+  background: none;
+}
+
+/* ======================================= */
+/* === KORT-KOMPONENTER                === */
+/* ======================================= */
+
+.welcome-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  margin: 0 auto;
+  margin-top: 110px;
+  text-align: center;
+  padding: 2.8rem 2rem 2.5rem 2rem;
+  background: rgba(243, 244, 246, 0.94); /* Genomskinlig bakgrund */
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rapport-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  text-align: center;
+  padding: 2.5rem 2rem 2.2rem 2rem;
+  background: rgba(243, 244, 246, 0.94); /* Genomskinlig bakgrund */
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.login-card {
+  background: #f3f4f6;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+  padding: 2.4rem;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ======================================= */
+/* === GEMENSAMMA ELEMENT              === */
+/* ======================================= */
+
+.main-logo {
+  width: 330px;
+  height: auto;
+  margin: 70px auto 0 auto;
+  display: block;
+  z-index: 2;
+}
+
+.rapport-logo-row {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  margin-top: 42px;
+  margin-bottom: 22px;
+}
+
+.rapport-logo-centered {
+  width: 210px;
+  max-width: 85vw;
+  height: auto;
+  display: block;
+  z-index: 10;
+}
+
+.welcome-title, .rapport-title, .login-title {
+  font-weight: 700;
+  color: var(--foreground);
+  text-align: center;
+}
+
+.welcome-title { font-size: 2.3rem; margin: 0 0 2.1rem 0; }
+.rapport-title { font-size: 2.1rem; margin: 0 0 1.3rem 0; }
+.login-title { font-size: 2.1rem; margin-bottom: 2.1rem; }
+
+.divider {
+  width: 50%;
+  border: none;
+  border-top: 3px solid var(--main-border);
+  margin: 0.8rem 0 1.8rem 0;
+}
+
+.rapport-divider {
+  width: 240px;
+  height: 0;
+  border-bottom: 3px solid #b0b4b8;
+  margin: 0 auto 2rem auto;
+  border-radius: 2px;
+}
+
+.btn {
+  min-width: 190px;
+  height: 64px;
+  padding: 0;
+  border: none;
+  border-radius: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+  font-size: 1.09rem;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  background: var(--main-blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.btn:hover { background: #003a6f; }
+
+.btn.report-btn {
+  background: var(--main-green);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.btn.report-btn:hover { background: #0d7a2b; }
+
+.copyright-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  padding: 10px;
+  background: white;
+  font-size: 0.9rem;
+  z-index: 100;
+  border-top: 1px solid #e5e7eb;
+  letter-spacing: 0.5px;
+}
+
+/* ======================================= */
+/* === RAPPORT-SPECIFIKA ELEMENT       === */
+/* ======================================= */
 
 .rapport-table-wrap {
   width: 100%;
@@ -28,8 +233,8 @@ body {
   vertical-align: middle;
   border-bottom: 1.5px solid #c5c9ce;
   border-right: 1px solid #e9e9ea;
+  font-size: 1em;
 }
-
 .rapport-table th:last-child,
 .rapport-table td:last-child {
   border-right: none;
@@ -48,8 +253,8 @@ body {
 }
 
 .regnr-col {
+  font-weight: 500;
   background: #f7f7fa;
-  font-weight: bold;
   text-align: left;
   border-left: 3px solid #b0b4b8;
 }
@@ -58,66 +263,61 @@ body {
   background: #eaf4fd;
   border-radius: 8px 0 0 8px;
   text-align: center;
+  box-shadow: 0 4px 16px 0 #eaf4fdcc;
 }
-
 .rapport-table th.region-section {
   background: #eaf4fd;
+  box-shadow: none;
 }
 
-.kommentar-col {
-  min-width: 120px;
-  white-space: normal;
-  overflow-wrap: break-word;
+.region-section.region-flat {
+  background: #e4f1fb !important;
+  border-radius: 4px;
+  box-shadow: none !important;
+}
+.rapport-table th.region-section.region-flat {
+  background: #cbe4f6 !important;
+}
+
+.skada-cell .skada-hierarki {
+  color: #222 !important;
+  font-weight: 400;
+}
+
+.rapport-stats {
+  width: 100%;
+  margin-bottom: 1.2rem;
+  font-size: 1.07rem;
   text-align: left;
+  line-height: 1.7;
+  padding-left: 0.4rem;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 600px;
 }
 
-.centered-cell {
-  text-align: center !important;
-  justify-content: center;
-  align-items: center;
-}
-
-.skada-cell {
-  text-align: center;
-  font-size: 1.07em;
-  background: #f5fbff;
-}
-
-.skada-hierarki {
+.rapport-filter {
+  margin: 2.3rem 0 2.3rem 0;
+  font-size: 1.12rem;
   display: flex;
-  flex-direction: row;
   align-items: center;
+  gap: 2.2rem;
   justify-content: center;
-  gap: 0.3em;
-  font-size: 1em;
-  color: #234d6b;
-}
-.skada-arrow {
-  color: #b0b4b8;
-  font-size: 1.17em;
+  font-weight: 600;
 }
 
-.cell-dash {
-  color: #b0b4b8;
-  font-size: 1.12em;
+.rapport-filter label {
+  margin-right: 0.5rem;
 }
 
-.incheckare-cell {
-  text-align: left;
-}
-
-.datum-klocka {
-  color: #2a3f57;
-  font-size: 0.93em;
-}
-
-.media-thumb {
-  width: 33px;
-  height: 33px;
-  object-fit: contain;
+.rapport-filter select {
+  font-size: 1rem;
+  padding: 0.35rem 0.7rem;
   border-radius: 7px;
   border: 1px solid #b0b4b8;
-  background: #f8fafc;
+  background: #fff;
+  color: var(--foreground);
+  margin-left: 0.7rem;
 }
 
 .rapport-search-row {
@@ -136,780 +336,5 @@ body {
   border: 1.5px solid #b0b4b8;
   background: #fff;
   color: #1f2937;
-}
-
-.rapport-search-btn,
-.rapport-reset-btn {
-  background: #005A9C;
-  color: #fff;
-  border-radius: 8px;
-  border: none;
-  padding: 0.46em 1.2em;
-  font-weight: 600;
-  font-size: 1em;
-  cursor: pointer;
-  transition: background 0.18s;
-}
-
-.rapport-search-btn:disabled {
-  background: #b0b4b8;
-  color: #fff;
-  cursor: not-allowed;
-}
-
-.rapport-reset-btn {
-  background: #b0b4b8;
-  color: #fff;
-}
-
-.rapport-search-active {
-  margin-bottom: 1.1rem;
-  text-align: center;
-}
-
-.search-regnr-big {
-  font-size: 2.1em;
-  font-weight: bold;
-  color: #005A9C;
-  letter-spacing: 0.08em;
-}
-
-.search-status {
-  font-size: 1.23em;
-  color: #b0b4b8;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-.background-img {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: -1;
-  background: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif') center center/cover no-repeat;
-  opacity: 0.18;
-  pointer-events: none;
-}
-
-.rapport-main {
-  min-height: 100vh;
-  background: var(--background);
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* === ÄNDRING: Från 'center' till 'flex-start' === */
-  justify-content: flex-start;
-}
-
-.rapport-center-content {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.rapport-logo-row {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  margin-top: 42px;
-  margin-bottom: 22px;
-}
-
-.rapport-logo-centered {
-  width: 210px;
-  max-width: 85vw;
-  height: auto;
-  display: block;
-  z-index: 10;
-}
-
-.rapport-card {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  text-align: center;
-  padding: 2.5rem 2rem 2.2rem 2rem;
-  background: #f3f4f6;
-  border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.rapport-title {
-  font-size: 2.1rem;
-  font-weight: 700;
-  margin: 0 0 1.3rem 0;
-  color: var(--foreground);
-  text-align: center;
-}
-
-.rapport-divider {
-  width: 240px;
-  height: 0;
-  border-bottom: 3px solid #b0b4b8;
-  margin: 0 auto 2rem auto;
-  border-radius: 2px;
-}
-/* Rapportkortet högre upp på sidan */
-.rapport-center-content {
-  margin-top: 26px;
-}
-
-/* Summering under Rapport & Statistik: vänsterställd, större radavstånd */
-.rapport-stats {
-  width: 100%;
-  margin-bottom: 1.2rem;
-  font-size: 1.07rem;
-  text-align: left;
-  line-height: 1.7;
-  padding-left: 0.4rem;
-}
-
-/* "Vald period" med luft ovanför och under, större font */
-.rapport-filter {
-  margin: 2.3rem 0 2.3rem 0;
-  font-size: 1.12rem;
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  justify-content: flex-start;
-  font-weight: 600;
-}
-
-.rapport-filter select {
-  font-size: 1rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 7px;
-  border: 1px solid #b0b4b8;
-  background: #fff;
-  color: var(--foreground);
-  margin-left: 0.7rem;
-}
-
-/* Sökruta: alla bokstäver blir versaler */
-.rapport-search-input {
   text-transform: uppercase;
-}
-
-/* Reg.nr: fet, men INTE större än tabelltext */
-.regnr-col {
-  font-weight: bold;
-  background: #f7f7fa;
-  text-align: left;
-  border-left: 3px solid #b0b4b8;
-  font-size: 1em; /* Samma som övriga celler */
-}
-
-/* Tabellrubriker */
-.rapport-table th {
-  font-weight: 700;
-  background: #f8fafc;
-  text-align: center;
-  letter-spacing: 0.04em;
-  font-size: 1em;
-}
-.rapport-table th.kommentar-col {
-  text-align: left;
-}
-.rapport-table th.centered-cell {
-  text-align: center;
-}
-
-/* Region/Ort/Station: ljusblå bakgrund och subtil skugga på cellerna i raderna */
-.region-section {
-  background: #eaf4fd;
-  border-radius: 8px 0 0 8px;
-  text-align: center;
-  box-shadow: 0 2px 9px 0 #eaf4fd99;
-}
-.rapport-table th.region-section {
-  background: #eaf4fd;
-  box-shadow: none;
-}
-
-/* Övriga justeringar */
-.rapport-table th:nth-child(2) {
-  /* Ny/gammal */
-  text-transform: capitalize;
-}
-.rapport-table th:nth-child(9) {
-  /* Anteckning */
-  text-transform: capitalize;
-}
-/* Rapportkortet högre upp på sidan */
-.rapport-center-content {
-  margin-top: 26px;
-}
-
-/* Sammanfattning - centrera i sektionen, men vänsterställ texten */
-.rapport-stats {
-  width: 100%;
-  margin-bottom: 1.2rem;
-  font-size: 1.07rem;
-  text-align: left;
-  line-height: 1.7;
-  padding-left: 0.4rem;
-  margin-left: auto;
-  margin-right: auto;
-  max-width: 600px;
-}
-
-/* Vald period och plats - luft och bredvid varandra */
-.rapport-filter {
-  margin: 2.3rem 0 2.3rem 0;
-  font-size: 1.12rem;
-  display: flex;
-  align-items: center;
-  gap: 2.2rem;
-  justify-content: center;
-  font-weight: 600;
-}
-
-.rapport-filter label {
-  margin-right: 0.5rem;
-}
-
-.rapport-filter select {
-  font-size: 1rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 7px;
-  border: 1px solid #b0b4b8;
-  background: #fff;
-  color: var(--foreground);
-  margin-left: 0.7rem;
-}
-
-/* Sökruta: alla bokstäver blir versaler */
-.rapport-search-input {
-  text-transform: uppercase;
-}
-
-/* Reg.nr: fet, men INTE större än tabelltext */
-.regnr-col {
-  font-weight: bold;
-  background: #f7f7fa;
-  text-align: left;
-  border-left: 3px solid #b0b4b8;
-  font-size: 1em; /* Samma som övriga celler */
-}
-
-/* Tabellrubriker */
-.rapport-table th {
-  font-weight: 700;
-  background: #f8fafc;
-  text-align: center;
-  letter-spacing: 0.04em;
-  font-size: 1em;
-}
-.rapport-table th.kommentar-col {
-  text-align: left;
-}
-.rapport-table th.centered-cell {
-  text-align: center;
-}
-
-/* Datumkolumn tillräckligt bred */
-.rapport-table th.datum-col,
-.rapport-table td.datum-col {
-  min-width: 120px;
-  white-space: nowrap;
-}
-
-/* Region/Ort/Station: ljusblå bakgrund och tydlig skugga */
-.region-section {
-  background: #eaf4fd;
-  border-radius: 8px 0 0 8px;
-  text-align: center;
-  box-shadow: 0 4px 16px 0 #eaf4fdcc;
-}
-.rapport-table th.region-section {
-  background: #eaf4fd;
-  box-shadow: none;
-}
-
-/* Datum-klocka */
-.datum-klocka {
-  color: #2a3f57;
-  font-size: 0.93em;
-  margin-top: 2px;
-}
-:root {
-  --background: #f8fafc;
-  --foreground: #1f2937;
-  --card-bg: #f3f4f6;
-  --main-blue: #005A9C;
-  --main-green: #16a34a;
-  --main-border: #b0b4b8;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #f8fafc;
-    --foreground: #1f2937;
-    --card-bg: #eeeeee;
-  }
-}
-
-.welcome-main {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--background);
-  position: relative;
-}
-
-.main-logo {
-  width: 330px;
-  height: auto;
-  margin: 70px auto 0 auto;
-  display: block;
-  z-index: 2;
-}
-
-.welcome-card {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 440px;
-  margin: 0 auto;
-  margin-top: 110px;
-  text-align: center;
-  padding: 2.4rem 2rem 2.2rem 2rem;
-  background: var(--card-bg);
-  border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.welcome-title {
-  font-size: 2.3rem;
-  font-weight: 700;
-  margin: 0 0 2.1rem 0;
-  color: var(--foreground);
-}
-
-.btn-group {
-  display: flex;
-  gap: 1.2rem;
-  justify-content: center;
-  margin-bottom: 2.1rem;
-}
-
-.btn {
-  min-width: 190px;
-  height: 64px;
-  padding: 0;
-  border: none;
-  border-radius: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  font-size: 1.09rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-  margin-bottom: 0;
-  background: var(--main-blue);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.btn.incheckning {
-  background: var(--main-blue);
-  color: #fff;
-}
-.btn.incheckning:hover {
-  background: #003a6f;
-}
-
-.divider-wrap {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.divider {
-  width: 50%;
-  border: none;
-  border-top: 3px solid var(--main-border);
-  margin: 0.8rem 0 1.8rem 0;
-}
-
-.report-section {
-  margin-top: 0.2rem;
-}
-
-.btn.report-btn {
-  background: var(--main-green);
-  color: #fff;
-  font-size: 1.09rem;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  min-width: 190px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn.report-btn:hover {
-  background: #0d7a2b;
-}
-
-.copyright-footer {
-  width: 100vw;
-  text-align: center;
-  font-size: 0.95rem;
-  color: #777;
-  padding: 30px 0 16px 0;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  background: none;
-  z-index: 10;
-  letter-spacing: 0.5px;
-}
-.welcome-main {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  background: var(--background);
-  position: relative;
-}
-
-.main-logo {
-  width: 330px;
-  height: auto;
-  margin: 70px auto 0 auto;
-  display: block;
-  z-index: 2;
-}
-
-.welcome-card {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 440px;
-  margin: 0 auto;
-  margin-top: 110px;
-  text-align: center;
-  padding: 2.8rem 2rem 2.5rem 2rem;
-  background: var(--card-bg, #f3f4f6);
-  border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.welcome-title {
-  font-size: 2.3rem;
-  font-weight: 700;
-  margin: 0 0 2.1rem 0;
-  color: var(--foreground);
-}
-
-.btn-group {
-  display: flex;
-  gap: 1.2rem;
-  justify-content: center;
-  margin-bottom: 2.1rem;
-}
-
-.btn {
-  min-width: 190px;
-  height: 64px;
-  padding: 0;
-  border: none;
-  border-radius: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  font-size: 1.09rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-  margin-bottom: 0;
-  background: var(--main-blue, #005A9C);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
-
-.btn.incheckning {
-  background: var(--main-blue, #005A9C);
-  color: #fff;
-}
-.btn.incheckning:hover {
-  background: #003a6f;
-}
-
-.divider-wrap {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.divider {
-  width: 50%;
-  border: none;
-  border-top: 3px solid var(--main-border, #b0b4b8);
-  margin: 0.8rem 0 1.8rem 0;
-}
-
-.report-section {
-  margin-top: 0.2rem;
-}
-
-.btn.report-btn {
-  background: var(--main-green, #16a34a);
-  color: #fff;
-  font-size: 1.09rem;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  min-width: 190px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn.report-btn:hover {
-  background: #0d7a2b;
-}
-
-.copyright-footer {
-  width: 100vw;
-  text-align: center;
-  font-size: 0.95rem;
-  color: #777;
-  padding: 30px 0 16px 0;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  background: none;
-  z-index: 10;
-  letter-spacing: 0.5px;
-}
-.login-bg {
-  min-height: 100vh;
-  width: 100vw;
-  background: var(--background, #f8fafc);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.login-card {
-  background: #f3f4f6;
-  border-radius: 18px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-  padding: 2.4rem 2.4rem 2rem 2.4rem;
-  max-width: 360px;
-  width: 100%;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.login-title {
-  font-size: 2.1rem;
-  font-weight: 700;
-  color: var(--foreground, #1f2937);
-  margin-bottom: 2.1rem;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.3rem;
-  width: 100%;
-}
-
-.login-input {
-  font-size: 1.12rem;
-  border: 1.5px solid #b0b4b8;
-  border-radius: 9px;
-  padding: 1.05rem 1.1rem;
-  background: #fff;
-  color: #1f2937;
-  outline: none;
-  margin-bottom: 0.5rem;
-}
-
-.login-btn {
-  font-size: 1.1rem;
-  font-weight: 600;
-  padding: 1rem 0;
-  border-radius: 9px;
-  border: none;
-  background: #005A9C;
-  color: #fff;
-  cursor: pointer;
-  transition: background 0.16s;
-  margin-bottom: 0.7rem;
-}
-
-.login-btn:hover {
-  background: #003a6f;
-}
-
-.login-msg {
-  font-size: 1rem;
-  margin-top: 1.2rem;
-  color: #005A9C;
-}
-.login-msg-wrap {
-  margin-top: 2.1rem;
-}
-
-.login-thanks {
-  font-size: 1.4rem;
-  font-weight: 600;
-  color: #005A9C;
-  margin-bottom: 0.8rem;
-  margin-top: 0;
-}
-
-.login-msg {
-  font-size: 1rem;
-  margin-bottom: 0.7rem;
-  color: #005A9C;
-}
-
-.login-close-tab {
-  font-size: 0.99rem;
-  color: #3b3b3b;
-  opacity: 0.85;
-  margin-bottom: 0.2rem;
-}
-.rapport-stats-centered {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-left: auto;
-  margin-right: auto;
-  max-width: 600px;
-  text-align: left;
-}
-
-.rapport-filter {
-  margin: 2.3rem 0 2.3rem 0;
-  font-size: 1.12rem;
-  display: flex;
-  align-items: center;
-  gap: 2.2rem;
-  justify-content: center;
-  font-weight: 600;
-}
-
-.rapport-filter label {
-  margin-right: 0.5rem;
-}
-
-.rapport-filter select {
-  font-size: 1rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 7px;
-  border: 1px solid #b0b4b8;
-  background: #fff;
-  color: var(--foreground);
-  margin-left: 0.7rem;
-}
-
-.rapport-search-input {
-  text-transform: uppercase;
-}
-
-/* Datumkolumn tillräckligt bred */
-.rapport-table th.datum-col,
-.rapport-table td.datum-col {
-  min-width: 120px;
-  white-space: nowrap;
-}
-
-/* Region/Ort/Station: ljusblå bakgrund och tydlig skugga */
-.region-section.region-shadow {
-  box-shadow: 0 4px 28px 0 #eaf4fd;
-}
-
-/* Resten av rapport-tabellen och design finns redan enligt tidigare kod */
-.rapport-table th,
-.rapport-table td {
-  font-size: 1em; /* Reg.nr exakt som rubriker */
-}
-
-.regnr-col {
-  font-weight: 500;
-  background: #f7f7fa;
-  text-align: left;
-  border-left: 3px solid #b0b4b8;
-}
-
-.region-section.region-shadow {
-  background: #d2e7fa !important;
-  box-shadow: 0 2px 12px 0 #99c2e3 !important;
-  border-radius: 4px;
-}
-
-.skada-cell .skada-hierarki {
-  color: #222 !important; /* Svart text, ingen länkfärg */
-  font-weight: 400;
-}
-
-.rapport-table th {
-  font-weight: 700;
-  background: #f8fafc;
-  text-align: center;
-  letter-spacing: 0.04em;
-  font-size: 1em;
-}
-.rapport-table th.kommentar-col {
-  text-align: left;
-}
-.rapport-table th.centered-cell {
-  text-align: center;
-}
-
-/* Datumkolumn tillräckligt bred */
-.rapport-table th.datum-col,
-.rapport-table td.datum-col {
-  min-width: 120px;
-  white-space: nowrap;
-}
-
-.datum-klocka {
-  color: #2a3f57;
-  font-size: 0.93em;
-  margin-top: 2px;
-}
-
-/* Resten av rapport-tabellen och design finns redan enligt tidigare kod */
-.region-section.region-flat {
-  background: #e4f1fb !important;
-  border-radius: 4px;
-  box-shadow: none !important;
-}
-
-.rapport-table th.region-section.region-flat {
-  background: #cbe4f6 !important;
 }
