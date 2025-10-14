@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import MediaModal from "@/components/MediaModal";
 
 // ==============================
-// Typer och konstanter (Oförändrad)
+// Typer och konstanter
 // ==============================
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 
@@ -56,7 +56,7 @@ const platsAlternativ = stationer.map(st => {
 });
 
 // ==============================
-// Hjälpfunktioner (Oförändrad)
+// Hjälpfunktioner
 // ==============================
 
 function getDamageStatus(row: DamageWithVehicle) {
@@ -101,7 +101,7 @@ const mapOrtToRegion = (ort: string): string => {
 };
 
 // ==============================
-// Huvudkomponent (Oförändrad)
+// Huvudkomponent
 // ==============================
 
 export default function RapportPage() {
@@ -256,188 +256,115 @@ export default function RapportPage() {
 
   return (
     <main className="rapport-main">
-      <div className="background-img" />
-      <div className="rapport-content-wrapper">
-        <div className="rapport-logo-row">
-          <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
+      {/* ÄNDRING: Lokal bakgrunds-div och inline-stilar borttagna för att förlita sig på globals.css */}
+      <div className="rapport-logo-row">
+        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
+      </div>
+      <div className="rapport-card">
+        <h1 className="rapport-title">Rapport & Statistik</h1>
+        <div className="rapport-divider" />
+        
+        <div className="rapport-stats rapport-stats-centered">
+          <div><strong>Totalt incheckningar (all tid):</strong> {totIncheckningar}</div>
+          <div><strong>Totalt skador (all tid):</strong> {totSkador}</div>
+          <div><strong>Skadeprocent (all tid):</strong> {skadeprocent}%</div>
+          <div><strong>Senaste incheckning:</strong> {senasteIncheckning}</div>
+          <hr style={{width: '50%', margin: '1rem auto', border: 'none', borderTop: '1px solid #ddd'}}/>
+          <div><strong>Antal träffar i listan:</strong> {filteredRows.length}</div>
         </div>
-        <div className="rapport-card">
-          <h1 className="rapport-title">Rapport & Statistik</h1>
-          <div className="rapport-divider" />
-          
-          <div className="rapport-stats">
-            <div><strong>Totalt incheckningar (all tid):</strong> {totIncheckningar}</div>
-            <div><strong>Totalt skador (all tid):</strong> {totSkador}</div>
-            <div><strong>Skadeprocent (all tid):</strong> {skadeprocent}%</div>
-            <div><strong>Senaste incheckning:</strong> {senasteIncheckning}</div>
-            <hr style={{width: '50%', margin: '1rem auto', border: 'none', borderTop: '1px solid #ddd'}}/>
-            <div><strong>Antal träffar i listan:</strong> {filteredRows.length}</div>
-          </div>
 
-          <div className="rapport-filter">
-            <div>
-              <label htmlFor="period-select">Period:</label>
-              <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)}>
-                {periodAlternativ.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="plats-select">Plats:</label>
-              <select id="plats-select" value={plats} onChange={e => setPlats(e.target.value)}>
-                {platsAlternativ.map(p => (<option key={p} value={p}>{p}</option>))}
-              </select>
-            </div>
+        <div className="rapport-filter">
+          <div>
+            <label htmlFor="period-select">Period:</label>
+            <select id="period-select" value={period} onChange={e => setPeriod(e.target.value)}>
+              {periodAlternativ.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+            </select>
           </div>
+          <div>
+            <label htmlFor="plats-select">Plats:</label>
+            <select id="plats-select" value={plats} onChange={e => setPlats(e.target.value)}>
+              {platsAlternativ.map(p => (<option key={p} value={p}>{p}</option>))}
+            </select>
+          </div>
+        </div>
 
-          <div className="rapport-search-row" style={{position: "relative"}}>
-            <input
-              type="text" placeholder="SÖK REG.NR" value={searchRegnr}
-              onChange={e => setSearchRegnr(e.target.value.toUpperCase())} className="rapport-search-input" autoComplete="off"
-            />
-            {autocomplete.length > 0 && (
-              <ul className="autocomplete-list">
-                {autocomplete.map(regnr => (
-                  <li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }}>
-                    {regnr}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <button className="rapport-search-btn" onClick={() => setActiveRegnr(searchRegnr.trim())} disabled={!searchRegnr.trim()}>Sök</button>
-            {activeRegnr && (<button className="rapport-reset-btn" onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}>Rensa</button>)}
-          </div>
-          
-          {loading ? (<div>Hämtar data...</div>) 
-           : error ? (<div style={{ color: "red" }}>{error}</div>) 
-           : (
-            <div className="rapport-table-wrap">
-              <table className="rapport-table">
-                <thead>
-                  <tr>
-                    <th onClick={() => handleSort("regnr")}>Regnr<SortArrow column="regnr" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("brand")}>Bilmodell<SortArrow column="brand" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("note_internal")}>Incheckad/BUHS<SortArrow column="note_internal" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("damage_date")} className="datum-column">Datum<SortArrow column="damage_date" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("region")}>Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("ort")}>Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("station_namn")}>Station<SortArrow column="station_namn" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("damage_type")}>Skada<SortArrow column="damage_type" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th onClick={() => handleSort("notering")}>Anteckning<SortArrow column="notering" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                    <th>Bild/video</th>
-                    <th onClick={() => handleSort("inchecker_name")}>Godkänd av<SortArrow column="inchecker_name" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRows.length === 0 ? (
-                    <tr><td colSpan={11} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller valda filtret.</td></tr>
-                  ) : (
-                    filteredRows.map((row) => (
-                      <tr key={row.id}>
-                        <td><span className="regnr-link" onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
-                        <td>{row.brand || ""} {row.model || ""}</td>
-                        <td>{getDamageStatus(row)}</td>
-                        <td className="datum-column">
-                          {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
-                          <div className="time-display"><span>{formatTime(row)}</span></div>
-                        </td>
-                        <td>{row.region}</td>
-                        <td>{row.ort || "--"}</td>
-                        <td>{row.station_namn || "--"}</td>
-                        <td>{row.damage_type || row.damage_type_raw || "--"}</td>
-                        <td>{row.notering || "--"}</td>
-                        <td>
-                          {row.media_url ? (
-                            <Image src={row.media_url} width={72} height={72} className="thumbnail-image"
-                              onClick={() => openMediaModalForRow(row)} alt="Tumnagel" 
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}/>
-                          ) : ("--")}
-                        </td>
-                        <td>{row.inchecker_name || row.godkandAv || "--"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+        <div className="rapport-search-row" style={{position: "relative"}}>
+          <input
+            type="text" placeholder="SÖK REG.NR" value={searchRegnr}
+            onChange={e => setSearchRegnr(e.target.value.toUpperCase())} className="rapport-search-input" autoComplete="off"
+          />
+          {autocomplete.length > 0 && (
+            <ul className="autocomplete-list" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #ddd', zIndex: 10, listStyle: 'none', padding: '4px', margin: 0, textAlign: 'left', borderRadius: '4px' }}>
+              {autocomplete.map(regnr => (
+                <li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }} style={{ padding: '6px', cursor: 'pointer' }}>
+                  {regnr}
+                </li>
+              ))}
+            </ul>
           )}
+          <button className="rapport-search-btn" onClick={() => setActiveRegnr(searchRegnr.trim())} disabled={!searchRegnr.trim()}>Sök</button>
+          {activeRegnr && (<button className="rapport-reset-btn" onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}>Rensa</button>)}
         </div>
+        
+        {loading ? (<div>Hämtar data...</div>) 
+         : error ? (<div style={{ color: "red" }}>{error}</div>) 
+         : (
+          <div className="rapport-table-wrap">
+            <table className="rapport-table">
+              <thead>
+                <tr>
+                  <th onClick={() => handleSort("regnr")}>Regnr<SortArrow column="regnr" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("brand")}>Bilmodell<SortArrow column="brand" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("note_internal")}>Incheckad/BUHS<SortArrow column="note_internal" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("damage_date")} className="datum-col">Datum<SortArrow column="damage_date" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("region")}>Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("ort")}>Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("station_namn")}>Station<SortArrow column="station_namn" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("damage_type")}>Skada<SortArrow column="damage_type" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("notering")}>Anteckning<SortArrow column="notering" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th>Bild/video</th>
+                  <th onClick={() => handleSort("inchecker_name")}>Godkänd av<SortArrow column="inchecker_name" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 ? (
+                  <tr><td colSpan={11} style={{ textAlign: "center" }}>Inga skador för det reg.nr eller valda filtret.</td></tr>
+                ) : (
+                  filteredRows.map((row) => (
+                    <tr key={row.id}>
+                      <td className="regnr-col"><span className="regnr-link" style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
+                      <td>{row.brand || ""} {row.model || ""}</td>
+                      <td>{getDamageStatus(row)}</td>
+                      <td className="datum-col">
+                        {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
+                        <div className="datum-klocka"><span>{formatTime(row)}</span></div>
+                      </td>
+                      <td className="region-section region-flat">{row.region}</td>
+                      <td>{row.ort || "--"}</td>
+                      <td>{row.station_namn || "--"}</td>
+                      <td>{row.damage_type || row.damage_type_raw || "--"}</td>
+                      <td className="kommentar-col">{row.notering || "--"}</td>
+                      <td className="centered-cell">
+                        {row.media_url ? (
+                          <Image src={row.media_url} width={72} height={72} className="media-thumb"
+                             onClick={() => openMediaModalForRow(row)} alt="Tumnagel" 
+                             style={{ cursor: 'pointer', objectFit: 'cover' }}
+                             onError={(e) => { e.currentTarget.style.display = 'none'; }}/>
+                        ) : ("--")}
+                      </td>
+                      <td>{row.inchecker_name || row.godkandAv || "--"}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
       <footer className="copyright-footer">&copy; Albarone AB 2025 &mdash; All rights reserved</footer>
       <MediaModal open={modalOpen} onClose={() => setModalOpen(false)} media={modalMedia} title={modalTitle} currentIdx={modalIdx}
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
-      
-      {/* ÅTGÄRD: Endast CSS-ändringar för bakgrund och layout */}
-      <style jsx global>{`
-        body {
-          /* Tar bort den globala bakgrunden så att den lokala kan synas */
-          background: none !important;
-        }
-        .rapport-main {
-          min-height: 100vh;
-          width: 100%;
-          position: relative;
-        }
-        .background-img {
-          position: fixed;
-          inset: 0;
-          width: 100vw;
-          height: 100vh;
-          z-index: -1; /* Lägger sig längst bak */
-          background: url('/bakgrund.jpg') center center / cover no-repeat;
-          opacity: 0.18;
-        }
-        .rapport-content-wrapper {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          padding: 2rem 1rem 6rem 1rem; /* Luft uppe och nere */
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .rapport-logo-row { 
-          text-align: center;
-          margin-bottom: 1rem;
-        }
-        .rapport-logo-centered { width: 190px; height: auto; }
-        .rapport-card { 
-          width: 100%;
-          max-width: 1200px;
-          padding: 36px 28px 28px 28px;
-          border-radius: 18px;
-          box-shadow: 0 2px 32px rgba(0, 0, 0, 0.08);
-          background: rgba(255,255,255,0.94);
-        }
-        .rapport-title { font-size: 2.1rem; font-weight: 700; text-align: center; margin-bottom: 18px; }
-        .rapport-divider { height: 2px; background: #e5e7eb; margin: 0 auto 18px auto; width: 240px; }
-        .rapport-stats { text-align: center; margin-bottom: 20px; line-height: 1.6; }
-        .rapport-filter { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem 2rem; margin-bottom: 20px; align-items: center; }
-        .rapport-table-wrap { margin-top: 20px; width: 100%; overflow-x: auto; }
-        .rapport-table { width: 100%; border-collapse: collapse; }
-        .rapport-table th, .rapport-table td { border: 1px solid #e5e7eb; padding: 8px 12px; font-size: 0.95rem; text-align: left; vertical-align: middle; }
-        .rapport-table th { background: #f5f6fa; font-weight: 600; cursor: pointer; user-select: none; }
-        .rapport-table th:hover { background: #e9edf5; }
-        .datum-column { min-width: 110px; white-space: nowrap; }
-        .rapport-table tr:nth-child(even) { background: #fafbfc; }
-        .rapport-search-row { margin-top: 22px; margin-bottom: 12px; display: flex; justify-content: center; gap: 8px; }
-        .rapport-search-input { padding: 6px 10px; font-size: 1rem; text-transform: uppercase; }
-        .rapport-search-btn, .rapport-reset-btn { padding: 6px 12px; font-size: 1rem; border: none; color: white; cursor: pointer; border-radius: 4px; }
-        .rapport-search-btn { background: #2a7ae4; }
-        .rapport-reset-btn { background: #6c757d; }
-        .autocomplete-list { position: absolute; top: 100%; background: #fff; border: 1px solid #ddd; z-index: 10; list-style: none; padding: 4px; margin: 0; text-align: left; border-radius: 4px; min-width: 180px; }
-        .autocomplete-list li { padding: 6px; cursor: pointer; }
-        .autocomplete-list li:hover { background: #f0f0f0; }
-        .regnr-link { text-decoration: underline; cursor: pointer; color: #005A9C; font-weight: 500; }
-        .time-display { font-size: 0.9em; color: #555; }
-        .thumbnail-image { cursor: pointer; border-radius: 7px; border: 1.5px solid #b0b4b8; object-fit: cover; margin: 0 auto; display: block; }
-        .thumbnail-image:hover { border-color: #005A9C; }
-        .copyright-footer { 
-          position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; 
-          padding: 10px; background: white; 
-          font-size: 0.9rem; z-index: 100;
-          border-top: 1px solid #e5e7eb;
-        }
-      `}</style>
     </main>
   );
 }
