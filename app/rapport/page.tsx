@@ -256,7 +256,6 @@ export default function RapportPage() {
 
   return (
     <main className="rapport-main">
-      {/* ÄNDRING: Lokal bakgrunds-div och inline-stilar borttagna för att förlita sig på globals.css */}
       <div className="rapport-logo-row">
         <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="rapport-logo-centered" />
       </div>
@@ -365,6 +364,8 @@ export default function RapportPage() {
       <MediaModal open={modalOpen} onClose={() => setModalOpen(false)} media={modalMedia} title={modalTitle} currentIdx={modalIdx}
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
+        
+      {/* ALL LOKAL CSS HAR NU TAGITS BORT FÖR ATT FÖRLITA SIG PÅ GLOBALS.CSS */}
     </main>
   );
 }
