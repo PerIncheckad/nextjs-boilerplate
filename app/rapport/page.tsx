@@ -89,13 +89,16 @@ function formatTime(row: DamageWithVehicle) {
     }
 }
 
-// ÅTGÄRD: Korrekt logik för att mappa ort till region, baserat på din feedback.
+// ÅTGÄRD: Korrekt logik för att mappa ort till region, baserat på din explicita instruktion.
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
-    // @ts-ignore
-    const stationData = stationer.find(st => st.namn.includes(ort));
-    // @ts-ignore
-    return stationData?.region || "--";
+    const ortLower = ort.toLowerCase();
+    
+    if (['halmstad', 'varberg', 'falkenberg'].includes(ortLower)) return 'Norr';
+    if (['helsingborg', 'ängelholm'].includes(ortLower)) return 'Mitt';
+    if (['malmö', 'trelleborg', 'lund'].includes(ortLower)) return 'Syd';
+    
+    return "--"; // Fallback om orten inte finns i listorna
 };
 
 // ==============================
