@@ -367,35 +367,33 @@ export default function RapportPage() {
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
       
-      {/* ÅTGÄRD: CSS för bakgrund, logotyp och layout */}
+      {/* ÅTGÄRD: Endast CSS-ändringar för bakgrund och layout */}
       <style jsx global>{`
         body {
-          /* ÅTGÄRD: Använder !important för att tvinga fram rätt bakgrundsfärg. */
-          background-color: #f8fafc !important;
+          /* Tar bort den globala bakgrunden så att den lokala kan synas */
+          background: none !important;
+        }
+        .rapport-main {
+          min-height: 100vh;
+          width: 100%;
+          position: relative;
         }
         .background-img {
           position: fixed;
           inset: 0;
           width: 100vw;
           height: 100vh;
-          z-index: -1;
+          z-index: -1; /* Lägger sig längst bak */
           background: url('/bakgrund.jpg') center center / cover no-repeat;
           opacity: 0.18;
-          pointer-events: none;
         }
-        .rapport-main {
+        .rapport-content-wrapper {
           display: flex;
           flex-direction: column;
           align-items: center;
-          min-height: 100vh;
-          padding: 0 1rem 60px 1rem; /* 60px för sidfotens höjd */
-          box-sizing: border-box;
-        }
-        .rapport-content-wrapper {
+          padding: 2rem 1rem 6rem 1rem; /* Luft uppe och nere */
           width: 100%;
-          max-width: 1200px;
-          margin-top: 2rem;
-          margin-bottom: 2rem;
+          box-sizing: border-box;
         }
         .rapport-logo-row { 
           text-align: center;
@@ -404,6 +402,7 @@ export default function RapportPage() {
         .rapport-logo-centered { width: 190px; height: auto; }
         .rapport-card { 
           width: 100%;
+          max-width: 1200px;
           padding: 36px 28px 28px 28px;
           border-radius: 18px;
           box-shadow: 0 2px 32px rgba(0, 0, 0, 0.08);
