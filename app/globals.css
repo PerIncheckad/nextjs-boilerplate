@@ -5,6 +5,8 @@ body {
   margin: 0;
   /* Säkerställer att body kan innehålla positionerade element korrekt */
   position: relative; 
+  /* Lägger till padding i botten så att sidfoten inte täcker innehåll */
+  padding-bottom: 50px; 
 }
 
 .rapport-table-wrap {
@@ -187,7 +189,6 @@ body {
   inset: 0;
   width: 100vw;
   height: 100vh;
-  /* ÄNDRING: z-index: -1 ser till att bilden alltid ligger längst bak. */
   z-index: -1; 
   background: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif') center center/cover no-repeat;
   opacity: 0.18;
@@ -196,14 +197,12 @@ body {
 
 .rapport-main {
   min-height: 100vh;
-  /* ÄNDRING: Bakgrunden borttagen för att låta den globala .background-img synas */
-  /* background: var(--background); */
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* Justerad för att innehåll ska börja från toppen */
-  padding: 2rem 1rem; /* Generell luft för sidan */
+  justify-content: flex-start;
+  padding: 2rem 1rem;
   box-sizing: border-box;
 }
 
@@ -212,11 +211,9 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* Justerad för att innehåll ska börja från toppen */
-  /* ÄNDRING: Bakgrunden borttagen för att låta den globala .background-img synas */
-  /* background: var(--background); */
+  justify-content: flex-start;
   position: relative;
-  padding: 2rem 1rem; /* Generell luft för sidan */
+  padding: 2rem 1rem;
   box-sizing: border-box;
 }
 
@@ -258,8 +255,8 @@ body {
   margin: 0 auto;
   text-align: center;
   padding: 2.5rem 2rem 2.2rem 2rem;
-  /* ÄNDRING: Lätt genomskinlig vit bakgrund för att ge "frostat glas"-effekt */
-  background: rgba(243, 244, 246, 0.94); 
+  /* ÄNDRING: Genomskinlig bakgrund för "frostat glas"-effekt */
+  background: rgba(255, 255, 255, 0.94);
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.10);
   display: flex;
@@ -303,7 +300,7 @@ body {
   margin: 2.3rem 0 2.3rem 0;
   font-size: 1.12rem;
   display: flex;
-  flex-wrap: wrap; /* Tillåter radbrytning på små skärmar */
+  flex-wrap: wrap; 
   align-items: center;
   gap: 1.5rem 2.2rem;
   justify-content: center;
@@ -333,7 +330,7 @@ body {
   background: #f7f7fa;
   text-align: left;
   border-left: 3px solid #b0b4b8;
-  font-size: 1em; /* Samma som övriga celler */
+  font-size: 1em; 
 }
 
 .rapport-table th {
@@ -407,8 +404,8 @@ body {
   margin-top: 110px;
   text-align: center;
   padding: 2.8rem 2rem 2.5rem 2rem;
-  /* ÄNDRING: Lätt genomskinlig vit bakgrund för att ge "frostat glas"-effekt */
-  background: rgba(243, 244, 246, 0.94);
+  /* ÄNDRING: Genomskinlig bakgrund för "frostat glas"-effekt */
+  background: rgba(255, 255, 255, 0.94);
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.10);
   display: flex;
@@ -495,16 +492,17 @@ body {
 }
 
 .copyright-footer {
+  /* ÄNDRING: Återställd till 'fixed' för att alltid vara i botten. */
+  position: fixed;
+  bottom: 0;
+  left: 0;
   width: 100%;
   text-align: center;
-  font-size: 0.95rem;
-  color: #777;
-  padding: 16px 0;
-  /* ÄNDRING: Inte längre 'position: absolute/fixed' för att följa med sidans flöde */
-  margin-top: auto; /* Trycker ner fotern till botten av flex-containern */
-  background: rgba(255, 255, 255, 0.8); /* Lätt bakgrund för läsbarhet */
+  padding: 10px;
+  background: white;
+  font-size: 0.9rem;
+  z-index: 100;
   border-top: 1px solid #e5e7eb;
-  letter-spacing: 0.5px;
 }
 
 .login-bg {
@@ -595,5 +593,3 @@ body {
   opacity: 0.85;
   margin-bottom: 0.2rem;
 }
-
-/* Dubletter och onödiga regler har städats bort från botten av filen */
