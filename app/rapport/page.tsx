@@ -59,21 +59,24 @@ const platsAlternativ = stationer.map(st => {
 // Hjälpfunktioner
 // ==============================
 
-function getDamageStatus(row: DamageWithVehicle) {
-  if (
-    (row.note_internal && String(row.note_internal).toLowerCase().includes("buhs")) ||
-    (row.damage_type_raw && String(row.damage_type_raw).toLowerCase().includes("buhs"))
-  ) {
-    return "BUHS";
+// === ÄNDRING STARTAR HÄR ===
+/**
+ * Bestämmer statusen för en skada baserat på om den har processats
+ * via det nya incheckningsformuläret.
+ * @param row Skadeobjektet från databasen.
+ * @returns "Incheckad" om den är hanterad, annars "BUHS".
+ */
+function getDamageStatus(row: DamageWithVehicle): 'Incheckad' | 'BUHS' {
+  // Om antingen `inchecker_name` eller det äldre `godkandAv` har ett värde,
+  // betyder det att skadan har hanterats via det nya formuläret.
+  if (row.inchecker_name || row.godkandAv) {
+    return "Incheckad";
   }
-  if (row.saludatum) {
-    const d = new Date(row.saludatum);
-    const nu = new Date();
-    const diff = (nu.getTime() - d.getTime()) / (1000 * 3600 * 24);
-    return diff < 30 ? "Incheckad" : "Gammal";
-  }
-  return "Incheckad";
+
+  // I alla andra fall är det en befintlig skada från BUHS som ännu inte har inventerats.
+  return "BUHS";
 }
+// === ÄNDRING SLUTAR HÄR ===
 
 function formatTime(row: DamageWithVehicle) {
     const isBuhs = getDamageStatus(row) === "BUHS";
