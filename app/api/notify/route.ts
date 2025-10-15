@@ -267,9 +267,7 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const payload = fullRequestPayload.meta; 
 
-    console.log("MOTTAGEN PAYLOAD FÖR BEARBETNING:", JSON.stringify(payload, null, 2));
-
-    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [], carModel, incheckare } = payload;
+    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -291,30 +289,7 @@ export async function POST(request: Request) {
     
     Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
 
-    // === NYTT STEG: Skapa en rad i 'checkins'-tabellen ===
-    const { data: checkinData, error: checkinError } = await supabaseAdmin
-      .from('checkins')
-      .insert({
-        regnr: regnr,
-        car_model: carModel || null,
-        checkin_date: now.toISOString(),
-        ort: ort,
-        station: station,
-        inchecker_name: incheckare,
-        has_new_damage: nya_skador.length > 0,
-        notes: notering || null,
-      })
-      .select()
-      .single();
-
-    if (checkinError) {
-      console.error('Supabase DB error during CHECKIN INSERT:', checkinError);
-      // Fortsätt ändå för att försöka hantera skador, men logga felet
-    } else {
-      console.log('Successfully created checkin with ID:', checkinData.id);
-    }
-    // ========================================================
-
+    // Databashantering
     const dbPromises = [];
 
     const getFirstPhotoUrl = (damage: any): string | null => {
@@ -325,11 +300,15 @@ export async function POST(request: Request) {
         return null;
     };
 
-    // 1. Hantera NYA skador
+    // Bearbeta alla skador som ska sparas till 'damages'-tabellen
+    const damagesToInsert = [];
+
+    // 1. Hantera NYA skador (skapa nya rader i 'damages')
     for (const damage of nya_skador) {
       const firstPhoto = getFirstPhotoUrl(damage);
-      const insertPayload = {
+      damagesToInsert.push({
         regnr: payload.regnr,
+        car_model: payload.carModel || null,
         damage_date: now.toISOString(),
         ort: payload.ort || null,
         station_namn: payload.station || null,
@@ -340,50 +319,42 @@ export async function POST(request: Request) {
         description: damage.text || null,
         media_url: firstPhoto,
         notering: payload.notering || null,
-        status: "complete",
-        checkin_id: checkinData?.id || null, // Koppla till den nya incheckningen
-      };
-      dbPromises.push(supabaseAdmin.from('damages').insert(insertPayload));
+        status: "complete", // Status för den nya skadan
+      });
     }
 
-    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador
+    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador (skapa nya rader i 'damages')
     for (const damage of dokumenterade_skador) {
-      if (!damage.db_id) {
-        console.error('Skipping update for damage because db_id is missing:', damage);
-        continue; 
-      }
-
       const firstPhoto = getFirstPhotoUrl(damage);
-      const updatePayload: { [key: string]: any } = {
-        inchecker_name: payload.incheckare || null,
-        updated_at: now.toISOString(),
-        notering: payload.notering || payload.notering,
-        damage_type: damage.userType || undefined,
-        car_part: damage.userCarPart || undefined,
-        position: damage.userPosition || undefined,
-        description: damage.userDescription || undefined,
-        checkin_id: checkinData?.id || null, // Koppla till den nya incheckningen
-      };
-
-      if (firstPhoto) {
-        updatePayload.media_url = firstPhoto;
-      }
+      // Kombinera den ursprungliga skadetexten med den nya informationen
+      const damageText = [damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean).join(' - ');
       
-      dbPromises.push(
-        supabaseAdmin.from('damages')
-          .update(updatePayload)
-          .eq('id', damage.db_id) 
-      );
+      damagesToInsert.push({
+        regnr: payload.regnr,
+        car_model: payload.carModel || null,
+        damage_date: now.toISOString(), // Använd incheckningsdatumet
+        ort: payload.ort || null,
+        station_namn: payload.station || null,
+        inchecker_name: payload.incheckare || null,
+        damage_type: damageText || damage.fullText || "Dokumenterad skada", // Använd den nya eller gamla texten
+        car_part: damage.userCarPart || null,
+        position: damage.userPosition || null,
+        description: damage.userDescription || damage.fullText, // Använd den nya kommentaren
+        media_url: firstPhoto,
+        notering: payload.notering || null,
+        status: "documented_existing", // En ny status för att visa att detta var en dokumentation
+      });
     }
 
-    const results = await Promise.all(dbPromises);
-    
-    results.forEach((result, index) => {
-      if (result.error) {
-        const failedOp = index < nya_skador.length ? `INSERT (nya_skador[${index}])` : `UPDATE (dokumenterade_skador[${index - nya_skador.length}])`;
-        console.error(`Supabase DB error during ${failedOp}:`, result.error);
+    // Kör alla databasoperationer samtidigt
+    if (damagesToInsert.length > 0) {
+      const { error } = await supabaseAdmin.from('damages').insert(damagesToInsert);
+      if (error) {
+        console.error('Supabase DB error during INSERT operation:', error);
+      } else {
+        console.log(`Successfully inserted ${damagesToInsert.length} damage records.`);
       }
-    });
+    }
 
     return NextResponse.json({ message: 'Notifications processed and database operations initiated.' });
 
