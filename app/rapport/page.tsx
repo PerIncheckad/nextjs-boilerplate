@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState, useMemo } from "react";
-// import Image from "next/image"; // === ÄNDRING: Tas bort då den inte längre används ===
 import stationer from '../../data/stationer.json';
 import { supabase } from "@/lib/supabase";
 import MediaModal from "@/components/MediaModal";
@@ -20,7 +19,7 @@ type DamageWithVehicle = {
   notering: string;
   inchecker_name?: string;
   godkandAv?: string;
-  photo_urls?: string[];
+  media_url?: string; // ÄNDRING: Bytt från photo_urls
   created_at: string;
   note_internal?: string;
   damage_type?: string;
@@ -102,7 +101,7 @@ export default function RapportPage() {
   const [activeRegnr, setActiveRegnr] = useState("");
   const [period, setPeriod] = useState("all");
   const [plats, setPlats] = useState(platsAlternativ[0]);
-  const [sortKey, setSortKey] = useState("damage_date");
+  const [sortKey, setSortKey] = useState("created_at"); // ÄNDRING: Sorterar på created_at som standard
   const [sortOrder, setSortOrder] = useState("desc");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMedia, setModalMedia] = useState<any[]>([]);
@@ -117,7 +116,7 @@ export default function RapportPage() {
         const { data: damagesData, error: damagesError } = await supabase
           .from("damages")
           .select('*')
-          .order("created_at", { ascending: false }); // Sorterar på created_at för att få senaste först
+          .order("created_at", { ascending: false });
         if (damagesError) throw damagesError;
 
         const { data: vehiclesData, error: vehiclesError } = await supabase
@@ -205,8 +204,11 @@ export default function RapportPage() {
   };
 
   const openMediaModalForRow = (row: DamageWithVehicle) => {
-    const mediaArr = (row.photo_urls || []).map(url => ({
-      url: url,
+    const mediaUrl = row.media_url;
+    if (!mediaUrl) return;
+
+    const mediaArr = [{
+      url: mediaUrl,
       type: "image",
       metadata: {
         date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
@@ -215,9 +217,7 @@ export default function RapportPage() {
         documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
         damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
       },
-    }));
-
-    if (mediaArr.length === 0) return;
+    }];
 
     setModalMedia(mediaArr);
     setModalTitle(`${row.regnr} - ${row.damage_type || row.damage_type_raw || "--"}`);
@@ -226,20 +226,18 @@ export default function RapportPage() {
   };
   
   const openMediaModalForRegnr = (regnr: string) => {
-    const skador = filteredRows.filter(row => row.regnr === regnr && row.photo_urls && row.photo_urls.length > 0);
-    const mediaArr = skador.flatMap(row => 
-        (row.photo_urls || []).map(url => ({
-            url: url,
-            type: "image",
-            metadata: {
-                date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
-                damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
-                note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
-                documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
-                damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
-            }
-        }))
-    );
+    const skador = filteredRows.filter(row => row.regnr === regnr && row.media_url);
+    const mediaArr = skador.map(row => ({
+      url: row.media_url!,
+      type: "image",
+      metadata: {
+        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
+        damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
+        note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
+        documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+        damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+      }
+    }));
     
     if (mediaArr.length === 0) return;
 
@@ -295,7 +293,7 @@ export default function RapportPage() {
             onChange={e => setSearchRegnr(e.target.value.toUpperCase())} className="rapport-search-input" autoComplete="off"
           />
           {autocomplete.length > 0 && (
-            <ul className="autocomplete-list" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #ddd', zIndex: 10, listStyle: 'none', padding: '4px', margin: 0, textAlign: 'left', borderRadius: '4px' }}>
+            <ul className="autocomplete-list" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #ddd', zIndex: 10, listStyle: 'none', padding: '4px'}}>
               {autocomplete.map(regnr => (
                 <li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }} style={{ padding: '6px', cursor: 'pointer' }}>
                   {regnr}
@@ -346,10 +344,9 @@ export default function RapportPage() {
                       <td>{row.damage_type || row.damage_type_raw || "--"}</td>
                       <td className="kommentar-col">{row.notering || "--"}</td>
                       <td className="centered-cell">
-                        {/* === ÄNDRING: Bytt till vanlig <img>-tagg === */}
-                        {row.photo_urls && row.photo_urls.length > 0 ? (
+                        {row.media_url ? (
                           <img 
-                            src={row.photo_urls[0]} 
+                            src={row.media_url} 
                             width={72} 
                             height={72} 
                             className="media-thumb"
