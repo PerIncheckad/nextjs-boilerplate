@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useMemo } from "react";
-import Image from "next/image";
+// import Image from "next/image"; // === ÄNDRING: Tas bort då den inte längre används ===
 import stationer from '../../data/stationer.json';
 import { supabase } from "@/lib/supabase";
 import MediaModal from "@/components/MediaModal";
@@ -20,7 +20,7 @@ type DamageWithVehicle = {
   notering: string;
   inchecker_name?: string;
   godkandAv?: string;
-  media_url?: string;
+  photo_urls?: string[];
   created_at: string;
   note_internal?: string;
   damage_type?: string;
@@ -29,7 +29,7 @@ type DamageWithVehicle = {
   station_id?: string;
   brand?: string;
   model?: string;
-  region?: string; // Manually added
+  region?: string;
 };
 
 const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: string, sortOrder: string }) => {
@@ -70,7 +70,6 @@ function formatCheckinTime(row: DamageWithVehicle): string {
   if (getDamageStatus(row) !== 'Incheckad' || !row.created_at) {
     return "";
   }
-
   try {
     const d = new Date(row.created_at);
     if (isNaN(d.getTime())) return "";
@@ -118,7 +117,7 @@ export default function RapportPage() {
         const { data: damagesData, error: damagesError } = await supabase
           .from("damages")
           .select('*')
-          .order("damage_date", { ascending: false });
+          .order("created_at", { ascending: false }); // Sorterar på created_at för att få senaste först
         if (damagesError) throw damagesError;
 
         const { data: vehiclesData, error: vehiclesError } = await supabase
@@ -206,17 +205,20 @@ export default function RapportPage() {
   };
 
   const openMediaModalForRow = (row: DamageWithVehicle) => {
-    if (!row.media_url) return;
-    const mediaArr = [{
-        url: row.media_url, type: "image",
-        metadata: {
-          date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
-          damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
-          note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
-          documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
-          damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
-        },
-      }];
+    const mediaArr = (row.photo_urls || []).map(url => ({
+      url: url,
+      type: "image",
+      metadata: {
+        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
+        damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
+        note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
+        documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+        damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+      },
+    }));
+
+    if (mediaArr.length === 0) return;
+
     setModalMedia(mediaArr);
     setModalTitle(`${row.regnr} - ${row.damage_type || row.damage_type_raw || "--"}`);
     setModalIdx(0);
@@ -224,17 +226,23 @@ export default function RapportPage() {
   };
   
   const openMediaModalForRegnr = (regnr: string) => {
-    const skador = filteredRows.filter(row => row.regnr === regnr && row.media_url);
-    const mediaArr = skador.map(row => ({
-      url: row.media_url, type: "image",
-      metadata: {
-        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
-        damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
-        note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
-        documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
-        damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
-      }
-    })).filter(item => !!item.url);
+    const skador = filteredRows.filter(row => row.regnr === regnr && row.photo_urls && row.photo_urls.length > 0);
+    const mediaArr = skador.flatMap(row => 
+        (row.photo_urls || []).map(url => ({
+            url: url,
+            type: "image",
+            metadata: {
+                date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
+                damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
+                note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
+                documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+                damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+            }
+        }))
+    );
+    
+    if (mediaArr.length === 0) return;
+
     setModalMedia(mediaArr);
     setModalTitle(`Alla media för ${regnr}`);
     setModalIdx(0);
@@ -309,8 +317,7 @@ export default function RapportPage() {
                   <th onClick={() => handleSort("regnr")}>Regnr<SortArrow column="regnr" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("brand")}>Bilmodell<SortArrow column="brand" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("status")}>Källa<SortArrow column="status" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  <th onClick={() => handleSort("damage_date")} className="datum-col">Datum<SortArrow column="damage_date" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  {/* === CSS-KLASS TILLAGD FÖR GRUPPERING === */}
+                  <th onClick={() => handleSort("created_at")} className="datum-col">Datum<SortArrow column="created_at" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("region")} className="location-group">Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("ort")} className="location-group">Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("station_namn")} className="location-group">Station<SortArrow column="station_namn" sortKey={sortKey} sortOrder={sortOrder} /></th>
@@ -330,21 +337,27 @@ export default function RapportPage() {
                       <td>{row.brand || ""} {row.model || ""}</td>
                       <td>{getDamageStatus(row)}</td>
                       <td className="datum-col">
-                        {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
+                        {row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : "--"}
                         <div className="datum-klocka">{formatCheckinTime(row)}</div>
                       </td>
-                      {/* === CSS-KLASS TILLAGD FÖR GRUPPERING === */}
-                      <td className="location-group">{row.region}</td>
+                      <td className="location-group region-section">{row.region}</td>
                       <td className="location-group">{row.ort || "--"}</td>
                       <td className="location-group">{row.station_namn || "--"}</td>
                       <td>{row.damage_type || row.damage_type_raw || "--"}</td>
                       <td className="kommentar-col">{row.notering || "--"}</td>
                       <td className="centered-cell">
-                        {row.media_url ? (
-                          <Image src={row.media_url} width={72} height={72} className="media-thumb"
-                             onClick={() => openMediaModalForRow(row)} alt="Tumnagel" 
-                             style={{ cursor: 'pointer', objectFit: 'cover' }}
-                             onError={(e) => { e.currentTarget.style.display = 'none'; }}/>
+                        {/* === ÄNDRING: Bytt till vanlig <img>-tagg === */}
+                        {row.photo_urls && row.photo_urls.length > 0 ? (
+                          <img 
+                            src={row.photo_urls[0]} 
+                            width={72} 
+                            height={72} 
+                            className="media-thumb"
+                            onClick={() => openMediaModalForRow(row)} 
+                            alt={`Skadebild för ${row.regnr}`}
+                            style={{ cursor: 'pointer', objectFit: 'cover', borderRadius: '4px' }}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                          />
                         ) : ("--")}
                       </td>
                       <td>{row.inchecker_name || row.godkandAv || "--"}</td>
