@@ -266,6 +266,10 @@ export async function POST(request: Request) {
   try {
     const fullRequestPayload = await request.json();
     const payload = fullRequestPayload.meta; 
+
+    // FELSÖKNING: Logga den mottagna datan
+    console.log("MOTTAGEN PAYLOAD:", JSON.stringify(payload, null, 2));
+
     const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
 
     const now = new Date();
@@ -291,7 +295,6 @@ export async function POST(request: Request) {
     // Databashantering
     const dbPromises = [];
 
-    // === ÄNDRING: Logik för att extrahera den första bildens URL ===
     const getFirstPhotoUrl = (damage: any): string | null => {
         const photoUrls = damage.uploads?.photo_urls;
         if (Array.isArray(photoUrls) && photoUrls.length > 0) {
@@ -313,7 +316,7 @@ export async function POST(request: Request) {
         car_part: damage.carPart || null,
         position: damage.position || null,
         description: damage.text || null,
-        media_url: firstPhoto, // === ÄNDRING: Använder korrekt kolumn och data ===
+        media_url: firstPhoto,
         notering: payload.notering || null,
         status: "complete",
       };
@@ -328,14 +331,13 @@ export async function POST(request: Request) {
       const updatePayload: { [key: string]: any } = {
         inchecker_name: payload.incheckare || null,
         updated_at: now.toISOString(),
-        notering: payload.notering || payload.notering, // Behåller befintlig om ny saknas
+        notering: payload.notering || payload.notering,
         damage_type: damage.userType || undefined,
         car_part: damage.userCarPart || undefined,
         position: damage.userPosition || undefined,
         description: damage.userDescription || undefined,
       };
 
-      // === ÄNDRING: Lägg bara till media_url om en bild faktiskt laddades upp ===
       if (firstPhoto) {
         updatePayload.media_url = firstPhoto;
       }
@@ -349,7 +351,6 @@ export async function POST(request: Request) {
 
     const results = await Promise.all(dbPromises);
     
-    // Förbättrad fel-loggning
     results.forEach((result, index) => {
       if (result.error) {
         const failedOp = index < nya_skador.length ? `INSERT (nya_skador[${index}])` : `UPDATE (dokumenterade_skador[${index - nya_skador.length}])`;
