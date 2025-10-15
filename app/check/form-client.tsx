@@ -8,7 +8,7 @@ import { notifyCheckin } from '@/lib/notify';
 const normalizeReg = (reg: string) => reg.toUpperCase().replace(/\s/g, '');
 
 // =================================================================
-// 1. DATA, TYPES & HELPERS (Oförändrat)
+// 1. DATA, TYPES & HELPERS
 // =================================================================
 
 const MABI_LOGO_URL = "/mabi-logo.png";
@@ -47,7 +47,10 @@ type MediaFile = {
 };
 
 type ExistingDamage = {
-  id: string; fullText: string; shortText: string;
+  db_id: number; // Det riktiga databas-ID:t
+  id: string; // Det slumpade ID:t för React
+  fullText: string; 
+  shortText: string;
   status: 'not_selected' | 'documented' | 'resolved';
   userType?: string; userCarPart?: string; userPosition?: string; userDescription?: string;
   media?: MediaFile[];
@@ -262,10 +265,11 @@ export default function CheckInForm() {
       setVehicleData(info);
       
       if (info.existing_damages.length > 0) {
-          setExistingDamages(info.existing_damages.map(d_text => ({ 
-              id: Math.random().toString(36).substring(2, 15), 
-              fullText: d_text,
-              shortText: d_text,
+          setExistingDamages(info.existing_damages.map(d => ({ 
+              db_id: d.id, // Det riktiga ID:t från databasen
+              id: Math.random().toString(36).substring(2, 15), // Ett slumpat ID för Reacts state-hantering
+              fullText: d.text,
+              shortText: d.text,
               status: 'not_selected',
           })));
       }
@@ -275,7 +279,6 @@ export default function CheckInForm() {
       }
   
     } catch (error: any) {
-      // UPPDATERING: Utökad felhantering för att logga mer information
       console.error("Fetch vehicle data error:", error);
       if (error.message.includes('fetch failed') || error.message.includes('NetworkError')) {
         console.error("Network-related error. Check Supabase connection and RLS policies.");
@@ -418,7 +421,13 @@ export default function CheckInForm() {
           åtgärdade_skador: resolvedDamages.map(d => ({...d, media: undefined})),
       };
       
-      await notifyCheckin(submissionPayload);
+      await notifyCheckin({
+        region: 'Syd', // This needs to be dynamic based on ort
+        subjectBase: `${normalizedReg} - ${ort} / ${station}`,
+        htmlBody: '', // This will be constructed in the API route
+        target: 'station', // Example
+        meta: submissionPayload
+      });
 
       setShowSuccessModal(true);
       setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
@@ -521,7 +530,6 @@ export default function CheckInForm() {
             <input 
               type="text" 
               value={regInput} 
-              // UPPDATERING: Återställer toUpperCase() här
               onChange={(e) => setRegInput(e.target.value.toUpperCase())}
               onFocus={() => setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
@@ -600,16 +608,16 @@ export default function CheckInForm() {
         {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))))}>
+      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>Inga kända skador på detta fordon.</p>}
+        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>{vehicleData ? 'Inga kända skador.' : 'Laddar...'}</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => setSkadekontroll('inga_nya_skador')} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)}{!newDamages.some(d => !d.type || !d.carPart) && <Button onClick={addDamage} variant="secondary" style={{marginTop: '1rem'}}>+ Lägg till ytterligare skada</Button>}</>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamage} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="secondary" style={{ marginTop: '1rem' }}>Lägg till ytterligare skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && !isChecklistComplete}>
@@ -645,7 +653,7 @@ export default function CheckInForm() {
   );
 }
 // =================================================================
-// 3. REUSABLE SUB-COMPONENTS & STYLES (Oförändrade)
+// 3. REUSABLE SUB-COMPONENTS & STYLES
 // =================================================================
 
 const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) => <div className="card" {...props}>{children}</div>;
@@ -791,7 +799,7 @@ const DamageItem: React.FC<{
           <div className="grid-3-col">
             <Field label="Typ av skada *"><select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, fieldKey('type'), e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
             <Field label="Placering *"><select value={commonProps.carPart || ''} onChange={e => onUpdate(damage.id, fieldKey('carPart'), e.target.value, isExisting)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.carPart || ''] || CAR_PARTS[commonProps.carPart || ''].length === 0}><option value="">Välj position</option>{(CAR_PARTS[commonProps.carPart || ''] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.carPart || ''] || CAR_PARTS[commonProps.carPart || ''].length === 0}><option value="">Välj position</option>{(CAR_PARTS[commonProps.carPart || ''] || []).map(pos => <option key={pos} value={pos}>{pos}</option>)}</select></Field>
           </div>
           <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Mer detaljer..." rows={2}></textarea></Field>
           <div className="media-section">
@@ -916,7 +924,7 @@ const GlobalStyles = () => (
         .btn.warning { background-color: var(--color-warning); color: white; }
         .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
         .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: var(--color-card); color: var(--color-text-secondary); font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: center; }
+        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: var(--color-card); cursor: pointer; transition: all 0.2s; font-weight: 600; text-align: center; }
         .choice-btn:hover { filter: brightness(1.05); }
         .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
@@ -936,12 +944,12 @@ const GlobalStyles = () => (
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 14px; line-height: 1; cursor: pointer; }
+        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; cursor: pointer; line-height: 1; }
         .remove-media-btn:hover { background-color: #b91c1c; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
+        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); }
         .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); }
-        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
+        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem auto; }
         .confirm-modal .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
         .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-modal .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
