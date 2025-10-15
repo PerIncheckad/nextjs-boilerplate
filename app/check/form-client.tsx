@@ -416,18 +416,22 @@ export default function CheckInForm() {
           notering: preliminarAvslutNotering,
           incheckare: firstName,
           timestamp: new Date().toISOString(),
-          // === ÄNDRING: Tvingar med db_id explicit ===
+          // === ÄNDRING: Tvingar med db_id explicit och rensar bort onödig 'media'-data ===
           dokumenterade_skador: documentedForUpload.map((d, i) => {
-            const cleanDamage = { ...d };
-            // @ts-ignore
-            delete cleanDamage.media; // Ta bort den stora media-datan som inte behövs i payload
+            const { media, ...rest } = d; // Ta bort 'media' från objektet
             return {
-              ...cleanDamage,
+              ...rest, // Sprid ut resten av fälten (inkl. db_id, userType etc.)
               uploads: documentedUploads[i],
             };
           }),
-          nya_skador: newForUpload.map((d, i) => ({ ...d, uploads: newUploads[i], media: undefined })),
-          åtgärdade_skador: resolvedDamages.map(d => ({...d, media: undefined})),
+          nya_skador: newForUpload.map((d, i) => {
+            const { media, ...rest } = d;
+            return { ...rest, uploads: newUploads[i] };
+          }),
+          åtgärdade_skador: resolvedDamages.map(d => {
+            const { media, ...rest } = d;
+            return rest;
+          }),
       };
       
       await notifyCheckin({
