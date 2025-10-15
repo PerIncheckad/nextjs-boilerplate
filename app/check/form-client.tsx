@@ -416,8 +416,8 @@ export default function CheckInForm() {
           notering: preliminarAvslutNotering,
           incheckare: firstName,
           timestamp: new Date().toISOString(),
-          // === ÄNDRING: Här läggs `db_id` till i payloaden ===
-          dokumenterade_skador: documentedForUpload.map((d, i) => ({ ...d, db_id: d.db_id, uploads: documentedUploads[i], media: undefined })),
+          // === ÄNDRING: Sprider ut hela objektet `d` som redan innehåller `db_id` ===
+          dokumenterade_skador: documentedForUpload.map((d, i) => ({ ...d, uploads: documentedUploads[i], media: undefined })),
           nya_skador: newForUpload.map((d, i) => ({ ...d, uploads: newUploads[i], media: undefined })),
           åtgärdade_skador: resolvedDamages.map(d => ({...d, media: undefined})),
       };
@@ -433,8 +433,9 @@ export default function CheckInForm() {
       setShowSuccessModal(true);
       setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
     } catch (error) {
+      // === ÄNDRING: Utökad felloggning vid klientfel ===
       console.error("Final save failed:", error);
-      alert("Något gick fel vid inskickningen. Vänligen försök igen.");
+      alert("Något gick fel vid inskickningen. Vänligen försök igen. Detaljer finns i konsolen.");
     } finally {
       setIsFinalSaving(false);
     }
