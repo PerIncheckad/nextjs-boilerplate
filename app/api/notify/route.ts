@@ -267,10 +267,9 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const payload = fullRequestPayload.meta; 
 
-    // FELSÖKNING: Logga den mottagna datan
-    console.log("MOTTAGEN PAYLOAD:", JSON.stringify(payload, null, 2));
+    console.log("MOTTAGEN PAYLOAD FÖR BEARBETNING:", JSON.stringify(payload, null, 2));
 
-    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
+    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [], carModel, incheckare } = payload;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -292,7 +291,30 @@ export async function POST(request: Request) {
     
     Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
 
-    // Databashantering
+    // === NYTT STEG: Skapa en rad i 'checkins'-tabellen ===
+    const { data: checkinData, error: checkinError } = await supabaseAdmin
+      .from('checkins')
+      .insert({
+        regnr: regnr,
+        car_model: carModel || null,
+        checkin_date: now.toISOString(),
+        ort: ort,
+        station: station,
+        inchecker_name: incheckare,
+        has_new_damage: nya_skador.length > 0,
+        notes: notering || null,
+      })
+      .select()
+      .single();
+
+    if (checkinError) {
+      console.error('Supabase DB error during CHECKIN INSERT:', checkinError);
+      // Fortsätt ändå för att försöka hantera skador, men logga felet
+    } else {
+      console.log('Successfully created checkin with ID:', checkinData.id);
+    }
+    // ========================================================
+
     const dbPromises = [];
 
     const getFirstPhotoUrl = (damage: any): string | null => {
@@ -319,13 +341,17 @@ export async function POST(request: Request) {
         media_url: firstPhoto,
         notering: payload.notering || null,
         status: "complete",
+        checkin_id: checkinData?.id || null, // Koppla till den nya incheckningen
       };
       dbPromises.push(supabaseAdmin.from('damages').insert(insertPayload));
     }
 
     // 2. Hantera DOKUMENTERADE BEFINTLIGA skador
     for (const damage of dokumenterade_skador) {
-      if (!damage.db_id) continue; 
+      if (!damage.db_id) {
+        console.error('Skipping update for damage because db_id is missing:', damage);
+        continue; 
+      }
 
       const firstPhoto = getFirstPhotoUrl(damage);
       const updatePayload: { [key: string]: any } = {
@@ -336,6 +362,7 @@ export async function POST(request: Request) {
         car_part: damage.userCarPart || undefined,
         position: damage.userPosition || undefined,
         description: damage.userDescription || undefined,
+        checkin_id: checkinData?.id || null, // Koppla till den nya incheckningen
       };
 
       if (firstPhoto) {
