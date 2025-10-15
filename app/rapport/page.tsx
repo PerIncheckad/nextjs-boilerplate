@@ -59,37 +59,28 @@ const platsAlternativ = stationer.map(st => {
 // Hjälpfunktioner
 // ==============================
 
-// === ÄNDRING STARTAR HÄR ===
-/**
- * Bestämmer statusen för en skada baserat på om den har processats
- * via det nya incheckningsformuläret.
- * @param row Skadeobjektet från databasen.
- * @returns "Incheckad" om den är hanterad, annars "BUHS".
- */
 function getDamageStatus(row: DamageWithVehicle): 'Incheckad' | 'BUHS' {
-  // Om antingen `inchecker_name` eller det äldre `godkandAv` har ett värde,
-  // betyder det att skadan har hanterats via det nya formuläret.
   if (row.inchecker_name || row.godkandAv) {
     return "Incheckad";
   }
-
-  // I alla andra fall är det en befintlig skada från BUHS som ännu inte har inventerats.
   return "BUHS";
 }
-// === ÄNDRING SLUTAR HÄR ===
 
-function formatTime(row: DamageWithVehicle) {
-    const isBuhs = getDamageStatus(row) === "BUHS";
-    if (isBuhs || !row.damage_date) return "";
+// === NY FUNKTION FÖR ATT VISA KLOCKSLAG ===
+function formatCheckinTime(row: DamageWithVehicle): string {
+  // Visa bara klockslag om källan är "Incheckad"
+  if (getDamageStatus(row) !== 'Incheckad' || !row.created_at) {
+    return "";
+  }
 
-    try {
-        const d = new Date(row.damage_date);
-        if (isNaN(d.getTime())) return "";
-        if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return "";
-        return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
-    } catch {
-        return "";
-    }
+  try {
+    const d = new Date(row.created_at);
+    if (isNaN(d.getTime())) return "";
+    // Formatera till HH:MM
+    return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
+  } catch {
+    return "";
+  }
 }
 
 const mapOrtToRegion = (ort: string): string => {
@@ -177,19 +168,24 @@ export default function RapportPage() {
       items = items.filter(row => row.regnr?.toLowerCase().includes(activeRegnr.toLowerCase()));
     }
 
+    // === KORREKT SORTERINGSLOGIK ===
     return items.sort((a: any, b: any) => {
+      // Specialhantering för den virtuella 'status'-kolumnen (Källa)
+      if (sortKey === 'status') {
+        const aStatus = getDamageStatus(a);
+        const bStatus = getDamageStatus(b);
+        return sortOrder === 'desc' ? bStatus.localeCompare(aStatus) : aStatus.localeCompare(bStatus);
+      }
+
       let ak = a[sortKey] ?? "";
       let bk = b[sortKey] ?? "";
+
       if (sortKey === "damage_date" || sortKey === "created_at") {
         ak = new Date(ak).getTime() || 0;
         bk = new Date(bk).getTime() || 0;
         return sortOrder === "desc" ? bk - ak : ak - bk;
       }
-      if (sortKey === 'note_internal') {
-          const aStatus = getDamageStatus(a);
-          const bStatus = getDamageStatus(b);
-          return sortOrder === 'desc' ? bStatus.localeCompare(aStatus) : aStatus.localeCompare(bStatus);
-      }
+      
       if (typeof ak === "string" && typeof bk === "string") {
         return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
       }
@@ -219,7 +215,7 @@ export default function RapportPage() {
     const mediaArr = [{
         url: row.media_url, type: "image",
         metadata: {
-          date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatTime(row),
+          date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
           damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
           note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
           documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
@@ -237,7 +233,7 @@ export default function RapportPage() {
     const mediaArr = skador.map(row => ({
       url: row.media_url, type: "image",
       metadata: {
-        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatTime(row),
+        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
         damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
         note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
         documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
@@ -317,7 +313,8 @@ export default function RapportPage() {
                 <tr>
                   <th onClick={() => handleSort("regnr")}>Regnr<SortArrow column="regnr" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("brand")}>Bilmodell<SortArrow column="brand" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  <th onClick={() => handleSort("note_internal")}>Incheckad/BUHS<SortArrow column="note_internal" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  {/* === RUBRIK ÄNDRAD & SORTERING FIXAD === */}
+                  <th onClick={() => handleSort("status")}>Källa<SortArrow column="status" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("damage_date")} className="datum-col">Datum<SortArrow column="damage_date" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("region")}>Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("ort")}>Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
@@ -339,7 +336,8 @@ export default function RapportPage() {
                       <td>{getDamageStatus(row)}</td>
                       <td className="datum-col">
                         {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
-                        <div className="datum-klocka"><span>{formatTime(row)}</span></div>
+                        {/* === KLOCKSLAG TILLAGT HÄR === */}
+                        <div className="datum-klocka">{formatCheckinTime(row)}</div>
                       </td>
                       <td className="region-section region-flat">{row.region}</td>
                       <td>{row.ort || "--"}</td>
@@ -367,8 +365,6 @@ export default function RapportPage() {
       <MediaModal open={modalOpen} onClose={() => setModalOpen(false)} media={modalMedia} title={modalTitle} currentIdx={modalIdx}
         onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
         hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
-        
-      {/* ALL LOKAL CSS HAR NU TAGITS BORT FÖR ATT FÖRLITA SIG PÅ GLOBALS.CSS */}
     </main>
   );
 }
