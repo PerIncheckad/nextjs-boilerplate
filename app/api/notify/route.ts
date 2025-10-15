@@ -290,60 +290,76 @@ export async function POST(request: Request) {
     Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
 
     // Databashantering
-    const damagesToInsert = [];
+    const damagesToProcess = [...nya_skador, ...dokumenterade_skador];
+    
+    for (const damage of damagesToProcess) {
+        const isNewDamage = 'type' in damage;
+        const firstPhoto = damage.uploads?.photo_urls?.[0] || null;
 
-    const getFirstPhotoUrl = (damage: any): string | null => {
-        const photoUrls = damage.uploads?.photo_urls;
-        if (Array.isArray(photoUrls) && photoUrls.length > 0) {
-            return photoUrls[0];
+        const damageData = {
+            regnr: payload.regnr,
+            damage_date: now.toISOString(),
+            ort: payload.ort || null,
+            station_namn: payload.station || null,
+            inchecker_name: payload.incheckare || null,
+            damage_type: isNewDamage ? damage.type : ([damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean).join(' - ') || damage.fullText),
+            car_part: isNewDamage ? damage.carPart : damage.userCarPart,
+            position: isNewDamage ? damage.position : damage.userPosition,
+            description: isNewDamage ? damage.text : (damage.userDescription || damage.fullText),
+            media_url: firstPhoto, // Fortsätter spara första bilden för tumnageln
+            status: "complete", // Alltid 'complete'
+            notering: payload.notering || null, // Sparar den generella noteringen på varje skada
+        };
+        
+        // Steg 1: Skapa skadan i 'damages' och få tillbaka dess ID
+        const { data: newDamage, error: damageError } = await supabaseAdmin
+            .from('damages')
+            .insert(damageData)
+            .select('id')
+            .single();
+
+        if (damageError) {
+            console.error('Supabase DB error during damage INSERT:', damageError);
+            continue; // Hoppa till nästa skada om denna misslyckas
         }
-        return null;
-    };
 
-    // 1. Hantera NYA skador
-    for (const damage of nya_skador) {
-      const firstPhoto = getFirstPhotoUrl(damage);
-      damagesToInsert.push({
-        regnr: payload.regnr,
-        damage_date: now.toISOString(),
-        ort: payload.ort || null,
-        station_namn: payload.station || null,
-        inchecker_name: payload.incheckare || null,
-        damage_type: damage.type || "Okänd",
-        car_part: damage.carPart || null,
-        position: damage.position || null,
-        description: damage.text || null,
-        media_url: firstPhoto,
-        status: "complete", // Använder godkänt värde
-      });
-    }
+        if (!newDamage) {
+            console.error('Failed to get ID for new damage, cannot save media.');
+            continue;
+        }
 
-    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador
-    for (const damage of dokumenterade_skador) {
-      const firstPhoto = getFirstPhotoUrl(damage);
-      const damageText = [damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean).join(' - ');
-      
-      damagesToInsert.push({
-        regnr: payload.regnr,
-        damage_date: now.toISOString(),
-        ort: payload.ort || null,
-        station_namn: payload.station || null,
-        inchecker_name: payload.incheckare || null,
-        damage_type: damageText || damage.fullText || "Dokumenterad skada",
-        car_part: damage.userCarPart || null,
-        position: damage.userPosition || null,
-        description: damage.userDescription || damage.fullText,
-        media_url: firstPhoto,
-        status: "complete", // KORRIGERING: Använder 'complete' istället för 'documented_existing'
-      });
-    }
+        // Steg 2: Skapa poster i 'damage_media' för alla uppladdade filer
+        const mediaToInsert = [];
+        const allPhotoUrls = damage.uploads?.photo_urls || [];
+        const allVideoUrls = damage.uploads?.video_urls || [];
 
-    // Kör alla databasoperationer samtidigt
-    if (damagesToInsert.length > 0) {
-      const { error } = await supabaseAdmin.from('damages').insert(damagesToInsert);
-      if (error) {
-        console.error('Supabase DB error during INSERT operation:', error);
-      }
+        for (const url of allPhotoUrls) {
+            mediaToInsert.push({
+                damage_id: newDamage.id,
+                url: url,
+                type: 'image',
+                comment: isNewDamage ? damage.text : damage.userDescription,
+            });
+        }
+        for (const url of allVideoUrls) {
+            mediaToInsert.push({
+                damage_id: newDamage.id,
+                url: url,
+                type: 'video',
+                comment: isNewDamage ? damage.text : damage.userDescription,
+            });
+        }
+
+        if (mediaToInsert.length > 0) {
+            const { error: mediaError } = await supabaseAdmin
+                .from('damage_media')
+                .insert(mediaToInsert);
+            
+            if (mediaError) {
+                console.error('Supabase DB error during damage_media INSERT:', mediaError);
+                // Fortsätt även om media-koppling misslyckas, skadan är redan skapad.
+            }
+        }
     }
 
     return NextResponse.json({ message: 'Notifications processed.' });
