@@ -31,7 +31,7 @@ const regionMapping: { [ort: string]: string | undefined } = {
 const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/INcheckad%20logo/INCHECKAD%20LOGO%20yellow%20DRAFT.png';
 
 // =================================================================
-// 2. HTML BUILDER - HELPERS (Oförändrad)
+// 2. HTML BUILDER - HELPERS
 // =================================================================
 
 const createAlertBanner = (condition: boolean, text: string): string => {
@@ -160,7 +160,7 @@ const createBaseLayout = (regnr: string, content: string): string => `
 `;
 
 // =================================================================
-// 3. HTML BUILDERS - SPECIFIC EMAILS (Oförändrad)
+// 3. HTML BUILDERS - SPECIFIC EMAILS
 // =================================================================
 
 const buildRegionEmail = (payload: any, date: string, time: string): string => {
@@ -255,7 +255,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
 };
 
 // =================================================================
-// 4. MAIN API FUNCTION (POST)
+// 4. MAIN API FUNCTION
 // =================================================================
 export async function POST(request: Request) {
   if (!bilkontrollAddress || !fallbackAddress) {
@@ -265,20 +265,20 @@ export async function POST(request: Request) {
 
   try {
     const payload = await request.json();
-    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
+    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload.meta;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
     const date = now.toLocaleDateString('sv-SE', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' });
     const time = now.toLocaleTimeString('sv-SE', { ...options, hour: '2-digit', minute: '2-digit' });
 
-    // === E-posthantering (oförändrad) ===
+    // E-posthantering
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
-    const regionHtml = buildRegionEmail(payload, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${regnr} - ${ort} / ${station} - REGION`, html: regionHtml }));
-    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${regnr} - ${ort} / ${station} - BILKONTROLL`, html: bilkontrollHtml }));
+    const regionHtml = buildRegionEmail(payload.meta, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${payload.subjectBase} - REGION`, html: regionHtml }));
+    const bilkontrollHtml = buildBilkontrollEmail(payload.meta, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${payload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
       const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen lägg till det manuellt.</p></td></tr>`);
@@ -286,61 +286,59 @@ export async function POST(request: Request) {
     }
     await Promise.all(emailPromises);
 
-    // === ÄNDRING STARTAR HÄR: Databashantering ===
+    // Databashantering
     const dbPromises = [];
 
     // 1. Hantera NYA skador (skapa nya rader)
     for (const damage of nya_skador) {
       const insertPayload = {
-        regnr: payload.regnr,
+        regnr: payload.meta.regnr,
         damage_date: now.toISOString(),
-        ort: payload.ort || null,
-        station_namn: payload.station || null,
-        inchecker_name: payload.incheckare || null,
+        ort: payload.meta.ort || null,
+        station_namn: payload.meta.station || null,
+        inchecker_name: payload.meta.incheckare || null,
         damage_type: damage.type || "Okänd",
         car_part: damage.carPart || null,
         position: damage.position || null,
         description: damage.text || null,
         photo_urls: damage.uploads?.photo_urls || [],
         video_urls: damage.uploads?.video_urls || [],
-        notering: payload.notering || null,
+        notering: payload.meta.notering || null,
         status: "complete",
       };
       dbPromises.push(supabaseAdmin.from('damages').insert(insertPayload));
     }
 
-    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador (uppdatera rader)
+    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador (uppdatera rader med RÄTT ID)
     for (const damage of dokumenterade_skador) {
-      // 'damage.id' från formuläret är ett slumpat id, vi behöver det riktiga från databasen.
-      // Vi antar att `damage.fullText` innehåller den unika texten för skadan.
-      // Detta är en svaghet - om två skador har samma text kan fel rad uppdateras.
-      // En bättre lösning vore att skicka med det riktiga skade-ID:t från databasen till formuläret.
+      if (!damage.db_id) continue; 
+
       const updatePayload = {
-        inchecker_name: payload.incheckare || null,
+        inchecker_name: payload.meta.incheckare || null,
         photo_urls: damage.uploads?.photo_urls || [],
         video_urls: damage.uploads?.video_urls || [],
         updated_at: now.toISOString(),
-        notering: payload.notering || null, 
+        notering: payload.meta.notering || null,
+        damage_type: damage.userType || undefined,
+        car_part: damage.userCarPart || undefined,
+        position: damage.userPosition || undefined,
+        description: damage.userDescription || undefined,
       };
-      // Vi matchar på regnr och den ursprungliga skadetexten.
+      
       dbPromises.push(
         supabaseAdmin.from('damages')
           .update(updatePayload)
-          .eq('regnr', payload.regnr)
-          .like('damage_type_raw', `%${damage.shortText}%`) // Använder 'like' för en mer flexibel matchning
+          .eq('id', damage.db_id) 
       );
     }
 
     const results = await Promise.all(dbPromises);
     
-    // Felhantering för databasoperationer
     for (const result of results) {
       if (result.error) {
         console.error('Supabase DB error:', result.error);
-        // Vi kastar inte ett fel här för att låta e-posten gå iväg, men vi loggar det.
       }
     }
-    // === ÄNDRING SLUTAR HÄR ===
 
     return NextResponse.json({ message: 'Notifications processed and database updated.' });
 
