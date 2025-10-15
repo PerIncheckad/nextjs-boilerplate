@@ -181,14 +181,17 @@ export default function RapportPage() {
   };
 
   const openMediaModalForRow = async (row: DamageWithVehicle) => {
-    setModalIsLoading(true);
     setModalOpen(true);
+    setModalIsLoading(true);
     setModalTitle(`${row.regnr} - ${row.damage_type || "--"}`);
+    setModalMedia([]); // Rensa gammal media direkt
+    setModalIdx(0);
 
     const { data, error } = await supabase.from('damage_media').select('url, type, comment').eq('damage_id', row.id);
+    
     if (error || !data) {
       console.error("Kunde inte hämta media:", error);
-      setModalMedia([]);
+      setModalMedia([]); // Sätt till tom array vid fel
     } else {
       const formattedMedia = data.map(media => ({
           url: media.url,
@@ -207,7 +210,6 @@ export default function RapportPage() {
       }));
       setModalMedia(formattedMedia);
     }
-    setModalIdx(0);
     setModalIsLoading(false);
   };
   
