@@ -15,20 +15,28 @@ type DamageWithVehicle = {
   damage_date: string;
   ort: string;
   station_namn: string;
-  damage_type_raw: string;
-  notering: string;
+  damage_type: string; // Använder nu det primära fältet
+  notering: string; // Generell notering
+  description: string; // Specifik skadebeskrivning/kommentar
   inchecker_name?: string;
   godkandAv?: string;
-  media_url?: string; // ÄNDRING: Bytt från photo_urls
+  media_url?: string;
   created_at: string;
-  note_internal?: string;
-  damage_type?: string;
-  saludatum?: string;
-  huvudstation_id?: string;
-  station_id?: string;
   brand?: string;
   model?: string;
   region?: string;
+  // Fält som inte längre behövs här men kan finnas i datan:
+  damage_type_raw?: string; 
+  note_internal?: string;
+  huvudstation_id?: string;
+  station_id?: string;
+  saludatum?: string;
+};
+
+type MediaItem = {
+  url: string;
+  type: "image" | "video";
+  comment?: string;
 };
 
 const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: string, sortOrder: string }) => {
@@ -37,14 +45,9 @@ const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: st
 };
 
 const periodAlternativ = [
-  { value: "all", label: "All tid" },
-  { value: "year", label: "2025" },
-  { value: "month", label: "Oktober 2025" },
-  { value: "week", label: "v. 41, 6–12 okt" },
-  { value: "ytd", label: "YTD (2025)" },
-  { value: "7days", label: "Rullande 7 dagar" },
-  { value: "30days", label: "Rullande 30 dagar" },
-  { value: "rollingyear", label: "Rullande år" }
+  { value: "all", label: "All tid" }, { value: "year", label: "2025" }, { value: "month", label: "Oktober 2025" },
+  { value: "week", label: "v. 41, 6–12 okt" }, { value: "ytd", label: "YTD (2025)" }, { value: "7days", label: "Rullande 7 dagar" },
+  { value: "30days", label: "Rullande 30 dagar" }, { value: "rollingyear", label: "Rullande år" }
 ];
 
 const platsAlternativ = stationer.map(st => {
@@ -59,40 +62,30 @@ const platsAlternativ = stationer.map(st => {
 // ==============================
 
 function getDamageStatus(row: DamageWithVehicle): 'Incheckad' | 'BUHS' {
-  if (row.inchecker_name || row.godkandAv) {
-    return "Incheckad";
-  }
-  return "BUHS";
+  return (row.inchecker_name || row.godkandAv) ? "Incheckad" : "BUHS";
 }
 
 function formatCheckinTime(row: DamageWithVehicle): string {
-  if (getDamageStatus(row) !== 'Incheckad' || !row.created_at) {
-    return "";
-  }
+  if (getDamageStatus(row) !== 'Incheckad' || !row.created_at) return "";
   try {
     const d = new Date(row.created_at);
     if (isNaN(d.getTime())) return "";
     return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
-  } catch {
-    return "";
-  }
+  } catch { return ""; }
 }
 
 const mapOrtToRegion = (ort: string): string => {
     if (!ort) return "--";
     const ortLower = ort.toLowerCase();
-    
     if (['halmstad', 'varberg', 'falkenberg'].includes(ortLower)) return 'Norr';
     if (['helsingborg', 'ängelholm'].includes(ortLower)) return 'Mitt';
     if (['malmö', 'trelleborg', 'lund'].includes(ortLower)) return 'Syd';
-    
     return "--";
 };
 
 // ==============================
 // Huvudkomponent
 // ==============================
-
 export default function RapportPage() {
   const [allDamages, setAllDamages] = useState<DamageWithVehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,11 +94,13 @@ export default function RapportPage() {
   const [activeRegnr, setActiveRegnr] = useState("");
   const [period, setPeriod] = useState("all");
   const [plats, setPlats] = useState(platsAlternativ[0]);
-  const [sortKey, setSortKey] = useState("created_at"); // ÄNDRING: Sorterar på created_at som standard
+  const [sortKey, setSortKey] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
+  
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMedia, setModalMedia] = useState<any[]>([]);
   const [modalTitle, setModalTitle] = useState("");
+  const [modalIsLoading, setModalIsLoading] = useState(false);
   const [modalIdx, setModalIdx] = useState(0);
 
   useEffect(() => {
@@ -119,26 +114,21 @@ export default function RapportPage() {
           .order("created_at", { ascending: false });
         if (damagesError) throw damagesError;
 
-        const { data: vehiclesData, error: vehiclesError } = await supabase
-          .from("vehicles")
-          .select("regnr, brand, model");
+        const { data: vehiclesData, error: vehiclesError } = await supabase.from("vehicles").select("regnr, brand, model");
         if (vehiclesError) throw vehiclesError;
 
         const vehiclesMap = new Map(vehiclesData.map(v => [v.regnr, v]));
         
-        const combinedData = damagesData.map((damage: any) => {
-          const vehicle = vehiclesMap.get(damage.regnr);
-          return {
-            ...damage,
-            brand: vehicle?.brand,
-            model: vehicle?.model,
-            region: mapOrtToRegion(damage.ort),
-          };
-        });
+        const combinedData = damagesData.map((damage: any) => ({
+          ...damage,
+          brand: vehiclesMap.get(damage.regnr)?.brand,
+          model: vehiclesMap.get(damage.regnr)?.model,
+          region: mapOrtToRegion(damage.ort),
+        }));
 
         setAllDamages(combinedData);
       } catch (e: any) {
-        setError("Misslyckades hämta data från Supabase: " + e.message);
+        setError("Misslyckades hämta data: " + e.message);
       } finally {
         setLoading(false);
       }
@@ -148,7 +138,6 @@ export default function RapportPage() {
 
   const filteredRows = useMemo(() => {
     let items = [...allDamages];
-
     const st = stationer.find(s => plats === s.namn || (s.type === "station" && plats === `${s.namn} (${s.station_id})`));
     if (st && st.type !== 'total') {
         // @ts-ignore
@@ -158,10 +147,7 @@ export default function RapportPage() {
         // @ts-ignore
         else if (st.type === "station") items = items.filter(d => d.station_id === st.station_id);
     }
-    
-    if (activeRegnr) {
-      items = items.filter(row => row.regnr?.toLowerCase().includes(activeRegnr.toLowerCase()));
-    }
+    if (activeRegnr) items = items.filter(row => row.regnr?.toLowerCase().includes(activeRegnr.toLowerCase()));
 
     return items.sort((a: any, b: any) => {
       if (sortKey === 'status') {
@@ -169,19 +155,14 @@ export default function RapportPage() {
         const bStatus = getDamageStatus(b);
         return sortOrder === 'desc' ? bStatus.localeCompare(aStatus) : aStatus.localeCompare(bStatus);
       }
-
       let ak = a[sortKey] ?? "";
       let bk = b[sortKey] ?? "";
-
       if (sortKey === "damage_date" || sortKey === "created_at") {
         ak = new Date(ak).getTime() || 0;
         bk = new Date(bk).getTime() || 0;
         return sortOrder === "desc" ? bk - ak : ak - bk;
       }
-      
-      if (typeof ak === "string" && typeof bk === "string") {
-        return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
-      }
+      if (typeof ak === "string" && typeof bk === "string") return sortOrder === "desc" ? bk.localeCompare(ak) : ak.localeCompare(bk);
       return 0;
     });
   }, [allDamages, plats, activeRegnr, sortKey, sortOrder]);
@@ -190,12 +171,8 @@ export default function RapportPage() {
   useEffect(() => {
     if (searchRegnr.length >= 2) {
       const regnrList = Array.from(new Set(allDamages.map(row => row.regnr).filter(Boolean)));
-      setAutocomplete(
-        regnrList.filter(r => r.toLowerCase().includes(searchRegnr.toLowerCase()))
-      );
-    } else {
-      setAutocomplete([]);
-    }
+      setAutocomplete(regnrList.filter(r => r.toLowerCase().includes(searchRegnr.toLowerCase())));
+    } else setAutocomplete([]);
   }, [searchRegnr, allDamages]);
 
   const handleSort = (key: string) => {
@@ -203,49 +180,37 @@ export default function RapportPage() {
     else { setSortKey(key); setSortOrder("desc"); }
   };
 
-  const openMediaModalForRow = (row: DamageWithVehicle) => {
-    const mediaUrl = row.media_url;
-    if (!mediaUrl) return;
-
-    const mediaArr = [{
-      url: mediaUrl,
-      type: "image",
-      metadata: {
-        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
-        damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
-        note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
-        documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
-        damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
-      },
-    }];
-
-    setModalMedia(mediaArr);
-    setModalTitle(`${row.regnr} - ${row.damage_type || row.damage_type_raw || "--"}`);
-    setModalIdx(0);
+  const openMediaModalForRow = async (row: DamageWithVehicle) => {
+    setModalIsLoading(true);
     setModalOpen(true);
+    setModalTitle(`${row.regnr} - ${row.damage_type || "--"}`);
+
+    const { data, error } = await supabase.from('damage_media').select('url, type, comment').eq('damage_id', row.id);
+    if (error || !data) {
+      console.error("Kunde inte hämta media:", error);
+      setModalMedia([]);
+    } else {
+      const formattedMedia = data.map(media => ({
+          url: media.url,
+          type: media.type as 'image' | 'video',
+          metadata: {
+              date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
+              time: formatCheckinTime(row),
+              damageType: row.damage_type || "--",
+              station: row.station_namn || "--",
+              note: media.comment || row.description, // Specifik notering från media, fallback till skada
+              generalNote: row.notering, // Generell notering
+              inchecker: row.inchecker_name || row.godkandAv || "",
+              documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+              damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+          }
+      }));
+      setModalMedia(formattedMedia);
+    }
+    setModalIdx(0);
+    setModalIsLoading(false);
   };
   
-  const openMediaModalForRegnr = (regnr: string) => {
-    const skador = filteredRows.filter(row => row.regnr === regnr && row.media_url);
-    const mediaArr = skador.map(row => ({
-      url: row.media_url!,
-      type: "image",
-      metadata: {
-        date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--", time: formatCheckinTime(row),
-        damageType: row.damage_type || row.damage_type_raw || "--", station: row.station_namn || row.station_id || "--",
-        note: row.notering || "", inchecker: row.inchecker_name || row.godkandAv || "",
-        documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
-        damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
-      }
-    }));
-    
-    if (mediaArr.length === 0) return;
-
-    setModalMedia(mediaArr);
-    setModalTitle(`Alla media för ${regnr}`);
-    setModalIdx(0);
-    setModalOpen(true);
-  };
   const handleModalPrev = () => setModalIdx(idx => (idx > 0 ? idx - 1 : idx));
   const handleModalNext = () => setModalIdx(idx => (idx < modalMedia.length - 1 ? idx + 1 : idx));
 
@@ -288,17 +253,10 @@ export default function RapportPage() {
         </div>
 
         <div className="rapport-search-row" style={{position: "relative"}}>
-          <input
-            type="text" placeholder="SÖK REG.NR" value={searchRegnr}
-            onChange={e => setSearchRegnr(e.target.value.toUpperCase())} className="rapport-search-input" autoComplete="off"
-          />
+          <input type="text" placeholder="SÖK REG.NR" value={searchRegnr} onChange={e => setSearchRegnr(e.target.value.toUpperCase())} className="rapport-search-input" autoComplete="off" />
           {autocomplete.length > 0 && (
-            <ul className="autocomplete-list" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #ddd', zIndex: 10, listStyle: 'none', padding: '4px'}}>
-              {autocomplete.map(regnr => (
-                <li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }} style={{ padding: '6px', cursor: 'pointer' }}>
-                  {regnr}
-                </li>
-              ))}
+            <ul className="autocomplete-list" style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: '1px solid #ddd', zIndex: 10, listStyle: 'none', padding: '4px', margin: 0, borderRadius: '4px' }}>
+              {autocomplete.map(regnr => (<li key={regnr} onMouseDown={() => { setSearchRegnr(regnr); setActiveRegnr(regnr); setAutocomplete([]); }} style={{ padding: '6px', cursor: 'pointer' }}>{regnr}</li>))}
             </ul>
           )}
           <button className="rapport-search-btn" onClick={() => setActiveRegnr(searchRegnr.trim())} disabled={!searchRegnr.trim()}>Sök</button>
@@ -320,7 +278,7 @@ export default function RapportPage() {
                   <th onClick={() => handleSort("ort")} className="location-group">Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("station_namn")} className="location-group">Station<SortArrow column="station_namn" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("damage_type")}>Skada<SortArrow column="damage_type" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  <th onClick={() => handleSort("notering")}>Anteckning<SortArrow column="notering" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("description")}>Anteckning<SortArrow column="description" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th>Bild/video</th>
                   <th onClick={() => handleSort("inchecker_name")}>Godkänd av<SortArrow column="inchecker_name" sortKey={sortKey} sortOrder={sortOrder} /></th>
                 </tr>
@@ -331,7 +289,7 @@ export default function RapportPage() {
                 ) : (
                   filteredRows.map((row) => (
                     <tr key={row.id}>
-                      <td className="regnr-col"><span className="regnr-link" style={{ textDecoration: 'underline', cursor: 'pointer' }} onClick={() => openMediaModalForRegnr(row.regnr)}>{row.regnr}</span></td>
+                      <td className="regnr-col"><span className="regnr-link" style={{ textDecoration: 'underline', cursor: 'pointer' }}>{row.regnr}</span></td>
                       <td>{row.brand || ""} {row.model || ""}</td>
                       <td>{getDamageStatus(row)}</td>
                       <td className="datum-col">
@@ -341,17 +299,11 @@ export default function RapportPage() {
                       <td className="location-group region-section">{row.region}</td>
                       <td className="location-group">{row.ort || "--"}</td>
                       <td className="location-group">{row.station_namn || "--"}</td>
-                      <td>{row.damage_type || row.damage_type_raw || "--"}</td>
-                      <td className="kommentar-col">{row.notering || "--"}</td>
+                      <td>{row.damage_type || "--"}</td>
+                      <td className="kommentar-col">{row.description || "--"}</td>
                       <td className="centered-cell">
                         {row.media_url ? (
-                          <img 
-                            src={row.media_url} 
-                            width={72} 
-                            height={72} 
-                            className="media-thumb"
-                            onClick={() => openMediaModalForRow(row)} 
-                            alt={`Skadebild för ${row.regnr}`}
+                          <img src={row.media_url} width={72} height={72} className="media-thumb" onClick={() => openMediaModalForRow(row)} alt={`Skadebild för ${row.regnr}`}
                             style={{ cursor: 'pointer', objectFit: 'cover', borderRadius: '4px' }}
                             onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                           />
@@ -367,9 +319,18 @@ export default function RapportPage() {
         )}
       </div>
       <footer className="copyright-footer">&copy; Albarone AB 2025 &mdash; All rights reserved</footer>
-      <MediaModal open={modalOpen} onClose={() => setModalOpen(false)} media={modalMedia} title={modalTitle} currentIdx={modalIdx}
-        onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} onNext={modalMedia.length > 1 ? handleModalNext : undefined}
-        hasPrev={modalIdx > 0} hasNext={modalIdx < modalMedia.length - 1} />
+      <MediaModal 
+        open={modalOpen} 
+        onClose={() => setModalOpen(false)} 
+        media={modalMedia} 
+        title={modalTitle} 
+        currentIdx={modalIdx}
+        isLoading={modalIsLoading}
+        onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} 
+        onNext={modalMedia.length > 1 ? handleModalNext : undefined}
+        hasPrev={modalIdx > 0} 
+        hasNext={modalIdx < modalMedia.length - 1} 
+      />
     </main>
   );
 }
