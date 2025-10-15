@@ -258,19 +258,14 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
 // 4. MAIN API FUNCTION
 // =================================================================
 export async function POST(request: Request) {
-  console.log(`--- [DEBUG] API Route Invoked at ${new Date().toISOString()} ---`);
-
   if (!bilkontrollAddress || !fallbackAddress) {
-    console.error('--- [DEBUG] SERVER ERROR: BILKONTROLL_MAIL or TEST_MAIL is not configured. ---');
+    console.error('SERVER ERROR: BILKONTROLL_MAIL or TEST_MAIL is not configured.');
     return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
   }
 
   try {
     const fullRequestPayload = await request.json();
-    console.log('--- [DEBUG] Full request payload received:', JSON.stringify(fullRequestPayload, null, 2));
-
     const payload = fullRequestPayload.meta; 
-    console.log('--- [DEBUG] Extracted "meta" payload:', JSON.stringify(payload, null, 2));
 
     const { regnr, ort, station, status, nya_skador = [], dokumenterade_skador = [] } = payload;
 
@@ -280,7 +275,6 @@ export async function POST(request: Request) {
     const time = now.toLocaleTimeString('sv-SE', { ...options, hour: '2-digit', minute: '2-digit' });
 
     // E-posthantering
-    console.log("--- [DEBUG] Processing emails... ---");
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
     const regionHtml = buildRegionEmail(payload, date, time);
@@ -293,11 +287,9 @@ export async function POST(request: Request) {
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
     
-    Promise.all(emailPromises).catch(err => console.error("--- [DEBUG] Email sending failed:", err));
-    console.log("--- [DEBUG] Email tasks dispatched. ---");
+    Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
 
     // Databashantering
-    console.log("--- [DEBUG] Starting database processing. ---");
     const damagesToInsert = [];
 
     const getFirstPhotoUrl = (damage: any): string | null => {
@@ -309,11 +301,9 @@ export async function POST(request: Request) {
     };
 
     // 1. Hantera NYA skador
-    console.log(`--- [DEBUG] Processing 'nya_skador'. Found ${nya_skador.length} items.`);
     for (const damage of nya_skador) {
-      console.log("--- [DEBUG] Processing 'nya_skador' item:", JSON.stringify(damage, null, 2));
       const firstPhoto = getFirstPhotoUrl(damage);
-      const newDamageObject = {
+      damagesToInsert.push({
         regnr: payload.regnr,
         damage_date: now.toISOString(),
         ort: payload.ort || null,
@@ -324,19 +314,16 @@ export async function POST(request: Request) {
         position: damage.position || null,
         description: damage.text || null,
         media_url: firstPhoto,
-        status: "complete",
-      };
-      damagesToInsert.push(newDamageObject);
+        status: "complete", // Använder godkänt värde
+      });
     }
 
     // 2. Hantera DOKUMENTERADE BEFINTLIGA skador
-    console.log(`--- [DEBUG] Processing 'dokumenterade_skador'. Found ${dokumenterade_skador.length} items.`);
     for (const damage of dokumenterade_skador) {
-      console.log("--- [DEBUG] Processing 'dokumenterade_skador' item:", JSON.stringify(damage, null, 2));
       const firstPhoto = getFirstPhotoUrl(damage);
       const damageText = [damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean).join(' - ');
       
-      const existingDamageObject = {
+      damagesToInsert.push({
         regnr: payload.regnr,
         damage_date: now.toISOString(),
         ort: payload.ort || null,
@@ -347,30 +334,22 @@ export async function POST(request: Request) {
         position: damage.userPosition || null,
         description: damage.userDescription || damage.fullText,
         media_url: firstPhoto,
-        status: "documented_existing",
-      };
-      damagesToInsert.push(existingDamageObject);
+        status: "complete", // KORRIGERING: Använder 'complete' istället för 'documented_existing'
+      });
     }
 
-    console.log(`--- [DEBUG] Total items to insert into 'damages' table: ${damagesToInsert.length}`);
-    
     // Kör alla databasoperationer samtidigt
     if (damagesToInsert.length > 0) {
-      console.log("--- [DEBUG] Content of 'damagesToInsert':", JSON.stringify(damagesToInsert, null, 2));
-      console.log("--- [DEBUG] Calling supabase.from('damages').insert()...");
       const { error } = await supabaseAdmin.from('damages').insert(damagesToInsert);
       if (error) {
-        console.error('--- [DEBUG] Supabase DB error during INSERT operation:', JSON.stringify(error, null, 2));
-      } else {
-        console.log("--- [DEBUG] Supabase INSERT operation completed successfully. ---");
+        console.error('Supabase DB error during INSERT operation:', error);
       }
     }
 
-    console.log(`--- [DEBUG] API Route Finished at ${new Date().toISOString()} ---`);
     return NextResponse.json({ message: 'Notifications processed.' });
 
   } catch (error) {
-    console.error('--- [DEBUG] FATAL: Uncaught error in API route:', error);
+    console.error('FATAL: Uncaught error in API route:', error);
     if (error instanceof Error) {
         console.error(error.message);
     }
