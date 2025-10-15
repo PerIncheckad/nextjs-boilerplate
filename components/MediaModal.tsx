@@ -51,7 +51,7 @@ export default function MediaModal({
       return <div className="media-modal-status-text">Ingen media att visa för denna skada.</div>;
     }
     return (
-      <>
+      <div className="media-modal-inner-content">
         <div className="media-container">
           {currentMedia.type === "image" ? (
             <img src={currentMedia.url} alt="Skada" className="media-modal-media" onClick={() => setLightboxOpen(true)} />
@@ -59,6 +59,7 @@ export default function MediaModal({
             <video src={currentMedia.url} controls className="media-modal-media" />
           )}
         </div>
+
         <div className="bottom-section">
           {(hasPrev || hasNext) && (
             <div className="arrow-container">
@@ -82,7 +83,7 @@ export default function MediaModal({
             {currentMedia.metadata.inchecker && <div style={{ marginTop: "1rem" }}><b>Incheckare:</b> {currentMedia.metadata.inchecker}</div>}
           </div>
         </div>
-      </>
+      </div>
     );
   };
 
@@ -109,18 +110,19 @@ export default function MediaModal({
           position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
           background: rgba(0, 0, 0, 0.65);
           display: flex; align-items: center; justify-content: center; z-index: 9999;
+          padding: 2rem;
         }
         .media-modal-content {
           background: #fff;
           border-radius: 16px;
           box-shadow: 0 5px 25px rgba(0,0,0,0.2);
           width: 600px; /* Fast bredd */
-          max-width: 90vw;
-          height: 85vh; /* Fast höjd */
+          max-width: 100%;
+          height: 90vh; /* Justerad höjd */
           max-height: 800px;
           display: flex;
           flex-direction: column;
-          overflow: hidden; /* Inget scroll på själva modalen */
+          overflow: hidden;
         }
         .media-modal-header {
           padding: 1rem 2rem;
@@ -133,6 +135,9 @@ export default function MediaModal({
           margin: 0;
           font-size: 1.25rem;
           color: #111827;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .media-modal-close {
           position: absolute; top: 50%; right: 20px;
@@ -142,21 +147,26 @@ export default function MediaModal({
           color: #6b7280; line-height: 1; padding: 0;
         }
         .media-modal-close:hover { color: #111827; }
-
         .media-modal-body {
           flex-grow: 1;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden; /* Viktigt! */
           padding: 1.5rem;
+          overflow: hidden;
+          display: flex;
         }
         .media-modal-status-text {
             flex-grow: 1; display: flex; align-items: center; justify-content: center;
             font-size: 1.2rem; color: #6b7280;
         }
+        .media-modal-inner-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
         .media-container {
           width: 100%;
-          flex-grow: 1; /* Tar upp tillgängligt utrymme */
+          min-height: 200px; /* Minimum höjd för bilden */
+          flex-grow: 1; /* TAR UPP RESTEN AV PLATSEN */
           display: flex;
           align-items: center;
           justify-content: center;
@@ -176,15 +186,16 @@ export default function MediaModal({
         }
         .bottom-section {
             flex-shrink: 0;
-            overflow-y: auto; /* Scroll enbart för nedre sektionen */
-            padding: 0.5rem;
+            overflow-y: auto;
+            max-height: 40%; /* Max 40% av utrymmet för botten-sektionen */
+            padding-right: 1rem; /* Utrymme för scrollbar */
         }
         .arrow-container {
           display: flex;
           justify-content: center;
           align-items: center;
           gap: 1.5rem;
-          padding: 0.5rem 0;
+          padding: 0.5rem 0 1rem 0;
           width: 100%;
         }
         .media-modal-arrow {
@@ -221,7 +232,7 @@ export default function MediaModal({
         .arrow-shape.right { transform: rotate(-45deg); }
 
         .media-modal-metadata {
-          font-size: 1rem; color: #374151; margin-top: 1rem;
+          font-size: 1rem; color: #374151;
           text-align: left; width: 100%;
           line-height: 1.5;
         }
