@@ -66,9 +66,7 @@ function getDamageStatus(row: DamageWithVehicle): 'Incheckad' | 'BUHS' {
   return "BUHS";
 }
 
-// === NY FUNKTION FÖR ATT VISA KLOCKSLAG ===
 function formatCheckinTime(row: DamageWithVehicle): string {
-  // Visa bara klockslag om källan är "Incheckad"
   if (getDamageStatus(row) !== 'Incheckad' || !row.created_at) {
     return "";
   }
@@ -76,7 +74,6 @@ function formatCheckinTime(row: DamageWithVehicle): string {
   try {
     const d = new Date(row.created_at);
     if (isNaN(d.getTime())) return "";
-    // Formatera till HH:MM
     return d.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
   } catch {
     return "";
@@ -168,9 +165,7 @@ export default function RapportPage() {
       items = items.filter(row => row.regnr?.toLowerCase().includes(activeRegnr.toLowerCase()));
     }
 
-    // === KORREKT SORTERINGSLOGIK ===
     return items.sort((a: any, b: any) => {
-      // Specialhantering för den virtuella 'status'-kolumnen (Källa)
       if (sortKey === 'status') {
         const aStatus = getDamageStatus(a);
         const bStatus = getDamageStatus(b);
@@ -313,12 +308,12 @@ export default function RapportPage() {
                 <tr>
                   <th onClick={() => handleSort("regnr")}>Regnr<SortArrow column="regnr" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("brand")}>Bilmodell<SortArrow column="brand" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  {/* === RUBRIK ÄNDRAD & SORTERING FIXAD === */}
                   <th onClick={() => handleSort("status")}>Källa<SortArrow column="status" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("damage_date")} className="datum-col">Datum<SortArrow column="damage_date" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  <th onClick={() => handleSort("region")}>Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  <th onClick={() => handleSort("ort")}>Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
-                  <th onClick={() => handleSort("station_namn")}>Station<SortArrow column="station_namn" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  {/* === CSS-KLASS TILLAGD FÖR GRUPPERING === */}
+                  <th onClick={() => handleSort("region")} className="location-group">Region<SortArrow column="region" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("ort")} className="location-group">Ort<SortArrow column="ort" sortKey={sortKey} sortOrder={sortOrder} /></th>
+                  <th onClick={() => handleSort("station_namn")} className="location-group">Station<SortArrow column="station_namn" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("damage_type")}>Skada<SortArrow column="damage_type" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th onClick={() => handleSort("notering")}>Anteckning<SortArrow column="notering" sortKey={sortKey} sortOrder={sortOrder} /></th>
                   <th>Bild/video</th>
@@ -336,12 +331,12 @@ export default function RapportPage() {
                       <td>{getDamageStatus(row)}</td>
                       <td className="datum-col">
                         {row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--"}
-                        {/* === KLOCKSLAG TILLAGT HÄR === */}
                         <div className="datum-klocka">{formatCheckinTime(row)}</div>
                       </td>
-                      <td className="region-section region-flat">{row.region}</td>
-                      <td>{row.ort || "--"}</td>
-                      <td>{row.station_namn || "--"}</td>
+                      {/* === CSS-KLASS TILLAGD FÖR GRUPPERING === */}
+                      <td className="location-group">{row.region}</td>
+                      <td className="location-group">{row.ort || "--"}</td>
+                      <td className="location-group">{row.station_namn || "--"}</td>
                       <td>{row.damage_type || row.damage_type_raw || "--"}</td>
                       <td className="kommentar-col">{row.notering || "--"}</td>
                       <td className="centered-cell">
