@@ -16,6 +16,19 @@ type MediaModalProps = {
   hasPrev?: boolean; hasNext?: boolean; isLoading?: boolean;
 };
 
+const ArrowLeftIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 18l-6-6 6-6" />
+  </svg>
+);
+
+const ArrowRightIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 18l6-6-6-6" />
+  </svg>
+);
+
+
 export default function MediaModal({
   open, onClose, media, title, currentIdx = 0, onPrev, onNext, hasPrev, hasNext, isLoading
 }: MediaModalProps) {
@@ -23,15 +36,22 @@ export default function MediaModal({
 
   useEffect(() => {
     if (!open) return;
-    const handleEsc = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (lightboxOpen) setLightboxOpen(false);
         else onClose();
       }
+      // NYTT: Tangentbordsnavigering
+      if (e.key === "ArrowLeft" && onPrev) {
+        onPrev();
+      }
+      if (e.key === "ArrowRight" && onNext) {
+        onNext();
+      }
     };
-    document.addEventListener("keydown", handleEsc);
-    return () => document.removeEventListener("keydown", handleEsc);
-  }, [open, lightboxOpen, onClose]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, lightboxOpen, onClose, onPrev, onNext]);
 
   if (!open) return null;
 
@@ -57,12 +77,12 @@ export default function MediaModal({
           
           {(hasPrev || hasNext) && (
             <div className="arrow-container">
-              <button className="media-modal-arrow left" onClick={onPrev} disabled={!hasPrev} aria-label="Föregående">
-                <span className="arrow-icon" />
+              <button className="media-modal-arrow" onClick={onPrev} disabled={!hasPrev} aria-label="Föregående">
+                <ArrowLeftIcon />
               </button>
               <span>{currentIdx + 1} / {media.length}</span>
-              <button className="media-modal-arrow right" onClick={onNext} disabled={!hasNext} aria-label="Nästa">
-                <span className="arrow-icon" />
+              <button className="media-modal-arrow" onClick={onNext} disabled={!hasNext} aria-label="Nästa">
+                <ArrowRightIcon />
               </button>
             </div>
           )}
@@ -105,7 +125,7 @@ export default function MediaModal({
           display: flex; align-items: center; justify-content: center; z-index: 9999;
         }
         .media-modal-content {
-          background: rgba(255,255,255,0.98); border-radius: 18px;
+          background: #fff; border-radius: 18px;
           padding: 2rem; min-width: 350px; max-width: 95vw; max-height: 95vh;
           overflow-y: auto; box-shadow: 0 4px 32px rgba(0,0,0,0.15); position: relative;
           display: flex; flex-direction: column;
@@ -122,9 +142,8 @@ export default function MediaModal({
         
         .media-container {
           width: 100%;
-          max-width: 650px;
-          height: 65vh; /* Justerad för att ge mer höjd */
-          max-height: 65vh;
+          max-width: 500px; /* Striktare maxbredd */
+          height: 500px;    /* Strikt maxhöjd */
           display: flex;
           align-items: center;
           justify-content: center;
@@ -168,34 +187,23 @@ export default function MediaModal({
           cursor: pointer;
           transition: all 0.2s ease;
           box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+          color: #374151;
         }
         .media-modal-arrow:hover:not(:disabled) {
           border-color: #9ca3af;
           background-color: #f9fafb;
+          color: #000;
         }
         .media-modal-arrow:disabled {
           cursor: not-allowed;
           background-color: #f3f4f6;
-          opacity: 0.6;
-        }
-        .arrow-icon {
-          border: solid #374151;
-          border-width: 0 3px 3px 0;
-          display: inline-block;
-          padding: 4px;
-        }
-        .media-modal-arrow.left .arrow-icon {
-          transform: rotate(135deg);
-          margin-left: 3px;
-        }
-        .media-modal-arrow.right .arrow-icon {
-          transform: rotate(-45deg);
-          margin-right: 3px;
+          color: #9ca3af;
+          opacity: 0.7;
         }
 
         .media-modal-metadata {
           font-size: 1.05rem; color: #1f2937; margin-top: 1.5rem;
-          text-align: left; width: 100%; max-width: 650px;
+          text-align: left; width: 100%; max-width: 500px;
           line-height: 1.6;
         }
         .media-modal-metadata div { margin-bottom: 0.3rem; }
