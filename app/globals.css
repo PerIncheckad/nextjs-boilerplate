@@ -38,26 +38,24 @@ body {
 /* === HUVUDLAYOUT FÖR SIDORNA         === */
 /* ======================================= */
 
-/* För startsidan - centrerar innehållet vertikalt */
 .welcome-main {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center; /* Centrerar kortet på sidan */
+  justify-content: center;
   position: relative;
   padding: 2rem 1rem;
   box-sizing: border-box;
   background: none;
 }
 
-/* För rapportsidan - förankrar innehållet i toppen */
 .rapport-main {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start; /* Förankrar i toppen */
+  justify-content: flex-start;
   position: relative;
   padding: 2rem 1rem;
   box-sizing: border-box;
@@ -77,7 +75,7 @@ body {
   margin-top: 110px;
   text-align: center;
   padding: 2.8rem 2rem 2.5rem 2rem;
-  background: rgba(243, 244, 246, 0.94); /* Genomskinlig bakgrund */
+  background: rgba(243, 244, 246, 0.94);
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.10);
   display: flex;
@@ -93,7 +91,7 @@ body {
   margin: 0 auto;
   text-align: center;
   padding: 2.5rem 2rem 2.2rem 2rem;
-  background: rgba(243, 244, 246, 0.94); /* Genomskinlig bakgrund */
+  background: rgba(243, 244, 246, 0.94);
   border-radius: 18px;
   box-shadow: 0 4px 24px rgba(0,0,0,0.10);
   display: flex;
@@ -337,4 +335,17 @@ body {
   background: #fff;
   color: #1f2937;
   text-transform: uppercase;
+}
+
+/* === FIX FÖR DATUMKOLUMNENS BREDD === */
+.rapport-table th.datum-col,
+.rapport-table td.datum-col {
+  min-width: 120px;
+  white-space: nowrap;
+}
+
+.datum-klocka {
+  color: #2a3f57;
+  font-size: 0.93em;
+  margin-top: 2px;
 }
