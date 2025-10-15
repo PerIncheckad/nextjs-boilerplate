@@ -57,9 +57,13 @@ export default function MediaModal({
           
           {(hasPrev || hasNext) && (
             <div className="arrow-container">
-              <button className="media-modal-arrow left" onClick={onPrev} disabled={!hasPrev}>←</button>
+              <button className="media-modal-arrow left" onClick={onPrev} disabled={!hasPrev} aria-label="Föregående">
+                <span className="arrow-icon" />
+              </button>
               <span>{currentIdx + 1} / {media.length}</span>
-              <button className="media-modal-arrow right" onClick={onNext} disabled={!hasNext}>→</button>
+              <button className="media-modal-arrow right" onClick={onNext} disabled={!hasNext} aria-label="Nästa">
+                <span className="arrow-icon" />
+              </button>
             </div>
           )}
 
@@ -97,34 +101,37 @@ export default function MediaModal({
       <style jsx>{`
         .media-modal-overlay {
           position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-          background: rgba(0, 0, 0, 0.55);
+          background: rgba(0, 0, 0, 0.6);
           display: flex; align-items: center; justify-content: center; z-index: 9999;
         }
         .media-modal-content {
           background: rgba(255,255,255,0.98); border-radius: 18px;
-          padding: 2rem; min-width: 350px; max-width: 95vw; max-height: 90vh;
-          overflow-y: auto; box-shadow: 0 2px 32px #0003; position: relative;
+          padding: 2rem; min-width: 350px; max-width: 95vw; max-height: 95vh;
+          overflow-y: auto; box-shadow: 0 4px 32px rgba(0,0,0,0.15); position: relative;
+          display: flex; flex-direction: column;
         }
         .media-modal-header {
-          text-align: center; margin-bottom: 1rem; width: 100%;
+          text-align: center; margin-bottom: 1rem; width: 100%; flex-shrink: 0;
         }
         .media-modal-close {
           position: absolute; top: 18px; right: 22px; font-size: 2.2rem;
-          background: none; border: none; cursor: pointer; color: #333;
+          background: none; border: none; cursor: pointer; color: #333; line-height: 1;
         }
-        .media-modal-body { display: flex; justify-content: center; }
+        .media-modal-body { display: flex; justify-content: center; flex-grow: 1; }
         .media-modal-item { display: flex; flex-direction: column; align-items: center; }
+        
         .media-container {
-          width: 500px;
-          height: 500px;
-          max-width: 80vw;
-          max-height: 60vh;
+          width: 100%;
+          max-width: 650px;
+          height: 65vh; /* Justerad för att ge mer höjd */
+          max-height: 65vh;
           display: flex;
           align-items: center;
           justify-content: center;
-          background-color: #e5e7eb;
+          background-color: #f0f2f5;
           border-radius: 14px;
           margin-bottom: 1rem;
+          flex-shrink: 0;
         }
         .media-modal-media {
           max-width: 100%;
@@ -132,35 +139,75 @@ export default function MediaModal({
           width: auto;
           height: auto;
           object-fit: contain;
-          border-radius: 14px;
+          border-radius: 8px;
         }
         .media-modal-media[src$=".mp4"], .media-modal-media[src$=".mov"] {
-            width: 100%; /* Låt video fylla ut bredden */
+            width: 100%;
         }
         .media-modal-media[src$=".jpeg"], .media-modal-media[src$=".png"] {
             cursor: pointer;
         }
+
         .arrow-container {
-          display: flex; justify-content: center; align-items: center;
-          gap: 1.5rem; margin: 1rem 0 0 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 1.5rem;
+          margin: 0.5rem 0;
+          width: 100%;
         }
         .media-modal-arrow {
-          font-size: 2rem; background: none; border: none; cursor: pointer; color: #005A9C;
+          background: #fff;
+          border: 1px solid #d1d5db;
+          border-radius: 50%;
+          width: 44px;
+          height: 44px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
-        .media-modal-arrow:disabled { color: #ccc; cursor: not-allowed; }
+        .media-modal-arrow:hover:not(:disabled) {
+          border-color: #9ca3af;
+          background-color: #f9fafb;
+        }
+        .media-modal-arrow:disabled {
+          cursor: not-allowed;
+          background-color: #f3f4f6;
+          opacity: 0.6;
+        }
+        .arrow-icon {
+          border: solid #374151;
+          border-width: 0 3px 3px 0;
+          display: inline-block;
+          padding: 4px;
+        }
+        .media-modal-arrow.left .arrow-icon {
+          transform: rotate(135deg);
+          margin-left: 3px;
+        }
+        .media-modal-arrow.right .arrow-icon {
+          transform: rotate(-45deg);
+          margin-right: 3px;
+        }
+
         .media-modal-metadata {
-          font-size: 1.1rem; color: #1f2937; margin-top: 1rem;
-          text-align: left; width: 100%; max-width: 500px;
+          font-size: 1.05rem; color: #1f2937; margin-top: 1.5rem;
+          text-align: left; width: 100%; max-width: 650px;
+          line-height: 1.6;
         }
-        .media-modal-metadata div { margin-bottom: 0.25rem; }
-        .note { margin-top: 1rem; font-style: italic; color: #444; }
-        .general-note { margin-top: 0.5rem; color: #555; font-style: normal;}
+        .media-modal-metadata div { margin-bottom: 0.3rem; }
+        .note { margin-top: 1rem; font-style: italic; color: #374151; border-left: 3px solid #d1d5db; padding-left: 1rem;}
+        .general-note { margin-top: 0.75rem; color: #4b5563; font-style: normal; }
+        
         .media-modal-lightbox {
           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
           background: rgba(0,0,0,0.88); display: flex; align-items: center;
           justify-content: center; z-index: 10000;
         }
-        .media-modal-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 16px; }
+        .media-modal-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
       `}</style>
     </>
   );
