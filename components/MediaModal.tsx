@@ -51,7 +51,7 @@ export default function MediaModal({
       return <div className="media-modal-status-text">Ingen media att visa för denna skada.</div>;
     }
     return (
-      <>
+      <div className="media-modal-inner-content">
         <div className="media-container">
           {currentMedia.type === "image" ? (
             <img src={currentMedia.url} alt="Skada" className="media-modal-media" onClick={() => setLightboxOpen(true)} />
@@ -59,6 +59,7 @@ export default function MediaModal({
             <video src={currentMedia.url} controls className="media-modal-media" />
           )}
         </div>
+
         <div className="bottom-section">
           {(hasPrev || hasNext) && (
             <div className="arrow-container">
@@ -82,7 +83,7 @@ export default function MediaModal({
             {currentMedia.metadata.inchecker && <div style={{ marginTop: "1rem" }}><b>Incheckare:</b> {currentMedia.metadata.inchecker}</div>}
           </div>
         </div>
-      </>
+      </div>
     );
   };
 
@@ -105,6 +106,12 @@ export default function MediaModal({
         </div>
       )}
       <style jsx>{`
+        /* === DIAGNOSTISKT TEST === */
+        .media-modal-content {
+          border: 5px dashed red !important;
+        }
+        /* ========================= */
+
         .media-modal-overlay {
           position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
           background: rgba(0, 0, 0, 0.65);
@@ -151,15 +158,22 @@ export default function MediaModal({
           padding: 1.5rem;
           overflow: hidden;
           display: flex;
-          flex-direction: column; /* Huvudlayoutriktning */
+          flex-direction: column;
         }
         .media-modal-status-text {
             flex-grow: 1; display: flex; align-items: center; justify-content: center;
             font-size: 1.2rem; color: #6b7280;
         }
+        .media-modal-inner-content {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
         .media-container {
           width: 100%;
-          height: 65%; /* Strikt höjdfördelning */
+          min-height: 200px;
+          flex-grow: 1;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -178,12 +192,11 @@ export default function MediaModal({
             cursor: pointer;
         }
         .bottom-section {
-            height: 35%; /* Strikt höjdfördelning */
-            display: flex;
-            flex-direction: column;
+            flex-shrink: 0;
+            overflow-y: auto;
+            max-height: 30%; /* Striktare maxhöjd för botten */
         }
         .arrow-container {
-          flex-shrink: 0; /* Ska inte krympa */
           display: flex;
           justify-content: center;
           align-items: center;
@@ -225,12 +238,12 @@ export default function MediaModal({
         .arrow-shape.right { transform: rotate(-45deg); }
 
         .media-modal-metadata {
-          flex-grow: 1; /* Tar upp resten av utrymmet i botten */
-          overflow-y: auto; /* Scroll enbart för denna div */
+          flex-grow: 1;
+          overflow-y: auto;
           font-size: 1rem; color: #374151;
           text-align: left; width: 100%;
           line-height: 1.5;
-          padding-right: 0.5rem; /* Plats för scrollbar */
+          padding-right: 0.5rem;
         }
         .media-modal-metadata div { margin-bottom: 0.25rem; }
         .note { margin-top: 0.75rem; font-style: italic; color: #1f2937; border-left: 3px solid #e5e7eb; padding-left: 0.75rem;}
