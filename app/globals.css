@@ -43,9 +43,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  /* === ÄNDRING: Justerar för att få mer kontroll över positioner === */
-  justify-content: flex-start; /* Börjar från toppen */
-  padding-top: 8vh; /* Trycker ner allt från toppen */
+  justify-content: flex-start;
+  padding-top: 8vh;
   position: relative;
   box-sizing: border-box;
   background: none;
@@ -63,8 +62,6 @@ body {
   background: none;
 }
 
-/* Wrapper togs bort, behövs ej */
-
 /* ======================================= */
 /* === KORT-KOMPONENTER                === */
 /* ======================================= */
@@ -75,8 +72,7 @@ body {
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  /* === ÄNDRING: Ny marginal för att skapa avstånd från loggan === */
-  margin-top: 5vh; 
+  margin-top: 5vh;
   text-align: center;
   padding: 2.8rem 2rem 2.5rem 2rem;
   background: rgba(243, 244, 246, 0.94);
@@ -102,8 +98,6 @@ body {
   flex-direction: column;
   align-items: center;
 }
-
-/* ... resten av CSS-filen är oförändrad ... */
 
 .login-card {
   background: #f3f4f6;
@@ -181,7 +175,6 @@ body {
 
 .btn-group {
   display: flex;
-  /* === ÄNDRING: Ökat avstånd mellan knapparna === */
   gap: 1.5rem; 
   justify-content: center;
   margin-bottom: 2.1rem;
@@ -282,24 +275,23 @@ body {
   border-left: 3px solid #b0b4b8;
 }
 
-.region-section {
-  background: #eaf4fd;
-  border-radius: 8px 0 0 8px;
-  text-align: center;
-  box-shadow: 0 4px 16px 0 #eaf4fdcc;
+/* === ÄNDRING: Gruppering av plats-kolumner === */
+.location-group {
+  background-color: #f7f7fa; /* Ljusgrå bakgrund */
 }
-.rapport-table th.region-section {
-  background: #eaf4fd;
+
+.rapport-table th.location-group {
+  background-color: #f0f2f5; /* Något mörkare för rubriker */
+}
+
+/* Tar bort den gamla blå färgen */
+.region-section {
+  text-align: center;
   box-shadow: none;
 }
 
-.region-section.region-flat {
-  background: #e4f1fb !important;
-  border-radius: 4px;
-  box-shadow: none !important;
-}
-.rapport-table th.region-section.region-flat {
-  background: #cbe4f6 !important;
+.rapport-table th.region-section {
+  box-shadow: none;
 }
 
 .skada-cell .skada-hierarki {
@@ -361,6 +353,16 @@ body {
   color: #1f2937;
   text-transform: uppercase;
 }
+
+/* === ÄNDRING: Ny färg på Rensa-knappen === */
+.rapport-reset-btn {
+  background: #6b7280; /* Mörkgrå */
+  color: #fff;
+}
+.rapport-reset-btn:hover {
+  background: #4b5563;
+}
+
 
 .rapport-table th.datum-col,
 .rapport-table td.datum-col {
