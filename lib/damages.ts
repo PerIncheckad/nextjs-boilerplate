@@ -5,10 +5,17 @@ import { supabase } from './supabase';
 // =================================================================
 
 type ExternalDamage = {
+  id: number; // === ÄNDRING: ID måste vara med ===
   damage_type_raw: string | null;
   note_customer: string | null;
   note_internal: string | null;
   saludatum: string | null;
+};
+
+// === ÄNDRING: Ny typ för att skicka till formuläret ===
+export type FormattedDamage = {
+  id: number;
+  text: string;
 };
 
 export type VehicleInfo = {
@@ -16,7 +23,7 @@ export type VehicleInfo = {
   model: string;
   wheel_storage_location: string;
   saludatum: string;
-  existing_damages: string[];
+  existing_damages: FormattedDamage[]; // === ÄNDRING: Använder den nya typen ===
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
 };
 
@@ -24,11 +31,12 @@ export type VehicleInfo = {
 // 2. HELPER FUNCTIONS
 // =================================================================
 
-function formatDamages(damages: ExternalDamage[]): string[] {
+// === ÄNDRING: Returnerar nu ett objekt med både ID och text ===
+function formatDamages(damages: ExternalDamage[]): FormattedDamage[] {
   if (!damages || damages.length === 0) {
     return [];
   }
-  return damages.map((damage, index) => {
+  return damages.map((damage) => {
     const parts = [
       damage.damage_type_raw,
       damage.note_customer,
@@ -36,9 +44,13 @@ function formatDamages(damages: ExternalDamage[]): string[] {
     ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
     const uniqueParts = [...new Set(parts)];
     const damageString = uniqueParts.join(' - ');
-    if (!damageString) return null; // Hoppa över helt tomma skador
-    return `${index + 1}. ${damageString}`;
-  }).filter(Boolean) as string[]; // Filtrera bort null-värden
+    if (!damageString) return null;
+    
+    return {
+      id: damage.id,
+      text: damageString,
+    };
+  }).filter(Boolean) as FormattedDamage[];
 }
 
 function formatModel(brand: string | null, model: string | null): string {
@@ -56,17 +68,16 @@ function formatSaludatum(dateStr: string | null | undefined): string {
     if (cleaned.length === 8 && /^\d{8}$/.test(cleaned)) {
         return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}`;
     }
-    return dateStr; // Returnera som den är om formatet är okänt
+    return dateStr;
 }
 
 // =================================================================
-// 3. CORE DATA FETCHING FUNCTION (FINAL-FINAL VERSION)
+// 3. CORE DATA FETCHING FUNCTION
 // =================================================================
 
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
-  // --- Steg 1: Använd RPC-funktioner för BÅDA anropen ---
   const [vehicleResponse, damagesResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
@@ -74,18 +85,14 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr })
   ]);
 
-  // Hämta första (och enda) bilen om den finns
   const vehicleData = vehicleResponse.data?.[0] || null; 
   const damagesData = damagesResponse.data || [];
 
-  // --- Steg 2: Bearbeta den hämtade datan ---
-  const formattedDamages = formatDamages(damagesData);
+  const formattedDamages = formatDamages(damagesData as ExternalDamage[]); // === ÄNDRING: Tydliggör typen ===
   const latestSaludatum = damagesData.length > 0 ? damagesData[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
-  // --- Steg 3: Bestäm scenario och returnera korrekt data ---
-
-  if (vehicleData) { // Scenario A: Bilen hittades i `vehicles`
+  if (vehicleData) {
     return {
       regnr: cleanedRegnr,
       model: formatModel(vehicleData.brand, vehicleData.model),
@@ -96,7 +103,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     };
   }
 
-  if (damagesData.length > 0) { // Scenario B: Endast skadehistorik finns
+  if (damagesData.length > 0) {
     return {
       regnr: cleanedRegnr,
       model: 'Modell saknas',
@@ -107,7 +114,6 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     };
   }
 
-  // Scenario C: Ingen träff alls
   return {
     regnr: cleanedRegnr,
     model: 'Modell saknas',
