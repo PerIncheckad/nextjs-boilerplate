@@ -267,7 +267,7 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const payload = fullRequestPayload.meta; 
 
-    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
+    const { regnr, ort, station, status, nya_skador = [], dokumenterade_skador = [] } = payload;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -314,7 +314,6 @@ export async function POST(request: Request) {
         position: damage.position || null,
         description: damage.text || null,
         media_url: firstPhoto,
-        notering: payload.notering || null,
         status: "complete",
       });
     }
@@ -326,7 +325,6 @@ export async function POST(request: Request) {
       
       damagesToInsert.push({
         regnr: payload.regnr,
-        // car_model: payload.carModel || null, // BORTTAGEN RAD - DETTA VAR FELET
         damage_date: now.toISOString(),
         ort: payload.ort || null,
         station_namn: payload.station || null,
@@ -336,7 +334,6 @@ export async function POST(request: Request) {
         position: damage.userPosition || null,
         description: damage.userDescription || damage.fullText,
         media_url: firstPhoto,
-        notering: payload.notering || null,
         status: "documented_existing",
       });
     }
@@ -345,14 +342,15 @@ export async function POST(request: Request) {
     if (damagesToInsert.length > 0) {
       const { error } = await supabaseAdmin.from('damages').insert(damagesToInsert);
       if (error) {
+        // Logga felet men krascha inte applikationen, mejlen har redan skickats.
         console.error('Supabase DB error during INSERT operation:', error);
       }
     }
 
-    return NextResponse.json({ message: 'Notifications processed and database operations initiated.' });
+    return NextResponse.json({ message: 'Notifications processed.' });
 
   } catch (error) {
-    console.error('FATAL: Failed to process request:', error);
+    console.error('FATAL: Uncaught error in API route:', error);
     if (error instanceof Error) {
         console.error(error.message);
     }
