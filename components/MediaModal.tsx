@@ -95,14 +95,25 @@ export default function MediaModal({
         </div>
       )}
       <style jsx>{`
-        .media-modal-overlay { /* ... befintlig stil ... */ }
-        .media-modal-content { /* ... befintlig stil ... */ }
-        .media-modal-header { /* ... befintlig stil ... */ }
-        .media-modal-close { /* ... befintlig stil ... */ }
+        .media-modal-overlay {
+          position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+          background: rgba(0, 0, 0, 0.55);
+          display: flex; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .media-modal-content {
+          background: rgba(255,255,255,0.98); border-radius: 18px;
+          padding: 2rem; min-width: 350px; max-width: 95vw; max-height: 90vh;
+          overflow-y: auto; box-shadow: 0 2px 32px #0003; position: relative;
+        }
+        .media-modal-header {
+          text-align: center; margin-bottom: 1rem; width: 100%;
+        }
+        .media-modal-close {
+          position: absolute; top: 18px; right: 22px; font-size: 2.2rem;
+          background: none; border: none; cursor: pointer; color: #333;
+        }
         .media-modal-body { display: flex; justify-content: center; }
         .media-modal-item { display: flex; flex-direction: column; align-items: center; }
-
-        /* NYTT: Fast storlek för mediakontainer */
         .media-container {
           width: 500px;
           height: 500px;
@@ -126,10 +137,17 @@ export default function MediaModal({
         .media-modal-media[src$=".mp4"], .media-modal-media[src$=".mov"] {
             width: 100%; /* Låt video fylla ut bredden */
         }
-        .media-modal-image { cursor: pointer; }
-        
-        .arrow-container { /* ... befintlig stil ... */ }
-        .media-modal-arrow { /* ... befintlig stil ... */ }
+        .media-modal-media[src$=".jpeg"], .media-modal-media[src$=".png"] {
+            cursor: pointer;
+        }
+        .arrow-container {
+          display: flex; justify-content: center; align-items: center;
+          gap: 1.5rem; margin: 1rem 0 0 0;
+        }
+        .media-modal-arrow {
+          font-size: 2rem; background: none; border: none; cursor: pointer; color: #005A9C;
+        }
+        .media-modal-arrow:disabled { color: #ccc; cursor: not-allowed; }
         .media-modal-metadata {
           font-size: 1.1rem; color: #1f2937; margin-top: 1rem;
           text-align: left; width: 100%; max-width: 500px;
@@ -137,9 +155,12 @@ export default function MediaModal({
         .media-modal-metadata div { margin-bottom: 0.25rem; }
         .note { margin-top: 1rem; font-style: italic; color: #444; }
         .general-note { margin-top: 0.5rem; color: #555; font-style: normal;}
-
-        .media-modal-lightbox { /* ... befintlig stil ... */ }
-        .media-modal-lightbox img { /* ... befintlig stil ... */ }
+        .media-modal-lightbox {
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.88); display: flex; align-items: center;
+          justify-content: center; z-index: 10000;
+        }
+        .media-modal-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 16px; }
       `}</style>
     </>
   );
