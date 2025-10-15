@@ -39,7 +39,7 @@ const createAlertBanner = (condition: boolean, text: string): string => {
   return `
     <tr>
       <td style="padding: 12px 0;">
-        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400E !important;">
+        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bol[...]
           ⚠️ ${text}
         </div>
       </td>
@@ -73,7 +73,7 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; m[...]
 };
 
 const formatTankning = (tankning: any): string => {
@@ -176,18 +176,18 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
         <table class="info-grid">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></t[...]
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td>[...]
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
         <table class="info-grid">
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #000000 !important; padding: 4px 0;">${matarstallning} km</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${formatTankning(tankning)}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #000000 !important; padding: 4px 0;">${matarstallning} km<[...]
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${formatTankning(tankning)}</[...]
         </table>
       </div>
       ${nya_skador.length > 0 ? `
@@ -222,7 +222,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
         <table class="info-grid">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></t[...]
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Däck:</td><td style="color: #000000 !important; padding: 4px 0;">${hjultyp || '---'}</td></tr>
         </table>
       </div>
@@ -232,7 +232,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td>[...]
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -265,7 +265,6 @@ export async function POST(request: Request) {
 
   try {
     const fullRequestPayload = await request.json();
-    // === ÄNDRING: Korrekt data-objekt ===
     const payload = fullRequestPayload.meta; 
     const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
 
@@ -283,18 +282,27 @@ export async function POST(request: Request) {
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen lägg till det manuellt.</p></td></tr>`);
+      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), s[...]
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
     
-    // Vänta inte på e-post, men fortsätt om de misslyckas
     Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
 
     // Databashantering
     const dbPromises = [];
 
+    // === ÄNDRING: Logik för att extrahera den första bildens URL ===
+    const getFirstPhotoUrl = (damage: any): string | null => {
+        const photoUrls = damage.uploads?.photo_urls;
+        if (Array.isArray(photoUrls) && photoUrls.length > 0) {
+            return photoUrls[0];
+        }
+        return null;
+    };
+
     // 1. Hantera NYA skador
     for (const damage of nya_skador) {
+      const firstPhoto = getFirstPhotoUrl(damage);
       const insertPayload = {
         regnr: payload.regnr,
         damage_date: now.toISOString(),
@@ -305,8 +313,7 @@ export async function POST(request: Request) {
         car_part: damage.carPart || null,
         position: damage.position || null,
         description: damage.text || null,
-        photo_urls: damage.uploads?.photo_urls || [],
-        video_urls: damage.uploads?.video_urls || [],
+        media_url: firstPhoto, // === ÄNDRING: Använder korrekt kolumn och data ===
         notering: payload.notering || null,
         status: "complete",
       };
@@ -317,17 +324,21 @@ export async function POST(request: Request) {
     for (const damage of dokumenterade_skador) {
       if (!damage.db_id) continue; 
 
-      const updatePayload = {
+      const firstPhoto = getFirstPhotoUrl(damage);
+      const updatePayload: { [key: string]: any } = {
         inchecker_name: payload.incheckare || null,
-        photo_urls: damage.uploads?.photo_urls || [],
-        video_urls: damage.uploads?.video_urls || [],
         updated_at: now.toISOString(),
-        notering: payload.notering || null,
+        notering: payload.notering || payload.notering, // Behåller befintlig om ny saknas
         damage_type: damage.userType || undefined,
         car_part: damage.userCarPart || undefined,
         position: damage.userPosition || undefined,
         description: damage.userDescription || undefined,
       };
+
+      // === ÄNDRING: Lägg bara till media_url om en bild faktiskt laddades upp ===
+      if (firstPhoto) {
+        updatePayload.media_url = firstPhoto;
+      }
       
       dbPromises.push(
         supabaseAdmin.from('damages')
@@ -338,12 +349,13 @@ export async function POST(request: Request) {
 
     const results = await Promise.all(dbPromises);
     
-    for (const result of results) {
+    // Förbättrad fel-loggning
+    results.forEach((result, index) => {
       if (result.error) {
-        // Logga felet men blockera inte svaret
-        console.error('Supabase DB error:', result.error);
+        const failedOp = index < nya_skador.length ? `INSERT (nya_skador[${index}])` : `UPDATE (dokumenterade_skador[${index - nya_skador.length}])`;
+        console.error(`Supabase DB error during ${failedOp}:`, result.error);
       }
-    }
+    });
 
     return NextResponse.json({ message: 'Notifications processed and database operations initiated.' });
 
