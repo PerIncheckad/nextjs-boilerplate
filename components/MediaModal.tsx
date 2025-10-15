@@ -16,19 +16,6 @@ type MediaModalProps = {
   hasPrev?: boolean; hasNext?: boolean; isLoading?: boolean;
 };
 
-const ArrowLeftIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 18l-6-6 6-6" />
-  </svg>
-);
-
-const ArrowRightIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 18l6-6-6-6" />
-  </svg>
-);
-
-
 export default function MediaModal({
   open, onClose, media, title, currentIdx = 0, onPrev, onNext, hasPrev, hasNext, isLoading
 }: MediaModalProps) {
@@ -41,17 +28,16 @@ export default function MediaModal({
         if (lightboxOpen) setLightboxOpen(false);
         else onClose();
       }
-      // NYTT: Tangentbordsnavigering
-      if (e.key === "ArrowLeft" && onPrev) {
+      if (e.key === "ArrowLeft" && onPrev && hasPrev) {
         onPrev();
       }
-      if (e.key === "ArrowRight" && onNext) {
+      if (e.key === "ArrowRight" && onNext && hasNext) {
         onNext();
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, lightboxOpen, onClose, onPrev, onNext]);
+  }, [open, lightboxOpen, onClose, onPrev, onNext, hasPrev, hasNext]);
 
   if (!open) return null;
 
@@ -59,34 +45,32 @@ export default function MediaModal({
 
   const renderContent = () => {
     if (isLoading) {
-      return <div className="media-modal-body" style={{ padding: '2rem', textAlign: 'center' }}>Hämtar media...</div>;
+      return <div className="media-modal-status-text">Hämtar media...</div>;
     }
     if (!currentMedia) {
-      return <div className="media-modal-body" style={{ padding: '2rem', textAlign: 'center' }}>Ingen media att visa för denna skada.</div>;
+      return <div className="media-modal-status-text">Ingen media att visa för denna skada.</div>;
     }
     return (
-      <div className="media-modal-body">
-        <div className="media-modal-item">
-          <div className="media-container">
-            {currentMedia.type === "image" ? (
-              <img src={currentMedia.url} alt="Skada" className="media-modal-media" onClick={() => setLightboxOpen(true)} />
-            ) : (
-              <video src={currentMedia.url} controls className="media-modal-media" />
-            )}
-          </div>
-          
+      <>
+        <div className="media-container">
+          {currentMedia.type === "image" ? (
+            <img src={currentMedia.url} alt="Skada" className="media-modal-media" onClick={() => setLightboxOpen(true)} />
+          ) : (
+            <video src={currentMedia.url} controls className="media-modal-media" />
+          )}
+        </div>
+        <div className="bottom-section">
           {(hasPrev || hasNext) && (
             <div className="arrow-container">
               <button className="media-modal-arrow" onClick={onPrev} disabled={!hasPrev} aria-label="Föregående">
-                <ArrowLeftIcon />
+                <span className="arrow-shape left" />
               </button>
               <span>{currentIdx + 1} / {media.length}</span>
               <button className="media-modal-arrow" onClick={onNext} disabled={!hasNext} aria-label="Nästa">
-                <ArrowRightIcon />
+                <span className="arrow-shape right" />
               </button>
             </div>
           )}
-
           <div className="media-modal-metadata">
             <div><b>Datum för dokumentation:</b> {currentMedia.metadata.documentationDate || "--"}</div>
             {currentMedia.metadata.time && <div><b>Klockslag:</b> kl {currentMedia.metadata.time}</div>}
@@ -98,7 +82,7 @@ export default function MediaModal({
             {currentMedia.metadata.inchecker && <div style={{ marginTop: "1rem" }}><b>Incheckare:</b> {currentMedia.metadata.inchecker}</div>}
           </div>
         </div>
-      </div>
+      </>
     );
   };
 
@@ -107,10 +91,12 @@ export default function MediaModal({
       <div className="media-modal-overlay" onClick={onClose}>
         <div className="media-modal-content" onClick={(e) => e.stopPropagation()}>
           <div className="media-modal-header">
-            <h2 style={{ textAlign: "center", width: "100%" }}>{title}</h2>
+            <h2 className="modal-title-text">{title}</h2>
             <button className="media-modal-close" onClick={onClose}>×</button>
           </div>
-          {renderContent()}
+          <div className="media-modal-body">
+            {renderContent()}
+          </div>
         </div>
       </div>
       {lightboxOpen && currentMedia && (
@@ -121,94 +107,127 @@ export default function MediaModal({
       <style jsx>{`
         .media-modal-overlay {
           position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-          background: rgba(0, 0, 0, 0.6);
+          background: rgba(0, 0, 0, 0.65);
           display: flex; align-items: center; justify-content: center; z-index: 9999;
         }
         .media-modal-content {
-          background: #fff; border-radius: 18px;
-          padding: 2rem; min-width: 350px; max-width: 95vw; max-height: 95vh;
-          overflow-y: auto; box-shadow: 0 4px 32px rgba(0,0,0,0.15); position: relative;
-          display: flex; flex-direction: column;
+          background: #fff;
+          border-radius: 16px;
+          box-shadow: 0 5px 25px rgba(0,0,0,0.2);
+          width: 600px; /* Fast bredd */
+          max-width: 90vw;
+          height: 85vh; /* Fast höjd */
+          max-height: 800px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden; /* Inget scroll på själva modalen */
         }
         .media-modal-header {
-          text-align: center; margin-bottom: 1rem; width: 100%; flex-shrink: 0;
+          padding: 1rem 2rem;
+          text-align: center;
+          border-bottom: 1px solid #e5e7eb;
+          position: relative;
+          flex-shrink: 0;
+        }
+        .modal-title-text {
+          margin: 0;
+          font-size: 1.25rem;
+          color: #111827;
         }
         .media-modal-close {
-          position: absolute; top: 18px; right: 22px; font-size: 2.2rem;
-          background: none; border: none; cursor: pointer; color: #333; line-height: 1;
+          position: absolute; top: 50%; right: 20px;
+          transform: translateY(-50%);
+          font-size: 2.5rem;
+          background: none; border: none; cursor: pointer;
+          color: #6b7280; line-height: 1; padding: 0;
         }
-        .media-modal-body { display: flex; justify-content: center; flex-grow: 1; }
-        .media-modal-item { display: flex; flex-direction: column; align-items: center; }
-        
+        .media-modal-close:hover { color: #111827; }
+
+        .media-modal-body {
+          flex-grow: 1;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden; /* Viktigt! */
+          padding: 1.5rem;
+        }
+        .media-modal-status-text {
+            flex-grow: 1; display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; color: #6b7280;
+        }
         .media-container {
           width: 100%;
-          max-width: 500px; /* Striktare maxbredd */
-          height: 500px;    /* Strikt maxhöjd */
+          flex-grow: 1; /* Tar upp tillgängligt utrymme */
           display: flex;
           align-items: center;
           justify-content: center;
-          background-color: #f0f2f5;
-          border-radius: 14px;
+          background-color: #f3f4f6;
+          border-radius: 12px;
+          overflow: hidden;
           margin-bottom: 1rem;
-          flex-shrink: 0;
         }
         .media-modal-media {
           max-width: 100%;
           max-height: 100%;
-          width: auto;
-          height: auto;
           object-fit: contain;
-          border-radius: 8px;
-        }
-        .media-modal-media[src$=".mp4"], .media-modal-media[src$=".mov"] {
-            width: 100%;
+          border-radius: 4px;
         }
         .media-modal-media[src$=".jpeg"], .media-modal-media[src$=".png"] {
             cursor: pointer;
         }
-
+        .bottom-section {
+            flex-shrink: 0;
+            overflow-y: auto; /* Scroll enbart för nedre sektionen */
+            padding: 0.5rem;
+        }
         .arrow-container {
           display: flex;
           justify-content: center;
           align-items: center;
           gap: 1.5rem;
-          margin: 0.5rem 0;
+          padding: 0.5rem 0;
           width: 100%;
         }
         .media-modal-arrow {
           background: #fff;
           border: 1px solid #d1d5db;
           border-radius: 50%;
-          width: 44px;
-          height: 44px;
+          width: 40px;
+          height: 40px;
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           transition: all 0.2s ease;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-          color: #374151;
+          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          color: #4b5563;
         }
         .media-modal-arrow:hover:not(:disabled) {
           border-color: #9ca3af;
           background-color: #f9fafb;
-          color: #000;
+          color: #1f2937;
         }
         .media-modal-arrow:disabled {
           cursor: not-allowed;
-          background-color: #f3f4f6;
-          color: #9ca3af;
-          opacity: 0.7;
+          background-color: #f9fafb;
+          color: #d1d5db;
         }
+        .arrow-shape {
+          border: solid currentColor;
+          border-width: 0 2px 2px 0;
+          display: inline-block;
+          padding: 4px;
+        }
+        .arrow-shape.left { transform: rotate(135deg); }
+        .arrow-shape.right { transform: rotate(-45deg); }
 
         .media-modal-metadata {
-          font-size: 1.05rem; color: #1f2937; margin-top: 1.5rem;
-          text-align: left; width: 100%; max-width: 500px;
-          line-height: 1.6;
+          font-size: 1rem; color: #374151; margin-top: 1rem;
+          text-align: left; width: 100%;
+          line-height: 1.5;
         }
-        .media-modal-metadata div { margin-bottom: 0.3rem; }
-        .note { margin-top: 1rem; font-style: italic; color: #374151; border-left: 3px solid #d1d5db; padding-left: 1rem;}
-        .general-note { margin-top: 0.75rem; color: #4b5563; font-style: normal; }
+        .media-modal-metadata div { margin-bottom: 0.25rem; }
+        .note { margin-top: 0.75rem; font-style: italic; color: #1f2937; border-left: 3px solid #e5e7eb; padding-left: 0.75rem;}
+        .general-note { margin-top: 0.5rem; color: #4b5563; font-style: normal; }
         
         .media-modal-lightbox {
           position: fixed; top: 0; left: 0; width: 100%; height: 100%;
