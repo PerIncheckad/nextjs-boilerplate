@@ -264,8 +264,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const payload = await request.json();
-    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload.meta;
+    const fullRequestPayload = await request.json();
+    // === ÄNDRING: Korrekt data-objekt ===
+    const payload = fullRequestPayload.meta; 
+    const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -275,50 +277,52 @@ export async function POST(request: Request) {
     // E-posthantering
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
-    const regionHtml = buildRegionEmail(payload.meta, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${payload.subjectBase} - REGION`, html: regionHtml }));
-    const bilkontrollHtml = buildBilkontrollEmail(payload.meta, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${payload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
+    const regionHtml = buildRegionEmail(payload, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - REGION`, html: regionHtml }));
+    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
       const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen lägg till det manuellt.</p></td></tr>`);
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
-    await Promise.all(emailPromises);
+    
+    // Vänta inte på e-post, men fortsätt om de misslyckas
+    Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
 
     // Databashantering
     const dbPromises = [];
 
-    // 1. Hantera NYA skador (skapa nya rader)
+    // 1. Hantera NYA skador
     for (const damage of nya_skador) {
       const insertPayload = {
-        regnr: payload.meta.regnr,
+        regnr: payload.regnr,
         damage_date: now.toISOString(),
-        ort: payload.meta.ort || null,
-        station_namn: payload.meta.station || null,
-        inchecker_name: payload.meta.incheckare || null,
+        ort: payload.ort || null,
+        station_namn: payload.station || null,
+        inchecker_name: payload.incheckare || null,
         damage_type: damage.type || "Okänd",
         car_part: damage.carPart || null,
         position: damage.position || null,
         description: damage.text || null,
         photo_urls: damage.uploads?.photo_urls || [],
         video_urls: damage.uploads?.video_urls || [],
-        notering: payload.meta.notering || null,
+        notering: payload.notering || null,
         status: "complete",
       };
       dbPromises.push(supabaseAdmin.from('damages').insert(insertPayload));
     }
 
-    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador (uppdatera rader med RÄTT ID)
+    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador
     for (const damage of dokumenterade_skador) {
       if (!damage.db_id) continue; 
 
       const updatePayload = {
-        inchecker_name: payload.meta.incheckare || null,
+        inchecker_name: payload.incheckare || null,
         photo_urls: damage.uploads?.photo_urls || [],
         video_urls: damage.uploads?.video_urls || [],
         updated_at: now.toISOString(),
-        notering: payload.meta.notering || null,
+        notering: payload.notering || null,
         damage_type: damage.userType || undefined,
         car_part: damage.userCarPart || undefined,
         position: damage.userPosition || undefined,
@@ -336,17 +340,18 @@ export async function POST(request: Request) {
     
     for (const result of results) {
       if (result.error) {
+        // Logga felet men blockera inte svaret
         console.error('Supabase DB error:', result.error);
       }
     }
 
-    return NextResponse.json({ message: 'Notifications processed and database updated.' });
+    return NextResponse.json({ message: 'Notifications processed and database operations initiated.' });
 
   } catch (error) {
-    console.error('FATAL: Failed to send notification or save damage:', error);
+    console.error('FATAL: Failed to process request:', error);
     if (error instanceof Error) {
         console.error(error.message);
     }
-    return NextResponse.json({ error: 'Failed to send notification or save damage' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
   }
 }
