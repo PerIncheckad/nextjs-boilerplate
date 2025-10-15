@@ -258,6 +258,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
 // 4. MAIN API FUNCTION
 // =================================================================
 export async function POST(request: Request) {
+  console.log("--- [DEBUG] API Route Invoked ---");
   if (!bilkontrollAddress || !fallbackAddress) {
     console.error('SERVER ERROR: BILKONTROLL_MAIL or TEST_MAIL is not configured.');
     return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
@@ -265,7 +266,10 @@ export async function POST(request: Request) {
 
   try {
     const fullRequestPayload = await request.json();
+    console.log("--- [DEBUG] Full request payload received:", JSON.stringify(fullRequestPayload, null, 2));
+
     const payload = fullRequestPayload.meta; 
+    console.log("--- [DEBUG] Extracted 'meta' payload:", JSON.stringify(payload, null, 2));
 
     const { regnr, ort, station, status, notering, nya_skador = [], dokumenterade_skador = [] } = payload;
 
@@ -274,6 +278,7 @@ export async function POST(request: Request) {
     const date = now.toLocaleDateString('sv-SE', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' });
     const time = now.toLocaleTimeString('sv-SE', { ...options, hour: '2-digit', minute: '2-digit' });
 
+    console.log("--- [DEBUG] Processing emails... ---");
     // E-posthantering
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
@@ -287,10 +292,13 @@ export async function POST(request: Request) {
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
     
-    Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
+    Promise.all(emailPromises).catch(err => console.error("--- [DEBUG] Email sending failed:", err));
+    console.log("--- [DEBUG] Email tasks dispatched. ---");
+
 
     // Databashantering
-    const dbPromises = [];
+    console.log("--- [DEBUG] Starting database processing. ---");
+    const damagesToInsert = [];
 
     const getFirstPhotoUrl = (damage: any): string | null => {
         const photoUrls = damage.uploads?.photo_urls;
@@ -300,11 +308,10 @@ export async function POST(request: Request) {
         return null;
     };
 
-    // Bearbeta alla skador som ska sparas till 'damages'-tabellen
-    const damagesToInsert = [];
-
-    // 1. Hantera NYA skador (skapa nya rader i 'damages')
+    // 1. Hantera NYA skador
+    console.log(`--- [DEBUG] Processing 'nya_skador'. Found ${nya_skador.length} items.`);
     for (const damage of nya_skador) {
+      console.log("--- [DEBUG] Processing 'nya_skador' item:", JSON.stringify(damage, null, 2));
       const firstPhoto = getFirstPhotoUrl(damage);
       damagesToInsert.push({
         regnr: payload.regnr,
@@ -319,47 +326,56 @@ export async function POST(request: Request) {
         description: damage.text || null,
         media_url: firstPhoto,
         notering: payload.notering || null,
-        status: "complete", // Status för den nya skadan
+        status: "complete",
       });
     }
 
-    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador (skapa nya rader i 'damages')
+    // 2. Hantera DOKUMENTERADE BEFINTLIGA skador
+    console.log(`--- [DEBUG] Processing 'dokumenterade_skador'. Found ${dokumenterade_skador.length} items.`);
     for (const damage of dokumenterade_skador) {
+      console.log("--- [DEBUG] Processing 'dokumenterade_skador' item:", JSON.stringify(damage, null, 2));
       const firstPhoto = getFirstPhotoUrl(damage);
-      // Kombinera den ursprungliga skadetexten med den nya informationen
       const damageText = [damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean).join(' - ');
       
       damagesToInsert.push({
         regnr: payload.regnr,
         car_model: payload.carModel || null,
-        damage_date: now.toISOString(), // Använd incheckningsdatumet
+        damage_date: now.toISOString(),
         ort: payload.ort || null,
         station_namn: payload.station || null,
         inchecker_name: payload.incheckare || null,
-        damage_type: damageText || damage.fullText || "Dokumenterad skada", // Använd den nya eller gamla texten
+        damage_type: damageText || damage.fullText || "Dokumenterad skada",
         car_part: damage.userCarPart || null,
         position: damage.userPosition || null,
-        description: damage.userDescription || damage.fullText, // Använd den nya kommentaren
+        description: damage.userDescription || damage.fullText,
         media_url: firstPhoto,
         notering: payload.notering || null,
-        status: "documented_existing", // En ny status för att visa att detta var en dokumentation
+        status: "documented_existing",
       });
     }
 
+    console.log(`--- [DEBUG] Total items to insert into 'damages' table: ${damagesToInsert.length}`);
+    console.log("--- [DEBUG] Content of 'damagesToInsert':", JSON.stringify(damagesToInsert, null, 2));
+
     // Kör alla databasoperationer samtidigt
     if (damagesToInsert.length > 0) {
-      const { error } = await supabaseAdmin.from('damages').insert(damagesToInsert);
+      console.log("--- [DEBUG] Calling supabase.from('damages').insert()...");
+      const { data, error } = await supabaseAdmin.from('damages').insert(damagesToInsert);
+      
       if (error) {
-        console.error('Supabase DB error during INSERT operation:', error);
+        console.error('--- [DEBUG] Supabase DB error during INSERT operation:', JSON.stringify(error, null, 2));
       } else {
-        console.log(`Successfully inserted ${damagesToInsert.length} damage records.`);
+        console.log(`--- [DEBUG] Supabase INSERT successful. Response data:`, JSON.stringify(data, null, 2));
       }
+    } else {
+        console.log("--- [DEBUG] 'damagesToInsert' array is empty. Skipping database insert.");
     }
 
+    console.log("--- [DEBUG] API Route Finished. ---");
     return NextResponse.json({ message: 'Notifications processed and database operations initiated.' });
 
   } catch (error) {
-    console.error('FATAL: Failed to process request:', error);
+    console.error('--- [DEBUG] FATAL: Uncaught error in API route:', error);
     if (error instanceof Error) {
         console.error(error.message);
     }
