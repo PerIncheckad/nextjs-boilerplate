@@ -38,6 +38,7 @@ body {
 /* === HUVUDLAYOUT FÖR SIDORNA         === */
 /* ======================================= */
 
+/* För startsidan - centrerar innehållet vertikalt */
 .welcome-main {
   min-height: 100vh;
   display: flex;
@@ -48,8 +49,10 @@ body {
   padding: 2rem 1rem;
   box-sizing: border-box;
   background: none;
+  gap: 2rem; /* === ÄNDRING: Skapar avstånd mellan logga och kort === */
 }
 
+/* För rapportsidan - förankrar innehållet i toppen */
 .rapport-main {
   min-height: 100vh;
   display: flex;
@@ -72,7 +75,7 @@ body {
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  margin-top: 110px;
+  /* margin-top: 110px; <-- BORTTAGEN */
   text-align: center;
   padding: 2.8rem 2rem 2.5rem 2rem;
   background: rgba(243, 244, 246, 0.94);
@@ -119,7 +122,8 @@ body {
 .main-logo {
   width: 330px;
   height: auto;
-  margin: 70px auto 0 auto;
+  /* margin: 70px auto 0 auto; <-- BORTTAGEN */
+  margin: 0 auto; /* Centrerar horisontellt */
   display: block;
   z-index: 2;
 }
@@ -337,7 +341,6 @@ body {
   text-transform: uppercase;
 }
 
-/* === FIX FÖR DATUMKOLUMNENS BREDD === */
 .rapport-table th.datum-col,
 .rapport-table td.datum-col {
   min-width: 120px;
