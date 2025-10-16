@@ -69,6 +69,15 @@ type ConfirmDialogState = {
     theme?: 'default' | 'warning';
 }
 
+const BILEN_STAR_NU_OPTIONS = {
+    iordningstalld: 'Iordningställd för uthyrning',
+    rekond: 'Parkerad för rekond',
+    verkstad: 'Parkerad för verkstad',
+    skadehantering: 'Står för skadehantering',
+};
+type BilenStarNuKey = keyof typeof BILEN_STAR_NU_OPTIONS;
+
+
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
@@ -207,6 +216,8 @@ export default function CheckInForm() {
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [initialUrlLoadHandled, setInitialUrlLoadHandled] = useState(false);
+  const [bilenStarNu, setBilenStarNu] = useState<BilenStarNuKey | null>(null);
+
 
   // Derived State & Memos
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
@@ -222,14 +233,14 @@ export default function CheckInForm() {
   }, [washed, otherChecklistItemsOK]);
 
   const formIsValidState = useMemo(() => {
-    if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null) return false;
+    if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNu) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
     if (drivmedelstyp === 'elbil' && !laddniva) return false;
     if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     return isChecklistComplete;
-  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning]);
+  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, bilenStarNu]);
 
   const finalPayloadForUI = useMemo(() => ({
       reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, varningslampaBeskrivning,
@@ -237,12 +248,13 @@ export default function CheckInForm() {
       laddning: { laddniva },
       ort,
       station,
+      bilenStarNu: bilenStarNu ? BILEN_STAR_NU_OPTIONS[bilenStarNu] : null,
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
-  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, varningslampaBeskrivning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
+  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, varningslampaBeskrivning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, bilenStarNu, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   // Datahämtningsfunktion med utökad felhantering
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -376,6 +388,7 @@ export default function CheckInForm() {
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
     setSpolarvatskaOK(false); setAdblueOK(false); setSkadekontroll(null);
     setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
+    setBilenStarNu(null);
     window.history.pushState({}, '', window.location.pathname); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -419,6 +432,7 @@ export default function CheckInForm() {
           rekond: behoverRekond,
           varningslampa: varningslampaLyser,
           varningslampa_beskrivning: varningslampaBeskrivning,
+          bilen_star_nu: bilenStarNu ? BILEN_STAR_NU_OPTIONS[bilenStarNu] : null,
           notering: preliminarAvslutNotering,
           incheckare: firstName,
           timestamp: new Date().toISOString(),
@@ -540,6 +554,20 @@ export default function CheckInForm() {
         onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id))
     });
   };
+  
+  const handleLaddningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value === '') {
+        setLaddniva('');
+        return;
+    }
+    const numValue = parseInt(value, 10);
+    if (numValue > 100) {
+        setLaddniva('100');
+    } else {
+        setLaddniva(value);
+    }
+  };
 
   return (
     <div className="checkin-form">
@@ -639,7 +667,7 @@ export default function CheckInForm() {
                 <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
             </div>}
         </>)}
-        {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} max="100" onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field>)}
+        {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
       </Card>
 
       <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media)))}>
@@ -686,6 +714,22 @@ export default function CheckInForm() {
           <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS finns</ChoiceButton>
           <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
           {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK (endast diesel)</ChoiceButton>}
+        </div>
+      </Card>
+
+      <Card data-error={showFieldErrors && !bilenStarNu}>
+        <SectionHeader title="Var är bilen nu?" />
+        <div className="grid-2-col">
+            {(Object.keys(BILEN_STAR_NU_OPTIONS) as BilenStarNuKey[]).map(key => (
+                <ChoiceButton 
+                    key={key} 
+                    onClick={() => setBilenStarNu(key)} 
+                    isActive={bilenStarNu === key}
+                    isSet={bilenStarNu !== null}
+                >
+                    {BILEN_STAR_NU_OPTIONS[key]}
+                </ChoiceButton>
+            ))}
         </div>
       </Card>
 
@@ -799,6 +843,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 <div className="confirm-details">
                     <div className="confirm-summary">
                         <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
+                         {payload.bilenStarNu && <p><strong>Nuvarande Plats:</strong> {payload.bilenStarNu}</p>}
                     </div>
                     
                     {renderDamageList(payload.nya_skador, '💥 Nya skador')}
