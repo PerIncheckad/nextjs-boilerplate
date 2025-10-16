@@ -252,4 +252,49 @@ function generateEmailContent(meta: any, huvudstation: string) {
     Registreringsnr: ${regnr}
     Ort: ${ort}
     Station: ${station}
-    Mätarställ
+    Mätarställning: ${matarstallning} km
+    Drivmedel: ${drivmedel} - ${fuelInfo}
+    Däck: ${hjultyp || '--'}
+    ${rekond ? 'OBS! Behöver rekond!' : ''}
+    ${varningslampa ? 'OBS! Varningslampa lyser!' : ''}
+    ${notering ? `Allmän kommentar: ${notering}` : ''}
+    ${currentLocation === 'different' ? `
+    Bilens nuvarande plats: ${currentOrt} / ${currentStation}
+    ${currentLocationNote ? `Kommentar: ${currentLocationNote}` : ''}
+    ` : ''}
+    
+    ${dokumenterade_skador && dokumenterade_skador.length > 0 ? `
+    === DOKUMENTERADE BEFINTLIGA SKADOR ===
+    OBS! Uppdatera skadan i BUHS!
+    
+    ${dokumenterade_skador.map(skada => `
+    * ${skada.userType} - ${skada.userCarPart} - ${skada.userPosition}
+      Ursprunglig beskrivning: ${skada.fullText}
+      ${skada.uploads.photo_urls.length > 0 ? `Bilder: ${skada.uploads.photo_urls.length} st` : ''}
+      ${skada.uploads.video_urls.length > 0 ? `Videor: ${skada.uploads.video_urls.length} st` : ''}
+      Se alla bilder/videos: https://incheckad.se/gallery/${skada.id}
+    `).join('\n')}
+    ` : ''}
+    
+    ${nya_skador && nya_skador.length > 0 ? `
+    === NYA SKADOR ===
+    Registrera skadan i BUHS med nedan info!
+    
+    ${nya_skador.map(skada => `
+    * ${skada.type} - ${skada.carPart} - ${skada.position}
+      ${skada.comment ? `Kommentar: ${skada.comment}` : ''}
+      Skadeanmälan: ${skada.needsReport === 'yes' ? 'BEHÖVS' : 'Behövs inte'}
+      ${skada.uploads.photo_urls.length > 0 ? `Bilder: ${skada.uploads.photo_urls.length} st` : ''}
+      ${skada.uploads.video_urls.length > 0 ? `Videor: ${skada.uploads.video_urls.length} st` : ''}
+      Se alla bilder/videos: https://incheckad.se/gallery/${skada.id}
+    `).join('\n')}
+    ` : ''}
+    
+    Incheckad av: ${incheckare}
+    Incheckad: ${new Date().toLocaleString('sv-SE')}
+    
+    Detta är ett automatiskt genererat meddelande från incheckad.se
+  `;
+
+  return { html, text };
+}
