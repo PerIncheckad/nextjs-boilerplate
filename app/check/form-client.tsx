@@ -1029,6 +1029,7 @@ const GlobalStyles = () => (
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
         .rekond-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
         .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
+        .rekond-highlight { background-color: #f59e0b; color: #92400e; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
         .warning-light-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
         .warning-light-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
         .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
