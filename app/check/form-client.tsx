@@ -190,6 +190,7 @@ export default function CheckInForm() {
   const [laddniva, setLaddniva] = useState('');
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   const [behoverRekond, setBehoverRekond] = useState(false);
+  const [varningslampaLyser, setVarningslampaLyser] = useState(false); // NYTT STATE FÖR VARNINGSLAMPA
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [insynsskyddOK, setInsynsskyddOK] = useState(false);
   const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
@@ -229,7 +230,7 @@ export default function CheckInForm() {
   }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete]);
 
   const finalPayloadForUI = useMemo(() => ({
-      reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond,
+      reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, // NYTT FÄLT FÖR UI
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva },
       ort,
@@ -239,7 +240,7 @@ export default function CheckInForm() {
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
-  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
+  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   // Datahämtningsfunktion med utökad felhantering
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -367,7 +368,8 @@ export default function CheckInForm() {
     setRegInput(''); setVehicleData(null); setExistingDamages([]); setOrt('');
     setStation(''); setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null);
     setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva('');
-    setHjultyp(null); setBehoverRekond(false); setInsynsskyddOK(false);
+    setHjultyp(null); setBehoverRekond(false); setVarningslampaLyser(false); // Återställ varningslampa
+    setInsynsskyddOK(false);
     setDekalDjurRokningOK(false); setIsskrapaOK(false); setPskivaOK(false);
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
     setSpolarvatskaOK(false); setAdblueOK(false); setSkadekontroll(null);
@@ -413,6 +415,7 @@ export default function CheckInForm() {
           laddning: { laddniva },
           hjultyp,
           rekond: behoverRekond,
+          varningslampa: varningslampaLyser, // NYTT FÄLT I PAYLOAD
           notering: preliminarAvslutNotering,
           incheckare: firstName,
           timestamp: new Date().toISOString(),
@@ -481,6 +484,22 @@ export default function CheckInForm() {
         });
     } else {
         setBehoverRekond(false);
+    }
+  };
+  
+  // NY HANTERARE FÖR VARNINGSLAMPA
+  const handleVarningslampaClick = () => {
+    if (!varningslampaLyser) {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Bekräfta Varningslampa',
+            text: 'Är du säker på att en varningslampa lyser? Detta är en allvarlig indikation.',
+            confirmButtonVariant: 'danger',
+            onConfirm: () => setVarningslampaLyser(true),
+            theme: 'warning'
+        });
+    } else {
+        setVarningslampaLyser(false);
     }
   };
 
@@ -595,7 +614,7 @@ export default function CheckInForm() {
         </div>
       </Card>
 
-      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris))) || (drivmedelstyp === 'elbil' && !laddniva)}>
+      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && !laddniva))}>
         <SectionHeader title="Fordonsstatus" />
         <SubSectionHeader title="Mätarställning" />
         <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
@@ -623,19 +642,23 @@ export default function CheckInForm() {
       <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media)))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador att visa.</p>}
+        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onAction={handleExistingDamageAction} />) : <p>Inga kända skador på detta fordon.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             {/* ÄNDRING: Rensar newDamages-arrayen när man väljer "Inga nya skador" */}
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, nya skador finns</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)} <Button onClick={addDamage}>Lägg till ytterligare en skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="secondary" style={{ marginTop: '1rem' }}>Lägg till ytterligare en ny skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && !isChecklistComplete}>
         <SectionHeader title="Checklista" />
-        <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
+        {/* NY CONTAINER FÖR SPECIALKNAPPAR */}
+        <div className="special-buttons">
+            <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
+            <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa lyser</ChoiceButton>
+        </div>
         <SubSectionHeader title="Allt måste vara OK för att slutföra" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
@@ -751,6 +774,12 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 {renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}
                 {renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
                 
+                {/* NYTT: Visa varning för varningslampa */}
+                {payload.varningslampa && (
+                    <div className="confirm-summary">
+                        <p className="warning-highlight">Varningslampa lyser!</p>
+                    </div>
+                )}
                 {payload.rekond && (
                     <div className="confirm-summary">
                         <p className="rekond-highlight">Behöver rekond!</p>
@@ -811,8 +840,8 @@ const DamageItem: React.FC<{
         <div className="damage-details">
           <div className="grid-3-col">
             <Field label="Typ av skada *"><select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, fieldKey('type'), e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-            <Field label="Placering *"><select value={commonProps.carPart || ''} onChange={e => onUpdate(damage.id, fieldKey('carPart'), e.target.value, isExisting)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.carPart || ''] || CAR_PARTS[commonProps.carPart || ''].length === 0}><option value="">Välj position</option>{CAR_PARTS[commonProps.carPart || '']?.map(pos => <option key={pos} value={pos}>{pos}</option>)}</select></Field>
+            <Field label="Placering *"><select value={commonProps.carPart || ''} onChange={e => onUpdate(damage.id, fieldKey('carPart'), e.target.value, isExisting)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).sort().map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.carPart || ''] || CAR_PARTS[commonProps.carPart || ''].length === 0}><option value="">Välj position</option>{(CAR_PARTS[commonProps.carPart || ''] || []).sort().map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
           </div>
           <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Mer detaljer om skadan..." rows={2}></textarea></Field>
           <div className="media-section">
@@ -876,7 +905,8 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
             <div className="modal-overlay" onClick={onClose} />
             <div className={`modal-content confirm-modal ${themeClass}`}>
                 {state.title === 'Bekräfta rekond' && <h3><strong>Bekräfta rekond ⚠️</strong></h3>}
-                {state.title && state.title !== 'Bekräfta rekond' && <h3>{state.title}</h3>}
+                {state.title === 'Bekräfta Varningslampa' && <h3><strong>Bekräfta Varningslampa ⚠️</strong></h3>}
+                {state.title && !['Bekräfta rekond', 'Bekräfta Varningslampa'].includes(state.title) && <h3>{state.title}</h3>}
                 <p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
                 <div className="modal-actions">
                     <Button onClick={onClose} variant="secondary">Avbryt</Button>
@@ -937,12 +967,16 @@ const GlobalStyles = () => (
         .btn.warning { background-color: var(--color-warning); color: white; }
         .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
         .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: var(--color-card); color: var(--color-text); cursor: pointer; transition: all 0.2s; }
+        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: var(--color-bg); cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 1rem; }
         .choice-btn:hover { filter: brightness(1.05); }
         .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
         .rekond-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
         .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
+        .warning-light-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
+        .warning-light-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
+        .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; }
+        .special-buttons { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
         .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
         .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
         .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
@@ -957,12 +991,12 @@ const GlobalStyles = () => (
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; padding: 0; cursor: pointer; }
+        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; cursor: pointer; }
         .remove-media-btn:hover { background-color: #b91c1c; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
         .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); }
         .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); }
-        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem auto; }
+        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
         .confirm-modal .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; }
         .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-modal .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
