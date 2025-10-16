@@ -43,7 +43,7 @@ const createAlertBanner = (condition: boolean, text: string, details?: string): 
   return `
     <tr>
       <td style="padding: 12px 0;">
-        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">
+        <div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">
           <span style="color: #92400e !important;">${fullText}</span>
         </div>
       </td>
@@ -112,11 +112,10 @@ const createBaseLayout = (regnr: string, content: string): string => `
         color-scheme: light dark;
         supported-color-schemes: light dark;
       }
-      body {
+      body, div, table, tbody, tr, td {
         background-color: #ffffff !important;
-        background-image: linear-gradient(#ffffff, #ffffff) !important;
       }
-      h1, h2, h3, h4, h5, h6, p, a, li, span, td, div, strong, small {
+      h1, h2, h3, h4, h5, h6, p, a, li, span, strong, small {
         color: #000000 !important;
       }
       a, a:visited {
@@ -126,17 +125,17 @@ const createBaseLayout = (regnr: string, content: string): string => `
     </style>
     <!--<![endif]-->
   </head>
-  <body class="body" style="margin: 0; padding: 0; width: 100%; background-color: #ffffff !important; background-image: linear-gradient(#ffffff, #ffffff) !important;">
+  <body style="margin: 0; padding: 0; width: 100%; background-color: #ffffff !important;">
     <center>
       <!--[if mso]>
-        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="680">
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="680" style="background-color: #ffffff !important;">
         <tr>
-        <td class="mso-cell" style="background-color: #ffffff !important;">
+        <td style="background-color: #ffffff !important;">
       <![endif]-->
-      <div class="main-div" style="max-width: 680px; margin: 0 auto; background-color: #ffffff !important; background-image: linear-gradient(#ffffff, #ffffff) !important;">
-        <table class="main-table" role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff !important;">
+      <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff !important;">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff !important;">
           <tr>
-            <td class="content-cell" style="padding: 20px 40px; background-color: #ffffff !important; background-image: linear-gradient(#ffffff, #ffffff) !important;">
+            <td style="padding: 20px 40px; background-color: #ffffff !important;">
               <div style="text-align: center; margin-bottom: 20px;">
                 <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
               </div>
@@ -146,7 +145,7 @@ const createBaseLayout = (regnr: string, content: string): string => `
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 ${content}
               </table>
-              <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #000000 !important;">
+              <div style="text-align: center; margin-top: 30px; font-size: 12px;">
                 <p style="color: #000000 !important;">Detta mejl skickades automatiskt från incheckad.se</p>
               </div>
             </td>
@@ -167,9 +166,17 @@ const createBaseLayout = (regnr: string, content: string): string => `
 // 3. HTML BUILDERS - SPECIFIC EMAILS
 // =================================================================
 
-const buildRegionEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu } = payload;
+const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
+
+  let bilenStarNuText = '---';
+  if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
+    bilenStarNuText = `${bilen_star_nu.ort} / ${bilen_star_nu.station}`;
+    if (bilen_star_nu.kommentar) {
+      bilenStarNuText += `<br><small style="color: #000000 !important;">(${bilen_star_nu.kommentar})</small>`;
+    }
+  }
 
   const content = `
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
@@ -179,10 +186,11 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
     <tr><td style="padding: 10px 0; color: #000000 !important;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
-        <table class="info-grid" style="color: #000000 !important;">
+        <table class="info-grid" style="color: #000000 !important; width: 100%;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Incheckad vid:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilenStarNuText}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
@@ -190,10 +198,9 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
-        <table class="info-grid" style="color: #000000 !important;">
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilen_star_nu || '---'}</td></tr>
+        <table class="info-grid" style="color: #000000 !important; width: 100%;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #000000 !important; padding: 4px 0;">${matarstallning} km</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${formatTankning(tankning)}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${payload.drivmedel === 'elbil' ? `Laddning: ${laddning.laddniva}%` : formatTankning(tankning)}</td></tr>
         </table>
       </div>
       ${nya_skador.length > 0 ? `
@@ -203,7 +210,7 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
       ` : ''}
       ${notering ? `
         <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-          <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>
+          <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Övriga kommentarer</h2>
           <p style="margin:0; color: #000000 !important;">${notering}</p>
         </div>
       ` : ''}
@@ -218,6 +225,14 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
+
+  let bilenStarNuText = '---';
+  if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
+    bilenStarNuText = `${bilen_star_nu.ort} / ${bilen_star_nu.station}`;
+    if (bilen_star_nu.kommentar) {
+      bilenStarNuText += ` (${bilen_star_nu.kommentar})`;
+    }
+  }
           
   const content = `
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
@@ -227,7 +242,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
     <tr><td style="padding: 10px 0; color: #000000 !important;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
-        <table class="info-grid" style="color: #000000 !important;">
+        <table class="info-grid" style="color: #000000 !important; width: 100%;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Däck:</td><td style="color: #000000 !important; padding: 4px 0;">${hjultyp || '---'}</td></tr>
@@ -235,9 +250,9 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
-        <table class="info-grid" style="color: #000000 !important;">
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilen_star_nu || '---'}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
+        <table class="info-grid" style="color: #000000 !important; width: 100%;">
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Incheckad vid:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilenStarNuText}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
@@ -251,7 +266,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
       </div>
       ${notering ? `
         <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-          <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>
+          <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Övriga kommentarer</h2>
           <p style="margin:0; color: #000000 !important;">${notering}</p>
         </div>
       ` : ''}
@@ -285,10 +300,12 @@ export async function POST(request: Request) {
     // E-posthantering
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
-    const regionHtml = buildRegionEmail(payload, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - REGION`, html: regionHtml }));
+    const huvudstationHtml = buildHuvudstationEmail(payload, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
+    
     const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
+    
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
       const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret.</p></td></tr>`);
