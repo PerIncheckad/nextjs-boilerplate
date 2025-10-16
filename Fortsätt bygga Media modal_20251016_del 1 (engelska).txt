@@ -1,0 +1,175 @@
+TECHNICAL DOCUMENTATION - MEDIA MODAL LAYOUT ISSUE
+Date: 2025-10-16 Author: GitHub Copilot Status: Analysis Complete / Solution Proposed / Implementation Pending
+
+1. ISSUE SUMMARY
+The application's media modal component (MediaModal.tsx) suffers from critical layout issues when displaying images and videos. Specifically:
+
+Images/videos expand beyond their container, pushing navigation controls and metadata off-screen
+The modal lacks a consistent, fixed size, causing layout instability
+Navigation controls (arrow buttons) are improperly positioned and styled
+Media content lacks proper size constraints
+The issue is purely CSS-related with all functional logic working correctly. It appears the modal was built with a mix of absolute positioning and flexbox layout techniques that conflict with each other.
+
+2. ROOT CAUSE ANALYSIS
+After thorough examination of the components/MediaModal.tsx file, I identified the following specific issues:
+
+Conflicting Layout Systems: The component mixes absolute positioning with flexbox in ways that create unpredictable layout behavior:
+
+jsx
+.media-modal-body {
+  padding-top: 80px; /* Höjden på headern */
+  padding-bottom: 250px; /* Höjden på botten-sektionen */
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+No Size Constraints on Media: The media container grows to accommodate the image/video size rather than constraining the media to fit the container:
+
+jsx
+.media-modal-media {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+Fixed Height Bottom Section: The bottom section has a fixed height regardless of its content:
+
+jsx
+.bottom-section {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 250px; /* Fast höjd för botten */
+  ...
+}
+Erratic Caching Behavior: There appears to be aggressive caching at multiple levels (browser, Vercel) that makes CSS updates inconsistent. Changes to the existing component often don't appear even after hard refreshes.
+
+3. PROPOSED SOLUTION
+I propose a complete rewrite of the modal component with a clean, predictable layout structure using a new name to avoid caching issues. The solution was provided as DamageModal.tsx with these key improvements:
+
+Fixed, Predictable Modal Size:
+
+CSS
+.dm-container {
+  width: 550px;
+  height: 600px;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+Strict Media Container with Fixed Height:
+
+CSS
+.dm-media-wrapper {
+  height: 300px;
+  overflow: hidden;
+}
+
+.dm-media {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+CSS Prefix Strategy: Using a new prefix (dm- instead of media-modal-) to ensure no CSS rules are accidentally inherited:
+
+CSS
+.dm-overlay { ... }
+.dm-container { ... }
+.dm-navigation { ... }
+Clean Flexbox Layout:
+
+CSS
+.dm-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+Proper Scrolling Control:
+
+CSS
+.dm-metadata {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto; /* Only metadata scrolls if needed */
+}
+4. IMPLEMENTATION STEPS
+For any developer implementing this solution:
+
+Create the new components/DamageModal.tsx component with the provided code
+
+Update app/rapport/page.tsx to import and use DamageModal instead of MediaModal:
+
+jsx
+import DamageModal from "@/components/DamageModal";
+
+// At the bottom of the render function:
+<DamageModal 
+  open={modalOpen} 
+  onClose={() => setModalOpen(false)} 
+  media={modalMedia} 
+  title={modalTitle} 
+  currentIdx={modalIdx}
+  isLoading={modalIsLoading}
+  onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} 
+  onNext={modalMedia.length > 1 ? handleModalNext : undefined}
+  hasPrev={modalIdx > 0} 
+  hasNext={modalIdx < modalMedia.length - 1} 
+/>
+Deploy with cache clearing:
+
+In Vercel, find the latest deployment
+Click the three dots (...)
+Select "Redeploy"
+Uncheck "Use existing build cache"
+Click "Redeploy"
+The original MediaModal.tsx can be kept initially to ensure no other parts of the application are using it, but could be removed after confirming the new component works properly.
+
+5. SYSTEM ARCHITECTURE INSIGHTS
+During the analysis, I gathered several insights about the application architecture that will be valuable for future development:
+
+Data Flow for Damage Media:
+
+The application uses a damages table for primary damage records
+Associated media is stored in a damage_media table with a foreign key relationship
+When a user clicks on a thumbnail in the report table, the system fetches all associated media from damage_media for that specific damage_id
+Modal Implementation Pattern:
+
+The app uses React's JSX with styled-jsx for component-scoped styling
+Event handlers for keyboard navigation (Escape, arrow keys) are properly implemented
+The modal has both a standard view and a fullscreen lightbox mode for images
+Cache Management Issues:
+
+The application appears to have aggressive caching at multiple levels
+For future CSS changes, consider using unique class names or CSS modules
+When making significant UI changes, performing a cache-cleared rebuild is essential
+6. ADDITIONAL RECOMMENDATIONS
+Beyond fixing the immediate modal layout issue, I recommend:
+
+Component Structure Improvements:
+
+Consider breaking down the modal into smaller sub-components (Header, MediaViewer, Navigation, Metadata)
+This would improve maintainability and make future changes less risky
+Responsive Design Enhancement:
+
+The current modal design works but could be improved for very small screens
+Consider adding specific breakpoints for mobile devices
+Image Loading Optimization:
+
+Add proper loading states for images (loading indicators, fallbacks)
+Consider implementing lazy loading for gallery view
+Testing Strategy:
+
+Add visual regression tests for the modal to prevent future layout regressions
+Test with various media types and sizes to ensure consistent display
+7. KNOWN LIMITATIONS
+The proposed solution has been thoroughly analyzed but has these known limitations:
+
+It doesn't yet implement the gallery view functionality (when clicking on registration numbers)
+The thumbnail images in the report table still need better size normalization
+There's no zoom functionality for images in lightbox mode
+8. CONCLUSION
+The MediaModal layout issues stem from conflicting CSS approaches and lack of proper size constraints. The proposed solution provides a clean, predictable layout system using modern CSS best practices. The implementation uses a new component name to avoid cache-related issues, while maintaining all existing functionality.
+
+When implementing this solution, be sure to deploy with cache clearing enabled to ensure a clean start.

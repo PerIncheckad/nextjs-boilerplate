@@ -1,0 +1,30 @@
+1. PROBLEMANALYS
+Mediamodalen (MediaModal.tsx) lider av flera kritiska layout-problem:
+
+Överexpansion av media: Bilder/videor expanderar utanför sin container och trycker navigeringskontroller och metadata utanför skärmen
+Inkonsekvent storlek: Modalen saknar en fast, konsekvent storlek
+Felplacerade navigationsknappar: Pilarna hamnar inte centrerade och har bristfällig styling
+Avsaknad av storleksbegränsningar: Mediainnehållet saknar korrekta storleksbegränsningar
+Problemet är helt CSS-relaterat - all funktionell logik fungerar korrekt.
+
+2. GRUNDORSAK
+Efter grundlig genomgång av koden identifierades följande specifika problem:
+
+Konflikt mellan layouttekniker: Komponenten blandar absolut positionering med flexbox på ett sätt som skapar oförutsägbart beteende
+Inga storleksbegränsningar för media: Mediacontainern växer för att rymma hela bilden istället för att tvinga bilden att passa containern
+Fix höjd för bottensektionen: Bottensektionen har en fast höjd oavsett innehåll
+Aggressiv cachning: Ändringar i befintlig komponent visas inte konsekvent pga cachning på flera nivåer
+3. FÖRESLAGEN LÖSNING
+En komplett omskrivning av komponenten med en ren, förutsägbar layout och nytt namn (DamageModal) för att undvika cachningsproblem:
+
+Fast modalstorlek: 550px x 600px med responsiva maxgränser
+Strikt mediacontainer med fast höjd: 300px med overflow: hidden
+CSS-prefixstrategi: Användning av nytt prefix (dm- istället för media-modal-) för att säkerställa att inga CSS-regler ärvs av misstag
+Ren flexbox-layout med korrekt nästlade sektioner
+Korrekt scrollningshantering: Endast metadatadelen scrollar vid behov
+4. IMPLEMENTERING OCH DEPLOY-STRATEGI
+Implementering bör ske med särskild hänsyn till cachningsproblem:
+
+Skapa ny komponent med unikt namn
+Uppdatera referenser i rapport-sidan
+Deploya med cachning avstängd för att säkerställa en ren start
