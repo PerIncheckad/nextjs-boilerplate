@@ -821,12 +821,14 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 <div className="confirm-header">
                     <h3 className="confirm-modal-title">Bekräfta incheckning</h3>
                     <p className="confirm-vehicle-info">{payload.reg} - {payload.carModel || '---'}</p>
-                    {payload.varningslampa && (
-                        <p className="warning-highlight">Varningslampa lyser: {payload.varningslampaBeskrivning || 'Ej specificerat'}</p>
-                    )}
-                    {payload.rekond && (
-                        <p className="rekond-highlight">Behöver rekond!</p>
-                    )}
+                    <div className="confirm-warnings-wrapper">
+                        {payload.varningslampa && (
+                            <p className="warning-highlight">Varningslampa lyser: {payload.varningslampaBeskrivning || 'Ej specificerat'}</p>
+                        )}
+                        {payload.rekond && (
+                            <p className="warning-highlight rekond-highlight">Behöver rekond!</p>
+                        )}
+                    </div>
                 </div>
                 
                 <div className="confirm-details">
@@ -1029,7 +1031,6 @@ const GlobalStyles = () => (
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
         .rekond-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
         .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
-        .rekond-highlight { background-color: #f59e0b; color: #92400e; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
         .warning-light-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
         .warning-light-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
         .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
@@ -1060,6 +1061,7 @@ const GlobalStyles = () => (
         .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
         .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
         .confirm-vehicle-info { font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0 1rem 0; }
+        .confirm-warnings-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
         .confirm-details { }
         .confirm-summary { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
