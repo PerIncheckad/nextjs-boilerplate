@@ -44,7 +44,7 @@ const createAlertBanner = (condition: boolean, text: string, details?: string): 
     <tr>
       <td style="padding: 12px 0;">
         <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">
-          ${fullText}
+          <span style="color: #92400e !important;">${fullText}</span>
         </div>
       </td>
     </tr>
@@ -112,8 +112,7 @@ const createBaseLayout = (regnr: string, content: string): string => `
         color-scheme: light dark;
         supported-color-schemes: light dark;
       }
-      /* Tvingande Dark Mode-fixar */
-      .body, .main-div, .main-table, .content-cell {
+      body {
         background-color: #ffffff !important;
         background-image: linear-gradient(#ffffff, #ffffff) !important;
       }
@@ -127,17 +126,17 @@ const createBaseLayout = (regnr: string, content: string): string => `
     </style>
     <!--<![endif]-->
   </head>
-  <body class="body" style="margin: 0; padding: 0; width: 100%; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
+  <body class="body" style="margin: 0; padding: 0; width: 100%; background-color: #ffffff !important; background-image: linear-gradient(#ffffff, #ffffff) !important;">
     <center>
       <!--[if mso]>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="680">
         <tr>
         <td class="mso-cell" style="background-color: #ffffff !important;">
       <![endif]-->
-      <div class="main-div" style="max-width: 680px; margin: 0 auto; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
+      <div class="main-div" style="max-width: 680px; margin: 0 auto; background-color: #ffffff !important; background-image: linear-gradient(#ffffff, #ffffff) !important;">
         <table class="main-table" role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff !important;">
           <tr>
-            <td class="content-cell" style="padding: 20px 40px; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
+            <td class="content-cell" style="padding: 20px 40px; background-color: #ffffff !important; background-image: linear-gradient(#ffffff, #ffffff) !important;">
               <div style="text-align: center; margin-bottom: 20px;">
                 <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
               </div>
@@ -177,7 +176,7 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
-    <tr><td style="padding: 10px 0;">
+    <tr><td style="padding: 10px 0; color: #000000 !important;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
         <table class="info-grid" style="color: #000000 !important;">
@@ -224,7 +223,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
-    <tr><td style="padding: 10px 0;">
+    <tr><td style="padding: 10px 0; color: #000000 !important;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
         <table class="info-grid" style="color: #000000 !important;">
