@@ -39,7 +39,7 @@ const createAlertBanner = (condition: boolean, text: string): string => {
   return `
     <tr>
       <td style="padding: 12px 0;">
-        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #000000 !important;">
+        <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">
           ⚠️ ${text}
         </div>
       </td>
@@ -73,7 +73,7 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
@@ -164,10 +164,11 @@ const createBaseLayout = (regnr: string, content: string): string => `
 // =================================================================
 
 const buildRegionEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, nya_skador = [], notering } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, varningslampa, nya_skador = [], notering } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
 
   const content = `
+    ${createAlertBanner(varningslampa, 'Varningslampa Lyser')}
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
@@ -209,11 +210,12 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, notering,
+  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, notering,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
           
   const content = `
+    ${createAlertBanner(varningslampa, 'Varningslampa Lyser')}
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
@@ -267,7 +269,7 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const payload = fullRequestPayload.meta; 
 
-    const { regnr, ort, station, status, nya_skador = [], dokumenterade_skador = [] } = payload;
+    const { regnr, ort, station, status, varningslampa, nya_skador = [], dokumenterade_skador = [] } = payload;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -283,7 +285,7 @@ export async function POST(request: Request) {
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen uppdatera.</p></td></tr>`);
+      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret.</p></td></tr>`);
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
     
