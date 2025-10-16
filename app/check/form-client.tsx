@@ -46,7 +46,6 @@ type MediaFile = {
   file: File; type: 'image' | 'video'; preview?: string; thumbnail?: string;
 };
 
-// NY TYP FÖR UPPLADDNINGAR
 type Uploads = {
   photo_urls: string[];
   video_urls: string[];
@@ -60,14 +59,14 @@ type ExistingDamage = {
   shortText: string;
   status: 'not_selected' | 'documented' | 'resolved';
   userType?: string; userCarPart?: string; userPosition?: string; userDescription?: string;
-  media: MediaFile[]; // ÄNDRING: media är nu enbart för UI och filhantering
-  uploads: Uploads; // NYTT: För att hålla reda på uppladdade fil-URL:er
+  media: MediaFile[];
+  uploads: Uploads;
 };
 
 type NewDamage = {
   id: string; type: string; carPart: string; position: string; text: string; 
-  media: MediaFile[]; // ÄNDRING: media är nu enbart för UI och filhantering
-  uploads: Uploads; // NYTT: För att hålla reda på uppladdade fil-URL:er
+  media: MediaFile[];
+  uploads: Uploads;
 };
 
 type ConfirmDialogState = {
@@ -84,26 +83,40 @@ const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f =
 
 function slugify(s: string) {
   if (!s) return '';
-  return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
+  return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9.]+/g, "-").replace(/(^-|-$)+/g, "");
 }
 
-function createDamageFolderName(damage: ExistingDamage | NewDamage): string {
+function createFileName(regnr: string, damage: ExistingDamage | NewDamage, index: number): string {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const time = `kl ${hours}.${minutes}`;
+
     const isExisting = 'fullText' in damage;
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     
-    const type = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
+    const damageType = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
     const part = isExisting ? (damage as ExistingDamage).userCarPart : (damage as NewDamage).carPart;
     const pos = isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position;
 
-    const folderName = [date, type, part, pos].filter(Boolean).map(s => slugify(s!)).join('_');
-    return folderName || `${date}_okand-skada`;
+    const nameParts = [
+        slugify(regnr),
+        date,
+        slugify(time),
+        slugify(damageType),
+        slugify(part),
+        slugify(pos),
+        (index + 1).toString()
+    ];
+    
+    return nameParts.filter(Boolean).join('-');
 }
 
-async function uploadOne(file: File, reg: string, damageFolder: string): Promise<string> {
+
+async function uploadOne(file: File, reg: string, damageFolder: string, fileName: string): Promise<string> {
     const BUCKET = "damage-photos";
     const ext = file.name.split(".").pop() || "bin";
-    const randomString = Math.random().toString(36).slice(2, 7);
-    const path = `${slugify(reg)}/${damageFolder}/${Date.now()}-${randomString}.${ext}`;
+    const path = `${slugify(reg)}/${damageFolder}/${fileName}.${ext}`;
     
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
     if (error) throw error;
@@ -123,14 +136,24 @@ function partitionMediaByType(files: MediaFile[]) {
 }
 
 async function uploadAllForDamage(damage: ExistingDamage | NewDamage, reg: string): Promise<Uploads> {
-    const damageFolder = createDamageFolderName(damage);
-    if (!damage.media) return { photo_urls: [], video_urls: [], folder: damageFolder };
+    const damageFolder = createFileName(reg, damage, 0).split('-').slice(0, -1).join('-');
+    if (!damage.media || damage.media.length === 0) return { photo_urls: [], video_urls: [], folder: damageFolder };
     
     const { photos, videos } = partitionMediaByType(damage.media);
     
+    const photoUploadPromises = photos.map((p, i) => {
+        const fileName = createFileName(reg, damage, i);
+        return uploadOne(p, reg, damageFolder, fileName);
+    });
+    
+    const videoUploadPromises = videos.map((v, i) => {
+        const fileName = createFileName(reg, damage, photos.length + i);
+        return uploadOne(v, reg, damageFolder, fileName);
+    });
+
     const [photoUploads, videoUploads] = await Promise.all([
-        Promise.all(photos.map(p => uploadOne(p, reg, damageFolder))),
-        Promise.all(videos.map(v => uploadOne(v, reg, damageFolder))),
+        Promise.all(photoUploadPromises),
+        Promise.all(videoUploadPromises),
     ]);
 
     return { photo_urls: photoUploads, video_urls: videoUploads, folder: damageFolder };
@@ -290,8 +313,8 @@ export default function CheckInForm() {
               fullText: d.text,
               shortText: d.text,
               status: 'not_selected',
-              media: [], // Startar tom
-              uploads: { photo_urls: [], video_urls: [], folder: '' } // Startar tom
+              media: [],
+              uploads: { photo_urls: [], video_urls: [], folder: '' }
           })));
       }
   
@@ -413,7 +436,6 @@ export default function CheckInForm() {
     setShowConfirmModal(false);
     setIsFinalSaving(true);
     try {
-        // Steg 1: Ladda upp all media och få tillbaka URL:er
         const documentedForUpload = existingDamages.filter(d => d.status === 'documented');
         const newForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
         
@@ -424,7 +446,6 @@ export default function CheckInForm() {
             newForUpload.map(d => uploadAllForDamage(d, normalizedReg))
         );
 
-        // Steg 2: Uppdatera state med de returnerade URL:erna
         const updatedExistingDamages = existingDamages.map(d => {
             const index = documentedForUpload.findIndex(up => up.id === d.id);
             if (index > -1) {
@@ -439,7 +460,6 @@ export default function CheckInForm() {
         });
         setNewDamages(updatedNewDamages);
 
-        // Steg 3: Bygg payload från det uppdaterade state
         const resolvedDamages = updatedExistingDamages.filter(d => d.status === 'resolved');
 
         const submissionPayload = {
@@ -462,14 +482,13 @@ export default function CheckInForm() {
             timestamp: new Date().toISOString(),
             dokumenterade_skador: updatedExistingDamages
                 .filter(d => d.status === 'documented')
-                .map(({ media, ...rest }) => rest), // Ta bort UI-specifika 'media'
+                .map(({ media, ...rest }) => rest),
             nya_skador: updatedNewDamages
-                .map(({ media, ...rest }) => rest), // Ta bort UI-specifika 'media'
+                .map(({ media, ...rest }) => rest),
             åtgärdade_skador: resolvedDamages
-                .map(({ media, ...rest }) => rest), // Ta bort UI-specifika 'media'
+                .map(({ media, ...rest }) => rest),
         };
       
-        // Steg 4: Skicka till API
         await notifyCheckin({
             region: 'Syd',
             subjectBase: `${normalizedReg} - ${ort} / ${station}`,
@@ -542,7 +561,6 @@ export default function CheckInForm() {
     updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, [field]: value } : d));
   };
 
-  // NYA MEDIA-HANTERARE
   const handleMediaUpdate = async (id: string, files: FileList, isExisting: boolean) => {
     const processed = await processFiles(files);
     const updater = isExisting ? setExistingDamages : setNewDamages;
