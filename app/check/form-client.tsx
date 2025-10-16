@@ -69,15 +69,6 @@ type ConfirmDialogState = {
     theme?: 'default' | 'warning';
 }
 
-const BILEN_STAR_NU_OPTIONS = {
-    iordningstalld: 'Iordningställd för uthyrning',
-    rekond: 'Parkerad för rekond',
-    verkstad: 'Parkerad för verkstad',
-    skadehantering: 'Står för skadehantering',
-};
-type BilenStarNuKey = keyof typeof BILEN_STAR_NU_OPTIONS;
-
-
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
@@ -216,12 +207,15 @@ export default function CheckInForm() {
   const [preliminarAvslutNotering, setPreliminarAvslutNotering] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [initialUrlLoadHandled, setInitialUrlLoadHandled] = useState(false);
-  const [bilenStarNu, setBilenStarNu] = useState<BilenStarNuKey | null>(null);
+  const [bilenStarNuOrt, setBilenStarNuOrt] = useState('');
+  const [bilenStarNuStation, setBilenStarNuStation] = useState('');
+  const [bilenStarNuKommentar, setBilenStarNuKommentar] = useState('');
 
 
   // Derived State & Memos
   const normalizedReg = useMemo(() => normalizeReg(regInput), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
+  const availableStationsBilenStarNu = useMemo(() => STATIONER[bilenStarNuOrt] || [], [bilenStarNuOrt]);
   
   const otherChecklistItemsOK = useMemo(() => {
      const common = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK;
@@ -233,14 +227,14 @@ export default function CheckInForm() {
   }, [washed, otherChecklistItemsOK]);
 
   const formIsValidState = useMemo(() => {
-    if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNu) return false;
+    if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
     if (drivmedelstyp === 'elbil' && !laddniva) return false;
     if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     return isChecklistComplete;
-  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, bilenStarNu]);
+  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, bilenStarNuOrt, bilenStarNuStation]);
 
   const finalPayloadForUI = useMemo(() => ({
       reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, varningslampaBeskrivning,
@@ -248,13 +242,13 @@ export default function CheckInForm() {
       laddning: { laddniva },
       ort,
       station,
-      bilenStarNu: bilenStarNu ? BILEN_STAR_NU_OPTIONS[bilenStarNu] : null,
+      bilenStarNu: { ort: bilenStarNuOrt, station: bilenStarNuStation, kommentar: bilenStarNuKommentar },
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
-  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, varningslampaBeskrivning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, bilenStarNu, newDamages, existingDamages, washed, otherChecklistItemsOK]);
+  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, varningslampaBeskrivning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, newDamages, existingDamages, washed, otherChecklistItemsOK]);
 
   // Datahämtningsfunktion med utökad felhantering
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -388,7 +382,7 @@ export default function CheckInForm() {
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
     setSpolarvatskaOK(false); setAdblueOK(false); setSkadekontroll(null);
     setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
-    setBilenStarNu(null);
+    setBilenStarNuOrt(''); setBilenStarNuStation(''); setBilenStarNuKommentar('');
     window.history.pushState({}, '', window.location.pathname); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -432,7 +426,7 @@ export default function CheckInForm() {
           rekond: behoverRekond,
           varningslampa: varningslampaLyser,
           varningslampa_beskrivning: varningslampaBeskrivning,
-          bilen_star_nu: bilenStarNu ? BILEN_STAR_NU_OPTIONS[bilenStarNu] : null,
+          bilen_star_nu: { ort: bilenStarNuOrt, station: bilenStarNuStation, kommentar: bilenStarNuKommentar },
           notering: preliminarAvslutNotering,
           incheckare: firstName,
           timestamp: new Date().toISOString(),
@@ -717,25 +711,20 @@ export default function CheckInForm() {
         </div>
       </Card>
 
-      <Card data-error={showFieldErrors && !bilenStarNu}>
+      <Card data-error={showFieldErrors && (!bilenStarNuOrt || !bilenStarNuStation)}>
         <SectionHeader title="Var är bilen nu?" />
         <div className="grid-2-col">
-            {(Object.keys(BILEN_STAR_NU_OPTIONS) as BilenStarNuKey[]).map(key => (
-                <ChoiceButton 
-                    key={key} 
-                    onClick={() => setBilenStarNu(key)} 
-                    isActive={bilenStarNu === key}
-                    isSet={bilenStarNu !== null}
-                >
-                    {BILEN_STAR_NU_OPTIONS[key]}
-                </ChoiceButton>
-            ))}
+          <Field label="Ort *"><select value={bilenStarNuOrt} onChange={e => { setBilenStarNuOrt(e.target.value); setBilenStarNuStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
+          <Field label="Station *"><select value={bilenStarNuStation} onChange={e => setBilenStarNuStation(e.target.value)} disabled={!bilenStarNuOrt}><option value="">Välj station</option>{availableStationsBilenStarNu.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
         </div>
+        <Field label="Parkeringsinfo (frivilligt)">
+            <textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea>
+        </Field>
       </Card>
 
       <Card>
-        <Field label="Kommentarer (frivilligt)">
-          <textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info..." rows={4}></textarea>
+        <Field label="Övriga kommentarer (frivilligt)">
+          <textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar någon annanstans..." rows={4}></textarea>
         </Field>
       </Card>
 
@@ -765,7 +754,7 @@ const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?:
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
   <>
     <div className="modal-overlay" />
-    <div className="modal-content">
+    <div className="modal-content success-modal">
       <div className="success-icon">✓</div>
       <h3>Tack {firstName}!</h3>
       <p>Incheckningen har skickats.</p>
@@ -842,8 +831,9 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 
                 <div className="confirm-details">
                     <div className="confirm-summary">
-                        <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
-                         {payload.bilenStarNu && <p><strong>Nuvarande Plats:</strong> {payload.bilenStarNu}</p>}
+                        <p>📍 <strong>Incheckad vid:</strong> {payload.ort} / {payload.station}</p>
+                         {payload.bilenStarNu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilenStarNu.ort} / {payload.bilenStarNu.station}</p>}
+                         {payload.bilenStarNu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilenStarNu.kommentar}</small></p>}
                     </div>
                     
                     {renderDamageList(payload.nya_skador, '💥 Nya skador')}
@@ -1062,7 +1052,8 @@ const GlobalStyles = () => (
         .remove-media-btn:hover { background-color: #b91c1c; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
         .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
-        .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); }
+        .modal-content.success-modal { text-align: center; }
+        .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); text-align: center; }
         .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
         .confirm-modal { text-align: left; }
         .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
