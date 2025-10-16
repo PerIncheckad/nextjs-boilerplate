@@ -168,7 +168,7 @@ const createBaseLayout = (regnr: string, content: string): string => `
 // =================================================================
 
 const buildRegionEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
 
   const content = `
@@ -191,6 +191,7 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
         <table class="info-grid" style="color: #000000 !important;">
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilen_star_nu || '---'}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #000000 !important; padding: 4px 0;">${matarstallning} km</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${formatTankning(tankning)}</td></tr>
         </table>
@@ -214,7 +215,7 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering,
+  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
           
@@ -235,6 +236,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table class="info-grid" style="color: #000000 !important;">
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilen_star_nu || '---'}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
