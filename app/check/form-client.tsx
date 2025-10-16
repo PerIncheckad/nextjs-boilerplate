@@ -191,7 +191,7 @@ export default function CheckInForm() {
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   const [behoverRekond, setBehoverRekond] = useState(false);
   const [varningslampaLyser, setVarningslampaLyser] = useState(false);
-  const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState(''); // NYTT STATE
+  const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState('');
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [insynsskyddOK, setInsynsskyddOK] = useState(false);
   const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
@@ -227,12 +227,12 @@ export default function CheckInForm() {
     if (drivmedelstyp === 'elbil' && !laddniva) return false;
     if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
-    if (varningslampaLyser && !varningslampaBeskrivning) return false; // NY VALDIERING
+    if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     return isChecklistComplete;
   }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning]);
 
   const finalPayloadForUI = useMemo(() => ({
-      reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, varningslampaBeskrivning, // NYA FÄLT
+      reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, varningslampaBeskrivning,
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva },
       ort,
@@ -370,7 +370,7 @@ export default function CheckInForm() {
     setRegInput(''); setVehicleData(null); setExistingDamages([]); setOrt('');
     setStation(''); setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null);
     setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva('');
-    setHjultyp(null); setBehoverRekond(false); setVarningslampaLyser(false); setVarningslampaBeskrivning(''); // ÅTERSTÄLL
+    setHjultyp(null); setBehoverRekond(false); setVarningslampaLyser(false); setVarningslampaBeskrivning('');
     setInsynsskyddOK(false);
     setDekalDjurRokningOK(false); setIsskrapaOK(false); setPskivaOK(false);
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
@@ -418,7 +418,7 @@ export default function CheckInForm() {
           hjultyp,
           rekond: behoverRekond,
           varningslampa: varningslampaLyser,
-          varningslampa_beskrivning: varningslampaBeskrivning, // NYTT FÄLT
+          varningslampa_beskrivning: varningslampaBeskrivning,
           notering: preliminarAvslutNotering,
           incheckare: firstName,
           timestamp: new Date().toISOString(),
@@ -502,7 +502,7 @@ export default function CheckInForm() {
         });
     } else {
         setVarningslampaLyser(false);
-        setVarningslampaBeskrivning(''); // Rensa beskrivning när man av-klickar
+        setVarningslampaBeskrivning('');
     }
   };
 
@@ -655,7 +655,7 @@ export default function CheckInForm() {
       </Card>
 
       <Card data-error={showFieldErrors && !isChecklistComplete}>
-        <SectionHeader title="Checklista" />
+        <SectionHeader title="Checklista & Status" />
         <div className="special-buttons-wrapper">
             <div className="special-button-item">
                 <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
@@ -663,12 +663,13 @@ export default function CheckInForm() {
             <div className="special-button-item">
                 <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa lyser</ChoiceButton>
                 {varningslampaLyser && (
-                    <div data-error={showFieldErrors && !varningslampaBeskrivning} className="field" style={{marginTop: '1rem'}}>
+                    <div className="field" style={{marginTop: '1rem'}} data-error={showFieldErrors && !varningslampaBeskrivning.trim()}>
+                        <label>Specificera varningslampa *</label>
                         <textarea 
                             value={varningslampaBeskrivning} 
                             onChange={e => setVarningslampaBeskrivning(e.target.value)} 
-                            placeholder="Vilken eller vilka varningslampor lyser? *" 
-                            rows={3}
+                            placeholder="Vilken eller vilka lampor?" 
+                            rows={2}
                         ></textarea>
                     </div>
                 )}
@@ -773,7 +774,6 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
         return null;
     };
     
-    // NY LOGIK FÖR LADDNINGSVARNING
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
 
     return (
@@ -785,35 +785,33 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                         Säkerställ att bilen omedelbart sätts på laddning!
                     </div>
                 )}
-                <h3 className="confirm-modal-title">Bekräfta incheckning</h3>
-                <div className="confirm-summary">
-                    <p>🚗 <strong>Fordon:</strong> {payload.reg} ({payload.carModel || '---'})</p>
-                </div>
-                <div className="confirm-summary">
-                    <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
-                </div>
-                
-                {renderDamageList(payload.nya_skador, '💥 Nya skador')}
-                {renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}
-                {renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
-                
-                {payload.varningslampa && (
-                    <div className="confirm-summary">
+                <div className="confirm-header">
+                    <h3 className="confirm-modal-title">Bekräfta incheckning</h3>
+                    <p className="confirm-vehicle-info">{payload.reg} - {payload.carModel || '---'}</p>
+                    {payload.varningslampa && (
                         <p className="warning-highlight">Varningslampa lyser: {payload.varningslampaBeskrivning || 'Ej specificerat'}</p>
-                    </div>
-                )}
-                {payload.rekond && (
-                    <div className="confirm-summary">
+                    )}
+                    {payload.rekond && (
                         <p className="rekond-highlight">Behöver rekond!</p>
-                    </div>
-                )}
+                    )}
+                </div>
                 
-                <div className="confirm-summary">
-                    <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>
-                    {getTankningText()}
-                    <p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
-                    {payload.washed && <p><strong>✅ Tvättad</strong></p>}
-                    {payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
+                <div className="confirm-details">
+                    <div className="confirm-summary">
+                        <p>📍 <strong>Plats:</strong> {payload.ort} / {payload.station}</p>
+                    </div>
+                    
+                    {renderDamageList(payload.nya_skador, '💥 Nya skador')}
+                    {renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}
+                    {renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
+                    
+                    <div className="confirm-summary">
+                        <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>
+                        {getTankningText()}
+                        <p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
+                        {payload.washed && <p><strong>✅ Tvättad</strong></p>}
+                        {payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
+                    </div>
                 </div>
 
                 <div className="modal-actions">
@@ -998,8 +996,8 @@ const GlobalStyles = () => (
         .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
         .warning-light-checkbox { border-color: var(--color-warning) !important; background-color: var(--color-warning-light) !important; color: #92400e !important; }
         .warning-light-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger) !important; color: white !important; }
-        .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; }
-        .special-buttons-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
+        .special-buttons-wrapper { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; align-items: start; }
         .special-button-item { display: flex; flex-direction: column; }
         .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
         .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
@@ -1018,19 +1016,22 @@ const GlobalStyles = () => (
         .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; cursor: pointer; }
         .remove-media-btn:hover { background-color: #b91c1c; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; text-align: center; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
+        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
         .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); }
         .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
-        .confirm-modal .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; margin-top: 0; }
-        .confirm-modal .confirm-summary { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
-        .confirm-modal .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+        .confirm-modal { text-align: left; }
+        .confirm-header { text-align: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+        .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+        .confirm-vehicle-info { font-size: 1.2rem; font-weight: 600; margin: 0.5rem 0; }
+        .confirm-details { }
+        .confirm-summary { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+        .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
         .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
-        .confirm-modal .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
-        .confirm-damage-section { text-align: left; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
+        .confirm-damage-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
         .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
         .confirm-damage-section li { margin-bottom: 0.25rem; }
-        .rekond-highlight { background-color: var(--color-danger); color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; }
         .charge-warning-banner { background-color: var(--color-danger); color: white; font-weight: 700; font-size: 1.25rem; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center; }
         .spinner-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: 600; }
         .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--color-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
