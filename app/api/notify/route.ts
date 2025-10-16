@@ -77,7 +77,7 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0; color: #000000 !important;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
@@ -104,19 +104,20 @@ const createBaseLayout = (regnr: string, content: string): string => `
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="color-scheme" content="light">
-    <meta name="supported-color-schemes" content="light">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
     <!--[if !mso]><!-->
     <style>
       :root {
-        color-scheme: light;
-        supported-color-schemes: light;
+        color-scheme: light dark;
+        supported-color-schemes: light dark;
       }
-      body {
+      /* Tvingande Dark Mode-fixar */
+      .body, .main-div, .main-table, .content-cell {
         background-color: #ffffff !important;
         background-image: linear-gradient(#ffffff, #ffffff) !important;
       }
-      h1, h2, h3, h4, h5, h6, p, a, li, span, td, div {
+      h1, h2, h3, h4, h5, h6, p, a, li, span, td, div, strong, small {
         color: #000000 !important;
       }
       a, a:visited {
@@ -131,12 +132,12 @@ const createBaseLayout = (regnr: string, content: string): string => `
       <!--[if mso]>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="680">
         <tr>
-        <td>
+        <td class="mso-cell" style="background-color: #ffffff !important;">
       <![endif]-->
-      <div style="max-width: 680px; margin: 0 auto; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
-        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+      <div class="main-div" style="max-width: 680px; margin: 0 auto; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
+        <table class="main-table" role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff !important;">
           <tr>
-            <td style="padding: 20px 40px; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
+            <td class="content-cell" style="padding: 20px 40px; background-color: #ffffff; background-image: linear-gradient(#ffffff, #ffffff);">
               <div style="text-align: center; margin-bottom: 20px;">
                 <img src="${LOGO_URL}" alt="Incheckad" style="width: 60px; height: auto;">
               </div>
@@ -147,7 +148,7 @@ const createBaseLayout = (regnr: string, content: string): string => `
                 ${content}
               </table>
               <div style="text-align: center; margin-top: 30px; font-size: 12px; color: #000000 !important;">
-                Detta mejl skickades automatiskt från incheckad.se
+                <p style="color: #000000 !important;">Detta mejl skickades automatiskt från incheckad.se</p>
               </div>
             </td>
           </tr>
@@ -172,14 +173,14 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
 
   const content = `
-    ${createAlertBanner(varningslampa, 'Varningslampa Lyser', varningslampa_beskrivning)}
+    ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
-        <table class="info-grid">
+        <table class="info-grid" style="color: #000000 !important;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
@@ -190,7 +191,7 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
-        <table class="info-grid">
+        <table class="info-grid" style="color: #000000 !important;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #000000 !important; padding: 4px 0;">${matarstallning} km</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${formatTankning(tankning)}</td></tr>
         </table>
@@ -219,14 +220,14 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
           
   const content = `
-    ${createAlertBanner(varningslampa, 'Varningslampa Lyser', varningslampa_beskrivning)}
+    ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
-        <table class="info-grid">
+        <table class="info-grid" style="color: #000000 !important;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Däck:</td><td style="color: #000000 !important; padding: 4px 0;">${hjultyp || '---'}</td></tr>
@@ -234,7 +235,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
-        <table class="info-grid">
+        <table class="info-grid" style="color: #000000 !important;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Plats:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
