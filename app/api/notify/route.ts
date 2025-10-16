@@ -34,13 +34,17 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 // 2. HTML BUILDER - HELPERS
 // =================================================================
 
-const createAlertBanner = (condition: boolean, text: string): string => {
+const createAlertBanner = (condition: boolean, text: string, details?: string): string => {
   if (!condition) return '';
+  let fullText = `⚠️ ${text}`;
+  if (details) {
+    fullText += `: ${details}`;
+  }
   return `
     <tr>
       <td style="padding: 12px 0;">
         <div style="background-color: #FFFBEB !important; background-image: linear-gradient(#FFFBEB, #FFFBEB) !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">
-          ⚠️ ${text}
+          ${fullText}
         </div>
       </td>
     </tr>
@@ -164,11 +168,11 @@ const createBaseLayout = (regnr: string, content: string): string => `
 // =================================================================
 
 const buildRegionEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, varningslampa, nya_skador = [], notering } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
 
   const content = `
-    ${createAlertBanner(varningslampa, 'Varningslampa Lyser')}
+    ${createAlertBanner(varningslampa, 'Varningslampa Lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
@@ -210,12 +214,12 @@ const buildRegionEmail = (payload: any, date: string, time: string): string => {
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, notering,
+  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
   const storageLink = `https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/list/damage-photos/${slugify(regnr)}`;
           
   const content = `
-    ${createAlertBanner(varningslampa, 'Varningslampa Lyser')}
+    ${createAlertBanner(varningslampa, 'Varningslampa Lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
@@ -269,7 +273,7 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const payload = fullRequestPayload.meta; 
 
-    const { regnr, ort, station, status, varningslampa, nya_skador = [], dokumenterade_skador = [] } = payload;
+    const { regnr, ort, station, status, nya_skador = [], dokumenterade_skador = [] } = payload;
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
