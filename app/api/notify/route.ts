@@ -177,8 +177,11 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
       bilenStarNuText += `<br><small style="color: #000000 !important;">(${bilen_star_nu.kommentar})</small>`;
     }
   }
+  
+  const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
 
   const content = `
+    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!')}
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
