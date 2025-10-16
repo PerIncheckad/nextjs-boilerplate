@@ -639,7 +639,7 @@ export default function CheckInForm() {
                 <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
             </div>}
         </>)}
-        {drivmedelstyp === 'elbil' && (<><Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field></>)}
+        {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} max="100" onChange={e => setLaddniva(e.target.value)} placeholder="0-100" /></Field>)}
       </Card>
 
       <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media)))}>
@@ -654,7 +654,7 @@ export default function CheckInForm() {
         {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={updateDamageMedia} onMediaRemove={removeDamageMedia} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="secondary" style={{ marginTop: '1rem' }}>Lägg till ytterligare en ny skada</Button></>)}
       </Card>
 
-      <Card data-error={showFieldErrors && !isChecklistComplete}>
+      <Card data-error={showFieldErrors && !isChecklistComplete || (varningslampaLyser && !varningslampaBeskrivning.trim())}>
         <SectionHeader title="Checklista & Status" />
         <div className="special-buttons-wrapper">
             <div className="special-button-item">
@@ -953,7 +953,7 @@ const GlobalStyles = () => (
         .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
         .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; }
         .card[data-error="true"] { border: 2px solid var(--color-danger); }
-        .field[data-error="true"] textarea { border: 2px solid var(--color-danger); }
+        .field[data-error="true"] textarea { border: 2px solid var(--color-danger) !important; }
         .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
         .section-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; margin:0; }
         .sub-section-header { margin-top: 2rem; margin-bottom: 1rem; }
@@ -1020,14 +1020,14 @@ const GlobalStyles = () => (
         .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); }
         .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
         .confirm-modal { text-align: left; }
-        .confirm-header { text-align: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+        .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
         .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
-        .confirm-vehicle-info { font-size: 1.2rem; font-weight: 600; margin: 0.5rem 0; }
+        .confirm-vehicle-info { font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0 1rem 0; }
         .confirm-details { }
         .confirm-summary { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
         .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
         .confirm-damage-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
         .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
         .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
