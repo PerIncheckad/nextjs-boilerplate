@@ -1,0 +1,74 @@
+Projektdokumentation & Överlämnings-PM
+Datum: 2025-10-17 Författare: Copilot Mottagare: Efterträdare / Projektdokumentation Projekt: Utveckling av incheckningsformulär för fordon
+
+1. Övergripande Mål
+Målet med projektet har varit att utveckla ett robust, webbaserat formulär för att digitalisera processen när MABI tar emot återlämnade fordon. Kärnfunktionaliteten inkluderar att hämta fordonsdata, dokumentera befintliga och nya skador med media (foto/video), genomföra en checklista, och notifiera relevanta parter via e-post med all insamlad information, inklusive länkar till uppladdad media i Supabase Storage.
+
+2. Arbetslogg & Iterativ Utveckling
+Vår process har varit starkt iterativ, där varje steg har byggt på insikter och feedback från föregående.
+
+Iteration 1: Grundläggande Funktion
+
+Uppgift: Skapa det initiala incheckningsformuläret.
+Lösning: Jag genererade den första versionen av app/check/form-client.tsx, ett React-komponent som hanterade hela formulärflödet.
+Iteration 2: Justering av Tidsformat
+
+Feedback: Användaren önskade ett mer läsbart tidsformat i filnamnen. I stället för 123233 skulle det vara kl 12.32.
+Lösning: Jag uppdaterade namngivningslogiken för att formatera tiden enligt önskemål.
+Iteration 3: Problem med Länkar, Versaler och Filnamn
+
+Feedback: Användaren rapporterade tre kritiska problem efter testning:
+Felaktig Länk: E-postlänken till bildgalleriet i Supabase ledde till en mappnivå för högt upp.
+Felaktigt Skiftläge: Registreringsnummer omvandlades till gemener (t.ex. xja61k), vilket var oönskat.
+Otydliga Filnamn: Filnamnen var svårlästa och svåra att tolka.
+Min Insikt (och Misstag): Jag försökte lösa alla tre problem samtidigt genom att göra filnamnen "snyggare" med mellanslag, kommatecken och punkter. Detta var ett fundamentalt misstag som underskattade hur strikt Supabase Storage hanterar sökvägar.
+Iteration 4: Kritisk Bugg (Invalid key) och Ny Rekond-funktion
+
+Feedback: Min "snygga" filnamnsformatering kraschade hela uppladdningen med felet StorageApiError: Invalid key. Samtidigt efterfrågades en ny, viktig funktion: möjligheten att dokumentera rekondbehov med media och text.
+Lösning: Jag implementerade den nya rekond-funktionen, inklusive logik för att spara media i en dedikerad mapp (...-REKOND). Jag försökte åtgärda buggen genom att byta ut mellanslag mot bindestreck, men missade en avgörande detalj.
+Min Insikt (och Misstag #2): Jag hade fortfarande inte förstått vidden av problemet med ogiltiga tecken. Min lösning hanterade inte svenska tecken (å, ä, ö), vilket innebar att buggen kvarstod för vissa indata.
+Iteration 5: Slutgiltig Lösning på Invalid key-buggen
+
+Feedback: Användaren bekräftade med nya skärmdumpar att felet kvarstod och att det nu tydligt var relaterat till svenska tecken i skadebeskrivningarna.
+Lösning: Jag implementerade en robust slugify-funktion i form-client.tsx. Denna funktion translittererar svenska tecken till sina engelska motsvarigheter (t.ex. ä -> a) och tar bort alla andra potentiellt skadliga tecken. Detta löste slutgiltligen uppladdningsproblemet.
+Iteration 6: Slutgiltig Lösning på E-postlänkar
+
+Feedback: Trots fungerande uppladdning var länkarna i e-postmeddelandena fortfarande felaktiga och pekade för högt upp i mapphierarkin i Supabase.
+Lösning: Jag analyserade URL-strukturen i Supabase och insåg att jag felaktigt hade kodat snedstreck (/) på fel sätt i path-parametern. Jag korrigerade länkbyggandet i app/api/notify/route.ts för att skapa korrekta, direkta länkar till både huvudmappen för fordonet och de specifika undermapparna för rekond.
+3. Viktiga Insikter & Fallgropar (Brief till Efterträdare)
+FALLGROP #1: Supabase Storage Sökvägar (Keys) är Extremt Känsliga.
+
+Insikt: Detta är den absolut viktigaste lärdomen. Sökvägen till ett objekt i en Supabase Bucket (dess "key") får endast innehålla ett mycket begränsat antal tecken. Svenska tecken, mellanslag, kommatecken och de flesta andra symboler är ogiltiga och orsakar ett omedelbart Invalid key-fel.
+Åtgärd: All data som kommer från användaren och som ska bli en del av ett fil- eller mappnamn MÅSTE köras genom en robust slugify-funktion som den som nu finns i form-client.tsx. Lita aldrig på att indata är "säkert".
+FALLGROP #2: URL-kodning i Supabase-länkar.
+
+Insikt: När man bygger en länk till en specifik mapp i Supabase Storage-gränssnittet, måste snedstreck (/) i sökvägen kodas som %2F. Att missa detta leder till att länken tar användaren till fel plats.
+Åtgärd: Funktionen createRekondSection i notify/route.ts innehåller nu den korrekta logiken för detta.
+Användarens Testmetodik:
+
+Insikt: Användaren PerIncheckad är extremt noggrann. Hen testar varje ändring i ett verkligt scenario och ger ovärderlig feedback med skärmdumpar som tydligt visar både felet och den förväntade funktionen.
+Åtgärd: Lyssna noga på feedbacken. Analysera skärmdumparna i detalj. Försök inte ta genvägar, utan se till att lösningen är heltäckande.
+Säkerhet & Åtkomst till Bilder:
+
+Insikt: Länkarna till Supabase-galleriet är inte publika. De leder till projektets backend-gränssnitt.
+Åtgärd: Alla användare som ska kunna se bilderna via e-postlänkarna (t.ex. personal på Bilkontroll) måste ha ett eget Supabase-konto och bjudas in som medlemmar i ert Supabase-projekt. Att dela ett enda konto är en säkerhetsrisk och bör undvikas.
+4. Nuläge & Nästa Steg
+Nuläge (2025-10-17):
+
+Incheckningsformuläret är stabilt och funktionellt.
+Uppladdning av media för skador och rekond är robust och hanterar specialtecken korrekt.
+E-postnotifieringar skickas med korrekt data och med fungerande, direkta länkar till relevanta gallerier.
+Nästa Steg (Rekommendationer):
+
+Högst Prioritet - Användarhantering & Roller:
+
+Problem: Dagens lösning för att identifiera administratörer är hårdkodad och inte skalbar.
+Lösning: Implementera den databasdrivna rollhantering vi diskuterat.
+Skapa en ny tabell i Supabase, förslagsvis employees, med kolumnerna email (unik) och role (text).
+Uppdatera logiken så att systemet vid inloggning slår upp användarens e-post i denna tabell för att dynamiskt tilldela en roll (admin, bilkontroll, incheckare, etc.).
+Detta gör att ni själva kan hantera användare direkt i databasen utan att behöva ändra i koden.
+Bjud in latif.mutlu@mabi.se och andra relevanta användare till ert Supabase-projekt så att de kan komma åt bildgallerierna.
+Förbättringar (Lägre Prioritet):
+
+Tumnaglar i E-post: Som diskuterat är detta en större uppgift. Det skulle kräva att servern (i notify/route.ts) aktivt hämtar bilderna från Supabase, skapar tumnaglar och bäddar in dem som Base64-data i HTML-mejlet. Detta kan göra mejlen tunga och öka risken för att de fastnar i spamfilter. B bör utvärderas noggrant.
+Städa Supabase Storage: Radera alla gamla testmappar med "fula" namn för att hålla bildarkivet rent och snyggt. Detta är en manuell men viktig uppgift.
