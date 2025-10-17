@@ -81,14 +81,14 @@ type ConfirmDialogState = {
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
-const sanitize = (s: string) => s.replace(/\s/g, '-');
+const slugify = (s: string) => s.replace(/\s/g, '-').replace(/,/g, '');
 
-function createFileName(regnr: string, damage: ExistingDamage | NewDamage, index: number): string {
+function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamage): string {
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
-    const time = `kl ${hours}.${minutes}`;
+    const time = `kl-${hours}-${minutes}`;
 
     const isExisting = 'fullText' in damage;
     
@@ -98,23 +98,36 @@ function createFileName(regnr: string, damage: ExistingDamage | NewDamage, index
 
     const nameParts = [
         regnr,
-        `${date}, ${time}`,
+        date,
+        time,
         damageType,
         part,
         pos
     ];
     
-    return sanitize(nameParts.filter(Boolean).join(' - '));
+    return slugify(nameParts.filter(Boolean).join('-'));
 }
 
+function createRekondFolderName(regnr: string): string {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const time = `kl-${hours}-${minutes}`;
+    return `${regnr}-${date}-${time}-REKOND`;
+}
 
-async function uploadOne(file: File, reg: string, damageFolder: string, fileName: string): Promise<string> {
+async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
-    const ext = file.name.split(".").pop() || "bin";
-    const path = `${reg}/${damageFolder}/${fileName}.${ext}`;
-    
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
-    if (error) throw error;
+    if (error) {
+        // Om filen redan finns, försök inte hämta URL, returnera bara sökvägen.
+        if (error.message.includes('The resource already exists')) {
+            console.warn(`File already exists, not re-uploading: ${path}`);
+        } else {
+            throw error;
+        }
+    }
     
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
@@ -131,19 +144,21 @@ function partitionMediaByType(files: MediaFile[]) {
 }
 
 async function uploadAllForDamage(damage: ExistingDamage | NewDamage, reg: string): Promise<Uploads> {
-    const damageFolder = createFileName(reg, damage, 0);
-    if (!damage.media || damage.media.length === 0) return { photo_urls: [], video_urls: [], folder: damageFolder };
+    const folderName = createDamageFolderName(reg, damage);
+    if (!damage.media || damage.media.length === 0) return { photo_urls: [], video_urls: [], folder: folderName };
     
     const { photos, videos } = partitionMediaByType(damage.media);
     
     const photoUploadPromises = photos.map((p, i) => {
-        const fileName = `${damageFolder}-${i + 1}`;
-        return uploadOne(p, reg, damageFolder, fileName);
+        const ext = p.name.split('.').pop() || 'png';
+        const path = `${reg}/${folderName}/${folderName}-${i + 1}.${ext}`;
+        return uploadOne(p, path);
     });
     
     const videoUploadPromises = videos.map((v, i) => {
-        const fileName = `${damageFolder}-${photos.length + i + 1}`;
-        return uploadOne(v, reg, damageFolder, fileName);
+        const ext = v.name.split('.').pop() || 'mp4';
+        const path = `${reg}/${folderName}/${folderName}-${photos.length + i + 1}.${ext}`;
+        return uploadOne(v, path);
     });
 
     const [photoUploads, videoUploads] = await Promise.all([
@@ -151,8 +166,35 @@ async function uploadAllForDamage(damage: ExistingDamage | NewDamage, reg: strin
         Promise.all(videoUploadPromises),
     ]);
 
-    return { photo_urls: photoUploads, video_urls: videoUploads, folder: damageFolder };
+    return { photo_urls: photoUploads, video_urls: videoUploads, folder: folderName };
 }
+
+async function uploadRekondMedia(media: MediaFile[], reg: string): Promise<Uploads> {
+    const folderName = createRekondFolderName(reg);
+    if (!media || media.length === 0) return { photo_urls: [], video_urls: [], folder: folderName };
+    
+    const { photos, videos } = partitionMediaByType(media);
+    
+    const photoUploadPromises = photos.map((p, i) => {
+        const ext = p.name.split('.').pop() || 'png';
+        const path = `${reg}/${folderName}/${folderName}-${i + 1}.${ext}`;
+        return uploadOne(p, path);
+    });
+    
+    const videoUploadPromises = videos.map((v, i) => {
+        const ext = v.name.split('.').pop() || 'mp4';
+        const path = `${reg}/${folderName}/${folderName}-${photos.length + i + 1}.${ext}`;
+        return uploadOne(v, path);
+    });
+
+    const [photoUploads, videoUploads] = await Promise.all([
+        Promise.all(photoUploadPromises),
+        Promise.all(videoUploadPromises),
+    ]);
+
+    return { photo_urls: photoUploads, video_urls: videoUploads, folder: folderName };
+}
+
 
 const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
 
@@ -218,6 +260,8 @@ export default function CheckInForm() {
   const [laddniva, setLaddniva] = useState('');
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   const [behoverRekond, setBehoverRekond] = useState(false);
+  const [rekondText, setRekondText] = useState('');
+  const [rekondMedia, setRekondMedia] = useState<MediaFile[]>([]);
   const [varningslampaLyser, setVarningslampaLyser] = useState(false);
   const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState('');
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
@@ -261,8 +305,9 @@ export default function CheckInForm() {
     if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
+    if (behoverRekond && !hasPhoto(rekondMedia)) return false;
     return isChecklistComplete;
-  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, bilenStarNuOrt, bilenStarNuStation]);
+  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, bilenStarNuOrt, bilenStarNuStation, behoverRekond, rekondMedia]);
 
   const finalPayloadForUI = useMemo(() => ({
       reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, varningslampaBeskrivning,
@@ -276,7 +321,8 @@ export default function CheckInForm() {
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
-  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, varningslampaBeskrivning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, newDamages, existingDamages, washed, otherChecklistItemsOK]);
+      rekond_details: { text: rekondText, photo_urls: [], video_urls: [], folder: '' }
+  }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, varningslampaBeskrivning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, newDamages, existingDamages, washed, otherChecklistItemsOK, rekondText]);
 
   // Datahämtningsfunktion med utökad felhantering
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -408,6 +454,7 @@ export default function CheckInForm() {
     setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva('');
     setHjultyp(null); setBehoverRekond(false); setVarningslampaLyser(false); setVarningslampaBeskrivning('');
     setInsynsskyddOK(false);
+    setRekondText(''); setRekondMedia([]);
     setDekalDjurRokningOK(false); setIsskrapaOK(false); setPskivaOK(false);
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
     setSpolarvatskaOK(false); setAdblueOK(false); setSkadekontroll(null);
@@ -431,6 +478,11 @@ export default function CheckInForm() {
     setShowConfirmModal(false);
     setIsFinalSaving(true);
     try {
+        let rekondUploadResults: Uploads | null = null;
+        if (behoverRekond) {
+            rekondUploadResults = await uploadRekondMedia(rekondMedia, normalizedReg);
+        }
+
         const documentedForUpload = existingDamages.filter(d => d.status === 'documented');
         const newForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
         
@@ -475,6 +527,7 @@ export default function CheckInForm() {
             notering: preliminarAvslutNotering,
             incheckare: firstName,
             timestamp: new Date().toISOString(),
+            rekond_details: rekondUploadResults ? { ...rekondUploadResults, text: rekondText } : null,
             dokumenterade_skador: updatedExistingDamages
                 .filter(d => d.status === 'documented')
                 .map(({ media, ...rest }) => rest),
@@ -561,6 +614,11 @@ export default function CheckInForm() {
     const updater = isExisting ? setExistingDamages : setNewDamages;
     updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
   };
+  
+  const handleRekondMediaUpdate = async (files: FileList) => {
+    const processed = await processFiles(files);
+    setRekondMedia(prev => [...prev, ...processed]);
+  };
 
   const handleMediaRemove = (id: string, index: number, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
@@ -570,6 +628,14 @@ export default function CheckInForm() {
       newMedia.splice(index, 1);
       return { ...d, media: newMedia };
     }));
+  };
+  
+  const handleRekondMediaRemove = (index: number) => {
+    setRekondMedia(prev => {
+        const newMedia = [...prev];
+        newMedia.splice(index, 1);
+        return newMedia;
+    });
   };
 
   const addDamage = () => {
@@ -716,11 +782,23 @@ export default function CheckInForm() {
         {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="secondary" style={{marginTop: '1rem'}}>Lägg till ytterligare en skada</Button></>)}
       </Card>
 
-      <Card data-error={showFieldErrors && !isChecklistComplete || (varningslampaLyser && !varningslampaBeskrivning.trim())}>
+      <Card data-error={showFieldErrors && (!isChecklistComplete || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && !hasPhoto(rekondMedia)) )}>
         <SectionHeader title="Checklista & Status" />
         <div className="special-buttons-wrapper">
             <div className="special-button-item">
                 <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
+                {behoverRekond && (
+                    <div className="damage-details" style={{padding: '1rem 0 0 0'}}>
+                        <Field label="Kommentar (frivilligt)"><textarea value={rekondText} onChange={e => setRekondText(e.target.value)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
+                        <div className="media-section">
+                            <MediaUpload id="rekond-photo" onUpload={handleRekondMediaUpdate} hasFile={hasPhoto(rekondMedia)} fileType="image" label="Foto *" />
+                            <MediaUpload id="rekond-video" onUpload={handleRekondMediaUpdate} hasFile={hasVideo(rekondMedia)} fileType="video" label="Video" isOptional={true} />
+                        </div>
+                        <div className="media-previews">
+                            {rekondMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRekondMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
+                        </div>
+                    </div>
+                )}
             </div>
             <div className="special-button-item">
                 <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa lyser</ChoiceButton>
