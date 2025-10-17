@@ -54,17 +54,24 @@ const createAlertBanner = (condition: boolean, text: string, details?: string): 
 const getDamageString = (damage: any): string => {
     let baseString = '';
     let comment = '';
+    let positionsString = '';
 
-    if (damage.type || damage.carPart) { // Ny skada
-        baseString = [damage.type, damage.carPart, damage.position].filter(Boolean).join(' - ');
+    // Ny skada med expanderade positioner
+    if (damage.positions && damage.positions.length > 0) {
+        const positionParts = damage.positions.map((p: any) => `${p.carPart} (${p.position})`).join(', ');
+        baseString = `${damage.type}: ${positionParts}`;
         comment = damage.text;
-    } else if (damage.userType || damage.userCarPart) { // Dokumenterad befintlig skada
+    } 
+    // Gammal struktur för dokumenterad befintlig skada
+    else if (damage.userType || damage.userCarPart) { 
         const mainInfo = (damage.fullText || '').split(' - ').map((s:string) => s.trim()).filter(Boolean);
         const userParts = [damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean);
         const combined = [...new Set([...mainInfo, ...userParts])];
         baseString = combined.join(' - ');
         comment = damage.userDescription;
-    } else { // Fallback (åtgärdade skador)
+    } 
+    // Fallback
+    else { 
         baseString = damage.fullText || damage.text || String(damage);
     }
 
@@ -73,6 +80,7 @@ const getDamageString = (damage: any): string => {
     }
     return baseString;
 };
+
 
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
@@ -254,6 +262,14 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
   const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos`;
+
+  let bilenStarNuText = '---';
+  if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
+    bilenStarNuText = `${bilen_star_nu.ort} / ${bilen_star_nu.station}`;
+    if (bilen_star_nu.kommentar) {
+      bilenStarNuText += ` (${bilen_star_nu.kommentar})`;
+    }
+  }
           
   const content = `
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
@@ -274,7 +290,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table class="info-grid" style="color: #000000 !important; width: 100%;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Incheckad vid:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilen_star_nu ? `${bilen_star_nu.ort} / ${bilen_star_nu.station}` + (bilen_star_nu.kommentar ? ` (${bilen_star_nu.kommentar})` : '') : '---'}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilenStarNuText}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
@@ -322,20 +338,11 @@ export async function POST(request: Request) {
     // E-posthantering
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
+    const huvudstationHtml = buildHuvudstationEmail(payload, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
     
-    try {
-      const huvudstationHtml = buildHuvudstationEmail(payload, date, time);
-      emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
-    } catch (e) {
-      console.error("Failed to build Huvudstation email:", e);
-    }
-    
-    try {
-      const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
-      emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
-    } catch (e) {
-      console.error("Failed to build Bilkontroll email:", e);
-    }
+    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
@@ -349,18 +356,17 @@ export async function POST(request: Request) {
     const damagesToProcess = [...nya_skador, ...dokumenterade_skador];
     
     for (const damage of damagesToProcess) {
-        const isNewDamage = 'type' in damage;
+        const isNewDamage = 'positions' in damage;
         const firstPhoto = damage.uploads?.photo_urls?.[0] || null;
 
+        // Steg 1: Skapa huvudinlägget för skadan i 'damages'-tabellen (utan positionsdata)
         const damageData = {
             regnr: payload.regnr,
             damage_date: now.toISOString(),
             ort: payload.ort || null,
             station_namn: payload.station || null,
             inchecker_name: payload.incheckare || null,
-            damage_type: isNewDamage ? damage.type : ([damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean).join(' - ') || damage.fullText),
-            car_part: isNewDamage ? damage.carPart : damage.userCarPart,
-            position: isNewDamage ? damage.position : damage.userPosition,
+            damage_type: isNewDamage ? damage.type : (damage.fullText || 'Dokumenterad befintlig skada'),
             description: isNewDamage ? damage.text : (damage.userDescription || damage.fullText),
             media_url: firstPhoto,
             status: "complete",
@@ -375,14 +381,32 @@ export async function POST(request: Request) {
 
         if (damageError) {
             console.error('Supabase DB error during damage INSERT:', damageError);
-            continue;
+            continue; // Gå till nästa skada om detta misslyckas
         }
 
         if (!newDamage) {
-            console.error('Failed to get ID for new damage, cannot save media.');
+            console.error('Failed to get ID for new damage, cannot save positions or media.');
             continue;
         }
 
+        // Steg 2: Spara positionerna i den nya 'damage_positions'-tabellen
+        if (isNewDamage && damage.positions && damage.positions.length > 0) {
+            const positionsToInsert = damage.positions.map((pos: any) => ({
+                damage_id: newDamage.id,
+                car_part: pos.carPart,
+                position: pos.position,
+            }));
+
+            const { error: positionsError } = await supabaseAdmin
+                .from('damage_positions')
+                .insert(positionsToInsert);
+
+            if (positionsError) {
+                console.error('Supabase DB error during damage_positions INSERT:', positionsError);
+            }
+        }
+
+        // Steg 3: Spara media i 'damage_media'-tabellen (oförändrat)
         const mediaToInsert = [];
         const allPhotoUrls = damage.uploads?.photo_urls || [];
         const allVideoUrls = damage.uploads?.video_urls || [];
