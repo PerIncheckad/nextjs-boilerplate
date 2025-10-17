@@ -164,7 +164,7 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
     if (!rekond_details || !rekond_details.text && (!rekond_details.photo_urls || rekond_details.photo_urls.length === 0)) return '';
     
     const { text, photo_urls = [], folder } = rekond_details;
-    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}/${folder}`;
+    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}%2F${folder}`;
 
     let photosHtml = '';
     if (photo_urls.length > 0) {
