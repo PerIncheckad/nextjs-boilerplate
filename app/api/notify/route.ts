@@ -77,7 +77,7 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
@@ -164,7 +164,7 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
     if (!rekond_details || !rekond_details.text && (!rekond_details.photo_urls || rekond_details.photo_urls.length === 0)) return '';
     
     const { text, photo_urls = [], folder } = rekond_details;
-    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}%2F${folder}`;
+    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${folder}`;
 
     let photosHtml = '';
     if (photo_urls.length > 0) {
@@ -191,7 +191,7 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
 const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
   const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu, rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -227,7 +227,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
         <table class="info-grid" style="color: #000000 !important; width: 100%;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #000000 !important; padding: 4px 0;">${matarstallning} km</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${payload.drivmedel === 'elbil' ? `${laddning.laddniva}%` : formatTankning(tankning)}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${payload.drivmedel === 'elbil' ? '---' : formatTankning(tankning)}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Laddning:</td><td style="color: #000000 !important; padding: 4px 0;">${payload.drivmedel === 'elbil' ? `${laddning.laddniva}%` : '---'}</td></tr>
         </table>
       </div>
       ${nya_skador.length > 0 ? `
@@ -252,7 +253,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -337,7 +338,7 @@ export async function POST(request: Request) {
     
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i MABI's bilregister. Incheckningen har sparats, men bilen behöver läggas in manuellt i systemet.</p></td></tr>`);
+      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen kontrollera om det är korrekt inmatat.</p></td></tr>`);
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
     
