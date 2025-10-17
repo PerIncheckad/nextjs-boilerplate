@@ -160,17 +160,17 @@ const createBaseLayout = (regnr: string, content: string): string => `
   </html>
 `;
 
-const createRekondSection = (rekond_details: any, projectRef: string): string => {
+const createRekondSection = (rekond_details: any, regnr: string, projectRef: string): string => {
     if (!rekond_details || !rekond_details.text && (!rekond_details.photo_urls || rekond_details.photo_urls.length === 0)) return '';
     
     const { text, photo_urls = [], folder } = rekond_details;
-    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${folder}`;
+    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}/${folder}`;
 
     let photosHtml = '';
     if (photo_urls.length > 0) {
         photosHtml = `
             <p style="margin:10px 0 5px 0; color: #000000 !important; font-weight: bold;">Bilder:</p>
-            ${photo_urls.map((url: string) => `<a href="${url}" style="color: #005A9C !important; text-decoration: none !important; margin-right: 10px;">Visa bild</a>`).join('')}
+            ${photo_urls.map((url: string, index: number) => `<a href="${url}" style="color: #005A9C !important; text-decoration: none !important; margin-right: 10px;">Visa bild ${index + 1}</a>`).join('')}
             <br/><a href="${galleryLink}" style="color: #005A9C !important; text-decoration: none !important; margin-top: 5px; display: inline-block;">Öppna Rekond-galleri →</a>
         `;
     }
@@ -207,7 +207,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
     ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!')}
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
-    ${rekond ? createRekondSection(rekond_details, projectRef) : ''}
+    ${rekond ? createRekondSection(rekond_details, regnr, projectRef) : ''}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0; color: #000000 !important;">
@@ -265,7 +265,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const content = `
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
-    ${rekond ? createRekondSection(rekond_details, projectRef) : ''}
+    ${rekond ? createRekondSection(rekond_details, regnr, projectRef) : ''}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0; color: #000000 !important;">
