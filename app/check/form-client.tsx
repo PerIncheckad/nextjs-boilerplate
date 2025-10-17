@@ -63,8 +63,17 @@ type ExistingDamage = {
   uploads: Uploads;
 };
 
+// MODIFIED TYPE
+type DamagePosition = {
+  id: string;
+  carPart: string;
+  position: string;
+};
+
+// MODIFIED TYPE
 type NewDamage = {
-  id: string; type: string; carPart: string; position: string; text: string; 
+  id: string; type: string; text: string; 
+  positions: DamagePosition[];
   media: MediaFile[];
   uploads: Uploads;
 };
@@ -97,6 +106,7 @@ function slugify(str: string): string {
         .replace(/-+$/, ''); // Trim - from end of text
 }
 
+// MODIFIED FUNCTION
 function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamage): string {
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
@@ -107,16 +117,17 @@ function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamag
     const isExisting = 'fullText' in damage;
     
     const damageType = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
-    const part = isExisting ? (damage as ExistingDamage).userCarPart : (damage as NewDamage).carPart;
-    const pos = isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position;
+
+    // Use the first position to name the folder
+    const firstPos = isExisting ? { carPart: (damage as ExistingDamage).userCarPart, position: (damage as ExistingDamage).userPosition } : (damage as NewDamage).positions[0];
 
     const nameParts = [
         regnr,
         date,
         time,
         damageType,
-        part,
-        pos
+        firstPos?.carPart,
+        firstPos?.position
     ];
     
     return nameParts.filter(Boolean).map(s => slugify(s)).join('-');
@@ -311,16 +322,26 @@ export default function CheckInForm() {
     return washed && otherChecklistItemsOK;
   }, [washed, otherChecklistItemsOK]);
 
+  // MODIFIED VALIDATION
   const formIsValidState = useMemo(() => {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
     if (drivmedelstyp === 'elbil' && !laddniva) return false;
-    if (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) return false;
+    // Check new damages validity
+    if (skadekontroll === 'nya_skador') {
+        if (newDamages.length === 0) return false;
+        for (const d of newDamages) {
+            if (!d.type || !hasPhoto(d.media) || !hasVideo(d.media)) return false;
+            for (const p of d.positions) {
+                if (!p.carPart) return false;
+            }
+        }
+    }
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     if (behoverRekond && !hasPhoto(rekondMedia)) return false;
     return isChecklistComplete;
-  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, bilenStarNuOrt, bilenStarNuStation, behoverRekond, rekondMedia]);
+  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, behoverRekond, rekondMedia, bilenStarNuOrt, bilenStarNuStation]);
 
   const finalPayloadForUI = useMemo(() => ({
       reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, varningslampaBeskrivning,
@@ -487,6 +508,7 @@ export default function CheckInForm() {
     });
   };
 
+  // MODIFIED FUNCTION
   const confirmAndSubmit = async () => {
     setShowConfirmModal(false);
     setIsFinalSaving(true);
@@ -545,7 +567,11 @@ export default function CheckInForm() {
                 .filter(d => d.status === 'documented')
                 .map(({ media, ...rest }) => rest),
             nya_skador: updatedNewDamages
-                .map(({ media, ...rest }) => rest),
+                .map(({ media, ...rest }) => ({
+                    ...rest,
+                    // Ensure positions are sent correctly
+                    positions: rest.positions.map(p => ({ carPart: p.carPart, position: p.position }))
+                })),
             åtgärdade_skador: resolvedDamages
                 .map(({ media, ...rest }) => rest),
         };
@@ -617,9 +643,24 @@ export default function CheckInForm() {
     }
   };
 
-  const updateDamageField = (id: string, field: string, value: any, isExisting: boolean) => {
+  // MODIFIED FUNCTION
+  const updateDamageField = (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, [field]: value } : d));
+    updater((damages: any[]) => damages.map(d => {
+      if (d.id !== id) return d;
+      
+      // Handle position updates for NewDamage
+      if (!isExisting && positionId) {
+        const newPositions = (d as NewDamage).positions.map(p => 
+          p.id === positionId ? { ...p, [field]: value } : p
+        );
+        return { ...d, positions: newPositions };
+      }
+      
+      // Handle other fields
+      const fieldKey = isExisting ? `user${field.charAt(0).toUpperCase() + field.slice(1)}` : field;
+      return { ...d, [fieldKey]: value };
+    }));
   };
 
   const handleMediaUpdate = async (id: string, files: FileList, isExisting: boolean) => {
@@ -651,9 +692,11 @@ export default function CheckInForm() {
     });
   };
 
+  // MODIFIED FUNCTION
   const addDamage = () => {
     setNewDamages(prev => [...prev, { 
-        id: `new_${Date.now()}`, type: '', carPart: '', position: '', text: '', 
+        id: `new_${Date.now()}`, type: '', text: '', 
+        positions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }],
         media: [], uploads: { photo_urls: [], video_urls: [], folder: '' } 
     }]);
   };
@@ -666,6 +709,23 @@ export default function CheckInForm() {
         confirmButtonVariant: 'danger',
         onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id))
     });
+  };
+
+  // NEW FUNCTIONS
+  const addDamagePosition = (damageId: string) => {
+    setNewDamages(prev => prev.map(d => 
+        d.id === damageId 
+        ? { ...d, positions: [...d.positions, { id: `pos-${Date.now()}`, carPart: '', position: '' }] }
+        : d
+    ));
+  };
+
+  const removeDamagePosition = (damageId: string, positionId: string) => {
+      setNewDamages(prev => prev.map(d => {
+          if (d.id !== damageId) return d;
+          if (d.positions.length <= 1) return d; // Don't remove the last one
+          return { ...d, positions: d.positions.filter(p => p.id !== positionId) };
+      }));
   };
   
   const handleLaddningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -783,16 +843,16 @@ export default function CheckInForm() {
         {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || !d.carPart || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))))}>
+      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media)) )}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} />) : <p>Inga kända skador.</p>}
+        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} />) : <p>Inga kända skador på detta fordon.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, nya skador finns</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} />)}<Button onClick={addDamage} variant="secondary" style={{marginTop: '1rem'}}>Lägg till ytterligare en skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />)}<Button onClick={addDamage}>+ Lägg till ytterligare en skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && (!isChecklistComplete || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && !hasPhoto(rekondMedia)) )}>
@@ -900,6 +960,7 @@ const SpinnerOverlay = () => (
     </div>
 );
 
+// MODIFIED COMPONENT
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
@@ -908,17 +969,28 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             <div className="confirm-damage-section">
                 <h4>{title}</h4>
                 <ul>
-                    {damages.map((d: any) => {
-                        const type = d.type || d.userType;
-                        const carPart = d.carPart || d.userCarPart;
-                        const position = d.position || d.userPosition;
-                        const text = d.text || d.userDescription || d.fullText;
-                        
-                        let damageString = [type, carPart, position].filter(Boolean).join(' - ');
-                        if (!damageString) damageString = text;
-                        else if (text && damageString !== text) damageString += ` (${text})`;
+                    {damages.map((d: any, index: number) => {
+                        let damageString = '';
+                        // New damage with positions
+                        if (d.positions && d.positions.length > 0) {
+                            const positionsStr = d.positions.map((p: any) => `${p.carPart} (${p.position})`).join(', ');
+                            damageString = `${d.type}: ${positionsStr}`;
+                        } else { // Existing damage
+                            const type = d.userType || d.type;
+                            const carPart = d.userCarPart || d.carPart;
+                            const position = d.userPosition || d.position;
+                            const text = d.text || d.userDescription || d.fullText;
+                            
+                            damageString = [type, carPart, position].filter(Boolean).join(' - ');
+                            if (!damageString) damageString = text;
+                        }
 
-                        return <li key={d.id}>{damageString}</li>;
+                        const comment = d.text || d.userDescription;
+                        if (comment && damageString !== comment) {
+                            damageString += ` (${comment})`;
+                        }
+
+                        return <li key={d.id || index}>{damageString}</li>;
                     })}
                 </ul>
             </div>
@@ -991,22 +1063,22 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     );
 };
 
-
+// MODIFIED COMPONENT
 const DamageItem: React.FC<{
   damage: ExistingDamage | NewDamage; isExisting: boolean;
-  onUpdate: (id: string, field: string, value: any, isExisting: boolean) => void;
+  onUpdate: (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => void;
   onMediaUpdate: (id: string, files: FileList, isExisting: boolean) => void;
   onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
   onAction?: (id: string, action: 'document' | 'resolve', shortText: string) => void;
   onRemove?: (id: string) => void;
-}> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove }) => {
+  onAddPosition?: (damageId: string) => void;
+  onRemovePosition?: (damageId: string, positionId: string) => void;
+}> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
   const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
   const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
 
   const commonProps = {
     type: isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type,
-    carPart: isExisting ? (damage as ExistingDamage).userCarPart : (damage as NewDamage).carPart,
-    position: isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position,
     description: isExisting ? (damage as ExistingDamage).userDescription : (damage as NewDamage).text,
   };
 
@@ -1026,12 +1098,47 @@ const DamageItem: React.FC<{
       </div>
       {(isDocumented || !isExisting) && !resolved && (
         <div className="damage-details">
-          <div className="grid-3-col">
-            <Field label="Typ av skada *"><select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, fieldKey('type'), e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
-            <Field label="Placering *"><select value={commonProps.carPart || ''} onChange={e => onUpdate(damage.id, fieldKey('carPart'), e.target.value, isExisting)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            <Field label="Position"><select value={commonProps.position || ''} onChange={e => onUpdate(damage.id, fieldKey('position'), e.target.value, isExisting)} disabled={!CAR_PARTS[commonProps.carPart || ''] || CAR_PARTS[commonProps.carPart || ''].length === 0}><option value="">Välj position</option>{(CAR_PARTS[commonProps.carPart || ''] || []).map(pos => <option key={pos} value={pos}>{pos}</option>)}</select></Field>
-          </div>
-          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Frivillig beskrivning av skadan" rows={2}></textarea></Field>
+          <Field label="Typ av skada *">
+            <select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}>
+              <option value="">Välj typ</option>
+              {DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Field>
+          
+          {!isExisting && (damage as NewDamage).positions.map((pos, index) => (
+            <div key={pos.id} className="damage-position-row">
+                <div className="grid-2-col">
+                    <Field label={index === 0 ? "Placering *" : ""}>
+                        <select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, false, pos.id)}>
+                            <option value="">Välj del</option>
+                            {Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                    </Field>
+                    <Field label={index === 0 ? "Position" : ""}>
+                        <select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, false, pos.id)} disabled={!pos.carPart}>
+                            <option value="">Välj position</option>
+                            {(CAR_PARTS[pos.carPart] || []).map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                    </Field>
+                </div>
+                {index > 0 && onRemovePosition && (
+                    <button onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>
+                )}
+            </div>
+          ))}
+
+          {!isExisting && onAddPosition && (
+            <Button onClick={() => onAddPosition(damage.id)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
+          )}
+
+          {isExisting && (
+            <div className="grid-3-col">
+                <Field label="Placering *"><select value={(damage as ExistingDamage).userCarPart || ''} onChange={e => onUpdate(damage.id, 'userCarPart', e.target.value, isExisting)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+                <Field label="Position"><select value={(damage as ExistingDamage).userPosition || ''} onChange={e => onUpdate(damage.id, 'userPosition', e.target.value, isExisting)} disabled={!CAR_PARTS[(damage as ExistingDamage).userCarPart || '']}><option value="">Välj position</option>{(CAR_PARTS[(damage as ExistingDamage).userCarPart || ''] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+            </div>
+          )}
+
+          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} rows={2} placeholder="Frivillig kommentar..."></textarea></Field>
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
             <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video *"} isOptional={isExisting} />
@@ -1114,7 +1221,7 @@ const GlobalStyles = () => (
           --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
           --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
         }
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; padding-bottom: 5rem; }
         .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
         .main-header { text-align: center; margin-bottom: 1.5rem; }
         .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
@@ -1132,7 +1239,7 @@ const GlobalStyles = () => (
         .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
         .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
         .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto; }
+        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
         .suggestion-item { padding: 0.75rem; cursor: pointer; }
         .suggestion-item:hover { background-color: var(--color-primary-light); }
         .error-text { color: var(--color-danger); }
@@ -1156,7 +1263,7 @@ const GlobalStyles = () => (
         .btn.warning { background-color: var(--color-warning); color: white; }
         .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
         .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: var(--color-card); cursor: pointer; transition: all 0.2s; text-align: center; font-weight: 500; }
+        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: var(--color-card); color: var(--color-text); font-weight: 500; cursor: pointer; transition: all 0.2s; }
         .choice-btn:hover { filter: brightness(1.05); }
         .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
@@ -1172,6 +1279,10 @@ const GlobalStyles = () => (
         .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
         .damage-item-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
+        .damage-position-row { position: relative; padding-right: 2.5rem; } /* NEW STYLE */
+        .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; } /* NEW STYLE */
+        .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: bold; cursor: pointer; } /* NEW STYLE */
+        .remove-position-btn:hover { background-color: var(--color-danger); color: white; } /* NEW STYLE */
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
         .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
         .media-label:hover { filter: brightness(0.95); }
@@ -1181,13 +1292,13 @@ const GlobalStyles = () => (
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; cursor: pointer; }
+        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; line-height: 1; padding: 0; }
         .remove-media-btn:hover { background-color: #b91c1c; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); max-width: 90vw; max-height: 90vh; overflow-y: auto; width: 600px; }
+        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; }
         .modal-content.success-modal { text-align: center; }
         .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); text-align: center; }
-        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
+        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem auto; }
         .confirm-modal { text-align: left; }
         .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
         .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
