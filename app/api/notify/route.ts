@@ -160,12 +160,36 @@ const createBaseLayout = (regnr: string, content: string): string => `
   </html>
 `;
 
+const createRekondSection = (rekond_details: any, projectRef: string): string => {
+    if (!rekond_details || !rekond_details.text && (!rekond_details.photo_urls || rekond_details.photo_urls.length === 0)) return '';
+    
+    const { text, photo_urls = [], folder } = rekond_details;
+    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${folder}`;
+
+    let photosHtml = '';
+    if (photo_urls.length > 0) {
+        photosHtml = `
+            <p style="margin:10px 0 5px 0; color: #000000 !important; font-weight: bold;">Bilder:</p>
+            ${photo_urls.map((url: string) => `<a href="${url}" style="color: #005A9C !important; text-decoration: none !important; margin-right: 10px;">Visa bild</a>`).join('')}
+            <br/><a href="${galleryLink}" style="color: #005A9C !important; text-decoration: none !important; margin-top: 5px; display: inline-block;">Öppna Rekond-galleri →</a>
+        `;
+    }
+
+    return `
+        <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; margin-top: 10px;">
+            <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #991b1b !important; text-transform: uppercase; letter-spacing: 0.5px;">Rekondinformation</h3>
+            ${text ? `<p style="margin:0 0 10px 0; color: #000000 !important;"><strong>Kommentar:</strong> ${text}</p>` : ''}
+            ${photosHtml}
+        </div>
+    `;
+};
+
 // =================================================================
 // 3. HTML BUILDERS - SPECIFIC EMAILS
 // =================================================================
 
 const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu, rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
   const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
 
@@ -183,6 +207,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
     ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!')}
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
+    ${rekond ? createRekondSection(rekond_details, projectRef) : ''}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0; color: #000000 !important;">
@@ -225,7 +250,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
-          åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
+          åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
   const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
 
@@ -240,6 +265,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const content = `
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
     ${createAlertBanner(rekond, 'Behöver rekond')}
+    ${rekond ? createRekondSection(rekond_details, projectRef) : ''}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
 
     <tr><td style="padding: 10px 0; color: #000000 !important;">
