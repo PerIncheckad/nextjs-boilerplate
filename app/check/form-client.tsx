@@ -81,7 +81,21 @@ type ConfirmDialogState = {
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
-const slugify = (s: string) => s.replace(/\s/g, '-').replace(/,/g, '');
+function slugify(str: string): string {
+    if (!str) return '';
+    const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:;';
+    const b = 'aaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz------';
+    const p = new RegExp(a.split('').join('|'), 'g');
+
+    return str.toString()
+        .replace(/\s+/g, '-') // Replace spaces with -
+        .replace(p, c => b.charAt(a.indexOf(c))) // Replace special characters
+        .replace(/&/g, '-and-') // Replace & with 'and'
+        .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+        .replace(/\-\-+/g, '-') // Replace multiple - with single -
+        .replace(/^-+/, '') // Trim - from start of text
+        .replace(/-+$/, ''); // Trim - from end of text
+}
 
 function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamage): string {
     const now = new Date();
@@ -105,7 +119,7 @@ function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamag
         pos
     ];
     
-    return slugify(nameParts.filter(Boolean).join('-'));
+    return nameParts.filter(Boolean).map(s => slugify(s)).join('-');
 }
 
 function createRekondFolderName(regnr: string): string {
@@ -121,7 +135,6 @@ async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
     if (error) {
-        // Om filen redan finns, försök inte hämta URL, returnera bara sökvägen.
         if (error.message.includes('The resource already exists')) {
             console.warn(`File already exists, not re-uploading: ${path}`);
         } else {
