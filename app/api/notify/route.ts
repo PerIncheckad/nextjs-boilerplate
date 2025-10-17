@@ -164,7 +164,7 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
     if (!rekond_details || !rekond_details.text && (!rekond_details.photo_urls || rekond_details.photo_urls.length === 0)) return '';
     
     const { text, photo_urls = [], folder } = rekond_details;
-    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}%2F${folder}`;
+    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${folder}`;
 
     let photosHtml = '';
     if (photo_urls.length > 0) {
@@ -191,7 +191,7 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
 const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
   const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu, rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -253,7 +253,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos`;
           
   const content = `
     ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
@@ -274,7 +274,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
         <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table class="info-grid" style="color: #000000 !important; width: 100%;">
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Incheckad vid:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilenStarNuText}</td></tr>
+          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilen_star_nu ? `${bilen_star_nu.ort} / ${bilen_star_nu.station}` + (bilen_star_nu.kommentar ? ` (${bilen_star_nu.kommentar})` : '') : '---'}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
           <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
@@ -322,11 +322,20 @@ export async function POST(request: Request) {
     // E-posthantering
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
-    const huvudstationHtml = buildHuvudstationEmail(payload, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
     
-    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
+    try {
+      const huvudstationHtml = buildHuvudstationEmail(payload, date, time);
+      emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
+    } catch (e) {
+      console.error("Failed to build Huvudstation email:", e);
+    }
+    
+    try {
+      const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
+      emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
+    } catch (e) {
+      console.error("Failed to build Bilkontroll email:", e);
+    }
     
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
