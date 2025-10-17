@@ -95,8 +95,6 @@ const formatTankning = (tankning: any): string => {
     return '---';
 };
 
-const slugify = (s: string) => s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "");
-
 const createBaseLayout = (regnr: string, content: string): string => `
   <!DOCTYPE html>
   <html lang="sv" xmlns:v="urn:schemas-microsoft-com:vml">
@@ -169,7 +167,7 @@ const createBaseLayout = (regnr: string, content: string): string => `
 const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
   const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${slugify(regnr)}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -229,7 +227,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${slugify(regnr)}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${regnr}`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -336,12 +334,11 @@ export async function POST(request: Request) {
             car_part: isNewDamage ? damage.carPart : damage.userCarPart,
             position: isNewDamage ? damage.position : damage.userPosition,
             description: isNewDamage ? damage.text : (damage.userDescription || damage.fullText),
-            media_url: firstPhoto, // Fortsätter spara första bilden för tumnageln
-            status: "complete", // Alltid 'complete'
-            notering: payload.notering || null, // Sparar den generella noteringen på varje skada
+            media_url: firstPhoto,
+            status: "complete",
+            notering: payload.notering || null,
         };
         
-        // Steg 1: Skapa skadan i 'damages' och få tillbaka dess ID
         const { data: newDamage, error: damageError } = await supabaseAdmin
             .from('damages')
             .insert(damageData)
@@ -350,7 +347,7 @@ export async function POST(request: Request) {
 
         if (damageError) {
             console.error('Supabase DB error during damage INSERT:', damageError);
-            continue; // Hoppa till nästa skada om denna misslyckas
+            continue;
         }
 
         if (!newDamage) {
@@ -358,7 +355,6 @@ export async function POST(request: Request) {
             continue;
         }
 
-        // Steg 2: Skapa poster i 'damage_media' för alla uppladdade filer
         const mediaToInsert = [];
         const allPhotoUrls = damage.uploads?.photo_urls || [];
         const allVideoUrls = damage.uploads?.video_urls || [];
@@ -387,7 +383,6 @@ export async function POST(request: Request) {
             
             if (mediaError) {
                 console.error('Supabase DB error during damage_media INSERT:', mediaError);
-                // Fortsätt även om media-koppling misslyckas, skadan är redan skapad.
             }
         }
     }
