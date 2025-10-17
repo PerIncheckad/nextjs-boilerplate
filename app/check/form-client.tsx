@@ -81,14 +81,11 @@ type ConfirmDialogState = {
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
-function slugify(s: string) {
-  if (!s) return '';
-  return s.toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9.]+/g, "-").replace(/(^-|-$)+/g, "");
-}
+const sanitize = (s: string) => s.replace(/\s/g, '-');
 
 function createFileName(regnr: string, damage: ExistingDamage | NewDamage, index: number): string {
     const now = new Date();
-    const date = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const date = now.toISOString().slice(0, 10);
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const time = `kl ${hours}.${minutes}`;
@@ -100,23 +97,21 @@ function createFileName(regnr: string, damage: ExistingDamage | NewDamage, index
     const pos = isExisting ? (damage as ExistingDamage).userPosition : (damage as NewDamage).position;
 
     const nameParts = [
-        slugify(regnr),
-        date,
-        slugify(time),
-        slugify(damageType),
-        slugify(part),
-        slugify(pos),
-        (index + 1).toString()
+        regnr,
+        `${date}, ${time}`,
+        damageType,
+        part,
+        pos
     ];
     
-    return nameParts.filter(Boolean).join('-');
+    return sanitize(nameParts.filter(Boolean).join(' - '));
 }
 
 
 async function uploadOne(file: File, reg: string, damageFolder: string, fileName: string): Promise<string> {
     const BUCKET = "damage-photos";
     const ext = file.name.split(".").pop() || "bin";
-    const path = `${slugify(reg)}/${damageFolder}/${fileName}.${ext}`;
+    const path = `${reg}/${damageFolder}/${fileName}.${ext}`;
     
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
     if (error) throw error;
@@ -136,18 +131,18 @@ function partitionMediaByType(files: MediaFile[]) {
 }
 
 async function uploadAllForDamage(damage: ExistingDamage | NewDamage, reg: string): Promise<Uploads> {
-    const damageFolder = createFileName(reg, damage, 0).split('-').slice(0, -1).join('-');
+    const damageFolder = createFileName(reg, damage, 0);
     if (!damage.media || damage.media.length === 0) return { photo_urls: [], video_urls: [], folder: damageFolder };
     
     const { photos, videos } = partitionMediaByType(damage.media);
     
     const photoUploadPromises = photos.map((p, i) => {
-        const fileName = createFileName(reg, damage, i);
+        const fileName = `${damageFolder}-${i + 1}`;
         return uploadOne(p, reg, damageFolder, fileName);
     });
     
     const videoUploadPromises = videos.map((v, i) => {
-        const fileName = createFileName(reg, damage, photos.length + i);
+        const fileName = `${damageFolder}-${photos.length + i + 1}`;
         return uploadOne(v, reg, damageFolder, fileName);
     });
 
