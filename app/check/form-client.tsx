@@ -1133,8 +1133,8 @@ const DamageItem: React.FC<{
 
           {isExisting && (
             <div className="grid-3-col">
-                <Field label="Placering *"><select value={(damage as ExistingDamage).userCarPart || ''} onChange={e => onUpdate(damage.id, 'userCarPart', e.target.value, isExisting)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-                <Field label="Position"><select value={(damage as ExistingDamage).userPosition || ''} onChange={e => onUpdate(damage.id, 'userPosition', e.target.value, isExisting)} disabled={!CAR_PARTS[(damage as ExistingDamage).userCarPart || '']}><option value="">Välj position</option>{(CAR_PARTS[(damage as ExistingDamage).userCarPart || ''] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+                <Field label="Placering *"><select value={(damage as ExistingDamage).userCarPart || ''} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, true)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+                <Field label="Position"><select value={(damage as ExistingDamage).userPosition || ''} onChange={e => onUpdate(damage.id, 'position', e.target.value, true)} disabled={!(damage as ExistingDamage).userCarPart}><option value="">Välj position</option>{(CAR_PARTS[(damage as ExistingDamage).userCarPart || ''] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
             </div>
           )}
 
