@@ -172,7 +172,7 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
     if (!rekond_details || !rekond_details.text && (!rekond_details.photo_urls || rekond_details.photo_urls.length === 0)) return '';
     
     const { text, photo_urls = [], folder } = rekond_details;
-    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${folder}`;
+    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(folder)}`;
 
     let photosHtml = '';
     if (photo_urls.length > 0) {
@@ -199,7 +199,7 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
 const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
   const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu, rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(regnr)}`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -261,7 +261,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(regnr)}`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
