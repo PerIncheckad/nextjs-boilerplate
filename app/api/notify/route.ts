@@ -54,26 +54,26 @@ const createAlertBanner = (condition: boolean, text: string, details?: string): 
 const getDamageString = (damage: any): string => {
     let baseString = '';
     let comment = '';
-    let positionsString = '';
+    
+    const positions = damage.positions || damage.userPositions || [];
+    const type = damage.type || damage.userType;
+    const shortText = damage.shortText || '';
 
-    // Ny skada med expanderade positioner
-    if (damage.positions && damage.positions.length > 0) {
-        const positionParts = damage.positions.map((p: any) => `${p.carPart} (${p.position})`).join(', ');
-        baseString = `${damage.type}: ${positionParts}`;
-        comment = damage.text;
-    } 
-    // Gammal struktur för dokumenterad befintlig skada
-    else if (damage.userType || damage.userCarPart) { 
-        const mainInfo = (damage.fullText || '').split(' - ').map((s:string) => s.trim()).filter(Boolean);
-        const userParts = [damage.userType, damage.userCarPart, damage.userPosition].filter(Boolean);
-        const combined = [...new Set([...mainInfo, ...userParts])];
-        baseString = combined.join(' - ');
-        comment = damage.userDescription;
-    } 
-    // Fallback
-    else { 
-        baseString = damage.fullText || damage.text || String(damage);
+    let mainPart = type;
+    if (shortText && type) {
+        mainPart = `${type} (${shortText})`;
+    } else if (shortText) {
+        mainPart = shortText;
     }
+
+    if (positions.length > 0) {
+        const positionParts = positions.map((p: any) => `${p.carPart} ${p.position || ''}`.trim()).filter(Boolean).join(', ');
+        baseString = positionParts ? `${mainPart}: ${positionParts}` : mainPart;
+    } else {
+        baseString = mainPart || damage.fullText || 'Okänd skada';
+    }
+
+    comment = damage.text || damage.userDescription || '';
 
     if (comment) {
         return `${baseString}<br><small style="color: #000000 !important;"><strong>Kommentar:</strong> ${comment}</small>`;
@@ -85,7 +85,7 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0; color: #000000 !important;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
@@ -196,10 +196,10 @@ const createRekondSection = (rekond_details: any, regnr: string, projectRef: str
 // 3. HTML BUILDERS - SPECIFIC EMAILS
 // =================================================================
 
-const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
+const buildHuvudstationEmail = (payload: any, date: string, time: string, checkinFolderName: string): string => {
   const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu, rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(regnr)}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(checkinFolderName)}`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -257,11 +257,11 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
   return createBaseLayout(regnr, content);
 };
 
-const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
+const buildBilkontrollEmail = (payload: any, date: string, time: string, checkinFolderName: string): string => {
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
           åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], rekond_details } = payload;
   const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(regnr)}`;
+  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(checkinFolderName)}`;
 
   let bilenStarNuText = '---';
   if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
@@ -328,7 +328,12 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const payload = fullRequestPayload.meta; 
 
-    const { regnr, ort, station, status, nya_skador = [], dokumenterade_skador = [] } = payload;
+    const { regnr, ort, station, status, nya_skador = [], dokumenterade_skador = [], checkinFolderName } = payload;
+
+    if (!checkinFolderName) {
+      // Lägg till en säkerhetskontroll för att säkerställa att mappnamnet finns
+      throw new Error("Critical error: 'checkinFolderName' is missing from the payload.");
+    }
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -338,15 +343,15 @@ export async function POST(request: Request) {
     // E-posthantering
     const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
-    const huvudstationHtml = buildHuvudstationEmail(payload, date, time);
+    const huvudstationHtml = buildHuvudstationEmail(payload, date, time, checkinFolderName);
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
     
-    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
+    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, checkinFolderName);
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     
     if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen kontrollera om det är korrekt inmatat.</p></td></tr>`);
+      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen lägg till bilen manuellt.</p></td></tr>`);
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
     
@@ -390,8 +395,9 @@ export async function POST(request: Request) {
         }
 
         // Steg 2: Spara positionerna i den nya 'damage_positions'-tabellen
-        if (isNewDamage && damage.positions && damage.positions.length > 0) {
-            const positionsToInsert = damage.positions.map((pos: any) => ({
+        const positionsToSave = isNewDamage ? damage.positions : damage.userPositions;
+        if (positionsToSave && positionsToSave.length > 0) {
+            const positionsToInsert = positionsToSave.map((pos: any) => ({
                 damage_id: newDamage.id,
                 car_part: pos.carPart,
                 position: pos.position,
