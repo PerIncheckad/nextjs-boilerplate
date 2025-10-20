@@ -649,7 +649,6 @@ export default function CheckInForm() {
     updater((damages: any[]) => damages.map(d => {
       if (d.id !== id) return d;
       
-      // Handle position updates for NewDamage
       if (!isExisting && positionId) {
         const newPositions = (d as NewDamage).positions.map(p => 
           p.id === positionId ? { ...p, [field]: value } : p
@@ -657,8 +656,14 @@ export default function CheckInForm() {
         return { ...d, positions: newPositions };
       }
       
-      // Handle other fields
-      const fieldKey = isExisting ? `user${field.charAt(0).toUpperCase() + field.slice(1)}` : field;
+      let fieldKey = field;
+      if (isExisting) {
+          fieldKey = `user${field.charAt(0).toUpperCase() + field.slice(1)}`;
+      } else if (field === 'description') {
+          // För nya skador heter textfältet 'text' i state.
+          fieldKey = 'text';
+      }
+
       return { ...d, [fieldKey]: value };
     }));
   };
@@ -1138,7 +1143,7 @@ const DamageItem: React.FC<{
             </div>
           )}
 
-          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
+          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
             <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video *"} isOptional={isExisting} />
