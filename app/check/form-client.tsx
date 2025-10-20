@@ -658,9 +658,7 @@ export default function CheckInForm() {
       }
       
       // Handle other fields
-      // FIX: Check if the field already starts with 'user' to prevent double-prefixing.
-      const alreadyPrefixed = field.startsWith('user');
-      const fieldKey = (isExisting && !alreadyPrefixed) ? `user${field.charAt(0).toUpperCase() + field.slice(1)}` : field;
+      const fieldKey = isExisting ? `user${field.charAt(0).toUpperCase() + field.slice(1)}` : field;
       return { ...d, [fieldKey]: value };
     }));
   };
@@ -1140,7 +1138,7 @@ const DamageItem: React.FC<{
             </div>
           )}
 
-          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
+          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, isExisting ? 'userDescription' : 'text', e.target.value, isExisting)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
             <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video *"} isOptional={isExisting} />
