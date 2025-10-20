@@ -52,25 +52,25 @@ type Uploads = {
   folder: string;
 };
 
-type ExistingDamage = {
-  db_id: number;
-  id: string;
-  fullText: string; 
-  shortText: string;
-  status: 'not_selected' | 'documented' | 'resolved';
-  userType?: string; userCarPart?: string; userPosition?: string; userDescription?: string;
-  media: MediaFile[];
-  uploads: Uploads;
-};
-
-// MODIFIED TYPE
 type DamagePosition = {
   id: string;
   carPart: string;
   position: string;
 };
 
-// MODIFIED TYPE
+type ExistingDamage = {
+  db_id: number;
+  id: string;
+  fullText: string; 
+  shortText: string;
+  status: 'not_selected' | 'documented' | 'resolved';
+  userType?: string; 
+  userPositions: DamagePosition[]; // ÄNDRAD
+  userDescription?: string;
+  media: MediaFile[];
+  uploads: Uploads;
+};
+
 type NewDamage = {
   id: string; type: string; text: string; 
   positions: DamagePosition[];
@@ -106,7 +106,6 @@ function slugify(str: string): string {
         .replace(/-+$/, ''); // Trim - from end of text
 }
 
-// MODIFIED FUNCTION
 function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamage): string {
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
@@ -118,8 +117,8 @@ function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamag
     
     const damageType = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
 
-    // Use the first position to name the folder
-    const firstPos = isExisting ? { carPart: (damage as ExistingDamage).userCarPart, position: (damage as ExistingDamage).userPosition } : (damage as NewDamage).positions[0];
+    const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as NewDamage).positions;
+    const firstPos = positions[0];
 
     const nameParts = [
         regnr,
@@ -327,7 +326,7 @@ export default function CheckInForm() {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
     if (drivmedelstyp === 'elbil' && !laddniva) return false;
-    // Check new damages validity
+    
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
         for (const d of newDamages) {
@@ -337,9 +336,12 @@ export default function CheckInForm() {
             }
         }
     }
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !d.userCarPart || !hasPhoto(d.media))) return false;
+    
+    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media))) return false;
+
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     if (behoverRekond && !hasPhoto(rekondMedia)) return false;
+    
     return isChecklistComplete;
   }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, behoverRekond, rekondMedia, bilenStarNuOrt, bilenStarNuStation]);
 
@@ -388,6 +390,7 @@ export default function CheckInForm() {
               fullText: d.text,
               shortText: d.text,
               status: 'not_selected',
+              userPositions: [], // ÄNDRAD
               media: [],
               uploads: { photo_urls: [], video_urls: [], folder: '' }
           })));
@@ -508,7 +511,6 @@ export default function CheckInForm() {
     });
   };
 
-  // MODIFIED FUNCTION
   const confirmAndSubmit = async () => {
     setShowConfirmModal(false);
     setIsFinalSaving(true);
@@ -569,7 +571,6 @@ export default function CheckInForm() {
             nya_skador: updatedNewDamages
                 .map(({ media, ...rest }) => ({
                     ...rest,
-                    // Ensure positions are sent correctly
                     positions: rest.positions.map(p => ({ carPart: p.carPart, position: p.position }))
                 })),
             åtgärdade_skador: resolvedDamages
@@ -608,7 +609,22 @@ export default function CheckInForm() {
             }
         });
     } else {
-        setExistingDamages(damages => damages.map(d => d.id === id ? { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' } : d));
+        setExistingDamages(damages => damages.map(d => {
+            if (d.id !== id) return d;
+            
+            const isBecomingDocumented = d.status !== 'documented';
+            if (isBecomingDocumented && d.userPositions.length === 0) {
+                // If documenting for the first time, add an initial position
+                return { 
+                    ...d, 
+                    status: 'documented',
+                    userPositions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }]
+                };
+            } else {
+                // Toggle off or if positions already exist
+                return { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' };
+            }
+        }));
     }
   };
 
@@ -643,28 +659,30 @@ export default function CheckInForm() {
     }
   };
 
-  // KORRIGERAD FUNKTION
   const updateDamageField = (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
+    
     updater((damages: any[]) => damages.map(d => {
-      if (d.id !== id) return d;
-      
-      if (!isExisting && positionId) {
-        const newPositions = (d as NewDamage).positions.map(p => 
-          p.id === positionId ? { ...p, [field]: value } : p
-        );
-        return { ...d, positions: newPositions };
-      }
-      
-      let fieldKey = field;
-      if (isExisting) {
-          fieldKey = `user${field.charAt(0).toUpperCase() + field.slice(1)}`;
-      } else if (field === 'description') {
-          // För nya skador heter textfältet 'text' i state.
-          fieldKey = 'text';
-      }
+        if (d.id !== id) return d;
 
-      return { ...d, [fieldKey]: value };
+        // Handle position updates specifically
+        if (positionId && (field === 'carPart' || field === 'position')) {
+            const positionsKey = isExisting ? 'userPositions' : 'positions';
+            const updatedPositions = (d[positionsKey] as DamagePosition[]).map(p => 
+                p.id === positionId ? { ...p, [field]: value } : p
+            );
+            return { ...d, [positionsKey]: updatedPositions };
+        }
+
+        // Handle other fields
+        let fieldKey = field;
+        if (isExisting) {
+            fieldKey = `user${field.charAt(0).toUpperCase() + field.slice(1)}`;
+        } else if (field === 'description') {
+            fieldKey = 'text';
+        }
+        
+        return { ...d, [fieldKey]: value };
     }));
   };
 
@@ -697,7 +715,6 @@ export default function CheckInForm() {
     });
   };
 
-  // MODIFIED FUNCTION
   const addDamage = () => {
     setNewDamages(prev => [...prev, { 
         id: `new_${Date.now()}`, type: '', text: '', 
@@ -716,21 +733,27 @@ export default function CheckInForm() {
     });
   };
 
-  // NEW FUNCTIONS
-  const addDamagePosition = (damageId: string) => {
-    setNewDamages(prev => prev.map(d => 
-        d.id === damageId 
-        ? { ...d, positions: [...d.positions, { id: `pos-${Date.now()}`, carPart: '', position: '' }] }
-        : d
-    ));
+  const addDamagePosition = (damageId: string, isExisting: boolean) => {
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    const positionsKey = isExisting ? 'userPositions' : 'positions';
+
+    updater((prev => prev.map(d => {
+        if (d.id !== damageId) return d;
+        const newPosition: DamagePosition = { id: `pos-${Date.now()}`, carPart: '', position: '' };
+        return { ...d, [positionsKey]: [...d[positionsKey], newPosition] };
+    })) as any);
   };
 
-  const removeDamagePosition = (damageId: string, positionId: string) => {
-      setNewDamages(prev => prev.map(d => {
+  const removeDamagePosition = (damageId: string, positionId: string, isExisting: boolean) => {
+      const updater = isExisting ? setExistingDamages : setNewDamages;
+      const positionsKey = isExisting ? 'userPositions' : 'positions';
+      
+      updater((prev => prev.map(d => {
           if (d.id !== damageId) return d;
-          if (d.positions.length <= 1) return d; // Don't remove the last one
-          return { ...d, positions: d.positions.filter(p => p.id !== positionId) };
-      }));
+          if (d[positionsKey].length <= 1) return d;
+          const updatedPositions = d[positionsKey].filter((p: DamagePosition) => p.id !== positionId);
+          return { ...d, [positionsKey]: updatedPositions };
+      })) as any);
   };
   
   const handleLaddningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -848,10 +871,10 @@ export default function CheckInForm() {
         {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.some(d => d.status === 'documented' && (!d.userType || !d.userCarPart || !hasPhoto(d.media)))) )}>
+      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.some(d => d.status === 'documented' && (!d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media)))) )}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} />) : <p>Inga befintliga skador att visa.</p>}
+        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />) : <p>Inga befintliga skador att visa.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
@@ -965,7 +988,6 @@ const SpinnerOverlay = () => (
     </div>
 );
 
-// MODIFIED COMPONENT
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
@@ -975,23 +997,18 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 <h4>{title}</h4>
                 <ul>
                     {damages.map((d: any, index: number) => {
-                        let damageString = '';
-                        // New damage with positions
-                        if (d.positions && d.positions.length > 0) {
-                            const positionsStr = d.positions.map((p: any) => `${p.carPart} (${p.position})`).join(', ');
-                            damageString = `${d.type}: ${positionsStr}`;
-                        } else { // Existing damage
-                            const type = d.userType || d.type;
-                            const carPart = d.userCarPart || d.carPart;
-                            const position = d.userPosition || d.position;
-                            const text = d.text || d.userDescription || d.fullText;
-                            
-                            damageString = [type, carPart, position].filter(Boolean).join(' - ');
-                            if (!damageString) damageString = text;
+                        const positions = d.positions || d.userPositions || [];
+                        let damageString = d.type || d.userType || 'Okänd skada';
+
+                        if (positions.length > 0) {
+                            const positionsStr = positions.map((p: any) => `${p.carPart} (${p.position})`).filter((s:string) => s !== ' ()').join(', ');
+                            if (positionsStr) {
+                                damageString += `: ${positionsStr}`;
+                            }
                         }
 
                         const comment = d.text || d.userDescription;
-                        if (comment && damageString !== comment) {
+                        if (comment) {
                             damageString += ` (${comment})`;
                         }
 
@@ -1068,7 +1085,6 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     );
 };
 
-// MODIFIED COMPONENT
 const DamageItem: React.FC<{
   damage: ExistingDamage | NewDamage; isExisting: boolean;
   onUpdate: (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => void;
@@ -1076,8 +1092,8 @@ const DamageItem: React.FC<{
   onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
   onAction?: (id: string, action: 'document' | 'resolve', shortText: string) => void;
   onRemove?: (id: string) => void;
-  onAddPosition?: (damageId: string) => void;
-  onRemovePosition?: (damageId: string, positionId: string) => void;
+  onAddPosition: (damageId: string, isExisting: boolean) => void; // ÄNDRAD
+  onRemovePosition: (damageId: string, positionId: string, isExisting: boolean) => void; // ÄNDRAD
 }> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
   const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
   const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
@@ -1087,7 +1103,7 @@ const DamageItem: React.FC<{
     description: isExisting ? (damage as ExistingDamage).userDescription : (damage as NewDamage).text,
   };
 
-  const fieldKey = (f: string) => isExisting ? `user${f.charAt(0).toUpperCase() + f.slice(1)}` : f;
+  const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as NewDamage).positions;
 
   return (
     <div className={`damage-item ${resolved ? 'resolved' : ''}`}>
@@ -1110,39 +1126,30 @@ const DamageItem: React.FC<{
             </select>
           </Field>
           
-          {!isExisting && (damage as NewDamage).positions.map((pos, index) => (
+          {positions.map((pos, index) => (
             <div key={pos.id} className="damage-position-row">
                 <div className="grid-2-col">
                     <Field label={index === 0 ? "Placering *" : ""}>
-                        <select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, false, pos.id)}>
+                        <select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)}>
                             <option value="">Välj del</option>
                             {Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </Field>
                     <Field label={index === 0 ? "Position" : ""}>
-                        <select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, false, pos.id)} disabled={!pos.carPart}>
+                        <select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}>
                             <option value="">Välj position</option>
                             {(CAR_PARTS[pos.carPart] || []).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </Field>
                 </div>
-                {index > 0 && onRemovePosition && (
-                    <button onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>
+                {positions.length > 1 && (
+                    <button onClick={() => onRemovePosition(damage.id, pos.id, isExisting)} className="remove-position-btn">×</button>
                 )}
             </div>
           ))}
 
-          {!isExisting && onAddPosition && (
-            <Button onClick={() => onAddPosition(damage.id)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
-          )}
-
-          {isExisting && (
-            <div className="grid-3-col">
-                <Field label="Placering *"><select value={(damage as ExistingDamage).userCarPart || ''} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, true)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-                <Field label="Position"><select value={(damage as ExistingDamage).userPosition || ''} onChange={e => onUpdate(damage.id, 'position', e.target.value, true)} disabled={!(damage as ExistingDamage).userCarPart}><option value="">Välj position</option>{(CAR_PARTS[(damage as ExistingDamage).userCarPart || ''] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-            </div>
-          )}
-
+          <Button onClick={() => onAddPosition(damage.id, isExisting)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
+          
           <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
@@ -1284,10 +1291,10 @@ const GlobalStyles = () => (
         .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
         .damage-item-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
-        .damage-position-row { position: relative; padding-right: 2.5rem; } /* NEW STYLE */
-        .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; } /* NEW STYLE */
+        .damage-position-row { position: relative; padding-right: 2.5rem; }
+        .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; }
         .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.25rem; display: flex; align-items: center; justify-content: center; }
-        .remove-position-btn:hover { background-color: var(--color-danger); color: white; } /* NEW STYLE */
+        .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
         .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
         .media-label:hover { filter: brightness(0.95); }
