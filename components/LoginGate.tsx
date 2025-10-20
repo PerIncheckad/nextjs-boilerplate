@@ -47,7 +47,7 @@ export default function LoginGate({ children }: Props) {
     e.preventDefault();
     setMsg('');
 
-    // FIX: Flyttade denna logik in i funktionen för att säkerställa att den bara körs på klienten.
+    // Redirect till startsidan
     const redirectTo =
       (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
 
