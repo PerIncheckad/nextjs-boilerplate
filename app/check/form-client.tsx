@@ -65,7 +65,7 @@ type ExistingDamage = {
   shortText: string;
   status: 'not_selected' | 'documented' | 'resolved';
   userType?: string; 
-  userPositions: DamagePosition[]; // ÄNDRAD
+  userPositions: DamagePosition[];
   userDescription?: string;
   media: MediaFile[];
   uploads: Uploads;
@@ -106,29 +106,22 @@ function slugify(str: string): string {
         .replace(/-+$/, ''); // Trim - from end of text
 }
 
-function createDamageFolderName(regnr: string, damage: ExistingDamage | NewDamage): string {
+function generateUniqueFolderName(regnr: string): string {
     const now = new Date();
     const date = now.toISOString().slice(0, 10);
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
-    const time = `kl-${hours}-${minutes}`;
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const time = `${hours}-${minutes}-${seconds}`;
+    return `${regnr}/${regnr}-${date}-kl-${time}`;
+}
 
-    const isExisting = 'fullText' in damage;
-    
-    const damageType = isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type;
-
-    const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as NewDamage).positions;
-    const firstPos = positions[0];
-
+function createDamageFolderName(damageType: string, carPart: string, position: string): string {
     const nameParts = [
-        regnr,
-        date,
-        time,
         damageType,
-        firstPos?.carPart,
-        firstPos?.position
+        carPart,
+        position
     ];
-    
     return nameParts.filter(Boolean).map(s => slugify(s)).join('-');
 }
 
@@ -138,7 +131,7 @@ function createRekondFolderName(regnr: string): string {
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const time = `kl-${hours}-${minutes}`;
-    return `${regnr}-${date}-${time}-REKOND`;
+    return `${regnr}/${regnr}-${date}-${time}-REKOND`;
 }
 
 async function uploadOne(file: File, path: string): Promise<string> {
@@ -166,21 +159,28 @@ function partitionMediaByType(files: MediaFile[]) {
   return { photos, videos };
 }
 
-async function uploadAllForDamage(damage: ExistingDamage | NewDamage, reg: string): Promise<Uploads> {
-    const folderName = createDamageFolderName(reg, damage);
-    if (!damage.media || damage.media.length === 0) return { photo_urls: [], video_urls: [], folder: folderName };
+async function uploadAllForDamage(checkinFolderName: string, damage: ExistingDamage | NewDamage): Promise<Uploads> {
+    const isExisting = 'fullText' in damage;
+    const damageType = (isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type) || 'okand';
+    const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as NewDamage).positions;
+    const firstPos = positions[0] || { carPart: 'okand', position: 'okand' };
+
+    const damageFolderName = createDamageFolderName(damageType, firstPos.carPart, firstPos.position);
+    const fullFolderPath = `${checkinFolderName}/${damageFolderName}`;
+
+    if (!damage.media || damage.media.length === 0) return { photo_urls: [], video_urls: [], folder: fullFolderPath };
     
     const { photos, videos } = partitionMediaByType(damage.media);
     
     const photoUploadPromises = photos.map((p, i) => {
         const ext = p.name.split('.').pop() || 'png';
-        const path = `${reg}/${folderName}/${folderName}-${i + 1}.${ext}`;
+        const path = `${fullFolderPath}/${damageFolderName}-${i + 1}.${ext}`;
         return uploadOne(p, path);
     });
     
     const videoUploadPromises = videos.map((v, i) => {
         const ext = v.name.split('.').pop() || 'mp4';
-        const path = `${reg}/${folderName}/${folderName}-${photos.length + i + 1}.${ext}`;
+        const path = `${fullFolderPath}/${damageFolderName}-${photos.length + i + 1}.${ext}`;
         return uploadOne(v, path);
     });
 
@@ -189,7 +189,7 @@ async function uploadAllForDamage(damage: ExistingDamage | NewDamage, reg: strin
         Promise.all(videoUploadPromises),
     ]);
 
-    return { photo_urls: photoUploads, video_urls: videoUploads, folder: folderName };
+    return { photo_urls: photoUploads, video_urls: videoUploads, folder: fullFolderPath };
 }
 
 async function uploadRekondMedia(media: MediaFile[], reg: string): Promise<Uploads> {
@@ -321,7 +321,6 @@ export default function CheckInForm() {
     return washed && otherChecklistItemsOK;
   }, [washed, otherChecklistItemsOK]);
 
-  // MODIFIED VALIDATION
   const formIsValidState = useMemo(() => {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
@@ -360,7 +359,6 @@ export default function CheckInForm() {
       rekond_details: { text: rekondText, photo_urls: [], video_urls: [], folder: '' }
   }), [normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, varningslampaLyser, varningslampaBeskrivning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, newDamages, existingDamages, washed, otherChecklistItemsOK, rekondText]);
 
-  // Datahämtningsfunktion med utökad felhantering
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
@@ -390,7 +388,7 @@ export default function CheckInForm() {
               fullText: d.text,
               shortText: d.text,
               status: 'not_selected',
-              userPositions: [], // ÄNDRAD
+              userPositions: [],
               media: [],
               uploads: { photo_urls: [], video_urls: [], folder: '' }
           })));
@@ -515,6 +513,8 @@ export default function CheckInForm() {
     setShowConfirmModal(false);
     setIsFinalSaving(true);
     try {
+        const checkinFolderName = generateUniqueFolderName(normalizedReg);
+
         let rekondUploadResults: Uploads | null = null;
         if (behoverRekond) {
             rekondUploadResults = await uploadRekondMedia(rekondMedia, normalizedReg);
@@ -524,10 +524,10 @@ export default function CheckInForm() {
         const newForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
         
         const documentedUploadResults = await Promise.all(
-            documentedForUpload.map(d => uploadAllForDamage(d, normalizedReg))
+            documentedForUpload.map(d => uploadAllForDamage(checkinFolderName, d))
         );
         const newUploadResults = await Promise.all(
-            newForUpload.map(d => uploadAllForDamage(d, normalizedReg))
+            newForUpload.map(d => uploadAllForDamage(checkinFolderName, d))
         );
 
         const updatedExistingDamages = existingDamages.map(d => {
@@ -575,12 +575,13 @@ export default function CheckInForm() {
                 })),
             åtgärdade_skador: resolvedDamages
                 .map(({ media, ...rest }) => rest),
+            checkinFolderName: checkinFolderName,
         };
       
         await notifyCheckin({
             region: 'Syd',
             subjectBase: `${normalizedReg} - ${ort} / ${station}`,
-            htmlBody: '',
+            htmlBody: '', // This is not used, the API route builds the HTML
             target: 'station',
             meta: submissionPayload
         });
@@ -614,14 +615,12 @@ export default function CheckInForm() {
             
             const isBecomingDocumented = d.status !== 'documented';
             if (isBecomingDocumented && d.userPositions.length === 0) {
-                // If documenting for the first time, add an initial position
                 return { 
                     ...d, 
                     status: 'documented',
                     userPositions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }]
                 };
             } else {
-                // Toggle off or if positions already exist
                 return { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' };
             }
         }));
@@ -665,7 +664,6 @@ export default function CheckInForm() {
     updater((damages: any[]) => damages.map(d => {
         if (d.id !== id) return d;
 
-        // Handle position updates specifically
         if (positionId && (field === 'carPart' || field === 'position')) {
             const positionsKey = isExisting ? 'userPositions' : 'positions';
             const updatedPositions = (d[positionsKey] as DamagePosition[]).map(p => 
@@ -674,12 +672,12 @@ export default function CheckInForm() {
             return { ...d, [positionsKey]: updatedPositions };
         }
 
-        // Handle other fields
         let fieldKey = field;
         if (isExisting) {
-            fieldKey = `user${field.charAt(0).toUpperCase() + field.slice(1)}`;
-        } else if (field === 'description') {
-            fieldKey = 'text';
+            if (field === 'description') fieldKey = 'userDescription';
+            else if (field === 'type') fieldKey = 'userType';
+        } else {
+            if (field === 'description') fieldKey = 'text';
         }
         
         return { ...d, [fieldKey]: value };
@@ -1092,8 +1090,8 @@ const DamageItem: React.FC<{
   onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
   onAction?: (id: string, action: 'document' | 'resolve', shortText: string) => void;
   onRemove?: (id: string) => void;
-  onAddPosition: (damageId: string, isExisting: boolean) => void; // ÄNDRAD
-  onRemovePosition: (damageId: string, positionId: string, isExisting: boolean) => void; // ÄNDRAD
+  onAddPosition: (damageId: string, isExisting: boolean) => void;
+  onRemovePosition: (damageId: string, positionId: string, isExisting: boolean) => void;
 }> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
   const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
   const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
@@ -1126,7 +1124,7 @@ const DamageItem: React.FC<{
             </select>
           </Field>
           
-          {positions.map((pos, index) => (
+          {positions && positions.map((pos, index) => (
             <div key={pos.id} className="damage-position-row">
                 <div className="grid-2-col">
                     <Field label={index === 0 ? "Placering *" : ""}>
