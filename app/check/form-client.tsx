@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getVehicleInfo, VehicleInfo } from '@/lib/damages';
+import { getVehicleInfo, VehicleInfo, FormattedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
 const normalizeReg = (reg: string) => reg.toUpperCase().replace(/\s/g, '');
@@ -63,10 +63,13 @@ type ExistingDamage = {
   id: string;
   fullText: string; 
   shortText: string;
+  originalDamageDate: string | null; // YYYY-MM-DD
+  isInventoried: boolean;
   status: 'not_selected' | 'documented' | 'resolved';
   userType?: string; 
   userPositions: DamagePosition[];
   userDescription?: string;
+  resolvedComment?: string;
   media: MediaFile[];
   uploads: Uploads;
 };
@@ -83,8 +86,9 @@ type ConfirmDialogState = {
     title?: string;
     text: string;
     confirmButtonVariant?: 'success' | 'danger' | 'primary';
-    onConfirm: () => void;
+    onConfirm: (comment?: string) => void;
     theme?: 'default' | 'warning';
+    requiresComment?: boolean;
 }
 
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
@@ -96,43 +100,52 @@ function slugify(str: string): string {
     const b = 'aaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz------';
     const p = new RegExp(a.split('').join('|'), 'g');
 
-    return str.toString()
-        .replace(/\s+/g, '-') // Replace spaces with -
+    return str.toString().toLowerCase()
+        .replace(/\s+/g, '_') // Replace spaces with _
         .replace(p, c => b.charAt(a.indexOf(c))) // Replace special characters
-        .replace(/&/g, '-and-') // Replace & with 'and'
+        .replace(/&/g, '_and_') // Replace & with 'and'
         .replace(/[^\w\-]+/g, '') // Remove all non-word chars
-        .replace(/\-\-+/g, '-') // Replace multiple - with single -
-        .replace(/^-+/, '') // Trim - from start of text
-        .replace(/-+$/, ''); // Trim - from end of text
+        .replace(/__+/g, '_') // Replace multiple _ with single _
+        .replace(/^_/, '') // Trim _ from start of text
+        .replace(/_$/, ''); // Trim _ from end of text
 }
 
-function generateUniqueFolderName(regnr: string): string {
+const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM') => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+
+    if (format === 'YYYYMMDD') return `${year}${month}${day}`;
+    if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`;
+    if (format === 'HH.MM') return `${hours}.${minutes}`;
+    return '';
+};
+
+// --- New Folder/File Name Helpers ---
+const generateNewCheckinFolderName = (regnr: string, incheckare: string): string => {
     const now = new Date();
-    const date = now.toISOString().slice(0, 10);
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const seconds = now.getSeconds().toString().padStart(2, '0');
-    const time = `${hours}-${minutes}-${seconds}`;
-    return `${regnr}/${regnr}-${date}-kl-${time}`;
-}
+    return `${regnr} - ${formatDate(now, 'YYYYMMDD')} - kl ${formatDate(now, 'HH.MM')} - ${incheckare}`;
+};
 
-function createDamageFolderName(damageType: string, carPart: string, position: string): string {
-    const nameParts = [
-        damageType,
-        carPart,
-        position
-    ];
-    return nameParts.filter(Boolean).map(s => slugify(s)).join('-');
-}
-
-function createRekondFolderName(regnr: string): string {
+const generateLegacyDocFolderName = (regnr: string, originalDate: string, incheckare: string): string => {
     const now = new Date();
-    const date = now.toISOString().slice(0, 10);
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const time = `kl-${hours}-${minutes}`;
-    return `${regnr}/${regnr}-${date}-${time}-REKOND`;
-}
+    return `${regnr} - ${originalDate.replace(/-/g, '')} - incheckad ${formatDate(now, 'YYYYMMDD')} kl ${formatDate(now, 'HH.MM')} av ${incheckare}`;
+};
+
+const generateSubFolderName = (damageDate: string, type: string, carPart: string, position: string): string => {
+    const datePart = damageDate.replace(/-/g, '');
+    return `${datePart}_${slugify(type)}_${slugify(carPart)}_${slugify(position)}`;
+};
+
+const generateFileName = (regnr: string, damageDate: string, type: string, index: number): string => {
+    return `${regnr}_${damageDate}_${slugify(type)}_${index}`;
+};
+
+const createCommentFile = (content: string): File => {
+    return new File([content], "kommentar.txt", { type: "text/plain" });
+};
 
 async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
@@ -148,76 +161,6 @@ async function uploadOne(file: File, path: string): Promise<string> {
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
 }
-
-function partitionMediaByType(files: MediaFile[]) {
-  const photos: File[] = [];
-  const videos: File[] = [];
-  for (const mediaFile of files ?? []) {
-    if (mediaFile.type === 'image') photos.push(mediaFile.file);
-    else if (mediaFile.type === 'video') videos.push(mediaFile.file);
-  }
-  return { photos, videos };
-}
-
-async function uploadAllForDamage(checkinFolderName: string, damage: ExistingDamage | NewDamage): Promise<Uploads> {
-    const isExisting = 'fullText' in damage;
-    const damageType = (isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type) || 'okand';
-    const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as NewDamage).positions;
-    const firstPos = positions[0] || { carPart: 'okand', position: 'okand' };
-
-    const damageFolderName = createDamageFolderName(damageType, firstPos.carPart, firstPos.position);
-    const fullFolderPath = `${checkinFolderName}/${damageFolderName}`;
-
-    if (!damage.media || damage.media.length === 0) return { photo_urls: [], video_urls: [], folder: fullFolderPath };
-    
-    const { photos, videos } = partitionMediaByType(damage.media);
-    
-    const photoUploadPromises = photos.map((p, i) => {
-        const ext = p.name.split('.').pop() || 'png';
-        const path = `${fullFolderPath}/${damageFolderName}-${i + 1}.${ext}`;
-        return uploadOne(p, path);
-    });
-    
-    const videoUploadPromises = videos.map((v, i) => {
-        const ext = v.name.split('.').pop() || 'mp4';
-        const path = `${fullFolderPath}/${damageFolderName}-${photos.length + i + 1}.${ext}`;
-        return uploadOne(v, path);
-    });
-
-    const [photoUploads, videoUploads] = await Promise.all([
-        Promise.all(photoUploadPromises),
-        Promise.all(videoUploadPromises),
-    ]);
-
-    return { photo_urls: photoUploads, video_urls: videoUploads, folder: fullFolderPath };
-}
-
-async function uploadRekondMedia(media: MediaFile[], reg: string): Promise<Uploads> {
-    const folderName = createRekondFolderName(reg);
-    if (!media || media.length === 0) return { photo_urls: [], video_urls: [], folder: folderName };
-    
-    const { photos, videos } = partitionMediaByType(media);
-    
-    const photoUploadPromises = photos.map((p, i) => {
-        const ext = p.name.split('.').pop() || 'png';
-        const path = `${reg}/${folderName}/${folderName}-${i + 1}.${ext}`;
-        return uploadOne(p, path);
-    });
-    
-    const videoUploadPromises = videos.map((v, i) => {
-        const ext = v.name.split('.').pop() || 'mp4';
-        const path = `${reg}/${folderName}/${folderName}-${photos.length + i + 1}.${ext}`;
-        return uploadOne(v, path);
-    });
-
-    const [photoUploads, videoUploads] = await Promise.all([
-        Promise.all(photoUploadPromises),
-        Promise.all(videoUploadPromises),
-    ]);
-
-    return { photo_urls: photoUploads, video_urls: videoUploads, folder: folderName };
-}
-
 
 const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
 
@@ -288,6 +231,7 @@ export default function CheckInForm() {
   const [varningslampaLyser, setVarningslampaLyser] = useState(false);
   const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState('');
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
+  const [inventoriedLegacyTexts, setInventoriedLegacyTexts] = useState<string[]>([]);
   const [insynsskyddOK, setInsynsskyddOK] = useState(false);
   const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
   const [isskrapaOK, setIsskrapaOK] = useState(false);
@@ -321,6 +265,10 @@ export default function CheckInForm() {
     return washed && otherChecklistItemsOK;
   }, [washed, otherChecklistItemsOK]);
 
+  const unhandledLegacyDamages = useMemo(() => {
+    return existingDamages.some(d => !d.isInventoried && d.status === 'not_selected');
+  }, [existingDamages]);
+
   const formIsValidState = useMemo(() => {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
@@ -341,8 +289,10 @@ export default function CheckInForm() {
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     if (behoverRekond && !hasPhoto(rekondMedia)) return false;
     
+    if (unhandledLegacyDamages) return false;
+
     return isChecklistComplete;
-  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, behoverRekond, rekondMedia, bilenStarNuOrt, bilenStarNuStation]);
+  }, [regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, behoverRekond, rekondMedia, bilenStarNuOrt, bilenStarNuStation, unhandledLegacyDamages]);
 
   const finalPayloadForUI = useMemo(() => ({
       reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, rekond: behoverRekond, varningslampa: varningslampaLyser, varningslampaBeskrivning,
@@ -366,7 +316,10 @@ export default function CheckInForm() {
     setExistingDamages([]);
     try {
       const normalized = normalizeReg(reg);
-      const info = await getVehicleInfo(normalized);
+      const [info, documentedTextsResult] = await Promise.all([
+          getVehicleInfo(normalized),
+          supabase.rpc('get_documented_legacy_texts', { p_regnr: normalized })
+      ]);
   
       if (info.status === 'NO_MATCH') {
         const proceed = window.confirm(
@@ -378,15 +331,20 @@ export default function CheckInForm() {
           return;
         }
       }
-  
+      
+      const documentedTexts = documentedTextsResult.data?.map(item => item.legacy_damage_source_text) || [];
+      setInventoriedLegacyTexts(documentedTexts);
+      
       setVehicleData(info);
       
       if (info.existing_damages.length > 0) {
-          setExistingDamages(info.existing_damages.map(d => ({ 
+          setExistingDamages(info.existing_damages.map((d: FormattedDamage) => ({ 
               db_id: d.id,
               id: Math.random().toString(36).substring(2, 15),
               fullText: d.text,
               shortText: d.text,
+              originalDamageDate: d.damage_date, // Stored as YYYY-MM-DD
+              isInventoried: documentedTexts.includes(d.text),
               status: 'not_selected',
               userPositions: [],
               media: [],
@@ -513,38 +471,103 @@ export default function CheckInForm() {
     setShowConfirmModal(false);
     setIsFinalSaving(true);
     try {
-        const checkinFolderName = generateUniqueFolderName(normalizedReg);
+        const now = new Date();
+        const incheckare = firstName || 'Okand';
 
-        let rekondUploadResults: Uploads | null = null;
-        if (behoverRekond) {
-            rekondUploadResults = await uploadRekondMedia(rekondMedia, normalizedReg);
+        // --- Upload resolved legacy damages comments ---
+        const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
+        for (const damage of resolvedLegacyDamages) {
+            const fileName = `${formatDate(now, 'YYYYMMDD')}_${formatDate(now, 'HH.MM')}_${slugify(damage.shortText)}_${incheckare}.txt`;
+            const filePath = `${normalizedReg}/Åtgärdade och Ej hittade skador från BUHS/${fileName}`;
+            const commentFile = createCommentFile(damage.resolvedComment!);
+            await uploadOne(commentFile, filePath);
         }
 
-        const documentedForUpload = existingDamages.filter(d => d.status === 'documented');
-        const newForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
+        // --- Handle new damages and rekond (Scenario A) ---
+        const newDamagesForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
+        const needsNewCheckinFolder = newDamagesForUpload.length > 0 || behoverRekond;
+        let newCheckinFolderName = '';
+        let finalNewDamages: NewDamage[] = [];
+        let rekondUploadResults: Uploads | null = null;
         
-        const documentedUploadResults = await Promise.all(
-            documentedForUpload.map(d => uploadAllForDamage(checkinFolderName, d))
-        );
-        const newUploadResults = await Promise.all(
-            newForUpload.map(d => uploadAllForDamage(checkinFolderName, d))
-        );
+        if (needsNewCheckinFolder) {
+            newCheckinFolderName = generateNewCheckinFolderName(normalizedReg, incheckare);
+            const commonPath = `${normalizedReg}/${newCheckinFolderName}`;
+            const todayStr = formatDate(now, 'YYYY-MM-DD');
 
-        const updatedExistingDamages = existingDamages.map(d => {
-            const index = documentedForUpload.findIndex(up => up.id === d.id);
-            if (index > -1) {
-                return { ...d, uploads: documentedUploadResults[index] };
+            // Upload new damages
+            finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
+                const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+                const subFolderName = generateSubFolderName(todayStr, damage.type, damage.positions[0]?.carPart || '', damage.positions[0]?.position || '');
+                const damagePath = `${commonPath}/${subFolderName}`;
+                damageUploads.folder = damagePath;
+
+                let mediaIndex = 1;
+                for (const media of damage.media) {
+                    const fileName = generateFileName(normalizedReg, todayStr, damage.type, mediaIndex++);
+                    const ext = media.file.name.split('.').pop();
+                    const mediaPath = `${damagePath}/${fileName}.${ext}`;
+                    const url = await uploadOne(media.file, mediaPath);
+                    if (media.type === 'image') damageUploads.photo_urls.push(url);
+                    else damageUploads.video_urls.push(url);
+                }
+
+                if (damage.text) {
+                    const commentFile = createCommentFile(damage.text);
+                    await uploadOne(commentFile, `${damagePath}/kommentar.txt`);
+                }
+                return { ...damage, uploads: damageUploads };
+            }));
+
+            // Upload rekond
+            if (behoverRekond) {
+                const rekondUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+                const subFolderName = `${formatDate(now, 'YYYYMMDD')}_REKOND`;
+                const rekondPath = `${commonPath}/${subFolderName}`;
+                rekondUploads.folder = rekondPath;
+
+                let mediaIndex = 1;
+                for (const media of rekondMedia) {
+                    const fileName = generateFileName(normalizedReg, todayStr, 'Rekond', mediaIndex++);
+                    const ext = media.file.name.split('.').pop();
+                    const mediaPath = `${rekondPath}/${fileName}.${ext}`;
+                    const url = await uploadOne(media.file, mediaPath);
+                    if (media.type === 'image') rekondUploads.photo_urls.push(url);
+                    else rekondUploads.video_urls.push(url);
+                }
+                if (rekondText) {
+                    const commentFile = createCommentFile(rekondText);
+                    await uploadOne(commentFile, `${rekondPath}/kommentar.txt`);
+                }
+                rekondUploadResults = rekondUploads;
             }
-            return d;
-        });
-        setExistingDamages(updatedExistingDamages);
+        }
+        
+        // --- Handle documented legacy damages (Scenario B) ---
+        const legacyDamagesForUpload = existingDamages.filter(d => d.status === 'documented');
+        const finalLegacyDamages = await Promise.all(legacyDamagesForUpload.map(async (damage) => {
+            const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+            const originalDate = damage.originalDamageDate || formatDate(now, 'YYYY-MM-DD');
+            const legacyFolderName = generateLegacyDocFolderName(normalizedReg, originalDate, incheckare);
+            const subFolderName = generateSubFolderName(originalDate, damage.userType || 'Okand', damage.userPositions[0]?.carPart || '', damage.userPositions[0]?.position || '');
+            const damagePath = `${normalizedReg}/${legacyFolderName}/${subFolderName}`;
+            damageUploads.folder = damagePath;
 
-        const updatedNewDamages = newDamages.map((d, i) => {
-            return { ...d, uploads: newUploadResults[i] };
-        });
-        setNewDamages(updatedNewDamages);
-
-        const resolvedDamages = updatedExistingDamages.filter(d => d.status === 'resolved');
+            let mediaIndex = 1;
+            for (const media of damage.media) {
+                const fileName = generateFileName(normalizedReg, originalDate, damage.userType || 'Okand', mediaIndex++);
+                const ext = media.file.name.split('.').pop();
+                const mediaPath = `${damagePath}/${fileName}.${ext}`;
+                const url = await uploadOne(media.file, mediaPath);
+                if (media.type === 'image') damageUploads.photo_urls.push(url);
+                else damageUploads.video_urls.push(url);
+            }
+            if (damage.userDescription) {
+                const commentFile = createCommentFile(damage.userDescription);
+                await uploadOne(commentFile, `${damagePath}/kommentar.txt`);
+            }
+            return { ...damage, uploads: damageUploads };
+        }));
 
         const submissionPayload = {
             regnr: normalizedReg,
@@ -565,24 +588,26 @@ export default function CheckInForm() {
             incheckare: firstName,
             timestamp: new Date().toISOString(),
             rekond_details: rekondUploadResults ? { ...rekondUploadResults, text: rekondText } : null,
-            dokumenterade_skador: updatedExistingDamages
-                .filter(d => d.status === 'documented')
-                .map(({ media, ...rest }) => rest),
-            nya_skador: updatedNewDamages
+            dokumenterade_skador: finalLegacyDamages
+                .map(({ media, ...rest }) => ({
+                    ...rest,
+                    legacy_damage_source_text: rest.fullText // Add the stamp!
+                })),
+            nya_skador: finalNewDamages
                 .map(({ media, ...rest }) => ({
                     ...rest,
                     positions: rest.positions.map(p => ({ carPart: p.carPart, position: p.position }))
                 })),
-            åtgärdade_skador: resolvedDamages
+            åtgärdade_skador: existingDamages
+                .filter(d => d.status === 'resolved')
                 .map(({ media, ...rest }) => rest),
-            checkinFolderName: checkinFolderName,
+            checkinFolderName: normalizedReg, // Send only REGNR for root link
         };
       
         await notifyCheckin({
             region: 'Syd',
             subjectBase: `${normalizedReg} - ${ort} / ${station}`,
             htmlBody: '', // This is not used, the API route builds the HTML
-            target: 'station',
             meta: submissionPayload
         });
 
@@ -600,16 +625,20 @@ export default function CheckInForm() {
     if (action === 'resolve') {
         setConfirmDialog({
             isOpen: true,
-            text: `Är du säker på att du vill markera skadan "${shortText}" som åtgärdad/hittas ej?`,
+            title: `Åtgärdad: "${shortText}"`,
+            text: 'Vänligen beskriv varför skadan markeras som åtgärdad/ej hittad. Denna kommentar sparas.',
             confirmButtonVariant: 'success',
-            onConfirm: () => {
+            requiresComment: true,
+            onConfirm: (comment) => {
                 setExistingDamages(damages => damages.map(d => {
                     if (d.id !== id) return d;
-                    return d.status === 'resolved' ? { ...d, status: 'not_selected' } : { ...d, status: 'resolved' };
+                    return d.status === 'resolved' 
+                        ? { ...d, status: 'not_selected', resolvedComment: undefined } 
+                        : { ...d, status: 'resolved', resolvedComment: comment };
                 }));
             }
         });
-    } else {
+    } else { // 'document'
         setExistingDamages(damages => damages.map(d => {
             if (d.id !== id) return d;
             
@@ -869,16 +898,16 @@ export default function CheckInForm() {
         {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.some(d => d.status === 'documented' && (!d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media)))) )}>
+      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media)))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador" />
-        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />) : <p>Inga befintliga skador att visa.</p>}
+        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />) : <p>Inga befintliga skador att rapportera.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
-            <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, nya skador finns</ChoiceButton>
+            <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />)}<Button onClick={addDamage} variant="secondary" style={{ marginTop: '1rem', width: '100%' }}>+ Lägg till ytterligare en ny skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && (!isChecklistComplete || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && !hasPhoto(rekondMedia)) )}>
@@ -1095,6 +1124,18 @@ const DamageItem: React.FC<{
 }> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
   const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
   const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
+  const inventoried = isExisting && (damage as ExistingDamage).isInventoried;
+
+  if (inventoried && !isDocumented && !resolved) {
+    return (
+        <div className="damage-item inventoried">
+            <div className="damage-item-header">
+                <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
+                <span className="inventoried-badge">✓ Redan inventerad</span>
+            </div>
+        </div>
+    );
+  }
 
   const commonProps = {
     type: isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type,
@@ -1107,7 +1148,7 @@ const DamageItem: React.FC<{
     <div className={`damage-item ${resolved ? 'resolved' : ''}`}>
       <div className="damage-item-header">
         <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
-        {isExisting && onAction && (
+        {isExisting && onAction && !inventoried && (
           <div className="damage-item-actions">
             <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).shortText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
             <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).shortText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
@@ -1148,7 +1189,7 @@ const DamageItem: React.FC<{
 
           <Button onClick={() => onAddPosition(damage.id, isExisting)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
           
-          <Field label="Beskrivning (frivilligt)"><textarea value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
+          <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan mer i detalj..."></textarea></Field>
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
             <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video *"} isOptional={isExisting} />
@@ -1196,10 +1237,15 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 );
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
+    const [comment, setComment] = useState('');
     if (!state.isOpen) return null;
 
     const handleConfirm = () => {
-        state.onConfirm();
+        if (state.requiresComment && !comment.trim()) {
+            alert('Kommentar är obligatoriskt.');
+            return;
+        }
+        state.onConfirm(comment);
         onClose();
     };
 
@@ -1209,13 +1255,29 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         <>
             <div className="modal-overlay" onClick={onClose} />
             <div className={`modal-content confirm-modal ${themeClass}`}>
-                {state.title === 'Bekräfta rekond' && <h3><strong>Bekräfta rekond ⚠️</strong></h3>}
-                {state.title === 'Bekräfta Varningslampa' && <h3><strong>Bekräfta Varningslampa ⚠️</strong></h3>}
-                {state.title && !['Bekräfta rekond', 'Bekräfta Varningslampa'].includes(state.title) && <h3>{state.title}</h3>}
+                {state.title && <h3>{state.title}</h3>}
                 <p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
+                {state.requiresComment && (
+                    <div className="field" style={{marginBottom: '1.5rem'}}>
+                        <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            placeholder="Ange motivering här..."
+                            rows={3}
+                            style={{width: '100%'}}
+                            autoFocus
+                        />
+                    </div>
+                )}
                 <div className="modal-actions">
                     <Button onClick={onClose} variant="secondary">Avbryt</Button>
-                    <Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'}>Bekräfta</Button>
+                    <Button 
+                        onClick={handleConfirm} 
+                        variant={state.confirmButtonVariant || 'danger'}
+                        disabled={state.requiresComment && !comment.trim()}
+                    >
+                        Bekräfta
+                    </Button>
                 </div>
             </div>
         </>
@@ -1236,7 +1298,7 @@ const GlobalStyles = () => (
         .main-header { text-align: center; margin-bottom: 1.5rem; }
         .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
         .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-        .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border 0.2s; }
+        .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
         .card[data-error="true"] { border: 2px solid var(--color-danger); }
         .field[data-error="true"] textarea { border: 2px solid var(--color-danger) !important; }
         .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
@@ -1249,7 +1311,7 @@ const GlobalStyles = () => (
         .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
         .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
         .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto; }
+        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
         .suggestion-item { padding: 0.75rem; cursor: pointer; }
         .suggestion-item:hover { background-color: var(--color-primary-light); }
         .error-text { color: var(--color-danger); }
@@ -1273,7 +1335,7 @@ const GlobalStyles = () => (
         .btn.warning { background-color: var(--color-warning); color: white; }
         .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
         .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: var(--color-card); cursor: pointer; transition: all 0.2s; font-weight: 500; }
+        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); cursor: pointer; font-weight: 500; transition: all 0.2s; }
         .choice-btn:hover { filter: brightness(1.05); }
         .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
         .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
@@ -1286,12 +1348,14 @@ const GlobalStyles = () => (
         .special-button-item { display: flex; flex-direction: column; }
         .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
         .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
+        .damage-item.inventoried { background-color: #f9fafb; }
         .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
+        .inventoried-badge { font-size: 0.8rem; font-weight: 600; color: var(--color-success); background-color: var(--color-success-light); padding: 0.25rem 0.5rem; border-radius: 99px; }
         .damage-item-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
         .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
         .damage-position-row { position: relative; padding-right: 2.5rem; }
         .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; }
-        .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.25rem; display: flex; align-items: center; justify-content: center; }
+        .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
         .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
         .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
         .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
@@ -1302,13 +1366,14 @@ const GlobalStyles = () => (
         .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
         .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; cursor: pointer; }
+        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 0; }
         .remove-media-btn:hover { background-color: #b91c1c; }
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); max-width: 90vw; width: 600px; }
+        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
+        .modal-content h3 { margin-top: 0; text-align: center; font-size: 1.25rem; }
         .modal-content.success-modal { text-align: center; }
         .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); text-align: center; }
-        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem auto; }
+        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
         .confirm-modal { text-align: left; }
         .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
         .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
