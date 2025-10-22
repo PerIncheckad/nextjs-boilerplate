@@ -55,25 +55,18 @@ const getDamageString = (damage: any): string => {
     let baseString = '';
     let comment = '';
     
-    const positions = damage.positions || damage.userPositions || [];
-    const type = damage.type || damage.userType;
-    const shortText = damage.shortText || '';
-
-    let mainPart = type;
-    if (shortText && type) {
-        mainPart = `${type} (${shortText})`;
-    } else if (shortText) {
-        mainPart = shortText;
-    }
-
+    // Anpassad för den NYA damage-strukturen
+    const positions = damage.user_positions || [];
+    const type = damage.user_type || damage.type || 'Skada';
+    
     if (positions.length > 0) {
-        const positionParts = positions.map((p: any) => `${p.carPart} ${p.position || ''}`.trim()).filter(Boolean).join(', ');
-        baseString = positionParts ? `${mainPart}: ${positionParts}` : mainPart;
+        const positionParts = positions.map((p: any) => `${p.car_part} ${p.position || ''}`.trim()).filter(Boolean).join(', ');
+        baseString = positionParts ? `${type}: ${positionParts}` : type;
     } else {
-        baseString = mainPart || damage.fullText || 'Okänd skada';
+        baseString = damage.legacyDamageSourceText || type;
     }
 
-    comment = damage.text || damage.userDescription || '';
+    comment = damage.comment || '';
 
     if (comment) {
         return `${baseString}<br><small style="color: #000000 !important;"><strong>Kommentar:</strong> ${comment}</small>`;
@@ -85,22 +78,16 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0; color: #000000 !important;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 0; color: #000000 !important;">${items}</ul>`;
 };
 
-const formatTankning = (tankning: any): string => {
-    if (!tankning) return '---';
-    if (tankning.tankniva === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
-    if (tankning.tankniva === 'tankad_nu') {
-        const parts = [
-            'Tankad nu av MABI',
-            tankning.liters ? `(${tankning.liters}L` : null,
-            tankning.bransletyp ? `${tankning.bransletyp}` : null,
-            tankning.literpris ? `@ ${tankning.literpris} kr/L)` : (tankning.liters ? ')' : null)
-        ].filter(Boolean).join(' ');
-        return parts;
-    }
-    return '---';
+const createInfoGrid = (rows: [string, string | undefined | null][]): string => {
+  return rows.filter(row => row[0] !== null).map(([label, value]) => `
+    <tr>
+      <td style="font-weight: bold; color: #000000 !important; width: 150px; padding: 4px 0; vertical-align: top;">${label}</td>
+      <td style="color: #000000 !important; padding: 4px 0;">${value || '---'}</td>
+    </tr>
+  `).join('');
 };
 
 const createBaseLayout = (regnr: string, content: string): string => `
@@ -168,150 +155,77 @@ const createBaseLayout = (regnr: string, content: string): string => `
   </html>
 `;
 
-const createRekondSection = (rekond_details: any, regnr: string, projectRef: string): string => {
-    if (!rekond_details || !rekond_details.text && (!rekond_details.photo_urls || rekond_details.photo_urls.length === 0)) return '';
-    
-    const { text, photo_urls = [], folder } = rekond_details;
-    const galleryLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(folder)}`;
-
-    let photosHtml = '';
-    if (photo_urls.length > 0) {
-        photosHtml = `
-            <p style="margin:10px 0 5px 0; color: #000000 !important; font-weight: bold;">Bilder:</p>
-            ${photo_urls.map((url: string, index: number) => `<a href="${url}" style="color: #005A9C !important; text-decoration: none !important; margin-right: 10px;">Visa bild ${index + 1}</a>`).join('')}
-            <br/><a href="${galleryLink}" style="color: #005A9C !important; text-decoration: none !important; margin-top: 5px; display: inline-block;">Öppna Rekond-galleri →</a>
-        `;
-    }
-
-    return `
-        <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; margin-top: 10px;">
-            <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: #991b1b !important; text-transform: uppercase; letter-spacing: 0.5px;">Rekondinformation</h3>
-            ${text ? `<p style="margin:0 0 10px 0; color: #000000 !important;"><strong>Kommentar:</strong> ${text}</p>` : ''}
-            ${photosHtml}
-        </div>
-    `;
-};
-
 // =================================================================
 // 3. HTML BUILDERS - SPECIFIC EMAILS
 // =================================================================
 
-const buildHuvudstationEmail = (payload: any, date: string, time: string, checkinFolderName: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, varningslampa_beskrivning, nya_skador = [], notering, bilen_star_nu, rekond_details } = payload;
-  const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(checkinFolderName)}`;
-
-  let bilenStarNuText = '---';
-  if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
-    bilenStarNuText = `${bilen_star_nu.ort} / ${bilen_star_nu.station}`;
-    if (bilen_star_nu.kommentar) {
-      bilenStarNuText += `<br><small style="color: #000000 !important;">(${bilen_star_nu.kommentar})</small>`;
-    }
-  }
+const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
+  const { regnr, carModel, ort, station, incheckare, notering, bilen_star_nu, drivmedel, tankniva, laddkablar, varningslampa_status } = payload;
   
-  const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
+  const alerts: string[] = [];
+  if (tankniva === 'Ej upptankad') alerts.push('Ej upptankad - kontakta Bilkontroll!');
+  if (payload.husdjur?.needed) alerts.push('Sanerad för husdjur - kontakta Bilkontroll!');
+  if (payload.rokning?.needed) alerts.push('Sanerad för rökning - kontakta Bilkontroll!');
+  if (varningslampa_status === 'no') alerts.push('Varningslampa lyser - går ej att hyra ut! - Kontakta Bilkontroll.');
 
   const content = `
-    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!')}
-    ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
-    ${createAlertBanner(rekond, 'Behöver rekond')}
-    ${rekond ? createRekondSection(rekond_details, regnr, projectRef) : ''}
-    ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
-
+    ${alerts.map(alert => createAlertBanner(true, alert)).join('')}
     <tr><td style="padding: 10px 0; color: #000000 !important;">
-      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
-        <table class="info-grid" style="color: #000000 !important; width: 100%;">
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Incheckad vid:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilenStarNuText}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
-        </table>
-      </div>
-      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
-        <table class="info-grid" style="color: #000000 !important; width: 100%;">
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Mätarställning:</td><td style="color: #000000 !important; padding: 4px 0;">${matarstallning} km</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tankning:</td><td style="color: #000000 !important; padding: 4px 0;">${payload.drivmedel === 'elbil' ? '---' : formatTankning(tankning)}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Laddning:</td><td style="color: #000000 !important; padding: 4px 0;">${payload.drivmedel === 'elbil' ? `${laddning.laddniva}%` : '---'}</td></tr>
-        </table>
-      </div>
-      ${nya_skador.length > 0 ? `
-        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-          ${formatDamagesToHtml(nya_skador, 'Nya skador')}
-        </div>
-      ` : ''}
-      ${notering ? `
-        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-          <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Övriga kommentarer</h2>
-          <p style="margin:0; color: #000000 !important;">${notering}</p>
-        </div>
-      ` : ''}
-      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #005A9C !important; text-decoration: none !important;">Öppna bildgalleri för ${regnr} →</a></div>
+      <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Sammanfattning</h2>
+      <table class="info-grid" style="color: #000000 !important; width: 100%;">
+        ${createInfoGrid([
+          ['Reg.nr:', regnr],
+          ['Bilmodell:', carModel],
+          ['Incheckad vid:', `${ort} / ${station}`],
+          ['Bilen står nu:', `${bilen_star_nu.ort} / ${bilen_star_nu.station} ${bilen_star_nu.kommentar ? `(${bilen_star_nu.kommentar})` : ''}`],
+          ['Datum:', date],
+          ['Tid:', time],
+          ['Incheckare:', incheckare],
+          ['Drivmedel:', drivmedel],
+          ['Tank/Laddnivå:', tankniva],
+          [drivmedel === 'Elbil' ? 'Antal laddkablar:' : null, laddkablar],
+        ])}
+      </table>
+      ${formatDamagesToHtml(payload.nya_skador, 'Nya skador')}
+      ${notering ? `<h3 style="margin-top: 20px;">Övriga kommentarer</h3><p style="color: #000000 !important;">${notering}</p>` : ''}
     </td></tr>
   `;
 
   return createBaseLayout(regnr, content);
 };
 
-const buildBilkontrollEmail = (payload: any, date: string, time: string, checkinFolderName: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, varningslampa, varningslampa_beskrivning, notering, bilen_star_nu,
-          åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], rekond_details } = payload;
-  const projectRef = supabaseUrl.split('.')[0].split('//')[1];
-  const storageLink = `https://app.supabase.com/project/${projectRef}/storage/buckets/damage-photos?path=${encodeURIComponent(checkinFolderName)}`;
+const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
+  const { regnr, carModel, ort, station, incheckare, bilen_star_nu, drivmedel, tankniva, laddkablar, varningslampa_status } = payload;
+  
+  const alerts: string[] = [];
+  if (tankniva === 'Ej upptankad') alerts.push('Ej upptankad');
+  if (payload.husdjur?.needed) alerts.push('Sanerad för husdjur');
+  if (payload.rokning?.needed) alerts.push('Sanerad för rökning');
+  if (payload.varningslampa?.active) alerts.push(`Varningslampa lyser ${varningslampa_status === 'no' ? '(Går ej att hyra ut)' : '(Går att hyra ut)'}`);
 
-  let bilenStarNuText = '---';
-  if (bilen_star_nu && bilen_star_nu.ort && bilen_star_nu.station) {
-    bilenStarNuText = `${bilen_star_nu.ort} / ${bilen_star_nu.station}`;
-    if (bilen_star_nu.kommentar) {
-      bilenStarNuText += ` (${bilen_star_nu.kommentar})`;
-    }
-  }
-          
   const content = `
-    ${createAlertBanner(varningslampa, 'Varningslampa lyser', varningslampa_beskrivning)}
-    ${createAlertBanner(rekond, 'Behöver rekond')}
-    ${rekond ? createRekondSection(rekond_details, regnr, projectRef) : ''}
-    ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
-
+    ${alerts.map(alert => createAlertBanner(true, alert)).join('')}
     <tr><td style="padding: 10px 0; color: #000000 !important;">
+      <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
+      <table class="info-grid" style="color: #000000 !important; width: 100%;">
+      ${createInfoGrid([
+        ['Reg.nr:', regnr],
+        ['Bilmodell:', carModel],
+        ['Incheckad vid:', `${ort} / ${station}`],
+        ['Datum:', date],
+        ['Tid:', time],
+        ['Incheckare:', incheckare],
+      ])}
+      </table>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Fordonsinformation</h2>
-        <table class="info-grid" style="color: #000000 !important; width: 100%;">
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Reg.nr:</td><td style="color: #000000 !important; padding: 4px 0;">${regnr}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Bilmodell:</td><td style="color: #000000 !important; padding: 4px 0;">${carModel || '---'}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Däck:</td><td style="color: #000000 !important; padding: 4px 0;">${hjultyp || '---'}</td></tr>
-        </table>
+        <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px; margin-top: 20px;">Skadeöversikt</h2>
+        ${formatDamagesToHtml(payload.åtgärdade_skador, 'Åtgärdade / Hittas ej')}
+        ${formatDamagesToHtml(payload.dokumenterade_skador, 'Dokumenterade befintliga skador')}
+        ${formatDamagesToHtml(payload.nya_skador, 'Nya skador')}
       </div>
-      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
-        <table class="info-grid" style="color: #000000 !important; width: 100%;">
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Incheckad vid:</td><td style="color: #000000 !important; padding: 4px 0;">${ort} / ${station}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0; vertical-align: top;">Bilen står nu:</td><td style="color: #000000 !important; padding: 4px 0;">${bilenStarNuText}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Datum:</td><td style="color: #000000 !important; padding: 4px 0;">${date}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Tid:</td><td style="color: #000000 !important; padding: 4px 0;">${time}</td></tr>
-          <tr><td style="font-weight: bold; color: #000000 !important; width: 120px; padding: 4px 0;">Incheckare:</td><td style="color: #000000 !important; padding: 4px 0;">${incheckare || '---'}</td></tr>
-        </table>
-      </div>
-      <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-        <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Skadeöversikt</h2>
-        ${formatDamagesToHtml(åtgärdade_skador, 'Åtgärdade / Hittas ej')}
-        ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador')}
-        ${formatDamagesToHtml(nya_skador, 'Nya skador')}
-      </div>
-      ${notering ? `
-        <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
-          <h2 style="font-size: 16px; color: #000000 !important; font-weight: 600; margin-bottom: 15px;">Övriga kommentarer</h2>
-          <p style="margin:0; color: #000000 !important;">${notering}</p>
-        </div>
-      ` : ''}
-      <div style="padding-top: 10px;"><a href="${storageLink}" style="color: #005A9C !important; text-decoration: none !important;">Öppna bildgalleri för ${regnr} →</a></div>
     </td></tr>
   `;
-
+  
   return createBaseLayout(regnr, content);
 };
 
@@ -325,15 +239,43 @@ export async function POST(request: Request) {
   }
 
   try {
-    const fullRequestPayload = await request.json();
-    const payload = fullRequestPayload.meta; 
+    const incomingPayload = await request.json();
+    const { region, subjectBase, meta } = incomingPayload;
 
-    const { regnr, ort, station, status, nya_skador = [], dokumenterade_skador = [], checkinFolderName } = payload;
-
-    if (!checkinFolderName) {
-      // Lägg till en säkerhetskontroll för att säkerställa att mappnamnet finns
-      throw new Error("Critical error: 'checkinFolderName' is missing from the payload.");
-    }
+    // --- ADAPTER: Konvertera ny payload-struktur till det "platta" format som e-postmallarna förväntar sig ---
+    const emailPayload = {
+      // Grundläggande metadata
+      regnr: meta.regnr,
+      ort: meta.ort,
+      station: meta.station,
+      incheckare: meta.name,
+      notering: meta.generalComment,
+      carModel: meta.carModel || 'Okänd', // Antag att bilmodell kan finnas i meta
+      bilen_star_nu: {
+        ort: meta.ort,
+        station: meta.station,
+        kommentar: meta.parking,
+      },
+      // Status-objekt
+      drivmedel: meta.status.drivmedel,
+      tankniva: meta.status.tankniva,
+      laddkablar: meta.status.laddkablar,
+      varningslampa: meta.status.varningslampa.active,
+      varningslampa_status: meta.status.varningslampa.rentable,
+      // Rekond och Sanering
+      rekond: meta.rekond.needed,
+      husdjur: meta.sanering.husdjur,
+      rokning: meta.sanering.rokning,
+      // Skador
+      nya_skador: meta.damages.new,
+      dokumenterade_skador: meta.damages.legacy_documented,
+      åtgärdade_skador: meta.damages.legacy_remedied.map((d: any) => ({
+        ...d,
+        // E-postmallen förväntar sig en enkel textsträng för åtgärdade skador
+        fullText: `<strong>${d.legacyDamageSourceText}</strong><br><small>${d.comment}</small>`
+      })),
+    };
+    // --- SLUT ADAPTER ---
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
@@ -341,44 +283,36 @@ export async function POST(request: Request) {
     const time = now.toLocaleTimeString('sv-SE', { ...options, hour: '2-digit', minute: '2-digit' });
 
     // E-posthantering
-    const regionalAddress = regionMapping[ort as keyof typeof regionMapping] || fallbackAddress;
+    const regionalAddress = regionMapping[emailPayload.ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
-    const huvudstationHtml = buildHuvudstationEmail(payload, date, time, checkinFolderName);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
     
-    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, checkinFolderName);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${fullRequestPayload.subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
+    const huvudstationHtml = buildHuvudstationEmail(emailPayload, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
     
-    if (status === 'PARTIAL_MATCH_DAMAGE_ONLY' || status === 'NO_MATCH') {
-      const warningSubject = `VARNING: ${regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(regnr, `<tr><td><p style="color: #000000 !important;">Registreringsnumret <strong>${regnr}</strong>, som nyss checkades in på station ${station} (${ort}), saknas i bilregistret. Vänligen lägg till bilen manuellt.</p></td></tr>`);
-      emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
-    }
+    const bilkontrollHtml = buildBilkontrollEmail(emailPayload, date, time);
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     
     Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
 
-    // Databashantering
-    const damagesToProcess = [...nya_skador, ...dokumenterade_skador];
+    // Databashantering (behålls från originalfilen)
+    const damagesToProcess = [...emailPayload.nya_skador, ...emailPayload.dokumenterade_skador];
     
     for (const damage of damagesToProcess) {
-        const isNewDamage = 'positions' in damage;
-        const firstPhoto = damage.uploads?.photo_urls?.[0] || null;
-
-        // Steg 1: Skapa huvudinlägget för skadan i 'damages'-tabellen (utan positionsdata)
         const damageData = {
-            regnr: payload.regnr,
+            regnr: emailPayload.regnr,
             damage_date: now.toISOString(),
-            ort: payload.ort || null,
-            station_namn: payload.station || null,
-            inchecker_name: payload.incheckare || null,
-            damage_type: isNewDamage ? damage.type : (damage.fullText || 'Dokumenterad befintlig skada'),
-            description: isNewDamage ? damage.text : (damage.userDescription || damage.fullText),
-            media_url: firstPhoto,
+            ort: emailPayload.ort || null,
+            station_namn: emailPayload.station || null,
+            inchecker_name: emailPayload.incheckare || null,
+            damage_type: damage.user_type || 'Dokumenterad befintlig skada',
+            description: damage.comment || damage.legacyDamageSourceText,
             status: "complete",
-            notering: payload.notering || null,
+            legacy_damage_source_text: damage.isLegacy ? damage.legacyDamageSourceText : null,
+            user_type: damage.user_type,
+            user_positions: damage.user_positions,
         };
         
-        const { data: newDamage, error: damageError } = await supabaseAdmin
+        const { error: damageError } = await supabaseAdmin
             .from('damages')
             .insert(damageData)
             .select('id')
@@ -386,62 +320,6 @@ export async function POST(request: Request) {
 
         if (damageError) {
             console.error('Supabase DB error during damage INSERT:', damageError);
-            continue; // Gå till nästa skada om detta misslyckas
-        }
-
-        if (!newDamage) {
-            console.error('Failed to get ID for new damage, cannot save positions or media.');
-            continue;
-        }
-
-        // Steg 2: Spara positionerna i den nya 'damage_positions'-tabellen
-        const positionsToSave = isNewDamage ? damage.positions : damage.userPositions;
-        if (positionsToSave && positionsToSave.length > 0) {
-            const positionsToInsert = positionsToSave.map((pos: any) => ({
-                damage_id: newDamage.id,
-                car_part: pos.carPart,
-                position: pos.position,
-            }));
-
-            const { error: positionsError } = await supabaseAdmin
-                .from('damage_positions')
-                .insert(positionsToInsert);
-
-            if (positionsError) {
-                console.error('Supabase DB error during damage_positions INSERT:', positionsError);
-            }
-        }
-
-        // Steg 3: Spara media i 'damage_media'-tabellen (oförändrat)
-        const mediaToInsert = [];
-        const allPhotoUrls = damage.uploads?.photo_urls || [];
-        const allVideoUrls = damage.uploads?.video_urls || [];
-
-        for (const url of allPhotoUrls) {
-            mediaToInsert.push({
-                damage_id: newDamage.id,
-                url: url,
-                type: 'image',
-                comment: isNewDamage ? damage.text : damage.userDescription,
-            });
-        }
-        for (const url of allVideoUrls) {
-            mediaToInsert.push({
-                damage_id: newDamage.id,
-                url: url,
-                type: 'video',
-                comment: isNewDamage ? damage.text : damage.userDescription,
-            });
-        }
-
-        if (mediaToInsert.length > 0) {
-            const { error: mediaError } = await supabaseAdmin
-                .from('damage_media')
-                .insert(mediaToInsert);
-            
-            if (mediaError) {
-                console.error('Supabase DB error during damage_media INSERT:', mediaError);
-            }
         }
     }
 
