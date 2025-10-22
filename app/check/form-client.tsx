@@ -5,8 +5,6 @@ import { supabase } from '@/lib/supabase';
 import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
-const normalizeReg = (reg: string) => reg.toUpperCase().replace(/\s/g, '');
-
 // =================================================================
 // 1. DATA, TYPES & HELPERS
 // =================================================================
@@ -93,7 +91,6 @@ type ConfirmDialogState = {
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
-// This slugify is for filenames and folder parts, keeping it simple.
 function slugify(str: string): string {
     if (!str) return '';
     const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:; '; // Added space
@@ -131,7 +128,6 @@ const createCommentFile = (content: string): File => {
 
 async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
-    // Use the path directly, slugify individual parts if needed but not the whole path.
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
     if (error) {
         if (error.message.includes('The resource already exists')) {
@@ -208,6 +204,7 @@ export default function CheckInForm() {
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
   const [literpris, setLiterpris] = useState('');
   const [laddniva, setLaddniva] = useState('');
+  const [antalLaddkablar, setAntalLaddkablar] = useState<0 | 1 | 2 | null>(null);
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   
   // Rekond & Sanering State
@@ -275,7 +272,7 @@ export default function CheckInForm() {
   const formIsValidState = useMemo(() => {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
-    if (drivmedelstyp === 'elbil' && !laddniva) return false;
+    if (drivmedelstyp === 'elbil' && (!laddniva || antalLaddkablar === null)) return false;
     
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
@@ -287,15 +284,15 @@ export default function CheckInForm() {
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media))) return false;
 
     if (varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) return false;
-    if (behoverRekond && (!rekondUtvandig && !rekondInvandig)) return false;
+    if (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))) return false;
     
     if (unhandledLegacyDamages) return false;
 
     return isChecklistComplete;
   }, [
-    regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, skadekontroll, 
-    newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
-    behoverRekond, rekondUtvandig, rekondInvandig, bilenStarNuOrt, bilenStarNuStation, unhandledLegacyDamages
+    regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
+    skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
+    behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, unhandledLegacyDamages
   ]);
 
   const finalPayloadForUI = useMemo(() => ({
@@ -320,7 +317,7 @@ export default function CheckInForm() {
         uthyrningsstatus: varningslampaUthyrningsstatus
       },
       drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
-      laddning: { laddniva },
+      laddning: { laddniva, antal_laddkablar: antalLaddkablar },
       ort,
       station,
       bilenStarNu: { ort: bilenStarNuOrt, station: bilenStarNuStation, kommentar: bilenStarNuKommentar },
@@ -333,7 +330,8 @@ export default function CheckInForm() {
     normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, rekondUtvandig, rekondInvandig, rekondText,
     husdjurSanerad, husdjurText, rokningSanerad, rokningText,
     varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
-    drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
+    drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
+    ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
     newDamages, existingDamages, washed, otherChecklistItemsOK
   ]);
 
@@ -379,11 +377,6 @@ export default function CheckInForm() {
   
     } catch (error: any) {
       console.error("Fetch vehicle data error:", error);
-      if (error.message.includes('fetch failed') || error.message.includes('NetworkError')) {
-        console.error("Network-related error. Check Supabase connection and RLS policies.");
-      } else if (error.message.includes('JSON')) {
-        console.error("Possible RLS policy issue. The server returned data that couldn't be parsed, often an empty response due to permissions.");
-      }
       setNotFound(true);
       setVehicleData(null);
       setExistingDamages([]);
@@ -404,11 +397,8 @@ export default function CheckInForm() {
   useEffect(() => {
     async function fetchAllRegistrations() {
       const { data, error } = await supabase.rpc('get_all_allowed_plates');
-      if (error) {
-        console.error("Could not fetch registrations via RPC:", error);
-      } else if (data) {
-        setAllRegistrations(data.map((item: any) => item.regnr));
-      }
+      if (error) console.error("Could not fetch registrations via RPC:", error);
+      else if (data) setAllRegistrations(data.map((item: any) => item.regnr));
     }
     fetchAllRegistrations();
   }, []);
@@ -438,9 +428,8 @@ export default function CheckInForm() {
       setInitialUrlLoadHandled(true);
     }
 
-    const normalized = regInput.toUpperCase().replace(/\s/g, '');
-
-    if (normalized.length < 6) {
+    const normalizedReg = regInput.toUpperCase().replace(/\s/g, '');
+    if (normalizedReg.length < 6) {
       setVehicleData(null);
       setExistingDamages([]);
       setNotFound(false);
@@ -448,7 +437,7 @@ export default function CheckInForm() {
     }
 
     const timer = setTimeout(() => {
-      fetchVehicleData(normalized);
+      fetchVehicleData(normalizedReg);
     }, 300);
 
     return () => clearTimeout(timer);
@@ -465,7 +454,7 @@ export default function CheckInForm() {
   const resetForm = () => {
     setRegInput(''); setVehicleData(null); setExistingDamages([]); setOrt('');
     setStation(''); setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null);
-    setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva('');
+    setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva(''); setAntalLaddkablar(null);
     setHjultyp(null); 
     setBehoverRekond(false); setRekondUtvandig(false); setRekondInvandig(false); setRekondText(''); setRekondMedia([]);
     setHusdjurSanerad(false); setHusdjurText(''); setHusdjurMedia([]);
@@ -499,8 +488,6 @@ export default function CheckInForm() {
         const now = new Date();
         const incheckare = firstName || 'Okand';
         const incheckningsdatum = formatDate(now, 'YYYYMMDD');
-        
-        // Use normalizedReg (already uppercase) for all paths
         const reg = normalizedReg;
 
         // --- Handle Inventoried Legacy Damages ---
@@ -522,9 +509,7 @@ export default function CheckInForm() {
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
                 else damageUploads.video_urls.push(url);
             }
-            if (damage.userDescription) {
-                await uploadOne(createCommentFile(damage.userDescription), `${damagePath}/kommentar.txt`);
-            }
+            if (damage.userDescription) await uploadOne(createCommentFile(damage.userDescription), `${damagePath}/kommentar.txt`);
             return { ...damage, uploads: damageUploads };
         }));
 
@@ -546,9 +531,7 @@ export default function CheckInForm() {
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
                 else damageUploads.video_urls.push(url);
             }
-            if (damage.text) {
-                await uploadOne(createCommentFile(damage.text), `${damagePath}/kommentar.txt`);
-            }
+            if (damage.text) await uploadOne(createCommentFile(damage.text), `${damagePath}/kommentar.txt`);
             return { ...damage, uploads: damageUploads };
         }));
 
@@ -569,7 +552,7 @@ export default function CheckInForm() {
                 const types = [];
                 if (rekondTypes.utvandig) types.push('UTVANDIG');
                 if (rekondTypes.invandig) types.push('INVANDIG');
-                typeString = `REKOND-${types.join('-')}`;
+                if (types.length > 0) typeString = `REKOND-${types.join('-')}`;
             }
 
             const eventFolderName = slugify(`${typeString} - ${incheckare}`);
@@ -584,9 +567,7 @@ export default function CheckInForm() {
                 if (m.type === 'image') uploads.photo_urls.push(url);
                 else uploads.video_urls.push(url);
             }
-            if (text) {
-                await uploadOne(createCommentFile(text), `${path}/kommentar.txt`);
-            }
+            if (text) await uploadOne(createCommentFile(text), `${path}/kommentar.txt`);
             return uploads;
         };
         
@@ -604,65 +585,9 @@ export default function CheckInForm() {
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
 
-        // --- Final Payload for Database & Notification ---
-        const submissionPayload = {
-            regnr: reg,
-            status: vehicleData?.status,
-            carModel: vehicleData?.model,
-            ort,
-            station,
-            matarstallning,
-            drivmedel: drivmedelstyp,
-            tankning: { tankniva, liters, bransletyp, literpris },
-            laddning: { laddniva },
-            hjultyp,
-            rekond: {
-                behoverRekond,
-                utvandig: rekondUtvandig,
-                invandig: rekondInvandig,
-                text: rekondText,
-                uploads: rekondUploadResults
-            },
-            husdjur: {
-                sanerad: husdjurSanerad,
-                text: husdjurText,
-                uploads: husdjurUploadResults
-            },
-            rokning: {
-                sanerad: rokningSanerad,
-                text: rokningText,
-                uploads: rokningUploadResults
-            },
-            varningslampa: {
-                lyser: varningslampaLyser,
-                beskrivning: varningslampaBeskrivning,
-                uthyrningsstatus: varningslampaUthyrningsstatus
-            },
-            bilen_star_nu: { ort: bilenStarNuOrt, station: bilenStarNuStation, kommentar: bilenStarNuKommentar },
-            notering: preliminarAvslutNotering,
-            incheckare: firstName,
-            timestamp: new Date().toISOString(),
-            dokumenterade_skador: finalLegacyDamages
-                .map(({ media, ...rest }) => ({
-                    ...rest,
-                    legacy_damage_source_text: rest.fullText
-                })),
-            nya_skador: finalNewDamages
-                .map(({ media, ...rest }) => ({
-                    ...rest,
-                    positions: rest.positions.map(p => ({ carPart: p.carPart, position: p.position }))
-                })),
-            åtgärdade_skador: existingDamages
-                .filter(d => d.status === 'resolved')
-                .map(({ media, uploads, ...rest }) => rest),
-        };
+        const submissionPayload = { ...finalPayloadForUI, regnr: reg, incheckare: firstName, timestamp: new Date().toISOString() };
       
-        await notifyCheckin({
-            region: 'Syd',
-            subjectBase: `${reg} - ${ort} / ${station}`,
-            htmlBody: '',
-            meta: submissionPayload
-        });
+        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, htmlBody: '', meta: submissionPayload });
 
         setShowSuccessModal(true);
         setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
@@ -683,28 +608,17 @@ export default function CheckInForm() {
             confirmButtonVariant: 'success',
             requiresComment: true,
             onConfirm: (comment) => {
-                setExistingDamages(damages => damages.map(d => {
-                    if (d.id !== id) return d;
-                    return d.status === 'resolved' 
-                        ? { ...d, status: 'not_selected', resolvedComment: undefined } 
-                        : { ...d, status: 'resolved', resolvedComment: comment };
-                }));
+                setExistingDamages(damages => damages.map(d => d.id !== id ? d : { ...d, status: d.status === 'resolved' ? 'not_selected' : 'resolved', resolvedComment: comment }));
             }
         });
     } else { // 'document'
         setExistingDamages(damages => damages.map(d => {
             if (d.id !== id) return d;
-            
             const isBecomingDocumented = d.status !== 'documented';
             if (isBecomingDocumented && d.userPositions.length === 0) {
-                return { 
-                    ...d, 
-                    status: 'documented',
-                    userPositions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }]
-                };
-            } else {
-                return { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' };
+                return { ...d, status: 'documented', userPositions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }] };
             }
+            return { ...d, status: d.status === 'documented' ? 'not_selected' : 'documented' };
         }));
     }
   };
@@ -715,6 +629,8 @@ export default function CheckInForm() {
     if (isCurrentlyOn) {
         setRekondInvandig(false);
         setRekondUtvandig(false);
+        setRekondText('');
+        setRekondMedia([]);
     }
   };
   
@@ -729,18 +645,13 @@ export default function CheckInForm() {
 
   const updateDamageField = (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    
     updater((damages: any[]) => damages.map(d => {
         if (d.id !== id) return d;
-
         if (positionId && (field === 'carPart' || field === 'position')) {
             const positionsKey = isExisting ? 'userPositions' : 'positions';
-            const updatedPositions = (d[positionsKey] as DamagePosition[]).map(p => 
-                p.id === positionId ? { ...p, [field]: value } : p
-            );
+            const updatedPositions = (d[positionsKey] as DamagePosition[]).map(p => p.id === positionId ? { ...p, [field]: value } : p);
             return { ...d, [positionsKey]: updatedPositions };
         }
-
         let fieldKey = field;
         if (isExisting) {
             if (field === 'description') fieldKey = 'userDescription';
@@ -748,62 +659,21 @@ export default function CheckInForm() {
         } else {
             if (field === 'description') fieldKey = 'text';
         }
-        
         return { ...d, [fieldKey]: value };
     }));
   };
 
-  const handleMediaUpdate = async (id: string, files: FileList, isExisting: boolean) => {
-    const processed = await processFiles(files);
-    const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
-  };
-  
-  const handleRekondMediaUpdate = async (files: FileList) => {
-    const processed = await processFiles(files);
-    setRekondMedia(prev => [...prev, ...processed]);
-  };
-
-  const handleMediaRemove = (id: string, index: number, isExisting: boolean) => {
-    const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater((damages: any[]) => damages.map(d => {
-      if (d.id !== id) return d;
-      const newMedia = [...(d.media || [])];
-      newMedia.splice(index, 1);
-      return { ...d, media: newMedia };
-    }));
-  };
-  
-  const handleRekondMediaRemove = (index: number) => {
-    setRekondMedia(prev => {
-        const newMedia = [...prev];
-        newMedia.splice(index, 1);
-        return newMedia;
-    });
-  };
-
   const addDamage = () => {
-    setNewDamages(prev => [...prev, { 
-        id: `new_${Date.now()}`, type: '', text: '', 
-        positions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }],
-        media: [], uploads: { photo_urls: [], video_urls: [], folder: '' } 
-    }]);
+    setNewDamages(prev => [...prev, { id: `new_${Date.now()}`, type: '', text: '', positions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }], media: [], uploads: { photo_urls: [], video_urls: [], folder: '' } }]);
   };
 
   const removeDamage = (id: string) => {
-    setConfirmDialog({
-        isOpen: true,
-        title: 'Ta bort skada',
-        text: 'Är du säker på att du vill ta bort denna nya skada?',
-        confirmButtonVariant: 'danger',
-        onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id))
-    });
+    setConfirmDialog({ isOpen: true, title: 'Ta bort skada', text: 'Är du säker på att du vill ta bort denna nya skada?', confirmButtonVariant: 'danger', onConfirm: () => setNewDamages(prev => prev.filter(d => d.id !== id)) });
   };
 
   const addDamagePosition = (damageId: string, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
     const positionsKey = isExisting ? 'userPositions' : 'positions';
-
     updater((prev => prev.map(d => {
         if (d.id !== damageId) return d;
         const newPosition: DamagePosition = { id: `pos-${Date.now()}`, carPart: '', position: '' };
@@ -814,7 +684,6 @@ export default function CheckInForm() {
   const removeDamagePosition = (damageId: string, positionId: string, isExisting: boolean) => {
       const updater = isExisting ? setExistingDamages : setNewDamages;
       const positionsKey = isExisting ? 'userPositions' : 'positions';
-      
       updater((prev => prev.map(d => {
           if (d.id !== damageId) return d;
           if (d[positionsKey].length <= 1) return d;
@@ -825,17 +694,12 @@ export default function CheckInForm() {
   
   const handleLaddningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value === '') {
-        setLaddniva('');
-        return;
-    }
+    if (value === '') { setLaddniva(''); return; }
     const numValue = parseInt(value, 10);
-    if (numValue > 100) {
-        setLaddniva('100');
-    } else {
-        setLaddniva(value);
-    }
+    setLaddniva(numValue > 100 ? '100' : value);
   };
+
+  const activeStatusSections = [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser].filter(Boolean).length;
 
   return (
     <div className="checkin-form">
@@ -843,10 +707,7 @@ export default function CheckInForm() {
       {isFinalSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
       {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
-      <ActionConfirmDialog
-        state={confirmDialog}
-        onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
-      />
+      <ActionConfirmDialog state={confirmDialog} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
       
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
@@ -857,32 +718,10 @@ export default function CheckInForm() {
         <SectionHeader title="Fordon" />
         <div style={{ position: 'relative' }}>
           <Field label="Registreringsnummer *">
-            <input 
-              type="text" 
-              value={regInput} 
-              onChange={(e) => setRegInput(e.target.value)}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-              placeholder="ABC 123" 
-              autoComplete="off" 
-              className="reg-input" 
-            />
+            <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="ABC 123" autoComplete="off" className="reg-input" />
           </Field>
           {showSuggestions && suggestions.length > 0 && (
-            <div className="suggestions-dropdown">
-              {suggestions.map(s => 
-                <div 
-                  key={s} 
-                  className="suggestion-item"
-                  onMouseDown={() => {
-                    setRegInput(s);
-                    setShowSuggestions(false);
-                  }}
-                >
-                  {s}
-                </div>
-              )}
-            </div>
+            <div className="suggestions-dropdown">{suggestions.map(s => <div key={s} className="suggestion-item" onMouseDown={() => { setRegInput(s); setShowSuggestions(false); }}>{s}</div>)}</div>
           )}
         </div>
         {loading && <p>Hämtar fordonsdata...</p>}
@@ -890,9 +729,7 @@ export default function CheckInForm() {
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} />
-              <InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} />
-              <InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
+              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
             </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
@@ -913,118 +750,107 @@ export default function CheckInForm() {
         </div>
       </Card>
 
-      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && !laddniva))}>
+      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && (!laddniva || antalLaddkablar === null)))}>
         <SectionHeader title="Fordonsstatus" />
-        <SubSectionHeader title="Mätarställning" />
-        <Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
-        <SubSectionHeader title="Däck som sitter på" />
-        <Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
-        <SubSectionHeader title="Tankning/Laddning" />
-        <Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
-        {drivmedelstyp === 'bensin_diesel' && (<>
-            <Field label="Tankstatus *"><div className="grid-3-col">
-                <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
-                <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
-                <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null}>Ej upptankad</ChoiceButton>
-            </div></Field>
-            {tankniva === 'tankad_nu' && <div className="grid-3-col">
-                <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
-                <Field label="Bränsletyp *"><div className="fuel-type-buttons">
-                    <ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton>
-                    <ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} isSet={bransletyp !== null}>Diesel</ChoiceButton>
-                </div></Field>
-                <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
-            </div>}
-        </>)}
+        <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
+        <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
+        <SubSectionHeader title="Tankning/Laddning" /><Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
+        {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-3-col">
+          <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
+          <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
+          <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
+        </div></Field>
+        {tankniva === 'tankad_nu' && <div className="grid-3-col">
+          <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
+          <Field label="Bränsletyp *"><div className="fuel-type-buttons"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} isSet={bransletyp !== null}>Diesel</ChoiceButton></div></Field>
+          <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
+        </div>}</>)}
         {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
       </Card>
+
+      {drivmedelstyp === 'elbil' && <Card data-error={showFieldErrors && antalLaddkablar === null}>
+        <SectionHeader title="Elbilsutrustning" />
+        <Field label="Antal laddkablar *"><div className="grid-3-col">
+            <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
+        </div></Field>
+      </Card>}
 
       <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media)))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador att hantera" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
-            ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />) 
+            ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(id, files) => handleMediaUpdate(id, files, true)} onMediaRemove={(id, index) => handleMediaRemove(id, index, true)} onAction={handleExistingDamageAction} onAddPosition={(id) => addDamagePosition(id, true)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, true)} />) 
             : <p>Inga ohanterade befintliga skador.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(id, files) => handleMediaUpdate(id, files, false)} onMediaRemove={(id, index) => handleMediaRemove(id, index, false)} onRemove={removeDamage} onAddPosition={(id) => addDamagePosition(id, false)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
       </Card>
 
-      <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig))) }>
+      <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia)))) }>
         <SectionHeader title="Status & Sanering" />
-        
         <div className="status-section-wrapper">
           <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
-          {behoverRekond && (
-              <div className="damage-details">
-                  <Field label="Typ av rekond *">
-                    <div className="grid-2-col">
-                      <ChoiceButton onClick={() => setRekondUtvandig(!rekondUtvandig)} isActive={rekondUtvandig}>Utvändig</ChoiceButton>
-                      <ChoiceButton onClick={() => setRekondInvandig(!rekondInvandig)} isActive={rekondInvandig}>Invändig</ChoiceButton>
-                    </div>
-                  </Field>
-                  <Field label="Kommentar (frivilligt)"><textarea value={rekondText} onChange={e => setRekondText(e.target.value)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
-                  <div className="media-section">
-                      <MediaUpload id="rekond-photo" onUpload={handleRekondMediaUpdate} hasFile={hasPhoto(rekondMedia)} fileType="image" label="Foto" isOptional={true} />
-                      <MediaUpload id="rekond-video" onUpload={handleRekondMediaUpdate} hasFile={hasVideo(rekondMedia)} fileType="video" label="Video" isOptional={true} />
-                  </div>
-                  <div className="media-previews">
-                      {rekondMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRekondMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
-                  </div>
-              </div>
-          )}
+          {behoverRekond && (<div className="damage-details">
+            <Field label="Typ av rekond *"><div className="grid-2-col">
+              <ChoiceButton onClick={() => setRekondUtvandig(!rekondUtvandig)} isActive={rekondUtvandig}>Utvändig</ChoiceButton>
+              <ChoiceButton onClick={() => setRekondInvandig(!rekondInvandig)} isActive={rekondInvandig}>Invändig</ChoiceButton>
+            </div></Field>
+            <Field label="Kommentar (frivilligt)"><textarea value={rekondText} onChange={e => setRekondText(e.target.value)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
+            <div className="media-section">
+              <MediaUpload id="rekond-photo" onUpload={handleRekondMediaUpdate} hasFile={hasPhoto(rekondMedia)} fileType="image" label="Foto *" />
+              <MediaUpload id="rekond-video" onUpload={handleRekondMediaUpdate} hasFile={hasVideo(rekondMedia)} fileType="video" label="Video" isOptional={true} />
+            </div>
+            <div className="media-previews">{rekondMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRekondMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
+          </div>)}
         </div>
+        {activeStatusSections > 1 && behoveRekond && <hr className="subsection-divider" />}
 
         <div className="status-section-wrapper">
           <ChoiceButton onClick={() => setHusdjurSanerad(!husdjurSanerad)} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur - sanerad</ChoiceButton>
-          {husdjurSanerad && (
-              <div className="damage-details">
-                  <Field label="Kommentar (frivilligt)"><textarea value={husdjurText} onChange={e => setHusdjurText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
-                  <div className="media-section">
-                      <MediaUpload id="husdjur-photo" onUpload={files => setHusdjurMedia(prev => [...prev, ...processFiles(files)])} hasFile={hasPhoto(husdjurMedia)} fileType="image" label="Foto" isOptional={true} />
-                      <MediaUpload id="husdjur-video" onUpload={files => setHusdjurMedia(prev => [...prev, ...processFiles(files)])} hasFile={hasVideo(husdjurMedia)} fileType="video" label="Video" isOptional={true} />
-                  </div>
-              </div>
-          )}
+          {husdjurSanerad && (<div className="damage-details">
+            <Field label="Kommentar (frivilligt)"><textarea value={husdjurText} onChange={e => setHusdjurText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
+            <div className="media-section">
+              <MediaUpload id="husdjur-photo" onUpload={async files => setHusdjurMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasPhoto(husdjurMedia)} fileType="image" label="Foto" isOptional={true} />
+              <MediaUpload id="husdjur-video" onUpload={async files => setHusdjurMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasVideo(husdjurMedia)} fileType="video" label="Video" isOptional={true} />
+            </div>
+          </div>)}
         </div>
+        {activeStatusSections > 1 && husdjurSanerad && (rokningSanerad || varningslampaLyser) && <hr className="subsection-divider" />}
 
         <div className="status-section-wrapper">
           <ChoiceButton onClick={() => setRokningSanerad(!rokningSanerad)} isActive={rokningSanerad} className="rekond-checkbox">Rökning - sanerad</ChoiceButton>
-          {rokningSanerad && (
-              <div className="damage-details">
-                  <Field label="Kommentar (frivilligt)"><textarea value={rokningText} onChange={e => setRokningText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
-                  <div className="media-section">
-                      <MediaUpload id="rokning-photo" onUpload={files => setRokningMedia(prev => [...prev, ...processFiles(files)])} hasFile={hasPhoto(rokningMedia)} fileType="image" label="Foto" isOptional={true} />
-                      <MediaUpload id="rokning-video" onUpload={files => setRokningMedia(prev => [...prev, ...processFiles(files)])} hasFile={hasVideo(rokningMedia)} fileType="video" label="Video" isOptional={true} />
-                  </div>
-              </div>
-          )}
+          {rokningSanerad && (<div className="damage-details">
+            <Field label="Kommentar (frivilligt)"><textarea value={rokningText} onChange={e => setRokningText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
+            <div className="media-section">
+              <MediaUpload id="rokning-photo" onUpload={async files => setRokningMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasPhoto(rokningMedia)} fileType="image" label="Foto" isOptional={true} />
+              <MediaUpload id="rokning-video" onUpload={async files => setRokningMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasVideo(rokningMedia)} fileType="video" label="Video" isOptional={true} />
+            </div>
+          </div>)}
         </div>
-
+        {activeStatusSections > 1 && rokningSanerad && varningslampaLyser && <hr className="subsection-divider" />}
+        
         <div className="status-section-wrapper">
           <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa lyser</ChoiceButton>
-          {varningslampaLyser && (
-              <div className="damage-details">
-                  <div className="field" data-error={showFieldErrors && !varningslampaBeskrivning.trim()}>
-                      <label>Specificera varningslampa *</label>
-                      <textarea value={varningslampaBeskrivning} onChange={e => setVarningslampaBeskrivning(e.target.value)} placeholder="Vilken eller vilka lampor?" rows={2}></textarea>
-                  </div>
-                  <Field label="Uthyrningsstatus *">
-                    <div className="grid-2-col">
-                      <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null}>Går att hyra ut</ChoiceButton>
-                      <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null}>Går INTE att hyra ut</ChoiceButton>
-                    </div>
-                  </Field>
-              </div>
-          )}
+          {varningslampaLyser && (<div className="damage-details">
+            <div className="field" data-error={showFieldErrors && !varningslampaBeskrivning.trim()}>
+              <label>Specificera varningslampa *</label>
+              <textarea value={varningslampaBeskrivning} onChange={e => setVarningslampaBeskrivning(e.target.value)} placeholder="Vilken eller vilka lampor?" rows={2}></textarea>
+            </div>
+            <Field label="Uthyrningsstatus *"><div className="grid-2-col">
+              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null}>Går att hyra ut</ChoiceButton>
+              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null} variant={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut' ? 'danger' : 'default'}>Går INTE att hyra ut</ChoiceButton>
+            </div></Field>
+          </div>)}
         </div>
       </Card>
 
       <Card data-error={showFieldErrors && !isChecklistComplete}>
-        <SubSectionHeader title="Allt måste vara OK för att slutföra" />
+        <SectionHeader title="Checklista" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
           <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd finns</ChoiceButton>
@@ -1045,23 +871,12 @@ export default function CheckInForm() {
           <Field label="Ort *"><select value={bilenStarNuOrt} onChange={e => { setBilenStarNuOrt(e.target.value); setBilenStarNuStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
           <Field label="Station *"><select value={bilenStarNuStation} onChange={e => setBilenStarNuStation(e.target.value)} disabled={!bilenStarNuOrt}><option value="">Välj station</option>{availableStationsBilenStarNu.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
         </div>
-        <Field label="Parkeringsinfo (frivilligt)">
-            <textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea>
-        </Field>
+        <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
       </Card>
 
-      <Card>
-        <Field label="Övriga kommentarer (frivilligt)">
-          <textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar någon annanstans..." rows={4}></textarea>
-        </Field>
-      </Card>
+      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar någon annanstans..." rows={4}></textarea></Field></Card>
 
-      <div className="form-actions">
-        <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
-        <Button onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>
-          {!formIsValidState ? 'Visa saknad information' : 'Slutför incheckning'}
-        </Button>
-      </div>
+      <div className="form-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>{!formIsValidState ? 'Visa saknad information' : 'Slutför incheckning'}</Button></div>
     </div>
   );
 }
@@ -1074,394 +889,229 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => (
-  <button onClick={onClick} className={`btn ${variant} ${className || ''}`} disabled={disabled} style={style}>{children}</button>
-);
-
-const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
-  <>
-    <div className="modal-overlay" />
-    <div className="modal-content success-modal">
-      <div className="success-icon">✓</div>
-      <h3>Tack {firstName}!</h3>
-      <p>Incheckningen har skickats.</p>
-    </div>
-  </>
-);
-
-const SpinnerOverlay = () => (
-    <div className="modal-overlay spinner-overlay">
-        <div className="spinner"></div>
-        <p>Skickar in...</p>
-    </div>
-);
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => (<button onClick={onClick} className={`btn ${variant} ${className || ''}`} disabled={disabled} style={style}>{children}</button>);
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon">✓</div><h3>Tack {firstName}!</h3><p>Incheckningen har skickats.</p></div></>);
+const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
-        
-        return (
-            <div className="confirm-damage-section">
-                <h4>{title}</h4>
-                <ul>
-                    {damages.map((d: any, index: number) => {
-                        let damageString = d.fullText || d.type || d.userType || 'Okänd skada';
-                        
-                        if (title === '✅ Åtgärdade skador' && d.resolvedComment) {
-                             damageString += ` (Kommentar: ${d.resolvedComment})`;
-                        } else {
-                            const positions = d.positions || d.userPositions || [];
-                            if (positions.length > 0) {
-                                const positionsStr = positions.map((p: any) => `${p.carPart} (${p.position})`).filter((s:string) => s !== ' ()').join(', ');
-                                if (positionsStr) {
-                                    damageString += `: ${positionsStr}`;
-                                }
-                            }
-                            const comment = d.text || d.userDescription;
-                            if (comment) {
-                                damageString += ` (${comment})`;
-                            }
-                        }
-
-                        return <li key={d.id || index}>{damageString}</li>;
-                    })}
-                </ul>
-            </div>
-        );
+        return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
+            let damageString = d.fullText || d.type || d.userType || 'Okänd skada';
+            if (title === '✅ Åtgärdade skador' && d.resolvedComment) { damageString += ` (Kommentar: ${d.resolvedComment})`; } else {
+                const positions = (d.positions || d.userPositions || []).map((p: any) => `${p.carPart} (${p.position})`).filter((s:string) => s !== ' ()').join(', ');
+                if (positions) { damageString += `: ${positions}`; }
+                const comment = d.text || d.userDescription;
+                if (comment) { damageString += ` (${comment})`; }
+            }
+            return <li key={d.id || index}>{damageString}</li>;
+        })}</ul></div>);
     };
-
     const getTankningText = () => {
         if (payload.drivmedel === 'bensin_diesel') {
-            const tankText = payload.tankning.tankniva === 'tankad_nu'
-                ? `Upptankad av MABI (${payload.tankning.liters}L ${payload.tankning.bransletyp} @ ${payload.tankning.literpris} kr/L)`
-                : 'Återlämnades fulltankad';
-            return <p>⛽ <strong>Tankning:</strong> {tankText}</p>;
+            if (payload.tankning.tankniva === 'tankad_nu') return <p>⛽ <strong>Tankning:</strong> {`Upptankad av MABI (${payload.tankning.liters}L ${payload.tankning.bransletyp} @ ${payload.tankning.literpris} kr/L)`}</p>;
+            if (payload.tankning.tankniva === 'ej_upptankad') return <p>⛽ <strong>Tankning:</strong> <span style="color: #d97706; font-weight: bold;">Ej upptankad</span></p>;
+            return <p>⛽ <strong>Tankning:</strong> Återlämnades fulltankad</p>;
         }
-        if (payload.drivmedel === 'elbil') {
-            return <p>⚡ <strong>Laddning:</strong> {payload.laddning.laddniva}%</p>;
-        }
+        if (payload.drivmedel === 'elbil') return <p>⚡ <strong>Laddning:</strong> {payload.laddning.laddniva}%</p>;
         return null;
     };
-    
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
 
-    return (
-        <>
-            <div className="modal-overlay" />
-            <div className="modal-content confirm-modal">
-                {showChargeWarning && (
-                    <div className="charge-warning-banner">
-                        Säkerställ att bilen omedelbart sätts på laddning!
-                    </div>
-                )}
-                <div className="confirm-header">
-                    <h3 className="confirm-modal-title">Bekräfta incheckning</h3>
-                    <p className="confirm-vehicle-info">{payload.reg} - {payload.carModel || '---'}</p>
-                    <div className="confirm-warnings-wrapper">
-                        {payload.varningslampa.lyser && (
-                            <p className="warning-highlight">Varningslampa lyser: {payload.varningslampa.beskrivning || 'Ej specificerat'}</p>
-                        )}
-                        {payload.rekond.behoverRekond && (
-                            <p className="warning-highlight rekond-highlight">Behöver rekond!</p>
-                        )}
-                    </div>
-                </div>
-                
-                <div className="confirm-details">
-                    <div className="confirm-summary">
-                        <p>📍 <strong>Incheckad vid:</strong> {payload.ort} / {payload.station}</p>
-                         {payload.bilenStarNu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilenStarNu.ort} / {payload.bilenStarNu.station}</p>}
-                         {payload.bilenStarNu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilenStarNu.kommentar}</small></p>}
-                    </div>
-                    
-                    {renderDamageList(payload.nya_skador, '💥 Nya skador')}
-                    {renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}
-                    {renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
-                    
-                    <div className="confirm-summary">
-                        <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>
-                        {getTankningText()}
-                        <p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
-                        {payload.washed && <p><strong>✅ Tvättad</strong></p>}
-                        {payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
-                    </div>
-                </div>
-
-                <div className="modal-actions">
-                    <Button onClick={onCancel} variant="secondary">Avbryt</Button>
-                    <Button onClick={onConfirm} variant="success">Bekräfta och skicka</Button>
-                </div>
+    return (<><div className="modal-overlay" /><div className="modal-content confirm-modal">
+        {showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
+        <div className="confirm-header">
+            <h3 className="confirm-modal-title">Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.reg} - {payload.carModel || '---'}</p>
+            <div className="confirm-warnings-wrapper">
+                {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa lyser: {payload.varningslampa.beskrivning || 'Ej specificerat'}</p>}
+                {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Behöver rekond!</p>}
             </div>
-        </>
-    );
+        </div>
+        <div className="confirm-details">
+            <div className="confirm-summary">
+                <p>📍 <strong>Incheckad vid:</strong> {payload.ort} / {payload.station}</p>
+                {payload.bilenStarNu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilenStarNu.ort} / {payload.bilenStarNu.station}</p>}
+                {payload.bilenStarNu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilenStarNu.kommentar}</small></p>}
+            </div>
+            {renderDamageList(payload.nya_skador, '💥 Nya skador')}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}{renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
+            <div className="confirm-summary">
+                <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>{getTankningText()}<p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
+                {payload.washed && <p><strong>✅ Tvättad</strong></p>}{payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
+            </div>
+        </div>
+        <div className="modal-actions"><Button onClick={onCancel} variant="secondary">Avbryt</Button><Button onClick={onConfirm} variant="success">Bekräfta och skicka</Button></div>
+    </div></>);
 };
 
 const DamageItem: React.FC<{
   damage: ExistingDamage; index: number; isExisting: boolean;
   onUpdate: (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => void;
-  onMediaUpdate: (id: string, files: FileList, isExisting: boolean) => void;
-  onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
-  onAction?: (id: string, action: 'document' | 'resolve', fullText: string) => void;
-  onRemove?: (id: string) => void;
-  onAddPosition: (damageId: string, isExisting: boolean) => void;
-  onRemovePosition: (damageId: string, positionId: string, isExisting: boolean) => void;
+  onMediaUpdate: (id: string, files: FileList) => void; onMediaRemove: (id: string, index: number) => void;
+  onAction?: (id: string, action: 'document' | 'resolve', fullText: string) => void; onRemove?: (id: string) => void;
+  onAddPosition: (damageId: string) => void; onRemovePosition: (damageId: string, positionId: string) => void;
 }> = ({ damage, index, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
-  const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
-  const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
-
-  const commonProps = {
-    type: isExisting ? (damage as ExistingDamage).userType : (damage as any).type,
-    description: isExisting ? (damage as ExistingDamage).userDescription : (damage as any).text,
-  };
-
-  const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as any).positions;
-
+  const isDocumented = isExisting && damage.status === 'documented';
+  const resolved = isExisting && damage.status === 'resolved';
+  const commonProps = { type: isExisting ? damage.userType : (damage as any).type, description: isExisting ? damage.userDescription : (damage as any).text };
+  const positions = isExisting ? damage.userPositions : (damage as any).positions;
   const headerText = isExisting ? `${index}. ${damage.fullText}` : `Ny skada #${index}`;
 
-  return (
-    <div className={`damage-item ${resolved ? 'resolved' : ''}`}>
-      <div className="damage-item-header">
-        <span>{headerText}</span>
-        {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}
-      </div>
-      {isExisting && onAction && (
-          <div className="damage-item-actions">
-            <Button onClick={() => onAction(damage.id, 'document', damage.fullText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve', damage.fullText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
-          </div>
-        )}
-      {(isDocumented || !isExisting) && !resolved && (
-        <div className="damage-details">
-          <Field label="Typ av skada *">
-            <select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}>
-              <option value="">Välj typ</option>
-              {DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </Field>
-          
-          {positions && positions.map((pos, index) => (
-            <div key={pos.id} className="damage-position-row">
-                <div className="grid-2-col">
-                    <Field label={index === 0 ? "Placering *" : ""}>
-                        <select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)}>
-                            <option value="">Välj del</option>
-                            {Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                    </Field>
-                    <Field label={index === 0 ? "Position *" : ""}>
-                        <select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}>
-                            <option value="">Välj position</option>
-                            {(CAR_PARTS[pos.carPart] || []).map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                    </Field>
-                </div>
-                {positions.length > 1 && (
-                    <button onClick={() => onRemovePosition(damage.id, pos.id, isExisting)} className="remove-position-btn">×</button>
-                )}
+  return (<div className={`damage-item ${resolved ? 'resolved' : ''}`}>
+      <div className="damage-item-header"><span>{headerText}</span>{!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}</div>
+      {isExisting && onAction && (<div className="damage-item-actions">
+        <Button onClick={() => onAction(damage.id, 'document', damage.fullText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
+        <Button onClick={() => onAction(damage.id, 'resolve', damage.fullText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
+      </div>)}
+      {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
+        <Field label="Typ av skada *"><select value={commonProps.type || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></Field>
+        {positions && positions.map((pos, i) => (<div key={pos.id} className="damage-position-row">
+            <div className="grid-2-col">
+                <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+                <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}><option value="">Välj position</option>{(CAR_PARTS[pos.carPart] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
             </div>
-          ))}
-
-          <Button onClick={() => onAddPosition(damage.id, isExisting)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
-          
-          <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan mer i detalj..."></textarea></Field>
-          <div className="media-section">
-            <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
-            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video" : "Video *"} isOptional={isExisting} />
-          </div>
-          <div className="media-previews">
-            {damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
-          </div>
+            {positions.length > 1 && <button onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>}
+        </div>))}
+        <Button onClick={() => onAddPosition(damage.id)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
+        <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan mer i detalj..."></textarea></Field>
+        <div className="media-section">
+          <MediaUpload id={`photo-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
+          <MediaUpload id={`video-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video" : "Video *"} isOptional={isExisting} />
         </div>
-      )}
-    </div>
-  );
+        <div className="media-previews">{damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
+      </div>)}
+    </div>);
 };
 
 const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string, isOptional?: boolean }> = ({ id, onUpload, hasFile, fileType, label, isOptional }) => {
     let className = 'media-label';
-    if (hasFile) {
-        className += ' active';
-    } else if (isOptional) {
-        className += ' optional';
-    } else {
-        className += ' mandatory';
-    }
-
-    const buttonText = hasFile
-        ? `Lägg till ${fileType === 'image' ? 'fler foton' : 'fler videor'}`
-        : label;
-
-    return (
-      <div className="media-upload">
+    if (hasFile) className += ' active';
+    else if (isOptional) className += ' optional';
+    else className += ' mandatory';
+    const buttonText = hasFile ? `Lägg till ${fileType === 'image' ? 'fler foton' : 'fler videor'}` : label;
+    return (<div className="media-upload">
         <label htmlFor={id} className={className}>{buttonText}</label>
         <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
-      </div>
-    );
+    </div>);
 };
 
-const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (
-  <div className="media-btn">
-    {children}
-    {onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}
-  </div>
-);
-
-const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean}> = ({ onClick, isActive, children, className, isSet }) => (
-    <button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${isSet && !isActive ? 'disabled-choice' : ''} ${className || ''}`}>{children}</button>
-);
+const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}</div>);
+const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet, variant='default' }) => (<button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${isSet && !isActive ? 'disabled-choice' : ''} ${className || ''} ${variant}`}>{children}</button>);
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
     if (!state.isOpen) return null;
-
     const handleConfirm = () => {
-        if (state.requiresComment && !comment.trim()) {
-            alert('Kommentar är obligatoriskt.');
-            return;
-        }
+        if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
         state.onConfirm(comment);
         onClose();
     };
-
     const themeClass = state.theme ? `theme-${state.theme}` : '';
-
-    return (
-        <>
-            <div className="modal-overlay" onClick={onClose} />
-            <div className={`modal-content confirm-modal ${themeClass}`}>
-                {state.title && <h3>{state.title}</h3>}
-                <p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
-                {state.requiresComment && (
-                    <div className="field" style={{marginBottom: '1.5rem'}}>
-                        <textarea
-                            value={comment}
-                            onChange={(e) => setComment(e.target.value)}
-                            placeholder="Ange motivering här..."
-                            rows={3}
-                            style={{width: '100%'}}
-                            autoFocus
-                        />
-                    </div>
-                )}
-                <div className="modal-actions">
-                    <Button onClick={onClose} variant="secondary">Avbryt</Button>
-                    <Button 
-                        onClick={handleConfirm} 
-                        variant={state.confirmButtonVariant || 'danger'}
-                        disabled={state.requiresComment && !comment.trim()}
-                    >
-                        Bekräfta
-                    </Button>
-                </div>
-            </div>
-        </>
-    );
+    return (<><div className="modal-overlay" onClick={onClose} /><div className={`modal-content confirm-modal ${themeClass}`}>
+        {state.title && <h3>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
+        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3} style={{width: '100%'}} autoFocus/></div>)}
+        <div className="modal-actions"><Button onClick={onClose} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
+    </div></>);
 };
 
-const GlobalStyles = () => (
-    <style jsx global>{`
-        :root {
-          --color-bg: #f8fafc; --color-card: #ffffff; --color-text: #1f2937; --color-text-secondary: #6b7280;
-          --color-primary: #2563eb; --color-primary-light: #eff6ff; --color-success: #16a34a; --color-success-light: #f0fdf4;
-          --color-danger: #dc2626; --color-danger-light: #fef2f2; --color-warning: #f59e0b; --color-warning-light: #fffbeb;
-          --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
-          --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-        }
-        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
-        .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
-        .main-header { text-align: center; margin-bottom: 1.5rem; }
-        .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
-        .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-        .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
-        .card[data-error="true"] { border: 2px solid var(--color-danger); }
-        .field[data-error="true"] textarea, .field[data-error="true"] select { border: 2px solid var(--color-danger) !important; }
-        .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
-        .section-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; margin:0; }
-        .sub-section-header { margin-top: 2rem; margin-bottom: 1rem; }
-        .sub-section-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-text); margin:0; }
-        .field { margin-bottom: 1rem; }
-        .field label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; }
-        .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; }
-        .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
-        .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
-        .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-        .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
-        .suggestion-item { padding: 0.75rem; cursor: pointer; }
-        .suggestion-item:hover { background-color: var(--color-primary-light); }
-        .error-text { color: var(--color-danger); }
-        .info-box { margin-top: 1rem; padding: 1rem; background-color: var(--color-primary-light); border-radius: 8px; }
-        .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; }
-        .info-label { font-weight: 600; font-size: 0.875rem; color: #1e3a8a; }
-        .info-grid > span { font-size: 0.875rem; align-self: center; }
-        .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
-        .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
-        .damage-list-item { padding-left: 1rem; line-height: 1.4; font-size: 0.875rem;}
-        .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-        .grid-3-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
-        .fuel-type-buttons { display: flex; flex-wrap: wrap; gap: 1rem; }
-        .fuel-type-buttons .choice-btn { flex-grow: 1; }
-        .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 3rem; }
-        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .btn.primary { background-color: var(--color-primary); color: white; }
-        .btn.secondary { background-color: var(--color-border); color: var(--color-text); }
-        .btn.success { background-color: var(--color-success); color: white; }
-        .btn.danger { background-color: var(--color-danger); color: white; }
-        .btn.warning { background-color: var(--color-warning); color: white; }
-        .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
-        .btn:not(:disabled):hover { filter: brightness(1.1); }
-        .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); cursor: pointer; font-weight: 500; transition: all 0.2s; }
-        .choice-btn:hover { filter: brightness(1.05); }
-        .choice-btn.active { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
-        .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
-        .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger-light) !important; color: #9a3412 !important; }
-        .warning-light-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger-light) !important; color: #9a3412 !important; }
-        .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
-        .status-section-wrapper { display: flex; flex-direction: column; margin-bottom: 1.5rem; }
-        .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
-        .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
-        .damage-item.inventoried { background-color: #f9fafb; }
-        .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
-        .damage-item-actions { padding: 0 1rem 1rem 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
-        .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
-        .damage-position-row { position: relative; padding-right: 2.5rem; }
-        .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; }
-        .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
-        .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
-        .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
-        .media-label:hover { filter: brightness(0.95); }
-        .media-label.active { border-style: solid; border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
-        .media-label.mandatory { border-color: var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); }
-        .media-label.optional { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #92400e; }
-        .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
-        .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
-        .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 0; }
-        .remove-media-btn:hover { background-color: #b91c1c; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-        .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
-        .modal-content h3 { margin-top: 0; text-align: center; font-size: 1.25rem; }
-        .modal-content.success-modal { text-align: center; }
-        .modal-content.theme-warning { background-color: var(--color-warning-light); border: 1px solid var(--color-warning); text-align: center; }
-        .success-icon { width: 60px; height: 60px; border-radius: 50%; background-color: var(--color-success); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 1rem; }
-        .confirm-modal { text-align: left; }
-        .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
-        .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
-        .confirm-vehicle-info { font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0 1rem 0; }
-        .confirm-warnings-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-        .confirm-details { }
-        .confirm-summary { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
-        .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
-        .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
-        .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
-        .confirm-damage-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
-        .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
-        .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
-        .confirm-damage-section li { margin-bottom: 0.25rem; }
-        .charge-warning-banner { background-color: var(--color-danger); color: white; font-weight: 700; font-size: 1.25rem; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center; }
-        .spinner-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: 600; }
-        .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--color-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    `}</style>
-)
+const GlobalStyles = () => (<style jsx global>{`
+    :root {
+      --color-bg: #f8fafc; --color-card: #ffffff; --color-text: #1f2937; --color-text-secondary: #6b7280;
+      --color-primary: #2563eb; --color-primary-light: #eff6ff; --color-success: #16a34a; --color-success-light: #f0fdf4;
+      --color-danger: #dc2626; --color-danger-light: #fef2f2; --color-warning: #f59e0b; --color-warning-light: #fffbeb;
+      --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+    .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
+    .main-header { text-align: center; margin-bottom: 1.5rem; }
+    .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
+    .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
+    .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
+    .card[data-error="true"] { border: 2px solid var(--color-danger); }
+    .field[data-error="true"] textarea, .field[data-error="true"] select { border: 2px solid var(--color-danger) !important; }
+    .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
+    .section-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; margin:0; }
+    .sub-section-header { margin-top: 2rem; margin-bottom: 1rem; }
+    .sub-section-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-text); margin:0; }
+    .field { margin-bottom: 1rem; }
+    .field label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; }
+    .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; }
+    .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
+    .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
+    .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
+    .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
+    .suggestion-item { padding: 0.75rem; cursor: pointer; }
+    .suggestion-item:hover { background-color: var(--color-primary-light); }
+    .error-text { color: var(--color-danger); }
+    .info-box { margin-top: 1rem; padding: 1rem; background-color: var(--color-primary-light); border-radius: 8px; }
+    .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1rem; }
+    .info-label { font-weight: 600; font-size: 0.875rem; color: #1e3a8a; }
+    .info-grid > span { font-size: 0.875rem; align-self: center; }
+    .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
+    .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
+    .damage-list-item { padding-left: 0.5rem; line-height: 1.4; font-size: 0.875rem;}
+    .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .grid-3-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    .fuel-type-buttons { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .fuel-type-buttons .choice-btn { flex-grow: 1; }
+    .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 3rem; }
+    .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn.primary { background-color: var(--color-primary); color: white; }
+    .btn.secondary { background-color: var(--color-border); color: var(--color-text); }
+    .btn.success { background-color: var(--color-success); color: white; }
+    .btn.danger { background-color: var(--color-danger); color: white; }
+    .btn.warning { background-color: var(--color-warning); color: white; }
+    .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
+    .btn:not(:disabled):hover { filter: brightness(1.1); }
+    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); cursor: pointer; font-weight: 500; transition: all 0.2s; }
+    .choice-btn:hover { filter: brightness(1.05); }
+    .choice-btn.active.default { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
+    .choice-btn.active.warning { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #b45309; }
+    .choice-btn.active.danger { border-color: var(--color-danger); background-color: var(--color-danger-light); color: #991b1b; }
+    .choice-btn.disabled-choice { border-color: var(--color-border); background-color: var(--color-bg); color: var(--color-disabled); cursor: default; }
+    .rekond-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger-light) !important; color: #9a3412 !important; }
+    .warning-light-checkbox.active { border-color: var(--color-danger) !important; background-color: var(--color-danger-light) !important; color: #9a3412 !important; }
+    .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
+    .status-section-wrapper { display: flex; flex-direction: column; margin-bottom: 1rem; }
+    .subsection-divider { border: 0; height: 1px; background-color: var(--color-border); margin: 1.5rem 0; }
+    .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
+    .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
+    .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
+    .damage-item-actions { padding: 0 1rem 1rem 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--color-border); margin-top: 0.75rem; padding-top: 1rem; }
+    .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
+    .damage-position-row { position: relative; padding-right: 2.5rem; }
+    .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; }
+    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
+    .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
+    .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
+    .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
+    .media-label:hover { filter: brightness(0.95); }
+    .media-label.active { border-style: solid; border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
+    .media-label.mandatory { border-color: var(--color-danger); background-color: var(--color-danger-light); color: var(--color-danger); }
+    .media-label.optional { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #92400e; }
+    .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
+    .media-btn img { width: 100%; height: 100%; object-fit: cover; }
+    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 0; }
+    .remove-media-btn:hover { background-color: #b91c1c; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
+    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
+    .confirm-modal { text-align: left; }
+    .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
+    .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
+    .confirm-vehicle-info { font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0 1rem 0; }
+    .confirm-warnings-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+    .confirm-details { }
+    .confirm-summary { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+    .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+    .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+    .confirm-damage-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
+    .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
+    .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
+    .confirm-damage-section li { margin-bottom: 0.25rem; }
+    .charge-warning-banner { background-color: var(--color-danger); color: white; font-weight: 700; font-size: 1.25rem; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center; }
+    .spinner-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: 600; }
+    .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--color-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+`}</style>);
