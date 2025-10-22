@@ -93,21 +93,22 @@ type ConfirmDialogState = {
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
+// This slugify is for filenames and folder parts, keeping it simple.
 function slugify(str: string): string {
     if (!str) return '';
-    const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:;';
-    const b = 'aaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz------';
+    const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:; '; // Added space
+    const b = 'aaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz-------'; // Space becomes -
     const p = new RegExp(a.split('').join('|'), 'g');
 
     return str.toString().toLowerCase()
-        .replace(/\s+/g, '_') // Replace spaces with _
-        .replace(p, c => b.charAt(a.indexOf(c))) // Replace special characters
-        .replace(/&/g, '_and_') // Replace & with 'and'
-        .replace(/[^\w\-]+/g, '') // Remove all non-word chars
-        .replace(/__+/g, '_') // Replace multiple _ with single _
-        .replace(/^_/, '') // Trim _ from start of text
-        .replace(/_$/, ''); // Trim _ from end of text
+        .replace(p, c => b.charAt(a.indexOf(c)))
+        .replace(/&/g, '-and-')
+        .replace(/[^\w\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-/, '')
+        .replace(/_$/, '');
 }
+
 
 const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'HH-MM') => {
     const year = date.getFullYear();
@@ -259,15 +260,13 @@ export default function CheckInForm() {
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
         for (const d of newDamages) {
-            // CORRECTED: Video IS mandatory again.
-            if (!d.type || !hasPhoto(d.media) || !hasVideo(d.media)) return false;
-            for (const p of d.positions) {
-                if (!p.carPart) return false;
-            }
+            // CORRECTED: Video IS mandatory again. Position is now also mandatory.
+            if (!d.type || !hasPhoto(d.media) || !hasVideo(d.media) || d.positions.some(p => !p.carPart || !p.position)) return false;
         }
     }
     
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media))) return false;
+    // CORRECTED: Position is now also mandatory for inventoried damages.
+    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media))) return false;
 
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     if (behoverRekond && !hasPhoto(rekondMedia)) return false;
@@ -452,19 +451,22 @@ export default function CheckInForm() {
         const incheckningsdatum = formatDate(now, 'YYYYMMDD');
         const sluggedIncheckare = slugify(incheckare);
 
+        const buildPath = (parts: string[]) => parts.map(slugify).join('/');
+
         // --- Handle Inventoried Legacy Damages ---
         const legacyDamagesForUpload = existingDamages.filter(d => d.status === 'documented');
         const finalLegacyDamages = await Promise.all(legacyDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
             const dateEventFolderName = `${normalizedReg} - ${skadedatum}`;
-            const eventFolderName = `${slugify(damage.userType || 'skada')}_${slugify(damage.userPositions[0]?.carPart || '')}_${slugify(damage.userPositions[0]?.position || '')}_${sluggedIncheckare}`;
+            const eventFolderName = `${skadedatum} - ${damage.userType} - incheckad ${incheckningsdatum} - ${incheckare}`;
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
-                const fileName = `${normalizedReg}_${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(damage.userType || 'skada')}_${mediaIndex++}`;
+                const positionString = damage.userPositions.map(p => `${p.carPart}-${p.position}`).join('_');
+                const fileName = `${normalizedReg} - ${skadedatum} - ${slugify(damage.userType || '')}-${slugify(positionString)}_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
@@ -481,13 +483,14 @@ export default function CheckInForm() {
         const finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const dateEventFolderName = `${normalizedReg} - ${incheckningsdatum}`;
-            const eventFolderName = `${slugify(damage.type)}_${slugify(damage.positions[0]?.carPart || '')}_${slugify(damage.positions[0]?.position || '')}_${sluggedIncheckare}`;
+            const positionString = damage.positions.map(p => `${p.carPart}-${p.position}`).join('_');
+            const eventFolderName = `${incheckningsdatum}-${damage.type}-${positionString}-${incheckare}`;
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
-                const fileName = `${normalizedReg}_${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(damage.type)}_${mediaIndex++}`;
+                const fileName = `${normalizedReg} - ${incheckningsdatum} - ${slugify(damage.type)}-${slugify(positionString)}_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
@@ -504,13 +507,13 @@ export default function CheckInForm() {
         if (behoverRekond) {
             const rekondUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const dateEventFolderName = `${normalizedReg} - ${incheckningsdatum}`;
-            const eventFolderName = `REKOND_${sluggedIncheckare}`;
+            const eventFolderName = `REKOND - ${incheckare}`;
             const rekondPath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             rekondUploads.folder = rekondPath;
 
             let mediaIndex = 1;
             for (const media of rekondMedia) {
-                const fileName = `${normalizedReg}_${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_rekond_${mediaIndex++}`;
+                const fileName = `${normalizedReg} - ${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_rekond_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${rekondPath}/${fileName}.${ext}`);
                 if (media.type === 'image') rekondUploads.photo_urls.push(url);
@@ -527,7 +530,7 @@ export default function CheckInForm() {
         for (const damage of resolvedLegacyDamages) {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
             const dateEventFolderName = `${normalizedReg} - ${skadedatum}`;
-            const eventFolderName = `ATGARDAD_${slugify(damage.fullText)}_${sluggedIncheckare}`;
+            const eventFolderName = `ÅTGÄRDAD - ${damage.fullText} - incheckad ${incheckningsdatum} - ${incheckare}`;
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
@@ -862,7 +865,7 @@ export default function CheckInForm() {
         {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media)))}>
+      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media)))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador att hantera" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
@@ -1131,7 +1134,7 @@ const DamageItem: React.FC<{
                             {Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                     </Field>
-                    <Field label={index === 0 ? "Position" : ""}>
+                    <Field label={index === 0 ? "Position *" : ""}>
                         <select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}>
                             <option value="">Välj position</option>
                             {(CAR_PARTS[pos.carPart] || []).map(p => <option key={p} value={p}>{p}</option>)}
@@ -1150,7 +1153,7 @@ const DamageItem: React.FC<{
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
             {/* CORRECTED: Video is mandatory for NEW damages, optional for EXISTING. */}
-            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label="Video *" isOptional={isExisting} />
+            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video" : "Video *"} isOptional={isExisting} />
           </div>
           <div className="media-previews">
             {damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
