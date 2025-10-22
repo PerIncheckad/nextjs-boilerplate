@@ -806,30 +806,28 @@ export default function CheckInForm() {
           <Field label="Bränsletyp *"><div className="fuel-type-buttons"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} isSet={bransletyp !== null}>Diesel</ChoiceButton></div></Field>
           <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
         </div>}</>)}
-        {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
-      </Card>
-
-      {drivmedelstyp === 'elbil' && <Card data-error={showFieldErrors && antalLaddkablar === null}>
-        <SectionHeader title="Elbilsutrustning" />
-        <Field label="Antal laddkablar *"><div className="grid-3-col">
+        {drivmedelstyp === 'elbil' && (<>
+          <Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>
+          <Field label="Antal laddkablar *"><div className="grid-3-col">
             <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
             <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
             <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
-        </div></Field>
-      </Card>}
+          </div></Field>
+        </>)}
+      </Card>
 
       <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media)))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador att hantera" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
-            ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(id, files) => handleMediaUpdate(id, files, true)} onMediaRemove={(id, index) => handleMediaRemove(id, index, true)} onAction={handleExistingDamageAction} onAddPosition={(id) => addDamagePosition(id, true)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, true)} />) 
+            ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(positionId) => removeDamagePosition(d.id, positionId, true)} />) 
             : <p>Inga ohanterade befintliga skador.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(id, files) => handleMediaUpdate(id, files, false)} onMediaRemove={(id, index) => handleMediaRemove(id, index, false)} onRemove={removeDamage} onAddPosition={(id) => addDamagePosition(id, false)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(positionId) => removeDamagePosition(d.id, positionId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia)))) }>
@@ -989,9 +987,9 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
 const DamageItem: React.FC<{
   damage: ExistingDamage; index: number; isExisting: boolean;
   onUpdate: (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => void;
-  onMediaUpdate: (id: string, files: FileList) => void; onMediaRemove: (id: string, index: number) => void;
+  onMediaUpdate: (files: FileList) => void; onMediaRemove: (index: number) => void;
   onAction?: (id: string, action: 'document' | 'resolve', fullText: string) => void; onRemove?: (id: string) => void;
-  onAddPosition: (damageId: string) => void; onRemovePosition: (damageId: string, positionId: string) => void;
+  onAddPosition: () => void; onRemovePosition: (positionId: string) => void;
 }> = ({ damage, index, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
   const isDocumented = isExisting && damage.status === 'documented';
   const resolved = isExisting && damage.status === 'resolved';
