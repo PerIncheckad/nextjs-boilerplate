@@ -4,18 +4,12 @@ import { supabase } from './supabase';
 // 1. TYPE DEFINITIONS
 // =================================================================
 
-type ExternalDamage = {
-  id: number; // === ÄNDRING: ID måste vara med ===
-  damage_type_raw: string | null;
-  note_customer: string | null;
-  note_internal: string | null;
-  saludatum: string | null;
-};
-
-// === ÄNDRING: Ny typ för att skicka till formuläret ===
-export type FormattedDamage = {
-  id: number;
-  text: string;
+// Represents a damage entry from the new, "smart" database function.
+export type ConsolidatedDamage = {
+  id: number;                   // The database ID from either the legacy table or the new damages table
+  text: string;                 // The final, user-friendly text to be displayed
+  damage_date: string | null;   // The original damage date from the legacy data (YYYY-MM-DD)
+  is_inventoried: boolean;      // True if this legacy damage has already been documented by a user
 };
 
 export type VehicleInfo = {
@@ -23,35 +17,13 @@ export type VehicleInfo = {
   model: string;
   wheel_storage_location: string;
   saludatum: string;
-  existing_damages: FormattedDamage[]; // === ÄNDRING: Använder den nya typen ===
+  existing_damages: ConsolidatedDamage[]; // Use the new, smarter type
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
 };
 
 // =================================================================
 // 2. HELPER FUNCTIONS
 // =================================================================
-
-// === ÄNDRING: Returnerar nu ett objekt med både ID och text ===
-function formatDamages(damages: ExternalDamage[]): FormattedDamage[] {
-  if (!damages || damages.length === 0) {
-    return [];
-  }
-  return damages.map((damage) => {
-    const parts = [
-      damage.damage_type_raw,
-      damage.note_customer,
-      damage.note_internal,
-    ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
-    const uniqueParts = [...new Set(parts)];
-    const damageString = uniqueParts.join(' - ');
-    if (!damageString) return null;
-    
-    return {
-      id: damage.id,
-      text: damageString,
-    };
-  }).filter(Boolean) as FormattedDamage[];
-}
 
 function formatModel(brand: string | null, model: string | null): string {
     const cleanBrand = brand?.trim();
@@ -78,42 +50,46 @@ function formatSaludatum(dateStr: string | null | undefined): string {
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
+  // Perform both data fetches simultaneously for efficiency
   const [vehicleResponse, damagesResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
-      .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr })
+      .rpc('get_consolidated_damages', { p_regnr: cleanedRegnr }) // <<< NEW "SMART" FUNCTION
   ]);
 
   const vehicleData = vehicleResponse.data?.[0] || null; 
-  const damagesData = damagesResponse.data || [];
+  const damagesData: ConsolidatedDamage[] = damagesResponse.data || [];
 
-  const formattedDamages = formatDamages(damagesData as ExternalDamage[]); // === ÄNDRING: Tydliggör typen ===
-  const latestSaludatum = damagesData.length > 0 ? damagesData[0].saludatum : null;
+  // Extract the latest saludatum from the damages list if available
+  const latestSaludatum = damagesData.length > 0 ? damagesData[0].damage_date : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
   if (vehicleData) {
+    // Full match: We found the vehicle in the master list.
     return {
       regnr: cleanedRegnr,
       model: formatModel(vehicleData.brand, vehicleData.model),
       wheel_storage_location: vehicleData.wheel_storage_location || 'Ingen information',
       saludatum: finalSaludatum,
-      existing_damages: formattedDamages,
+      existing_damages: damagesData, // Return the consolidated list directly
       status: 'FULL_MATCH',
     };
   }
 
   if (damagesData.length > 0) {
+    // Partial match: Vehicle not in master list, but legacy damages were found.
     return {
       regnr: cleanedRegnr,
       model: 'Modell saknas',
       wheel_storage_location: 'Ingen information',
       saludatum: finalSaludatum,
-      existing_damages: formattedDamages,
+      existing_damages: damagesData, // Return the consolidated list directly
       status: 'PARTIAL_MATCH_DAMAGE_ONLY',
     };
   }
 
+  // No match: Nothing found anywhere for this registration number.
   return {
     regnr: cleanedRegnr,
     model: 'Modell saknas',
