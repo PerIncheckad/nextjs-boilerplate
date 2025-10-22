@@ -118,6 +118,9 @@ function generateBilkontrollBody(meta: Record<string, any>): string {
         body += `<p><strong>Tankning:</strong> ${tankText}</p>`;
     } else if (meta.drivmedel === 'elbil') {
         body += `<p><strong>Laddning:</strong> ${meta.laddning.laddniva}%</p>`;
+        if (meta.laddning.antal_laddkablar !== null) {
+            body += `<p><strong>Antal laddkablar:</strong> ${meta.laddning.antal_laddkablar}</p>`;
+        }
     }
 
     if (meta.varningslampa.lyser) {
