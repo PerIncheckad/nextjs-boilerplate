@@ -259,6 +259,7 @@ export default function CheckInForm() {
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
         for (const d of newDamages) {
+            // CORRECTED: Video IS mandatory again.
             if (!d.type || !hasPhoto(d.media) || !hasVideo(d.media)) return false;
             for (const p of d.positions) {
                 if (!p.carPart) return false;
@@ -457,13 +458,13 @@ export default function CheckInForm() {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
             const dateEventFolderName = `${normalizedReg} - ${skadedatum}`;
-            const eventFolderName = `INVENTERING_${slugify(damage.userType || 'skada')}_${sluggedIncheckare}`;
+            const eventFolderName = `${slugify(damage.userType || 'skada')}_${slugify(damage.userPositions[0]?.carPart || '')}_${slugify(damage.userPositions[0]?.position || '')}_${sluggedIncheckare}`;
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
-                const fileName = `${normalizedReg}_${skadedatum}_inventerad-${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(damage.userType || 'skada')}_${mediaIndex++}`;
+                const fileName = `${normalizedReg}_${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(damage.userType || 'skada')}_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
@@ -480,7 +481,7 @@ export default function CheckInForm() {
         const finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const dateEventFolderName = `${normalizedReg} - ${incheckningsdatum}`;
-            const eventFolderName = `NY_SKADA_${slugify(damage.type)}_${sluggedIncheckare}`;
+            const eventFolderName = `${slugify(damage.type)}_${slugify(damage.positions[0]?.carPart || '')}_${slugify(damage.positions[0]?.position || '')}_${sluggedIncheckare}`;
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
@@ -861,7 +862,7 @@ export default function CheckInForm() {
         {drivmedelstyp === 'elbil' && (<Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media)))}>
+      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media)))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador att hantera" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
@@ -1148,7 +1149,8 @@ const DamageItem: React.FC<{
           <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan mer i detalj..."></textarea></Field>
           <div className="media-section">
             <MediaUpload id={`photo-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
-            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video (frivilligt)" : "Video *"} isOptional={isExisting} />
+            {/* CORRECTED: Video is mandatory for NEW damages, optional for EXISTING. */}
+            <MediaUpload id={`video-${damage.id}`} onUpload={files => onMediaUpdate(damage.id, files, isExisting)} hasFile={hasVideo(damage.media)} fileType="video" label="Video *" isOptional={isExisting} />
           </div>
           <div className="media-previews">
             {damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i, isExisting)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}
