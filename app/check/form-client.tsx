@@ -296,7 +296,12 @@ export default function CheckInForm() {
   ]);
 
   const finalPayloadForUI = useMemo(() => ({
-      reg: normalizedReg, carModel: vehicleData?.model, matarstallning, hjultyp, 
+      regnr: normalizedReg,
+      incheckare: firstName,
+      timestamp: new Date().toISOString(),
+      carModel: vehicleData?.model, 
+      matarstallning, 
+      hjultyp, 
       rekond: {
         behoverRekond,
         utvandig: rekondUtvandig,
@@ -316,23 +321,25 @@ export default function CheckInForm() {
         beskrivning: varningslampaBeskrivning,
         uthyrningsstatus: varningslampaUthyrningsstatus
       },
-      drivmedel: drivmedelstyp, tankning: { tankniva, liters, bransletyp, literpris },
+      drivmedel: drivmedelstyp, 
+      tankning: { tankniva, liters, bransletyp, literpris },
       laddning: { laddniva, antal_laddkablar: antalLaddkablar },
       ort,
       station,
-      bilenStarNu: { ort: bilenStarNuOrt, station: bilenStarNuStation, kommentar: bilenStarNuKommentar },
+      bilen_star_nu: { ort: bilenStarNuOrt, station: bilenStarNuStation, kommentar: bilenStarNuKommentar },
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
+      notering: preliminarAvslutNotering,
   }), [
-    normalizedReg, vehicleData, matarstallning, hjultyp, behoverRekond, rekondUtvandig, rekondInvandig, rekondText,
+    normalizedReg, firstName, vehicleData, matarstallning, hjultyp, behoverRekond, rekondUtvandig, rekondInvandig, rekondText,
     husdjurSanerad, husdjurText, rokningSanerad, rokningText,
     varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
     drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
-    newDamages, existingDamages, washed, otherChecklistItemsOK
+    newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering
   ]);
 
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -491,14 +498,13 @@ export default function CheckInForm() {
         const reg = normalizedReg;
 
         // --- Handle Inventoried Legacy Damages ---
-        const legacyDamagesForUpload = existingDamages.filter(d => d.status === 'documented');
-        const finalLegacyDamages = await Promise.all(legacyDamagesForUpload.map(async (damage) => {
-            const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+        const legacyDamagesForUpload = finalPayloadForUI.dokumenterade_skador;
+        await Promise.all(legacyDamagesForUpload.map(async (damage) => {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
             const dateEventFolderName = slugify(`${reg} - ${skadedatum}`);
             const eventFolderName = slugify(`${skadedatum} - ${damage.userType} - incheckad ${incheckningsdatum} - ${incheckare}`);
             const damagePath = `${reg}/${dateEventFolderName}/${eventFolderName}`;
-            damageUploads.folder = damagePath;
+            damage.uploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
@@ -506,33 +512,30 @@ export default function CheckInForm() {
                 const fileName = slugify(`${reg} - ${skadedatum} - ${damage.userType}-${positionString}`) + `_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
-                if (media.type === 'image') damageUploads.photo_urls.push(url);
-                else damageUploads.video_urls.push(url);
+                if (media.type === 'image') damage.uploads.photo_urls.push(url);
+                else damage.uploads.video_urls.push(url);
             }
             if (damage.userDescription) await uploadOne(createCommentFile(damage.userDescription), `${damagePath}/kommentar.txt`);
-            return { ...damage, uploads: damageUploads };
         }));
 
         // --- Handle New Damages ---
-        const newDamagesForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
-        const finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
-            const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+        const newDamagesForUpload = finalPayloadForUI.nya_skador;
+        await Promise.all(newDamagesForUpload.map(async (damage) => {
             const dateEventFolderName = slugify(`${reg} - ${incheckningsdatum}`);
             const positionString = damage.positions.map(p => `${p.carPart}-${p.position}`).join('_');
             const eventFolderName = slugify(`${incheckningsdatum}-${damage.type}-${positionString}-${incheckare}`);
             const damagePath = `${reg}/${dateEventFolderName}/${eventFolderName}`;
-            damageUploads.folder = damagePath;
+            damage.uploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
                 const fileName = slugify(`${reg} - ${incheckningsdatum} - ${damage.type}-${positionString}`) + `_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
-                if (media.type === 'image') damageUploads.photo_urls.push(url);
-                else damageUploads.video_urls.push(url);
+                if (media.type === 'image') damage.uploads.photo_urls.push(url);
+                else damage.uploads.video_urls.push(url);
             }
             if (damage.text) await uploadOne(createCommentFile(damage.text), `${damagePath}/kommentar.txt`);
-            return { ...damage, uploads: damageUploads };
         }));
 
         const processSaneringEvent = async (
@@ -542,11 +545,8 @@ export default function CheckInForm() {
             text: string,
             rekondTypes?: { utvandig: boolean, invandig: boolean }
         ) => {
-            if (!isEnabled) return null;
-
-            const uploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+            if (!isEnabled) return;
             const dateEventFolderName = slugify(`${reg} - ${incheckningsdatum}`);
-            
             let typeString = type;
             if (type === 'REKOND' && rekondTypes) {
                 const types = [];
@@ -557,26 +557,22 @@ export default function CheckInForm() {
 
             const eventFolderName = slugify(`${typeString} - ${incheckare}`);
             const path = `${reg}/${dateEventFolderName}/${eventFolderName}`;
-            uploads.folder = path;
-
+            
             let mediaIndex = 1;
             for (const m of media) {
                 const fileName = slugify(`${reg} - ${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${type}`) + `_${mediaIndex++}`;
                 const ext = m.file.name.split('.').pop();
-                const url = await uploadOne(m.file, `${path}/${fileName}.${ext}`);
-                if (m.type === 'image') uploads.photo_urls.push(url);
-                else uploads.video_urls.push(url);
+                await uploadOne(m.file, `${path}/${fileName}.${ext}`);
             }
             if (text) await uploadOne(createCommentFile(text), `${path}/kommentar.txt`);
-            return uploads;
         };
         
-        const rekondUploadResults = await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, { utvandig: rekondUtvandig, invandig: rekondInvandig });
-        const husdjurUploadResults = await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText);
-        const rokningUploadResults = await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText);
+        await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, { utvandig: rekondUtvandig, invandig: rekondInvandig });
+        await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText);
+        await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText);
 
         // --- Handle Resolved Damages ---
-        const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
+        const resolvedLegacyDamages = finalPayloadForUI.åtgärdade_skador;
         for (const damage of resolvedLegacyDamages) {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
             const dateEventFolderName = slugify(`${reg} - ${skadedatum}`);
@@ -584,10 +580,8 @@ export default function CheckInForm() {
             const damagePath = `${reg}/${dateEventFolderName}/${eventFolderName}`;
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
-
-        const submissionPayload = { ...finalPayloadForUI, regnr: reg, incheckare: firstName, timestamp: new Date().toISOString() };
       
-        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, htmlBody: '', meta: submissionPayload });
+        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, htmlBody: '', meta: finalPayloadForUI });
 
         setShowSuccessModal(true);
         setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
@@ -954,7 +948,13 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             if (payload.tankning.tankniva === 'ej_upptankad') return <p>⛽ <strong>Tankning:</strong> <span style={{color: '#d97706', fontWeight: 'bold'}}>Ej upptankad</span></p>;
             return <p>⛽ <strong>Tankning:</strong> Återlämnades fulltankad</p>;
         }
-        if (payload.drivmedel === 'elbil') return <p>⚡ <strong>Laddning:</strong> {payload.laddning.laddniva}%</p>;
+        if (payload.drivmedel === 'elbil') {
+            let text = `⚡ Laddning: ${payload.laddning.laddniva}%`;
+            if (payload.laddning.antal_laddkablar !== null) {
+                text += ` | Kablar: ${payload.laddning.antal_laddkablar}`;
+            }
+            return <p><strong>{text}</strong></p>;
+        }
         return null;
     };
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
@@ -962,7 +962,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     return (<><div className="modal-overlay" /><div className="modal-content confirm-modal">
         {showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
         <div className="confirm-header">
-            <h3 className="confirm-modal-title">Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.reg} - {payload.carModel || '---'}</p>
+            <h3 className="confirm-modal-title">Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
             <div className="confirm-warnings-wrapper">
                 {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa lyser: {payload.varningslampa.beskrivning || 'Ej specificerat'}</p>}
                 {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Behöver rekond!</p>}
@@ -971,8 +971,8 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
         <div className="confirm-details">
             <div className="confirm-summary">
                 <p>📍 <strong>Incheckad vid:</strong> {payload.ort} / {payload.station}</p>
-                {payload.bilenStarNu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilenStarNu.ort} / {payload.bilenStarNu.station}</p>}
-                {payload.bilenStarNu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilenStarNu.kommentar}</small></p>}
+                {payload.bilen_star_nu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilen_star_nu.ort} / {payload.bilen_star_nu.station}</p>}
+                {payload.bilen_star_nu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilen_star_nu.kommentar}</small></p>}
             </div>
             {renderDamageList(payload.nya_skador, '💥 Nya skador')}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}{renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
             <div className="confirm-summary">
@@ -989,7 +989,7 @@ const DamageItem: React.FC<{
   onUpdate: (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => void;
   onMediaUpdate: (files: FileList) => void; onMediaRemove: (index: number) => void;
   onAction?: (id: string, action: 'document' | 'resolve', fullText: string) => void; onRemove?: (id: string) => void;
-  onAddPosition: () => void; onRemovePosition: (positionId: string) => void;
+  onAddPosition: (damageId: string) => void; onRemovePosition: (damageId: string, positionId: string) => void;
 }> = ({ damage, index, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
   const isDocumented = isExisting && damage.status === 'documented';
   const resolved = isExisting && damage.status === 'resolved';
