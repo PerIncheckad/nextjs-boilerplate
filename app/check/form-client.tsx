@@ -663,6 +663,47 @@ export default function CheckInForm() {
     }));
   };
 
+  const handleMediaUpdate = async (id: string, files: FileList, isExisting: boolean) => {
+    const processed = await processFiles(files);
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    updater((damages: any[]) => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
+  };
+  
+  const handleRekondMediaUpdate = async (files: FileList) => {
+    const processed = await processFiles(files);
+    setRekondMedia(prev => [...prev, ...processed]);
+  };
+  
+  const handleHusdjurMediaUpdate = async (files: FileList) => {
+    const processed = await processFiles(files);
+    setHusdjurMedia(prev => [...prev, ...processed]);
+  };
+  
+  const handleRokningMediaUpdate = async (files: FileList) => {
+    const processed = await processFiles(files);
+    setRokningMedia(prev => [...prev, ...processed]);
+  };
+
+  const handleMediaRemove = (id: string, index: number, isExisting: boolean) => {
+    const updater = isExisting ? setExistingDamages : setNewDamages;
+    updater((damages: any[]) => damages.map(d => {
+      if (d.id !== id) return d;
+      const newMedia = [...(d.media || [])];
+      newMedia.splice(index, 1);
+      return { ...d, media: newMedia };
+    }));
+  };
+  
+  const handleRekondMediaRemove = (index: number) => {
+    setRekondMedia(prev => { const newMedia = [...prev]; newMedia.splice(index, 1); return newMedia; });
+  };
+  const handleHusdjurMediaRemove = (index: number) => {
+    setHusdjurMedia(prev => { const newMedia = [...prev]; newMedia.splice(index, 1); return newMedia; });
+  };
+  const handleRokningMediaRemove = (index: number) => {
+    setRokningMedia(prev => { const newMedia = [...prev]; newMedia.splice(index, 1); return newMedia; });
+  };
+
   const addDamage = () => {
     setNewDamages(prev => [...prev, { id: `new_${Date.now()}`, type: '', text: '', positions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }], media: [], uploads: { photo_urls: [], video_urls: [], folder: '' } }]);
   };
@@ -808,16 +849,17 @@ export default function CheckInForm() {
             <div className="media-previews">{rekondMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRekondMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
           </div>)}
         </div>
-        {activeStatusSections > 1 && behoveRekond && <hr className="subsection-divider" />}
+        {activeStatusSections > 1 && behoverRekond && <hr className="subsection-divider" />}
 
         <div className="status-section-wrapper">
           <ChoiceButton onClick={() => setHusdjurSanerad(!husdjurSanerad)} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur - sanerad</ChoiceButton>
           {husdjurSanerad && (<div className="damage-details">
             <Field label="Kommentar (frivilligt)"><textarea value={husdjurText} onChange={e => setHusdjurText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
             <div className="media-section">
-              <MediaUpload id="husdjur-photo" onUpload={async files => setHusdjurMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasPhoto(husdjurMedia)} fileType="image" label="Foto" isOptional={true} />
-              <MediaUpload id="husdjur-video" onUpload={async files => setHusdjurMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasVideo(husdjurMedia)} fileType="video" label="Video" isOptional={true} />
+              <MediaUpload id="husdjur-photo" onUpload={handleHusdjurMediaUpdate} hasFile={hasPhoto(husdjurMedia)} fileType="image" label="Foto" isOptional={true} />
+              <MediaUpload id="husdjur-video" onUpload={handleHusdjurMediaUpdate} hasFile={hasVideo(husdjurMedia)} fileType="video" label="Video" isOptional={true} />
             </div>
+            <div className="media-previews">{husdjurMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleHusdjurMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
           </div>)}
         </div>
         {activeStatusSections > 1 && husdjurSanerad && (rokningSanerad || varningslampaLyser) && <hr className="subsection-divider" />}
@@ -827,9 +869,10 @@ export default function CheckInForm() {
           {rokningSanerad && (<div className="damage-details">
             <Field label="Kommentar (frivilligt)"><textarea value={rokningText} onChange={e => setRokningText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
             <div className="media-section">
-              <MediaUpload id="rokning-photo" onUpload={async files => setRokningMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasPhoto(rokningMedia)} fileType="image" label="Foto" isOptional={true} />
-              <MediaUpload id="rokning-video" onUpload={async files => setRokningMedia(prev => [...prev, ...await processFiles(files)])} hasFile={hasVideo(rokningMedia)} fileType="video" label="Video" isOptional={true} />
+              <MediaUpload id="rokning-photo" onUpload={handleRokningMediaUpdate} hasFile={hasPhoto(rokningMedia)} fileType="image" label="Foto" isOptional={true} />
+              <MediaUpload id="rokning-video" onUpload={handleRokningMediaUpdate} hasFile={hasVideo(rokningMedia)} fileType="video" label="Video" isOptional={true} />
             </div>
+             <div className="media-previews">{rokningMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRokningMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
           </div>)}
         </div>
         {activeStatusSections > 1 && rokningSanerad && varningslampaLyser && <hr className="subsection-divider" />}
@@ -910,7 +953,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     const getTankningText = () => {
         if (payload.drivmedel === 'bensin_diesel') {
             if (payload.tankning.tankniva === 'tankad_nu') return <p>⛽ <strong>Tankning:</strong> {`Upptankad av MABI (${payload.tankning.liters}L ${payload.tankning.bransletyp} @ ${payload.tankning.literpris} kr/L)`}</p>;
-            if (payload.tankning.tankniva === 'ej_upptankad') return <p>⛽ <strong>Tankning:</strong> <span style="color: #d97706; font-weight: bold;">Ej upptankad</span></p>;
+            if (payload.tankning.tankniva === 'ej_upptankad') return <p>⛽ <strong>Tankning:</strong> <span style={{color: '#d97706', fontWeight: 'bold'}}>Ej upptankad</span></p>;
             return <p>⛽ <strong>Tankning:</strong> Återlämnades fulltankad</p>;
         }
         if (payload.drivmedel === 'elbil') return <p>⚡ <strong>Laddning:</strong> {payload.laddning.laddniva}%</p>;
@@ -995,7 +1038,7 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
 };
 
 const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}</div>);
-const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet, variant='default' }) => (<button onClick={onClick} className={`choice-btn ${isActive ? 'active' : ''} ${isSet && !isActive ? 'disabled-choice' : ''} ${className || ''} ${variant}`}>{children}</button>);
+const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet, variant='default' }) => (<button onClick={onClick} className={`choice-btn ${isActive ? `active ${variant}` : ''} ${isSet && !isActive ? 'disabled-choice' : ''} ${className || ''}`}>{children}</button>);
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
