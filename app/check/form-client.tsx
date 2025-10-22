@@ -449,24 +449,21 @@ export default function CheckInForm() {
         const now = new Date();
         const incheckare = firstName || 'Okand';
         const incheckningsdatum = formatDate(now, 'YYYYMMDD');
-        const sluggedIncheckare = slugify(incheckare);
-
-        const buildPath = (parts: string[]) => parts.map(slugify).join('/');
-
+        
         // --- Handle Inventoried Legacy Damages ---
         const legacyDamagesForUpload = existingDamages.filter(d => d.status === 'documented');
         const finalLegacyDamages = await Promise.all(legacyDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
-            const dateEventFolderName = `${normalizedReg} - ${skadedatum}`;
-            const eventFolderName = `${skadedatum} - ${damage.userType} - incheckad ${incheckningsdatum} - ${incheckare}`;
+            const dateEventFolderName = slugify(`${normalizedReg} - ${skadedatum}`);
+            const eventFolderName = slugify(`${skadedatum} - ${damage.userType} - incheckad ${incheckningsdatum} - ${incheckare}`);
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
                 const positionString = damage.userPositions.map(p => `${p.carPart}-${p.position}`).join('_');
-                const fileName = `${normalizedReg} - ${skadedatum} - ${slugify(damage.userType || '')}-${slugify(positionString)}_${mediaIndex++}`;
+                const fileName = slugify(`${normalizedReg} - ${skadedatum} - ${damage.userType}-${positionString}`) + `_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
@@ -482,15 +479,15 @@ export default function CheckInForm() {
         const newDamagesForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
         const finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
-            const dateEventFolderName = `${normalizedReg} - ${incheckningsdatum}`;
+            const dateEventFolderName = slugify(`${normalizedReg} - ${incheckningsdatum}`);
             const positionString = damage.positions.map(p => `${p.carPart}-${p.position}`).join('_');
-            const eventFolderName = `${incheckningsdatum}-${damage.type}-${positionString}-${incheckare}`;
+            const eventFolderName = slugify(`${incheckningsdatum}-${damage.type}-${positionString}-${incheckare}`);
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
-                const fileName = `${normalizedReg} - ${incheckningsdatum} - ${slugify(damage.type)}-${slugify(positionString)}_${mediaIndex++}`;
+                const fileName = slugify(`${normalizedReg} - ${incheckningsdatum} - ${damage.type}-${positionString}`) + `_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
@@ -506,14 +503,14 @@ export default function CheckInForm() {
         let rekondUploadResults: Uploads | null = null;
         if (behoverRekond) {
             const rekondUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
-            const dateEventFolderName = `${normalizedReg} - ${incheckningsdatum}`;
-            const eventFolderName = `REKOND - ${incheckare}`;
+            const dateEventFolderName = slugify(`${normalizedReg} - ${incheckningsdatum}`);
+            const eventFolderName = slugify(`REKOND - ${incheckare}`);
             const rekondPath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             rekondUploads.folder = rekondPath;
 
             let mediaIndex = 1;
             for (const media of rekondMedia) {
-                const fileName = `${normalizedReg} - ${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_rekond_${mediaIndex++}`;
+                const fileName = slugify(`${normalizedReg} - ${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_rekond`) + `_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${rekondPath}/${fileName}.${ext}`);
                 if (media.type === 'image') rekondUploads.photo_urls.push(url);
@@ -529,8 +526,8 @@ export default function CheckInForm() {
         const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
         for (const damage of resolvedLegacyDamages) {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
-            const dateEventFolderName = `${normalizedReg} - ${skadedatum}`;
-            const eventFolderName = `ÅTGÄRDAD - ${damage.fullText} - incheckad ${incheckningsdatum} - ${incheckare}`;
+            const dateEventFolderName = slugify(`${normalizedReg} - ${skadedatum}`);
+            const eventFolderName = slugify(`ÅTGÄRDAD - ${damage.fullText} - incheckad ${incheckningsdatum} - ${incheckare}`);
             const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
