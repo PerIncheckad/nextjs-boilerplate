@@ -11,6 +11,7 @@ type LegacyDamage = {
   note_customer: string | null;
   note_internal: string | null;
   saludatum: string | null;
+  damage_date: string | null; // <<< CORRECTED: Ensure this field is fetched
 };
 
 // Represents an already inventoried damage from our main 'damages' table
@@ -118,7 +119,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     return {
       id: leg.id,
       text: displayText,
-      damage_date: leg.saludatum, // Using saludatum as the damage_date
+      damage_date: leg.damage_date, // <<< CORRECTED: Use the actual damage_date
       is_inventoried: isInventoried,
     };
   }).filter(d => d.text); // Ensure we don't have empty damage entries
