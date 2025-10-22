@@ -4,30 +4,37 @@ type NotifyCheckinParams = {
   meta: any;
 };
 
-export async function notifyCheckin(props: NotifyCheckinParams) {
+export const notifyCheckin = async (params: NotifyCheckinParams): Promise<{ success: boolean; error?: string }> => {
+  console.log('notifyCheckin called with params:', params);
+
   try {
-    // Anropa den befintliga, korrekta API-routen på /api/notify
     const response = await fetch('/api/notify', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      // Skicka med hela props-objektet, eftersom din API-route förväntar sig det
-      body: JSON.stringify(props) 
+      // The API route expects the data to be wrapped in a specific structure.
+      // This is the key correction.
+      body: JSON.stringify({
+        region: params.region,
+        subjectBase: params.subjectBase,
+        meta: params.meta,
+      }),
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('API Route Error:', errorData);
-      throw new Error(errorData.error || 'Failed to process notification via API route.');
+      const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
+      console.error(`API response not OK. Status: ${response.status}`, errorData);
+      throw new Error(`Failed to process request. Server responded with status ${response.status}`);
     }
 
-    const data = await response.json();
-    console.log("Notification processed successfully via API route:", data);
-    return { success: true, data };
+    const result = await response.json();
+    console.log('API response OK:', result);
+    return { success: true };
 
-  } catch (e) {
-    console.error("Exception during notifyCheckin:", e);
-    throw e;
+  } catch (error) {
+    console.error('Exception during notifyCheckin fetch:', error);
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    return { success: false, error: errorMessage };
   }
-}
+};
