@@ -109,7 +109,7 @@ function slugify(str: string): string {
         .replace(/_$/, ''); // Trim _ from end of text
 }
 
-const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH-MM') => {
+const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'HH-MM') => {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
@@ -118,30 +118,11 @@ const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH-MM') => 
 
     if (format === 'YYYYMMDD') return `${year}${month}${day}`;
     if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`;
+    if (format === 'HH.MM') return `${hours}.${minutes}`;
     if (format === 'HH-MM') return `${hours}-${minutes}`;
     return '';
 };
 
-// --- New Folder/File Name Helpers ---
-const generateNewCheckinFolderName = (regnr: string, incheckare: string): string => {
-    const now = new Date();
-    return `NY-INCHECKNING_${regnr}_${formatDate(now, 'YYYYMMDD')}_kl-${formatDate(now, 'HH-MM')}_av-${slugify(incheckare)}`;
-};
-
-const generateLegacyDocFolderName = (regnr: string, incheckare: string): string => {
-    const now = new Date();
-    return `INVENTERING_${regnr}_${formatDate(now, 'YYYYMMDD')}_kl-${formatDate(now, 'HH-MM')}_av-${slugify(incheckare)}`;
-};
-
-const generateSubFolderName = (damageDate: string, type: string, carPart: string, position: string): string => {
-    const datePart = damageDate.replace(/-/g, '');
-    return `${datePart}_${slugify(type)}_${slugify(carPart)}_${slugify(position)}`;
-};
-
-const generateFileName = (regnr: string, damageDate: string, type: string, index: number): string => {
-    const datePart = damageDate.replace(/-/g, '');
-    return `${regnr}_${datePart}_${slugify(type)}_${index}`;
-};
 
 const createCommentFile = (content: string): File => {
     return new File([content], "kommentar.txt", { type: "text/plain" });
@@ -149,7 +130,6 @@ const createCommentFile = (content: string): File => {
 
 async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
-    // Sanitize the entire path, but keep slashes
     const sanitizedPath = path.split('/').map(part => slugify(part)).join('/');
     const { error } = await supabase.storage.from(BUCKET).upload(sanitizedPath, file, { contentType: file.type });
     if (error) {
@@ -468,105 +448,86 @@ export default function CheckInForm() {
     try {
         const now = new Date();
         const incheckare = firstName || 'Okand';
+        const incheckningsdatum = formatDate(now, 'YYYYMMDD');
+        const sluggedIncheckare = slugify(incheckare);
 
-        // --- Upload resolved legacy damages comments ---
-        const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
-        for (const damage of resolvedLegacyDamages) {
-            const fileName = `${formatDate(now, 'YYYYMMDD')}_kl-${formatDate(now, 'HH-MM')}_${slugify(damage.fullText)}_${slugify(incheckare)}.txt`;
-            const folderPath = `${normalizedReg}/Atgardade-och-Ej-hittade-skador-fran-BUHS/`;
-            const commentFile = createCommentFile(damage.resolvedComment!);
-            await uploadOne(commentFile, `${folderPath}${fileName}`);
-        }
-
-        // --- Handle new damages and rekond (Scenario A) ---
-        const newDamagesForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
-        const needsNewCheckinFolder = newDamagesForUpload.length > 0 || behoverRekond;
-        let newCheckinFolderName = '';
-        let finalNewDamages: NewDamage[] = [];
-        let rekondUploadResults: Uploads | null = null;
-        
-        if (needsNewCheckinFolder) {
-            newCheckinFolderName = generateNewCheckinFolderName(normalizedReg, incheckare);
-            const commonPath = `${normalizedReg}/${newCheckinFolderName}`;
-            const todayStr = formatDate(now, 'YYYY-MM-DD');
-
-            // Upload new damages
-            finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
-                const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
-                const subFolderName = generateSubFolderName(todayStr, damage.type, damage.positions[0]?.carPart || '', damage.positions[0]?.position || '');
-                const damagePath = `${commonPath}/${subFolderName}`;
-                damageUploads.folder = damagePath;
-
-                let mediaIndex = 1;
-                for (const media of damage.media) {
-                    const fileName = generateFileName(normalizedReg, todayStr, damage.type, mediaIndex++);
-                    const ext = media.file.name.split('.').pop();
-                    const mediaPath = `${damagePath}/${fileName}.${ext}`;
-                    const url = await uploadOne(media.file, mediaPath);
-                    if (media.type === 'image') damageUploads.photo_urls.push(url);
-                    else damageUploads.video_urls.push(url);
-                }
-
-                if (damage.text) {
-                    const commentFile = createCommentFile(damage.text);
-                    await uploadOne(commentFile, `${damagePath}/kommentar.txt`);
-                }
-                return { ...damage, uploads: damageUploads };
-            }));
-
-            // Upload rekond
-            if (behoverRekond) {
-                const rekondUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
-                const subFolderName = `${formatDate(now, 'YYYYMMDD')}_REKOND`;
-                const rekondPath = `${commonPath}/${subFolderName}`;
-                rekondUploads.folder = rekondPath;
-
-                let mediaIndex = 1;
-                for (const media of rekondMedia) {
-                    const fileName = generateFileName(normalizedReg, todayStr, 'Rekond', mediaIndex++);
-                    const ext = media.file.name.split('.').pop();
-                    const mediaPath = `${rekondPath}/${fileName}.${ext}`;
-                    const url = await uploadOne(media.file, mediaPath);
-                    if (media.type === 'image') rekondUploads.photo_urls.push(url);
-                    else rekondUploads.video_urls.push(url);
-                }
-                if (rekondText) {
-                    const commentFile = createCommentFile(rekondText);
-                    await uploadOne(commentFile, `${rekondPath}/kommentar.txt`);
-                }
-                rekondUploadResults = rekondUploads;
-            }
-        }
-        
-        // --- Handle documented legacy damages (Scenario B) ---
+        // --- Handle Inventoried Legacy Damages ---
         const legacyDamagesForUpload = existingDamages.filter(d => d.status === 'documented');
-        let legacyFolderName = '';
-        if (legacyDamagesForUpload.length > 0) {
-            legacyFolderName = generateLegacyDocFolderName(normalizedReg, incheckare);
-        }
         const finalLegacyDamages = await Promise.all(legacyDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
-            const originalDate = damage.originalDamageDate || formatDate(now, 'YYYY-MM-DD');
-            const subFolderName = generateSubFolderName(originalDate, damage.userType || 'Okand', damage.userPositions[0]?.carPart || '', damage.userPositions[0]?.position || '');
-            const damagePath = `${normalizedReg}/${legacyFolderName}/${subFolderName}`;
+            const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
+            const eventFolderName = `INVENTERING_${slugify(damage.userType || 'skada')}_incheckad-${incheckningsdatum}_${sluggedIncheckare}`;
+            const damagePath = `${normalizedReg}/${skadedatum}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
-                const fileName = generateFileName(normalizedReg, originalDate, damage.userType || 'Okand', mediaIndex++);
+                const fileName = `${normalizedReg}_${skadedatum}_inventerad-${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(damage.userType || 'skada')}_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
-                const mediaPath = `${damagePath}/${fileName}.${ext}`;
-                const url = await uploadOne(media.file, mediaPath);
+                const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damageUploads.photo_urls.push(url);
                 else damageUploads.video_urls.push(url);
             }
             if (damage.userDescription) {
-                const commentFile = createCommentFile(damage.userDescription);
-                await uploadOne(commentFile, `${damagePath}/kommentar.txt`);
+                await uploadOne(createCommentFile(damage.userDescription), `${damagePath}/kommentar.txt`);
             }
             return { ...damage, uploads: damageUploads };
         }));
 
+        // --- Handle New Damages ---
+        const newDamagesForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
+        const finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
+            const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+            const eventFolderName = `NY_SKADA_${slugify(damage.type)}_${sluggedIncheckare}`;
+            const damagePath = `${normalizedReg}/${incheckningsdatum}/${eventFolderName}`;
+            damageUploads.folder = damagePath;
+
+            let mediaIndex = 1;
+            for (const media of damage.media) {
+                const fileName = `${normalizedReg}_${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(damage.type)}_${mediaIndex++}`;
+                const ext = media.file.name.split('.').pop();
+                const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
+                if (media.type === 'image') damageUploads.photo_urls.push(url);
+                else damageUploads.video_urls.push(url);
+            }
+            if (damage.text) {
+                await uploadOne(createCommentFile(damage.text), `${damagePath}/kommentar.txt`);
+            }
+            return { ...damage, uploads: damageUploads };
+        }));
+
+        // --- Handle Rekond ---
+        let rekondUploadResults: Uploads | null = null;
+        if (behoverRekond) {
+            const rekondUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+            const eventFolderName = `REKOND_${sluggedIncheckare}`;
+            const rekondPath = `${normalizedReg}/${incheckningsdatum}/${eventFolderName}`;
+            rekondUploads.folder = rekondPath;
+
+            let mediaIndex = 1;
+            for (const media of rekondMedia) {
+                const fileName = `${normalizedReg}_${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_rekond_${mediaIndex++}`;
+                const ext = media.file.name.split('.').pop();
+                const url = await uploadOne(media.file, `${rekondPath}/${fileName}.${ext}`);
+                if (media.type === 'image') rekondUploads.photo_urls.push(url);
+                else rekondUploads.video_urls.push(url);
+            }
+            if (rekondText) {
+                await uploadOne(createCommentFile(rekondText), `${rekondPath}/kommentar.txt`);
+            }
+            rekondUploadResults = rekondUploads;
+        }
+
+        // --- Handle Resolved Damages ---
+        const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
+        for (const damage of resolvedLegacyDamages) {
+            const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
+            const eventFolderName = `ATGARDAD_${slugify(damage.fullText)}_incheckad-${incheckningsdatum}_${sluggedIncheckare}`;
+            const damagePath = `${normalizedReg}/${skadedatum}/${eventFolderName}`;
+            await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
+        }
+
+        // --- Final Payload for Database & Notification ---
         const submissionPayload = {
             regnr: normalizedReg,
             status: vehicleData?.status,
@@ -589,7 +550,7 @@ export default function CheckInForm() {
             dokumenterade_skador: finalLegacyDamages
                 .map(({ media, ...rest }) => ({
                     ...rest,
-                    legacy_damage_source_text: rest.fullText // Add the stamp!
+                    legacy_damage_source_text: rest.fullText
                 })),
             nya_skador: finalNewDamages
                 .map(({ media, ...rest }) => ({
@@ -599,13 +560,13 @@ export default function CheckInForm() {
             åtgärdade_skador: existingDamages
                 .filter(d => d.status === 'resolved')
                 .map(({ media, uploads, ...rest }) => rest),
-            checkinFolderName: normalizedReg, // Send only REGNR for root link
+            checkinFolderName: `${normalizedReg}/${incheckningsdatum}`, // Link to the check-in day folder
         };
       
         await notifyCheckin({
             region: 'Syd',
             subjectBase: `${normalizedReg} - ${ort} / ${station}`,
-            htmlBody: '', // This is not used, the API route builds the HTML
+            htmlBody: '',
             meta: submissionPayload
         });
 
@@ -619,11 +580,11 @@ export default function CheckInForm() {
     }
   };
 
-  const handleExistingDamageAction = (id: string, action: 'document' | 'resolve', shortText: string) => {
+  const handleExistingDamageAction = (id: string, action: 'document' | 'resolve', fullText: string) => {
     if (action === 'resolve') {
         setConfirmDialog({
             isOpen: true,
-            title: `Åtgärdad: "${shortText}"`,
+            title: `Åtgärdad: "${fullText}"`,
             text: 'Vänligen beskriv varför skadan markeras som åtgärdad/ej hittad. Denna kommentar sparas.',
             confirmButtonVariant: 'success',
             requiresComment: true,
@@ -907,7 +868,7 @@ export default function CheckInForm() {
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map(d => <DamageItem key={d.id} damage={d as any} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onRemove={removeDamage} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && (!isChecklistComplete || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && !hasPhoto(rekondMedia)) )}>
@@ -1120,7 +1081,7 @@ const DamageItem: React.FC<{
   onUpdate: (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => void;
   onMediaUpdate: (id: string, files: FileList, isExisting: boolean) => void;
   onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
-  onAction?: (id: string, action: 'document' | 'resolve', shortText: string) => void;
+  onAction?: (id: string, action: 'document' | 'resolve', fullText: string) => void;
   onRemove?: (id: string) => void;
   onAddPosition: (damageId: string, isExisting: boolean) => void;
   onRemovePosition: (damageId: string, positionId: string, isExisting: boolean) => void;
