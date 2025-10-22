@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getVehicleInfo, VehicleInfo, FormattedDamage } from '@/lib/damages';
+import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 
 const normalizeReg = (reg: string) => reg.toUpperCase().replace(/\s/g, '');
@@ -62,7 +62,6 @@ type ExistingDamage = {
   db_id: number;
   id: string;
   fullText: string; 
-  shortText: string;
   originalDamageDate: string | null; // YYYY-MM-DD
   isInventoried: boolean;
   status: 'not_selected' | 'documented' | 'resolved';
@@ -110,7 +109,7 @@ function slugify(str: string): string {
         .replace(/_$/, ''); // Trim _ from end of text
 }
 
-const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM') => {
+const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH-MM') => {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
@@ -119,19 +118,19 @@ const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM') => 
 
     if (format === 'YYYYMMDD') return `${year}${month}${day}`;
     if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`;
-    if (format === 'HH.MM') return `${hours}.${minutes}`;
+    if (format === 'HH-MM') return `${hours}-${minutes}`;
     return '';
 };
 
 // --- New Folder/File Name Helpers ---
 const generateNewCheckinFolderName = (regnr: string, incheckare: string): string => {
     const now = new Date();
-    return `${regnr} - ${formatDate(now, 'YYYYMMDD')} - kl ${formatDate(now, 'HH.MM')} - ${incheckare}`;
+    return `NY-INCHECKNING_${regnr}_${formatDate(now, 'YYYYMMDD')}_kl-${formatDate(now, 'HH-MM')}_av-${slugify(incheckare)}`;
 };
 
-const generateLegacyDocFolderName = (regnr: string, originalDate: string, incheckare: string): string => {
+const generateLegacyDocFolderName = (regnr: string, incheckare: string): string => {
     const now = new Date();
-    return `${regnr} - ${originalDate.replace(/-/g, '')} - incheckad ${formatDate(now, 'YYYYMMDD')} kl ${formatDate(now, 'HH.MM')} av ${incheckare}`;
+    return `INVENTERING_${regnr}_${formatDate(now, 'YYYYMMDD')}_kl-${formatDate(now, 'HH-MM')}_av-${slugify(incheckare)}`;
 };
 
 const generateSubFolderName = (damageDate: string, type: string, carPart: string, position: string): string => {
@@ -140,7 +139,8 @@ const generateSubFolderName = (damageDate: string, type: string, carPart: string
 };
 
 const generateFileName = (regnr: string, damageDate: string, type: string, index: number): string => {
-    return `${regnr}_${damageDate}_${slugify(type)}_${index}`;
+    const datePart = damageDate.replace(/-/g, '');
+    return `${regnr}_${datePart}_${slugify(type)}_${index}`;
 };
 
 const createCommentFile = (content: string): File => {
@@ -149,7 +149,7 @@ const createCommentFile = (content: string): File => {
 
 async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
-    // Sanitize the entire path
+    // Sanitize the entire path, but keep slashes
     const sanitizedPath = path.split('/').map(part => slugify(part)).join('/');
     const { error } = await supabase.storage.from(BUCKET).upload(sanitizedPath, file, { contentType: file.type });
     if (error) {
@@ -234,7 +234,6 @@ export default function CheckInForm() {
   const [varningslampaLyser, setVarningslampaLyser] = useState(false);
   const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState('');
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
-  const [inventoriedLegacyTexts, setInventoriedLegacyTexts] = useState<string[]>([]);
   const [insynsskyddOK, setInsynsskyddOK] = useState(false);
   const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
   const [isskrapaOK, setIsskrapaOK] = useState(false);
@@ -319,10 +318,7 @@ export default function CheckInForm() {
     setExistingDamages([]);
     try {
       const normalized = normalizeReg(reg);
-      const [info, documentedTextsResult] = await Promise.all([
-          getVehicleInfo(normalized),
-          supabase.rpc('get_documented_legacy_texts', { p_regnr: normalized })
-      ]);
+      const info = await getVehicleInfo(normalized);
   
       if (info.status === 'NO_MATCH') {
         const proceed = window.confirm(
@@ -335,19 +331,15 @@ export default function CheckInForm() {
         }
       }
       
-      const documentedTexts = documentedTextsResult.data?.map(item => item.legacy_damage_source_text) || [];
-      setInventoriedLegacyTexts(documentedTexts);
-      
       setVehicleData(info);
       
       if (info.existing_damages.length > 0) {
-          setExistingDamages(info.existing_damages.map((d: FormattedDamage) => ({ 
+          setExistingDamages(info.existing_damages.map((d: ConsolidatedDamage) => ({ 
               db_id: d.id,
               id: Math.random().toString(36).substring(2, 15),
               fullText: d.text,
-              shortText: d.text,
-              originalDamageDate: d.damage_date, // Stored as YYYY-MM-DD
-              isInventoried: documentedTexts.includes(d.text),
+              originalDamageDate: d.damage_date,
+              isInventoried: d.is_inventoried,
               status: 'not_selected',
               userPositions: [],
               media: [],
@@ -480,8 +472,8 @@ export default function CheckInForm() {
         // --- Upload resolved legacy damages comments ---
         const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
         for (const damage of resolvedLegacyDamages) {
-            const fileName = `${formatDate(now, 'YYYYMMDD')}_${formatDate(now, 'HH.MM')}_${slugify(damage.shortText)}_${incheckare}.txt`;
-            const folderPath = `${normalizedReg}/Åtgärdade och Ej hittade skador från BUHS/`;
+            const fileName = `${formatDate(now, 'YYYYMMDD')}_kl-${formatDate(now, 'HH-MM')}_${slugify(damage.fullText)}_${slugify(incheckare)}.txt`;
+            const folderPath = `${normalizedReg}/Atgardade-och-Ej-hittade-skador-fran-BUHS/`;
             const commentFile = createCommentFile(damage.resolvedComment!);
             await uploadOne(commentFile, `${folderPath}${fileName}`);
         }
@@ -548,10 +540,13 @@ export default function CheckInForm() {
         
         // --- Handle documented legacy damages (Scenario B) ---
         const legacyDamagesForUpload = existingDamages.filter(d => d.status === 'documented');
+        let legacyFolderName = '';
+        if (legacyDamagesForUpload.length > 0) {
+            legacyFolderName = generateLegacyDocFolderName(normalizedReg, incheckare);
+        }
         const finalLegacyDamages = await Promise.all(legacyDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const originalDate = damage.originalDamageDate || formatDate(now, 'YYYY-MM-DD');
-            const legacyFolderName = generateLegacyDocFolderName(normalizedReg, originalDate, incheckare);
             const subFolderName = generateSubFolderName(originalDate, damage.userType || 'Okand', damage.userPositions[0]?.carPart || '', damage.userPositions[0]?.position || '');
             const damagePath = `${normalizedReg}/${legacyFolderName}/${subFolderName}`;
             damageUploads.folder = damagePath;
@@ -590,7 +585,7 @@ export default function CheckInForm() {
             notering: preliminarAvslutNotering,
             incheckare: firstName,
             timestamp: new Date().toISOString(),
-            rekond_details: rekondUploadResults ? { ...rekondUploadResults, text: rekondText } : null,
+            rekond_details: { ...rekondUploadResults, text: rekondText },
             dokumenterade_skador: finalLegacyDamages
                 .map(({ media, ...rest }) => ({
                     ...rest,
@@ -603,7 +598,7 @@ export default function CheckInForm() {
                 })),
             åtgärdade_skador: existingDamages
                 .filter(d => d.status === 'resolved')
-                .map(({ media, ...rest }) => rest),
+                .map(({ media, uploads, ...rest }) => rest),
             checkinFolderName: normalizedReg, // Send only REGNR for root link
         };
       
@@ -860,7 +855,7 @@ export default function CheckInForm() {
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
                 <span className="info-label">Befintliga skador ({existingDamages.length})</span>
-                {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.shortText}</div>)}
+                {existingDamages.map(d => <div key={d.id} className="damage-list-item">- {d.fullText}</div>)}
               </div>
             )}
             {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
@@ -903,8 +898,10 @@ export default function CheckInForm() {
 
       <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart) || !hasPhoto(d.media)))}>
         <SectionHeader title="Skador" />
-        <SubSectionHeader title="Befintliga skador" />
-        {vehicleData && existingDamages.length > 0 ? existingDamages.map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />) : <p>Inga befintliga skador att rapportera.</p>}
+        <SubSectionHeader title="Befintliga skador att hantera" />
+        {vehicleData && existingDamages.some(d => !d.isInventoried) 
+            ? existingDamages.filter(d => !d.isInventoried).map(d => <DamageItem key={d.id} damage={d} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={handleMediaUpdate} onMediaRemove={handleMediaRemove} onAction={handleExistingDamageAction} onAddPosition={addDamagePosition} onRemovePosition={removeDamagePosition} />) 
+            : <p>Inga ohanterade befintliga skador.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
@@ -1027,19 +1024,22 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 <h4>{title}</h4>
                 <ul>
                     {damages.map((d: any, index: number) => {
-                        const positions = d.positions || d.userPositions || [];
-                        let damageString = d.type || d.userType || 'Okänd skada';
-
-                        if (positions.length > 0) {
-                            const positionsStr = positions.map((p: any) => `${p.carPart} (${p.position})`).filter((s:string) => s !== ' ()').join(', ');
-                            if (positionsStr) {
-                                damageString += `: ${positionsStr}`;
+                        let damageString = d.fullText || d.type || d.userType || 'Okänd skada';
+                        
+                        if (title === '✅ Åtgärdade skador' && d.resolvedComment) {
+                             damageString += ` (Kommentar: ${d.resolvedComment})`;
+                        } else {
+                            const positions = d.positions || d.userPositions || [];
+                            if (positions.length > 0) {
+                                const positionsStr = positions.map((p: any) => `${p.carPart} (${p.position})`).filter((s:string) => s !== ' ()').join(', ');
+                                if (positionsStr) {
+                                    damageString += `: ${positionsStr}`;
+                                }
                             }
-                        }
-
-                        const comment = d.text || d.userDescription;
-                        if (comment) {
-                            damageString += ` (${comment})`;
+                            const comment = d.text || d.userDescription;
+                            if (comment) {
+                                damageString += ` (${comment})`;
+                            }
                         }
 
                         return <li key={d.id || index}>{damageString}</li>;
@@ -1116,7 +1116,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
 };
 
 const DamageItem: React.FC<{
-  damage: ExistingDamage | NewDamage; isExisting: boolean;
+  damage: ExistingDamage; isExisting: boolean;
   onUpdate: (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => void;
   onMediaUpdate: (id: string, files: FileList, isExisting: boolean) => void;
   onMediaRemove: (id: string, index: number, isExisting: boolean) => void;
@@ -1127,34 +1127,22 @@ const DamageItem: React.FC<{
 }> = ({ damage, isExisting, onUpdate, onMediaUpdate, onMediaRemove, onAction, onRemove, onAddPosition, onRemovePosition }) => {
   const isDocumented = isExisting && (damage as ExistingDamage).status === 'documented';
   const resolved = isExisting && (damage as ExistingDamage).status === 'resolved';
-  const inventoried = isExisting && (damage as ExistingDamage).isInventoried;
-
-  if (inventoried && !isDocumented && !resolved) {
-    return (
-        <div className="damage-item inventoried">
-            <div className="damage-item-header">
-                <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
-                <span className="inventoried-badge">✓ Redan inventerad</span>
-            </div>
-        </div>
-    );
-  }
 
   const commonProps = {
-    type: isExisting ? (damage as ExistingDamage).userType : (damage as NewDamage).type,
-    description: isExisting ? (damage as ExistingDamage).userDescription : (damage as NewDamage).text,
+    type: isExisting ? (damage as ExistingDamage).userType : (damage as any).type,
+    description: isExisting ? (damage as ExistingDamage).userDescription : (damage as any).text,
   };
 
-  const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as NewDamage).positions;
+  const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as any).positions;
 
   return (
     <div className={`damage-item ${resolved ? 'resolved' : ''}`}>
       <div className="damage-item-header">
-        <span>{isExisting ? (damage as ExistingDamage).shortText : 'Ny skada'}</span>
-        {isExisting && onAction && !inventoried && (
+        <span>{damage.fullText}</span>
+        {isExisting && onAction && (
           <div className="damage-item-actions">
-            <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).shortText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
-            <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).shortText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
+            <Button onClick={() => onAction(damage.id, 'document', damage.fullText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
+            <Button onClick={() => onAction(damage.id, 'resolve', damage.fullText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
           </div>
         )}
         {!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}
