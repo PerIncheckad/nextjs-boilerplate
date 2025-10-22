@@ -55,7 +55,6 @@ const getDamageString = (damage: any): string => {
     let baseString = '';
     let comment = '';
     
-    // Anpassad för den NYA damage-strukturen
     const positions = damage.user_positions || [];
     const type = damage.user_type || damage.type || 'Skada';
     
@@ -63,7 +62,7 @@ const getDamageString = (damage: any): string => {
         const positionParts = positions.map((p: any) => `${p.car_part} ${p.position || ''}`.trim()).filter(Boolean).join(', ');
         baseString = positionParts ? `${type}: ${positionParts}` : type;
     } else {
-        baseString = damage.legacyDamageSourceText || type;
+        baseString = damage.legacyDamageSourceText || damage.description || type;
     }
 
     comment = damage.comment || '';
@@ -81,7 +80,7 @@ const formatDamagesToHtml = (damages: any[], title: string): string => {
   return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 0; color: #000000 !important;">${items}</ul>`;
 };
 
-const createInfoGrid = (rows: [string, string | undefined | null][]): string => {
+const createInfoGrid = (rows: [string | null, string | undefined | null][]): string => {
   return rows.filter(row => row[0] !== null).map(([label, value]) => `
     <tr>
       <td style="font-weight: bold; color: #000000 !important; width: 150px; padding: 4px 0; vertical-align: top;">${label}</td>
@@ -164,8 +163,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
   
   const alerts: string[] = [];
   if (tankniva === 'Ej upptankad') alerts.push('Ej upptankad - kontakta Bilkontroll!');
-  if (payload.husdjur?.needed) alerts.push('Sanerad för husdjur - kontakta Bilkontroll!');
-  if (payload.rokning?.needed) alerts.push('Sanerad för rökning - kontakta Bilkontroll!');
+  if (payload.husdjur_needed) alerts.push('Sanerad för husdjur - kontakta Bilkontroll!');
+  if (payload.rokning_needed) alerts.push('Sanerad för rökning - kontakta Bilkontroll!');
   if (varningslampa_status === 'no') alerts.push('Varningslampa lyser - går ej att hyra ut! - Kontakta Bilkontroll.');
 
   const content = `
@@ -195,13 +194,13 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, bilen_star_nu, drivmedel, tankniva, laddkablar, varningslampa_status } = payload;
+  const { regnr, carModel, ort, station, incheckare, tankniva, varningslampa_active, varningslampa_status } = payload;
   
   const alerts: string[] = [];
   if (tankniva === 'Ej upptankad') alerts.push('Ej upptankad');
-  if (payload.husdjur?.needed) alerts.push('Sanerad för husdjur');
-  if (payload.rokning?.needed) alerts.push('Sanerad för rökning');
-  if (payload.varningslampa?.active) alerts.push(`Varningslampa lyser ${varningslampa_status === 'no' ? '(Går ej att hyra ut)' : '(Går att hyra ut)'}`);
+  if (payload.husdjur_needed) alerts.push(`Sanerad för husdjur. Kommentar: ${payload.husdjur_comment}`);
+  if (payload.rokning_needed) alerts.push(`Sanerad för rökning. Kommentar: ${payload.rokning_comment}`);
+  if (varningslampa_active) alerts.push(`Varningslampa lyser ${varningslampa_status === 'no' ? '(Går ej att hyra ut)' : '(Går att hyra ut)'}. Kommentar: ${payload.varningslampa_comment}`);
 
   const content = `
     ${alerts.map(alert => createAlertBanner(true, alert)).join('')}
@@ -260,20 +259,19 @@ export async function POST(request: Request) {
       drivmedel: meta.status.drivmedel,
       tankniva: meta.status.tankniva,
       laddkablar: meta.status.laddkablar,
-      varningslampa: meta.status.varningslampa.active,
+      varningslampa_active: meta.status.varningslampa.active,
       varningslampa_status: meta.status.varningslampa.rentable,
+      varningslampa_comment: meta.status.varningslampa.comment,
       // Rekond och Sanering
-      rekond: meta.rekond.needed,
-      husdjur: meta.sanering.husdjur,
-      rokning: meta.sanering.rokning,
+      rekond_needed: meta.rekond.needed,
+      husdjur_needed: meta.sanering.husdjur.needed,
+      husdjur_comment: meta.sanering.husdjur.comment,
+      rokning_needed: meta.sanering.rokning.needed,
+      rokning_comment: meta.sanering.rokning.comment,
       // Skador
       nya_skador: meta.damages.new,
       dokumenterade_skador: meta.damages.legacy_documented,
-      åtgärdade_skador: meta.damages.legacy_remedied.map((d: any) => ({
-        ...d,
-        // E-postmallen förväntar sig en enkel textsträng för åtgärdade skador
-        fullText: `<strong>${d.legacyDamageSourceText}</strong><br><small>${d.comment}</small>`
-      })),
+      åtgärdade_skador: meta.damages.legacy_remedied,
     };
     // --- SLUT ADAPTER ---
 
@@ -292,9 +290,10 @@ export async function POST(request: Request) {
     const bilkontrollHtml = buildBilkontrollEmail(emailPayload, date, time);
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     
-    Promise.all(emailPromises).catch(err => console.error("Email sending failed:", err));
+    // Korrekt await för att invänta e-postutskick
+    await Promise.all(emailPromises);
 
-    // Databashantering (behålls från originalfilen)
+    // Databashantering (behålls från originalfilen, men anpassad för den nya payloaden)
     const damagesToProcess = [...emailPayload.nya_skador, ...emailPayload.dokumenterade_skador];
     
     for (const damage of damagesToProcess) {
@@ -315,15 +314,13 @@ export async function POST(request: Request) {
         const { error: damageError } = await supabaseAdmin
             .from('damages')
             .insert(damageData)
-            .select('id')
-            .single();
 
         if (damageError) {
             console.error('Supabase DB error during damage INSERT:', damageError);
         }
     }
 
-    return NextResponse.json({ message: 'Notifications processed.' });
+    return NextResponse.json({ message: 'Notifications processed successfully.' });
 
   } catch (error) {
     console.error('FATAL: Uncaught error in API route:', error);
