@@ -130,18 +130,18 @@ const createCommentFile = (content: string): File => {
 
 async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
-    const sanitizedPath = path.split('/').map(part => slugify(part)).join('/');
-    const { error } = await supabase.storage.from(BUCKET).upload(sanitizedPath, file, { contentType: file.type });
+    // Use the path directly, slugify individual parts if needed but not the whole path.
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
     if (error) {
         if (error.message.includes('The resource already exists')) {
-            console.warn(`File already exists, not re-uploading: ${sanitizedPath}`);
+            console.warn(`File already exists, not re-uploading: ${path}`);
         } else {
-            console.error(`Storage Error for key "${sanitizedPath}":`, error);
+            console.error(`Storage Error for key "${path}":`, error);
             throw error;
         }
     }
     
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(sanitizedPath);
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
 }
 
@@ -456,8 +456,9 @@ export default function CheckInForm() {
         const finalLegacyDamages = await Promise.all(legacyDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
-            const eventFolderName = `INVENTERING_${slugify(damage.userType || 'skada')}_incheckad-${incheckningsdatum}_${sluggedIncheckare}`;
-            const damagePath = `${normalizedReg}/${skadedatum}/${eventFolderName}`;
+            const dateEventFolderName = `${normalizedReg} - ${skadedatum}`;
+            const eventFolderName = `INVENTERING_${slugify(damage.userType || 'skada')}_${sluggedIncheckare}`;
+            const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
@@ -478,8 +479,9 @@ export default function CheckInForm() {
         const newDamagesForUpload = skadekontroll === 'nya_skador' ? newDamages : [];
         const finalNewDamages = await Promise.all(newDamagesForUpload.map(async (damage) => {
             const damageUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+            const dateEventFolderName = `${normalizedReg} - ${incheckningsdatum}`;
             const eventFolderName = `NY_SKADA_${slugify(damage.type)}_${sluggedIncheckare}`;
-            const damagePath = `${normalizedReg}/${incheckningsdatum}/${eventFolderName}`;
+            const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             damageUploads.folder = damagePath;
 
             let mediaIndex = 1;
@@ -500,8 +502,9 @@ export default function CheckInForm() {
         let rekondUploadResults: Uploads | null = null;
         if (behoverRekond) {
             const rekondUploads: Uploads = { photo_urls: [], video_urls: [], folder: '' };
+            const dateEventFolderName = `${normalizedReg} - ${incheckningsdatum}`;
             const eventFolderName = `REKOND_${sluggedIncheckare}`;
-            const rekondPath = `${normalizedReg}/${incheckningsdatum}/${eventFolderName}`;
+            const rekondPath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             rekondUploads.folder = rekondPath;
 
             let mediaIndex = 1;
@@ -522,8 +525,9 @@ export default function CheckInForm() {
         const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
         for (const damage of resolvedLegacyDamages) {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
-            const eventFolderName = `ATGARDAD_${slugify(damage.fullText)}_incheckad-${incheckningsdatum}_${sluggedIncheckare}`;
-            const damagePath = `${normalizedReg}/${skadedatum}/${eventFolderName}`;
+            const dateEventFolderName = `${normalizedReg} - ${skadedatum}`;
+            const eventFolderName = `ATGARDAD_${slugify(damage.fullText)}_${sluggedIncheckare}`;
+            const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
 
