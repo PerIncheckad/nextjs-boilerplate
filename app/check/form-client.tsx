@@ -149,16 +149,19 @@ const createCommentFile = (content: string): File => {
 
 async function uploadOne(file: File, path: string): Promise<string> {
     const BUCKET = "damage-photos";
-    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
+    // Sanitize the entire path
+    const sanitizedPath = path.split('/').map(part => slugify(part)).join('/');
+    const { error } = await supabase.storage.from(BUCKET).upload(sanitizedPath, file, { contentType: file.type });
     if (error) {
         if (error.message.includes('The resource already exists')) {
-            console.warn(`File already exists, not re-uploading: ${path}`);
+            console.warn(`File already exists, not re-uploading: ${sanitizedPath}`);
         } else {
+            console.error(`Storage Error for key "${sanitizedPath}":`, error);
             throw error;
         }
     }
     
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(sanitizedPath);
     return data.publicUrl;
 }
 
@@ -478,9 +481,9 @@ export default function CheckInForm() {
         const resolvedLegacyDamages = existingDamages.filter(d => d.status === 'resolved' && d.resolvedComment);
         for (const damage of resolvedLegacyDamages) {
             const fileName = `${formatDate(now, 'YYYYMMDD')}_${formatDate(now, 'HH.MM')}_${slugify(damage.shortText)}_${incheckare}.txt`;
-            const filePath = `${normalizedReg}/Åtgärdade och Ej hittade skador från BUHS/${fileName}`;
+            const folderPath = `${normalizedReg}/Åtgärdade och Ej hittade skador från BUHS/`;
             const commentFile = createCommentFile(damage.resolvedComment!);
-            await uploadOne(commentFile, filePath);
+            await uploadOne(commentFile, `${folderPath}${fileName}`);
         }
 
         // --- Handle new damages and rekond (Scenario A) ---
