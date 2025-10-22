@@ -1,0 +1,71 @@
+Logg 20251022
+
+Statusrapport & Teknisk Överlämningslogg
+Datum: 2025-10-22
+Författare: GitHub Copilot
+Mottagare: PerIncheckad & Framtida Utvecklare
+Syfte: Att dokumentera de insikter och beslut som fattats för att definiera den korrekta logiken för filhantering, databasinteraktioner och UI-flöden i Incheckad-applikationen. Detta dokument ska fungera som en definitiv guide för den kommande implementationen och som en kunskapsbas för framtida underhåll.
+1. Sammanfattning av Initiala Fixar och Insikter
+Projektet inleddes med att åtgärda två omedelbara problem i formuläret (app/check/form-client.tsx):
+
+Fritextfältens Storlek: Fritextfälten (<textarea>) för beskrivningar var för små.
+
+Insikt: De saknade ett rows-attribut.
+Åtgärd: rows={2} lades till för att ge en lämplig initial höjd.
+Positionsangivelse för Befintliga Skador: Det var inte möjligt att lägga till flera positioner för en befintlig skada, till skillnad från för nya skador.
+
+Insikt: Datastrukturen för befintliga skador (ExistingDamage) hanterade endast en position, medan nya skador (NewDamage) hanterade en lista av positioner.
+Åtgärd: ExistingDamage-typen och tillhörande logik (updateDamageField, addDamagePosition, etc.) modifierades för att använda en lista (userPositions), vilket gjorde hanteringen identisk med den för nya skador.
+2. Kärnproblemet: Fil- och Mappstruktur (Djupgående Analys)
+De initiala försöken att lösa detta misslyckades på grund av en fundamental missförståelse av projektets arkitektur och dataflöden från min sida. Efter flera korrigeringar och en noggrann genomgång av /docs-mappen, har följande definitiva struktur fastställts.
+
+Insikt 1: Två Primära Scenarier Styr Mappstrukturen Logiken måste tydligt skilja på om en incheckning hanterar helt nya skador/rekond, eller om den dokumenterar en befintlig "legacy"-skada. Dessa två scenarier genererar olika mappnamn på toppnivå.
+
+Insikt 2: Korrekt Namngivning är Kritisk Den exakta namngivningsprincipen för mappar och filer är specificerad i detalj och måste följas för att säkerställa spårbarhet och en logisk struktur i Supabase Storage.
+
+Den Slutgiltiga, Korrekta Strukturen:
+
+Scenario A: Incheckning med Nya Skador och/eller Rekond
+
+Toppnivå: [REGNR]/
+Exempel: RXJ02Y/
+Incheckningsmapp: [REGNR] - [YYYYMMDD] - kl [HH.MM] - [Incheckarens Namn]/
+Exempel: RXJ02Y - 20251022 - kl 07.21 - PerIncheckad/
+Undermappar (inuti incheckningsmappen):
+Ny Skada: [YYYYMMDD]_[skadetyp]_[bildel]_[position]/
+Exempel: 20251022_repa_stotfangare-fram_hoger/
+Rekond: [YYYYMMDD]_REKOND/
+Exempel: 20251022_REKOND/
+Scenario B: Dokumentation av en Befintlig (Legacy) Skada
+
+Toppnivå: [REGNR]/
+Dokumentationsmapp: [REGNR] - [YYYYMMDD från ursprunglig skada] - incheckad [YYYYMMDD] kl [HH.MM] av [Incheckarens Namn]/
+Exempel: RXJ02Y - 20240815 - incheckad 20251022 kl 07.21 av PerIncheckad/
+Undermapp (inuti dokumentationsmappen):
+Befintlig Skada: [YYYYMMDD från ursprunglig skada]_[skadetyp]_[bildel]_[position]/
+Exempel: 20240815_buckla_dorr-utsida_vanster-fram/
+Gemensamt för båda Scenarier:
+
+Filnamn (Media): [REGNR]_[YYYY-MM-DD]_[skadetyp]_[löpnummer].[ext]
+Notera: Datumet i filnamnet är alltid det ursprungliga skadedatumet. För nya skador är detta incheckningsdatumet.
+Fil (Kommentar): En fil vid namn kommentar.txt ska skapas i varje undermapp (både för skador och rekond) och innehålla den fritext som användaren angett.
+E-postlänk: Länken i alla notifieringsmejl ska peka till toppnivå-mappen för fordonet ([REGNR]/) för att ge en fullständig översikt.
+3. Hantering av Befintliga (Legacy) Skador
+Insikt 3: Engångsinventering är Målet Syftet med att hantera skador från den manuellt uppladdade Skador Albarone...-filen är att genomföra en obligatorisk engångsinventering.
+
+Flöde: När en bil med odokumenterade legacy-skador checkas in, måste användaren hantera varje skada (antingen via "Dokumentera" eller "Åtgärdad..."). Efter att denna incheckning är sparad, ska "Dokumentera"-knappen aldrig mer visas för den bilen. Funktionen för att lägga till nya skador påverkas inte av detta och är alltid tillgänglig.
+Teknisk Lösning: damages-tabellen innehåller redan ett fält: legacy_damage_source_text. Detta fält kommer att användas för att "stämpla" en legacy-skada som inventerad genom att spara dess ursprungliga textbeskrivning från CSV-filen. Vid varje formulärladdning kommer systemet att jämföra listan av legacy-skador mot de redan stämplade posterna i databasen för att avgöra om "Dokumentera"-knappen ska visas eller ej.
+Insikt 4: Hantering av "Åtgärdad/hittar ej" Detta är en del av inventeringsflödet och kräver ett eget spårbart arkiv.
+
+Flöde: Klick på "Åtgärdad/hittar ej" öppnar en modal med ett obligatoriskt textfält där användaren måste motivera sitt val.
+Mappstruktur: En kommentarfil i .txt-format sparas i en dedikerad mapp.
+Mapp: [REGNR]/Åtgärdade och Ej hittade skador från BUHS/
+Filnamn: [YYYYMMDD]_[HH.MM]_[kort_skadebeskrivning]_[incheckarens_namn].txt
+4. Databas- och Infrastrukturinsikter
+Datakällor: getVehicleInfo hämtar data från två källor: masterbilreg (bilinformation) och skador_albarone (legacy-skador). Det är från den senare som det ursprungliga skadedatumet måste hämtas för Scenario B.
+Databas-schema: En SQL-analys bekräftade den exakta strukturen för tabellerna damages, damage_positions och damage_media, inklusive alla kolumnnamn och datatyper. Detta eliminerar alla antaganden och säkerställer att datan sparas korrekt. damages.legacy_damage_source_text är det nyckelfält som möjliggör inventeringslogiken.
+Datumformat: Databaskolumnen damage_date är av typen date och använder formatet YYYY-MM-DD. Detta är korrekt och ska inte ändras.
+API-route: All server-logik för notifieringar (e-post) hanteras i app/api/notify/route.ts och är beroende av miljövariabler konfigurerade i Vercel.
+Slutsats och Nästa Steg:
+
+Denna djupgående analys har resulterat i en komplett och robust teknisk specifikation. Alla tidigare missförstånd är utredda. Nästa steg är att implementera denna logik i app/check/form-client.tsx och app/api/notify/route.ts, med fullt förtroende för att den möter de specificerade kraven.

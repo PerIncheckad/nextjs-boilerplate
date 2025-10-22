@@ -1,0 +1,76 @@
+Brief till ny bot 20251022
+
+Handover Brief: Refactoring av Incheckningslogik & Filstruktur
+Till: Nästa GitHub Copilot-instans Från: Din föregångare Datum: 2025-10-22 Ämne: Slutförande av den detaljspecificerade refaktoreringen av app/check/form-client.tsx och dess beroenden.
+
+1. Målsättning & Kontext
+
+Uppdraget är att genomföra en kritisk refaktorering av incheckningsformuläret. Den nuvarande implementationen har en felaktig och ologisk hantering av filuppladdning och mappstruktur i Supabase Storage. Flera misslyckade försök att patcha detta har gjorts. En komplett, från grunden ombyggd logik krävs, baserad på den specifikation som har arbetats fram med användaren @PerIncheckad.
+
+VARNING: Jag, din föregångare, har upprepade gånger misslyckats med att korrekt slå samman den nya logiken med den befintliga koden i app/check/form-client.tsx. Specifikt har jag utelämnat det stora <GlobalStyles>-blocket, vilket resulterat i kodförslag som raderar all CSS. DITT FÖRSTA STEG MÅSTE VARA ATT HÄMTA DEN FULLSTÄNDIGA, BEFINTLIGA FILEN OCH ANVÄNDA DEN SOM GRUND. RADERA INGENTING.
+
+2. Databas: Förutsättningar
+
+Följande struktur i Supabase MÅSTE vara på plats innan klientkoden kan fungera. Användaren har bekräftat att dessa SQL-kommandon har körts med "Success".
+
+Ny Kolumn: Tabellen public.damages måste ha en kolumn för att stämpla inventerade legacy-skador.
+
+SQL
+-- Status: BEKRÄFTAD KÖRD
+ALTER TABLE public.damages
+ADD COLUMN legacy_damage_source_text TEXT;
+RPC-funktion: En funktion för att effektivt hämta vilka legacy-skador som redan dokumenterats för ett givet fordon.
+
+SQL
+-- Status: BEKRÄFTAD KÖRD
+create or replace function get_documented_legacy_texts(p_regnr text)
+returns table (legacy_damage_source_text text)
+language sql security definer as $$
+  select distinct legacy_damage_source_text
+  from public.damages
+  where regnr = p_regnr
+  and legacy_damage_source_text is not null
+  and legacy_damage_source_text != '';
+$$;
+3. Kärnspecifikation: Logik för Klient (form-client.tsx)
+
+3.1. Engångsinventering av Befintliga (Legacy) Skador
+
+Syfte: Att genomföra en obligatorisk engångsinventering av skador som hämtas från CSV-filen Skador Albarone....
+Datakälla: getVehicleInfo() i lib/damages.ts tillhandahåller dessa skador. Det är kritiskt att extrahera det ursprungliga skadedatumet (damage_date) från denna källa.
+Logik vid Laddning:
+Vid hämtning av fordonsdata, anropa även den nya RPC-funktionen get_documented_legacy_texts.
+För varje befintlig skada från getVehicleInfo, jämför dess fullText med listan från RPC-anropet.
+Sätt en ny state-variabel, isInventoried: boolean, på varje ExistingDamage-objekt.
+UI-logik:
+Om isInventoried är true: Visa endast skadans text med en "✓ Redan inventerad"-badge. Inga knappar.
+Om isInventoried är false: Visa skadan med knapparna "Dokumentera" och "Åtgärdad/Hittas ej".
+Validering: Formuläret får inte kunna skickas (formIsValidState ska vara false) om det finns befintliga skador där isInventoried är false och användaren inte har hanterat dem (dvs. deras status fortfarande är 'not_selected').
+3.2. Hantering av "Åtgärdad/Hittas ej"
+
+UI-flöde: Klick på knappen ska öppna en modal (ActionConfirmDialog). Modalen måste innehålla ett obligatoriskt textfält för motivering.
+Filgenerering: Vid slutförande av incheckningen ska en .txt-fil skapas.
+Mapp: [REGNR]/Åtgärdade och Ej hittade skador från BUHS/
+Filnamn: [YYYYMMDD]_[HH.MM]_[kort_skadebeskrivning]_[incheckarens_namn].txt
+Innehåll: Den fullständiga kommentaren från modalens textfält.
+3.3. Fil- och Mappstruktur för Media (Kärnlogik)
+
+Detta är den mest komplexa delen och måste följas till punkt och pricka.
+
+Scenario A: Incheckning med Nya Skador/Rekond
+
+Toppmapp: [REGNR]/[REGNR] - [YYYYMMDD] - kl [HH.MM] - [Incheckarens Namn]/
+Undermapp (Skada): [YYYYMMDD]_[skadetyp]_[bildel]_[position]/
+Undermapp (Rekond): [YYYYMMDD]_REKOND/
+Scenario B: Dokumentation av Befintlig Skada
+
+Toppmapp: [REGNR]/[REGNR] - [YYYYMMDD från ursprunglig skada] - incheckad [YYYYMMDD] kl [HH.MM] av [Incheckarens Namn]/
+Undermapp: [YYYYMMDD från ursprunglig skada]_[skadetyp]_[bildel]_[position]/
+Gemensam Logik:
+
+Filnamn (Media): [REGNR]_[YYYY-MM-DD]_[skadetyp]_[löpnummer].[ext]. Datumet är alltid det ursprungliga skadedatumet.
+Kommentarfil: I varje undermapp ska en kommentar.txt skapas med innehållet från fritextfältet.
+E-postlänk: checkinFolderName som skickas till notifyCheckin ska endast vara registreringsnumret ([REGNR]). Backend-routen (app/api/notify/route.ts) är redan anpassad för att hantera detta och bygga en länk till fordonets rotmapp.
+4. Avslutande Instruktion
+
+Din uppgift är att kirurgiskt implementera ovanstående logik i den befintliga form-client.tsx utan att förlora någon existerande kod, särskilt inte <GlobalStyles>. Var metodisk. Validera varje steg. Lycka till. Du har en komplett och validerad specifikation, vilket är mer än jag hade. Gör inte om mina misstag.
