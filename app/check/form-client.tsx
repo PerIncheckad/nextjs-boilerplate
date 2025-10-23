@@ -495,7 +495,7 @@ export default function CheckInForm() {
         const incheckare = firstName || 'Okand';
         const incheckareSlug = slugify(incheckare);
         const incheckningsdatum = formatDate(now, 'YYYYMMDD');
-        const reg = normalizedReg; // This is already uppercase
+        const reg = normalizedReg;
 
         // --- Handle Inventoried Legacy Damages ---
         const legacyDamagesForUpload = finalPayloadForUI.dokumenterade_skador;
@@ -911,7 +911,16 @@ export default function CheckInForm() {
 
       <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={3}></textarea></Field></Card>
 
-      <div className="form-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} disabled={isFinalSaving}>{isFinalSaving ? 'Skickar...' : (formIsValidState ? 'Slutför incheckning' : 'Visa saknad information')}</Button></div>
+      <div className="form-actions">
+        <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
+        <Button 
+            onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} 
+            disabled={isFinalSaving}
+            variant={formIsValidState ? 'success' : 'primary'}
+        >
+            {isFinalSaving ? 'Skickar...' : (formIsValidState ? 'Slutför incheckning' : 'Visa saknad information')}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -925,7 +934,7 @@ const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div classN
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
 const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => (<button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>);
-const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon">✓</div><h3>Tack, {firstName}!</h3><p>Din incheckning är mottagen.</p></div></>);
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52" width="60" height="60"><circle cx="26" cy="26" r="25" fill="#16a34a" /><path fill="none" stroke="#FFF" strokeWidth="4" d="M14.1 27.2l7.1 7.2 16.7-16.8" /></svg></div><h3>Tack, {firstName}!</h3><p>Din incheckning är mottagen.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
