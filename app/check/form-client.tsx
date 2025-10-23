@@ -93,8 +93,8 @@ const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f =
 
 function slugify(str: string): string {
     if (!str) return '';
-    const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:; '; // Added space
-    const b = 'aaaaaaaaaacccddeeeeeeeegghiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz-------'; // Space becomes -
+    const a = 'åäöÅÄÖ ';
+    const b = 'aaoAAO-';
     const p = new RegExp(a.split('').join('|'), 'g');
 
     return str.toString().toLowerCase()
@@ -105,7 +105,6 @@ function slugify(str: string): string {
         .replace(/^-/, '')
         .replace(/_$/, '');
 }
-
 
 const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'HH-MM') => {
     const year = date.getFullYear();
@@ -494,22 +493,23 @@ export default function CheckInForm() {
     try {
         const now = new Date();
         const incheckare = firstName || 'Okand';
+        const incheckareSlug = slugify(incheckare);
         const incheckningsdatum = formatDate(now, 'YYYYMMDD');
-        const reg = normalizedReg;
+        const reg = normalizedReg; // This is already uppercase
 
         // --- Handle Inventoried Legacy Damages ---
         const legacyDamagesForUpload = finalPayloadForUI.dokumenterade_skador;
         await Promise.all(legacyDamagesForUpload.map(async (damage) => {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
-            const dateEventFolderName = slugify(`${reg} - ${skadedatum}`);
+            const dateEventFolderName = `${reg}-${skadedatum}`;
             const eventFolderName = slugify(`${skadedatum} - ${damage.userType} - incheckad ${incheckningsdatum} - ${incheckare}`);
             const damagePath = `${reg}/${dateEventFolderName}/${eventFolderName}`;
             damage.uploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
-                const positionString = damage.userPositions.map(p => `${p.carPart}-${p.position}`).join('_');
-                const fileName = slugify(`${reg} - ${skadedatum} - ${damage.userType}-${positionString}`) + `_${mediaIndex++}`;
+                const positionString = slugify(damage.userPositions.map(p => `${p.carPart}-${p.position}`).join('_'));
+                const fileName = `${reg}-${skadedatum}-${slugify(damage.userType)}-${positionString}_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damage.uploads.photo_urls.push(url);
@@ -521,15 +521,15 @@ export default function CheckInForm() {
         // --- Handle New Damages ---
         const newDamagesForUpload = finalPayloadForUI.nya_skador;
         await Promise.all(newDamagesForUpload.map(async (damage) => {
-            const dateEventFolderName = slugify(`${reg} - ${incheckningsdatum}`);
-            const positionString = damage.positions.map(p => `${p.carPart}-${p.position}`).join('_');
+            const dateEventFolderName = `${reg}-${incheckningsdatum}`;
+            const positionString = slugify(damage.positions.map(p => `${p.carPart}-${p.position}`).join('_'));
             const eventFolderName = slugify(`${incheckningsdatum}-${damage.type}-${positionString}-${incheckare}`);
             const damagePath = `${reg}/${dateEventFolderName}/${eventFolderName}`;
             damage.uploads.folder = damagePath;
 
             let mediaIndex = 1;
             for (const media of damage.media) {
-                const fileName = slugify(`${reg} - ${incheckningsdatum} - ${damage.type}-${positionString}`) + `_${mediaIndex++}`;
+                const fileName = `${reg}-${incheckningsdatum}-${slugify(damage.type)}-${positionString}_${mediaIndex++}`;
                 const ext = media.file.name.split('.').pop();
                 const url = await uploadOne(media.file, `${damagePath}/${fileName}.${ext}`);
                 if (media.type === 'image') damage.uploads.photo_urls.push(url);
@@ -546,7 +546,7 @@ export default function CheckInForm() {
             rekondTypes?: { utvandig: boolean, invandig: boolean }
         ) => {
             if (!isEnabled) return;
-            const dateEventFolderName = slugify(`${reg} - ${incheckningsdatum}`);
+            const dateEventFolderName = `${reg}-${incheckningsdatum}`;
             let typeString = type;
             if (type === 'REKOND' && rekondTypes) {
                 const types = [];
@@ -560,7 +560,7 @@ export default function CheckInForm() {
             
             let mediaIndex = 1;
             for (const m of media) {
-                const fileName = slugify(`${reg} - ${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${type}`) + `_${mediaIndex++}`;
+                const fileName = `${reg}-${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(type)}_${mediaIndex++}`;
                 const ext = m.file.name.split('.').pop();
                 await uploadOne(m.file, `${path}/${fileName}.${ext}`);
             }
@@ -575,7 +575,7 @@ export default function CheckInForm() {
         const resolvedLegacyDamages = finalPayloadForUI.åtgärdade_skador;
         for (const damage of resolvedLegacyDamages) {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
-            const dateEventFolderName = slugify(`${reg} - ${skadedatum}`);
+            const dateEventFolderName = `${reg}-${skadedatum}`;
             const eventFolderName = slugify(`ÅTGÄRDAD - ${damage.fullText} - incheckad ${incheckningsdatum} - ${incheckare}`);
             const damagePath = `${reg}/${dateEventFolderName}/${eventFolderName}`;
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
@@ -753,7 +753,7 @@ export default function CheckInForm() {
         <SectionHeader title="Fordon" />
         <div style={{ position: 'relative' }}>
           <Field label="Registreringsnummer *">
-            <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="ABC 123" autoComplete="off" className="reg-input" />
+            <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="ABC 123" className="reg-input" />
           </Field>
           {showSuggestions && suggestions.length > 0 && (
             <div className="suggestions-dropdown">{suggestions.map(s => <div key={s} className="suggestion-item" onMouseDown={() => { setRegInput(s); setShowSuggestions(false); }}>{s}</div>)}</div>
@@ -764,7 +764,7 @@ export default function CheckInForm() {
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
+              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.sale_date ? formatDate(new Date(vehicleData.sale_date), 'YYYY-MM-DD') : '---'} />
             </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
@@ -789,7 +789,7 @@ export default function CheckInForm() {
         <SectionHeader title="Fordonsstatus" />
         <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
         <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
-        <SubSectionHeader title="Tankning/Laddning" /><Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
+        <SubSectionHeader title="Tankning/Laddning" /><Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'}>Elbil</ChoiceButton></div></Field>
         {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-3-col">
           <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
           <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
@@ -810,21 +810,21 @@ export default function CheckInForm() {
         </>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media) || !hasVideo(d.media)))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || !p.position) || !hasPhoto(d.media)))}>
+      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.length === 0 || !hasPhoto(d.media) || !hasVideo(d.media))))) || existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.length === 0 || !hasPhoto(d.media))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador att hantera" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
-            ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(positionId) => removeDamagePosition(d.id, positionId, true)} />) 
+            ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, true)} />)
             : <p>Inga ohanterade befintliga skador.</p>}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(positionId) => removeDamagePosition(d.id, positionId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{ width: '100%', marginTop: '1rem' }}>+ Lägg till ytterligare ny skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, false)} />)}<Button onClick={addDamage} variant="secondary" className="add-damage-btn">+ Lägg till ytterligare ny skada</Button></>)}
       </Card>
 
-      <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia)))) }>
+      <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
         <SectionHeader title="Status & Sanering" />
         <div className="status-section-wrapper">
           <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
@@ -878,7 +878,7 @@ export default function CheckInForm() {
             </div>
             <Field label="Uthyrningsstatus *"><div className="grid-2-col">
               <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null}>Går att hyra ut</ChoiceButton>
-              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null} variant={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut' ? 'danger' : 'default'}>Går INTE att hyra ut</ChoiceButton>
+              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null} variant="danger">Går INTE att hyra ut</ChoiceButton>
             </div></Field>
           </div>)}
         </div>
@@ -909,9 +909,9 @@ export default function CheckInForm() {
         <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
       </Card>
 
-      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar någon annanstans..." rows={4}></textarea></Field></Card>
+      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={3}></textarea></Field></Card>
 
-      <div className="form-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} disabled={isFinalSaving || !regInput} variant={formIsValidState ? 'success' : 'disabled'}>{!formIsValidState ? 'Visa saknad information' : 'Slutför incheckning'}</Button></div>
+      <div className="form-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} disabled={isFinalSaving}>{isFinalSaving ? 'Skickar...' : (formIsValidState ? 'Slutför incheckning' : 'Visa saknad information')}</Button></div>
     </div>
   );
 }
@@ -924,8 +924,8 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => (<button onClick={onClick} className={`btn ${variant} ${className || ''}`} disabled={disabled} style={style}>{children}</button>);
-const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon">✓</div><h3>Tack {firstName}!</h3><p>Incheckningen har skickats.</p></div></>);
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => (<button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>);
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon">✓</div><h3>Tack, {firstName}!</h3><p>Din incheckning är mottagen.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
@@ -1008,17 +1008,17 @@ const DamageItem: React.FC<{
         {positions && positions.map((pos, i) => (<div key={pos.id} className="damage-position-row">
             <div className="grid-2-col">
                 <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)}><option value="">Välj del</option>{Object.keys(CAR_PARTS).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-                <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}><option value="">Välj position</option>{(CAR_PARTS[pos.carPart] || []).map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+                <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}><option value="">Välj position</option>{CAR_PARTS[pos.carPart]?.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
             </div>
             {positions.length > 1 && <button onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>}
         </div>))}
         <Button onClick={() => onAddPosition(damage.id)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
-        <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan mer i detalj..."></textarea></Field>
+        <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={commonProps.description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan..." /></Field>
         <div className="media-section">
           <MediaUpload id={`photo-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
           <MediaUpload id={`video-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video" : "Video *"} isOptional={isExisting} />
         </div>
-        <div className="media-previews">{damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(damage.id, i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
+        <div className="media-previews">{damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
       </div>)}
     </div>);
 };
@@ -1036,7 +1036,7 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
 };
 
 const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}</div>);
-const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet, variant='default' }) => (<button onClick={onClick} className={`choice-btn ${isActive ? `active ${variant}` : ''} ${isSet && !isActive ? 'disabled-choice' : ''} ${className || ''}`}>{children}</button>);
+const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet, variant='default' }) => { let btnClass = `choice-btn ${className || ''}`; if (isActive) btnClass += ` active ${variant}`; else if (isSet) btnClass += ' disabled-choice'; return <button onClick={onClick} className={btnClass}>{children}</button>; };
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
@@ -1049,8 +1049,8 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
     const themeClass = state.theme ? `theme-${state.theme}` : '';
     return (<><div className="modal-overlay" onClick={onClose} /><div className={`modal-content confirm-modal ${themeClass}`}>
         {state.title && <h3>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
-        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3} style={{width: '100%'}} autoFocus/></div>)}
-        <div className="modal-actions"><Button onClick={onClose} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
+        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
+        <div className="modal-actions"><Button onClick={onClose} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Spara</Button></div>
     </div></>);
 };
 
@@ -1067,7 +1067,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .main-header { text-align: center; margin-bottom: 1.5rem; }
     .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-    .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
+    .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s ease; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }
     .field[data-error="true"] textarea, .field[data-error="true"] select { border: 2px solid var(--color-danger) !important; }
     .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
@@ -1076,11 +1076,11 @@ const GlobalStyles = () => (<style jsx global>{`
     .sub-section-header h3 { font-size: 1rem; font-weight: 600; color: var(--color-text); margin:0; }
     .field { margin-bottom: 1rem; }
     .field label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.875rem; }
-    .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; }
+    .field input, .field select, .field textarea { width: 100%; padding: 0.75rem; border: 1px solid var(--color-border); border-radius: 6px; font-size: 1rem; background-color: white; box-sizing: border-box; transition: all 0.2s ease; }
     .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
     .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
     .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-    .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
+    .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto; }
     .suggestion-item { padding: 0.75rem; cursor: pointer; }
     .suggestion-item:hover { background-color: var(--color-primary-light); }
     .error-text { color: var(--color-danger); }
@@ -1104,7 +1104,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .btn.warning { background-color: var(--color-warning); color: white; }
     .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
     .btn:not(:disabled):hover { filter: brightness(1.1); }
-    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); cursor: pointer; font-weight: 500; transition: all 0.2s; }
+    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; cursor: pointer; transition: all 0.2s ease; text-align: center; }
     .choice-btn:hover { filter: brightness(1.05); }
     .choice-btn.active.default { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
     .choice-btn.active.warning { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #b45309; }
@@ -1122,7 +1122,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
     .damage-position-row { position: relative; padding-right: 2.5rem; }
     .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; }
-    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
+    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 0; }
     .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
     .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
     .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
@@ -1133,10 +1133,12 @@ const GlobalStyles = () => (<style jsx global>{`
     .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
     .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
     .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 0.8rem; display: flex; align-items: center; justify-content: center; padding: 0; line-height: 0; }
+    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 0.75rem; line-height: 1; padding: 0; }
     .remove-media-btn:hover { background-color: #b91c1c; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 500px; }
+    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; }
+    .success-modal { text-align: center; }
+    .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
     .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
     .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
