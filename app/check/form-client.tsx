@@ -1059,7 +1059,7 @@ const DamageItem: React.FC<{
 
             return (
                 <div key={pos.id} className="damage-position-row">
-                    <div className="grid-2-col">
+                    <div className={showPositionDropdown ? "grid-2-col" : ""}>
                         <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)} disabled={!damageType}><option value="">Välj del</option>{availablePlaceringar.map(part => <option key={part} value={part}>{part}</option>)}</select></Field>
                         {showPositionDropdown && <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}><option value="">Välj position</option>{availablePositioner.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>}
                     </div>
