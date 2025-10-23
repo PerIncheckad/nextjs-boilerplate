@@ -294,10 +294,6 @@ export default function CheckInForm() {
     return existingDamages.some(d => !d.isInventoried && d.status === 'not_selected');
   }, [existingDamages]);
 
-  const activeStatusSections = useMemo(() => {
-    return [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser].filter(Boolean).length;
-  }, [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser]);
-
   const formIsValidState = useMemo(() => {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
@@ -774,6 +770,8 @@ export default function CheckInForm() {
     setLaddniva(numValue > 100 ? '100' : value);
   };
 
+  const activeStatusSections = [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser].filter(Boolean).length;
+
   return (
     <div className="checkin-form">
       <GlobalStyles />
@@ -962,6 +960,7 @@ export default function CheckInForm() {
     </div>
   );
 }
+
 // =================================================================
 // 3. REUSABLE SUB-COMPONENTS & STYLES
 // =================================================================
