@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
+import { DAMAGE_OPTIONS } from '@/data/damage-options';
 
 // =================================================================
 // 1. DATA, TYPES & HELPERS
@@ -24,47 +25,7 @@ const STATIONER: Record<string, string[]> = {
   'Varberg': ['Ford Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
 };
 
-const DAMAGE_OPTIONS = {
-    "Buckla": {
-        "Stötfångare fram": ["Höger", "Mitten", "Vänster"],
-        "Stötfångare bak": ["Höger", "Mitten", "Vänster"],
-        "Dörr fram": ["Höger", "Vänster"],
-        "Dörr bak": ["Höger", "Vänster"],
-        "Skärm fram": ["Höger", "Vänster"],
-        "Skärm bak": ["Höger", "Vänster"],
-        "Tröskel": ["Höger", "Vänster"],
-        "Tak": [],
-        "Huv": [],
-        "Baklucka": []
-    },
-    "Repa": {
-        "Stötfångare fram": ["Höger", "Mitten", "Vänster"],
-        "Stötfångare bak": ["Höger", "Mitten", "Vänster"],
-        "Dörr fram": ["Höger", "Vänster"],
-        "Dörr bak": ["Höger", "Vänster"],
-        "Skärm fram": ["Höger", "Vänster"],
-        "Skärm bak": ["Höger", "Vänster"],
-        "Tröskel": ["Höger", "Vänster"],
-        "Tak": [],
-        "Huv": [],
-        "Baklucka": []
-    },
-    "Stenskott": {
-        "Vindruta": [],
-        "Huv": [],
-        "Grill": [],
-        "Strålkastare": ["Höger", "Vänster"]
-    },
-    "Skada": {
-        "Fälg": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Däck": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Vindruta": [],
-        "Sidoruta": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Backspegel": ["Höger", "Vänster"]
-    }
-};
-
-const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort();
+const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort((a, b) => a.localeCompare(b, 'sv'));
 
 type MediaFile = {
   file: File; type: 'image' | 'video'; preview?: string; thumbnail?: string;
@@ -1044,7 +1005,7 @@ const DamageItem: React.FC<{
   const description = isExisting ? (damage as ExistingDamage).userDescription : (damage as NewDamage).text;
   const positions = isExisting ? (damage as ExistingDamage).userPositions : (damage as NewDamage).positions;
   const headerText = isExisting ? `${index}. ${(damage as ExistingDamage).fullText}` : `Ny skada #${index}`;
-  const availablePlaceringar = damageType ? Object.keys(DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS] || {}) : [];
+  const availablePlaceringar = damageType ? Object.keys(DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS] || {}).sort((a, b) => a.localeCompare(b, 'sv')) : [];
 
   return (<div className={`damage-item ${resolved ? 'resolved' : ''}`}>
       <div className="damage-item-header"><span>{headerText}</span>{!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}</div>
@@ -1055,7 +1016,8 @@ const DamageItem: React.FC<{
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>
         {positions && positions.map((pos, i) => {
-            const availablePositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart]) || [];
+            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart]) || [];
+            const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
             const showPositionDropdown = availablePositioner.length > 0;
 
             return (
