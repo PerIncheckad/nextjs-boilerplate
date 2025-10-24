@@ -38,43 +38,56 @@ const createAlertBanner = (condition: boolean, text: string, details?: string): 
   if (!condition) return '';
   let fullText = `⚠️ ${text}`;
   if (details) fullText += `: ${details}`;
-  return `<tr><td style="padding: 12px 0;"><div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;"><span style="color: #92400e !important;">${fullText}</span></div></td></tr>`;
+  return `<tr><td style="padding: 12px 0;"><div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">${fullText}</div></td></tr>`;
 };
 
 const getDamageString = (damage: any): string => {
     let baseString = damage.fullText || damage.type || damage.userType || 'Okänd skada';
-    const positions = (damage.positions || damage.userPositions || []).map((p: any) => `${p.carPart} ${p.position || ''}`.trim()).filter(Boolean).join(', ');
+    
+    const positions = (damage.positions || damage.userPositions || [])
+        .map((p: any) => {
+            if (p.carPart && p.position) return `${p.carPart} (${p.position})`;
+            if (p.carPart) return p.carPart;
+            return '';
+        })
+        .filter(Boolean)
+        .join(', ');
+
     if (positions) baseString += `: ${positions}`;
+    
     const comment = damage.text || damage.userDescription || damage.resolvedComment;
     if (comment) baseString += `<br><small style="color: #000000 !important;"><strong>Kommentar:</strong> ${comment}</small>`;
+    
     return baseString;
 };
 
 const formatDamagesToHtml = (damages: any[], title: string): string => {
   if (!damages || damages.length === 0) return '';
   const items = damages.map(d => `<li style="margin-bottom: 8px; color: #000000 !important;">${getDamageString(d)}</li>`).join('');
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin: 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: #000000 !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0; color: #000000 !important;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
     if (!tankning) return '---';
     if (tankning.tankniva === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
     if (tankning.tankniva === 'tankad_nu') {
-        const parts = ['Tankad nu av MABI', tankning.liters ? `(${tankning.liters}L` : null, tankning.bransletyp ? `${tankning.bransletyp}` : null, tankning.literpris ? `@ ${tankning.literpris} kr/L)` : (tankning.liters ? ')' : null)].filter(Boolean).join(' ');
+        const parts = ['Tankad nu av MABI', tankning.liters ? `(${tankning.liters}L` : null, tankning.bransletyp ? `${tankning.bransletyp}` : null, tankning.literpris ? `@ ${tankning.literpris} kr/L)` : ')']
+            .filter(Boolean)
+            .join(' ');
         return parts;
     }
     if (tankning.tankniva === 'ej_upptankad') return 'Ej upptankad';
     return '---';
 };
 
-const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>:root{color-scheme:light dark;}body,div,table,tbody,tr,td{background-color:#ffffff!important;}h1,h2,h3,p,a,li,span,strong,small{color:#000000!important;}a,a:visited{color:#005A9C!important;text-decoration:none!important;}</style></head><body style="margin:0;padding:0;width:100%;background-color:#ffffff!important;"><center><div style="max-width:680px;margin:0 auto;background-color:#ffffff!important;"><table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%"><tr><td style="padding:20px 40px;"><div style="text-align:center;margin-bottom:20px;"><img src="${LOGO_URL}" alt="Incheckad" style="width:60px;height:auto;"></div><div style="text-align:center;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid #e5e7eb;"><h1 style="font-size:28px;font-weight:bold;margin:0;letter-spacing:2px;">${regnr}</h1></div><table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">${content}</table><div style="text-align:center;margin-top:30px;font-size:12px;"><p>Detta mejl skickades automatiskt från incheckad.se</p></div></td></tr></table></div></center></body></html>`;
+const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>:root{color-scheme:light dark;}body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,sans-serif;background-color:#f9fafb;color:#374151;margin:0;padding:20px;}.container{max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;padding:30px;border:1px solid #e5e7eb;}@media (prefers-color-scheme:dark){body{background-color:#111827;color:#9ca3af;}.container{background-color:#1f2937;border-color:#374151;}}</style></head><body><div class="container"><div style="text-align:center;border-bottom:1px solid #e5e7eb;padding-bottom:20px;margin-bottom:20px;"><img src="${LOGO_URL}" alt="INCHECKAD Logo" width="150"></div><table width="100%" style="color: #000000 !important;"><tbody>${content}</tbody></table></div></body></html>`;
 
 // =================================================================
 // 3. HTML BUILDERS - SPECIFIC EMAILS (Updated to use new payload directly)
 // =================================================================
 
 const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, tankning, laddning, rekond, varningslampa, nya_skador = [], notering, bilen_star_nu } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, nya_skador = [], notering, bilen_star_nu } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
 
@@ -101,12 +114,13 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
         <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Fordonsstatus</h2>
         <table width="100%">
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Mätarställning:</td><td>${matarstallning} km</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Däcktyp:</td><td>${hjultyp || '---'}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tankning:</td><td>${payload.drivmedel === 'elbil' ? '---' : formatTankning(tankning)}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Laddning:</td><td>${payload.drivmedel === 'elbil' ? `${laddning.laddniva}% (${laddning.antal_laddkablar} kablar)` : '---'}</td></tr>
         </table>
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador')}
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin:0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
@@ -144,7 +158,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador')}
         ${formatDamagesToHtml(nya_skador, 'Nya skador')}
       </div>
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin:0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
@@ -160,7 +174,6 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Ingen adapter behövs längre. Vi använder den nya strukturen direkt.
     const fullRequestPayload = await request.json();
     const { meta: payload, subjectBase, region } = fullRequestPayload; 
 
@@ -181,17 +194,14 @@ export async function POST(request: Request) {
     
     if (payload.status === 'PARTIAL_MATCH_DAMAGE_ONLY' || payload.status === 'NO_MATCH') {
       const warningSubject = `VARNING: ${payload.regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(payload.regnr, `<tr><td><p>Registreringsnumret <strong>${payload.regnr}</strong>, som nyss checkades in på station ${payload.station} (${payload.ort}), saknas i masterlistan. Vänligen lägg till fordonet manuellt.</p></td></tr>`);
+      const warningHtml = createBaseLayout(payload.regnr, `<tr><td><p>Registreringsnumret <strong>${payload.regnr}</strong>, som nyss checkades in på station ${payload.station} (${payload.ort}), saknas i MABI's bilregister (BUHS). En ny post kommer att skapas, men detta kan behöva följas upp manuellt.</p></td></tr>`);
       emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
     }
     
     await Promise.all(emailPromises);
 
-    // Behåll databaslogiken som den är.
-    const damagesToProcess = [...(payload.nya_skador || []), ...(payload.dokumenterade_skador || [])];
-    for (const damage of damagesToProcess) {
-        // ... (befintlig databaslogik)
-    }
+    // Databaslogiken är oförändrad och hanteras på klientsidan vid uppladdning.
+    // Denna API-route är endast för notifieringar.
 
     return NextResponse.json({ message: 'Notifications processed successfully.' });
 
