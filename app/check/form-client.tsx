@@ -201,12 +201,15 @@ export default function CheckInForm() {
   const [rekondInvandig, setRekondInvandig] = useState(false);
   const [rekondText, setRekondText] = useState('');
   const [rekondMedia, setRekondMedia] = useState<MediaFile[]>([]);
+  const [rekondFolder, setRekondFolder] = useState('');
   const [husdjurSanerad, setHusdjurSanerad] = useState(false);
   const [husdjurText, setHusdjurText] = useState('');
   const [husdjurMedia, setHusdjurMedia] = useState<MediaFile[]>([]);
+  const [husdjurFolder, setHusdjurFolder] = useState('');
   const [rokningSanerad, setRokningSanerad] = useState(false);
   const [rokningText, setRokningText] = useState('');
   const [rokningMedia, setRokningMedia] = useState<MediaFile[]>([]);
+  const [rokningFolder, setRokningFolder] = useState('');
 
   // Varningslampa State
   const [varningslampaLyser, setVarningslampaLyser] = useState(false);
@@ -265,12 +268,12 @@ export default function CheckInForm() {
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
         for (const d of newDamages) {
-            const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart]?.length || 0) > 0 && !p.position));
+            const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length || 0) > 0 && !p.position));
             if (!d.type || !hasAnyMedia(d.media) || positionsInvalid) return false;
         }
     }
     
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart]?.length > 0 && !p.position)))) return false;
+    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length > 0 && !p.position)))) return false;
 
     if (varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) return false;
     if (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))) return false;
@@ -295,15 +298,21 @@ export default function CheckInForm() {
         behoverRekond,
         utvandig: rekondUtvandig,
         invandig: rekondInvandig,
-        text: rekondText
+        text: rekondText,
+        folder: rekondFolder,
+        hasMedia: hasAnyMedia(rekondMedia)
       },
       husdjur: {
         sanerad: husdjurSanerad,
-        text: husdjurText
+        text: husdjurText,
+        folder: husdjurFolder,
+        hasMedia: hasAnyMedia(husdjurMedia)
       },
       rokning: {
         sanerad: rokningSanerad,
-        text: rokningText
+        text: rokningText,
+        folder: rokningFolder,
+        hasMedia: hasAnyMedia(rokningMedia)
       },
       varningslampa: {
         lyser: varningslampaLyser,
@@ -322,9 +331,12 @@ export default function CheckInForm() {
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
       notering: preliminarAvslutNotering,
+      status: vehicleData?.status
   }), [
-    normalizedReg, firstName, vehicleData, matarstallning, hjultyp, behoverRekond, rekondUtvandig, rekondInvandig, rekondText,
-    husdjurSanerad, husdjurText, rokningSanerad, rokningText,
+    normalizedReg, firstName, vehicleData, matarstallning, hjultyp, 
+    behoverRekond, rekondUtvandig, rekondInvandig, rekondText, rekondMedia, rekondFolder,
+    husdjurSanerad, husdjurText, husdjurMedia, husdjurFolder,
+    rokningSanerad, rokningText, rokningMedia, rokningFolder,
     varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
     drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
@@ -461,9 +473,9 @@ export default function CheckInForm() {
     setStation(''); setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null);
     setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva(''); setAntalLaddkablar(null);
     setHjultyp(null); 
-    setBehoverRekond(false); setRekondUtvandig(false); setRekondInvandig(false); setRekondText(''); setRekondMedia([]);
-    setHusdjurSanerad(false); setHusdjurText(''); setHusdjurMedia([]);
-    setRokningSanerad(false); setRokningText(''); setRokningMedia([]);
+    setBehoverRekond(false); setRekondUtvandig(false); setRekondInvandig(false); setRekondText(''); setRekondMedia([]); setRekondFolder('');
+    setHusdjurSanerad(false); setHusdjurText(''); setHusdjurMedia([]); setHusdjurFolder('');
+    setRokningSanerad(false); setRokningText(''); setRokningMedia([]); setRokningFolder('');
     setVarningslampaLyser(false); setVarningslampaBeskrivning(''); setVarningslampaUthyrningsstatus(null);
     setInsynsskyddOK(false);
     setDekalDjurRokningOK(false); setIsskrapaOK(false); setPskivaOK(false);
@@ -492,13 +504,12 @@ export default function CheckInForm() {
     try {
         const now = new Date();
         const incheckare = firstName || 'Okand';
-        const incheckareSlug = slugify(incheckare);
         const incheckningsdatum = formatDate(now, 'YYYYMMDD');
         const reg = normalizedReg;
 
         // --- Handle Inventoried Legacy Damages ---
         const legacyDamagesForUpload = finalPayloadForUI.dokumenterade_skador;
-        await Promise.all(legacyDamagesForUpload.map(async (damage) => {
+        for (const damage of legacyDamagesForUpload) {
             const skadedatum = (damage.originalDamageDate || 'unknown_date').replace(/-/g, '');
             const dateEventFolderName = `${reg}-${skadedatum}`;
             const eventFolderName = slugify(`${skadedatum} - ${damage.userType} - incheckad ${incheckningsdatum} - ${incheckare}`);
@@ -515,11 +526,11 @@ export default function CheckInForm() {
                 else damage.uploads.video_urls.push(url);
             }
             if (damage.userDescription) await uploadOne(createCommentFile(damage.userDescription), `${damagePath}/kommentar.txt`);
-        }));
+        }
 
         // --- Handle New Damages ---
         const newDamagesForUpload = finalPayloadForUI.nya_skador;
-        await Promise.all(newDamagesForUpload.map(async (damage) => {
+        for (const damage of newDamagesForUpload) {
             const dateEventFolderName = `${reg}-${incheckningsdatum}`;
             const positionString = slugify(damage.positions.map(p => `${p.carPart}-${p.position}`).join('_'));
             const eventFolderName = slugify(`${incheckningsdatum}-${damage.type}-${positionString}-${incheckare}`);
@@ -535,16 +546,17 @@ export default function CheckInForm() {
                 else damage.uploads.video_urls.push(url);
             }
             if (damage.text) await uploadOne(createCommentFile(damage.text), `${damagePath}/kommentar.txt`);
-        }));
+        }
 
         const processSaneringEvent = async (
             isEnabled: boolean,
             type: 'REKOND' | 'HUSDJUR' | 'ROKNING',
             media: MediaFile[],
             text: string,
+            setFolder: (folder: string) => void,
             rekondTypes?: { utvandig: boolean, invandig: boolean }
         ) => {
-            if (!isEnabled) return;
+            if (!isEnabled || media.length === 0) return;
             const dateEventFolderName = `${reg}-${incheckningsdatum}`;
             let typeString = type;
             if (type === 'REKOND' && rekondTypes) {
@@ -556,6 +568,7 @@ export default function CheckInForm() {
 
             const eventFolderName = slugify(`${typeString} - ${incheckare}`);
             const path = `${reg}/${dateEventFolderName}/${eventFolderName}`;
+            setFolder(path);
             
             let mediaIndex = 1;
             for (const m of media) {
@@ -566,9 +579,9 @@ export default function CheckInForm() {
             if (text) await uploadOne(createCommentFile(text), `${path}/kommentar.txt`);
         };
         
-        await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, { utvandig: rekondUtvandig, invandig: rekondInvandig });
-        await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText);
-        await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText);
+        await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, setRekondFolder, { utvandig: rekondUtvandig, invandig: rekondInvandig });
+        await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText, setHusdjurFolder);
+        await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText, setRokningFolder);
 
         // --- Handle Resolved Damages ---
         const resolvedLegacyDamages = finalPayloadForUI.åtgärdade_skador;
@@ -580,7 +593,18 @@ export default function CheckInForm() {
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
       
-        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, htmlBody: '', meta: finalPayloadForUI });
+        // The payload now contains all the necessary data, including upload folders.
+        // We create a new object from `finalPayloadForUI` to ensure React state updates are picked up.
+        const finalPayloadForNotification = {
+            ...finalPayloadForUI,
+            rekond: { ...finalPayloadForUI.rekond, folder: rekondFolder },
+            husdjur: { ...finalPayloadForUI.husdjur, folder: husdjurFolder },
+            rokning: { ...finalPayloadForUI.rokning, folder: rokningFolder },
+            dokumenterade_skador: legacyDamagesForUpload,
+            nya_skador: newDamagesForUpload,
+        };
+
+        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, meta: finalPayloadForNotification });
 
         setShowSuccessModal(true);
         setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
@@ -773,7 +797,7 @@ export default function CheckInForm() {
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.sale_date || '---'} />
+              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
             </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
@@ -819,7 +843,7 @@ export default function CheckInForm() {
         </>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart]?.length || 0) > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart))))}>
+      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length || 0) > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart))))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador att hantera" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
@@ -952,12 +976,21 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
         if (!damages || damages.length === 0) return null;
         return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
             let damageString = d.fullText || d.type || d.userType || 'Okänd skada';
-            if (title === '✅ Åtgärdade skador' && d.resolvedComment) { damageString += ` (Kommentar: ${d.resolvedComment})`; } else {
-                const positions = (d.positions || d.userPositions || []).map((p: any) => `${p.carPart} (${p.position})`).filter((s:string) => s !== ' ()').join(', ');
-                if (positions) { damageString += `: ${positions}`; }
-                const comment = d.text || d.userDescription;
-                if (comment) { damageString += ` (${comment})`; }
-            }
+            
+            const positions = (d.positions || d.userPositions || [])
+              .map((p: any) => {
+                  if (p.carPart && p.position) return `${p.carPart} (${p.position})`;
+                  if (p.carPart) return p.carPart;
+                  return '';
+              })
+              .filter(Boolean)
+              .join(', ');
+
+            if (positions) { damageString += `: ${positions}`; }
+
+            const comment = d.text || d.userDescription || (title.includes('Åtgärdade') ? d.resolvedComment : '');
+            if (comment) { damageString += ` (${comment})`; }
+
             return <li key={d.id || index}>{damageString}</li>;
         })}</ul></div>);
     };
@@ -1028,7 +1061,7 @@ const DamageItem: React.FC<{
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>
         {positions && positions.map((pos, i) => {
-            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart]) || [];
+            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]) || [];
             const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
             const showPositionDropdown = availablePositioner.length > 0;
 
@@ -1045,7 +1078,7 @@ const DamageItem: React.FC<{
         <Button onClick={() => onAddPosition(damage.id)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
         <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan..."></textarea></Field>
         <div className="media-section">
-          <MediaUpload id={`photo-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
+          <MediaUpload id={`photo-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" isOptional={isExisting} />
           <MediaUpload id={`video-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasVideo(damage.media)} fileType="video" label="Video" isOptional={true} />
         </div>
         <div className="media-previews">{damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
@@ -1105,7 +1138,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
     .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }
-    .field[data-error="true"] textarea, .field[data-error="true"] select { border: 2px solid var(--color-danger) !important; }
+    .field[data-error="true"] input, .field[data-error="true"] select, .field[data-error="true"] textarea { border: 2px solid var(--color-danger) !important; }
     .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
     .section-header h2 { font-size: 1.25rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; margin:0; }
     .sub-section-header { margin-top: 2rem; margin-bottom: 1rem; }
