@@ -26,41 +26,196 @@ const STATIONER: Record<string, string[]> = {
 
 const DAMAGE_OPTIONS = {
     "Buckla": {
-        "Stötfångare fram": ["Höger", "Mitten", "Vänster"],
-        "Stötfångare bak": ["Höger", "Mitten", "Vänster"],
-        "Dörr fram": ["Höger", "Vänster"],
-        "Dörr bak": ["Höger", "Vänster"],
-        "Skärm fram": ["Höger", "Vänster"],
-        "Skärm bak": ["Höger", "Vänster"],
-        "Tröskel": ["Höger", "Vänster"],
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Däck": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Motorhuv": [],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
         "Tak": [],
-        "Huv": [],
-        "Baklucka": []
+        "Tröskel": ["Höger", "Vänster"]
+    },
+    "Däckskada": {
+        "Däck": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"]
+    },
+    "Däckskada sommarhjul": {
+        "Däck": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"]
+    },
+    "Däckskada vinterhjul": {
+        "Däck": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"]
+    },
+    "Fälgskada sommarhjul": {
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"]
+    },
+    "Fälgskada vinterhjul": {
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"]
+    },
+    "Feltankning": {},
+    "Höjdledsskada": {},
+    "Intryck": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Grill": []
+    },
+    "Invändig skada": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida"],
+        "Panel (transportbil)": [],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tak": []
+    },
+    "Jack": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Motorhuv": ["Utsida"],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
+    },
+    "Krockskada": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Motorhuv": ["Utsida"],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
+    },
+    "Krossad ruta": {
+        "Höger fram": [],
+        "Höger bak": [],
+        "Höger annan": [],
+        "Vänster bak": [],
+        "Vänster fram": [],
+        "Vänster annan": [],
+        "Vindruta": [],
+        "Bakruta": [],
+        "Tak": []
+    },
+    "Oaktsamhet": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Däck": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Motorhuv": ["Utsida"],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tak": [],
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
+    },
+    "Punktering": {
+        "Däck": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"]
     },
     "Repa": {
-        "Stötfångare fram": ["Höger", "Mitten", "Vänster"],
-        "Stötfångare bak": ["Höger", "Mitten", "Vänster"],
-        "Dörr fram": ["Höger", "Vänster"],
-        "Dörr bak": ["Höger", "Vänster"],
-        "Skärm fram": ["Höger", "Vänster"],
-        "Skärm bak": ["Höger", "Vänster"],
-        "Tröskel": ["Höger", "Vänster"],
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Motorhuv": ["Utsida"],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
         "Tak": [],
-        "Huv": [],
-        "Baklucka": []
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
+    },
+    "Repor": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Motorhuv": ["Utsida"],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tak": [],
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
+    },
+    "Skrapad": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Motorhuv": ["Utsida"],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tak": [],
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
+    },
+    "Skrapad fälg": {
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"]
+    },
+    "Spricka": {
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Yttre backspegel": ["Höger", "Vänster"]
     },
     "Stenskott": {
-        "Vindruta": [],
-        "Huv": [],
+        "Annan del": [],
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
         "Grill": [],
-        "Strålkastare": ["Höger", "Vänster"]
+        "Motorhuv": [],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
     },
-    "Skada": {
-        "Fälg": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Däck": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Vindruta": [],
-        "Sidoruta": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Backspegel": ["Höger", "Vänster"]
+    "Trasig": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Yttre backspegel": ["Höger", "Vänster"]
+    },
+    "Övrigt": {
+        "Annan del": [],
+        "Bagagelucka": ["Insida", "Utsida"],
+        "Däck": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr insida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Dörr utsida": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Front läpp": ["Höger", "Mitten", "Vänster"],
+        "Fälg": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Glas": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Grill": [],
+        "Motorhuv": ["Utsida"],
+        "Skärm": ["Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Stötfångare fram": ["Bak", "Fram", "Höger bak", "Höger fram", "Vänster bak", "Vänster fram"],
+        "Tak": [],
+        "Tröskel": ["Höger", "Vänster"],
+        "Yttre backspegel": ["Höger", "Vänster"]
     }
 };
 
@@ -945,7 +1100,7 @@ export default function CheckInForm() {
         <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
       </Card>
 
-      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={3}></textarea></Card>
+      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={3}></textarea></Field></Card>
 
       <div className="form-actions">
         <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
