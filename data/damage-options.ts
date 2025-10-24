@@ -145,21 +145,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tröskel": [
       "Höger",
@@ -211,21 +199,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tröskel": [
       "Höger",
@@ -300,21 +276,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tak": [],
     "Tröskel": [
@@ -381,21 +345,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tak": [],
     "Tröskel": [
@@ -454,21 +406,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tak": [],
     "Tröskel": [
@@ -527,21 +467,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tak": [],
     "Tröskel": [
@@ -571,21 +499,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster fram"
     ],
     "Grill": [],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Yttre backspegel": [
       "Höger",
@@ -610,21 +526,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tröskel": [
       "Höger",
@@ -717,21 +621,9 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
-    "Stötfångare fram": [
-      "Bak",
+    "Stötfångare": [
       "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
-    ],
-    "Stötfångare bak": [
-      "Bak",
-      "Fram",
-      "Höger bak",
-      "Höger fram",
-      "Vänster bak",
-      "Vänster fram"
+      "Bak"
     ],
     "Tak": [],
     "Tröskel": [
