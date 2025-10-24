@@ -48,11 +48,25 @@ function parseCSV(filePath: string): DamageEntry[] {
     const line = lines[i].trim();
     if (!line) continue;
     
-    // Parse CSV - handle quoted fields and trim whitespace/tabs
-    const parts = line.split(',').map(part => {
-      // Remove quotes and normalize whitespace
-      return normalizeWhitespace(part.replace(/^["']|["']$/g, ''));
-    });
+    // Simple CSV parsing - splits on comma, handles quoted fields
+    // For production use, consider a library like papaparse for complex CSV handling
+    const parts: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
+      
+      if (char === '"') {
+        inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        parts.push(normalizeWhitespace(current));
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    parts.push(normalizeWhitespace(current)); // Add last field
     
     if (parts.length < 3) continue;
     
