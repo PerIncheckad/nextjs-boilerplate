@@ -1043,7 +1043,7 @@ const DamageItem: React.FC<{
         <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan..." /></Field>
         <div className="media-section">
           <MediaUpload id={`photo-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
-          <MediaUpload id={`video-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video" : "Video *"} isOptional={isExisting} />
+          <MediaUpload id={`video-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video" : "Video"} isOptional={true} />
         </div>
         <div className="media-previews">{damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
       </div>)}
