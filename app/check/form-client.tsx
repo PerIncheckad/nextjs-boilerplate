@@ -440,8 +440,17 @@ export default function CheckInForm() {
   // Handlers
   const handleShowErrors = () => {
     setShowFieldErrors(true);
-    const firstError = document.querySelector('.card[data-error="true"], .field[data-error="true"]');
-    if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Defer to next paint so data-error attributes are applied before querying
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const firstError = document.querySelector('.card[data-error="true"], .field[data-error="true"]') as HTMLElement | null;
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const focusable = firstError.querySelector('input, select, textarea') as HTMLElement | null;
+          focusable?.focus();
+        }
+      });
+    });
   };
 
   const resetForm = () => {
