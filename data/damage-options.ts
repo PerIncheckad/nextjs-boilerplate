@@ -1,5 +1,5 @@
 // Auto-generated from Skadetyp, Placering, Position_20251023.csv
-// Generated at: 2025-10-24T07:44:39.355Z
+// Generated at: 2025-10-24T10:03:51.219Z
 
 export const DAMAGE_OPTIONS = {
   "Buckla": {
@@ -153,6 +153,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
+    "Stötfångare bak": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
     "Tröskel": [
       "Höger",
       "Vänster"
@@ -204,6 +212,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster fram"
     ],
     "Stötfångare fram": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
+    "Stötfångare bak": [
       "Bak",
       "Fram",
       "Höger bak",
@@ -292,6 +308,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
+    "Stötfångare bak": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
     "Tak": [],
     "Tröskel": [
       "Höger",
@@ -365,6 +389,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
+    "Stötfångare bak": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
     "Tak": [],
     "Tröskel": [
       "Höger",
@@ -423,6 +455,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster fram"
     ],
     "Stötfångare fram": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
+    "Stötfångare bak": [
       "Bak",
       "Fram",
       "Höger bak",
@@ -495,6 +535,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
+    "Stötfångare bak": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
     "Tak": [],
     "Tröskel": [
       "Höger",
@@ -531,6 +579,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster bak",
       "Vänster fram"
     ],
+    "Stötfångare bak": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
     "Yttre backspegel": [
       "Höger",
       "Vänster"
@@ -555,6 +611,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster fram"
     ],
     "Stötfångare fram": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
+    "Stötfångare bak": [
       "Bak",
       "Fram",
       "Höger bak",
@@ -654,6 +718,14 @@ export const DAMAGE_OPTIONS = {
       "Vänster fram"
     ],
     "Stötfångare fram": [
+      "Bak",
+      "Fram",
+      "Höger bak",
+      "Höger fram",
+      "Vänster bak",
+      "Vänster fram"
+    ],
+    "Stötfångare bak": [
       "Bak",
       "Fram",
       "Höger bak",
