@@ -440,7 +440,7 @@ export default function CheckInForm() {
   // Handlers
   const handleShowErrors = () => {
     setShowFieldErrors(true);
-    // Defer to next paint so data-error attributes are applied before querying
+    // Use double requestAnimationFrame to ensure DOM queries happen after React re-render and browser paint
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const firstError = document.querySelector('.card[data-error="true"], .field[data-error="true"]') as HTMLElement | null;
