@@ -267,7 +267,7 @@ export default function CheckInForm() {
         }
     }
     
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart]?.length > 0 && !p.position)) || !hasPhoto(d.media))) return false;
+    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart]?.length > 0 && !p.position)))) return false;
 
     if (varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) return false;
     if (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))) return false;
@@ -770,7 +770,7 @@ export default function CheckInForm() {
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
+              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.sale_date || '---'} />
             </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
@@ -816,7 +816,7 @@ export default function CheckInForm() {
         </>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart]?.length > 0 && !p.position)) || !hasPhoto(d.media) || !hasVideo(d.media)))))}>
+      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => !d.type || d.positions.some(p => !p.carPart) || !hasPhoto(d.media) || !hasVideo(d.media)))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || d.userPositions.some(p => !p.carPart))))}>
         <SectionHeader title="Skador" />
         <SubSectionHeader title="Befintliga skador att hantera" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
@@ -827,7 +827,7 @@ export default function CheckInForm() {
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, false)} />)}<Button onClick={addDamage} variant="secondary" className="add-position-btn">+ Lägg till ytterligare ny skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{width: '100%', marginTop: '1rem'}}>+ Lägg till ytterligare en ny skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
@@ -884,7 +884,7 @@ export default function CheckInForm() {
             </div>
             <Field label="Uthyrningsstatus *"><div className="grid-2-col">
               <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null}>OK att hyra ut</ChoiceButton>
-              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null} variant='danger'>EJ OK att hyra ut</ChoiceButton>
+              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null} variant="danger">EJ OK att hyra ut</ChoiceButton>
             </div></Field>
           </div>)}
         </div>
@@ -940,8 +940,8 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>;
-const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg></div><h3>Tack {firstName}!</h3><p>Din incheckning har registrerats.</p></div></>);
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, ...props }) => <button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''}`} disabled={disabled} {...props}>{children}</button>;
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: '3rem', height: '3rem'}}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15L15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div><h3>Tack {firstName}!</h3><p>Din incheckning har skickats.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
@@ -1032,15 +1032,15 @@ const DamageItem: React.FC<{
             return (
                 <div key={pos.id} className="damage-position-row">
                     <div className={showPositionDropdown ? "grid-2-col" : ""}>
-                        <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)} disabled={!damageType}><option value="">Välj del</option>{availablePlaceringar.map(part => <option key={part} value={part}>{part}</option>)}</select></Field>
-                        {showPositionDropdown && <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)} disabled={!pos.carPart}><option value="">Välj position</option>{availablePositioner.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>}
+                        <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)} disabled={!damageType}><option value="">Välj placering</option>{availablePlaceringar.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+                        {showPositionDropdown && <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)}><option value="">Välj position</option>{availablePositioner.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>}
                     </div>
                     {positions.length > 1 && <button onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>}
                 </div>
             );
         })}
         <Button onClick={() => onAddPosition(damage.id)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
-        <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan..." /></Field>
+        <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan..."></textarea></Field>
         <div className="media-section">
           <MediaUpload id={`photo-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" />
           <MediaUpload id={`video-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasVideo(damage.media)} fileType="video" label={isExisting ? "Video" : "Video"} isOptional={true} />
@@ -1050,7 +1050,7 @@ const DamageItem: React.FC<{
     </div>);
 };
 
-const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string, isOptional?: boolean }> = ({ id, onUpload, hasFile, fileType, label, isOptional }) => {
+const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string, isOptional?: boolean }> = ({ id, onUpload, hasFile, fileType, label, isOptional = false }) => {
     let className = 'media-label';
     if (hasFile) className += ' active';
     else if (isOptional) className += ' optional';
@@ -1063,7 +1063,7 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
 };
 
 const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}</div>);
-const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet, variant='default' }) => {
+const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet = false, variant = 'default' }) => {
     let btnClass = 'choice-btn';
     if (className) btnClass += ` ${className}`;
     if (isActive) btnClass += ` active ${variant}`;
@@ -1100,7 +1100,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .main-header { text-align: center; margin-bottom: 1.5rem; }
     .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-    .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s ease; }
+    .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }
     .field[data-error="true"] textarea, .field[data-error="true"] select { border: 2px solid var(--color-danger) !important; }
     .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
@@ -1137,7 +1137,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .btn.warning { background-color: var(--color-warning); color: white; }
     .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
     .btn:not(:disabled):hover { filter: brightness(1.1); }
-    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
     .choice-btn:hover { filter: brightness(1.05); }
     .choice-btn.active.default { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
     .choice-btn.active.warning { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #b45309; }
@@ -1155,7 +1155,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
     .damage-position-row { position: relative; padding-right: 2.5rem; }
     .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; }
-    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.25rem; line-height: 1; padding: 0; }
+    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; font-size: 1.25rem; font-weight: bold; cursor: pointer; }
     .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
     .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
     .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
@@ -1166,10 +1166,10 @@ const GlobalStyles = () => (<style jsx global>{`
     .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
     .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
     .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; padding: 0; }
+    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 1rem; font-weight: bold; line-height: 1; padding: 0; }
     .remove-media-btn:hover { background-color: #b91c1c; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; max-height: 90vh; overflow-y: auto; }
+    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; }
     .success-modal { text-align: center; }
     .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
