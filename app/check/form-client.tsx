@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
+import { DAMAGE_OPTIONS } from '@/lib/damage-options';
 
 // =================================================================
 // 1. DATA, TYPES & HELPERS
@@ -22,46 +23,6 @@ const STATIONER: Record<string, string[]> = {
   'Halmstad': ['Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
   'Trelleborg': ['Trelleborg'],
   'Varberg': ['Ford Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
-};
-
-const DAMAGE_OPTIONS = {
-    "Buckla": {
-        "Stötfångare fram": ["Höger", "Mitten", "Vänster"],
-        "Stötfångare bak": ["Höger", "Mitten", "Vänster"],
-        "Dörr fram": ["Höger", "Vänster"],
-        "Dörr bak": ["Höger", "Vänster"],
-        "Skärm fram": ["Höger", "Vänster"],
-        "Skärm bak": ["Höger", "Vänster"],
-        "Tröskel": ["Höger", "Vänster"],
-        "Tak": [],
-        "Huv": [],
-        "Baklucka": []
-    },
-    "Repa": {
-        "Stötfångare fram": ["Höger", "Mitten", "Vänster"],
-        "Stötfångare bak": ["Höger", "Mitten", "Vänster"],
-        "Dörr fram": ["Höger", "Vänster"],
-        "Dörr bak": ["Höger", "Vänster"],
-        "Skärm fram": ["Höger", "Vänster"],
-        "Skärm bak": ["Höger", "Vänster"],
-        "Tröskel": ["Höger", "Vänster"],
-        "Tak": [],
-        "Huv": [],
-        "Baklucka": []
-    },
-    "Stenskott": {
-        "Vindruta": [],
-        "Huv": [],
-        "Grill": [],
-        "Strålkastare": ["Höger", "Vänster"]
-    },
-    "Skada": {
-        "Fälg": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Däck": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Vindruta": [],
-        "Sidoruta": ["Höger fram", "Vänster fram", "Höger bak", "Vänster bak"],
-        "Backspegel": ["Höger", "Vänster"]
-    }
 };
 
 const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort();
@@ -945,7 +906,7 @@ export default function CheckInForm() {
         <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
       </Card>
 
-      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={3}></textarea></Card>
+      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={3}></textarea></Field></Card>
 
       <div className="form-actions">
         <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
