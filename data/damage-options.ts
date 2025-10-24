@@ -1,5 +1,5 @@
 // Auto-generated from Skadetyp, Placering, Position_20251023.csv
-// Generated at: 2025-10-24T07:39:31.075Z
+// Generated at: 2025-10-24T07:42:12.873Z
 
 export const DAMAGE_OPTIONS = {
   "Buckla": {

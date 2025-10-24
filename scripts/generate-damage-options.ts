@@ -17,6 +17,7 @@ function normalizeWhitespace(str: string): string {
 
 /**
  * Parses a CSV line handling quoted fields properly
+ * Supports escaped quotes ("") within quoted fields per CSV standard
  */
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
@@ -25,9 +26,17 @@ function parseCSVLine(line: string): string[] {
   
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
+    const nextChar = i + 1 < line.length ? line[i + 1] : null;
     
     if (char === '"') {
-      inQuotes = !inQuotes;
+      if (inQuotes && nextChar === '"') {
+        // Escaped quote ("") - add one quote to current and skip next
+        current += '"';
+        i++; // Skip the next quote
+      } else {
+        // Toggle quote state
+        inQuotes = !inQuotes;
+      }
     } else if (char === ',' && !inQuotes) {
       result.push(current);
       current = '';
