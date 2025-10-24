@@ -7,6 +7,7 @@ type Props = { children: React.ReactNode };
 const EMAIL_WHITELIST = new Set<string>([
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
+  'latif.mutlu@mabi.se',
 ]);
 
 export default function LoginGate({ children }: Props) {
