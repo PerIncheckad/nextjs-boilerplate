@@ -1,5 +1,5 @@
-// Auto-generated from docs/Skadetyp, Placering, Position_20251023.csv
-// Generated at: 2025-10-24T07:32:54.496Z
+// Auto-generated from Skadetyp, Placering, Position_20251023.csv
+// Generated at: 2025-10-24T07:39:31.075Z
 
 export const DAMAGE_OPTIONS = {
   "Buckla": {
@@ -228,9 +228,7 @@ export const DAMAGE_OPTIONS = {
     "Vänster fram": [],
     "Vänster annan": [],
     "Vindruta": [],
-    "Bakruta": []
-  },
-  "\"Krossad ruta \"": {
+    "Bakruta": [],
     "Tak": []
   },
   "Oaktsamhet": {

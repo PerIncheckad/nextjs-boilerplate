@@ -16,6 +16,31 @@ function normalizeWhitespace(str: string): string {
 }
 
 /**
+ * Parses a CSV line handling quoted fields properly
+ */
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  
+  return result;
+}
+
+/**
  * Strips UTF-8 BOM (Byte Order Mark) from the beginning of a string if present
  */
 function stripBOM(content: string): string {
@@ -46,8 +71,8 @@ function generateDamageOptions() {
   const damageOptions: Record<string, Record<string, string[]>> = {};
   
   for (const line of dataLines) {
-    // Split by comma, handling potential edge cases
-    const parts = line.split(',');
+    // Parse CSV line properly handling quoted fields
+    const parts = parseCSVLine(line);
     
     if (parts.length < 3) {
       console.warn(`Skipping malformed line: ${line}`);
@@ -81,7 +106,8 @@ function generateDamageOptions() {
   }
   
   // Generate the output
-  const output = `// Auto-generated from docs/Skadetyp, Placering, Position_20251023.csv
+  const csvFileName = csvPath.split('/').pop() || 'CSV file';
+  const output = `// Auto-generated from ${csvFileName}
 // Generated at: ${new Date().toISOString()}
 
 export const DAMAGE_OPTIONS = ${JSON.stringify(damageOptions, null, 2)} as const;
