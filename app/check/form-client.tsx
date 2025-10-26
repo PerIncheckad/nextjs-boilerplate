@@ -549,20 +549,14 @@ export default function CheckInForm() {
             if (damage.text) await uploadOne(createCommentFile(damage.text), `${damagePath}/kommentar.txt`);
         }
 
-        // Define temp folders for this submission
-        let tempRekondFolder = '';
-        let tempHusdjurFolder = '';
-        let tempRokningFolder = '';
-
         const processSaneringEvent = async (
             isEnabled: boolean,
             type: 'REKOND' | 'HUSDJUR' | 'ROKNING',
             media: MediaFile[],
             text: string,
-            setFolder: (folder: string) => void,
             rekondTypes?: { utvandig: boolean, invandig: boolean }
-        ) => {
-            if (!isEnabled || media.length === 0) return;
+        ): Promise<{ folder: string; photo_urls: string[]; video_urls: string[] }> => {
+            if (!isEnabled || media.length === 0) return { folder: '', photo_urls: [], video_urls: [] };
             const dateEventFolderName = `${reg}-${incheckningsdatum}`;
             let typeString = type;
             if (type === 'REKOND' && rekondTypes) {
@@ -574,20 +568,25 @@ export default function CheckInForm() {
 
             const eventFolderName = slugify(`${typeString} - ${incheckare}`);
             const path = `${reg}/${dateEventFolderName}/${eventFolderName}`;
-            setFolder(path);
             
+            const photo_urls: string[] = [];
+            const video_urls: string[] = [];
             let mediaIndex = 1;
             for (const m of media) {
                 const fileName = `${reg}-${incheckningsdatum}-kl-${formatDate(now, 'HH-MM')}_${slugify(type)}_${mediaIndex++}`;
                 const ext = m.file.name.split('.').pop();
-                await uploadOne(m.file, `${path}/${fileName}.${ext}`);
+                const url = await uploadOne(m.file, `${path}/${fileName}.${ext}`);
+                if (m.type === 'image') photo_urls.push(url);
+                else video_urls.push(url);
             }
             if (text) await uploadOne(createCommentFile(text), `${path}/kommentar.txt`);
+            
+            return { folder: path, photo_urls, video_urls };
         };
         
-        await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, (f) => tempRekondFolder = f, { utvandig: rekondUtvandig, invandig: rekondInvandig });
-        await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText, (f) => tempHusdjurFolder = f);
-        await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText, (f) => tempRokningFolder = f);
+        const rekondUploads = await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, { utvandig: rekondUtvandig, invandig: rekondInvandig });
+        const husdjurUploads = await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText);
+        const rokningUploads = await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText);
 
         // --- Handle Resolved Damages ---
         const resolvedLegacyDamages = finalPayloadForUI.åtgärdade_skador;
@@ -601,9 +600,33 @@ export default function CheckInForm() {
       
         const finalPayloadForNotification = {
             ...finalPayloadForUI,
-            rekond: { ...finalPayloadForUI.rekond, folder: tempRekondFolder },
-            husdjur: { ...finalPayloadForUI.husdjur, folder: tempHusdjurFolder },
-            rokning: { ...finalPayloadForUI.rokning, folder: tempRokningFolder },
+            rekond: { 
+                ...finalPayloadForUI.rekond, 
+                folder: rekondUploads.folder,
+                uploads: {
+                    photo_urls: rekondUploads.photo_urls,
+                    video_urls: rekondUploads.video_urls,
+                    folder: rekondUploads.folder
+                }
+            },
+            husdjur: { 
+                ...finalPayloadForUI.husdjur, 
+                folder: husdjurUploads.folder,
+                uploads: {
+                    photo_urls: husdjurUploads.photo_urls,
+                    video_urls: husdjurUploads.video_urls,
+                    folder: husdjurUploads.folder
+                }
+            },
+            rokning: { 
+                ...finalPayloadForUI.rokning, 
+                folder: rokningUploads.folder,
+                uploads: {
+                    photo_urls: rokningUploads.photo_urls,
+                    video_urls: rokningUploads.video_urls,
+                    folder: rokningUploads.folder
+                }
+            },
             dokumenterade_skador: legacyDamagesForUpload,
             nya_skador: newDamagesForUpload,
         };
@@ -1150,12 +1173,23 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         background-image: url(${backgroundUrl});
         background-size: cover;
         background-position: center;
-        opacity: 0.5;
+        opacity: 0.45;
         z-index: -1;
     }
     .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
     .main-header { text-align: center; margin-bottom: 1.5rem; }
-    .main-logo { max-width: 188px; height: auto; margin: 0 auto 1rem auto; display: block; }
+    .main-logo { 
+        max-width: 235px; 
+        height: auto; 
+        margin: 0 auto 1rem auto; 
+        display: block; 
+        transform: translateX(8%);
+    }
+    @media (min-width: 768px) {
+        .main-logo {
+            transform: translateX(0%);
+        }
+    }
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
     .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }

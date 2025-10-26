@@ -38,20 +38,21 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 
 const createStorageLink = (folderPath: string | undefined): string | null => {
     if (!folderPath || !supabaseProjectId) return null;
-    return `https://app.supabase.com/project/${supabaseProjectId}/storage/buckets/damage-photos/browse/${folderPath}`;
+    // Encode each path segment separately to preserve slashes as separators
+    const encodedPath = folderPath.split('/').map(encodeURIComponent).join('/');
+    return `https://app.supabase.com/project/${supabaseProjectId}/storage/buckets/damage-photos/browse/${encodedPath}`;
 }
 
-const createAlertBanner = (condition: boolean, text: string, details?: string, folderPath?: string): string => {
+const createAlertBanner = (condition: boolean, text: string, details?: string, link?: string, bgColor = '#FFFBEB', borderColor = '#FDE68A', textColor = '#92400e'): string => {
   if (!condition) return '';
   
-  const storageLink = createStorageLink(folderPath);
   let fullText = `⚠️ ${text}`;
   if (details) fullText += `: ${details}`;
 
-  const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">${fullText}${storageLink ? ' <span style="font-size: 1.1em;">🔗</span>' : ''}</div>`;
+  const bannerContent = `<div style="background-color: ${bgColor} !important; border: 1px solid ${borderColor}; padding: 12px; text-align: center; font-weight: bold; color: ${textColor} !important; border-radius: 8px;">${fullText}${link ? ' <span style="font-size: 1.1em;">🔗</span>' : ''}</div>`;
 
-  const finalHtml = storageLink 
-    ? `<a href="${storageLink}" target="_blank" style="text-decoration: none; color: #92400e !important;">${bannerContent}</a>`
+  const finalHtml = link 
+    ? `<a href="${link}" target="_blank" rel="noopener noreferrer" style="text-decoration: none !important; color: ${textColor} !important; display: block;">${bannerContent}</a>`
     : bannerContent;
 
   return `<tr><td style="padding: 6px 0;">${finalHtml}</td></tr>`;
@@ -72,7 +73,7 @@ const getDamageString = (damage: any): string => {
     if (positions) baseString += `: ${positions}`;
     
     const comment = damage.text || damage.userDescription || damage.resolvedComment;
-    if (comment) baseString += `<br><small style="color: inherit !important;"><strong>Kommentar:</strong> ${comment}</small>`;
+    if (comment) baseString += `<br><small style="color: inherit !important;"><strong>Kommentar (skada):</strong> ${comment}</small>`;
     
     return baseString;
 };
@@ -82,9 +83,10 @@ const formatDamagesToHtml = (damages: any[], title: string): string => {
   
   const items = damages.map(d => {
     const text = getDamageString(d);
-    const storageLink = createStorageLink(d.uploads?.folder);
-    const linkContent = storageLink 
-      ? ` <a href="${storageLink}" target="_blank" style="text-decoration: none; color: #2563eb !important; font-weight: bold;">(Visa media 🔗)</a>`
+    // Prefer public URLs from uploads arrays, fallback to storage link
+    const mediaLink = d.uploads?.photo_urls?.[0] || d.uploads?.video_urls?.[0] || createStorageLink(d.uploads?.folder);
+    const linkContent = mediaLink 
+      ? ` <a href="${mediaLink}" target="_blank" rel="noopener noreferrer" style="text-decoration: none !important; color: #2563eb !important; font-weight: bold;">(Visa media 🔗)</a>`
       : '';
     return `<li style="margin-bottom: 8px; color: inherit !important;">${text}${linkContent}</li>`;
   }).join('');
@@ -116,13 +118,34 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
+  const isEjOkAttHyraUt = varningslampa?.uthyrningsstatus === 'ej_ok_att_hyra_ut';
+
+  // Determine the link for banners - prefer public URLs
+  const varningslampaLink = varningslampa?.media?.photo_urls?.[0] || varningslampa?.media?.video_urls?.[0] || createStorageLink(varningslampa?.folder);
+  const rekondLink = rekond?.uploads?.photo_urls?.[0] || rekond?.uploads?.video_urls?.[0] || createStorageLink(rekond?.folder);
+
+  // Build comments section
+  let commentsSection = '';
+  const comments = [];
+  if (notering) comments.push({ label: 'Incheckare notering', text: notering });
+  if (rekond?.text) comments.push({ label: 'Kommentar (rekond)', text: rekond.text });
+  if (payload.husdjur?.text) comments.push({ label: 'Kommentar (husdjur)', text: payload.husdjur.text });
+  if (payload.rokning?.text) comments.push({ label: 'Kommentar (rökning)', text: payload.rokning.text });
+  
+  if (comments.length > 0) {
+    const commentItems = comments.map(c => `<p style="margin: 0.5rem 0;"><strong>${c.label}:</strong> ${c.text}</p>`).join('');
+    commentsSection = `<div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;"><h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>${commentItems}</div>`;
+  }
 
   const content = `
+    ${createAlertBanner(isEjOkAttHyraUt, 'Ej OK att hyra ut', varningslampa.beskrivning, varningslampaLink, '#FEE2E2', '#DC2626', '#991b1b')}
+    ${createAlertBanner(varningslampa.lyser && !isEjOkAttHyraUt, 'Varningslampa lyser', varningslampa.beskrivning, varningslampaLink)}
     ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!')}
     ${createAlertBanner(notRefueled, 'Bilen är ej upptankad!')}
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning)}
-    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder)}
+    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekondLink)}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
+
+    ${commentsSection}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -143,11 +166,10 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Mätarställning:</td><td>${matarstallning} km</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Däcktyp:</td><td>${hjultyp || '---'}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tankning:</td><td>${payload.drivmedel === 'elbil' ? '---' : formatTankning(tankning)}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Laddning:</td><td>${payload.drivmedel === 'elbil' ? `${laddning.laddniva}% (${laddning.antal_laddkablar} kablar)` : '---'}</td></tr>
+          ${payload.drivmedel === 'elbil' ? `<tr><td style="font-weight:bold;width:120px;padding:4px 0;">Laddning:</td><td>${laddning.laddniva}% (${laddning.antal_laddkablar} kablar)</td></tr>` : ''}
         </table>
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador')}
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
@@ -155,13 +177,37 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
+  
+  const isEjOkAttHyraUt = varningslampa?.uthyrningsstatus === 'ej_ok_att_hyra_ut';
+  
+  // Determine the links for banners - prefer public URLs
+  const varningslampaLink = varningslampa?.media?.photo_urls?.[0] || varningslampa?.media?.video_urls?.[0] || createStorageLink(varningslampa?.folder);
+  const rekondLink = rekond?.uploads?.photo_urls?.[0] || rekond?.uploads?.video_urls?.[0] || createStorageLink(rekond?.folder);
+  const husdjurLink = husdjur?.uploads?.photo_urls?.[0] || husdjur?.uploads?.video_urls?.[0] || createStorageLink(husdjur?.folder);
+  const rokningLink = rokning?.uploads?.photo_urls?.[0] || rokning?.uploads?.video_urls?.[0] || createStorageLink(rokning?.folder);
+
+  // Build comments section
+  let commentsSection = '';
+  const comments = [];
+  if (notering) comments.push({ label: 'Incheckare notering', text: notering });
+  if (rekond?.text) comments.push({ label: 'Kommentar (rekond)', text: rekond.text });
+  if (husdjur?.text) comments.push({ label: 'Kommentar (husdjur)', text: husdjur.text });
+  if (rokning?.text) comments.push({ label: 'Kommentar (rökning)', text: rokning.text });
+  
+  if (comments.length > 0) {
+    const commentItems = comments.map(c => `<p style="margin: 0.5rem 0;"><strong>${c.label}:</strong> ${c.text}</p>`).join('');
+    commentsSection = `<div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;"><h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Kommentarer</h2>${commentItems}</div>`;
+  }
           
   const content = `
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning)}
-    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekond.folder)}
-    ${createAlertBanner(husdjur.sanerad, 'Husdjur - sanerad', husdjur.text, husdjur.folder)}
-    ${createAlertBanner(rokning.sanerad, 'Rökning - sanerad', rokning.text, rokning.folder)}
+    ${createAlertBanner(isEjOkAttHyraUt, 'Ej OK att hyra ut', varningslampa.beskrivning, varningslampaLink, '#FEE2E2', '#DC2626', '#991b1b')}
+    ${createAlertBanner(varningslampa.lyser && !isEjOkAttHyraUt, 'Varningslampa lyser', varningslampa.beskrivning, varningslampaLink)}
+    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekondLink)}
+    ${createAlertBanner(husdjur.sanerad, 'Husdjur - sanerad', husdjur.text, husdjurLink)}
+    ${createAlertBanner(rokning.sanerad, 'Rökning - sanerad', rokning.text, rokningLink)}
     ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats')}
+
+    ${commentsSection}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -187,7 +233,6 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador')}
         ${formatDamagesToHtml(nya_skador, 'Nya skador')}
       </div>
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
@@ -204,6 +249,7 @@ export async function POST(request: Request) {
 
   try {
     const fullRequestPayload = await request.json();
+    // console.log(JSON.stringify(fullRequestPayload, null, 2));
     const { meta: payload, subjectBase, region } = fullRequestPayload; 
 
     const now = new Date();
