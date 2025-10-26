@@ -48,12 +48,13 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
   let fullText = `⚠️ ${text}`;
   if (details) fullText += `: ${details}`;
 
-  const linkContent = storageLink 
-    ? `<a href="${storageLink}" target="_blank" style="text-decoration: none; color: #92400e !important;">${fullText} <span style="font-size: 1.1em;">🔗</span></a>`
-    : fullText;
+  const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">${fullText}${storageLink ? ' <span style="font-size: 1.1em;">🔗</span>' : ''}</div>`;
 
-  // CORRECTED: Re-added the hard-forced color styling for dark mode compatibility.
-  return `<tr><td style="padding: 12px 0;"><div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">${linkContent}</div></td></tr>`;
+  const finalHtml = storageLink 
+    ? `<a href="${storageLink}" target="_blank" style="text-decoration: none; color: #92400e !important;">${bannerContent}</a>`
+    : bannerContent;
+
+  return `<tr><td style="padding: 6px 0;">${finalHtml}</td></tr>`;
 };
 
 const getDamageString = (damage: any): string => {
@@ -100,7 +101,7 @@ const formatTankning = (tankning: any): string => {
             .join(' ');
         return parts;
     }
-    if (tankning.tankniva === 'ej_upptankad') return 'Ej upptankad';
+    if (tankning.tankniva === 'ej_upptankad') return '<span style="font-weight: bold; color: #b91c1c !important;">Ej upptankad</span>';
     return '---';
 };
 
@@ -114,9 +115,11 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
   const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, nya_skador = [], notering, bilen_star_nu } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
+  const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
 
   const content = `
     ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!')}
+    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad!')}
     ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder)}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
