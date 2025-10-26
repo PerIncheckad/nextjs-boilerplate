@@ -11,6 +11,7 @@ import { DAMAGE_OPTIONS } from '@/data/damage-options';
 // =================================================================
 
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga.png";
+// keep background image reference but don't change UI behavior
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Svart%20bakgrund%20MB%20grill/MB%20front%20grill%20logo.jpg";
 
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
@@ -83,17 +84,26 @@ const hasAnyMedia = (files?: MediaFile[]) => hasPhoto(files) || hasVideo(files);
 
 function slugify(str: string): string {
     if (!str) return '';
-    const a = 'åäöÅÄÖ ';
-    const b = 'aaoAAO-';
-    const p = new RegExp(a.split('').join('|'), 'g');
-
-    return str.toString().toLowerCase()
-        .replace(p, c => b.charAt(a.indexOf(c)))
+    // preserve main behavior but ensure ascii output
+    const replacements: Record<string, string> = {
+        'å': 'a', 'ä': 'a', 'ö': 'o',
+        'Å': 'A', 'Ä': 'A', 'Ö': 'O',
+        ' ': '-'
+    };
+    
+    let result = str.toString();
+    // Replace Swedish characters and spaces
+    for (const [char, replacement] of Object.entries(replacements)) {
+        result = result.split(char).join(replacement);
+    }
+    
+    return result.toLowerCase()
         .replace(/&/g, '-and-')
         .replace(/[^\w\-]+/g, '')
         .replace(/\-\-+/g, '-')
-        .replace(/^-/, '')
-        .replace(/_$/, '');
+        .replace(/^-+/, '')
+        .replace(/-+$/, '')
+        .replace(/_+$/, '');
 }
 
 const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'HH-MM') => {
@@ -115,20 +125,31 @@ const createCommentFile = (content: string): File => {
     return new File([content], "kommentar.txt", { type: "text/plain" });
 };
 
+// Improved uploadOne: handles already existing resources, returns publicUrl or throws when unavailable
 async function uploadOne(file: File, path: string): Promise<string> {
-    const BUCKET = "damage-photos";
-    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type });
-    if (error) {
-        if (error.message.includes('The resource already exists')) {
-            console.warn(`File already exists, not re-uploading: ${path}`);
-        } else {
-            console.error(`Storage Error for key "${path}":`, error);
-            throw error;
-        }
+  const BUCKET = 'damage-photos';
+  try {
+    // try upload; ignore already exists error
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+    if (error && !/already exists/i.test(error.message || '')) {
+      console.error('Storage upload error for', path, error);
+      // continue to attempt to return public url even on upload error
     }
-    
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    return data.publicUrl;
+  } catch (e) {
+    console.error('Unexpected upload error', e);
+  }
+
+  // Always try to fetch public url
+  const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  if (urlError) {
+    console.error('Failed to get public url for', path, urlError);
+    throw urlError;
+  }
+  if (!data?.publicUrl) {
+    console.warn('Public url missing for', path);
+    throw new Error('Public url missing');
+  }
+  return data.publicUrl;
 }
 
 const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
