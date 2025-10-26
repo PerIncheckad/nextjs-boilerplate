@@ -101,9 +101,8 @@ function slugify(str: string): string {
         .replace(/&/g, '-and-')
         .replace(/[^\w\-]+/g, '')
         .replace(/\-\-+/g, '-')
-        .replace(/^-+/, '')
-        .replace(/-+$/, '')
-        .replace(/_+$/, '');
+        .replace(/^-+|-+$/g, '')
+        .replace(/_+$/g, '');
 }
 
 const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'HH-MM') => {
@@ -129,7 +128,7 @@ const createCommentFile = (content: string): File => {
 async function uploadOne(file: File, path: string): Promise<string> {
   const BUCKET = 'damage-photos';
   try {
-    // try upload; ignore already exists error
+    // try upload with upsert: false to detect already-existing files
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
     if (error && !/already exists/i.test(error.message || '')) {
       console.error('Storage upload error for', path, error);
