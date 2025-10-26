@@ -10,7 +10,8 @@ import { DAMAGE_OPTIONS } from '@/data/damage-options';
 // 1. DATA, TYPES & HELPERS
 // =================================================================
 
-const MABI_LOGO_URL = "/mabi-logo.png";
+const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga.png";
+const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Svart%20bakgrund%20MB%20grill/MB%20front%20grill%20logo.jpg";
 
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
@@ -548,6 +549,11 @@ export default function CheckInForm() {
             if (damage.text) await uploadOne(createCommentFile(damage.text), `${damagePath}/kommentar.txt`);
         }
 
+        // Define temp folders for this submission
+        let tempRekondFolder = '';
+        let tempHusdjurFolder = '';
+        let tempRokningFolder = '';
+
         const processSaneringEvent = async (
             isEnabled: boolean,
             type: 'REKOND' | 'HUSDJUR' | 'ROKNING',
@@ -579,9 +585,9 @@ export default function CheckInForm() {
             if (text) await uploadOne(createCommentFile(text), `${path}/kommentar.txt`);
         };
         
-        await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, setRekondFolder, { utvandig: rekondUtvandig, invandig: rekondInvandig });
-        await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText, setHusdjurFolder);
-        await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText, setRokningFolder);
+        await processSaneringEvent(behoverRekond, 'REKOND', rekondMedia, rekondText, (f) => tempRekondFolder = f, { utvandig: rekondUtvandig, invandig: rekondInvandig });
+        await processSaneringEvent(husdjurSanerad, 'HUSDJUR', husdjurMedia, husdjurText, (f) => tempHusdjurFolder = f);
+        await processSaneringEvent(rokningSanerad, 'ROKNING', rokningMedia, rokningText, (f) => tempRokningFolder = f);
 
         // --- Handle Resolved Damages ---
         const resolvedLegacyDamages = finalPayloadForUI.åtgärdade_skador;
@@ -593,13 +599,11 @@ export default function CheckInForm() {
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
       
-        // The payload now contains all the necessary data, including upload folders.
-        // We create a new object from `finalPayloadForUI` to ensure React state updates are picked up.
         const finalPayloadForNotification = {
             ...finalPayloadForUI,
-            rekond: { ...finalPayloadForUI.rekond, folder: rekondFolder },
-            husdjur: { ...finalPayloadForUI.husdjur, folder: husdjurFolder },
-            rokning: { ...finalPayloadForUI.rokning, folder: rokningFolder },
+            rekond: { ...finalPayloadForUI.rekond, folder: tempRekondFolder },
+            husdjur: { ...finalPayloadForUI.husdjur, folder: tempHusdjurFolder },
+            rokning: { ...finalPayloadForUI.rokning, folder: tempRokningFolder },
             dokumenterade_skador: legacyDamagesForUpload,
             nya_skador: newDamagesForUpload,
         };
@@ -771,7 +775,7 @@ export default function CheckInForm() {
 
   return (
     <div className="checkin-form">
-      <GlobalStyles />
+      <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
       {isFinalSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
       {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
@@ -1123,7 +1127,7 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
     </div></>);
 };
 
-const GlobalStyles = () => (<style jsx global>{`
+const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) => (<style jsx global>{`
     :root {
       --color-bg: #f8fafc; --color-card: #ffffff; --color-text: #1f2937; --color-text-secondary: #6b7280;
       --color-primary: #2563eb; --color-primary-light: #eff6ff; --color-success: #16a34a; --color-success-light: #f0fdf4;
@@ -1131,10 +1135,27 @@ const GlobalStyles = () => (<style jsx global>{`
       --color-border: #e5e7eb; --color-border-focus: #3b82f6; --color-disabled: #a1a1aa; --color-disabled-light: #f4f4f5;
       --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05); --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; }
+    body { 
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+        background-color: var(--color-bg); 
+        color: var(--color-text); 
+        margin: 0; 
+        padding: 0; 
+    }
+    body::before {
+        content: "";
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background-image: url(${backgroundUrl});
+        background-size: cover;
+        background-position: center;
+        opacity: 0.5;
+        z-index: -1;
+    }
     .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
     .main-header { text-align: center; margin-bottom: 1.5rem; }
-    .main-logo { max-width: 150px; height: auto; margin: 0 auto 1rem auto; display: block; }
+    .main-logo { max-width: 188px; height: auto; margin: 0 auto 1rem auto; display: block; }
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
     .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }
@@ -1190,7 +1211,7 @@ const GlobalStyles = () => (<style jsx global>{`
     .damage-item-actions { padding: 0 1rem 1rem 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--color-border); margin-top: 0.75rem; padding-top: 1rem; }
     .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
     .damage-position-row { position: relative; padding-right: 2.5rem; }
-    .add-position-btn { width: 100%; margin: 0.5rem 0; font-size: 0.875rem; padding: 0.5rem; }
+    .add-position-btn { width: 100% !important; margin: 0.5rem 0 !important; font-size: 0.875rem !important; padding: 0.5rem !important; }
     .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; font-size: 1.25rem; font-weight: bold; cursor: pointer; }
     .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
     .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
