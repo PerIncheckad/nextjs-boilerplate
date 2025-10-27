@@ -6,12 +6,19 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
+interface MediaFile {
+  name: string;
+  url: string;
+  isImage: boolean;
+  isVideo: boolean;
+}
+
 export default function MediaViewer() {
   const params = useParams();
   const path = params.path as string[];
   const folderPath = path ? path.join('/') : '';
   
-  const [files, setFiles] = useState<any[]>([]);
+  const [files, setFiles] = useState<MediaFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +41,7 @@ export default function MediaViewer() {
         if (listError) throw listError;
 
         // Get public URLs for all files
-        const filesWithUrls = data?.filter(file => !file.id.endsWith('/'))
+        const filesWithUrls: MediaFile[] = data?.filter(file => !file.name.endsWith('/'))
           .map(file => {
             const fullPath = folderPath ? `${folderPath}/${file.name}` : file.name;
             const { data: urlData } = supabase.storage
@@ -46,7 +53,7 @@ export default function MediaViewer() {
               url: urlData.publicUrl,
               isImage: /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name),
               isVideo: /\.(mp4|webm|mov)$/i.test(file.name),
-            };
+            } as MediaFile;
           }) || [];
 
         setFiles(filesWithUrls);
