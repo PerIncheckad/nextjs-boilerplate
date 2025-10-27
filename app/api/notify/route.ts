@@ -12,22 +12,21 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeho
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 const bilkontrollAddress = process.env.BILKONTROLL_MAIL;
-const regionSydAddress = process.env.MAIL_REGION_SYD;
-const regionMittAddress = process.env.MAIL_REGION_MITT;
-const regionNorrAddress = process.env.MAIL_REGION_NORR;
+const huvudstationAddress = process.env.HUVUDSTATION_MAIL || 'per@incheckad.se';
 const fallbackAddress = process.env.TEST_MAIL;
 
 const supabaseProjectId = supabaseUrl.match(/https:\/\/(.*)\.supabase\.co/)?.[1];
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://nextjs-boilerplate-eight-zeta-15.vercel.app';
 
 const regionMapping: { [ort: string]: string | undefined } = {
-  'Malmö': regionSydAddress,
-  'Helsingborg': regionSydAddress,
-  'Ängelholm': regionSydAddress,
-  'Halmstad': regionSydAddress,
-  'Falkenberg': regionSydAddress,
-  'Trelleborg': regionSydAddress,
-  'Varberg': regionSydAddress,
-  'Lund': regionSydAddress,
+  'Malmö': huvudstationAddress,
+  'Helsingborg': huvudstationAddress,
+  'Ängelholm': huvudstationAddress,
+  'Halmstad': huvudstationAddress,
+  'Falkenberg': huvudstationAddress,
+  'Trelleborg': huvudstationAddress,
+  'Varberg': huvudstationAddress,
+  'Lund': huvudstationAddress,
 };
 
 const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/INcheckad%20logo/INCHECKAD%20LOGO%20yellow%20DRAFT.png';
@@ -37,8 +36,8 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 // =================================================================
 
 const createStorageLink = (folderPath: string | undefined): string | null => {
-    if (!folderPath || !supabaseProjectId) return null;
-    return `https://app.supabase.com/project/${supabaseProjectId}/storage/buckets/damage-photos/browse/${folderPath}`;
+    if (!folderPath) return null;
+    return `${siteUrl}/media/${folderPath}`;
 }
 
 const createAlertBanner = (condition: boolean, text: string, details?: string, folderPath?: string): string => {
@@ -105,7 +104,65 @@ const formatTankning = (tankning: any): string => {
     return '---';
 };
 
-const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>:root{color-scheme:light dark;}body{font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica Neue,Arial,sans-serif;background-color:#f9fafb;color:#374151;margin:0;padding:20px;}.container{max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:8px;padding:30px;border:1px solid #e5e7eb;}p,td,h1,h2,h3,li{color:#000000!important} @media (prefers-color-scheme:dark){body{background-color:#111827;color:#9ca3af;}.container{background-color:#1f2937;border-color:#374151;}p,td,h1,h2,h3,li{color:#ffffff!important}}</style></head><body><div class="container"><div style="text-align:center;border-bottom:1px solid #e5e7eb;padding-bottom:20px;margin-bottom:20px;"><img src="${LOGO_URL}" alt="INCHECKAD Logo" width="150"></div><table width="100%"><tbody>${content}</tbody></table></div></body></html>`;
+const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <meta name="color-scheme" content="light dark">
+  <meta name="supported-color-schemes" content="light dark">
+  <style>
+    :root { color-scheme: light dark; }
+    body { 
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
+      background-color: #f9fafb !important; 
+      color: #000000 !important; 
+      margin: 0; 
+      padding: 20px; 
+    }
+    .container { 
+      max-width: 600px; 
+      margin: 0 auto; 
+      background-color: #ffffff !important; 
+      border-radius: 8px; 
+      padding: 30px; 
+      border: 1px solid #e5e7eb; 
+    }
+    p, td, h1, h2, h3, li, span, div, strong, small { 
+      color: #000000 !important; 
+    }
+    a { 
+      color: #2563eb !important; 
+    }
+    @media (prefers-color-scheme: dark) {
+      body { 
+        background-color: #111827 !important; 
+        color: #ffffff !important; 
+      }
+      .container { 
+        background-color: #1f2937 !important; 
+        border-color: #374151 !important; 
+      }
+      p, td, h1, h2, h3, li, span, div, strong, small { 
+        color: #ffffff !important; 
+      }
+      a { 
+        color: #60a5fa !important; 
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div style="text-align: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 20px;">
+      <img src="${LOGO_URL}" alt="INCHECKAD Logo" width="150">
+    </div>
+    <table width="100%" style="color: #000000 !important;">
+      <tbody>${content}</tbody>
+    </table>
+  </div>
+</body>
+</html>`;
 
 // =================================================================
 // 3. HTML BUILDERS - SPECIFIC EMAILS

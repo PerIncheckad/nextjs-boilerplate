@@ -25,6 +25,7 @@
 
   { "namn": "HBSC Helsingborg", "station_id": "1701", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "Ford Helsingborg", "station_id": "1702", "huvudstation_id": "170", "region": "Syd", "type": "station" },
+  { "namn": "MB Helsingborg", "station_id": "1704", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "Transport Helsingborg", "station_id": "1703", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "S. Jönsson", "station_id": "1705", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "BMW Helsingborg", "station_id": "1706", "huvudstation_id": "170", "region": "Syd", "type": "station" },
@@ -36,13 +37,13 @@
   { "namn": "Werksta Helsingborg", "station_id": "174", "huvudstation_id": "170", "region": "Syd", "type": "station" },
   { "namn": "Båstad", "station_id": "157", "huvudstation_id": "170", "region": "Syd", "type": "station" },
 
-  { "namn": "FORD Ängelholm", "station_id": "1711", "huvudstation_id": "171", "region": "Syd", "type": "station" },
+  { "namn": "Ford Ängelholm", "station_id": "1711", "huvudstation_id": "171", "region": "Syd", "type": "station" },
   { "namn": "Mekonomen Ängelholm", "station_id": "1712", "huvudstation_id": "171", "region": "Syd", "type": "station" },
   { "namn": "Flyget Ängelholm", "station_id": "154", "huvudstation_id": "171", "region": "Syd", "type": "station" },
 
   { "namn": "Flyget Halmstad", "station_id": "2741", "huvudstation_id": "274", "region": "Norr", "type": "station" },
   { "namn": "KIA Halmstad", "station_id": "2743", "huvudstation_id": "274", "region": "Norr", "type": "station" },
-  { "namn": "FORD Halmstad", "station_id": "2744", "huvudstation_id": "274", "region": "Norr", "type": "station" },
+  { "namn": "Ford Halmstad", "station_id": "2744", "huvudstation_id": "274", "region": "Norr", "type": "station" },
 
   { "namn": "Ford Varberg", "station_id": "2901", "huvudstation_id": "290", "region": "Syd", "type": "station" },
   { "namn": "Hedin Automotive Varberg", "station_id": "2902", "huvudstation_id": "290", "region": "Syd", "type": "station" },

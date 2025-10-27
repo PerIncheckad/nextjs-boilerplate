@@ -1170,7 +1170,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         background-image: url(${backgroundUrl});
         background-size: cover;
         background-position: center;
-        opacity: 0.5;
+        opacity: 0.3;
         z-index: -1;
     }
     .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
