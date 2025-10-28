@@ -902,7 +902,7 @@ export default function CheckInForm() {
             <Field label="Kommentar (frivilligt)"><textarea value={rentalComment} onChange={e => setRentalComment(e.target.value)} placeholder="Ange orsak till varför bilen inte kan hyras ut..." rows={2}></textarea></Field>
           </div>)}
         </div>
-        {(rentalUnavailable || behoverRekond) && <hr className="subsection-divider" />}
+        {activeStatusSections > 1 && rentalUnavailable && <hr className="subsection-divider" />}
 
         <div className="status-section-wrapper">
           <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
