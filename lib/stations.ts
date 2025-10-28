@@ -17,6 +17,7 @@ export const STATIONS: StationTree = {
     { id: 'halmstad-city-airport', name: 'Halmstad City Airport' },
   ],
   'Helsingborg': [
+    { id: 'helsingborg-mb', name: 'MB Helsingborg' },
     { id: 'helsingborg-bilskadeservice', name: 'Bil & Skadeservice' },
     { id: 'helsingborg-floretten', name: 'Floretten' },
     { id: 'helsingborg-forenade-bil', name: 'Förenade Bil' },

@@ -17,14 +17,14 @@ const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
 const STATIONER: Record<string, string[]> = {
-  'Malmö': ['Ford Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
-  'Helsingborg': ['HBSC Helsingborg', 'Ford Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby'],
-  'Lund': ['Ford Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
+  'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
+  'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B/S Helsingborg', 'Werksta Helsingborg', 'Båstad'],
+  'Lund': ['FORD Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
   'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
   'Falkenberg': ['Falkenberg'],
   'Halmstad': ['Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
   'Trelleborg': ['Trelleborg'],
-  'Varberg': ['Ford Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
+  'Varberg': ['FORD Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
 };
 
 const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort((a, b) => a.localeCompare(b, 'sv'));
@@ -1170,14 +1170,14 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         background-image: url(${backgroundUrl});
         background-size: cover;
         background-position: center;
-        opacity: 0.3;
+        opacity: 1;
         z-index: -1;
     }
     .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
     .main-header { text-align: center; margin-bottom: 1.5rem; }
     .main-logo { max-width: 188px; height: auto; margin: 0 auto 1rem auto; display: block; }
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-    .card { background-color: var(--color-card); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
+    .card { background-color: rgba(255, 255, 255, 0.92); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }
     .field[data-error="true"] input, .field[data-error="true"] select, .field[data-error="true"] textarea { border: 2px solid var(--color-danger) !important; }
     .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
@@ -1246,7 +1246,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 1rem; font-weight: bold; line-height: 1; padding: 0; }
     .remove-media-btn:hover { background-color: #b91c1c; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: white; padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; }
+    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(255, 255, 255, 0.92); padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; }
     .success-modal { text-align: center; }
     .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
