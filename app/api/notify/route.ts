@@ -190,16 +190,19 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 // =================================================================
 
 const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, nya_skador = [], notering, bilen_star_nu } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, rental, varningslampa, nya_skador = [], notering, bilen_star_nu, status } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
+  const insynsskyddSaknas = status?.insynsskyddSaknas === true;
 
   const content = `
-    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!', undefined, undefined, siteUrl)}
-    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad!', undefined, undefined, siteUrl)}
+    ${createAlertBanner(rental?.unavailable, 'Bilen går inte att hyra ut', rental?.comment, undefined, siteUrl)}
     ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder, siteUrl)}
+    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
+    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!', undefined, undefined, siteUrl)}
+    ${createAlertBanner(insynsskyddSaknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats', undefined, undefined, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
@@ -232,11 +235,17 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
+  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, rental, varningslampa, tankning, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], status } = payload;
+  
+  const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning?.tankniva === 'ej_upptankad';
+  const insynsskyddSaknas = status?.insynsskyddSaknas === true;
           
   const content = `
+    ${createAlertBanner(rental?.unavailable, 'Bilen går inte att hyra ut', rental?.comment, undefined, siteUrl)}
     ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekond.folder, siteUrl)}
+    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
+    ${createAlertBanner(insynsskyddSaknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
     ${createAlertBanner(husdjur.sanerad, 'Husdjur - sanerad', husdjur.text, husdjur.folder, siteUrl)}
     ${createAlertBanner(rokning.sanerad, 'Rökning - sanerad', rokning.text, rokning.folder, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats', undefined, undefined, siteUrl)}

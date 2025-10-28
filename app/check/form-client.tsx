@@ -237,6 +237,10 @@ export default function CheckInForm() {
   const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState('');
   const [varningslampaUthyrningsstatus, setVarningslampaUthyrningsstatus] = useState<'ok_att_hyra_ut' | 'ej_ok_att_hyra_ut' | null>(null);
 
+  // Rental Status State
+  const [rentalUnavailable, setRentalUnavailable] = useState(false);
+  const [rentalComment, setRentalComment] = useState('');
+
   // Skador State
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'inga_nya_skador' | 'nya_skador' | null>(null);
@@ -315,6 +319,10 @@ export default function CheckInForm() {
       carModel: vehicleData?.model, 
       matarstallning, 
       hjultyp, 
+      rental: {
+        unavailable: rentalUnavailable,
+        comment: rentalComment
+      },
       rekond: {
         behoverRekond,
         utvandig: rekondUtvandig,
@@ -352,16 +360,20 @@ export default function CheckInForm() {
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
       notering: preliminarAvslutNotering,
-      status: vehicleData?.status
+      status: {
+        ...vehicleData?.status,
+        insynsskyddSaknas: !insynsskyddOK
+      }
   }), [
     normalizedReg, firstName, vehicleData, matarstallning, hjultyp, 
+    rentalUnavailable, rentalComment,
     behoverRekond, rekondUtvandig, rekondInvandig, rekondText, rekondMedia, rekondFolder,
     husdjurSanerad, husdjurText, husdjurMedia, husdjurFolder,
     rokningSanerad, rokningText, rokningMedia, rokningFolder,
     varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
     drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
-    newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering
+    newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering, insynsskyddOK
   ]);
 
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -494,6 +506,7 @@ export default function CheckInForm() {
     setStation(''); setMatarstallning(''); setDrivmedelstyp(null); setTankniva(null);
     setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva(''); setAntalLaddkablar(null);
     setHjultyp(null); 
+    setRentalUnavailable(false); setRentalComment('');
     setBehoverRekond(false); setRekondUtvandig(false); setRekondInvandig(false); setRekondText(''); setRekondMedia([]); setRekondFolder('');
     setHusdjurSanerad(false); setHusdjurText(''); setHusdjurMedia([]); setHusdjurFolder('');
     setRokningSanerad(false); setRokningText(''); setRokningMedia([]); setRokningFolder('');
@@ -791,7 +804,7 @@ export default function CheckInForm() {
     setLaddniva(numValue > 100 ? '100' : value);
   };
 
-  const activeStatusSections = [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser].filter(Boolean).length;
+  const activeStatusSections = [rentalUnavailable, behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser].filter(Boolean).length;
 
   return (
     <div className="checkin-form">
@@ -883,6 +896,14 @@ export default function CheckInForm() {
 
       <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
         <SectionHeader title="Status & Sanering" />
+        <div className="status-section-wrapper">
+          <ChoiceButton onClick={() => setRentalUnavailable(!rentalUnavailable)} isActive={rentalUnavailable} className="warning-light-checkbox">Går inte att hyra ut</ChoiceButton>
+          {rentalUnavailable && (<div className="damage-details">
+            <Field label="Kommentar (frivilligt)"><textarea value={rentalComment} onChange={e => setRentalComment(e.target.value)} placeholder="Ange orsak till varför bilen inte kan hyras ut..." rows={2}></textarea></Field>
+          </div>)}
+        </div>
+        {(rentalUnavailable || behoverRekond) && <hr className="subsection-divider" />}
+
         <div className="status-section-wrapper">
           <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
           {behoverRekond && (<div className="damage-details">
