@@ -68,9 +68,9 @@ export default function MediaViewer() {
 
         setFiles(filesWithUrls);
         
-        // Load kommentar.txt files content
+        // Load kommentar.txt files content in parallel
         const kommentarFiles = filesWithUrls.filter(f => f.isKommentar);
-        for (const file of kommentarFiles) {
+        const kommentarPromises = kommentarFiles.map(async (file) => {
           const fullPath = folderPath ? `${folderPath}/${file.name}` : file.name;
           const { data: downloadData, error: downloadError } = await supabase.storage
             .from('damage-photos')
@@ -78,9 +78,19 @@ export default function MediaViewer() {
           
           if (!downloadError && downloadData) {
             const text = await downloadData.text();
-            setKommentarContent(prev => ({ ...prev, [file.name]: text }));
+            return { name: file.name, text };
           }
-        }
+          return null;
+        });
+        
+        const kommentarResults = await Promise.all(kommentarPromises);
+        const newKommentarContent: {[key: string]: string} = {};
+        kommentarResults.forEach(result => {
+          if (result) {
+            newKommentarContent[result.name] = result.text;
+          }
+        });
+        setKommentarContent(newKommentarContent);
       } catch (err: any) {
         setError(err.message || 'Failed to load media');
         console.error('Media load error:', err);
@@ -185,7 +195,7 @@ export default function MediaViewer() {
                 {isExpanded && content && (
                   <div className="kommentar-content">
                     {content.split('\n').map((line, i) => (
-                      <div key={i}>{line || '\u00A0'}</div>
+                      <div key={`line-${i}`}>{line || '\u00A0'}</div>
                     ))}
                   </div>
                 )}
