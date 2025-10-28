@@ -8,6 +8,8 @@ const EMAIL_WHITELIST = new Set<string>([
   'per.andersson@mabi.se',
   'ingemar.carqueija@mabi.se',
   'latif.mutlu@mabi.se',
+  'hugo.carqueija@gmail.com',
+  'benjamin.mutlu@outlook.com',
   'isak.brandeby@mabi.se',
 ]);
 
