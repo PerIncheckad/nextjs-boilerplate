@@ -16,7 +16,26 @@ const huvudstationAddress = process.env.HUVUDSTATION_MAIL || 'per@incheckad.se';
 const fallbackAddress = process.env.TEST_MAIL;
 
 const supabaseProjectId = supabaseUrl.match(/https:\/\/(.*)\.supabase\.co/)?.[1];
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://nextjs-boilerplate-eight-zeta-15.vercel.app';
+
+// Get the site URL from environment or construct it dynamically from the request
+// This ensures media links always point to the correct host (production or preview)
+const getSiteUrl = (request: Request): string => {
+  // First try environment variable
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+  
+  // Otherwise, use the request's host
+  const host = request.headers.get('host');
+  const protocol = request.headers.get('x-forwarded-proto') || 'https';
+  
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+  
+  // Final fallback (should rarely be used)
+  return 'https://nextjs-boilerplate-eight-zeta-15.vercel.app';
+};
 
 const regionMapping: { [ort: string]: string | undefined } = {
   'Malmö': huvudstationAddress,
@@ -35,15 +54,15 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 // 2. HTML BUILDER - HELPERS
 // =================================================================
 
-const createStorageLink = (folderPath: string | undefined): string | null => {
+const createStorageLink = (folderPath: string | undefined, siteUrl: string): string | null => {
     if (!folderPath) return null;
     return `${siteUrl}/media/${folderPath}`;
 }
 
-const createAlertBanner = (condition: boolean, text: string, details?: string, folderPath?: string): string => {
+const createAlertBanner = (condition: boolean, text: string, details?: string, folderPath?: string, siteUrl?: string): string => {
   if (!condition) return '';
   
-  const storageLink = createStorageLink(folderPath);
+  const storageLink = siteUrl ? createStorageLink(folderPath, siteUrl) : null;
   let fullText = `⚠️ ${text}`;
   if (details) fullText += `: ${details}`;
 
@@ -76,12 +95,12 @@ const getDamageString = (damage: any): string => {
     return baseString;
 };
 
-const formatDamagesToHtml = (damages: any[], title: string): string => {
+const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string): string => {
   if (!damages || damages.length === 0) return '';
   
   const items = damages.map(d => {
     const text = getDamageString(d);
-    const storageLink = createStorageLink(d.uploads?.folder);
+    const storageLink = createStorageLink(d.uploads?.folder, siteUrl);
     const linkContent = storageLink 
       ? ` <a href="${storageLink}" target="_blank" style="text-decoration: none; color: #2563eb !important; font-weight: bold;">(Visa media 🔗)</a>`
       : '';
@@ -109,10 +128,10 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light">
   <style>
-    :root { color-scheme: light dark; }
+    :root { color-scheme: light only; }
     body { 
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; 
       background-color: #f9fafb !important; 
@@ -134,20 +153,22 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
     a { 
       color: #2563eb !important; 
     }
+    /* Force light mode in email clients that support dark mode */
     @media (prefers-color-scheme: dark) {
+      :root { color-scheme: light only !important; }
       body { 
-        background-color: #111827 !important; 
-        color: #ffffff !important; 
+        background-color: #f9fafb !important; 
+        color: #000000 !important; 
       }
       .container { 
-        background-color: #1f2937 !important; 
-        border-color: #374151 !important; 
+        background-color: #ffffff !important; 
+        border-color: #e5e7eb !important; 
       }
       p, td, h1, h2, h3, li, span, div, strong, small { 
-        color: #ffffff !important; 
+        color: #000000 !important; 
       }
       a { 
-        color: #60a5fa !important; 
+        color: #2563eb !important; 
       }
     }
   </style>
@@ -168,18 +189,18 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 // 3. HTML BUILDERS - SPECIFIC EMAILS
 // =================================================================
 
-const buildHuvudstationEmail = (payload: any, date: string, time: string): string => {
+const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
   const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, nya_skador = [], notering, bilen_star_nu } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
 
   const content = `
-    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!')}
-    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad!')}
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning)}
-    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder)}
-    ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats')}
+    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!', undefined, undefined, siteUrl)}
+    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad!', undefined, undefined, siteUrl)}
+    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
+    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder, siteUrl)}
+    ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats', undefined, undefined, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -203,22 +224,22 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string): strin
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Laddning:</td><td>${payload.drivmedel === 'elbil' ? `${laddning.laddniva}% (${laddning.antal_laddkablar} kablar)` : '---'}</td></tr>
         </table>
       </div>
-      ${formatDamagesToHtml(nya_skador, 'Nya skador')}
+      ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
       ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
 };
 
-const buildBilkontrollEmail = (payload: any, date: string, time: string): string => {
+const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
   const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
           
   const content = `
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning)}
-    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekond.folder)}
-    ${createAlertBanner(husdjur.sanerad, 'Husdjur - sanerad', husdjur.text, husdjur.folder)}
-    ${createAlertBanner(rokning.sanerad, 'Rökning - sanerad', rokning.text, rokning.folder)}
-    ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats')}
+    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
+    ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekond.folder, siteUrl)}
+    ${createAlertBanner(husdjur.sanerad, 'Husdjur - sanerad', husdjur.text, husdjur.folder, siteUrl)}
+    ${createAlertBanner(rokning.sanerad, 'Rökning - sanerad', rokning.text, rokning.folder, siteUrl)}
+    ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats', undefined, undefined, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -240,9 +261,9 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string): string
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Skadeöversikt</h2>
-        ${formatDamagesToHtml(åtgärdade_skador, 'Åtgärdade / Hittas ej')}
-        ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador')}
-        ${formatDamagesToHtml(nya_skador, 'Nya skador')}
+        ${formatDamagesToHtml(åtgärdade_skador, 'Åtgärdade / Hittas ej', siteUrl)}
+        ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador', siteUrl)}
+        ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
       </div>
       ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
     </td></tr>
@@ -263,6 +284,10 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const { meta: payload, subjectBase, region } = fullRequestPayload; 
 
+    // Get the site URL from the request to ensure media links work correctly
+    const siteUrl = getSiteUrl(request);
+    console.log('Using site URL for media links:', siteUrl);
+
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
     const date = now.toLocaleDateString('sv-SE', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -272,10 +297,10 @@ export async function POST(request: Request) {
     const regionalAddress = regionMapping[payload.ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
     
-    const huvudstationHtml = buildHuvudstationEmail(payload, date, time);
+    const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
     
-    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time);
+    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, siteUrl);
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
     
     if (payload.status === 'PARTIAL_MATCH_DAMAGE_ONLY' || payload.status === 'NO_MATCH') {
