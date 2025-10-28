@@ -235,15 +235,20 @@ export default function CheckInForm() {
   // Varningslampa State
   const [varningslampaLyser, setVarningslampaLyser] = useState(false);
   const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState('');
-  const [varningslampaUthyrningsstatus, setVarningslampaUthyrningsstatus] = useState<'ok_att_hyra_ut' | 'ej_ok_att_hyra_ut' | null>(null);
+  
+  // Uthyrningsstatus State (separate from Varningslampa)
+  const [garInteAttHyraUt, setGarInteAttHyraUt] = useState(false);
+  const [garInteAttHyraUtBeskrivning, setGarInteAttHyraUtBeskrivning] = useState('');
 
   // Skador State
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'inga_nya_skador' | 'nya_skador' | null>(null);
   const [newDamages, setNewDamages] = useState<NewDamage[]>([]);
 
+  // Insynsskydd State (moved to Status & Sanering)
+  const [insynsskyddBehoverHanteras, setInsynsskyddBehoverHanteras] = useState(false);
+  
   // Checklista State
-  const [insynsskyddOK, setInsynsskyddOK] = useState(false);
   const [dekalDjurRokningOK, setDekalDjurRokningOK] = useState(false);
   const [isskrapaOK, setIsskrapaOK] = useState(false);
   const [pskivaOK, setPskivaOK] = useState(false);
@@ -269,9 +274,9 @@ export default function CheckInForm() {
   const availableStationsBilenStarNu = useMemo(() => STATIONER[bilenStarNuOrt] || [], [bilenStarNuOrt]);
   
   const otherChecklistItemsOK = useMemo(() => {
-     const common = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK && vindrutaAvtorkadOK;
+     const common = dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK && vindrutaAvtorkadOK;
      return drivmedelstyp === 'bensin_diesel' ? common && adblueOK : common;
-  }, [insynsskyddOK, dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, vindrutaAvtorkadOK, adblueOK, drivmedelstyp]);
+  }, [dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, vindrutaAvtorkadOK, adblueOK, drivmedelstyp]);
 
   const isChecklistComplete = useMemo(() => {
     return washed && otherChecklistItemsOK;
@@ -296,7 +301,7 @@ export default function CheckInForm() {
     
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length > 0 && !p.position)))) return false;
 
-    if (varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) return false;
+    if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     if (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))) return false;
     
     if (unhandledLegacyDamages) return false;
@@ -304,7 +309,7 @@ export default function CheckInForm() {
     return isChecklistComplete;
   }, [
     regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
-    skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
+    skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning,
     behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, unhandledLegacyDamages
   ]);
 
@@ -337,8 +342,14 @@ export default function CheckInForm() {
       },
       varningslampa: {
         lyser: varningslampaLyser,
-        beskrivning: varningslampaBeskrivning,
-        uthyrningsstatus: varningslampaUthyrningsstatus
+        beskrivning: varningslampaBeskrivning
+      },
+      uthyrningsstatus: {
+        garInteAttHyraUt: garInteAttHyraUt,
+        beskrivning: garInteAttHyraUtBeskrivning
+      },
+      insynsskydd: {
+        behoverHanteras: insynsskyddBehoverHanteras
       },
       drivmedel: drivmedelstyp, 
       tankning: { tankniva, liters, bransletyp, literpris },
@@ -358,7 +369,9 @@ export default function CheckInForm() {
     behoverRekond, rekondUtvandig, rekondInvandig, rekondText, rekondMedia, rekondFolder,
     husdjurSanerad, husdjurText, husdjurMedia, husdjurFolder,
     rokningSanerad, rokningText, rokningMedia, rokningFolder,
-    varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
+    varningslampaLyser, varningslampaBeskrivning,
+    garInteAttHyraUt, garInteAttHyraUtBeskrivning,
+    insynsskyddBehoverHanteras,
     drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering
@@ -497,8 +510,9 @@ export default function CheckInForm() {
     setBehoverRekond(false); setRekondUtvandig(false); setRekondInvandig(false); setRekondText(''); setRekondMedia([]); setRekondFolder('');
     setHusdjurSanerad(false); setHusdjurText(''); setHusdjurMedia([]); setHusdjurFolder('');
     setRokningSanerad(false); setRokningText(''); setRokningMedia([]); setRokningFolder('');
-    setVarningslampaLyser(false); setVarningslampaBeskrivning(''); setVarningslampaUthyrningsstatus(null);
-    setInsynsskyddOK(false);
+    setVarningslampaLyser(false); setVarningslampaBeskrivning('');
+    setGarInteAttHyraUt(false); setGarInteAttHyraUtBeskrivning('');
+    setInsynsskyddBehoverHanteras(false);
     setDekalDjurRokningOK(false); setIsskrapaOK(false); setPskivaOK(false);
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
     setSpolarvatskaOK(false); setAdblueOK(false); setVindrutaAvtorkadOK(false);
@@ -666,8 +680,21 @@ export default function CheckInForm() {
 
   const handleRekondClick = () => {
     const isCurrentlyOn = behoverRekond;
-    setBehoverRekond(!isCurrentlyOn);
-    if (isCurrentlyOn) {
+    if (!isCurrentlyOn) {
+        // Turning ON - show confirm dialog
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Behöver rekond',
+            text: 'Bekräfta att bilen behöver rekond. Detta kommer att noteras i incheckningen.',
+            confirmButtonVariant: 'danger',
+            theme: 'warning',
+            onConfirm: () => {
+                setBehoverRekond(true);
+            }
+        });
+    } else {
+        // Turning OFF - just toggle without confirmation
+        setBehoverRekond(false);
         setRekondInvandig(false);
         setRekondUtvandig(false);
         setRekondText('');
@@ -675,12 +702,97 @@ export default function CheckInForm() {
     }
   };
   
+  const handleHusdjurClick = () => {
+    const isCurrentlyOn = husdjurSanerad;
+    if (!isCurrentlyOn) {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Husdjur - sanerad',
+            text: 'Bekräfta att husdjurssanering har utförts. Detta kommer att noteras i incheckningen.',
+            confirmButtonVariant: 'success',
+            onConfirm: () => {
+                setHusdjurSanerad(true);
+            }
+        });
+    } else {
+        setHusdjurSanerad(false);
+        setHusdjurText('');
+        setHusdjurMedia([]);
+    }
+  };
+  
+  const handleRokningClick = () => {
+    const isCurrentlyOn = rokningSanerad;
+    if (!isCurrentlyOn) {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Rökning - sanerad',
+            text: 'Bekräfta att rökningssanering har utförts. Detta kommer att noteras i incheckningen.',
+            confirmButtonVariant: 'success',
+            onConfirm: () => {
+                setRokningSanerad(true);
+            }
+        });
+    } else {
+        setRokningSanerad(false);
+        setRokningText('');
+        setRokningMedia([]);
+    }
+  };
+  
   const handleVarningslampaClick = () => {
     const isCurrentlyOn = varningslampaLyser;
-    setVarningslampaLyser(!isCurrentlyOn);
-    if (isCurrentlyOn) {
+    if (!isCurrentlyOn) {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Varningslampa lyser',
+            text: 'Bekräfta att varningslampa lyser. Detta kommer att noteras i incheckningen.',
+            confirmButtonVariant: 'danger',
+            theme: 'warning',
+            onConfirm: () => {
+                setVarningslampaLyser(true);
+            }
+        });
+    } else {
+        setVarningslampaLyser(false);
         setVarningslampaBeskrivning('');
-        setVarningslampaUthyrningsstatus(null);
+    }
+  };
+  
+  const handleGarInteAttHyraUtClick = () => {
+    const isCurrentlyOn = garInteAttHyraUt;
+    if (!isCurrentlyOn) {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Går inte att hyra ut',
+            text: 'Bekräfta att bilen inte går att hyra ut. Detta flaggas tydligt i rapporteringen.',
+            confirmButtonVariant: 'danger',
+            theme: 'warning',
+            onConfirm: () => {
+                setGarInteAttHyraUt(true);
+            }
+        });
+    } else {
+        setGarInteAttHyraUt(false);
+        setGarInteAttHyraUtBeskrivning('');
+    }
+  };
+  
+  const handleInsynsskyddClick = () => {
+    const isCurrentlyOn = insynsskyddBehoverHanteras;
+    if (!isCurrentlyOn) {
+        setConfirmDialog({
+            isOpen: true,
+            title: 'Insynsskydd',
+            text: 'Bekräfta att insynsskydd behöver hanteras. Detta kommer att noteras i incheckningen.',
+            confirmButtonVariant: 'primary',
+            theme: 'warning',
+            onConfirm: () => {
+                setInsynsskyddBehoverHanteras(true);
+            }
+        });
+    } else {
+        setInsynsskyddBehoverHanteras(false);
     }
   };
 
@@ -791,7 +903,7 @@ export default function CheckInForm() {
     setLaddniva(numValue > 100 ? '100' : value);
   };
 
-  const activeStatusSections = [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser].filter(Boolean).length;
+  const activeStatusSections = [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser, garInteAttHyraUt, insynsskyddBehoverHanteras].filter(Boolean).length;
 
   return (
     <div className="checkin-form">
@@ -881,8 +993,22 @@ export default function CheckInForm() {
         {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{width: '100%', marginTop: '1rem'}}>+ Lägg till ytterligare en ny skada</Button></>)}
       </Card>
 
-      <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
+      <Card data-error={showFieldErrors && ((varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
         <SectionHeader title="Status & Sanering" />
+        
+        <div className="status-section-wrapper">
+          <ChoiceButton onClick={handleInsynsskyddClick} isActive={insynsskyddBehoverHanteras} className="rekond-checkbox">Insynsskydd behöver hanteras</ChoiceButton>
+        </div>
+        {activeStatusSections > 1 && insynsskyddBehoverHanteras && <hr className="subsection-divider" />}
+        
+        <div className="status-section-wrapper">
+          <ChoiceButton onClick={handleGarInteAttHyraUtClick} isActive={garInteAttHyraUt} className="warning-light-checkbox">Går inte att hyra ut</ChoiceButton>
+          {garInteAttHyraUt && (<div className="damage-details">
+            <Field label="Kommentar (frivilligt)"><textarea value={garInteAttHyraUtBeskrivning} onChange={e => setGarInteAttHyraUtBeskrivning(e.target.value)} placeholder="Beskriv varför bilen inte går att hyra ut..." rows={2}></textarea></Field>
+          </div>)}
+        </div>
+        {activeStatusSections > 1 && garInteAttHyraUt && (behoverRekond || husdjurSanerad || rokningSanerad || varningslampaLyser) && <hr className="subsection-divider" />}
+        
         <div className="status-section-wrapper">
           <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
           {behoverRekond && (<div className="damage-details">
@@ -898,10 +1024,10 @@ export default function CheckInForm() {
             <div className="media-previews">{rekondMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRekondMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
           </div>)}
         </div>
-        {activeStatusSections > 1 && behoverRekond && <hr className="subsection-divider" />}
+        {activeStatusSections > 1 && behoverRekond && (husdjurSanerad || rokningSanerad || varningslampaLyser) && <hr className="subsection-divider" />}
 
         <div className="status-section-wrapper">
-          <ChoiceButton onClick={() => setHusdjurSanerad(!husdjurSanerad)} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur - sanerad</ChoiceButton>
+          <ChoiceButton onClick={handleHusdjurClick} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur - sanerad</ChoiceButton>
           {husdjurSanerad && (<div className="damage-details">
             <Field label="Kommentar (frivilligt)"><textarea value={husdjurText} onChange={e => setHusdjurText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
             <div className="media-section">
@@ -914,7 +1040,7 @@ export default function CheckInForm() {
         {activeStatusSections > 1 && husdjurSanerad && (rokningSanerad || varningslampaLyser) && <hr className="subsection-divider" />}
 
         <div className="status-section-wrapper">
-          <ChoiceButton onClick={() => setRokningSanerad(!rokningSanerad)} isActive={rokningSanerad} className="rekond-checkbox">Rökning - sanerad</ChoiceButton>
+          <ChoiceButton onClick={handleRokningClick} isActive={rokningSanerad} className="rekond-checkbox">Rökning - sanerad</ChoiceButton>
           {rokningSanerad && (<div className="damage-details">
             <Field label="Kommentar (frivilligt)"><textarea value={rokningText} onChange={e => setRokningText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
             <div className="media-section">
@@ -933,10 +1059,6 @@ export default function CheckInForm() {
               <label>Specificera varningslampa *</label>
               <textarea value={varningslampaBeskrivning} onChange={e => setVarningslampaBeskrivning(e.target.value)} placeholder="Vilken eller vilka lampor?" rows={2}></textarea>
             </div>
-            <Field label="Uthyrningsstatus *"><div className="grid-2-col">
-              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null}>OK att hyra ut</ChoiceButton>
-              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null} variant="danger">EJ OK att hyra ut</ChoiceButton>
-            </div></Field>
           </div>)}
         </div>
       </Card>
@@ -945,7 +1067,6 @@ export default function CheckInForm() {
         <SectionHeader title="Checklista" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
-          <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd finns</ChoiceButton>
           <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal "Djur/rökning" finns</ChoiceButton>
           <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa finns</ChoiceButton>
           <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva finns</ChoiceButton>
@@ -991,7 +1112,7 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, ...props }) => <button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''}`} disabled={disabled} {...props}>{children}</button>;
+const Button = React.forwardRef<HTMLButtonElement, React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>>(({ onClick, variant = 'primary', disabled, children, ...props }, ref) => <button ref={ref} onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''}`} disabled={disabled} {...props}>{children}</button>);
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: '3rem', height: '3rem'}}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15L15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div><h3>Tack {firstName}!</h3><p>Din incheckning har skickats.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
@@ -1133,18 +1254,117 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
+    const modalRef = React.useRef<HTMLDivElement>(null);
+    const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
+    
+    // Handle ESC key
+    React.useEffect(() => {
+        if (!state.isOpen) return;
+        
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        
+        document.addEventListener('keydown', handleEsc);
+        return () => document.removeEventListener('keydown', handleEsc);
+    }, [state.isOpen, onClose]);
+    
+    // Focus management and focus trap
+    React.useEffect(() => {
+        if (!state.isOpen || !modalRef.current) return;
+        
+        const modal = modalRef.current;
+        const focusableElements = modal.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstFocusable = focusableElements[0];
+        const lastFocusable = focusableElements[focusableElements.length - 1];
+        
+        // Focus first element (or cancel button)
+        if (cancelButtonRef.current) {
+            cancelButtonRef.current.focus();
+        } else if (firstFocusable) {
+            firstFocusable.focus();
+        }
+        
+        // Focus trap
+        const handleTab = (e: KeyboardEvent) => {
+            if (e.key !== 'Tab') return;
+            
+            if (e.shiftKey) {
+                if (document.activeElement === firstFocusable) {
+                    e.preventDefault();
+                    lastFocusable?.focus();
+                }
+            } else {
+                if (document.activeElement === lastFocusable) {
+                    e.preventDefault();
+                    firstFocusable?.focus();
+                }
+            }
+        };
+        
+        modal.addEventListener('keydown', handleTab as any);
+        return () => modal.removeEventListener('keydown', handleTab as any);
+    }, [state.isOpen]);
+    
     if (!state.isOpen) return null;
+    
     const handleConfirm = () => {
-        if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
+        if (state.requiresComment && !comment.trim()) { 
+            alert('Kommentar är obligatoriskt.'); 
+            return; 
+        }
         state.onConfirm(comment);
+        setComment(''); // Reset comment
         onClose();
     };
+    
+    const handleCancel = () => {
+        setComment(''); // Reset comment
+        onClose();
+    };
+    
     const themeClass = state.theme ? `theme-${state.theme}` : '';
-    return (<><div className="modal-overlay" onClick={onClose} /><div className={`modal-content confirm-modal ${themeClass}`}>
-        {state.title && <h3>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
-        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
-        <div className="modal-actions"><Button onClick={onClose} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
-    </div></>);
+    
+    return (
+        <>
+            <div className="modal-overlay" onClick={handleCancel} />
+            <div ref={modalRef} className={`modal-content confirm-modal ${themeClass}`} role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+                {state.title && <h3 id="dialog-title">{state.title}</h3>}
+                <p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
+                {state.requiresComment && (
+                    <div className="field" style={{marginBottom: '1.5rem'}}>
+                        <textarea 
+                            value={comment} 
+                            onChange={(e) => setComment(e.target.value)} 
+                            placeholder="Ange motivering här..." 
+                            rows={3}
+                            aria-label="Kommentar"
+                        />
+                    </div>
+                )}
+                <div className="modal-actions">
+                    <Button 
+                        ref={cancelButtonRef}
+                        onClick={handleCancel} 
+                        variant="secondary"
+                    >
+                        Avbryt
+                    </Button>
+                    <Button 
+                        onClick={handleConfirm} 
+                        variant={state.confirmButtonVariant || 'danger'} 
+                        disabled={state.requiresComment && !comment.trim()}
+                    >
+                        Bekräfta
+                    </Button>
+                </div>
+            </div>
+        </>
+    );
 };
 
 const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) => (<style jsx global>{`
@@ -1250,6 +1470,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .success-modal { text-align: center; }
     .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
+    .confirm-modal.theme-warning { border: 3px solid var(--color-warning); }
+    .confirm-modal.theme-warning h3 { color: var(--color-warning); }
     .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
     .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
     .confirm-vehicle-info { font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0 1rem 0; }
