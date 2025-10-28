@@ -1291,25 +1291,24 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         }
         
         // Focus trap
-        const handleTab = (e: Event) => {
-            const keyEvent = e as KeyboardEvent;
-            if (keyEvent.key !== 'Tab') return;
+        const handleTab = (e: KeyboardEvent) => {
+            if (e.key !== 'Tab') return;
             
-            if (keyEvent.shiftKey) {
+            if (e.shiftKey) {
                 if (document.activeElement === firstFocusable) {
-                    keyEvent.preventDefault();
+                    e.preventDefault();
                     lastFocusable?.focus();
                 }
             } else {
                 if (document.activeElement === lastFocusable) {
-                    keyEvent.preventDefault();
+                    e.preventDefault();
                     firstFocusable?.focus();
                 }
             }
         };
         
-        modal.addEventListener('keydown', handleTab);
-        return () => modal.removeEventListener('keydown', handleTab);
+        modal.addEventListener('keydown', handleTab as EventListener);
+        return () => modal.removeEventListener('keydown', handleTab as EventListener);
     }, [state.isOpen]);
     
     if (!state.isOpen) return null;
@@ -1331,6 +1330,11 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         onClose();
     };
     
+    const handleCommentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setComment(e.target.value);
+        setShowError(false);
+    };
+    
     const themeClass = state.theme ? `theme-${state.theme}` : '';
     
     return (
@@ -1343,7 +1347,7 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
                     <div className="field" style={{marginBottom: '1.5rem'}}>
                         <textarea 
                             value={comment} 
-                            onChange={(e) => { setComment(e.target.value); setShowError(false); }} 
+                            onChange={handleCommentChange} 
                             placeholder="Ange motivering här..." 
                             rows={3}
                             aria-label="Kommentar"
