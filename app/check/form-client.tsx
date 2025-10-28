@@ -1254,6 +1254,7 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
+    const [showError, setShowError] = useState(false);
     const modalRef = React.useRef<HTMLDivElement>(null);
     const cancelButtonRef = React.useRef<HTMLButtonElement>(null);
     
@@ -1290,40 +1291,43 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         }
         
         // Focus trap
-        const handleTab = (e: KeyboardEvent) => {
-            if (e.key !== 'Tab') return;
+        const handleTab = (e: Event) => {
+            const keyEvent = e as KeyboardEvent;
+            if (keyEvent.key !== 'Tab') return;
             
-            if (e.shiftKey) {
+            if (keyEvent.shiftKey) {
                 if (document.activeElement === firstFocusable) {
-                    e.preventDefault();
+                    keyEvent.preventDefault();
                     lastFocusable?.focus();
                 }
             } else {
                 if (document.activeElement === lastFocusable) {
-                    e.preventDefault();
+                    keyEvent.preventDefault();
                     firstFocusable?.focus();
                 }
             }
         };
         
-        modal.addEventListener('keydown', handleTab as any);
-        return () => modal.removeEventListener('keydown', handleTab as any);
+        modal.addEventListener('keydown', handleTab);
+        return () => modal.removeEventListener('keydown', handleTab);
     }, [state.isOpen]);
     
     if (!state.isOpen) return null;
     
     const handleConfirm = () => {
         if (state.requiresComment && !comment.trim()) { 
-            alert('Kommentar är obligatoriskt.'); 
+            setShowError(true);
             return; 
         }
         state.onConfirm(comment);
         setComment(''); // Reset comment
+        setShowError(false);
         onClose();
     };
     
     const handleCancel = () => {
         setComment(''); // Reset comment
+        setShowError(false);
         onClose();
     };
     
@@ -1339,11 +1343,18 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
                     <div className="field" style={{marginBottom: '1.5rem'}}>
                         <textarea 
                             value={comment} 
-                            onChange={(e) => setComment(e.target.value)} 
+                            onChange={(e) => { setComment(e.target.value); setShowError(false); }} 
                             placeholder="Ange motivering här..." 
                             rows={3}
                             aria-label="Kommentar"
+                            aria-required="true"
+                            aria-invalid={showError}
                         />
+                        {showError && (
+                            <div role="alert" style={{color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem'}}>
+                                Kommentar är obligatoriskt.
+                            </div>
+                        )}
                     </div>
                 )}
                 <div className="modal-actions">
