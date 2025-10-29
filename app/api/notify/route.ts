@@ -110,6 +110,56 @@ const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string): st
   return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: inherit !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0; color: inherit !important;">${items}</ul>`;
 };
 
+const buildBilagorSection = (payload: any, siteUrl: string): string => {
+  const links: { label: string, url: string }[] = [];
+  
+  // Rekond
+  if (payload.rekond?.folder) {
+    const link = createStorageLink(payload.rekond.folder, siteUrl);
+    if (link) links.push({ label: 'Rekond', url: link });
+  }
+  
+  // Husdjur
+  if (payload.husdjur?.folder) {
+    const link = createStorageLink(payload.husdjur.folder, siteUrl);
+    if (link) links.push({ label: 'Husdjur – sanerad', url: link });
+  }
+  
+  // Rökning
+  if (payload.rokning?.folder) {
+    const link = createStorageLink(payload.rokning.folder, siteUrl);
+    if (link) links.push({ label: 'Rökning – sanerad', url: link });
+  }
+  
+  // New damages
+  if (payload.nya_skador) {
+    payload.nya_skador.forEach((d: any, i: number) => {
+      if (d.uploads?.folder) {
+        const link = createStorageLink(d.uploads.folder, siteUrl);
+        if (link) links.push({ label: `Ny skada ${i + 1}`, url: link });
+      }
+    });
+  }
+  
+  // Documented damages
+  if (payload.dokumenterade_skador) {
+    payload.dokumenterade_skador.forEach((d: any, i: number) => {
+      if (d.uploads?.folder) {
+        const link = createStorageLink(d.uploads.folder, siteUrl);
+        if (link) links.push({ label: `Dokumenterad skada ${i + 1}`, url: link });
+      }
+    });
+  }
+  
+  if (links.length === 0) return '';
+  
+  const linkItems = links.map(l => 
+    `<li style="margin-bottom: 8px;"><a href="${l.url}" target="_blank" style="color: #2563eb !important; text-decoration: none; font-weight: 500;">${l.label} 🔗</a></li>`
+  ).join('');
+  
+  return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 0;">${linkItems}</ul></div>`;
+};
+
 const formatTankning = (tankning: any): string => {
     if (!tankning) return '---';
     if (tankning.tankniva === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
@@ -190,16 +240,19 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 // =================================================================
 
 const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, nya_skador = [], notering, bilen_star_nu } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, husdjur, rokning, insynsskydd, nya_skador = [], notering, bilen_star_nu } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
 
   const content = `
     ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!', undefined, undefined, siteUrl)}
-    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad!', undefined, undefined, siteUrl)}
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
+    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
+    ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder, siteUrl)}
+    ${createAlertBanner(husdjur?.sanerad, 'Husdjur – sanerad', undefined, husdjur?.folder, siteUrl)}
+    ${createAlertBanner(rokning?.sanerad, 'Rökning – sanerad', undefined, rokning?.folder, siteUrl)}
+    ${createAlertBanner(insynsskydd?.saknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats', undefined, undefined, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
@@ -226,19 +279,25 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
       ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${buildBilagorSection(payload, siteUrl)}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
+  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, insynsskydd, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], tankning, laddning, unknownRegNr } = payload;
+  
+  const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
           
   const content = `
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
+    ${createAlertBanner(unknownRegNr, 'Reg.nr saknas i listan', 'Detta fordon skapades som ny post vid incheckningen', undefined, siteUrl)}
+    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
+    ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekond.folder, siteUrl)}
-    ${createAlertBanner(husdjur.sanerad, 'Husdjur - sanerad', husdjur.text, husdjur.folder, siteUrl)}
-    ${createAlertBanner(rokning.sanerad, 'Rökning - sanerad', rokning.text, rokning.folder, siteUrl)}
+    ${createAlertBanner(husdjur?.sanerad, 'Husdjur – sanerad', husdjur.text, husdjur.folder, siteUrl)}
+    ${createAlertBanner(rokning?.sanerad, 'Rökning – sanerad', rokning.text, rokning.folder, siteUrl)}
+    ${createAlertBanner(insynsskydd?.saknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats', undefined, undefined, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
@@ -266,6 +325,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
       </div>
       ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${buildBilagorSection(payload, siteUrl)}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);

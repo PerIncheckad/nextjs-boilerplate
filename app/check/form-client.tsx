@@ -56,6 +56,8 @@ type ExistingDamage = {
   userPositions: DamagePosition[];
   userDescription?: string;
   resolvedComment?: string;
+  undocumentable?: boolean;
+  undocumentedComment?: string;
   media: MediaFile[];
   uploads: Uploads;
 };
@@ -302,7 +304,14 @@ export default function CheckInForm() {
         }
     }
     
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length > 0 && !p.position)))) return false;
+    if (existingDamages.filter(d => d.status === 'documented').some(d => {
+      if (d.undocumentable) {
+        // If undocumentable, must have comment
+        return !d.undocumentedComment?.trim();
+      }
+      // Otherwise, must have type, media, and positions
+      return !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length > 0 && !p.position));
+    })) return false;
 
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     if (garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) return false;
@@ -651,7 +660,7 @@ export default function CheckInForm() {
             nya_skador: newDamagesForUpload,
         };
 
-        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, meta: finalPayloadForNotification });
+        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${station}`, meta: finalPayloadForNotification });
 
         setShowSuccessModal(true);
         setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
@@ -1268,11 +1277,29 @@ const DamageItem: React.FC<{
         })}
         <Button onClick={() => onAddPosition(damage.id)} variant="secondary" className="add-position-btn">+ Lägg till position</Button>
         <Field label="Beskrivning (frivilligt)"><textarea rows={2} value={description || ''} onChange={e => onUpdate(damage.id, 'description', e.target.value, isExisting)} placeholder="Beskriv skadan..."></textarea></Field>
-        <div className="media-section">
+        {isExisting && (<div style={{marginBottom: '1rem'}}>
+          <ChoiceButton 
+            onClick={() => onUpdate(damage.id, 'undocumentable', !(damage as ExistingDamage).undocumentable, isExisting)} 
+            isActive={(damage as ExistingDamage).undocumentable || false}
+          >
+            Kan ej dokumenteras
+          </ChoiceButton>
+        </div>)}
+        {isExisting && (damage as ExistingDamage).undocumentable && (
+          <Field label="Kommentar (obligatorisk) *">
+            <textarea 
+              rows={2} 
+              value={(damage as ExistingDamage).undocumentedComment || ''} 
+              onChange={e => onUpdate(damage.id, 'undocumentedComment', e.target.value, isExisting)} 
+              placeholder="Förklara varför skadan inte kan dokumenteras..."
+            ></textarea>
+          </Field>
+        )}
+        {(!isExisting || !(damage as ExistingDamage).undocumentable) && (<><div className="media-section">
           <MediaUpload id={`photo-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasPhoto(damage.media)} fileType="image" label="Foto *" isOptional={isExisting} />
           <MediaUpload id={`video-${damage.id}`} onUpload={onMediaUpdate} hasFile={hasVideo(damage.media)} fileType="video" label="Video" isOptional={true} />
         </div>
-        <div className="media-previews">{damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
+        <div className="media-previews">{damage.media?.map((m, i) => <MediaButton key={i} onRemove={() => onMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div></>)}
       </div>)}
     </div>);
 };
