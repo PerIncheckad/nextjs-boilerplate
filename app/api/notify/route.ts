@@ -250,8 +250,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
     ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
     ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder, siteUrl)}
-    ${createAlertBanner(husdjur?.sanerad, 'Husdjur – sanerad', undefined, husdjur?.folder, siteUrl)}
-    ${createAlertBanner(rokning?.sanerad, 'Rökning – sanerad', undefined, rokning?.folder, siteUrl)}
+    ${createAlertBanner(husdjur?.sanerad, 'Husdjur – sanerad', husdjur?.text, husdjur?.folder, siteUrl)}
+    ${createAlertBanner(rokning?.sanerad, 'Rökning – sanerad', rokning?.text, rokning?.folder, siteUrl)}
     ${createAlertBanner(insynsskydd?.saknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats', undefined, undefined, siteUrl)}
 
@@ -295,8 +295,8 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
     ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
     ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekond.folder, siteUrl)}
-    ${createAlertBanner(husdjur?.sanerad, 'Husdjur – sanerad', husdjur.text, husdjur.folder, siteUrl)}
-    ${createAlertBanner(rokning?.sanerad, 'Rökning – sanerad', rokning.text, rokning.folder, siteUrl)}
+    ${createAlertBanner(husdjur?.sanerad, 'Husdjur – sanerad', husdjur?.text, husdjur?.folder, siteUrl)}
+    ${createAlertBanner(rokning?.sanerad, 'Rökning – sanerad', rokning?.text, rokning?.folder, siteUrl)}
     ${createAlertBanner(insynsskydd?.saknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats', undefined, undefined, siteUrl)}
 
