@@ -11,9 +11,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-const bilkontrollAddress = process.env.BILKONTROLL_MAIL;
-const huvudstationAddress = process.env.HUVUDSTATION_MAIL || 'per@incheckad.se';
-const fallbackAddress = process.env.TEST_MAIL;
+const bilkontrollAddress = 'per@incheckad.se';
+const huvudstationAddress = 'per@incheckad.se';
+const fallbackAddress = 'per@incheckad.se';
 
 const supabaseProjectId = supabaseUrl.match(/https:\/\/(.*)\.supabase\.co/)?.[1];
 
@@ -48,7 +48,7 @@ const regionMapping: { [ort: string]: string | undefined } = {
   'Lund': huvudstationAddress,
 };
 
-const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/INcheckad%20logo/INCHECKAD%20LOGO%20yellow%20DRAFT.png';
+const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png';
 
 // =================================================================
 // 2. HTML BUILDER - HELPERS
@@ -73,6 +73,14 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
     : bannerContent;
 
   return `<tr><td style="padding: 6px 0;">${finalHtml}</td></tr>`;
+};
+
+const createAdminBanner = (condition: boolean, text: string): string => {
+  if (!condition) return '';
+  
+  const bannerContent = `<div style="background-color: #DBEAFE !important; border: 1px solid #93C5FD; padding: 12px; text-align: center; font-weight: bold; color: #1E40AF !important; border-radius: 8px;">${text}</div>`;
+
+  return `<tr><td style="padding: 6px 0;">${bannerContent}</td></tr>`;
 };
 
 const getDamageString = (damage: any): string => {
@@ -121,6 +129,23 @@ const formatTankning = (tankning: any): string => {
     }
     if (tankning.tankniva === 'ej_upptankad') return '<span style="font-weight: bold; color: #b91c1c !important;">Ej upptankad</span>';
     return '---';
+};
+
+const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: string): string => {
+    const bilagor = [];
+    if (rekond.folder && rekond.hasMedia) {
+        bilagor.push(`<li><a href="${siteUrl}/media/${rekond.folder}" target="_blank" style="color: #2563eb !important;">Rekond 🔗</a></li>`);
+    }
+    if (husdjur.folder && husdjur.hasMedia) {
+        bilagor.push(`<li><a href="${siteUrl}/media/${husdjur.folder}" target="_blank" style="color: #2563eb !important;">Husdjur 🔗</a></li>`);
+    }
+    if (rokning.folder && rokning.hasMedia) {
+        bilagor.push(`<li><a href="${siteUrl}/media/${rokning.folder}" target="_blank" style="color: #2563eb !important;">Rökning 🔗</a></li>`);
+    }
+    
+    if (bilagor.length === 0) return '';
+    
+    return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 0; color: #000000 !important;">${bilagor.join('')}</ul></div>`;
 };
 
 const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
@@ -176,7 +201,7 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 <body>
   <div class="container">
     <div style="text-align: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 20px;">
-      <img src="${LOGO_URL}" alt="INCHECKAD Logo" width="150">
+      <img src="${LOGO_URL}" alt="MABI Logo" width="150" style="margin-left: 6px;">
     </div>
     <table width="100%" style="color: #000000 !important;">
       <tbody>${content}</tbody>
@@ -190,17 +215,21 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 // =================================================================
 
 const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, nya_skador = [], notering, bilen_star_nu } = payload;
+  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, husdjur, rokning, rental, status, nya_skador = [], notering, bilen_star_nu } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
 
   const content = `
-    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!', undefined, undefined, siteUrl)}
-    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad!', undefined, undefined, siteUrl)}
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
+    ${createAlertBanner(rental?.unavailable, 'Går inte att hyra ut', rental?.comment, undefined, siteUrl)}
+    ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', undefined, rekond.folder, siteUrl)}
+    ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
+    ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!', undefined, undefined, siteUrl)}
+    ${createAlertBanner(status?.insynsskyddSaknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats', undefined, undefined, siteUrl)}
+    ${createAlertBanner(husdjur.sanerad, 'Husdjur', husdjur.text, husdjur.folder, siteUrl)}
+    ${createAlertBanner(rokning.sanerad, 'Rökning', rokning.text, rokning.folder, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -226,19 +255,25 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
       ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
+  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, rental, status, vehicleStatus, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [] } = payload;
+  
+  const unknownRegStatus = vehicleStatus === 'PARTIAL_MATCH_DAMAGE_ONLY' || vehicleStatus === 'NO_MATCH';
           
   const content = `
-    ${createAlertBanner(varningslampa.lyser, 'Varningslampa lyser', varningslampa.beskrivning, undefined, siteUrl)}
+    ${createAdminBanner(unknownRegStatus, 'Reg.nr saknas i "MABISYD Bilkontroll 2024–2025"')}
+    ${createAlertBanner(rental?.unavailable, 'Går inte att hyra ut', rental?.comment, undefined, siteUrl)}
+    ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Behöver rekond', rekond.text, rekond.folder, siteUrl)}
-    ${createAlertBanner(husdjur.sanerad, 'Husdjur - sanerad', husdjur.text, husdjur.folder, siteUrl)}
-    ${createAlertBanner(rokning.sanerad, 'Rökning - sanerad', rokning.text, rokning.folder, siteUrl)}
+    ${createAlertBanner(status?.insynsskyddSaknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
+    ${createAlertBanner(husdjur.sanerad, 'Husdjur', husdjur.text, husdjur.folder, siteUrl)}
+    ${createAlertBanner(rokning.sanerad, 'Rökning', rokning.text, rokning.folder, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats', undefined, undefined, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
@@ -266,6 +301,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
       </div>
       ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
@@ -275,11 +311,6 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
 // 4. MAIN API FUNCTION
 // =================================================================
 export async function POST(request: Request) {
-  if (!bilkontrollAddress || !fallbackAddress) {
-    console.error('SERVER ERROR: BILKONTROLL_MAIL or TEST_MAIL is not configured.');
-    return NextResponse.json({ error: 'Server configuration error.' }, { status: 500 });
-  }
-
   try {
     const fullRequestPayload = await request.json();
     const { meta: payload, subjectBase, region } = fullRequestPayload; 
@@ -293,21 +324,24 @@ export async function POST(request: Request) {
     const date = now.toLocaleDateString('sv-SE', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' });
     const time = now.toLocaleTimeString('sv-SE', { ...options, hour: '2-digit', minute: '2-digit' });
 
+    // Compute station for subject - use "Bilen står nu" station when present
+    const stationForSubject = payload.bilen_star_nu?.station || payload.station;
+    // If station contains "Ort / Station", keep only the Station portion
+    const cleanStation = stationForSubject.includes(' / ') ? stationForSubject.split(' / ').pop()?.trim() : stationForSubject;
+    
+    // Format subject: "INCHECKAD: [REG] - [STATION] - [HUVUDSTATION|BILKONTROLL]"
+    const regNr = payload.regnr || '';
+    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation} - HUVUDSTATION`;
+    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation} - BILKONTROLL`;
+
     // E-posthantering
-    const regionalAddress = regionMapping[payload.ort as keyof typeof regionMapping] || fallbackAddress;
     const emailPromises = [];
     
     const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: regionalAddress, subject: `INCHECKAD: ${subjectBase} - HUVUDSTATION`, html: huvudstationHtml }));
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: huvudstationAddress, subject: huvudstationSubject, html: huvudstationHtml }));
     
     const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, siteUrl);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: `INCHECKAD: ${subjectBase} - BILKONTROLL`, html: bilkontrollHtml }));
-    
-    if (payload.status === 'PARTIAL_MATCH_DAMAGE_ONLY' || payload.status === 'NO_MATCH') {
-      const warningSubject = `VARNING: ${payload.regnr} saknas i bilregistret`;
-      const warningHtml = createBaseLayout(payload.regnr, `<tr><td><p>Registreringsnumret <strong>${payload.regnr}</strong>, som nyss checkades in på station ${payload.station} (${payload.ort}), saknas i MABI's bilregister (BUHS). En ny post kommer att skapas, men detta kan behöva följas upp manuellt.</p></td></tr>`);
-      emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: warningSubject, html: warningHtml }));
-    }
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: bilkontrollSubject, html: bilkontrollHtml }));
     
     await Promise.all(emailPromises);
 
