@@ -1278,7 +1278,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     >
         {showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
         <div className="confirm-header" id="confirm-modal-body">
-            <h3 id="confirm-modal-title" className="confirm-modal-title">Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
+            <h3 id="confirm-modal-title" className="confirm-modal-title" style={{textAlign: 'center'}}>Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
             <div className="confirm-warnings-wrapper">
                 {payload.rental?.unavailable && <p className="warning-highlight">Går inte att hyra ut{payload.rental.comment ? `: ${payload.rental.comment}` : ''}</p>}
                 {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt{payload.varningslampa.beskrivning ? `: ${payload.varningslampa.beskrivning}` : ''}</p>}
@@ -1411,7 +1411,7 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         aria-describedby="action-dialog-text"
         {...(state.title && { 'aria-labelledby': 'action-dialog-title' })}
     >
-        {state.title && <h3 id="action-dialog-title">{state.title}</h3>}<p id="action-dialog-text" style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
+        {state.title && <h3 id="action-dialog-title" style={{textAlign: 'center'}}>{state.title}</h3>}<p id="action-dialog-text" style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
         {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
         <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
     </div></>);
