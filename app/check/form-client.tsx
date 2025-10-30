@@ -10,7 +10,7 @@ import { DAMAGE_OPTIONS } from '@/data/damage-options';
 // 1. DATA, TYPES & HELPERS
 // =================================================================
 
-const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga.png";
+const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 // keep background image reference but don't change UI behavior
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Svart%20bakgrund%20MB%20grill/MB%20front%20grill%20logo.jpg";
 
@@ -73,6 +73,7 @@ type ConfirmDialogState = {
     text: string;
     confirmButtonVariant?: 'success' | 'danger' | 'primary';
     onConfirm: (comment?: string) => void;
+    onCancel?: () => void;
     theme?: 'default' | 'warning';
     requiresComment?: boolean;
 }
@@ -235,7 +236,16 @@ export default function CheckInForm() {
   // Varningslampa State
   const [varningslampaLyser, setVarningslampaLyser] = useState(false);
   const [varningslampaBeskrivning, setVarningslampaBeskrivning] = useState('');
-  const [varningslampaUthyrningsstatus, setVarningslampaUthyrningsstatus] = useState<'ok_att_hyra_ut' | 'ej_ok_att_hyra_ut' | null>(null);
+
+  // Rental Status State
+  const [garInteAttHyraUt, setGarInteAttHyraUt] = useState(false);
+  const [garInteAttHyraUtKommentar, setGarInteAttHyraUtKommentar] = useState('');
+  
+  // Insynsskydd State
+  const [insynsskyddSaknas, setInsynsskyddSaknas] = useState(false);
+  
+  // Unknown reg.nr helper
+  const [showUnknownRegHelper, setShowUnknownRegHelper] = useState(false);
 
   // Skador State
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
@@ -269,9 +279,9 @@ export default function CheckInForm() {
   const availableStationsBilenStarNu = useMemo(() => STATIONER[bilenStarNuOrt] || [], [bilenStarNuOrt]);
   
   const otherChecklistItemsOK = useMemo(() => {
-     const common = insynsskyddOK && dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK && vindrutaAvtorkadOK;
+     const common = dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK && vindrutaAvtorkadOK;
      return drivmedelstyp === 'bensin_diesel' ? common && adblueOK : common;
-  }, [insynsskyddOK, dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, vindrutaAvtorkadOK, adblueOK, drivmedelstyp]);
+  }, [dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, vindrutaAvtorkadOK, adblueOK, drivmedelstyp]);
 
   const isChecklistComplete = useMemo(() => {
     return washed && otherChecklistItemsOK;
@@ -296,7 +306,8 @@ export default function CheckInForm() {
     
     if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length > 0 && !p.position)))) return false;
 
-    if (varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) return false;
+    if (garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) return false;
+    if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
     if (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))) return false;
     
     if (unhandledLegacyDamages) return false;
@@ -304,7 +315,7 @@ export default function CheckInForm() {
     return isChecklistComplete;
   }, [
     regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
-    skadekontroll, newDamages, existingDamages, isChecklistComplete, varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
+    skadekontroll, newDamages, existingDamages, isChecklistComplete, garInteAttHyraUt, garInteAttHyraUtKommentar, varningslampaLyser, varningslampaBeskrivning,
     behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, unhandledLegacyDamages
   ]);
 
@@ -315,6 +326,10 @@ export default function CheckInForm() {
       carModel: vehicleData?.model, 
       matarstallning, 
       hjultyp, 
+      rental: {
+        unavailable: garInteAttHyraUt,
+        comment: garInteAttHyraUtKommentar
+      },
       rekond: {
         behoverRekond,
         utvandig: rekondUtvandig,
@@ -337,8 +352,10 @@ export default function CheckInForm() {
       },
       varningslampa: {
         lyser: varningslampaLyser,
-        beskrivning: varningslampaBeskrivning,
-        uthyrningsstatus: varningslampaUthyrningsstatus
+        beskrivning: varningslampaBeskrivning
+      },
+      status: {
+        insynsskyddSaknas
       },
       drivmedel: drivmedelstyp, 
       tankning: { tankniva, liters, bransletyp, literpris },
@@ -352,13 +369,15 @@ export default function CheckInForm() {
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
       notering: preliminarAvslutNotering,
-      status: vehicleData?.status
+      vehicleStatus: vehicleData?.status
   }), [
     normalizedReg, firstName, vehicleData, matarstallning, hjultyp, 
+    garInteAttHyraUt, garInteAttHyraUtKommentar,
     behoverRekond, rekondUtvandig, rekondInvandig, rekondText, rekondMedia, rekondFolder,
     husdjurSanerad, husdjurText, husdjurMedia, husdjurFolder,
     rokningSanerad, rokningText, rokningMedia, rokningFolder,
-    varningslampaLyser, varningslampaBeskrivning, varningslampaUthyrningsstatus,
+    varningslampaLyser, varningslampaBeskrivning,
+    insynsskyddSaknas,
     drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering
@@ -367,21 +386,43 @@ export default function CheckInForm() {
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
+    setShowUnknownRegHelper(false);
     setVehicleData(null);
     setExistingDamages([]);
     try {
       const normalized = reg.toUpperCase().replace(/\s/g, '');
       const info = await getVehicleInfo(normalized);
   
-      if (info.status === 'NO_MATCH') {
-        const proceed = window.confirm(
-          '⚠️ Är du säker på att du skrivit in korrekt reg.nr?'
-        );
-        if (!proceed) {
-          setRegInput('');
-          setLoading(false);
-          return;
-        }
+      if (info.status === 'NO_MATCH' || info.status === 'PARTIAL_MATCH_DAMAGE_ONLY') {
+        setConfirmDialog({
+          isOpen: true,
+          title: '⚠️ Reg.nr saknas i Bilkontroll',
+          text: 'Okänt reg.nr. Vänligen dubbelkolla innan du fortsätter.',
+          confirmButtonVariant: 'danger',
+          theme: 'warning',
+          onConfirm: () => {
+            setShowUnknownRegHelper(true);
+            setVehicleData(info);
+            if (info.existing_damages.length > 0) {
+              setExistingDamages(info.existing_damages.map((d: ConsolidatedDamage) => ({ 
+                db_id: d.id,
+                id: Math.random().toString(36).substring(2, 15),
+                fullText: d.text,
+                originalDamageDate: d.damage_date,
+                isInventoried: d.is_inventoried,
+                status: 'not_selected',
+                userPositions: [],
+                media: [],
+                uploads: { photo_urls: [], video_urls: [], folder: '' }
+              })));
+            }
+          },
+          onCancel: () => {
+            setRegInput('');
+          }
+        });
+        setLoading(false);
+        return;
       }
       
       setVehicleData(info);
@@ -398,10 +439,6 @@ export default function CheckInForm() {
               media: [],
               uploads: { photo_urls: [], video_urls: [], folder: '' }
           })));
-      }
-  
-      if (info.status === 'PARTIAL_MATCH_DAMAGE_ONLY' || info.status === 'NO_MATCH') {
-          setNotFound(true);
       }
   
     } catch (error: any) {
@@ -497,7 +534,10 @@ export default function CheckInForm() {
     setBehoverRekond(false); setRekondUtvandig(false); setRekondInvandig(false); setRekondText(''); setRekondMedia([]); setRekondFolder('');
     setHusdjurSanerad(false); setHusdjurText(''); setHusdjurMedia([]); setHusdjurFolder('');
     setRokningSanerad(false); setRokningText(''); setRokningMedia([]); setRokningFolder('');
-    setVarningslampaLyser(false); setVarningslampaBeskrivning(''); setVarningslampaUthyrningsstatus(null);
+    setVarningslampaLyser(false); setVarningslampaBeskrivning('');
+    setGarInteAttHyraUt(false); setGarInteAttHyraUtKommentar('');
+    setInsynsskyddSaknas(false);
+    setShowUnknownRegHelper(false);
     setInsynsskyddOK(false);
     setDekalDjurRokningOK(false); setIsskrapaOK(false); setPskivaOK(false);
     setSkyltRegplatOK(false); setDekalGpsOK(false); setWashed(false);
@@ -665,22 +705,130 @@ export default function CheckInForm() {
   };
 
   const handleRekondClick = () => {
-    const isCurrentlyOn = behoverRekond;
-    setBehoverRekond(!isCurrentlyOn);
-    if (isCurrentlyOn) {
-        setRekondInvandig(false);
-        setRekondUtvandig(false);
-        setRekondText('');
-        setRekondMedia([]);
+    if (behoverRekond) {
+      // Turning off
+      setBehoverRekond(false);
+      setRekondInvandig(false);
+      setRekondUtvandig(false);
+      setRekondText('');
+      setRekondMedia([]);
+    } else {
+      // Turning on - show confirmation modal
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Behöver rekond',
+        text: 'Detta kan medföra en avgift för hyrestagaren.',
+        confirmButtonVariant: 'danger',
+        theme: 'warning',
+        onConfirm: () => {
+          setBehoverRekond(true);
+        }
+      });
     }
   };
   
   const handleVarningslampaClick = () => {
-    const isCurrentlyOn = varningslampaLyser;
-    setVarningslampaLyser(!isCurrentlyOn);
-    if (isCurrentlyOn) {
-        setVarningslampaBeskrivning('');
-        setVarningslampaUthyrningsstatus(null);
+    if (varningslampaLyser) {
+      // Turning off
+      setVarningslampaLyser(false);
+      setVarningslampaBeskrivning('');
+    } else {
+      // Turning on - show confirmation modal
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Varningslampa ej släckt',
+        text: 'Detta kan medföra en avgift för hyrestagaren.',
+        confirmButtonVariant: 'danger',
+        theme: 'warning',
+        requiresComment: true,
+        onConfirm: (comment) => {
+          setVarningslampaLyser(true);
+          setVarningslampaBeskrivning(comment || '');
+        }
+      });
+    }
+  };
+
+  const handleGarInteAttHyraUtClick = () => {
+    if (garInteAttHyraUt) {
+      // Turning off
+      setGarInteAttHyraUt(false);
+      setGarInteAttHyraUtKommentar('');
+    } else {
+      // Turning on - show confirmation modal
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Går inte att hyra ut',
+        text: 'Detta kan medföra en avgift för hyrestagaren.',
+        confirmButtonVariant: 'danger',
+        theme: 'warning',
+        requiresComment: true,
+        onConfirm: (comment) => {
+          setGarInteAttHyraUt(true);
+          setGarInteAttHyraUtKommentar(comment || '');
+        }
+      });
+    }
+  };
+
+  const handleHusdjurClick = () => {
+    if (husdjurSanerad) {
+      // Turning off
+      setHusdjurSanerad(false);
+      setHusdjurText('');
+      setHusdjurMedia([]);
+    } else {
+      // Turning on - show confirmation modal
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Husdjur',
+        text: 'Detta kan medföra en avgift för hyrestagaren.',
+        confirmButtonVariant: 'danger',
+        theme: 'warning',
+        onConfirm: () => {
+          setHusdjurSanerad(true);
+        }
+      });
+    }
+  };
+
+  const handleRokningClick = () => {
+    if (rokningSanerad) {
+      // Turning off
+      setRokningSanerad(false);
+      setRokningText('');
+      setRokningMedia([]);
+    } else {
+      // Turning on - show confirmation modal
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Rökning',
+        text: 'Detta kan medföra en avgift för hyrestagaren.',
+        confirmButtonVariant: 'danger',
+        theme: 'warning',
+        onConfirm: () => {
+          setRokningSanerad(true);
+        }
+      });
+    }
+  };
+
+  const handleInsynsskyddSaknasClick = () => {
+    if (insynsskyddSaknas) {
+      // Turning off
+      setInsynsskyddSaknas(false);
+    } else {
+      // Turning on - show confirmation modal
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Insynsskydd saknas',
+        text: 'Detta kan medföra en avgift för hyrestagaren.',
+        confirmButtonVariant: 'danger',
+        theme: 'warning',
+        onConfirm: () => {
+          setInsynsskyddSaknas(true);
+        }
+      });
     }
   };
 
@@ -791,7 +939,7 @@ export default function CheckInForm() {
     setLaddniva(numValue > 100 ? '100' : value);
   };
 
-  const activeStatusSections = [behoverRekond, husdjurSanerad, rokningSanerad, varningslampaLyser].filter(Boolean).length;
+  const activeStatusSections = [garInteAttHyraUt, varningslampaLyser, behoverRekond, husdjurSanerad, rokningSanerad, insynsskyddSaknas].filter(Boolean).length;
 
   return (
     <div className="checkin-form">
@@ -817,7 +965,7 @@ export default function CheckInForm() {
           )}
         </div>
         {loading && <p>Hämtar fordonsdata...</p>}
-        {notFound && !loading && <p className="error-text">Registreringsnumret saknas i masterlistan. Kontrollera stavning eller fortsätt för att skapa en ny post.</p>}
+        {showUnknownRegHelper && <p className="error-text">Reg.nr saknas i Bilkontroll-listan. Fortsätt om det stämmer, Bilkontroll informeras automatiskt.</p>}
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
@@ -881,8 +1029,34 @@ export default function CheckInForm() {
         {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{width: '100%', marginTop: '1rem'}}>+ Lägg till ytterligare en ny skada</Button></>)}
       </Card>
 
-      <Card data-error={showFieldErrors && ((varningslampaLyser && (!varningslampaBeskrivning.trim() || !varningslampaUthyrningsstatus)) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
+      <Card data-error={showFieldErrors && ((garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
         <SectionHeader title="Status & Sanering" />
+        
+        {/* 1) Går inte att hyra ut */}
+        <div className="status-section-wrapper">
+          <ChoiceButton onClick={handleGarInteAttHyraUtClick} isActive={garInteAttHyraUt} className="rekond-checkbox">Går inte att hyra ut</ChoiceButton>
+          {garInteAttHyraUt && (<div className="damage-details">
+            <div className="field" data-error={showFieldErrors && !garInteAttHyraUtKommentar.trim()}>
+              <label>Kommentar (obligatorisk) *</label>
+              <textarea value={garInteAttHyraUtKommentar} onChange={e => setGarInteAttHyraUtKommentar(e.target.value)} placeholder="Förklara varför bilen inte kan hyras ut..." rows={2}></textarea>
+            </div>
+          </div>)}
+        </div>
+        {activeStatusSections > 1 && garInteAttHyraUt && <hr className="subsection-divider" />}
+
+        {/* 2) Varningslampa ej släckt */}
+        <div className="status-section-wrapper">
+          <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa ej släckt</ChoiceButton>
+          {varningslampaLyser && (<div className="damage-details">
+            <div className="field" data-error={showFieldErrors && !varningslampaBeskrivning.trim()}>
+              <label>Kommentar (obligatorisk) *</label>
+              <textarea value={varningslampaBeskrivning} onChange={e => setVarningslampaBeskrivning(e.target.value)} placeholder="Vilken eller vilka lampor?" rows={2}></textarea>
+            </div>
+          </div>)}
+        </div>
+        {activeStatusSections > 1 && varningslampaLyser && <hr className="subsection-divider" />}
+        
+        {/* 3) Behöver rekond */}
         <div className="status-section-wrapper">
           <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
           {behoverRekond && (<div className="damage-details">
@@ -900,8 +1074,9 @@ export default function CheckInForm() {
         </div>
         {activeStatusSections > 1 && behoverRekond && <hr className="subsection-divider" />}
 
+        {/* 4) Husdjur */}
         <div className="status-section-wrapper">
-          <ChoiceButton onClick={() => setHusdjurSanerad(!husdjurSanerad)} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur - sanerad</ChoiceButton>
+          <ChoiceButton onClick={handleHusdjurClick} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur</ChoiceButton>
           {husdjurSanerad && (<div className="damage-details">
             <Field label="Kommentar (frivilligt)"><textarea value={husdjurText} onChange={e => setHusdjurText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
             <div className="media-section">
@@ -911,10 +1086,11 @@ export default function CheckInForm() {
             <div className="media-previews">{husdjurMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleHusdjurMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
           </div>)}
         </div>
-        {activeStatusSections > 1 && husdjurSanerad && (rokningSanerad || varningslampaLyser) && <hr className="subsection-divider" />}
+        {activeStatusSections > 1 && husdjurSanerad && <hr className="subsection-divider" />}
 
+        {/* 5) Rökning */}
         <div className="status-section-wrapper">
-          <ChoiceButton onClick={() => setRokningSanerad(!rokningSanerad)} isActive={rokningSanerad} className="rekond-checkbox">Rökning - sanerad</ChoiceButton>
+          <ChoiceButton onClick={handleRokningClick} isActive={rokningSanerad} className="rekond-checkbox">Rökning</ChoiceButton>
           {rokningSanerad && (<div className="damage-details">
             <Field label="Kommentar (frivilligt)"><textarea value={rokningText} onChange={e => setRokningText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
             <div className="media-section">
@@ -924,20 +1100,11 @@ export default function CheckInForm() {
              <div className="media-previews">{rokningMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRokningMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
           </div>)}
         </div>
-        {activeStatusSections > 1 && rokningSanerad && varningslampaLyser && <hr className="subsection-divider" />}
+        {activeStatusSections > 1 && rokningSanerad && <hr className="subsection-divider" />}
         
+        {/* 6) Insynsskydd saknas */}
         <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa lyser</ChoiceButton>
-          {varningslampaLyser && (<div className="damage-details">
-            <div className="field" data-error={showFieldErrors && !varningslampaBeskrivning.trim()}>
-              <label>Specificera varningslampa *</label>
-              <textarea value={varningslampaBeskrivning} onChange={e => setVarningslampaBeskrivning(e.target.value)} placeholder="Vilken eller vilka lampor?" rows={2}></textarea>
-            </div>
-            <Field label="Uthyrningsstatus *"><div className="grid-2-col">
-              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null}>OK att hyra ut</ChoiceButton>
-              <ChoiceButton onClick={() => setVarningslampaUthyrningsstatus('ej_ok_att_hyra_ut')} isActive={varningslampaUthyrningsstatus === 'ej_ok_att_hyra_ut'} isSet={varningslampaUthyrningsstatus !== null} variant="danger">EJ OK att hyra ut</ChoiceButton>
-            </div></Field>
-          </div>)}
+          <ChoiceButton onClick={handleInsynsskyddSaknasClick} isActive={insynsskyddSaknas} className="rekond-checkbox">Insynsskydd saknas</ChoiceButton>
         </div>
       </Card>
 
@@ -945,7 +1112,6 @@ export default function CheckInForm() {
         <SectionHeader title="Checklista" />
         <div className="grid-2-col">
           <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
-          <ChoiceButton onClick={() => setInsynsskyddOK(!insynsskyddOK)} isActive={insynsskyddOK}>Insynsskydd finns</ChoiceButton>
           <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal "Djur/rökning" finns</ChoiceButton>
           <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa finns</ChoiceButton>
           <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva finns</ChoiceButton>
@@ -1025,23 +1191,24 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             return <p>⛽ <strong>Tankning:</strong> Återlämnades fulltankad</p>;
         }
         if (payload.drivmedel === 'elbil') {
-            let text = `⚡ Laddning: ${payload.laddning.laddniva}%`;
-            if (payload.laddning.antal_laddkablar !== null) {
-                text += ` | Kablar: ${payload.laddning.antal_laddkablar}`;
-            }
-            return <p><strong>{text}</strong></p>;
+            return <><p><strong>⚡ Laddning: {payload.laddning.laddniva}%</strong></p><p><strong>Antal laddkablar: {payload.laddning.antal_laddkablar}</strong></p></>;
         }
         return null;
     };
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
+    const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
 
     return (<><div className="modal-overlay" /><div className="modal-content confirm-modal">
         {showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
         <div className="confirm-header">
             <h3 className="confirm-modal-title">Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
             <div className="confirm-warnings-wrapper">
-                {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa lyser: {payload.varningslampa.beskrivning || 'Ej specificerat'}</p>}
-                {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Behöver rekond!</p>}
+                {payload.rental?.unavailable && <p className="warning-highlight">Går inte att hyra ut{payload.rental.comment ? `: ${payload.rental.comment}` : ''}</p>}
+                {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt{payload.varningslampa.beskrivning ? `: ${payload.varningslampa.beskrivning}` : ''}</p>}
+                {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Behöver rekond</p>}
+                {payload.status?.insynsskyddSaknas && <p className="warning-highlight">Insynsskydd saknas</p>}
+                {showNotRefueled && <p className="warning-highlight">Bilen är ej upptankad</p>}
+                {showChargeWarning && <p className="warning-highlight">Låg laddnivå</p>}
             </div>
         </div>
         <div className="confirm-details">
@@ -1137,13 +1304,21 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
     const handleConfirm = () => {
         if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
         state.onConfirm(comment);
+        setComment('');
+        onClose();
+    };
+    const handleCancel = () => {
+        if (state.onCancel) {
+            state.onCancel();
+        }
+        setComment('');
         onClose();
     };
     const themeClass = state.theme ? `theme-${state.theme}` : '';
-    return (<><div className="modal-overlay" onClick={onClose} /><div className={`modal-content confirm-modal ${themeClass}`}>
+    return (<><div className="modal-overlay" onClick={handleCancel} /><div className={`modal-content confirm-modal ${themeClass}`}>
         {state.title && <h3>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
         {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
-        <div className="modal-actions"><Button onClick={onClose} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
+        <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
     </div></>);
 };
 
