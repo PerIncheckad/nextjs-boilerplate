@@ -779,7 +779,7 @@ export default function CheckInForm() {
       // Turning on - show confirmation modal
       setConfirmDialog({
         isOpen: true,
-        title: '⚠️ Behöver rekond',
+        title: '⚠️ Rekond',
         text: 'Detta kan medföra en avgift för hyrestagaren.',
         confirmButtonVariant: 'danger',
         theme: 'warning',
@@ -1120,9 +1120,9 @@ export default function CheckInForm() {
         </div>
         {activeStatusSections > 1 && varningslampaLyser && <hr className="subsection-divider" />}
         
-        {/* 3) Behöver rekond */}
+        {/* 3) Rekond */}
         <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
+          <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Rekond</ChoiceButton>
           {behoverRekond && (<div className="damage-details">
             <Field label="Typ av rekond *"><div className="grid-2-col">
               <ChoiceButton onClick={() => setRekondUtvandig(!rekondUtvandig)} isActive={rekondUtvandig}>Utvändig</ChoiceButton>
@@ -1282,7 +1282,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             <div className="confirm-warnings-wrapper">
                 {payload.rental?.unavailable && <p className="warning-highlight">Går inte att hyra ut{payload.rental.comment ? `: ${payload.rental.comment}` : ''}</p>}
                 {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt{payload.varningslampa.beskrivning ? `: ${payload.varningslampa.beskrivning}` : ''}</p>}
-                {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Behöver rekond</p>}
+                {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Rekond</p>}
                 {payload.status?.insynsskyddSaknas && <p className="warning-highlight">Insynsskydd saknas</p>}
                 {showNotRefueled && <p className="warning-highlight">Bilen är ej upptankad</p>}
                 {showChargeWarning && <p className="warning-highlight">Låg laddnivå</p>}
