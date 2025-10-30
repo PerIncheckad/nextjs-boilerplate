@@ -54,7 +54,8 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 // 2. HTML BUILDER - HELPERS
 // =================================================================
 
-const escapeHtml = (unsafe: string): string => {
+const escapeHtml = (unsafe: string | null | undefined): string => {
+  if (!unsafe) return '';
   return unsafe
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
