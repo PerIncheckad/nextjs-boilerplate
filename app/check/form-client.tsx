@@ -1162,6 +1162,18 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onCancel();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [onCancel]);
+
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
         return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
@@ -1300,6 +1312,21 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
+    
+    useEffect(() => {
+        if (!state.isOpen) return;
+        
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [state.isOpen, onClose]);
+
     if (!state.isOpen) return null;
     const handleConfirm = () => {
         if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
@@ -1422,6 +1449,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .remove-media-btn:hover { background-color: #b91c1c; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
     .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(255, 255, 255, 0.92); padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; }
+    .modal-content h3 { text-align: center; }
+    .confirm-modal-title { text-align: center; }
     .success-modal { text-align: center; }
     .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
