@@ -1313,34 +1313,31 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
     
+    const handleCancel = useCallback(() => {
+        if (state.onCancel) {
+            state.onCancel();
+        }
+        setComment('');
+        onClose();
+    }, [state.onCancel, onClose]);
+    
     useEffect(() => {
         if (!state.isOpen) return;
         
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                if (state.onCancel) {
-                    state.onCancel();
-                }
-                setComment('');
-                onClose();
+                handleCancel();
             }
         };
         
         window.addEventListener('keydown', handleEscape);
         return () => window.removeEventListener('keydown', handleEscape);
-    }, [state.isOpen, state.onCancel, onClose]);
+    }, [state.isOpen, handleCancel]);
     
     if (!state.isOpen) return null;
     const handleConfirm = () => {
         if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
         state.onConfirm(comment);
-        setComment('');
-        onClose();
-    };
-    const handleCancel = () => {
-        if (state.onCancel) {
-            state.onCancel();
-        }
         setComment('');
         onClose();
     };
