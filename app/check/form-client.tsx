@@ -1313,18 +1313,8 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
     
-    useEffect(() => {
-        if (!state.isOpen) return;
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                handleCancel();
-            }
-        };
-        document.addEventListener('keydown', handleEscape);
-        return () => document.removeEventListener('keydown', handleEscape);
-    }, [state.isOpen]);
-    
     if (!state.isOpen) return null;
+    
     const handleConfirm = () => {
         if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
         state.onConfirm(comment);
@@ -1338,6 +1328,17 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         setComment('');
         onClose();
     };
+    
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                handleCancel();
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        return () => document.removeEventListener('keydown', handleEscape);
+    }, []);
+    
     const themeClass = state.theme ? `theme-${state.theme}` : '';
     return (<><div className="modal-overlay" onClick={handleCancel} /><div className={`modal-content confirm-modal ${themeClass}`}>
         {state.title && <h3 style={{textAlign: 'center'}}>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
