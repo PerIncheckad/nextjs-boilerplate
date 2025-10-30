@@ -181,11 +181,15 @@ const processFiles = async (files: FileList): Promise<MediaFile[]> => {
   }));
 };
 
+const capitalizeFirstLetter = (str: string): string => {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
 const getFirstNameFromEmail = (email: string): string => {
     if (!email) return 'Okänd';
     const namePart = email.split('@')[0];
     const firstName = namePart.split('.')[0];
-    return firstName.charAt(0).toUpperCase() + firstName.slice(1);
+    return capitalizeFirstLetter(firstName);
 };
 
 const getFullNameFromEmail = (email: string): string => {
@@ -193,11 +197,11 @@ const getFullNameFromEmail = (email: string): string => {
     const namePart = email.split('@')[0];
     const parts = namePart.split('.');
     if (parts.length >= 2) {
-        const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-        const lastName = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+        const firstName = capitalizeFirstLetter(parts[0]);
+        const lastName = capitalizeFirstLetter(parts[1]);
         return `${firstName} ${lastName}`;
     }
-    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    return capitalizeFirstLetter(parts[0]);
 };
 
 // =================================================================
@@ -356,8 +360,8 @@ export default function CheckInForm() {
   
   const shouldHideAdBlue = useMemo(() => {
     // Hide AdBlue ONLY when:
-    // 1. Fuel type is explicitly set to Bensin (when tankad_nu is selected)
-    // 2. OR tankstatus is Elbil (drivmedelstyp === 'elbil')
+    // 1. drivmedelstyp is 'elbil' (electric car)
+    // 2. OR drivmedelstyp is 'bensin_diesel' with tankniva 'tankad_nu' and bransletyp 'Bensin' (explicitly gasoline)
     if (drivmedelstyp === 'elbil') return true;
     if (drivmedelstyp === 'bensin_diesel' && tankniva === 'tankad_nu' && bransletyp === 'Bensin') return true;
     return false;
