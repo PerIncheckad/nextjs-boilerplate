@@ -334,7 +334,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
         <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Skadeöversikt</h2>
-        ${formatDamagesToHtml(åtgärdade_skador, 'Åtgärdade / Hittas ej', siteUrl)}
+        ${formatDamagesToHtml(åtgärdade_skador, 'Kan ej dokumenteras', siteUrl)}
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador', siteUrl, 'Inga gamla skador dokumenterade.')}
         ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl, 'Inga nya skador rapporterade.')}
       </div>

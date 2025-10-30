@@ -775,8 +775,8 @@ export default function CheckInForm() {
     if (action === 'resolve') {
         setConfirmDialog({
             isOpen: true,
-            title: `Åtgärdad: "${fullText}"`,
-            text: 'Vänligen beskriv varför skadan markeras som åtgärdad/ej hittad. Denna kommentar sparas.',
+            title: `Kan ej dokumenteras: "${fullText}"`,
+            text: 'Beskriv varför skadan inte kan dokumenteras',
             confirmButtonVariant: 'success',
             requiresComment: true,
             onConfirm: (comment) => {
@@ -1354,7 +1354,7 @@ const DamageItem: React.FC<{
       <div className="damage-item-header"><span>{headerText}</span>{!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}</div>
       {isExisting && onAction && (<div className="damage-item-actions">
         <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).fullText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
-        <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).fullText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
+        <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).fullText)} variant={resolved ? 'warning' : 'secondary'}>Kan ej dokumenteras</Button>
       </div>)}
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>

@@ -24,40 +24,75 @@ body {
 /* Utility / layout */
 .main-logo {
   display: block;
-  margin: 0 auto;
+  margin: 0 auto 2rem auto;
   max-width: 260px;
+}
+
+/* Homepage specific */
+.homepage-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 720px;
 }
 
 .welcome-main {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: calc(100vh - 60px);
   padding: 24px;
+  position: relative;
 }
 
 .welcome-card {
-  background: var(--card-bg);
-  padding: 20px;
-  border-radius: 10px;
-  max-width: 720px;
+  background: #ffffff;
+  padding: 24px;
+  border-radius: 12px;
   width: 100%;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
 }
 
 .welcome-title {
   font-size: 28px;
-  margin: 0 0 12px 0;
+  margin: 0 0 20px 0;
+  text-align: center;
 }
 
-.btn-group { display:flex; gap:12px; margin-bottom:16px; }
-.btn { display:inline-block; padding:10px 14px; border-radius:8px; text-decoration:none; color:#fff; background:var(--main-blue); }
-.btn.incheckning { background:var(--main-green); }
-.report-btn { background:#111827; }
+.btn-group { 
+  display: flex; 
+  flex-wrap: wrap;
+  gap: 12px; 
+  margin-bottom: 16px; 
+}
+
+.btn { 
+  display: inline-block; 
+  padding: 12px 16px; 
+  border-radius: 8px; 
+  text-decoration: none; 
+  color: #fff; 
+  background: var(--main-blue);
+  text-align: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.btn.incheckning { background: var(--main-green); }
+.report-btn { background: #111827; }
 
 .divider { border: none; height: 1px; background: var(--main-border); margin: 12px 0; }
 
-.copyight-footer, .copyright-footer { text-align:center; margin-top:18px; color:#6b7280; }
+.copyright-footer { 
+  text-align: center; 
+  margin-top: 24px; 
+  color: #6b7280;
+  position: absolute;
+  bottom: 12px;
+  width: 100%;
+}
 
 /* Form specific */
 .checkin-form { max-width:900px; margin: 0 auto; }
@@ -66,8 +101,22 @@ body {
 
 /* Small screens */
 @media (max-width: 640px) {
-  .welcome-title { font-size:22px; }
-  .btn-group { flex-direction:column; }
+  .welcome-title { font-size: 22px; }
+  .btn-group { 
+    flex-direction: column; 
+    flex-wrap: wrap;
+  }
+  .btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .welcome-card {
+    padding: 20px;
+  }
+  .main-logo {
+    max-width: 200px;
+    margin-bottom: 1.5rem;
+  }
 }
 
 /* Keep the rest of existing rules (if any) intact in the original file. */
