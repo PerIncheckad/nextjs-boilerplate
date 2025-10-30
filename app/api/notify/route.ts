@@ -81,7 +81,7 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
   
   const storageLink = siteUrl ? createStorageLink(folderPath, siteUrl) : null;
   let bannerText = text;
-  if (count !== undefined && count > 0) bannerText += ` (${count})`;
+  if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
   let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
 
