@@ -255,7 +255,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Mätarställning:</td><td>${matarstallning} km</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Däcktyp:</td><td>${hjultyp || '---'}</td></tr>
           ${payload.drivmedel === 'elbil' ? '' : `<tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tankning:</td><td>${formatTankning(tankning)}</td></tr>`}
-          ${payload.drivmedel === 'elbil' ? `<tr><td style="font-weight:bold;width:120px;padding:4px 0;">Laddning:</td><td>${laddning.laddniva}% (${laddning.antal_laddkablar} kablar)</td></tr>` : ''}
+          ${payload.drivmedel === 'elbil' ? `<tr><td style="font-weight:bold;width:120px;padding:4px 0;">Laddning:</td><td>${laddning.laddniva}%</td></tr>` : ''}
+          ${payload.drivmedel === 'elbil' ? `<tr><td style="font-weight:bold;width:120px;padding:4px 0;">Antal laddkablar:</td><td>${laddning.antal_laddkablar}</td></tr>` : ''}
         </table>
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl, 'Inga nya skador rapporterade.')}
@@ -288,6 +289,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Reg.nr:</td><td>${regnr}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Bilmodell:</td><td>${carModel || 'Modell saknas, vänligen uppdatera i MABISYD Bilkontroll-filen'}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Däck:</td><td>${hjultyp || '---'}</td></tr>
+          ${payload.drivmedel === 'elbil' ? `<tr><td style="font-weight:bold;width:120px;padding:4px 0;">Antal laddkablar:</td><td>${payload.laddning?.antal_laddkablar}</td></tr>` : ''}
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
