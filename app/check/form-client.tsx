@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
@@ -187,6 +187,69 @@ const getFirstNameFromEmail = (email: string): string => {
     const firstName = namePart.split('.')[0];
     return firstName.charAt(0).toUpperCase() + firstName.slice(1);
 };
+
+// =================================================================
+// 1B. MODAL HELPER HOOKS
+// =================================================================
+
+/**
+ * useModalKeydown - Installs a keydown listener for Escape key when modal is open
+ * @param isOpen - Whether the modal is currently open
+ * @param onEscape - Callback to invoke when Escape is pressed
+ */
+function useModalKeydown(isOpen: boolean, onEscape: () => void): void {
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onEscape();
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onEscape]);
+}
+
+/**
+ * useDialogFocus - Manages focus when dialog opens/closes
+ * @param isOpen - Whether the dialog is currently open
+ * @param containerRef - Ref to the dialog container element
+ * @param restoreFocus - Whether to restore focus to previous element on close (default: true)
+ */
+function useDialogFocus(
+  isOpen: boolean, 
+  containerRef: React.RefObject<HTMLDivElement>,
+  restoreFocus = true
+): void {
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  
+  useEffect(() => {
+    if (isOpen) {
+      // Save current focus
+      previousFocusRef.current = document.activeElement as HTMLElement;
+      
+      // Move focus into dialog
+      if (containerRef.current) {
+        const firstFocusable = containerRef.current.querySelector<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (firstFocusable) {
+          firstFocusable.focus();
+        } else {
+          containerRef.current.focus();
+        }
+      }
+    } else {
+      // Restore focus on close
+      if (restoreFocus && previousFocusRef.current) {
+        previousFocusRef.current.focus();
+      }
+    }
+  }, [isOpen, containerRef, restoreFocus]);
+}
+
 // =================================================================
 // 2. MAIN COMPONENT
 // =================================================================
@@ -1021,6 +1084,7 @@ export default function CheckInForm() {
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
             ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, true)} />)
             : <p>Inga ohanterade befintliga skador.</p>}
+        <hr className="section-divider-strong" />
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
@@ -1162,6 +1226,12 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    
+    // Use modal hooks
+    useDialogFocus(true, containerRef);
+    useModalKeydown(true, onCancel);
+    
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
         return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
@@ -1198,10 +1268,17 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
     const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
 
-    return (<><div className="modal-overlay" /><div className="modal-content confirm-modal">
+    return (<><div className="modal-overlay" /><div 
+        ref={containerRef}
+        className="modal-content confirm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirm-modal-title"
+        aria-describedby="confirm-modal-body"
+    >
         {showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
-        <div className="confirm-header">
-            <h3 className="confirm-modal-title">Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
+        <div className="confirm-header" id="confirm-modal-body">
+            <h3 id="confirm-modal-title" className="confirm-modal-title">Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
             <div className="confirm-warnings-wrapper">
                 {payload.rental?.unavailable && <p className="warning-highlight">Går inte att hyra ut{payload.rental.comment ? `: ${payload.rental.comment}` : ''}</p>}
                 {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt{payload.varningslampa.beskrivning ? `: ${payload.varningslampa.beskrivning}` : ''}</p>}
@@ -1300,23 +1377,41 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
+    const containerRef = useRef<HTMLDivElement>(null);
+    
+    // Declare hooks unconditionally before any returns (Rules of Hooks)
+    useDialogFocus(state.isOpen, containerRef);
+    
+    const handleCancel = useCallback(() => {
+        if (state.onCancel) {
+            state.onCancel();
+        }
+        setComment('');
+        onClose();
+    }, [state, onClose]);
+    
+    useModalKeydown(state.isOpen, handleCancel);
+    
+    // Now safe to return early after all hooks are declared
     if (!state.isOpen) return null;
+    
     const handleConfirm = () => {
         if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
         state.onConfirm(comment);
         setComment('');
         onClose();
     };
-    const handleCancel = () => {
-        if (state.onCancel) {
-            state.onCancel();
-        }
-        setComment('');
-        onClose();
-    };
+    
     const themeClass = state.theme ? `theme-${state.theme}` : '';
-    return (<><div className="modal-overlay" onClick={handleCancel} /><div className={`modal-content confirm-modal ${themeClass}`}>
-        {state.title && <h3>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
+    return (<><div className="modal-overlay" onClick={handleCancel} /><div 
+        ref={containerRef}
+        className={`modal-content confirm-modal ${themeClass}`}
+        role="dialog"
+        aria-modal="true"
+        aria-describedby="action-dialog-text"
+        {...(state.title && { 'aria-labelledby': 'action-dialog-title' })}
+    >
+        {state.title && <h3 id="action-dialog-title">{state.title}</h3>}<p id="action-dialog-text" style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
         {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
         <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
     </div></>);
@@ -1400,6 +1495,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .warning-highlight { background-color: #dc2626; color: white; font-weight: bold; padding: 0.5rem 0.75rem; border-radius: 6px; display: inline-block; margin-top: 0.5rem; }
     .status-section-wrapper { display: flex; flex-direction: column; margin-bottom: 1rem; }
     .subsection-divider { border: 0; height: 1px; background-color: var(--color-border); margin: 1.5rem 0; }
+    .section-divider-strong { border: 0; border-top: 2px solid var(--color-border-strong, #d1d5db); margin: 24px 0; }
     .damage-item { border: 1px solid var(--color-border); border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
     .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
     .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
