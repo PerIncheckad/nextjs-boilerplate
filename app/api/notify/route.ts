@@ -54,6 +54,15 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 // 2. HTML BUILDER - HELPERS
 // =================================================================
 
+const escapeHtml = (unsafe: string): string => {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
 const createStorageLink = (folderPath: string | undefined, siteUrl: string): string | null => {
     if (!folderPath) return null;
     return `${siteUrl}/media/${folderPath}`;
@@ -63,8 +72,8 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
   if (!condition) return '';
   
   const storageLink = siteUrl ? createStorageLink(folderPath, siteUrl) : null;
-  let fullText = `⚠️ ${text}`;
-  if (details) fullText += `<br>${details}`;
+  let fullText = `⚠️ ${escapeHtml(text)}`;
+  if (details) fullText += `<br>${escapeHtml(details)}`;
 
   const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">${fullText}${storageLink ? ' <span style="font-size: 1.1em;">🔗</span>' : ''}</div>`;
 
@@ -98,7 +107,7 @@ const getDamageString = (damage: any): string => {
     if (positions) baseString += `: ${positions}`;
     
     const comment = damage.text || damage.userDescription || damage.resolvedComment;
-    if (comment) baseString += `<br><small style="color: inherit !important;"><strong>Kommentar:</strong> ${comment}</small>`;
+    if (comment) baseString += `<br><small style="color: inherit !important;"><strong>Kommentar:</strong> ${escapeHtml(comment)}</small>`;
     
     return baseString;
 };
@@ -238,7 +247,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Reg.nr:</td><td>${regnr}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Bilmodell:</td><td>${carModel || '---'}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Incheckad vid:</td><td>${ort} / ${station}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu.ort} / ${bilen_star_nu.station}${bilen_star_nu.kommentar ? `<br><small>(${bilen_star_nu.kommentar})</small>` : ''}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu.ort} / ${bilen_star_nu.station}${bilen_star_nu.kommentar ? `<br><small>(${escapeHtml(bilen_star_nu.kommentar)})</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${incheckare || '---'}</td></tr>
@@ -254,7 +263,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         </table>
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${escapeHtml(notering)}</p></div>` : ''}
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
   `;
@@ -289,7 +298,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table width="100%">
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckad vid:</td><td>${ort} / ${station}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${payload.bilen_star_nu.ort} / ${payload.bilen_star_nu.station}${payload.bilen_star_nu.kommentar ? `<br><small>(${payload.bilen_star_nu.kommentar})</small>` : ''}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${payload.bilen_star_nu.ort} / ${payload.bilen_star_nu.station}${payload.bilen_star_nu.kommentar ? `<br><small>(${escapeHtml(payload.bilen_star_nu.kommentar)})</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${incheckare || '---'}</td></tr>
@@ -301,7 +310,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador', siteUrl)}
         ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl)}
       </div>
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${escapeHtml(notering)}</p></div>` : ''}
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
   `;
