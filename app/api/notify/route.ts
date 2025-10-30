@@ -230,6 +230,9 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
     <table width="100%" style="color: #000000 !important;">
       <tbody>${content}</tbody>
     </table>
+    <div style="text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 20px; color: #6b7280 !important; font-size: 14px;">
+      (R) Albarone
+    </div>
   </div>
 </body>
 </html>`;
