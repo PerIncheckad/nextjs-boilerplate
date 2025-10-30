@@ -1315,14 +1315,20 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
     
     useEffect(() => {
         if (!state.isOpen) return;
+        
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                handleCancel();
+                if (state.onCancel) {
+                    state.onCancel();
+                }
+                setComment('');
+                onClose();
             }
         };
+        
         window.addEventListener('keydown', handleEscape);
         return () => window.removeEventListener('keydown', handleEscape);
-    }, [state.isOpen]);
+    }, [state.isOpen, state.onCancel, onClose]);
     
     if (!state.isOpen) return null;
     const handleConfirm = () => {
