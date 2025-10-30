@@ -54,16 +54,35 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 // 2. HTML BUILDER - HELPERS
 // =================================================================
 
+const formatCheckerName = (payload: any): string => {
+  // Try to get full name from various possible fields (defensive approach)
+  if (payload.fullName) return payload.fullName;
+  if (payload.full_name) return payload.full_name;
+  
+  // Try to combine first and last name if available
+  const firstName = payload.firstName || payload.first_name || payload.incheckare;
+  const lastName = payload.lastName || payload.last_name;
+  
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`;
+  }
+  
+  // Fallback to just first name or email-based name
+  return firstName || payload.incheckare || '---';
+};
+
 const createStorageLink = (folderPath: string | undefined, siteUrl: string): string | null => {
     if (!folderPath) return null;
     return `${siteUrl}/media/${folderPath}`;
 }
 
-const createAlertBanner = (condition: boolean, text: string, details?: string, folderPath?: string, siteUrl?: string): string => {
+const createAlertBanner = (condition: boolean, text: string, details?: string, folderPath?: string, siteUrl?: string, count?: number): string => {
   if (!condition) return '';
   
   const storageLink = siteUrl ? createStorageLink(folderPath, siteUrl) : null;
-  let fullText = `⚠️ ${text}`;
+  let bannerText = text;
+  if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
+  let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
 
   const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">${fullText}${storageLink ? ' <span style="font-size: 1.1em;">🔗</span>' : ''}</div>`;
@@ -220,19 +239,24 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 // =================================================================
 
 const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, ort, station, incheckare, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, husdjur, rokning, rental, status, nya_skador = [], notering, bilen_star_nu } = payload;
+  const { regnr, carModel, ort, station, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, husdjur, rokning, rental, status, nya_skador = [], notering, bilen_star_nu } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
 
+  // Find folder for new damages (prefer first damage with folder)
+  const nyaSkadorFolder = nya_skador.find((d: any) => d.uploads?.folder)?.uploads?.folder;
+  
+  const checkerName = formatCheckerName(payload);
+
   const content = `
     ${createAlertBanner(rental?.unavailable, 'Går inte att hyra ut', rental?.comment, undefined, siteUrl)}
     ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
-    ${createAlertBanner(rekond.behoverRekond, 'Rekond', undefined, rekond.folder, siteUrl)}
+    ${createAlertBanner(rekond.behoverRekond, 'Rekond', rekond.text, rekond.folder, siteUrl)}
     ${createAlertBanner(notRefueled, 'Bilen är ej upptankad', undefined, undefined, siteUrl)}
     ${createAlertBanner(showChargeWarning, 'Kolla bilens laddnivå!', undefined, undefined, siteUrl)}
     ${createAlertBanner(status?.insynsskyddSaknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
-    ${createAlertBanner(nya_skador.length > 0, 'Nya skador har rapporterats', undefined, undefined, siteUrl)}
+    ${createAlertBanner(nya_skador.length > 0, 'Nya skador dokumenterade', undefined, nyaSkadorFolder, siteUrl, nya_skador.length)}
     ${createAlertBanner(husdjur.sanerad, 'Husdjur', husdjur.text, husdjur.folder, siteUrl)}
     ${createAlertBanner(rokning.sanerad, 'Rökning', rokning.text, rokning.folder, siteUrl)}
 
@@ -246,7 +270,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small>(${bilen_star_nu?.kommentar})</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${checkerName}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -268,9 +292,14 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, hjultyp, ort, station, incheckare, rekond, husdjur, rokning, varningslampa, rental, status, vehicleStatus, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], bilen_star_nu } = payload;
+  const { regnr, carModel, hjultyp, ort, station, rekond, husdjur, rokning, varningslampa, rental, status, vehicleStatus, notering, åtgärdade_skador = [], dokumenterade_skador = [], nya_skador = [], bilen_star_nu } = payload;
   
   const unknownRegStatus = vehicleStatus === 'PARTIAL_MATCH_DAMAGE_ONLY' || vehicleStatus === 'NO_MATCH';
+
+  // Find folder for new damages (prefer first damage with folder)
+  const nyaSkadorFolder = nya_skador.find((d: any) => d.uploads?.folder)?.uploads?.folder;
+  
+  const checkerName = formatCheckerName(payload);
           
   const content = `
     ${createAdminBanner(unknownRegStatus, 'Reg.nr saknas i "MABISYD Bilkontroll 2024–2025"')}
@@ -278,6 +307,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
     ${createAlertBanner(varningslampa.lyser, 'Varningslampa ej släckt', varningslampa.beskrivning, undefined, siteUrl)}
     ${createAlertBanner(rekond.behoverRekond, 'Rekond', rekond.text, rekond.folder, siteUrl)}
     ${createAlertBanner(status?.insynsskyddSaknas, 'Insynsskydd saknas', undefined, undefined, siteUrl)}
+    ${createAlertBanner(nya_skador.length > 0, 'Nya skador dokumenterade', undefined, nyaSkadorFolder, siteUrl, nya_skador.length)}
     ${createAlertBanner(husdjur.sanerad, 'Husdjur', husdjur.text, husdjur.folder, siteUrl)}
     ${createAlertBanner(rokning.sanerad, 'Rökning', rokning.text, rokning.folder, siteUrl)}
     ${createAlertBanner(nya_skador.length > 0 || dokumenterade_skador.length > 0, 'Skador har hanterats', undefined, undefined, siteUrl)}
@@ -299,7 +329,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small>(${bilen_star_nu?.kommentar})</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${incheckare || '---'}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${checkerName}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
