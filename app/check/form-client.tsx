@@ -188,6 +188,18 @@ const getFirstNameFromEmail = (email: string): string => {
     return firstName.charAt(0).toUpperCase() + firstName.slice(1);
 };
 
+const getFullNameFromEmail = (email: string): string => {
+    if (!email) return 'Okänd';
+    const namePart = email.split('@')[0];
+    const parts = namePart.split('.');
+    if (parts.length >= 2) {
+        const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+        const lastName = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+        return `${firstName} ${lastName}`;
+    }
+    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+};
+
 // =================================================================
 // 1B. MODAL HELPER HOOKS
 // =================================================================
@@ -257,6 +269,7 @@ function useDialogFocus(
 export default function CheckInForm() {
   // State
   const [firstName, setFirstName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [regInput, setRegInput] = useState('');
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -341,10 +354,19 @@ export default function CheckInForm() {
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
   const availableStationsBilenStarNu = useMemo(() => STATIONER[bilenStarNuOrt] || [], [bilenStarNuOrt]);
   
+  const shouldHideAdBlue = useMemo(() => {
+    // Hide AdBlue ONLY when:
+    // 1. Fuel type is explicitly set to Bensin (when tankad_nu is selected)
+    // 2. OR tankstatus is Elbil (drivmedelstyp === 'elbil')
+    if (drivmedelstyp === 'elbil') return true;
+    if (drivmedelstyp === 'bensin_diesel' && tankniva === 'tankad_nu' && bransletyp === 'Bensin') return true;
+    return false;
+  }, [drivmedelstyp, tankniva, bransletyp]);
+
   const otherChecklistItemsOK = useMemo(() => {
      const common = dekalDjurRokningOK && isskrapaOK && pskivaOK && skyltRegplatOK && dekalGpsOK && spolarvatskaOK && vindrutaAvtorkadOK;
-     return drivmedelstyp === 'bensin_diesel' ? common && adblueOK : common;
-  }, [dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, vindrutaAvtorkadOK, adblueOK, drivmedelstyp]);
+     return shouldHideAdBlue ? common : common && adblueOK;
+  }, [dekalDjurRokningOK, isskrapaOK, pskivaOK, skyltRegplatOK, dekalGpsOK, spolarvatskaOK, vindrutaAvtorkadOK, adblueOK, shouldHideAdBlue]);
 
   const isChecklistComplete = useMemo(() => {
     return washed && otherChecklistItemsOK;
@@ -518,7 +540,9 @@ export default function CheckInForm() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setFirstName(getFirstNameFromEmail(user?.email || ''));
+      const email = user?.email || '';
+      setFirstName(getFirstNameFromEmail(email));
+      setFullName(getFullNameFromEmail(email));
     };
     getUser();
   }, []);
@@ -1014,7 +1038,7 @@ export default function CheckInForm() {
       
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
-        {firstName && <p className="user-info">Inloggad: {firstName}</p>}
+        {fullName && <p className="user-info">Inloggad: {fullName}</p>}
       </div>
 
       <Card data-error={showFieldErrors && !regInput}>
@@ -1183,7 +1207,7 @@ export default function CheckInForm() {
           <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS finns</ChoiceButton>
           <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
           <ChoiceButton onClick={() => setVindrutaAvtorkadOK(!vindrutaAvtorkadOK)} isActive={vindrutaAvtorkadOK}>Insida vindruta avtorkad</ChoiceButton>
-          {drivmedelstyp === 'bensin_diesel' && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
+          {!shouldHideAdBlue && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
         </div>
       </Card>
 
@@ -1281,8 +1305,10 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             <h3 id="confirm-modal-title" className="confirm-modal-title" style={{textAlign: 'center'}}>Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
             <div className="confirm-warnings-wrapper">
                 {payload.rental?.unavailable && <p className="warning-highlight">Går inte att hyra ut{payload.rental.comment ? `: ${payload.rental.comment}` : ''}</p>}
-                {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt{payload.varningslampa.beskrivning ? `: ${payload.varningslampa.beskrivning}` : ''}</p>}
+                {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt</p>}
                 {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Rekond</p>}
+                {payload.husdjur?.sanerad && <p className="warning-highlight">Husdjur</p>}
+                {payload.rokning?.sanerad && <p className="warning-highlight">Rökning</p>}
                 {payload.status?.insynsskyddSaknas && <p className="warning-highlight">Insynsskydd saknas</p>}
                 {showNotRefueled && <p className="warning-highlight">Bilen är ej upptankad</p>}
                 {showChargeWarning && <p className="warning-highlight">Låg laddnivå</p>}
