@@ -716,7 +716,7 @@ export default function CheckInForm() {
       // Turning on - show confirmation modal
       setConfirmDialog({
         isOpen: true,
-        title: '⚠️ Behöver rekond',
+        title: '⚠️ Rekond',
         text: 'Detta kan medföra en avgift för hyrestagaren.',
         confirmButtonVariant: 'danger',
         theme: 'warning',
@@ -1021,7 +1021,9 @@ export default function CheckInForm() {
         {vehicleData && existingDamages.some(d => !d.isInventoried) 
             ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, true)} />)
             : <p>Inga ohanterade befintliga skador.</p>}
-        <SubSectionHeader title="Nya skador" />
+        <div style={{marginTop: '2rem', marginBottom: '2rem', borderTop: '2px solid var(--color-border)', paddingTop: '1rem'}}>
+          <SubSectionHeader title="Nya skador" />
+        </div>
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
@@ -1058,7 +1060,7 @@ export default function CheckInForm() {
         
         {/* 3) Behöver rekond */}
         <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Behöver rekond</ChoiceButton>
+          <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Rekond</ChoiceButton>
           {behoverRekond && (<div className="damage-details">
             <Field label="Typ av rekond *"><div className="grid-2-col">
               <ChoiceButton onClick={() => setRekondUtvandig(!rekondUtvandig)} isActive={rekondUtvandig}>Utvändig</ChoiceButton>
@@ -1162,6 +1164,16 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onCancel();
+            }
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [onCancel]);
+    
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
         return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
@@ -1205,7 +1217,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             <div className="confirm-warnings-wrapper">
                 {payload.rental?.unavailable && <p className="warning-highlight">Går inte att hyra ut{payload.rental.comment ? `: ${payload.rental.comment}` : ''}</p>}
                 {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt{payload.varningslampa.beskrivning ? `: ${payload.varningslampa.beskrivning}` : ''}</p>}
-                {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Behöver rekond</p>}
+                {payload.rekond.behoverRekond && <p className="warning-highlight rekond-highlight">Rekond</p>}
                 {payload.status?.insynsskyddSaknas && <p className="warning-highlight">Insynsskydd saknas</p>}
                 {showNotRefueled && <p className="warning-highlight">Bilen är ej upptankad</p>}
                 {showChargeWarning && <p className="warning-highlight">Låg laddnivå</p>}
@@ -1300,6 +1312,18 @@ const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: 
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
     const [comment, setComment] = useState('');
+    
+    useEffect(() => {
+        if (!state.isOpen) return;
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                handleCancel();
+            }
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [state.isOpen]);
+    
     if (!state.isOpen) return null;
     const handleConfirm = () => {
         if (state.requiresComment && !comment.trim()) { alert('Kommentar är obligatoriskt.'); return; }
@@ -1316,7 +1340,7 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
     };
     const themeClass = state.theme ? `theme-${state.theme}` : '';
     return (<><div className="modal-overlay" onClick={handleCancel} /><div className={`modal-content confirm-modal ${themeClass}`}>
-        {state.title && <h3>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
+        {state.title && <h3 style={{textAlign: 'center'}}>{state.title}</h3>}<p style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
         {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
         <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
     </div></>);
