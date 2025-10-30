@@ -1408,8 +1408,8 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         className={`modal-content confirm-modal ${themeClass}`}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={state.title ? "action-dialog-title" : undefined}
         aria-describedby="action-dialog-text"
+        {...(state.title && { 'aria-labelledby': 'action-dialog-title' })}
     >
         {state.title && <h3 id="action-dialog-title">{state.title}</h3>}<p id="action-dialog-text" style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
         {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
