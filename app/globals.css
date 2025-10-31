@@ -25,7 +25,7 @@ body {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 24px 24px 60px 24px;
+  padding: 24px 24px 60px 24px; /* Bottom padding prevents overlap with fixed footer */
 }
 
 /* Background layer (restored) */
