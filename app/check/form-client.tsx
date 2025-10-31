@@ -274,7 +274,6 @@ export default function CheckInForm() {
   // State
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
-  const currentYear = new Date().getFullYear();
   const [regInput, setRegInput] = useState('');
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -472,6 +471,8 @@ export default function CheckInForm() {
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering
   ]);
+
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
 
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
