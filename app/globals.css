@@ -22,16 +22,17 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: calc(100vh - 60px);
+  min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 24px 24px 60px 24px;
 }
 
 /* Background layer (restored) */
 .background-img {
   position: fixed;
   inset: 0;
+  background-image: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
@@ -109,11 +110,24 @@ body {
   width: 100%;
 }
 
+/* Report section - centered */
+.report-section {
+  display: flex;
+  justify-content: center;
+}
+
 /* Copyright */
 .copyright-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   text-align: center;
-  margin-top: 24px;
+  padding: 12px;
   color: #6b7280;
+  font-size: 12px;
+  background: transparent;
+  z-index: 1;
 }
 
 /* Small screens */
@@ -121,4 +135,5 @@ body {
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 24px 20px; }
   .btn.incheckning, .report-btn, .divider { max-width: 100%; }
+  .copyright-footer { font-size: 11px; padding: 10px; }
 }
