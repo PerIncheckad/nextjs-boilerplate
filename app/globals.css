@@ -8,9 +8,7 @@
 }
 
 /* Base layout */
-html, body, #__next {
-  height: 100%;
-}
+html, body, #__next { height: 100%; }
 
 body {
   color: var(--foreground);
@@ -22,110 +20,105 @@ body {
 }
 
 /* Utility / layout */
+.welcome-main {
+  position: relative;
+  min-height: calc(100vh - 60px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+/* Background layer (restored) */
+.background-img {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  z-index: 0; /* card above */
+}
+
+/* Card with 90% white */
+.welcome-card {
+  position: relative;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 32px 24px;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 720px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+/* Logo spacing */
 .main-logo {
   display: block;
   margin: 0 auto 24px auto;
   max-width: 260px;
 }
 
-.welcome-main {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - 60px);
-  padding: 24px;
-}
-
-.welcome-card {
-  background: rgba(255, 255, 255, 0.9);
-  padding: 32px 24px;
-  border-radius: 12px;
-  max-width: 720px;
-  width: 100%;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  text-align: center;
-}
-
+/* Title */
 .welcome-title {
   font-size: 28px;
   margin: 0 0 24px 0;
   text-align: center;
 }
 
-.btn-group { 
-  display: flex; 
+/* Ensure vertical stack and winning specificity */
+.welcome-card .btn-group {
+  display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px; 
-  margin-bottom: 20px; 
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
-.btn { 
-  display: inline-block; 
-  padding: 12px 24px; 
-  border-radius: 8px; 
-  text-decoration: none; 
-  color: #fff; 
+/* Buttons with desktop width constraints, full width on mobile */
+.btn {
+  display: inline-block;
+  padding: 12px 24px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #fff;
   background: var(--main-blue);
   font-weight: 500;
   transition: opacity 0.2s;
 }
+.btn:hover { opacity: 0.9; }
 
-.btn:hover {
-  opacity: 0.9;
-}
-
-.btn.incheckning { 
+.btn.incheckning {
   background: var(--main-green);
-  max-width: 320px;
+  max-width: 320px; /* common practice: 280–360px */
   width: 100%;
 }
-
-.report-btn { 
+.report-btn {
   background: #111827;
   max-width: 320px;
   width: 100%;
 }
 
-.divider { 
-  border: none; 
-  height: 1px; 
-  background: var(--main-border); 
-  margin: 20px 0; 
+/* Centered divider same width as buttons */
+.divider-wrap { display: flex; justify-content: center; }
+.divider {
+  border: none;
+  height: 1px;
+  background: var(--main-border);
+  margin: 20px 0;
   max-width: 320px;
+  width: 100%;
 }
 
-.divider-wrap {
-  display: flex;
-  justify-content: center;
+/* Copyright */
+.copyright-footer {
+  text-align: center;
+  margin-top: 24px;
+  color: #6b7280;
 }
-
-.report-section {
-  display: flex;
-  justify-content: center;
-}
-
-.copyright-footer { 
-  text-align: center; 
-  margin-top: 24px; 
-  color: #6b7280; 
-}
-
-/* Form specific */
-.checkin-form { max-width:900px; margin: 0 auto; }
-.main-header { text-align:center; padding: 12px 0; }
-.user-info { font-size: 14px; color:#374151; }
 
 /* Small screens */
 @media (max-width: 640px) {
   .welcome-title { font-size: 22px; }
-  .btn.incheckning,
-  .report-btn {
-    max-width: 100%;
-  }
-  .welcome-card {
-    padding: 24px 20px;
-  }
+  .welcome-card { padding: 24px 20px; }
+  .btn.incheckning, .report-btn, .divider { max-width: 100%; }
 }
-
-/* Keep the rest of existing rules (if any) intact in the original file. */
