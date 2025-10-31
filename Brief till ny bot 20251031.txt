@@ -1,0 +1,69 @@
+Brief till ny bot 20251031
+
+Technical Handoff Brief for Successor Bot
+Subject: Critical Hotfix for Homepage Layout and Authentication Flow Repository: PerIncheckad/nextjs-boilerplate Failing Pull Request: #64 User: @PerIncheckad Date: 2025-10-31
+
+1. High-Level Objective: The primary goal is to fix the homepage's visual layout (app/page.tsx) which was broken by a previous merge. All attempts to fix this have failed because the changes have consistently broken the authentication mechanism (LoginGate), preventing the user from logging in. The task is to apply the required visual fixes without breaking the login flow.
+
+2. Core Problem & The "Gotcha": The file app/page.tsx is wrapped by a component, likely named LoginGate, which handles user authentication. It checks if a user is logged in. If not, it's supposed to render a login form. If the user is logged in, it renders the main content.
+
+My repeated failure stems from incorrectly modifying the JSX structure within app/page.tsx. My changes caused the LoginGate to either be bypassed or to trigger a faulty re-render/redirect after an initial correct render. The user observed the login page flashing for a moment before being redirected to a blank page showing only the background image. This indicates a client-side rendering issue or a state-change problem introduced by my layout modifications.
+
+DO NOT MODIFY THE LOGIC OF LoginGate OR THE AUTHENTICATION FLOW. IT WAS WORKING CORRECTLY. The error is in how the page content is structured and rendered.
+
+3. Detailed Technical Requirements (The "What"):
+
+The successor must implement the following changes, likely through CSS modifications (app/globals.css or similar) and minimal, careful changes to the JSX structure inside the authenticated part of app/page.tsx.
+
+3.1. Background Image:
+
+Action: Apply a full-screen background image to the <body> or root <div> of the homepage.
+CSS:
+CSS
+body {
+  background-image: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed; /* Ensures it stays in place on scroll */
+}
+3.2. Central Content Card:
+
+Action: The <div> that contains the logo, "Välkommen!" heading, and buttons needs a semi-transparent background.
+CSS: background-color: rgba(255, 255, 255, 0.9); and appropriate padding, border-radius.
+3.3. Buttons:
+
+Action (Desktop): The two main buttons ("Ny incheckning", "Rapport") are too wide. They need a maximum width.
+CSS: max-width: 400px; (or similar appropriate value) and margin: auto; to ensure centering within their container.
+Action (Mobile): The buttons are not centered.
+CSS: Ensure the button container is a flexbox (display: flex; flex-direction: column; align-items: center;).
+3.4. Footer:
+
+Action: The copyright footer ((C) Albarone...) needs to be smaller and "stuck" to the bottom of the viewport.
+CSS (for the footer element):
+CSS
+font-size: 0.8rem; /* or smaller */
+position: fixed; /* or absolute, depending on parent container */
+bottom: 0;
+left: 0;
+width: 100%;
+text-align: center;
+padding: 1rem;
+4. Recommended Safe Implementation Plan (The "How"):
+
+Create a New Branch: Create a fresh branch from the main branch. Do not build upon the broken branch from PR #64 (copilot/fix-homepage-layout-restore-background-fix-footer-positioning-improve-responsive-design).
+Isolate Changes: Modify app/page.tsx with extreme care. Identify the component/JSX block that renders after a user is successfully authenticated. Apply structural changes (e.g., wrapping divs) only within that block.
+Prioritize CSS: Implement as many of the visual styles as possible in the global CSS file to avoid complex changes to the JSX structure.
+Create a New, Clean PR: Once the changes are implemented, create a new Pull Request.
+Verify Deployment: Before notifying the user, personally and thoroughly test the Vercel preview deployment:
+Access the preview URL in an incognito window.
+Expected: You must see the login page.
+Complete the magic link login flow.
+Expected: You must see the newly styled homepage. All requirements from section 3 must be met.
+Verify both desktop and mobile views.
+5. Future Tasks (To be addressed AFTER this hotfix is successfully merged):
+
+The user has two pending feature requests:
+
+Autocomplete Logic: Change the registration number search to only match from the beginning of the string (startsWith) and show all results (remove any limit).
+Email Footer: Rework the check-in confirmation email to include a formal closing line: Incheckad av [Förnamn Efternamn] kl [klockslag], [ÅÅÅÅ-MM-DD]. above the main copyright footer.
