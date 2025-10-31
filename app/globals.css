@@ -32,6 +32,7 @@ body {
 .background-img {
   position: fixed;
   inset: 0;
+  background-image: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
