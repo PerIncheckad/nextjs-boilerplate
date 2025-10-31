@@ -16,15 +16,13 @@ export default function HomePage() {
       <main className="welcome-main">
         <div className="background-img" />
         
-        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
-        
         <div className="welcome-card">
+          <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
+          
           <h1 className="welcome-title">Välkommen!</h1>
           
-          {/* === ÄNDRING: Knapparna grupperade & streck återställt === */}
           <div className="btn-group">
             <a href="/check" className="btn incheckning">Ny incheckning</a>
-            <a href="/check/drafts" className="btn incheckning">Fortsätt påbörjad<br />incheckning</a>
           </div>
           
           <div className="divider-wrap">
