@@ -10,6 +10,9 @@ const EMAIL_WHITELIST = new Set<string>([
   'latif.mutlu@mabi.se',
   'hugo.carqueija@gmail.com',
   'benjamin.mutlu@outlook.com',
+  'oliwer.fredriksson@mabi.se',
+  'louise.espe@mabi.se',
+  'lucas.nemeth@mabi.se',
   'isak.brandeby@mabi.se',
 ]);
 
