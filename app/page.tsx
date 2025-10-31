@@ -38,7 +38,7 @@ export default function HomePage() {
         </div>
         
         <footer className="copyright-footer">
-          &copy; Albarone AB {currentYear} &mdash; All rights reserved
+          &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
         </footer>
       </main>
     </LoginGate>
