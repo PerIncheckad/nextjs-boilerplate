@@ -21,11 +21,12 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: 100vh;
+  min-height: 100dvh;            /* better mobile viewport handling */
   display: grid;
   place-items: center;
   padding: 24px;
-  padding-bottom: 88px; /* avoid overlap with sticky footer */
+  padding-bottom: 88px;           /* avoid overlap with sticky footer */
+  overflow: hidden;               /* prevent stray scroll on homepage */
 }
 
 /* Background layer (only on homepage) */
@@ -41,7 +42,7 @@ body {
   pointer-events: none;
 }
 
-/* Card with 90% white, slightly smaller and a bit lower on the page */
+/* Card with 90% white, compact and slightly higher on the page */
 .welcome-card {
   position: relative;
   z-index: 1;
@@ -49,10 +50,10 @@ body {
   padding: 24px 20px;
   border-radius: 12px;
   width: 100%;
-  max-width: 560px; /* smaller, less dominant */
+  max-width: 560px; /* compact */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   text-align: center;
-  margin-top: clamp(24px, 8vh, 72px); /* nudge down for better visual balance */
+  margin-top: clamp(16px, 6vh, 56px); /* lift slightly compared to previous */
 }
 
 /* Logo spacing */
@@ -78,10 +79,10 @@ body {
   margin: 0; /* keep divider perfectly centered between buttons */
 }
 
-/* Buttons with desktop width constraints, full width on mobile */
+/* Buttons — narrower, less elongated */
 .btn {
   display: inline-block;
-  padding: 12px 20px;
+  padding: 12px 16px;             /* tighter horizontal padding */
   border-radius: 8px;
   text-decoration: none;
   color: #fff;
@@ -93,12 +94,12 @@ body {
 
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 300px; /* slimmer buttons per feedback */
+  max-width: 260px;               /* slimmer */
   width: 100%;
 }
 .report-btn {
   background: #111827;
-  max-width: 300px;
+  max-width: 260px;
   width: 100%;
 }
 
@@ -108,8 +109,8 @@ body {
   border: none;
   height: 1px;
   background: var(--main-border);
-  margin: 16px 0; /* equal space above/below => visually mid */
-  max-width: 300px; /* match button width */
+  margin: 16px 0;                 /* equal space above/below => visually mid */
+  max-width: 260px;               /* match button width */
   width: 100%;
 }
 
