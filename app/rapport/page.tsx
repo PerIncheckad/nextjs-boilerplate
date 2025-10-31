@@ -320,7 +320,7 @@ export default function RapportPage() {
           </div>
         )}
       </div>
-      <footer className="copyright-footer">&copy; Albarone AB 2025 &mdash; All rights reserved</footer>
+      <footer className="copyright-footer">&copy; {new Date().getFullYear()} Albarone AB &mdash; Alla rättigheter förbehållna</footer>
       <MediaModal 
         open={modalOpen} 
         onClose={() => setModalOpen(false)} 

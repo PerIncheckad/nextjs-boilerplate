@@ -230,6 +230,9 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
     <table width="100%" style="color: #000000 !important;">
       <tbody>${content}</tbody>
     </table>
+    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: left; font-size: 12px; color: #6b7280 !important;">
+      &copy; ${new Date().getFullYear()} Albarone AB &mdash; Alla rättigheter förbehållna
+    </div>
   </div>
 </body>
 </html>`;
