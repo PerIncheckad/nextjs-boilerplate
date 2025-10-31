@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import LoginGate from '@/components/LoginGate';
 
+const currentYear = new Date().getFullYear();
+
 export const metadata: Metadata = {
   title: 'Incheckad',
   description: 'Startsida',
@@ -34,7 +36,7 @@ export default function HomePage() {
         </div>
 
         <footer className="copyright-footer">
-          (C) Albarone AB &mdash; Alla rättigheter förbehållna
+          (C) {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
         </footer>
       </main>
     </LoginGate>
