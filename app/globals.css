@@ -18,18 +18,22 @@ body {
   background: var(--background);
 }
 
+/* Stäng av scroll på desktop, tillåt på små skärmar */
+@media (min-width: 768px) {
+  html, body { overflow: hidden; }
+}
+
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: 100dvh;            /* better mobile viewport handling */
+  min-height: 100dvh;            /* stabilt på mobiler */
   display: grid;
   place-items: center;
   padding: 24px;
-  padding-bottom: 88px;           /* avoid overlap with sticky footer */
-  overflow: hidden;               /* prevent stray scroll on homepage */
+  padding-bottom: 88px;           /* luft ovanför fast footer */
 }
 
-/* Background layer (only on homepage) */
+/* Background layer (endast på startsidan) */
 .background-img {
   position: fixed;
   inset: 0;
@@ -37,12 +41,12 @@ body {
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  background-attachment: fixed; /* stays put on scroll */
-  z-index: 0; /* card above */
+  background-attachment: fixed;
+  z-index: 0;                     /* kortet över */
   pointer-events: none;
 }
 
-/* Card with 90% white, compact and slightly higher on the page */
+/* Kortet: kompakt och högre upp */
 .welcome-card {
   position: relative;
   z-index: 1;
@@ -50,39 +54,39 @@ body {
   padding: 24px 20px;
   border-radius: 12px;
   width: 100%;
-  max-width: 560px; /* compact */
+  max-width: 560px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   text-align: center;
-  margin-top: clamp(16px, 6vh, 56px); /* lift slightly compared to previous */
+  margin-top: clamp(0px, 2vh, 24px); /* Lyft kortet markant */
 }
 
-/* Logo spacing */
+/* Logga */
 .main-logo {
   display: block;
   margin: 0 auto 24px auto;
   max-width: 260px;
 }
 
-/* Title */
+/* Rubrik */
 .welcome-title {
   font-size: 28px;
   margin: 0 0 20px 0;
   text-align: center;
 }
 
-/* Stack and center */
+/* Övre knappgrupp */
 .welcome-card .btn-group {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  margin: 0; /* keep divider perfectly centered between buttons */
+  margin: 0;
 }
 
-/* Buttons — narrower, less elongated */
+/* Knappar – mindre avlånga */
 .btn {
   display: inline-block;
-  padding: 12px 16px;             /* tighter horizontal padding */
+  padding: 12px 16px;             /* tajtare bredd */
   border-radius: 8px;
   text-decoration: none;
   color: #fff;
@@ -94,7 +98,7 @@ body {
 
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 260px;               /* slimmer */
+  max-width: 260px;
   width: 100%;
 }
 .report-btn {
@@ -103,26 +107,26 @@ body {
   width: 100%;
 }
 
-/* Centered divider exactly between buttons */
+/* Avdelare – exakt mitt emellan knapparna */
 .divider-wrap { display: flex; justify-content: center; }
 .divider {
   border: none;
   height: 1px;
   background: var(--main-border);
-  margin: 16px 0;                 /* equal space above/below => visually mid */
-  max-width: 260px;               /* match button width */
+  margin: 16px 0;                 /* symmetrisk spacing */
+  max-width: 260px;               /* matchar knappar */
   width: 100%;
 }
 
-/* Ensure the report button container is centered (helps on mobile) */
+/* Nedre knappgrupp */
 .report-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin: 0; /* symmetry with btn-group */
+  margin: 0;
 }
 
-/* Copyright sticky at bottom */
+/* Copyright fast i botten */
 .copyright-footer {
   position: fixed;
   bottom: 0;
@@ -130,13 +134,13 @@ body {
   right: 0;
   text-align: center;
   padding: 12px 16px;
-  font-size: 0.8rem; /* a bit smaller */
+  font-size: 0.8rem;
   color: #6b7280;
-  z-index: 5; /* above background */
+  z-index: 5;
   background: transparent;
 }
 
-/* Small screens */
+/* Små skärmar */
 @media (max-width: 640px) {
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 20px 16px; margin-top: 24px; max-width: 100%; }
