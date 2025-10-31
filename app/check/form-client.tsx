@@ -472,6 +472,8 @@ export default function CheckInForm() {
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering
   ]);
 
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setNotFound(false);
@@ -1236,6 +1238,10 @@ export default function CheckInForm() {
             {isFinalSaving ? 'Skickar...' : (formIsValidState ? 'Slutför incheckning' : 'Visa saknad information')}
         </Button>
       </div>
+
+      <footer className="copyright-footer">
+        &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
+      </footer>
     </div>
   );
 }
@@ -1505,7 +1511,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .grid-3-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
     .fuel-type-buttons { display: flex; flex-wrap: wrap; gap: 1rem; }
     .fuel-type-buttons .choice-btn { flex-grow: 1; }
-    .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 3rem; }
+    .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 1.5rem; }
+    .copyright-footer { text-align: center; margin-top: 2rem; padding: 1.5rem 0 3rem 0; color: var(--color-text-secondary); font-size: 0.875rem; }
     .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
     .btn.primary { background-color: var(--color-primary); color: white; }
     .btn.secondary { background-color: var(--color-border); color: var(--color-text); }
