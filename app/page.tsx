@@ -32,10 +32,9 @@ export default function HomePage() {
           <div className="report-section">
             <a href="/rapport" className="btn report-btn">RAPPORT</a>
           </div>
-
         </div>
         
-        <footer className="copyright-footer">
+        <footer className="homepage-footer">
           &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
         </footer>
       </main>
