@@ -85,7 +85,9 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
   let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
 
-  const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">${fullText}${storageLink ? ' <span style="font-size: 1.1em;">🔗</span>' : ''}</div>`;
+  const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">
+    ${fullText}
+  </div>`;
 
   const finalHtml = storageLink 
     ? `<a href="${storageLink}" target="_blank" style="text-decoration: none; color: #92400e !important;">${bannerContent}</a>`
@@ -97,7 +99,9 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
 const createAdminBanner = (condition: boolean, text: string): string => {
   if (!condition) return '';
   
-  const bannerContent = `<div style="background-color: #DBEAFE !important; border: 1px solid #93C5FD; padding: 12px; text-align: center; font-weight: bold; color: #1E40AF !important; border-radius: 8px;">${text}</div>`;
+  const bannerContent = `<div style="background-color: #DBEAFE !important; border: 1px solid #93C5FD; padding: 12px; text-align: center; font-weight: bold; color: #1E40AF !important; border-radius: 8px;">
+    ${text}
+  </div>`;
 
   return `<tr><td style="padding: 6px 0;">${bannerContent}</td></tr>`;
 };
@@ -139,14 +143,14 @@ const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fal
     return `<li style="margin-bottom: 8px; color: inherit !important;">${text}${linkContent}</li>`;
   }).join('');
 
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: inherit !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0; color: inherit !important;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: inherit !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 8px; margin-bottom: 0;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
     if (!tankning) return '---';
     if (tankning.tankniva === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
     if (tankning.tankniva === 'tankad_nu') {
-        const parts = ['Tankad nu av MABI', tankning.liters ? `(${tankning.liters}L` : null, tankning.bransletyp ? `${tankning.bransletyp}` : null, tankning.literpris ? `@ ${tankning.literpris} kr/L)` : ')']
+        const parts = ['Tankad nu av MABI', tankning.liters ? `(${tankning.liters}L` : null, tankning.bransletyp ? `${tankning.bransletyp}` : null, tankning.literpris ? `@ ${tankning.literpris} kr/L)` : null]
             .filter(Boolean)
             .join(' ');
         return parts;
@@ -169,7 +173,7 @@ const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: s
     
     if (bilagor.length === 0) return '';
     
-    return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 0; color: #000000 !important;">${bilagor.join('')}</ul></div>`;
+    return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 8px; margin-bottom: 0;">${bilagor.join('')}</ul></div>`;
 };
 
 const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
@@ -270,10 +274,9 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Reg.nr:</td><td>${regnr}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Bilmodell:</td><td>${carModel || '---'}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Incheckad vid:</td><td>${ort} / ${station}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small>(${bilen_star_nu?.kommentar})</small>` : ''}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small style="color: inherit !important;"><strong>Parkeringsinfo:</strong> ${bilen_star_nu.kommentar}</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${checkerName}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -287,8 +290,12 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         </table>
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl, 'Inga nya skador rapporterade.')}
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top: 0;">${notering}</p></div>` : ''}
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
+    </td></tr>
+
+    <tr><td style="padding-top: 6px;">
+      <div style="color:#6b7280 !important; font-size: 12px;">Incheckad av ${checkerName} kl ${time}, ${date}.</div>
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
@@ -329,10 +336,9 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table width="100%">
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckad vid:</td><td>${ort} / ${station}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small>(${bilen_star_nu?.kommentar})</small>` : ''}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small style="color: inherit !important;"><strong>Parkeringsinfo:</strong> ${bilen_star_nu.kommentar}</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${checkerName}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -341,8 +347,12 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador', siteUrl, 'Inga gamla skador dokumenterade.')}
         ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl, 'Inga nya skador rapporterade.')}
       </div>
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top: 0;">${notering}</p></div>` : ''}
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
+    </td></tr>
+
+    <tr><td style="padding-top: 6px;">
+      <div style="color:#6b7280 !important; font-size: 12px;">Incheckad av ${checkerName} kl ${time}, ${date}.</div>
     </td></tr>
   `;
   return createBaseLayout(regnr, content);
@@ -368,7 +378,7 @@ export async function POST(request: Request) {
     // Compute station for subject - use "Bilen står nu" station when present
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
     // If station contains "Ort / Station", keep only the Station portion
-    const cleanStation = stationForSubject.includes(' / ') ? stationForSubject.split(' / ').pop()?.trim() : stationForSubject;
+    const cleanStation = stationForSubject?.includes(' / ') ? stationForSubject.split(' / ').pop()?.trim() : stationForSubject;
     
     // Check for "farliga" conditions (test mode marker in subject)
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
