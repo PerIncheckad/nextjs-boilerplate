@@ -54,6 +54,17 @@ const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/pub
 // 2. HTML BUILDER - HELPERS
 // =================================================================
 
+const escapeHtml = (text: string): string => {
+  const map: { [key: string]: string } = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+};
+
 const formatCheckerName = (payload: any): string => {
   // Try to get full name from various possible fields (defensive approach)
   if (payload.fullName) return payload.fullName;
@@ -231,7 +242,7 @@ const createBaseLayout = (regnr: string, content: string, checkerName: string, d
       <tbody>${content}</tbody>
     </table>
     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: left;">
-      <p style="margin: 0 0 10px 0; color: #000000 !important;">Incheckad av ${checkerName} kl ${time}, ${date}.</p>
+      <p style="margin: 0 0 10px 0; color: #000000 !important;">Incheckad av ${escapeHtml(checkerName)} kl ${escapeHtml(time)}, ${escapeHtml(date)}.</p>
     </div>
     <div style="margin-top: 10px; text-align: left; font-size: 12px; color: #6b7280 !important;">
       &copy; ${new Date().getFullYear()} Albarone AB &mdash; Alla rättigheter förbehållna
