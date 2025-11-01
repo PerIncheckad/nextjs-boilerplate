@@ -171,7 +171,7 @@ export default function RapportPage() {
   useEffect(() => {
     if (searchRegnr.length >= 2) {
       const regnrList = Array.from(new Set(allDamages.map(row => row.regnr).filter(Boolean)));
-      setAutocomplete(regnrList.filter(r => r.toLowerCase().includes(searchRegnr.toLowerCase())));
+      setAutocomplete(regnrList.filter(r => r.toLowerCase().startsWith(searchRegnr.toLowerCase())));
     } else setAutocomplete([]);
   }, [searchRegnr, allDamages]);
 
