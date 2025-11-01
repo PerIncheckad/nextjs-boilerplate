@@ -565,8 +565,7 @@ export default function CheckInForm() {
   useEffect(() => {
     if (regInput.length >= 2 && allRegistrations.length > 0) {
       const filteredSuggestions = allRegistrations
-        .filter(r => r && r.toUpperCase().includes(regInput.toUpperCase()))
-        .slice(0, 5);
+        .filter(r => r && r.toUpperCase().startsWith(regInput.toUpperCase()));
       setSuggestions(filteredSuggestions);
     } else {
       setSuggestions([]);

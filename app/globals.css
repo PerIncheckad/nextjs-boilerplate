@@ -32,6 +32,7 @@ body {
 .background-img {
   position: fixed;
   inset: 0;
+  background-image: url('https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Bild%20gammal%20MB/MB%20front%20old.avif');
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
@@ -89,12 +90,12 @@ body {
 
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 320px; /* common practice: 280–360px */
+  max-width: 400px;
   width: 100%;
 }
 .report-btn {
   background: #111827;
-  max-width: 320px;
+  max-width: 400px;
   width: 100%;
 }
 
@@ -105,15 +106,21 @@ body {
   height: 1px;
   background: var(--main-border);
   margin: 20px 0;
-  max-width: 320px;
+  max-width: 400px;
   width: 100%;
 }
 
 /* Copyright */
 .copyright-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
   text-align: center;
-  margin-top: 24px;
+  padding: 1rem;
   color: #6b7280;
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* Small screens */
