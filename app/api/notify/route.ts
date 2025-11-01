@@ -172,7 +172,7 @@ const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: s
     return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 0; color: #000000 !important;">${bilagor.join('')}</ul></div>`;
 };
 
-const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
+const createBaseLayout = (regnr: string, content: string, checkerName: string, date: string, time: string): string => `<!DOCTYPE html>
 <html lang="sv">
 <head>
   <meta charset="utf-8">
@@ -230,7 +230,10 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
     <table width="100%" style="color: #000000 !important;">
       <tbody>${content}</tbody>
     </table>
-    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: left; font-size: 12px; color: #6b7280 !important;">
+    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: left;">
+      <p style="margin: 0 0 10px 0; color: #000000 !important;">Incheckad av ${checkerName} kl ${time}, ${date}.</p>
+    </div>
+    <div style="margin-top: 10px; text-align: left; font-size: 12px; color: #6b7280 !important;">
       &copy; ${new Date().getFullYear()} Albarone AB &mdash; Alla rättigheter förbehållna
     </div>
   </div>
@@ -273,7 +276,6 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small>(${bilen_star_nu?.kommentar})</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${checkerName}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -291,7 +293,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
   `;
-  return createBaseLayout(regnr, content);
+  return createBaseLayout(regnr, content, checkerName, date, time);
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
@@ -332,7 +334,6 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small>(${bilen_star_nu?.kommentar})</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckare:</td><td>${checkerName}</td></tr>
         </table>
       </div>
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -345,7 +346,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
   `;
-  return createBaseLayout(regnr, content);
+  return createBaseLayout(regnr, content, checkerName, date, time);
 };
 
 // =================================================================
