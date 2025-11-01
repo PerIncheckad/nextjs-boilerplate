@@ -440,4 +440,5 @@ Det är en helt rimlig väg att gå! Och du har maximal kontroll:
 Byt bot om du vill
 Återkom till mig när du vill ha kod
 Alltid full spårbarhet och historik
+
 Vill du att jag förbereder kodfilerna ändå, eller ska du gå vidare direkt med briefen till nästa bot?
