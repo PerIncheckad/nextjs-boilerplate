@@ -411,7 +411,7 @@ export default function CheckInForm() {
   const finalPayloadForUI = useMemo(() => ({
       regnr: normalizedReg,
       incheckare: firstName,
-      fullName: fullName,
+      fullName,
       timestamp: new Date().toISOString(),
       carModel: vehicleData?.model, 
       matarstallning, 
