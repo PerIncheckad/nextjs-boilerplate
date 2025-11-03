@@ -1511,7 +1511,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
     .damage-list-item { padding-left: 0.5rem; line-height: 1.4; font-size: 0.875rem;}
     .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-    .grid-3-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    .grid-3-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
     .fuel-type-buttons { display: flex; flex-wrap: wrap; gap: 1rem; }
     .fuel-type-buttons .choice-btn { flex-grow: 1; }
     .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 1.5rem; }
@@ -1524,7 +1524,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .btn.warning { background-color: var(--color-warning); color: white; }
     .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
     .btn:not(:disabled):hover { filter: brightness(1.1); }
-    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s; box-sizing: border-box; }
     .choice-btn:hover { filter: brightness(1.05); }
     .choice-btn.active.default { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
     .choice-btn.active.warning { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #b45309; }
@@ -1578,4 +1578,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .spinner-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; font-size: 1.2rem; font-weight: 600; }
     .spinner { border: 5px solid #f3f3f3; border-top: 5px solid var(--color-primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 1rem; }
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .grid-3-col .choice-btn { min-height: 48px; }
+    @media (max-width: 480px) {
+      .grid-3-col { grid-template-columns: 1fr; }
+    }
 `}</style>);

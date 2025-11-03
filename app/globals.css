@@ -119,12 +119,13 @@ body {
   }
 }
 
-/* Mobile: full width buttons */
-@media (max-width: 641px) {
+/* Mobile: narrower buttons, centered */
+@media (max-width: 640px) {
   .welcome-card .btn.incheckning,
   .welcome-card .report-btn {
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 80%;
+    max-width: 260px;
+    margin: 0 auto;
   }
 }
 
@@ -257,7 +258,7 @@ body {
 @media (max-width: 640px) {
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 24px 20px; }
-  .divider { max-width: 100%; }
+  .divider { width: 80%; max-width: 260px; }
   .login-title { font-size: 22px; }
   .login-card { padding: 24px 20px; }
 }
