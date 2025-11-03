@@ -22,10 +22,15 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: 100vh; /* fyll vyhöjd utan extra scroll */
+  height: 100dvh; /* fyll vyhöjd exakt utan extra scroll */
+  box-sizing: border-box; /* inkludera padding i höjdberäkning */
+  overflow: hidden; /* förhindra scroll på desktop */
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding-top: 6vh; /* sänk kortet */
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-bottom: 24px;
 }
 
 /* Background layer (endast på startsidan via app/page.tsx) */
@@ -92,12 +97,12 @@ body {
 
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 300px; /* beslut ~300 px */
+  max-width: 120px; /* hälften av tidigare 240px */
   width: 100%;
 }
 .report-btn {
   background: #111827;
-  max-width: 300px;
+  max-width: 120px; /* hälften av tidigare 240px */
   width: 100%;
 }
 
@@ -108,7 +113,7 @@ body {
   height: 1px;
   background: var(--main-border);
   margin: 20px 0;
-  max-width: 300px;
+  max-width: 120px; /* matcha knapparna exakt */
   width: 100%;
 }
 
@@ -219,6 +224,10 @@ body {
 
 /* Small screens */
 @media (max-width: 640px) {
+  .welcome-main {
+    height: auto; /* mobil kan scrolla */
+    overflow: auto; /* återställ scroll på mobil */
+  }
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 24px 20px; }
   .btn.incheckning, .report-btn, .divider { max-width: 100%; }

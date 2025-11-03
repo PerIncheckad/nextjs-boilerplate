@@ -1510,7 +1510,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .btn.warning { background-color: var(--color-warning); color: white; }
     .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
     .btn:not(:disabled):hover { filter: brightness(1.1); }
-    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
+    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 100%; box-sizing: border-box; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s; }
     .choice-btn:hover { filter: brightness(1.05); }
     .choice-btn.active.default { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
     .choice-btn.active.warning { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #b45309; }
