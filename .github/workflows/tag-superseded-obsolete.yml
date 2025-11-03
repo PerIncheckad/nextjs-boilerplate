@@ -1,0 +1,74 @@
+name: Tag superseded/obsolete PRs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag PRs with superseded and obsolete labels
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNumbers = [74, 75, 76, 77, 78];
+            const labels = [
+              {
+                name: "superseded",
+                color: "b60205",
+                description: "Superseded by a newer PR"
+              },
+              {
+                name: "obsolete",
+                color: "c2e0c6",
+                description: "No longer needed or relevant"
+              }
+            ];
+
+            // Ensure labels exist
+            for (const l of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner,
+                  repo,
+                  name: l.name
+                });
+                core.info(`Label "${l.name}" already exists`);
+              } catch (e) {
+                if (e.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner,
+                    repo,
+                    name: l.name,
+                    color: l.color,
+                    description: l.description
+                  });
+                  core.info(`Created label "${l.name}"`);
+                } else {
+                  const msg = `Label check failed for ${l.name}`;
+                  core.warning(`${msg}: ${e.message}`);
+                }
+              }
+            }
+
+            // Apply labels to target PRs
+            for (const number of prNumbers) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner,
+                  repo,
+                  issue_number: number,
+                  labels: labels.map(x => x.name)
+                });
+                core.info(`Tagged #${number}`);
+              } catch (e) {
+                core.warning(`Could not tag #${number}: ${e.message}`);
+              }
+            }
