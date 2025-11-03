@@ -22,10 +22,15 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: 100vh; /* fyll vyhöjd utan extra scroll */
+  height: 100dvh; /* fyll vyhöjd utan extra scroll */
+  overflow: hidden; /* prevent desktop scrollbars */
   display: grid;
   place-items: center;
-  padding: 24px;
+  box-sizing: border-box;
+  padding-top: 1.5vh; /* move card higher */
+  padding-bottom: 0;
+  padding-left: 24px;
+  padding-right: 24px;
 }
 
 /* Background layer (endast på startsidan via app/page.tsx) */
@@ -73,7 +78,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 /* Knappar: begränsa bredd, centrera */
@@ -92,13 +97,13 @@ body {
 
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 300px; /* beslut ~300 px */
-  width: 100%;
+  width: 120px !important;
+  max-width: 120px !important;
 }
 .report-btn {
   background: #111827;
-  max-width: 300px;
-  width: 100%;
+  width: 120px !important;
+  max-width: 120px !important;
 }
 
 /* Divider med samma bredd som knapparna */
@@ -107,9 +112,14 @@ body {
   border: none;
   height: 1px;
   background: var(--main-border);
-  margin: 20px 0;
-  max-width: 300px;
+  margin: 12px auto;
+  max-width: 120px;
   width: 100%;
+}
+
+/* Report section with symmetric spacing */
+.welcome-card .report-section {
+  margin-top: 12px;
 }
 
 /* Sticky footer (endast startsidan använder denna klass) */
@@ -221,7 +231,11 @@ body {
 @media (max-width: 640px) {
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 24px 20px; }
-  .btn.incheckning, .report-btn, .divider { max-width: 100%; }
+  .btn.incheckning, .report-btn { 
+    width: 100% !important; 
+    max-width: 100% !important; 
+  }
+  .divider { max-width: 100%; }
   .login-title { font-size: 22px; }
   .login-card { padding: 24px 20px; }
 }
