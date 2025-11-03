@@ -26,12 +26,12 @@ body {
   display: grid;
   place-items: center;
   padding: 24px;
-  overflow: hidden; /* förhindra scroll på desktop */
 }
 
 @media (min-width: 640px) {
   .welcome-main {
     padding-top: 6vh; /* flytta ner kortet lite */
+    overflow: hidden; /* förhindra scroll på desktop */
   }
 }
 
