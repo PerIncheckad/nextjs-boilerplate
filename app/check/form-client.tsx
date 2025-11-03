@@ -411,6 +411,7 @@ export default function CheckInForm() {
   const finalPayloadForUI = useMemo(() => ({
       regnr: normalizedReg,
       incheckare: firstName,
+      fullName,
       timestamp: new Date().toISOString(),
       carModel: vehicleData?.model, 
       matarstallning, 
@@ -460,7 +461,7 @@ export default function CheckInForm() {
       notering: preliminarAvslutNotering,
       vehicleStatus: vehicleData?.status
   }), [
-    normalizedReg, firstName, vehicleData, matarstallning, hjultyp, 
+    normalizedReg, firstName, fullName, vehicleData, matarstallning, hjultyp, 
     garInteAttHyraUt, garInteAttHyraUtKommentar,
     behoverRekond, rekondUtvandig, rekondInvandig, rekondText, rekondMedia, rekondFolder,
     husdjurSanerad, husdjurText, husdjurMedia, husdjurFolder,
@@ -565,8 +566,7 @@ export default function CheckInForm() {
   useEffect(() => {
     if (regInput.length >= 2 && allRegistrations.length > 0) {
       const filteredSuggestions = allRegistrations
-        .filter(r => r && r.toUpperCase().includes(regInput.toUpperCase()))
-        .slice(0, 5);
+        .filter(r => r && r.toUpperCase().startsWith(regInput.toUpperCase()));
       setSuggestions(filteredSuggestions);
     } else {
       setSuggestions([]);
@@ -778,7 +778,7 @@ export default function CheckInForm() {
         setConfirmDialog({
             isOpen: true,
             title: `Åtgärdad: "${fullText}"`,
-            text: 'Vänligen beskriv varför skadan markeras som åtgärdad/ej hittad. Denna kommentar sparas.',
+            text: 'Beskriv varför skadan inte kan dokumenteras.',
             confirmButtonVariant: 'success',
             requiresComment: true,
             onConfirm: (comment) => {
@@ -1360,7 +1360,7 @@ const DamageItem: React.FC<{
       <div className="damage-item-header"><span>{headerText}</span>{!isExisting && onRemove && <Button onClick={() => onRemove(damage.id)} variant="danger">Ta bort</Button>}</div>
       {isExisting && onAction && (<div className="damage-item-actions">
         <Button onClick={() => onAction(damage.id, 'document', (damage as ExistingDamage).fullText)} variant={isDocumented ? 'success' : 'secondary'}>Dokumentera</Button>
-        <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).fullText)} variant={resolved ? 'warning' : 'secondary'}>Åtgärdad/Hittas ej</Button>
+        <Button onClick={() => onAction(damage.id, 'resolve', (damage as ExistingDamage).fullText)} variant={resolved ? 'warning' : 'secondary'}>Går inte att dokumentera</Button>
       </div>)}
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>
@@ -1467,17 +1467,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         color: var(--color-text); 
         margin: 0; 
         padding: 0; 
-    }
-    body::before {
-        content: "";
-        position: fixed;
-        top: 0; left: 0;
-        width: 100vw; height: 100vh;
-        background-image: url(${backgroundUrl});
-        background-size: cover;
-        background-position: center;
-        opacity: 1;
-        z-index: -1;
     }
     .checkin-form { max-width: 700px; margin: 0 auto; padding: 1rem; box-sizing: border-box; }
     .main-header { text-align: center; margin-bottom: 1.5rem; }
