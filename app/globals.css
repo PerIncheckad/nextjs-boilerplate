@@ -28,6 +28,13 @@ body {
   padding: 24px;
 }
 
+@media (min-width: 640px) {
+  .welcome-main {
+    padding-top: 6vh; /* flytta ner kortet lite */
+    overflow: hidden; /* förhindra scroll på desktop */
+  }
+}
+
 /* Background layer (endast på startsidan via app/page.tsx) */
 .background-img {
   position: fixed;
@@ -92,12 +99,12 @@ body {
 
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 300px; /* beslut ~300 px */
+  max-width: 240px; /* kortare knapp */
   width: 100%;
 }
 .report-btn {
   background: #111827;
-  max-width: 300px;
+  max-width: 240px;
   width: 100%;
 }
 
@@ -108,7 +115,7 @@ body {
   height: 1px;
   background: var(--main-border);
   margin: 20px 0;
-  max-width: 300px;
+  max-width: 240px;
   width: 100%;
 }
 
