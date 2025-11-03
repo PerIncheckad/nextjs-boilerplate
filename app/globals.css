@@ -22,10 +22,15 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: 100vh; /* fyll vyhöjd utan extra scroll */
+  height: 100dvh; /* fyll vyhöjd utan extra scroll */
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding-top: 2.5vh;
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-bottom: 0;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Background layer (endast på startsidan via app/page.tsx) */
@@ -90,6 +95,11 @@ body {
 }
 .btn:hover { opacity: 0.9; }
 
+/* Ensure buttons in welcome-card have no bottom margin */
+.welcome-card .btn {
+  margin-bottom: 0;
+}
+
 .btn.incheckning {
   background: var(--main-green);
   max-width: 300px; /* beslut ~300 px */
@@ -107,9 +117,24 @@ body {
   border: none;
   height: 1px;
   background: var(--main-border);
-  margin: 20px 0;
-  max-width: 300px;
+  margin: 12px 0;
+  max-width: 120px;
   width: 100%;
+}
+
+/* Symmetric spacing for divider between buttons */
+.welcome-card .btn + .divider {
+  margin-top: 12px;
+}
+
+.welcome-card .divider {
+  margin: 12px 0;
+  max-width: 120px;
+  width: 100%;
+}
+
+.welcome-card .divider + .btn {
+  margin-top: 12px;
 }
 
 /* Sticky footer (endast startsidan använder denna klass) */
