@@ -1110,11 +1110,11 @@ export default function CheckInForm() {
 
       <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length || 0) > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart))))}>
         <SectionHeader title="Skador" />
-        <SubSectionHeader title="Befintliga skador att hantera" />
-        {vehicleData && existingDamages.some(d => !d.isInventoried) 
-            ? existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, true)} />)
-            : <p>Inga ohanterade befintliga skador.</p>}
-        <hr className="section-divider-strong" />
+        {vehicleData && existingDamages.some(d => !d.isInventoried) && (<>
+          <SubSectionHeader title="Befintliga skador att hantera" />
+          {existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, true)} />)}
+          <hr className="section-divider-strong" />
+        </>)}
         <SubSectionHeader title="Nya skador" />
         <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
@@ -1540,6 +1540,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-item.resolved { opacity: 0.6; background-color: var(--color-warning-light); }
     .damage-item-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background-color: #f9fafb; font-weight: 600; flex-wrap: wrap; gap: 0.5rem; }
     .damage-item-actions { padding: 0 1rem 1rem 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap; border-top: 1px solid var(--color-border); margin-top: 0.75rem; padding-top: 1rem; }
+    .damage-item-actions .btn { flex: 1; min-width: 0; white-space: nowrap; }
     .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
     .damage-position-row { position: relative; padding-right: 2.5rem; }
     .add-position-btn { width: 100% !important; margin: 0.5rem 0 !important; font-size: 0.875rem !important; padding: 0.5rem !important; }
@@ -1581,5 +1582,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .grid-3-col .choice-btn { min-height: 48px; }
     @media (max-width: 480px) {
       .grid-3-col { grid-template-columns: 1fr; }
+      .damage-item-actions { flex-direction: column; }
+      .damage-item-actions .btn { width: 100%; }
     }
 `}</style>);
