@@ -22,10 +22,13 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: 100vh; /* fyll vyhöjd utan extra scroll */
+  height: 100dvh; /* fyll vyhöjd utan extra scroll */
   display: grid;
   place-items: center;
   padding: 24px;
+  padding-top: 3.5vh;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Background layer (endast på startsidan via app/page.tsx) */
@@ -73,7 +76,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 /* Knappar: begränsa bredd, centrera */
@@ -107,7 +110,7 @@ body {
   border: none;
   height: 1px;
   background: var(--main-border);
-  margin: 20px 0;
+  margin: 12px 0;
   max-width: 300px;
   width: 100%;
 }
@@ -219,6 +222,7 @@ body {
 
 /* Small screens */
 @media (max-width: 640px) {
+  .welcome-main { height: auto; overflow: auto; }
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 24px 20px; }
   .btn.incheckning, .report-btn, .divider { max-width: 100%; }
