@@ -22,10 +22,14 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  min-height: 100vh; /* fyll vyhöjd utan extra scroll */
+  height: 100dvh; /* force exact viewport height */
+  overflow: hidden; /* prevent scrolling */
+  box-sizing: border-box;
   display: grid;
   place-items: center;
   padding: 24px;
+  padding-top: 0; /* remove top padding to prevent scroll */
+  padding-bottom: 0; /* remove bottom padding to prevent scroll */
 }
 
 /* Background layer (endast på startsidan via app/page.tsx) */
@@ -53,6 +57,13 @@ body {
   text-align: center;
 }
 
+/* Move card up on desktop without scroll */
+@media (min-width: 641px) {
+  .welcome-card {
+    transform: translateY(-3vh);
+  }
+}
+
 /* Logo spacing */
 .main-logo {
   display: block;
@@ -73,7 +84,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 /* Knappar: begränsa bredd, centrera */
@@ -90,26 +101,51 @@ body {
 }
 .btn:hover { opacity: 0.9; }
 
+/* Force narrow buttons on desktop with high specificity */
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 300px; /* beslut ~300 px */
-  width: 100%;
 }
+
 .report-btn {
   background: #111827;
-  max-width: 300px;
-  width: 100%;
+}
+
+/* Desktop: force 120px width */
+@media (min-width: 641px) {
+  .welcome-card .btn.incheckning,
+  .welcome-card .report-btn {
+    width: 120px !important;
+    max-width: 120px !important;
+  }
+}
+
+/* Mobile: full width buttons */
+@media (max-width: 641px) {
+  .welcome-card .btn.incheckning,
+  .welcome-card .report-btn {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
 }
 
 /* Divider med samma bredd som knapparna */
-.divider-wrap { display: flex; justify-content: center; }
+.divider-wrap { 
+  display: flex; 
+  justify-content: center; 
+}
+
 .divider {
   border: none;
   height: 1px;
   background: var(--main-border);
-  margin: 20px 0;
-  max-width: 300px;
+  margin: 0;
   width: 100%;
+  max-width: 120px;
+}
+
+/* report-section spacing to center divider */
+.report-section {
+  margin-top: 12px;
 }
 
 /* Sticky footer (endast startsidan använder denna klass) */
@@ -221,7 +257,7 @@ body {
 @media (max-width: 640px) {
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 24px 20px; }
-  .btn.incheckning, .report-btn, .divider { max-width: 100%; }
+  .divider { max-width: 100%; }
   .login-title { font-size: 22px; }
   .login-card { padding: 24px 20px; }
 }
