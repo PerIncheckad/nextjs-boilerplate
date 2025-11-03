@@ -120,7 +120,7 @@ body {
 }
 
 /* Mobile: full width buttons */
-@media (max-width: 640px) {
+@media (max-width: 641px) {
   .welcome-card .btn.incheckning,
   .welcome-card .report-btn {
     width: 100% !important;
@@ -257,7 +257,7 @@ body {
 @media (max-width: 640px) {
   .welcome-title { font-size: 22px; }
   .welcome-card { padding: 24px 20px; }
-  .btn.incheckning, .report-btn, .divider { max-width: 100%; }
+  .divider { max-width: 100%; }
   .login-title { font-size: 22px; }
   .login-card { padding: 24px 20px; }
 }
