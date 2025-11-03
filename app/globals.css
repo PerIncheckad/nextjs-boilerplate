@@ -97,12 +97,12 @@ body {
 
 .btn.incheckning {
   background: var(--main-green);
-  max-width: 120px; /* hälften av tidigare 240px */
+  max-width: 120px; /* hälften av tidigare 300px */
   width: 100%;
 }
 .report-btn {
   background: #111827;
-  max-width: 120px; /* hälften av tidigare 240px */
+  max-width: 120px; /* hälften av tidigare 300px */
   width: 100%;
 }
 
