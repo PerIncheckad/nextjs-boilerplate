@@ -22,6 +22,7 @@ body {
 /* Utility / layout */
 .welcome-main {
   position: relative;
+  height: 100vh; /* fallback for older browsers */
   height: 100dvh; /* fyll vyhöjd utan extra scroll */
   display: grid;
   place-items: center;
