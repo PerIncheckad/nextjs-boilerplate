@@ -1127,7 +1127,6 @@ export default function CheckInForm() {
         <Card data-error={showFieldErrors && ((garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
           <SectionHeader title="Status & Sanering" />
           
-          {/* 1) Går inte att hyra ut */}
           <div className="status-section-wrapper">
             <ChoiceButton onClick={handleGarInteAttHyraUtClick} isActive={garInteAttHyraUt} className="rekond-checkbox">Går inte att hyra ut</ChoiceButton>
             {garInteAttHyraUt && (<div className="damage-details">
@@ -1139,7 +1138,6 @@ export default function CheckInForm() {
           </div>
           {activeStatusSections > 1 && garInteAttHyraUt && <hr className="subsection-divider" />}
 
-          {/* 2) Varningslampa ej släckt */}
           <div className="status-section-wrapper">
             <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa ej släckt</ChoiceButton>
             {varningslampaLyser && (<div className="damage-details">
@@ -1151,7 +1149,6 @@ export default function CheckInForm() {
           </div>
           {activeStatusSections > 1 && varningslampaLyser && <hr className="subsection-divider" />}
           
-          {/* 3) Rekond */}
           <div className="status-section-wrapper">
             <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Rekond</ChoiceButton>
             {behoverRekond && (<div className="damage-details">
@@ -1169,7 +1166,6 @@ export default function CheckInForm() {
           </div>
           {activeStatusSections > 1 && behoverRekond && <hr className="subsection-divider" />}
 
-          {/* 4) Husdjur */}
           <div className="status-section-wrapper">
             <ChoiceButton onClick={handleHusdjurClick} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur</ChoiceButton>
             {husdjurSanerad && (<div className="damage-details">
@@ -1183,7 +1179,6 @@ export default function CheckInForm() {
           </div>
           {activeStatusSections > 1 && husdjurSanerad && <hr className="subsection-divider" />}
 
-          {/* 5) Rökning */}
           <div className="status-section-wrapper">
             <ChoiceButton onClick={handleRokningClick} isActive={rokningSanerad} className="rekond-checkbox">Rökning</ChoiceButton>
             {rokningSanerad && (<div className="damage-details">
@@ -1197,7 +1192,6 @@ export default function CheckInForm() {
           </div>
           {activeStatusSections > 1 && rokningSanerad && <hr className="subsection-divider" />}
           
-          {/* 6) Insynsskydd saknas */}
           <div className="status-section-wrapper">
             <ChoiceButton onClick={handleInsynsskyddSaknasClick} isActive={insynsskyddSaknas} className="rekond-checkbox">Insynsskydd saknas</ChoiceButton>
           </div>
@@ -1257,7 +1251,7 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>;
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button type="button" onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>;
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg></div><h3>Tack {firstName}!</h3><p>Incheckningen är skickad.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
@@ -1572,7 +1566,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       box-shadow: var(--shadow-md); 
       width: 90%;
       max-width: 650px;
-      /* FIX: Sätter maxhöjd och tillåter scroll inuti rutan */
       max-height: 90vh;
       overflow-y: auto;
     }
