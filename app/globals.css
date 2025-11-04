@@ -107,7 +107,7 @@ body {
 }
 
 .btn.nybil {
-  background: #16a34a;
+  background: var(--main-green);
 }
 
 .report-btn {

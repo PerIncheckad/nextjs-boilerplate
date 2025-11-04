@@ -287,14 +287,9 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 );
 
 export default function NybilForm() {
-  // Get user info
-  const [userEmail] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userEmail') || '';
-    }
-    return '';
-  });
-  const firstName = getFirstNameFromEmail(userEmail);
+  // User state
+  const [userEmail, setUserEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
 
   // Form state
   const [regnr, setRegnr] = useState('');
@@ -311,6 +306,17 @@ export default function NybilForm() {
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+
+  // Get authenticated user on mount
+  React.useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email || '';
+      setUserEmail(email);
+      setFirstName(getFirstNameFromEmail(email));
+    };
+    getUser();
+  }, []);
 
   const handleSubmit = async () => {
     // Basic validation
@@ -494,7 +500,7 @@ export default function NybilForm() {
 
         {/* Form Actions */}
         <div className="form-actions">
-          <Button onClick={() => window.location.href = '/'} variant="secondary">
+          <Button onClick={() => { if (typeof window !== 'undefined') window.location.href = '/'; }} variant="secondary">
             Avbryt
           </Button>
           <Button onClick={handleSubmit} variant="success" disabled={isSaving || !regnr.trim()}>
