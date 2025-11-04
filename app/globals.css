@@ -106,6 +106,10 @@ body {
   background: var(--main-green);
 }
 
+.btn.nybil {
+  background: #16a34a;
+}
+
 .report-btn {
   background: #111827;
 }
@@ -113,6 +117,7 @@ body {
 /* Desktop: force 120px width */
 @media (min-width: 641px) {
   .welcome-card .btn.incheckning,
+  .welcome-card .btn.nybil,
   .welcome-card .report-btn {
     width: 120px !important;
     max-width: 120px !important;
@@ -122,6 +127,7 @@ body {
 /* Mobile: narrower buttons, centered */
 @media (max-width: 640px) {
   .welcome-card .btn.incheckning,
+  .welcome-card .btn.nybil,
   .welcome-card .report-btn {
     width: 80%;
     max-width: 260px;
