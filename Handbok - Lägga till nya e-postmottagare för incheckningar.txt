@@ -1,0 +1,55 @@
+Handbok: Lägga till nya e-postmottagare för incheckningar
+Datum: 2025-11-04 Skapad av: Copilot Syfte: Att dokumentera processen för att lägga till eller ändra e-postmottagare för incheckningsnotiser när nya huvudstationer (t.ex. Malmö, Halmstad) ansluts till systemet.
+
+Grundläggande systemdesign
+Systemet är uppbyggt i två delar för maximal flexibilitet:
+
+Kodbasen (app/api/notify/route.ts): Denna fil fungerar som systemets "växel". Den bestämmer vilket generiskt alias som ska användas baserat på bilens slutdestination. Till exempel:
+
+Om bilens slutmål är Ängelholm eller Helsingborg, skickar koden mejl till aliaset helsingborg@incheckad.se.
+Denna fil behöver endast ändras när en helt ny huvudstation (som Malmö) behöver sin egen unika e-postmottagare.
+E-posttjänsten (one.com Alias): Detta är den externa "vidarekopplingscentralen". Alias som helsingborg@incheckad.se ställs in här för att peka på en verklig inkorg, som helsingborg@mabi.se.
+
+Denna del behöver endast ändras när en mottagares faktiska e-postadress ändras (t.ex. om personal byts ut), eller vid den initiala konfigurationen av ett nytt alias.
+Denna uppdelning innebär att ni kan ändra vem som tar emot mejlen för Helsingborg utan att behöva göra kodändringar.
+
+Steg-för-steg-guide för att ansluta en ny huvudstation
+Scenario A: En ny huvudstation ska skicka mejl till en redan befintlig mottagare
+Detta är det enklaste scenariot. Exempel: Ni öppnar i Halmstad och vill att deras mejl till en början ska gå till helsingborg@mabi.se.
+
+Inga ändringar på one.com: Du behöver inte skapa några nya alias.
+Be om en kodändring: Kontakta en utvecklare (eller en Copilot) och be dem uppdatera stationEmailMapping i filen app/api/notify/route.ts.
+Exempelförfrågan: "Hej, kan du uppdatera e-postlogiken så att incheckningar för huvudstationen 'Halmstad' också skickas till aliaset helsingborg@incheckad.se?"
+Scenario B: En ny huvudstation behöver sin egen, unika e-postmottagare
+Detta är det vanligaste scenariot och kräver två delar. Exempel: Malmö ska anslutas och mejlen ska gå till malmo@mabi.se.
+
+Del 1: Skapa E-postalias (Utförs av dig, Per)
+
+Logga in på ert one.com-konto.
+Navigera till E-post och välj fliken Alias.
+Klicka på Nytt alias.
+Fyll i fälten:
+Ange e-post: malmo (systemet lägger själv till @incheckad.se).
+Ange vidarebefordringsadress: malmo@mabi.se (den faktiska, externa inkorgen).
+Klicka på "Skapa alias".
+Hantering av one.com verifieringsprocess (Viktigt!)
+
+Här uppstår den otydlighet vi tidigare såg. Följ dessa steg:
+
+Verifieringsmejl skickas: one.com skickar nu ett mejl till malmo@mabi.se med en knapp för att "Verifiera vidarebefordring".
+Mottagaren klickar (och misslyckas): När mottagaren klickar på knappen kommer de troligtvis till en one.com-sida med ett felmeddelande (This mail forward could not be verified). Detta är förväntat eftersom de inte är inloggade på ert domänkonto.
+Du aktiverar manuellt: Efter att mottagaren har klickat, gå tillbaka till Alias-listan i din inloggning på one.com. Status för malmo@incheckad.se kommer att vara "Väntande".
+Klicka på ordet "Väntande". Du får då upp en dialogruta där du som administratör kan "tvinga igenom" aktiveringen. Bekräfta detta.
+Statusen ska nu ändras till "Verifierad" med en grön ikon. Aliaset är nu aktivt.
+Del 2: Uppdatera koden (Utförs av utvecklare/Copilot)
+
+Meddela utvecklaren att aliaset malmo@incheckad.se nu är aktivt.
+Utvecklaren kommer att skapa en Pull Request (PR) för att uppdatera stationEmailMapping i filen app/api/notify/route.ts och lägga till den nya posten:
+JavaScript
+const stationEmailMapping: { [ort: string]: string } = {
+  'Helsingborg': 'helsingborg@incheckad.se',
+  'Ängelholm': 'helsingborg@incheckad.se',
+  'Malmö': 'malmo@incheckad.se', // Ny rad
+};
+Testa och verifiera: Använd PR:ens "View deployment"-länk för att göra en testincheckning med Malmö som slutdestination och bekräfta att mejlen kommer fram korrekt.
+Godkänn och slå samman (Merge): När testet är lyckat, godkänn och slå samman PR:en. Ändringen är nu live.
