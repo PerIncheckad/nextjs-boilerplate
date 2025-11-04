@@ -18,7 +18,7 @@ const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 
 
 const STATIONER: Record<string, string[]> = {
   'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
-  'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Landskrona'],
+  'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B/S Helsingborg', 'Werksta Helsingborg', 'Båstad'],
   'Lund': ['FORD Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
   'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
   'Falkenberg': ['Falkenberg'],
@@ -1035,214 +1035,216 @@ export default function CheckInForm() {
   const activeStatusSections = [garInteAttHyraUt, varningslampaLyser, behoverRekond, husdjurSanerad, rokningSanerad, insynsskyddSaknas].filter(Boolean).length;
 
   return (
-    <div className="checkin-form">
+    <>
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
       {isFinalSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
       {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
       <ActionConfirmDialog state={confirmDialog} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
       
-      <div className="main-header">
-        <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
-        {fullName && <p className="user-info">Inloggad: {fullName}</p>}
-      </div>
-
-      <Card data-error={showFieldErrors && !regInput}>
-        <SectionHeader title="Fordon" />
-        <div style={{ position: 'relative' }}>
-          <Field label="Registreringsnummer *">
-            <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="ABC 123" className="reg-input" />
-          </Field>
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="suggestions-dropdown">{suggestions.map(s => <div key={s} className="suggestion-item" onMouseDown={() => { setRegInput(s); setShowSuggestions(false); }}>{s}</div>)}</div>
-          )}
+      <div className="checkin-form">
+        <div className="main-header">
+          <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+          {fullName && <p className="user-info">Inloggad: {fullName}</p>}
         </div>
-        {loading && <p>Hämtar fordonsdata...</p>}
-        {showUnknownRegHelper && <p className="error-text">Reg.nr saknas i Bilkontroll-listan. Fortsätt om det stämmer, Bilkontroll informeras automatiskt.</p>}
-        {vehicleData && (
-          <div className="info-box">
-            <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.sell_date || '---'} />
-            </div>
-            {existingDamages.length > 0 && (
-              <div className="damage-list-info">
-                <span className="info-label">Befintliga skador ({existingDamages.length})</span>
-                {existingDamages.map((d, i) => <div key={d.id} className="damage-list-item">{i + 1}. {d.fullText}</div>)}
-              </div>
+
+        <Card data-error={showFieldErrors && !regInput}>
+          <SectionHeader title="Fordon" />
+          <div style={{ position: 'relative' }}>
+            <Field label="Registreringsnummer *">
+              <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 150)} placeholder="ABC 123" className="reg-input" />
+            </Field>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="suggestions-dropdown">{suggestions.map(s => <div key={s} className="suggestion-item" onMouseDown={() => { setRegInput(s); setShowSuggestions(false); }}>{s}</div>)}</div>
             )}
-            {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
           </div>
-        )}
-      </Card>
+          {loading && <p>Hämtar fordonsdata...</p>}
+          {showUnknownRegHelper && <p className="error-text">Reg.nr saknas i Bilkontroll-listan. Fortsätt om det stämmer, Bilkontroll informeras automatiskt.</p>}
+          {vehicleData && (
+            <div className="info-box">
+              <div className='info-grid'>
+                <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
+              </div>
+              {existingDamages.length > 0 && (
+                <div className="damage-list-info">
+                  <span className="info-label">Befintliga skador ({existingDamages.length})</span>
+                  {existingDamages.map((d, i) => <div key={d.id} className="damage-list-item">{i + 1}. {d.fullText}</div>)}
+                </div>
+              )}
+              {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
+            </div>
+          )}
+        </Card>
 
-      <Card data-error={showFieldErrors && (!ort || !station)}>
-        <SectionHeader title="Plats för incheckning" />
-        <div className="grid-2-col">
-          <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
-          <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
-        </div>
-      </Card>
+        <Card data-error={showFieldErrors && (!ort || !station)}>
+          <SectionHeader title="Plats för incheckning" />
+          <div className="grid-2-col">
+            <Field label="Ort *"><select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
+            <Field label="Station *"><select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}><option value="">Välj station</option>{availableStations.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
+          </div>
+        </Card>
 
-      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && (!laddniva || antalLaddkablar === null)))}>
-        <SectionHeader title="Fordonsstatus" />
-        <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
-        <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
-        <SubSectionHeader title="Tankning/Laddning" /><Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
-        {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-3-col">
-          <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
-          <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
-          <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
-        </div></Field>
-        {tankniva === 'tankad_nu' && <div className="grid-3-col">
-          <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
-          <Field label="Bränsletyp *"><div className="fuel-type-buttons"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} isSet={bransletyp !== null}>Diesel</ChoiceButton></div></Field>
-          <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
-        </div>}</>)}
-        {drivmedelstyp === 'elbil' && (<>
-          <Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>
-          <Field label="Antal laddkablar *"><div className="grid-3-col">
-            <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
+        <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && (!laddniva || antalLaddkablar === null)))}>
+          <SectionHeader title="Fordonsstatus" />
+          <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
+          <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
+          <SubSectionHeader title="Tankning/Laddning" /><Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
+          {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-3-col">
+            <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
+            <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
+            <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
           </div></Field>
-        </>)}
-      </Card>
-
-      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
-        <SectionHeader title="Skador" />
-        {vehicleData && existingDamages.some(d => !d.isInventoried) && (<>
-          <SubSectionHeader title="Befintliga skador att hantera" />
-          {existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={(damageId) => addDamagePosition(damageId, true)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, true)} />)}
-          <hr className="section-divider-strong" />
-        </>)}
-        <SubSectionHeader title="Nya skador" />
-        <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
-            <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
-            <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
-        </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={(damageId) => addDamagePosition(damageId, false)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{width: '100%', marginTop: '1rem'}}>+ Lägg till ytterligare skada</Button></>)}
-      </Card>
-
-      <Card data-error={showFieldErrors && ((garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
-        <SectionHeader title="Status & Sanering" />
-        
-        {/* 1) Går inte att hyra ut */}
-        <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleGarInteAttHyraUtClick} isActive={garInteAttHyraUt} className="rekond-checkbox">Går inte att hyra ut</ChoiceButton>
-          {garInteAttHyraUt && (<div className="damage-details">
-            <div className="field" data-error={showFieldErrors && !garInteAttHyraUtKommentar.trim()}>
-              <label>Kommentar (obligatorisk) *</label>
-              <textarea value={garInteAttHyraUtKommentar} onChange={e => setGarInteAttHyraUtKommentar(e.target.value)} placeholder="Förklara varför bilen inte kan hyras ut..." rows={2}></textarea>
-            </div>
-          </div>)}
-        </div>
-        {activeStatusSections > 1 && garInteAttHyraUt && <hr className="subsection-divider" />}
-
-        {/* 2) Varningslampa ej släckt */}
-        <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa ej släckt</ChoiceButton>
-          {varningslampaLyser && (<div className="damage-details">
-            <div className="field" data-error={showFieldErrors && !varningslampaBeskrivning.trim()}>
-              <label>Kommentar (obligatorisk) *</label>
-              <textarea value={varningslampaBeskrivning} onChange={e => setVarningslampaBeskrivning(e.target.value)} placeholder="Vilken eller vilka lampor?" rows={2}></textarea>
-            </div>
-          </div>)}
-        </div>
-        {activeStatusSections > 1 && varningslampaLyser && <hr className="subsection-divider" />}
-        
-        {/* 3) Rekond */}
-        <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Rekond</ChoiceButton>
-          {behoverRekond && (<div className="damage-details">
-            <Field label="Typ av rekond *"><div className="grid-2-col">
-              <ChoiceButton onClick={() => setRekondUtvandig(!rekondUtvandig)} isActive={rekondUtvandig}>Utvändig</ChoiceButton>
-              <ChoiceButton onClick={() => setRekondInvandig(!rekondInvandig)} isActive={rekondInvandig}>Invändig</ChoiceButton>
+          {tankniva === 'tankad_nu' && <div className="grid-3-col">
+            <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
+            <Field label="Bränsletyp *"><div className="fuel-type-buttons"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} isSet={bransletyp !== null}>Diesel</ChoiceButton></div></Field>
+            <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
+          </div>}</>)}
+          {drivmedelstyp === 'elbil' && (<>
+            <Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>
+            <Field label="Antal laddkablar *"><div className="grid-3-col">
+              <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
+              <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
+              <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
             </div></Field>
-            <Field label="Kommentar (frivilligt)"><textarea value={rekondText} onChange={e => setRekondText(e.target.value)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
-            <div className="media-section">
-              <MediaUpload id="rekond-photo" onUpload={handleRekondMediaUpdate} hasFile={hasPhoto(rekondMedia)} fileType="image" label="Foto *" />
-              <MediaUpload id="rekond-video" onUpload={handleRekondMediaUpdate} hasFile={hasVideo(rekondMedia)} fileType="video" label="Video" isOptional={true} />
-            </div>
-            <div className="media-previews">{rekondMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRekondMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
-          </div>)}
-        </div>
-        {activeStatusSections > 1 && behoverRekond && <hr className="subsection-divider" />}
+          </>)}
+        </Card>
 
-        {/* 4) Husdjur */}
-        <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleHusdjurClick} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur</ChoiceButton>
-          {husdjurSanerad && (<div className="damage-details">
-            <Field label="Kommentar (frivilligt)"><textarea value={husdjurText} onChange={e => setHusdjurText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
-            <div className="media-section">
-              <MediaUpload id="husdjur-photo" onUpload={handleHusdjurMediaUpdate} hasFile={hasPhoto(husdjurMedia)} fileType="image" label="Foto" isOptional={true} />
-              <MediaUpload id="husdjur-video" onUpload={handleHusdjurMediaUpdate} hasFile={hasVideo(husdjurMedia)} fileType="video" label="Video" isOptional={true} />
-            </div>
-            <div className="media-previews">{husdjurMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleHusdjurMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
-          </div>)}
-        </div>
-        {activeStatusSections > 1 && husdjurSanerad && <hr className="subsection-divider" />}
+        <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
+          <SectionHeader title="Skador" />
+          {vehicleData && existingDamages.some(d => !d.isInventoried) && (<>
+            <SubSectionHeader title="Befintliga skador att hantera" />
+            {existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(idx) => handleMediaRemove(d.id, idx, true)} onAction={handleExistingDamageAction} onAddPosition={(damageId) => addDamagePosition(damageId, true)} onRemovePosition={(damageId, posId) => removeDamagePosition(damageId, posId, true)} />)}
+            <hr className="section-divider-strong" />
+          </>)}
+          <SubSectionHeader title="Nya skador" />
+          <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
+              <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
+              <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
+          </div></Field>
+          {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(idx) => handleMediaRemove(d.id, idx, false)} onRemove={removeDamage} onAddPosition={(damageId) => addDamagePosition(damageId, false)} onRemovePosition={(damageId, posId) => removeDamagePosition(damageId, posId, false)} />)}<Button onClick={addDamage} variant="secondary">Lägg till ny skada</Button></>)}
+        </Card>
 
-        {/* 5) Rökning */}
-        <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleRokningClick} isActive={rokningSanerad} className="rekond-checkbox">Rökning</ChoiceButton>
-          {rokningSanerad && (<div className="damage-details">
-            <Field label="Kommentar (frivilligt)"><textarea value={rokningText} onChange={e => setRokningText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
-            <div className="media-section">
-              <MediaUpload id="rokning-photo" onUpload={handleRokningMediaUpdate} hasFile={hasPhoto(rokningMedia)} fileType="image" label="Foto" isOptional={true} />
-              <MediaUpload id="rokning-video" onUpload={handleRokningMediaUpdate} hasFile={hasVideo(rokningMedia)} fileType="video" label="Video" isOptional={true} />
-            </div>
-             <div className="media-previews">{rokningMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRokningMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
-          </div>)}
-        </div>
-        {activeStatusSections > 1 && rokningSanerad && <hr className="subsection-divider" />}
-        
-        {/* 6) Insynsskydd saknas */}
-        <div className="status-section-wrapper">
-          <ChoiceButton onClick={handleInsynsskyddSaknasClick} isActive={insynsskyddSaknas} className="rekond-checkbox">Insynsskydd saknas</ChoiceButton>
-        </div>
-      </Card>
+        <Card data-error={showFieldErrors && ((garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
+          <SectionHeader title="Status & Sanering" />
+          
+          {/* 1) Går inte att hyra ut */}
+          <div className="status-section-wrapper">
+            <ChoiceButton onClick={handleGarInteAttHyraUtClick} isActive={garInteAttHyraUt} className="rekond-checkbox">Går inte att hyra ut</ChoiceButton>
+            {garInteAttHyraUt && (<div className="damage-details">
+              <div className="field" data-error={showFieldErrors && !garInteAttHyraUtKommentar.trim()}>
+                <label>Kommentar (obligatorisk) *</label>
+                <textarea value={garInteAttHyraUtKommentar} onChange={e => setGarInteAttHyraUtKommentar(e.target.value)} placeholder="Förklara varför bilen inte kan hyras ut..." rows={2}></textarea>
+              </div>
+            </div>)}
+          </div>
+          {activeStatusSections > 1 && garInteAttHyraUt && <hr className="subsection-divider" />}
 
-      <Card data-error={showFieldErrors && !isChecklistComplete}>
-        <SectionHeader title="Checklista" />
-        <div className="grid-2-col">
-          <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
-          <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal "Djur/rökning" finns</ChoiceButton>
-          <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa finns</ChoiceButton>
-          <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva finns</ChoiceButton>
-          <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>MABI-skylt reg.plåt finns</ChoiceButton>
-          <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS finns</ChoiceButton>
-          <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
-          <ChoiceButton onClick={() => setVindrutaAvtorkadOK(!vindrutaAvtorkadOK)} isActive={vindrutaAvtorkadOK}>Insida vindruta avtorkad</ChoiceButton>
-          {!shouldHideAdBlue && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
+          {/* 2) Varningslampa ej släckt */}
+          <div className="status-section-wrapper">
+            <ChoiceButton onClick={handleVarningslampaClick} isActive={varningslampaLyser} className="warning-light-checkbox">Varningslampa ej släckt</ChoiceButton>
+            {varningslampaLyser && (<div className="damage-details">
+              <div className="field" data-error={showFieldErrors && !varningslampaBeskrivning.trim()}>
+                <label>Kommentar (obligatorisk) *</label>
+                <textarea value={varningslampaBeskrivning} onChange={e => setVarningslampaBeskrivning(e.target.value)} placeholder="Vilken eller vilka lampor?" rows={2}></textarea>
+              </div>
+            </div>)}
+          </div>
+          {activeStatusSections > 1 && varningslampaLyser && <hr className="subsection-divider" />}
+          
+          {/* 3) Rekond */}
+          <div className="status-section-wrapper">
+            <ChoiceButton onClick={handleRekondClick} isActive={behoverRekond} className="rekond-checkbox">Rekond</ChoiceButton>
+            {behoverRekond && (<div className="damage-details">
+              <Field label="Typ av rekond *"><div className="grid-2-col">
+                <ChoiceButton onClick={() => setRekondUtvandig(!rekondUtvandig)} isActive={rekondUtvandig}>Utvändig</ChoiceButton>
+                <ChoiceButton onClick={() => setRekondInvandig(!rekondInvandig)} isActive={rekondInvandig}>Invändig</ChoiceButton>
+              </div></Field>
+              <Field label="Kommentar (frivilligt)"><textarea value={rekondText} onChange={e => setRekondText(e.target.value)} placeholder="Beskriv vad som behövs..." rows={2}></textarea></Field>
+              <div className="media-section">
+                <MediaUpload id="rekond-photo" onUpload={handleRekondMediaUpdate} hasFile={hasPhoto(rekondMedia)} fileType="image" label="Foto *" />
+                <MediaUpload id="rekond-video" onUpload={handleRekondMediaUpdate} hasFile={hasVideo(rekondMedia)} fileType="video" label="Video" isOptional={true} />
+              </div>
+              <div className="media-previews">{rekondMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRekondMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
+            </div>)}
+          </div>
+          {activeStatusSections > 1 && behoverRekond && <hr className="subsection-divider" />}
+
+          {/* 4) Husdjur */}
+          <div className="status-section-wrapper">
+            <ChoiceButton onClick={handleHusdjurClick} isActive={husdjurSanerad} className="rekond-checkbox">Husdjur</ChoiceButton>
+            {husdjurSanerad && (<div className="damage-details">
+              <Field label="Kommentar (frivilligt)"><textarea value={husdjurText} onChange={e => setHusdjurText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
+              <div className="media-section">
+                <MediaUpload id="husdjur-photo" onUpload={handleHusdjurMediaUpdate} hasFile={hasPhoto(husdjurMedia)} fileType="image" label="Foto" isOptional={true} />
+                <MediaUpload id="husdjur-video" onUpload={handleHusdjurMediaUpdate} hasFile={hasVideo(husdjurMedia)} fileType="video" label="Video" isOptional={true} />
+              </div>
+              <div className="media-previews">{husdjurMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleHusdjurMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
+            </div>)}
+          </div>
+          {activeStatusSections > 1 && husdjurSanerad && <hr className="subsection-divider" />}
+
+          {/* 5) Rökning */}
+          <div className="status-section-wrapper">
+            <ChoiceButton onClick={handleRokningClick} isActive={rokningSanerad} className="rekond-checkbox">Rökning</ChoiceButton>
+            {rokningSanerad && (<div className="damage-details">
+              <Field label="Kommentar (frivilligt)"><textarea value={rokningText} onChange={e => setRokningText(e.target.value)} placeholder="Beskriv sanering..." rows={2}></textarea></Field>
+              <div className="media-section">
+                <MediaUpload id="rokning-photo" onUpload={handleRokningMediaUpdate} hasFile={hasPhoto(rokningMedia)} fileType="image" label="Foto" isOptional={true} />
+                <MediaUpload id="rokning-video" onUpload={handleRokningMediaUpdate} hasFile={hasVideo(rokningMedia)} fileType="video" label="Video" isOptional={true} />
+              </div>
+               <div className="media-previews">{rokningMedia.map((m, i) => <MediaButton key={i} onRemove={() => handleRokningMediaRemove(i)}><img src={m.thumbnail || m.preview} alt="preview" /></MediaButton>)}</div>
+            </div>)}
+          </div>
+          {activeStatusSections > 1 && rokningSanerad && <hr className="subsection-divider" />}
+          
+          {/* 6) Insynsskydd saknas */}
+          <div className="status-section-wrapper">
+            <ChoiceButton onClick={handleInsynsskyddSaknasClick} isActive={insynsskyddSaknas} className="rekond-checkbox">Insynsskydd saknas</ChoiceButton>
+          </div>
+        </Card>
+
+        <Card data-error={showFieldErrors && !isChecklistComplete}>
+          <SectionHeader title="Checklista" />
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
+            <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal "Djur/rökning" finns</ChoiceButton>
+            <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa finns</ChoiceButton>
+            <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva finns</ChoiceButton>
+            <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>MABI-skylt reg.plåt finns</ChoiceButton>
+            <ChoiceButton onClick={() => setDekalGpsOK(!dekalGpsOK)} isActive={dekalGpsOK}>Dekal GPS finns</ChoiceButton>
+            <ChoiceButton onClick={() => setSpolarvatskaOK(!spolarvatskaOK)} isActive={spolarvatskaOK}>Spolarvätska OK</ChoiceButton>
+            <ChoiceButton onClick={() => setVindrutaAvtorkadOK(!vindrutaAvtorkadOK)} isActive={vindrutaAvtorkadOK}>Insida vindruta avtorkad</ChoiceButton>
+            {!shouldHideAdBlue && <ChoiceButton onClick={() => setAdblueOK(!adblueOK)} isActive={adblueOK}>AdBlue OK</ChoiceButton>}
+          </div>
+        </Card>
+
+        <Card data-error={showFieldErrors && (!bilenStarNuOrt || !bilenStarNuStation)}>
+          <SectionHeader title="Var är bilen nu?" />
+          <div className="grid-2-col">
+            <Field label="Ort *"><select value={bilenStarNuOrt} onChange={e => { setBilenStarNuOrt(e.target.value); setBilenStarNuStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
+            <Field label="Station *"><select value={bilenStarNuStation} onChange={e => setBilenStarNuStation(e.target.value)} disabled={!bilenStarNuOrt}><option value="">Välj station</option>{availableStationsBilenStarNu.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
+          </div>
+          <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
+        </Card>
+
+        <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={4}></textarea></Card>
+
+        <div className="form-actions">
+          <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
+          <Button 
+              onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} 
+              disabled={isFinalSaving}
+              variant={formIsValidState ? 'success' : 'primary'}
+          >
+              {isFinalSaving ? 'Skickar...' : (formIsValidState ? 'Slutför incheckning' : 'Visa saknad information')}
+          </Button>
         </div>
-      </Card>
 
-      <Card data-error={showFieldErrors && (!bilenStarNuOrt || !bilenStarNuStation)}>
-        <SectionHeader title="Var är bilen nu?" />
-        <div className="grid-2-col">
-          <Field label="Ort *"><select value={bilenStarNuOrt} onChange={e => { setBilenStarNuOrt(e.target.value); setBilenStarNuStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
-          <Field label="Station *"><select value={bilenStarNuStation} onChange={e => setBilenStarNuStation(e.target.value)} disabled={!bilenStarNuOrt}><option value="">Välj station</option>{availableStationsBilenStarNu.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
-        </div>
-        <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
-      </Card>
-
-      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in någon annanstans..." rows={3}></textarea></Card>
-
-      <div className="form-actions">
-        <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
-        <Button 
-            onClick={formIsValidState ? () => setShowConfirmModal(true) : handleShowErrors} 
-            disabled={isFinalSaving}
-            variant={formIsValidState ? 'success' : 'primary'}
-        >
-            {isFinalSaving ? 'Skickar...' : (formIsValidState ? 'Slutför incheckning' : 'Visa saknad information')}
-        </Button>
+        <footer className="copyright-footer">
+          &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
+        </footer>
       </div>
-
-      <footer className="copyright-footer">
-        &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
-      </footer>
-    </div>
+    </>
   );
 }
 
@@ -1255,8 +1257,8 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button type="button" onClick={onClick} disabled={disabled} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} style={style}>{children}</button>;
-const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div><h3>Tack, {firstName}!</h3><p>Din incheckning har skickats.</p></div></>);
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>;
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg></div><h3>Tack {firstName}!</h3><p>Incheckningen är skickad.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
@@ -1365,15 +1367,15 @@ const DamageItem: React.FC<{
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>
         {positions && positions.map((pos, i) => {
-            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]]) || [];
+            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []);
             const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
             const showPositionDropdown = availablePositioner.length > 0;
 
             return (
                 <div key={pos.id} className="damage-position-row">
                     <div className={showPositionDropdown ? "grid-2-col" : ""}>
-                        <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)} disabled={!damageType}><option value="">Välj placering</option>{availablePlaceringar.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
-                        {showPositionDropdown && <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)}><option value="">Välj position</option>{availablePositioner.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>}
+                        <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)} disabled={!damageType}><option value="">Välj placering...</option>{availablePlaceringar.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
+                        {showPositionDropdown && <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)}><option value="">Välj position...</option>{availablePositioner.map(posOpt => <option key={posOpt} value={posOpt}>{posOpt}</option>)}</select></Field>}
                     </div>
                     {positions.length > 1 && <button type="button" onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>}
                 </div>
@@ -1390,7 +1392,7 @@ const DamageItem: React.FC<{
     </div>);
 };
 
-const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string, isOptional?: boolean }> = ({ id, onUpload, hasFile, fileType, label, isOptional = false }) => {
+const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, hasFile: boolean, fileType: 'image' | 'video', label: string, isOptional?: boolean }> = ({ id, onUpload, hasFile, fileType, label, isOptional }) => {
     let className = 'media-label';
     if (hasFile) className += ' active';
     else if (isOptional) className += ' optional';
@@ -1403,7 +1405,7 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
 };
 
 const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button type="button" onClick={onRemove} className="remove-media-btn">×</button>}</div>);
-const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet = false, variant = 'default'}) => {
+const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet, variant = 'default' }) => {
     let btnClass = 'choice-btn';
     if (className) btnClass += ` ${className}`;
     if (isActive) btnClass += ` active ${variant}`;
@@ -1448,8 +1450,8 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         {...(state.title && { 'aria-labelledby': 'action-dialog-title' })}
     >
         {state.title && <h3 id="action-dialog-title" style={{textAlign: 'center'}}>{state.title}</h3>}<p id="action-dialog-text" style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
-        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3} style={{width: '100%'}}></textarea></div>)}
-        <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>{state.confirmButtonVariant === 'success' ? 'Spara' : 'Bekräfta'}</Button></div>
+        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
+        <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
     </div></>);
 };
 
@@ -1524,7 +1526,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .btn.warning { background-color: var(--color-warning); color: white; }
     .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
     .btn:not(:disabled):hover { filter: brightness(1.1); }
-    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: center; }
+    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: center; }
     .choice-btn:hover { filter: brightness(1.05); }
     .choice-btn.active.default { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
     .choice-btn.active.warning { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #b45309; }
@@ -1544,7 +1546,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
     .damage-position-row { position: relative; padding-right: 2.5rem; }
     .add-position-btn { width: 100% !important; margin: 0.5rem 0 !important; font-size: 0.875rem !important; padding: 0.5rem !important; }
-    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: 1px solid var(--color-danger); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; line-height: 1; padding: 0; }
+    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; cursor: pointer; font-size: 1.25rem; line-height: 1; }
     .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
     .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
     .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
@@ -1555,10 +1557,9 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
     .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
     .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 1rem; line-height: 1; }
     .remove-media-btn:hover { background-color: #b91c1c; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-    
     .modal-content { 
       position: fixed; 
       top: 50%; 
@@ -1575,7 +1576,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       max-height: 90vh;
       overflow-y: auto;
     }
-
     .success-modal { text-align: center; }
     .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
