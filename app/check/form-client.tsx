@@ -1255,7 +1255,7 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button onClick={onClick} disabled={disabled} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} style={style}>{children}</button>;
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button type="button" onClick={onClick} disabled={disabled} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} style={style}>{children}</button>;
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div><h3>Tack, {firstName}!</h3><p>Din incheckning har skickats.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
@@ -1375,7 +1375,7 @@ const DamageItem: React.FC<{
                         <Field label={i === 0 ? "Placering *" : ""}><select value={pos.carPart} onChange={e => onUpdate(damage.id, 'carPart', e.target.value, isExisting, pos.id)} disabled={!damageType}><option value="">Välj placering</option>{availablePlaceringar.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>
                         {showPositionDropdown && <Field label={i === 0 ? "Position *" : ""}><select value={pos.position} onChange={e => onUpdate(damage.id, 'position', e.target.value, isExisting, pos.id)}><option value="">Välj position</option>{availablePositioner.map(p => <option key={p} value={p}>{p}</option>)}</select></Field>}
                     </div>
-                    {positions.length > 1 && <button onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>}
+                    {positions.length > 1 && <button type="button" onClick={() => onRemovePosition(damage.id, pos.id)} className="remove-position-btn">×</button>}
                 </div>
             );
         })}
@@ -1402,7 +1402,7 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
     </div>);
 };
 
-const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}</div>);
+const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button type="button" onClick={onRemove} className="remove-media-btn">×</button>}</div>);
 const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet = false, variant = 'default'}) => {
     let btnClass = 'choice-btn';
     if (className) btnClass += ` ${className}`;
@@ -1558,10 +1558,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
     .remove-media-btn:hover { background-color: #b91c1c; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-
-    /*
-     * MINA ÄNDRINGAR FÖR SCROLL-PROBLEMET
-     */
+    
     .modal-content { 
       position: fixed; 
       top: 50%; 
