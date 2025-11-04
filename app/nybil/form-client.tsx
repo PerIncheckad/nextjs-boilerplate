@@ -1,0 +1,1042 @@
+'use client';
+
+import React, { useEffect, useState, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
+
+// Constants
+const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
+const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Svart%20bakgrund%20MB%20grill/MB%20front%20grill%20logo.jpg";
+
+const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
+
+const STATIONER: Record<string, string[]> = {
+  'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
+  'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B/S Helsingborg', 'Werksta Helsingborg', 'Båstad'],
+  'Lund': ['FORD Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
+  'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
+  'Falkenberg': ['Falkenberg'],
+  'Halmstad': ['Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
+  'Trelleborg': ['Trelleborg'],
+  'Varberg': ['FORD Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
+};
+
+type MediaFile = {
+  file: File;
+  type: 'image' | 'video';
+  preview?: string;
+  thumbnail?: string;
+};
+
+const capitalizeFirstLetter = (str: string): string => {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+};
+
+const getFirstNameFromEmail = (email: string): string => {
+  if (!email) return 'Okänd';
+  const namePart = email.split('@')[0];
+  const firstName = namePart.split('.')[0];
+  return capitalizeFirstLetter(firstName);
+};
+
+const getFullNameFromEmail = (email: string): string => {
+  if (!email) return 'Okänd';
+  const namePart = email.split('@')[0];
+  const parts = namePart.split('.');
+  if (parts.length >= 2) {
+    const firstName = capitalizeFirstLetter(parts[0]);
+    const lastName = capitalizeFirstLetter(parts[1]);
+    return `${firstName} ${lastName}`;
+  }
+  return capitalizeFirstLetter(parts[0]);
+};
+
+const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
+
+const createVideoThumbnail = (file: File): Promise<string> => new Promise(resolve => {
+  const video = document.createElement('video');
+  video.src = URL.createObjectURL(file);
+  video.onloadeddata = () => { video.currentTime = 1; };
+  video.onseeked = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) { resolve(''); return; }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    resolve(canvas.toDataURL());
+    URL.revokeObjectURL(video.src);
+  };
+  video.onerror = () => { resolve(''); URL.revokeObjectURL(video.src); };
+});
+
+const processFiles = async (files: FileList): Promise<MediaFile[]> => {
+  return await Promise.all(Array.from(files).map(async file => {
+    const type = getFileType(file);
+    if (type === 'video') {
+      const thumbnail = await createVideoThumbnail(file);
+      return { file, type, thumbnail };
+    }
+    return { file, type, preview: URL.createObjectURL(file) };
+  }));
+};
+
+const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
+const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
+
+export default function NybilForm() {
+  const [firstName, setFirstName] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [regInput, setRegInput] = useState('');
+  const [bilmodell, setBilmodell] = useState('');
+  const [ort, setOrt] = useState('');
+  const [station, setStation] = useState('');
+  const [matarstallning, setMatarstallning] = useState('');
+  const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
+  const [hjulforvaring, setHjulforvaring] = useState('');
+  
+  // Equipment inventory
+  const [antalNycklar, setAntalNycklar] = useState<number>(0);
+  const [antalLaddkablar, setAntalLaddkablar] = useState<number>(0);
+  const [insynsskyddFinns, setInsynsskyddFinns] = useState(false);
+  const [isskrapaFinns, setIsskrapaFinns] = useState(false);
+  const [pskivaFinns, setPskivaFinns] = useState(false);
+  const [dekalDjurRokningFinns, setDekalDjurRokningFinns] = useState(false);
+  const [dekalGpsFinns, setDekalGpsFinns] = useState(false);
+  const [mabiSkyltFinns, setMabiSkyltFinns] = useState(false);
+  
+  // Fuel/charging
+  const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
+  const [tanknivaProcent, setTanknivaProcent] = useState('');
+  const [laddnivaProcent, setLaddnivaProcent] = useState('');
+  
+  // Notes and media
+  const [anteckningar, setAnteckningar] = useState('');
+  const [media, setMedia] = useState<MediaFile[]>([]);
+  
+  // UI state
+  const [isSaving, setIsSaving] = useState(false);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
+  const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
+  const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
+  const currentYear = useMemo(() => new Date().getFullYear(), []);
+  
+  const formIsValid = useMemo(() => {
+    if (!regInput || !bilmodell || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp) return false;
+    if (drivmedelstyp === 'bensin_diesel' && !tanknivaProcent) return false;
+    if (drivmedelstyp === 'elbil' && !laddnivaProcent) return false;
+    return true;
+  }, [regInput, bilmodell, ort, station, matarstallning, hjultyp, drivmedelstyp, tanknivaProcent, laddnivaProcent]);
+  
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const email = user?.email || '';
+      setFirstName(getFirstNameFromEmail(email));
+      setFullName(getFullNameFromEmail(email));
+    };
+    getUser();
+    
+    // Cleanup function to revoke all object URLs on unmount
+    return () => {
+      media.forEach(m => {
+        if (m.preview) URL.revokeObjectURL(m.preview);
+        if (m.thumbnail) URL.revokeObjectURL(m.thumbnail);
+      });
+    };
+  }, [media]);
+  
+  const handleMediaUpdate = async (files: FileList) => {
+    const processed = await processFiles(files);
+    setMedia(prev => [...prev, ...processed]);
+  };
+  
+  const handleMediaRemove = (index: number) => {
+    setMedia(prev => {
+      const newMedia = [...prev];
+      const removedItem = newMedia[index];
+      // Clean up object URLs to prevent memory leaks
+      if (removedItem?.preview) {
+        URL.revokeObjectURL(removedItem.preview);
+      }
+      if (removedItem?.thumbnail) {
+        URL.revokeObjectURL(removedItem.thumbnail);
+      }
+      newMedia.splice(index, 1);
+      return newMedia;
+    });
+  };
+  
+  const handleShowErrors = () => {
+    setShowFieldErrors(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const firstError = document.querySelector('.card[data-error="true"], .field[data-error="true"]') as HTMLElement | null;
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const focusable = firstError.querySelector('input, select, textarea') as HTMLElement | null;
+          focusable?.focus();
+        }
+      });
+    });
+  };
+  
+  const resetForm = () => {
+    setRegInput('');
+    setBilmodell('');
+    setOrt('');
+    setStation('');
+    setMatarstallning('');
+    setHjultyp(null);
+    setHjulforvaring('');
+    setAntalNycklar(0);
+    setAntalLaddkablar(0);
+    setInsynsskyddFinns(false);
+    setIsskrapaFinns(false);
+    setPskivaFinns(false);
+    setDekalDjurRokningFinns(false);
+    setDekalGpsFinns(false);
+    setMabiSkyltFinns(false);
+    setDrivmedelstyp(null);
+    setTanknivaProcent('');
+    setLaddnivaProcent('');
+    setAnteckningar('');
+    setMedia([]);
+    setShowFieldErrors(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
+  const handleSubmit = async () => {
+    if (!formIsValid) {
+      handleShowErrors();
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      const now = new Date();
+      
+      // Prepare data for database
+      const inventoryData = {
+        regnr: normalizedReg,
+        bilmodell,
+        registrerad_av: firstName,
+        fullstandigt_namn: fullName,
+        registreringsdatum: now.toISOString().split('T')[0],
+        ort,
+        station,
+        matarstallning,
+        hjultyp,
+        hjulforvaring: hjulforvaring || null,
+        antal_nycklar: antalNycklar,
+        antal_laddkablar: antalLaddkablar,
+        insynsskydd_finns: insynsskyddFinns,
+        isskrapa_finns: isskrapaFinns,
+        pskiva_finns: pskivaFinns,
+        dekal_djur_rokning_finns: dekalDjurRokningFinns,
+        dekal_gps_finns: dekalGpsFinns,
+        mabi_skylt_finns: mabiSkyltFinns,
+        drivmedelstyp,
+        tankniva_procent: drivmedelstyp === 'bensin_diesel' ? parseInt(tanknivaProcent, 10) : null,
+        laddniva_procent: drivmedelstyp === 'elbil' ? parseInt(laddnivaProcent, 10) : null,
+        anteckningar: anteckningar || null,
+        photo_urls: [],
+        video_urls: [],
+        media_folder: null
+      };
+      
+      // Insert into database
+      const { data, error } = await supabase
+        .from('nybil_inventering')
+        .insert([inventoryData])
+        .select();
+      
+      if (error) {
+        console.error('Database error:', error);
+        alert(`Fel vid sparande: ${error.message}`);
+        return;
+      }
+      
+      console.log('Successfully saved:', data);
+      setShowSuccessModal(true);
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        resetForm();
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Save error:', error);
+      alert('Något gick fel vid sparande. Vänligen försök igen.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleCancel = () => {
+    if (confirm('Är du säker? Alla ifyllda data kommer att raderas.')) {
+      resetForm();
+    }
+  };
+  
+  return (
+    <div className="nybil-form">
+      <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
+      {isSaving && <SpinnerOverlay />}
+      {showSuccessModal && <SuccessModal firstName={firstName} />}
+      
+      <div className="main-header">
+        <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+        {fullName && <p className="user-info">Inloggad: {fullName}</p>}
+      </div>
+      
+      <Card data-error={showFieldErrors && (!regInput || !bilmodell)}>
+        <SectionHeader title="Fordon" />
+        <Field label="Registreringsnummer *">
+          <input
+            type="text"
+            value={regInput}
+            onChange={(e) => setRegInput(e.target.value)}
+            placeholder="ABC 123"
+            className="reg-input"
+          />
+        </Field>
+        <Field label="Bilmodell *">
+          <input
+            type="text"
+            value={bilmodell}
+            onChange={(e) => setBilmodell(e.target.value)}
+            placeholder="t.ex. Mercedes-Benz C220"
+          />
+        </Field>
+      </Card>
+      
+      <Card data-error={showFieldErrors && (!ort || !station)}>
+        <SectionHeader title="Plats" />
+        <div className="grid-2-col">
+          <Field label="Ort *">
+            <select value={ort} onChange={e => { setOrt(e.target.value); setStation(''); }}>
+              <option value="">Välj ort</option>
+              {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+          <Field label="Station *">
+            <select value={station} onChange={e => setStation(e.target.value)} disabled={!ort}>
+              <option value="">Välj station</option>
+              {availableStations.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </Field>
+        </div>
+      </Card>
+      
+      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp)}>
+        <SectionHeader title="Fordonsstatus" />
+        <Field label="Mätarställning (km) *">
+          <input
+            type="number"
+            value={matarstallning}
+            onChange={e => setMatarstallning(e.target.value)}
+            placeholder="12345"
+          />
+        </Field>
+        
+        <SubSectionHeader title="Däck" />
+        <Field label="Däcktyp som sitter på *">
+          <div className="grid-2-col">
+            <ChoiceButton
+              onClick={() => setHjultyp('Sommardäck')}
+              isActive={hjultyp === 'Sommardäck'}
+              isSet={hjultyp !== null}
+            >
+              Sommardäck
+            </ChoiceButton>
+            <ChoiceButton
+              onClick={() => setHjultyp('Vinterdäck')}
+              isActive={hjultyp === 'Vinterdäck'}
+              isSet={hjultyp !== null}
+            >
+              Vinterdäck
+            </ChoiceButton>
+          </div>
+        </Field>
+        <Field label="Hjulförvaring (frivilligt)">
+          <input
+            type="text"
+            value={hjulforvaring}
+            onChange={e => setHjulforvaring(e.target.value)}
+            placeholder="t.ex. Station Malmö, hylla 3"
+          />
+        </Field>
+        
+        <SubSectionHeader title="Drivmedel" />
+        <Field label="Drivmedelstyp *">
+          <div className="grid-2-col">
+            <ChoiceButton
+              onClick={() => setDrivmedelstyp('bensin_diesel')}
+              isActive={drivmedelstyp === 'bensin_diesel'}
+              isSet={drivmedelstyp !== null}
+            >
+              Bensin/Diesel
+            </ChoiceButton>
+            <ChoiceButton
+              onClick={() => setDrivmedelstyp('elbil')}
+              isActive={drivmedelstyp === 'elbil'}
+              isSet={drivmedelstyp !== null}
+            >
+              Elbil
+            </ChoiceButton>
+          </div>
+        </Field>
+        
+        {drivmedelstyp === 'bensin_diesel' && (
+          <Field label="Tanknivå (%) *">
+            <input
+              type="number"
+              value={tanknivaProcent}
+              onChange={e => setTanknivaProcent(e.target.value)}
+              placeholder="0-100"
+              min="0"
+              max="100"
+            />
+          </Field>
+        )}
+        
+        {drivmedelstyp === 'elbil' && (
+          <Field label="Laddningsnivå (%) *">
+            <input
+              type="number"
+              value={laddnivaProcent}
+              onChange={e => setLaddnivaProcent(e.target.value)}
+              placeholder="0-100"
+              min="0"
+              max="100"
+            />
+          </Field>
+        )}
+      </Card>
+      
+      <Card>
+        <SectionHeader title="Utrustningsinventering" />
+        <Field label="Antal nycklar">
+          <input
+            type="number"
+            value={antalNycklar}
+            onChange={e => setAntalNycklar(parseInt(e.target.value, 10) || 0)}
+            min="0"
+          />
+        </Field>
+        
+        {drivmedelstyp === 'elbil' && (
+          <Field label="Antal laddkablar">
+            <input
+              type="number"
+              value={antalLaddkablar}
+              onChange={e => setAntalLaddkablar(parseInt(e.target.value, 10) || 0)}
+              min="0"
+            />
+          </Field>
+        )}
+        
+        <div className="grid-2-col" style={{ marginTop: '1rem' }}>
+          <ChoiceButton onClick={() => setInsynsskyddFinns(!insynsskyddFinns)} isActive={insynsskyddFinns}>
+            Insynsskydd finns
+          </ChoiceButton>
+          <ChoiceButton onClick={() => setIsskrapaFinns(!isskrapaFinns)} isActive={isskrapaFinns}>
+            Isskrapa finns
+          </ChoiceButton>
+          <ChoiceButton onClick={() => setPskivaFinns(!pskivaFinns)} isActive={pskivaFinns}>
+            P-skiva finns
+          </ChoiceButton>
+          <ChoiceButton onClick={() => setDekalDjurRokningFinns(!dekalDjurRokningFinns)} isActive={dekalDjurRokningFinns}>
+            Dekal "Djur/rökning" finns
+          </ChoiceButton>
+          <ChoiceButton onClick={() => setDekalGpsFinns(!dekalGpsFinns)} isActive={dekalGpsFinns}>
+            Dekal GPS finns
+          </ChoiceButton>
+          <ChoiceButton onClick={() => setMabiSkyltFinns(!mabiSkyltFinns)} isActive={mabiSkyltFinns}>
+            MABI-skylt finns
+          </ChoiceButton>
+        </div>
+      </Card>
+      
+      <Card>
+        <SectionHeader title="Övrigt" />
+        <Field label="Anteckningar (frivilligt)">
+          <textarea
+            value={anteckningar}
+            onChange={e => setAnteckningar(e.target.value)}
+            placeholder="Övrig information om bilen..."
+            rows={4}
+          />
+        </Field>
+        
+        <div className="media-section">
+          <MediaUpload
+            id="general-photo"
+            onUpload={handleMediaUpdate}
+            hasFile={hasPhoto(media)}
+            fileType="image"
+            label="Lägg till foton"
+            isOptional={true}
+          />
+          <MediaUpload
+            id="general-video"
+            onUpload={handleMediaUpdate}
+            hasFile={hasVideo(media)}
+            fileType="video"
+            label="Lägg till videor"
+            isOptional={true}
+          />
+        </div>
+        <div className="media-previews">
+          {media.map((m, i) => (
+            <MediaButton key={i} onRemove={() => handleMediaRemove(i)}>
+              <img src={m.thumbnail || m.preview} alt="preview" />
+            </MediaButton>
+          ))}
+        </div>
+      </Card>
+      
+      <div className="form-actions">
+        <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
+        <Button
+          onClick={formIsValid ? handleSubmit : handleShowErrors}
+          disabled={isSaving}
+          variant={formIsValid ? 'success' : 'primary'}
+        >
+          {isSaving ? 'Sparar...' : (formIsValid ? 'Registrera bil' : 'Visa saknad information')}
+        </Button>
+      </div>
+      
+      <footer className="copyright-footer">
+        &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
+      </footer>
+    </div>
+  );
+}
+
+// Sub-components
+const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) => (
+  <div className="card" {...props}>{children}</div>
+);
+
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+  <div className="section-header"><h2>{title}</h2></div>
+);
+
+const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => (
+  <div className="sub-section-header"><h3>{title}</h3></div>
+);
+
+const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => (
+  <div className="field"><label>{label}</label>{children}</div>
+);
+
+const Button: React.FC<React.PropsWithChildren<{
+  onClick?: () => void;
+  variant?: string;
+  disabled?: boolean;
+  style?: object;
+  className?: string;
+}>> = ({ onClick, variant = 'primary', disabled, children, ...props }) => (
+  <button
+    onClick={onClick}
+    className={`btn ${variant} ${disabled ? 'disabled' : ''}`}
+    disabled={disabled}
+    {...props}
+  >
+    {children}
+  </button>
+);
+
+const ChoiceButton: React.FC<{
+  onClick: () => void;
+  isActive: boolean;
+  children: React.ReactNode;
+  className?: string;
+  isSet?: boolean;
+}> = ({ onClick, isActive, children, className, isSet = false }) => {
+  let btnClass = 'choice-btn';
+  if (className) btnClass += ` ${className}`;
+  if (isActive) btnClass += ' active default';
+  else if (isSet) btnClass += ' disabled-choice';
+  return <button onClick={onClick} className={btnClass}>{children}</button>;
+};
+
+const MediaUpload: React.FC<{
+  id: string;
+  onUpload: (files: FileList) => void;
+  hasFile: boolean;
+  fileType: 'image' | 'video';
+  label: string;
+  isOptional?: boolean;
+}> = ({ id, onUpload, hasFile, fileType, label, isOptional = false }) => {
+  let className = 'media-label';
+  if (hasFile) className += ' active';
+  else if (isOptional) className += ' optional';
+  else className += ' mandatory';
+  
+  const buttonText = hasFile
+    ? `Lägg till ${fileType === 'image' ? 'fler foton' : 'fler videor'}`
+    : label;
+  
+  return (
+    <div className="media-upload">
+      <label htmlFor={id} className={className}>{buttonText}</label>
+      <input
+        id={id}
+        type="file"
+        accept={`${fileType}/*`}
+        capture="environment"
+        onChange={e => e.target.files && onUpload(e.target.files)}
+        style={{ display: 'none' }}
+        multiple
+      />
+    </div>
+  );
+};
+
+const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({
+  children,
+  onRemove
+}) => (
+  <div className="media-btn">
+    {children}
+    {onRemove && (
+      <button onClick={onRemove} className="remove-media-btn">×</button>
+    )}
+  </div>
+);
+
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
+  <>
+    <div className="modal-overlay" />
+    <div className="modal-content success-modal">
+      <div className="success-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: '3rem', height: '3rem'}}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15L15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <h3>Tack {firstName}!</h3>
+      <p>Bilregistreringen har sparats.</p>
+    </div>
+  </>
+);
+
+const SpinnerOverlay = () => (
+  <div className="modal-overlay spinner-overlay">
+    <div className="spinner"></div>
+    <p>Sparar...</p>
+  </div>
+);
+
+const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) => (
+  <style jsx global>{`
+    :root {
+      --color-bg: #f8fafc;
+      --color-card: #ffffff;
+      --color-text: #1f2937;
+      --color-text-secondary: #6b7280;
+      --color-primary: #2563eb;
+      --color-primary-light: #eff6ff;
+      --color-success: #16a34a;
+      --color-success-light: #f0fdf4;
+      --color-danger: #dc2626;
+      --color-danger-light: #fef2f2;
+      --color-warning: #f59e0b;
+      --color-warning-light: #fffbeb;
+      --color-border: #e5e7eb;
+      --color-border-focus: #3b82f6;
+      --color-disabled: #a1a1aa;
+      --color-disabled-light: #f4f4f5;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
+    
+    /* Hide global background and show new background for /nybil page */
+    .background-img {
+      display: none !important;
+    }
+    
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: url('${backgroundUrl}');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      opacity: 0.45;
+      filter: brightness(0.65);
+      z-index: -1;
+      pointer-events: none;
+    }
+    
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #e8f5e9; /* Light green tint */
+      color: var(--color-text);
+      margin: 0;
+      padding: 0;
+    }
+    
+    .nybil-form {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+    
+    .main-header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    .main-logo {
+      max-width: 188px;
+      height: auto;
+      margin: 0 auto 1rem auto;
+      display: block;
+    }
+    
+    .user-info {
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      margin: 0;
+    }
+    
+    .card {
+      background-color: rgba(255, 255, 255, 0.92);
+      padding: 1.5rem;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow-md);
+      border: 2px solid transparent;
+      transition: border-color 0.3s;
+    }
+    
+    .card[data-error="true"] {
+      border: 2px solid var(--color-danger);
+    }
+    
+    .field[data-error="true"] input,
+    .field[data-error="true"] select,
+    .field[data-error="true"] textarea {
+      border: 2px solid var(--color-danger) !important;
+    }
+    
+    .section-header {
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: 1.5rem;
+    }
+    
+    .section-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-text);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0;
+    }
+    
+    .sub-section-header {
+      margin-top: 2rem;
+      margin-bottom: 1rem;
+    }
+    
+    .sub-section-header h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--color-text);
+      margin: 0;
+    }
+    
+    .field {
+      margin-bottom: 1rem;
+    }
+    
+    .field label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+    }
+    
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      font-size: 1rem;
+      background-color: white;
+      box-sizing: border-box;
+    }
+    
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      outline: 2px solid var(--color-border-focus);
+      border-color: transparent;
+    }
+    
+    .field select[disabled] {
+      background-color: var(--color-disabled-light);
+      cursor: not-allowed;
+    }
+    
+    .reg-input {
+      text-align: center;
+      font-weight: 600;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+    
+    .grid-2-col {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    
+    .form-actions {
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+      padding-bottom: 1.5rem;
+    }
+    
+    .copyright-footer {
+      text-align: center;
+      margin-top: 2rem;
+      padding: 1.5rem 0 3rem 0;
+      color: var(--color-text-secondary);
+      font-size: 0.875rem;
+    }
+    
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .btn.primary {
+      background-color: var(--color-primary);
+      color: white;
+    }
+    
+    .btn.secondary {
+      background-color: var(--color-border);
+      color: var(--color-text);
+    }
+    
+    .btn.success {
+      background-color: var(--color-success);
+      color: white;
+    }
+    
+    .btn.disabled {
+      background-color: var(--color-disabled-light);
+      color: var(--color-disabled);
+      cursor: not-allowed;
+    }
+    
+    .btn:not(:disabled):hover {
+      filter: brightness(1.1);
+    }
+    
+    .choice-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-width: 0;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      border: 2px solid var(--color-border);
+      background-color: white;
+      color: var(--color-text);
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-sizing: border-box;
+    }
+    
+    .choice-btn:hover {
+      filter: brightness(1.05);
+    }
+    
+    .choice-btn.active.default {
+      border-color: var(--color-success);
+      background-color: var(--color-success-light);
+      color: var(--color-success);
+    }
+    
+    .choice-btn.disabled-choice {
+      border-color: var(--color-border);
+      background-color: var(--color-bg);
+      color: var(--color-disabled);
+      cursor: default;
+    }
+    
+    .media-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .media-label {
+      display: block;
+      text-align: center;
+      padding: 1.5rem 1rem;
+      border: 2px dashed;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 600;
+    }
+    
+    .media-label:hover {
+      filter: brightness(0.95);
+    }
+    
+    .media-label.active {
+      border-style: solid;
+      border-color: var(--color-success);
+      background-color: var(--color-success-light);
+      color: var(--color-success);
+    }
+    
+    .media-label.mandatory {
+      border-color: var(--color-danger);
+      background-color: var(--color-danger-light);
+      color: var(--color-danger);
+    }
+    
+    .media-label.optional {
+      border-color: var(--color-warning);
+      background-color: var(--color-warning-light);
+      color: #92400e;
+    }
+    
+    .media-previews {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    
+    .media-btn {
+      position: relative;
+      width: 70px;
+      height: 70px;
+      border-radius: 8px;
+      overflow: hidden;
+      background-color: var(--color-border);
+    }
+    
+    .media-btn img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .remove-media-btn {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background-color: var(--color-danger);
+      color: white;
+      border: 2px solid white;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: bold;
+      line-height: 1;
+      padding: 0;
+    }
+    
+    .remove-media-btn:hover {
+      background-color: #b91c1c;
+    }
+    
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+    }
+    
+    .modal-content {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(255, 255, 255, 0.92);
+      padding: 2rem;
+      border-radius: 12px;
+      z-index: 101;
+      box-shadow: var(--shadow-md);
+      width: 90%;
+      max-width: 600px;
+    }
+    
+    .success-modal {
+      text-align: center;
+    }
+    
+    .success-icon {
+      font-size: 3rem;
+      color: var(--color-success);
+      margin-bottom: 1rem;
+    }
+    
+    .spinner-overlay {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    
+    .spinner {
+      border: 5px solid #f3f3f3;
+      border-top: 5px solid var(--color-primary);
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @media (max-width: 480px) {
+      .grid-2-col {
+        grid-template-columns: 1fr;
+      }
+    }
+  `}</style>
+);
