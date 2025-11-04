@@ -23,6 +23,7 @@ export default function HomePage() {
           
           <div className="btn-group">
             <a href="/check" className="btn incheckning">Ny incheckning</a>
+            <a href="/nybil" className="btn registrera">Registrera ny bil</a>
           </div>
           
           <div className="divider-wrap">
