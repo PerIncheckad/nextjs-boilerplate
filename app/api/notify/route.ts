@@ -11,8 +11,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-const bilkontrollAddress = 'per@incheckad.se';
-const huvudstationAddress = 'per@incheckad.se';
+const bilkontrollAddresses = ['per@incheckad.se', 'latif.mutlu@mabi.se'];
+const huvudstationBaseAddress = 'per@incheckad.se';
 const fallbackAddress = 'per@incheckad.se';
 
 const supabaseProjectId = supabaseUrl.match(/https:\/\/(.*)\.supabase\.co/)?.[1];
@@ -37,15 +37,27 @@ const getSiteUrl = (request: Request): string => {
   return 'https://nextjs-boilerplate-eight-zeta-15.vercel.app';
 };
 
-const regionMapping: { [ort: string]: string | undefined } = {
-  'Malmö': huvudstationAddress,
-  'Helsingborg': huvudstationAddress,
-  'Ängelholm': huvudstationAddress,
-  'Halmstad': huvudstationAddress,
-  'Falkenberg': huvudstationAddress,
-  'Trelleborg': huvudstationAddress,
-  'Varberg': huvudstationAddress,
-  'Lund': huvudstationAddress,
+// Map station names to their specific email addresses
+const stationEmailMapping: { [station: string]: string | undefined } = {
+  'Helsingborg': 'helsingborg@mabi.se',
+  'Ängelholm': 'angelholm@mabi.se',
+  // Add more stations as needed
+};
+
+// Function to get recipients for Huvudstation email based on station
+const getHuvudstationRecipients = (station: string): string[] => {
+  const recipients = [huvudstationBaseAddress];
+  
+  // Normalize station name (remove extra spaces, lowercase for comparison)
+  const normalizedStation = station?.trim();
+  
+  // Check if there's a specific email for this station
+  const stationEmail = stationEmailMapping[normalizedStation];
+  if (stationEmail) {
+    recipients.push(stationEmail);
+  }
+  
+  return recipients;
 };
 
 const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png';
@@ -404,11 +416,24 @@ export async function POST(request: Request) {
     // E-posthantering
     const emailPromises = [];
     
+    // Huvudstation email - sent to base address and station-specific address
+    const huvudstationRecipients = getHuvudstationRecipients(cleanStation || payload.station || '');
     const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: huvudstationAddress, subject: huvudstationSubject, html: huvudstationHtml }));
+    emailPromises.push(resend.emails.send({ 
+      from: 'incheckning@incheckad.se', 
+      to: huvudstationRecipients, 
+      subject: huvudstationSubject, 
+      html: huvudstationHtml 
+    }));
     
+    // Bilkontroll email - sent to multiple fixed addresses
     const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, siteUrl);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: bilkontrollSubject, html: bilkontrollHtml }));
+    emailPromises.push(resend.emails.send({ 
+      from: 'incheckning@incheckad.se', 
+      to: bilkontrollAddresses, 
+      subject: bilkontrollSubject, 
+      html: bilkontrollHtml 
+    }));
     
     await Promise.all(emailPromises);
 
