@@ -18,7 +18,7 @@ const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 
 
 const STATIONER: Record<string, string[]> = {
   'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
-  'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B/S Helsingborg', 'Werksta Helsingborg', 'Båstad'],
+  'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Landskrona'],
   'Lund': ['FORD Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
   'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
   'Falkenberg': ['Falkenberg'],
@@ -388,12 +388,12 @@ export default function CheckInForm() {
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
         for (const d of newDamages) {
-            const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length || 0) > 0 && !p.position));
+            const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position));
             if (!d.type || !hasAnyMedia(d.media) || positionsInvalid) return false;
         }
     }
     
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length > 0 && !p.position)))) return false;
+    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position))) return false;
 
     if (garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) return false;
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
@@ -1062,7 +1062,7 @@ export default function CheckInForm() {
         {vehicleData && (
           <div className="info-box">
             <div className='info-grid'>
-              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
+              <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.sell_date || '---'} />
             </div>
             {existingDamages.length > 0 && (
               <div className="damage-list-info">
@@ -1108,11 +1108,11 @@ export default function CheckInForm() {
         </>)}
       </Card>
 
-      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]?.length || 0) > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))) || (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart))))}>
+      <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
         <SectionHeader title="Skador" />
         {vehicleData && existingDamages.some(d => !d.isInventoried) && (<>
           <SubSectionHeader title="Befintliga skador att hantera" />
-          {existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={() => addDamagePosition(d.id, true)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, true)} />)}
+          {existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(index) => handleMediaRemove(d.id, index, true)} onAction={handleExistingDamageAction} onAddPosition={(damageId) => addDamagePosition(damageId, true)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, true)} />)}
           <hr className="section-divider-strong" />
         </>)}
         <SubSectionHeader title="Nya skador" />
@@ -1120,7 +1120,7 @@ export default function CheckInForm() {
             <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
             <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
         </div></Field>
-        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={() => addDamagePosition(d.id, false)} onRemovePosition={(posId) => removeDamagePosition(d.id, posId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{width: '100%', marginTop: '1rem'}}>+ Lägg till ytterligare en ny skada</Button></>)}
+        {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(index) => handleMediaRemove(d.id, index, false)} onRemove={removeDamage} onAddPosition={(damageId) => addDamagePosition(damageId, false)} onRemovePosition={(damageId, positionId) => removeDamagePosition(damageId, positionId, false)} />)}<Button onClick={addDamage} variant="secondary" style={{width: '100%', marginTop: '1rem'}}>+ Lägg till ytterligare skada</Button></>)}
       </Card>
 
       <Card data-error={showFieldErrors && ((garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
@@ -1226,7 +1226,7 @@ export default function CheckInForm() {
         <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
       </Card>
 
-      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in ovan..." rows={3}></textarea></Field></Card>
+      <Card><Field label="Övriga kommentarer (frivilligt)"><textarea value={preliminarAvslutNotering} onChange={e => setPreliminarAvslutNotering(e.target.value)} placeholder="Övrig info som inte passar in någon annanstans..." rows={3}></textarea></Card>
 
       <div className="form-actions">
         <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
@@ -1255,8 +1255,8 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
-const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, ...props }) => <button onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''}`} disabled={disabled} {...props}>{children}</button>;
-const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" style={{width: '3rem', height: '3rem'}}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15L15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div><h3>Tack {firstName}!</h3><p>Din incheckning har skickats.</p></div></>);
+const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, variant = 'primary', disabled, children, style, className }) => <button onClick={onClick} disabled={disabled} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} style={style}>{children}</button>;
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg></div><h3>Tack, {firstName}!</h3><p>Din incheckning har skickats.</p></div></>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
@@ -1312,7 +1312,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     >
         {showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
         <div className="confirm-header" id="confirm-modal-body">
-            <h3 id="confirm-modal-title" className="confirm-modal-title" style={{textAlign: 'center'}}>Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel || '---'}</p>
+            <h3 id="confirm-modal-title" className="confirm-modal-title" style={{textAlign: 'center'}}>Bekräfta incheckning</h3><p className="confirm-vehicle-info">{payload.regnr} - {payload.carModel}</p>
             <div className="confirm-warnings-wrapper">
                 {payload.rental?.unavailable && <p className="warning-highlight">Går inte att hyra ut{payload.rental.comment ? `: ${payload.rental.comment}` : ''}</p>}
                 {payload.varningslampa.lyser && <p className="warning-highlight">Varningslampa ej släckt</p>}
@@ -1330,7 +1330,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 {payload.bilen_star_nu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilen_star_nu.ort} / {payload.bilen_star_nu.station}</p>}
                 {payload.bilen_star_nu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilen_star_nu.kommentar}</small></p>}
             </div>
-            {renderDamageList(payload.nya_skador, '💥 Nya skador')}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}{renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade skador')}
+            {renderDamageList(payload.nya_skador, '💥 Nya skador')}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}{renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade/Hittas ej')}
             <div className="confirm-summary">
                 <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>{getTankningText()}<p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
                 {payload.washed && <p><strong>✅ Tvättad</strong></p>}{payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
@@ -1365,7 +1365,7 @@ const DamageItem: React.FC<{
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>
         {positions && positions.map((pos, i) => {
-            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS]]) || [];
+            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]]) || [];
             const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
             const showPositionDropdown = availablePositioner.length > 0;
 
@@ -1403,12 +1403,12 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
 };
 
 const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (<div className="media-btn">{children}{onRemove && <button onClick={onRemove} className="remove-media-btn">×</button>}</div>);
-const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet = false, variant = 'default' }) => {
+const ChoiceButton: React.FC<{onClick: () => void, isActive: boolean, children: React.ReactNode, className?: string, isSet?: boolean, variant?: 'default' | 'warning' | 'danger'}> = ({ onClick, isActive, children, className, isSet = false, variant = 'default'}) => {
     let btnClass = 'choice-btn';
     if (className) btnClass += ` ${className}`;
     if (isActive) btnClass += ` active ${variant}`;
     else if (isSet) btnClass += ' disabled-choice';
-    return <button onClick={onClick} className={btnClass}>{children}</button>;
+    return <button type="button" onClick={onClick} className={btnClass}>{children}</button>;
 };
 
 const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => void }> = ({ state, onClose }) => {
@@ -1448,8 +1448,8 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         {...(state.title && { 'aria-labelledby': 'action-dialog-title' })}
     >
         {state.title && <h3 id="action-dialog-title" style={{textAlign: 'center'}}>{state.title}</h3>}<p id="action-dialog-text" style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
-        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
-        <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
+        {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3} style={{width: '100%'}}></textarea></div>)}
+        <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>{state.confirmButtonVariant === 'success' ? 'Spara' : 'Bekräfta'}</Button></div>
     </div></>);
 };
 
@@ -1486,7 +1486,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .main-header { text-align: center; margin-bottom: 1.5rem; }
     .main-logo { max-width: 188px; height: auto; margin: 0 auto 1rem auto; display: block; }
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
-    .card { background-color: rgba(255, 255, 255, 0.92); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.3s; }
+    .card { background-color: rgba(255, 255, 255, 0.92); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.2s; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }
     .field[data-error="true"] input, .field[data-error="true"] select, .field[data-error="true"] textarea { border: 2px solid var(--color-danger) !important; }
     .section-header { padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-border); margin-bottom: 1.5rem; }
@@ -1499,7 +1499,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--color-border-focus); border-color: transparent; }
     .field select[disabled] { background-color: var(--color-disabled-light); cursor: not-allowed; }
     .reg-input { text-align: center; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; }
-    .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); }
+    .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; background-color: white; border: 1px solid var(--color-border); border-radius: 6px; z-index: 10; box-shadow: var(--shadow-md); max-height: 200px; overflow-y: auto; }
     .suggestion-item { padding: 0.75rem; cursor: pointer; }
     .suggestion-item:hover { background-color: var(--color-primary-light); }
     .error-text { color: var(--color-danger); }
@@ -1524,7 +1524,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .btn.warning { background-color: var(--color-warning); color: white; }
     .btn.disabled { background-color: var(--color-disabled-light); color: var(--color-disabled); cursor: not-allowed; }
     .btn:not(:disabled):hover { filter: brightness(1.1); }
-    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; color: var(--color-text); font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s; box-sizing: border-box; }
+    .choice-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-width: 0; padding: 0.85rem 1rem; border-radius: 8px; border: 2px solid var(--color-border); background-color: white; font-weight: 500; cursor: pointer; transition: all 0.2s; text-align: center; }
     .choice-btn:hover { filter: brightness(1.05); }
     .choice-btn.active.default { border-color: var(--color-success); background-color: var(--color-success-light); color: var(--color-success); }
     .choice-btn.active.warning { border-color: var(--color-warning); background-color: var(--color-warning-light); color: #b45309; }
@@ -1544,7 +1544,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-details { padding: 1rem; border-top: 1px solid var(--color-border); }
     .damage-position-row { position: relative; padding-right: 2.5rem; }
     .add-position-btn { width: 100% !important; margin: 0.5rem 0 !important; font-size: 0.875rem !important; padding: 0.5rem !important; }
-    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: none; font-size: 1.25rem; font-weight: bold; cursor: pointer; }
+    .remove-position-btn { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background-color: var(--color-danger-light); color: var(--color-danger); border: 1px solid var(--color-danger); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; line-height: 1; padding: 0; }
     .remove-position-btn:hover { background-color: var(--color-danger); color: white; }
     .media-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
     .media-label { display: block; text-align: center; padding: 1.5rem 1rem; border: 2px dashed; border-radius: 8px; cursor: pointer; transition: all 0.2s; font-weight: 600; }
@@ -1555,10 +1555,30 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .media-previews { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
     .media-btn { position: relative; width: 70px; height: 70px; border-radius: 8px; overflow: hidden; background-color: var(--color-border); }
     .media-btn img { width: 100%; height: 100%; object-fit: cover; }
-    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; font-size: 1rem; font-weight: bold; line-height: 1; padding: 0; }
+    .remove-media-btn { position: absolute; top: 2px; right: 2px; width: 22px; height: 22px; border-radius: 50%; background-color: var(--color-danger); color: white; border: 2px solid white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; }
     .remove-media-btn:hover { background-color: #b91c1c; }
     .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); z-index: 100; }
-    .modal-content { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background-color: rgba(255, 255, 255, 0.92); padding: 2rem; border-radius: 12px; z-index: 101; box-shadow: var(--shadow-md); width: 90%; max-width: 600px; }
+
+    /*
+     * MINA ÄNDRINGAR FÖR SCROLL-PROBLEMET
+     */
+    .modal-content { 
+      position: fixed; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      background-color: rgba(255, 255, 255, 0.92); 
+      padding: 2rem; 
+      border-radius: 12px; 
+      z-index: 101; 
+      box-shadow: var(--shadow-md); 
+      width: 90%;
+      max-width: 650px;
+      /* FIX: Sätter maxhöjd och tillåter scroll inuti rutan */
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
     .success-modal { text-align: center; }
     .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
