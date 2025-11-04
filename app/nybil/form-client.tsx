@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 
 // Constants
@@ -82,7 +82,6 @@ const processFiles = async (files: FileList): Promise<MediaFile[]> => {
 
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
-const hasAnyMedia = (files?: MediaFile[]) => hasPhoto(files) || hasVideo(files);
 
 export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
@@ -138,7 +137,15 @@ export default function NybilForm() {
       setFullName(getFullNameFromEmail(email));
     };
     getUser();
-  }, []);
+    
+    // Cleanup function to revoke all object URLs on unmount
+    return () => {
+      media.forEach(m => {
+        if (m.preview) URL.revokeObjectURL(m.preview);
+        if (m.thumbnail) URL.revokeObjectURL(m.thumbnail);
+      });
+    };
+  }, [media]);
   
   const handleMediaUpdate = async (files: FileList) => {
     const processed = await processFiles(files);
@@ -148,6 +155,14 @@ export default function NybilForm() {
   const handleMediaRemove = (index: number) => {
     setMedia(prev => {
       const newMedia = [...prev];
+      const removedItem = newMedia[index];
+      // Clean up object URLs to prevent memory leaks
+      if (removedItem?.preview) {
+        URL.revokeObjectURL(removedItem.preview);
+      }
+      if (removedItem?.thumbnail) {
+        URL.revokeObjectURL(removedItem.thumbnail);
+      }
       newMedia.splice(index, 1);
       return newMedia;
     });
