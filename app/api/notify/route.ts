@@ -41,6 +41,12 @@ const getSiteUrl = (request: Request): string => {
 const stationEmailMapping: { [station: string]: string | undefined } = {
   'Helsingborg': 'helsingborg@mabi.se',
   'Ängelholm': 'angelholm@mabi.se',
+  'Malmö': 'malmo@mabi.se',
+  'Halmstad': 'halmstad@mabi.se',
+  'Falkenberg': 'falkenberg@mabi.se',
+  'Trelleborg': 'trelleborg@mabi.se',
+  'Varberg': 'varberg@mabi.se',
+  'Lund': 'lund@mabi.se',
   // Add more stations as needed
 };
 
@@ -48,7 +54,7 @@ const stationEmailMapping: { [station: string]: string | undefined } = {
 const getHuvudstationRecipients = (station: string): string[] => {
   const recipients = [huvudstationBaseAddress];
   
-  // Normalize station name (remove extra spaces, lowercase for comparison)
+  // Normalize station name (remove extra spaces)
   const normalizedStation = station?.trim();
   
   // Check if there's a specific email for this station
