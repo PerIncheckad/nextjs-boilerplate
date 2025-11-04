@@ -11,9 +11,19 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-const bilkontrollAddress = 'per@incheckad.se';
-const huvudstationAddress = 'per@incheckad.se';
-const fallbackAddress = 'per@incheckad.se';
+// --- E-postmottagare ---
+// Bilkontroll ska nu gå till en lista av mottagare.
+const bilkontrollAddress = ['per@incheckad.se', 'latif@incheckad.se']; 
+const defaultHuvudstationAddress = 'per@incheckad.se'; // Fallback och primär mottagare
+
+// Mappning för stationsspecifika e-postadresser.
+// Denna mappning styr vart huvudstation-mejlet skickas baserat på bilens slutdestination.
+const stationEmailMapping: { [ort: string]: string } = {
+  'Helsingborg': 'helsingborg@incheckad.se',
+  'Ängelholm': 'helsingborg@incheckad.se', // Ängelholm ska också gå till Helsingborg tills vidare.
+  // Fler orter kan läggas till här i framtiden, t.ex. 'Malmö': 'malmo@incheckad.se'
+};
+
 
 const supabaseProjectId = supabaseUrl.match(/https:\/\/(.*)\.supabase\.co/)?.[1];
 
@@ -35,17 +45,6 @@ const getSiteUrl = (request: Request): string => {
   
   // Final fallback (should rarely be used)
   return 'https://nextjs-boilerplate-eight-zeta-15.vercel.app';
-};
-
-const regionMapping: { [ort: string]: string | undefined } = {
-  'Malmö': huvudstationAddress,
-  'Helsingborg': huvudstationAddress,
-  'Ängelholm': huvudstationAddress,
-  'Halmstad': huvudstationAddress,
-  'Falkenberg': huvudstationAddress,
-  'Trelleborg': huvudstationAddress,
-  'Varberg': huvudstationAddress,
-  'Lund': huvudstationAddress,
 };
 
 const LOGO_URL = 'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png';
@@ -85,7 +84,7 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
   let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
 
-  const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px;">
+  const bannerContent = `<div style="background-color: #FFFBEB !important; border: 1px solid #FDE68A; padding: 12px; text-align: center; font-weight: bold; color: #92400e !important; border-radius: 8px; margin-bottom: 6px;">
     ${fullText}
   </div>`;
 
@@ -99,7 +98,7 @@ const createAlertBanner = (condition: boolean, text: string, details?: string, f
 const createAdminBanner = (condition: boolean, text: string): string => {
   if (!condition) return '';
   
-  const bannerContent = `<div style="background-color: #DBEAFE !important; border: 1px solid #93C5FD; padding: 12px; text-align: center; font-weight: bold; color: #1E40AF !important; border-radius: 8px;">
+  const bannerContent = `<div style="background-color: #DBEAFE !important; border: 1px solid #93C5FD; padding: 12px; text-align: center; font-weight: bold; color: #1E40AF !important; border-radius: 8px; margin-bottom: 6px;">
     ${text}
   </div>`;
 
@@ -129,7 +128,7 @@ const getDamageString = (damage: any): string => {
 const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fallbackText?: string): string => {
   if (!damages || damages.length === 0) {
     if (fallbackText) {
-      return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: inherit !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><p style="margin-top: 0; color: inherit !important;">${fallbackText}</p>`;
+      return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: inherit !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><p style="margin-top: 0; color: #6b7280 !important;">${fallbackText}</p>`;
     }
     return '';
   }
@@ -143,7 +142,7 @@ const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fal
     return `<li style="margin-bottom: 8px; color: inherit !important;">${text}${linkContent}</li>`;
   }).join('');
 
-  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: inherit !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 8px; margin-bottom: 0;">${items}</ul>`;
+  return `<h3 style="margin-bottom: 10px; margin-top: 20px; font-size: 14px; color: inherit !important; text-transform: uppercase; letter-spacing: 0.5px;">${title}</h3><ul style="padding-left: 20px; margin-top: 0;">${items}</ul>`;
 };
 
 const formatTankning = (tankning: any): string => {
@@ -173,7 +172,7 @@ const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: s
     
     if (bilagor.length === 0) return '';
     
-    return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 8px; margin-bottom: 0;">${bilagor.join('')}</ul></div>`;
+    return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 0;">${bilagor.join('')}</ul></div>`;
 };
 
 const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
@@ -274,7 +273,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Reg.nr:</td><td>${regnr}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Bilmodell:</td><td>${carModel || '---'}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Incheckad vid:</td><td>${ort} / ${station}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small style="color: inherit !important;"><strong>Parkeringsinfo:</strong> ${bilen_star_nu.kommentar}</small>` : ''}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small style="color: inherit !important;">${bilen_star_nu.kommentar}</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
         </table>
@@ -290,7 +289,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         </table>
       </div>
       ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl, 'Inga nya skador rapporterade.')}
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top: 0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
 
@@ -336,7 +335,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 15px;">Incheckningsdetaljer</h2>
         <table width="100%">
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Incheckad vid:</td><td>${ort} / ${station}</td></tr>
-          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small style="color: inherit !important;"><strong>Parkeringsinfo:</strong> ${bilen_star_nu.kommentar}</small>` : ''}</td></tr>
+          <tr><td style="font-weight:bold;width:120px;padding:4px 0;vertical-align:top;">Bilen står nu:</td><td>${bilen_star_nu?.ort || ort} / ${bilen_star_nu?.station || station}${bilen_star_nu?.kommentar ? `<br><small style="color: inherit !important;">${bilen_star_nu.kommentar}</small>` : ''}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Datum:</td><td>${date}</td></tr>
           <tr><td style="font-weight:bold;width:120px;padding:4px 0;">Tid:</td><td>${time}</td></tr>
         </table>
@@ -347,7 +346,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         ${formatDamagesToHtml(dokumenterade_skador, 'Dokumenterade befintliga skador', siteUrl, 'Inga gamla skador dokumenterade.')}
         ${formatDamagesToHtml(nya_skador, 'Nya skador', siteUrl, 'Inga nya skador rapporterade.')}
       </div>
-      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top: 0;">${notering}</p></div>` : ''}
+      ${notering ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Övriga kommentarer</h2><p style="margin-top:0;">${notering}</p></div>` : ''}
       ${buildBilagorSection(rekond, husdjur, rokning, siteUrl)}
     </td></tr>
 
@@ -374,6 +373,26 @@ export async function POST(request: Request) {
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };
     const date = now.toLocaleDateString('sv-SE', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' });
     const time = now.toLocaleTimeString('sv-SE', { ...options, hour: '2-digit', minute: '2-digit' });
+
+    // --- ÄNDRING: Logik för att bestämma e-postmottagare ---
+    // 1. Bestäm slutdestinationens ort. Använd "Bilen står nu" om den finns.
+    const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
+
+    // 2. Bygg mottagarlistan för huvudstationen.
+    const huvudstationTo = [defaultHuvudstationAddress];
+    const stationSpecificEmail = stationEmailMapping[finalOrt];
+    if (stationSpecificEmail) {
+      // Lägg till den specifika adressen, men undvik dubbletter.
+      if (!huvudstationTo.includes(stationSpecificEmail)) {
+        huvudstationTo.push(stationSpecificEmail);
+      }
+    }
+
+    // Console log to verify recipients
+    console.log(`Final Ort: ${finalOrt}`);
+    console.log(`Huvudstation recipients: ${huvudstationTo.join(', ')}`);
+    console.log(`Bilkontroll recipients: ${bilkontrollAddress.join(', ')}`);
+    // --- SLUT ÄNDRING ---
 
     // Compute station for subject - use "Bilen står nu" station when present
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
@@ -405,9 +424,11 @@ export async function POST(request: Request) {
     const emailPromises = [];
     
     const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: huvudstationAddress, subject: huvudstationSubject, html: huvudstationHtml }));
+    // Använd den nya dynamiska mottagarlistan
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: huvudstationTo, subject: huvudstationSubject, html: huvudstationHtml }));
     
     const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, siteUrl);
+    // Använd listan med mottagare för bilkontroll
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: bilkontrollSubject, html: bilkontrollHtml }));
     
     await Promise.all(emailPromises);
