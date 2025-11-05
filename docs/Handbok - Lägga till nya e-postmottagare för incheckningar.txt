@@ -53,3 +53,5 @@ const stationEmailMapping: { [ort: string]: string } = {
 };
 Testa och verifiera: Använd PR:ens "View deployment"-länk för att göra en testincheckning med Malmö som slutdestination och bekräfta att mejlen kommer fram korrekt.
 Godkänn och slå samman (Merge): När testet är lyckat, godkänn och slå samman PR:en. Ändringen är nu live.
+
+Ängelholm mappas till Helsingborg tills vidare (i kodens stationEmailMapping).
