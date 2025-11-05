@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
@@ -1035,7 +1035,7 @@ export default function CheckInForm() {
   const activeStatusSections = [garInteAttHyraUt, varningslampaLyser, behoverRekond, husdjurSanerad, rokningSanerad, insynsskyddSaknas].filter(Boolean).length;
 
   return (
-    <>
+    <Fragment>
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
       {isFinalSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
@@ -1089,7 +1089,7 @@ export default function CheckInForm() {
           <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
           <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
           <SubSectionHeader title="Tankning/Laddning" /><Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
-          {drivmedelstyp === 'bensin_diesel' && (<><Field label="Tankstatus *"><div className="grid-3-col">
+          {drivmedelstyp === 'bensin_diesel' && (<Fragment><Field label="Tankstatus *"><div className="grid-3-col">
             <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
             <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
             <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
@@ -1098,30 +1098,30 @@ export default function CheckInForm() {
             <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
             <Field label="Bränsletyp *"><div className="fuel-type-buttons"><ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton><ChoiceButton onClick={() => setBransletyp('Diesel')} isActive={bransletyp === 'Diesel'} isSet={bransletyp !== null}>Diesel</ChoiceButton></div></Field>
             <Field label="Literpris *"><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
-          </div>}</>)}
-          {drivmedelstyp === 'elbil' && (<>
+          </div>}</Fragment>)}
+          {drivmedelstyp === 'elbil' && (<Fragment>
             <Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>
             <Field label="Antal laddkablar *"><div className="grid-3-col">
               <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
               <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
               <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
             </div></Field>
-          </>)}
+          </Fragment>)}
         </Card>
 
         <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
           <SectionHeader title="Skador" />
-          {vehicleData && existingDamages.some(d => !d.isInventoried) && (<>
+          {vehicleData && existingDamages.some(d => !d.isInventoried) && (<Fragment>
             <SubSectionHeader title="Befintliga skador att hantera" />
             {existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(idx) => handleMediaRemove(d.id, idx, true)} onAction={handleExistingDamageAction} onAddPosition={(damageId) => addDamagePosition(damageId, true)} onRemovePosition={(damageId, posId) => removeDamagePosition(damageId, posId, true)} />)}
             <hr className="section-divider-strong" />
-          </>)}
+          </Fragment>)}
           <SubSectionHeader title="Nya skador" />
           <Field label="Har bilen några nya skador? *"><div className="grid-2-col">
               <ChoiceButton onClick={() => { setSkadekontroll('inga_nya_skador'); setNewDamages([]); }} isActive={skadekontroll === 'inga_nya_skador'} isSet={skadekontroll !== null}>Inga nya skador</ChoiceButton>
               <ChoiceButton onClick={() => { setSkadekontroll('nya_skador'); if (newDamages.length === 0) addDamage(); }} isActive={skadekontroll === 'nya_skador'} isSet={skadekontroll !== null}>Ja, det finns nya skador</ChoiceButton>
           </div></Field>
-          {skadekontroll === 'nya_skador' && (<>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(idx) => handleMediaRemove(d.id, idx, false)} onRemove={removeDamage} onAddPosition={(damageId) => addDamagePosition(damageId, false)} onRemovePosition={(damageId, posId) => removeDamagePosition(damageId, posId, false)} />)}<Button onClick={addDamage} variant="secondary">Lägg till ny skada</Button></>)}
+          {skadekontroll === 'nya_skador' && (<Fragment>{newDamages.map((d, i) => <DamageItem key={d.id} damage={d as any} index={i + 1} isExisting={false} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, false)} onMediaRemove={(idx) => handleMediaRemove(d.id, idx, false)} onRemove={removeDamage} onAddPosition={(damageId) => addDamagePosition(damageId, false)} onRemovePosition={(damageId, posId) => removeDamagePosition(damageId, posId, false)} />)}<Button onClick={addDamage} variant="secondary">Lägg till ny skada</Button></Fragment>)}
         </Card>
 
         <Card data-error={showFieldErrors && ((garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) || (varningslampaLyser && !varningslampaBeskrivning.trim()) || (behoverRekond && (!rekondUtvandig && !rekondInvandig || !hasPhoto(rekondMedia))))}>
@@ -1244,7 +1244,7 @@ export default function CheckInForm() {
           &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
         </footer>
       </div>
-    </>
+    </Fragment>
   );
 }
 
@@ -1256,10 +1256,10 @@ const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) =>
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="section-header"><h2>{title}</h2></div>;
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
-const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <><span className="info-label">{label}</span><span>{value}</span></>;
+const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <Fragment><span className="info-label">{label}</span><span>{value}</span></Fragment>;
 // *** FIX: Changed the default type to 'button' in the props, and spread the rest of the props to the button element
 const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, type?: 'button' | 'submit' | 'reset', variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, type = 'button', variant = 'primary', disabled, children, style, className }) => <button type={type} onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>;
-const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg></div><h3>Tack {firstName}!</h3><p>Incheckningen är skickad.</p></div></>);
+const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<Fragment><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg></div><h3>Tack {firstName}!</h3><p>Incheckningen är skickad.</p></div></Fragment>);
 const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><div className="spinner"></div><p>Skickar in...</p></div>);
 
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
@@ -1298,14 +1298,14 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             return <p>⛽ <strong>Tankning:</strong> Återlämnades fulltankad</p>;
         }
         if (payload.drivmedel === 'elbil') {
-            return <><p><strong>⚡ Laddning: {payload.laddning.laddniva}%</strong></p><p><strong>Antal laddkablar: {payload.laddning.antal_laddkablar}</strong></p></>;
+            return <Fragment><p><strong>⚡ Laddning: {payload.laddning.laddniva}%</strong></p><p><strong>Antal laddkablar: {payload.laddning.antal_laddkablar}</strong></p></Fragment>;
         }
         return null;
     };
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
     const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
 
-    return (<><div className="modal-overlay" /><div 
+    return (<Fragment><div className="modal-overlay" /><div 
         ref={containerRef}
         className="modal-content confirm-modal"
         role="dialog"
@@ -1340,7 +1340,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             </div>
         </div>
         <div className="modal-actions"><Button onClick={onCancel} variant="secondary">Avbryt</Button><Button onClick={onConfirm} variant="success">Bekräfta och skicka</Button></div>
-    </div></>);
+    </div></Fragment>);
 };
 
 const DamageItem: React.FC<{
@@ -1442,7 +1442,7 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
     };
     
     const themeClass = state.theme ? `theme-${state.theme}` : '';
-    return (<><div className="modal-overlay" onClick={handleCancel} /><div 
+    return (<Fragment><div className="modal-overlay" onClick={handleCancel} /><div 
         ref={containerRef}
         className={`modal-content confirm-modal ${themeClass}`}
         role="dialog"
@@ -1453,7 +1453,7 @@ const ActionConfirmDialog: React.FC<{ state: ConfirmDialogState, onClose: () => 
         {state.title && <h3 id="action-dialog-title" style={{textAlign: 'center'}}>{state.title}</h3>}<p id="action-dialog-text" style={{textAlign: 'center', marginBottom: '1.5rem'}}>{state.text}</p>
         {state.requiresComment && (<div className="field" style={{marginBottom: '1.5rem'}}><textarea value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Ange motivering här..." rows={3}></textarea></div>)}
         <div className="modal-actions"><Button onClick={handleCancel} variant="secondary">Avbryt</Button><Button onClick={handleConfirm} variant={state.confirmButtonVariant || 'danger'} disabled={state.requiresComment && !comment.trim()}>Bekräfta</Button></div>
-    </div></>);
+    </div></Fragment>);
 };
 
 const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) => (<style jsx global>{`
