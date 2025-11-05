@@ -1305,7 +1305,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
     const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
 
-    return (<Fragment><div className="modal-overlay" /><div 
+    return (<Fragment><div className="modal-overlay" onClick={onCancel} /><div 
         ref={containerRef}
         className="modal-content confirm-modal"
         role="dialog"
