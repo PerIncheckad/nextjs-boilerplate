@@ -54,4 +54,8 @@ const stationEmailMapping: { [ort: string]: string } = {
 Testa och verifiera: Använd PR:ens "View deployment"-länk för att göra en testincheckning med Malmö som slutdestination och bekräfta att mejlen kommer fram korrekt.
 Godkänn och slå samman (Merge): När testet är lyckat, godkänn och slå samman PR:en. Ändringen är nu live.
 
-Ängelholm mappas till Helsingborg tills vidare (i kodens stationEmailMapping).
+Routing av e‑postmottagare: Ängelholm mappas till Helsingborg tills vidare (i kodens stationEmailMapping).
+Anledning: gemensam hantering av inkommande ärenden för HBG/Ängelholm.
+Var i koden: stationEmailMapping (se lib/stations.ts eller där mappningen ligger definierad).
+Driftändring: om mappningen ändras i framtiden, uppdatera stationEmailMapping och verifiera i preview-miljö att notify‑utskick visar rätt mottagare i loggarna.
+Notis: I nuläget läses mottagare från kod (inte env). Detta är medvetet och ändras senare när vi introducerar en mer granular behörighets-/konfig‑setup.
