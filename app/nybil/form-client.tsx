@@ -158,6 +158,25 @@ export default function NybilForm() {
     return false;
   }, [matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris]);
   
+  const hasStatusNuErrors = useMemo(() => {
+    // Check location
+    if (!platsAktuellOrt || !platsAktuellStation) return true;
+    
+    // Check mileage mode
+    if (!matarstallningMode) return true;
+    if (matarstallningMode === 'new') {
+      const inkop = parseInt(matarstallning, 10);
+      const aktuell = parseInt(matarstallningAktuell, 10);
+      if (!matarstallningAktuell || isNaN(aktuell) || isNaN(inkop) || aktuell <= inkop) return true;
+    }
+    
+    // Check rental readiness
+    if (klarForUthyrning === null) return true;
+    if (klarForUthyrning === false && !klarForUthyrningNotering.trim()) return true;
+    
+    return false;
+  }, [platsAktuellOrt, platsAktuellStation, matarstallningMode, matarstallning, matarstallningAktuell, klarForUthyrning, klarForUthyrningNotering]);
+  
   const handleLaddningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     if (val === '') { 
@@ -710,7 +729,7 @@ export default function NybilForm() {
         </div>
       </Card>
       
-      <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || !matarstallningMode || (matarstallningMode === 'new' && (!matarstallningAktuell || parseInt(matarstallningAktuell, 10) <= parseInt(matarstallning, 10))) || klarForUthyrning === null || (klarForUthyrning === false && !klarForUthyrningNotering.trim()))}>
+      <Card data-error={showFieldErrors && hasStatusNuErrors}>
         <SectionHeader title="Status nu" />
         
         <SubSectionHeader title="Var är bilen nu?" />

@@ -7,10 +7,28 @@ ALTER TABLE public.nybil_inventering
   ADD COLUMN IF NOT EXISTS klar_for_uthyrning BOOLEAN,
   ADD COLUMN IF NOT EXISTS klar_for_uthyrning_notering TEXT;
 
--- Update matarstallning_aktuell from TEXT to INTEGER
--- First check if column exists and is TEXT type
+-- Update matarstallning fields from TEXT to INTEGER
+-- First check if columns exist and are TEXT type, then convert
 DO $$ 
 BEGIN
+  -- Convert matarstallning_inkop from TEXT to INTEGER
+  IF EXISTS (
+    SELECT 1 
+    FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+    AND table_name = 'nybil_inventering' 
+    AND column_name = 'matarstallning_inkop'
+    AND data_type = 'text'
+  ) THEN
+    ALTER TABLE public.nybil_inventering 
+      ALTER COLUMN matarstallning_inkop TYPE INTEGER 
+      USING CASE 
+        WHEN matarstallning_inkop ~ '^\d+$' THEN matarstallning_inkop::INTEGER 
+        ELSE NULL 
+      END;
+  END IF;
+
+  -- Convert matarstallning_aktuell from TEXT to INTEGER
   IF EXISTS (
     SELECT 1 
     FROM information_schema.columns 
@@ -19,7 +37,6 @@ BEGIN
     AND column_name = 'matarstallning_aktuell'
     AND data_type = 'text'
   ) THEN
-    -- Convert existing data to integer if possible, otherwise set to NULL
     ALTER TABLE public.nybil_inventering 
       ALTER COLUMN matarstallning_aktuell TYPE INTEGER 
       USING CASE 
@@ -50,7 +67,7 @@ ALTER TABLE public.nybil_inventering
   CHECK (
     matarstallning_aktuell IS NULL OR 
     matarstallning_inkop IS NULL OR
-    matarstallning_aktuell::INTEGER > matarstallning_inkop::INTEGER
+    matarstallning_aktuell > matarstallning_inkop
   );
 
 -- Add constraint: for electric vehicles, laddniva_procent must be between 0 and 100
@@ -94,4 +111,5 @@ ALTER TABLE public.nybil_inventering
 -- Add comments for new columns
 COMMENT ON COLUMN public.nybil_inventering.klar_for_uthyrning IS 'Whether the vehicle is ready for rental (true/false/null)';
 COMMENT ON COLUMN public.nybil_inventering.klar_for_uthyrning_notering IS 'Required note explaining why vehicle is not ready for rental (when klar_for_uthyrning = false)';
+COMMENT ON COLUMN public.nybil_inventering.matarstallning_inkop IS 'Odometer reading at purchase (integer)';
 COMMENT ON COLUMN public.nybil_inventering.matarstallning_aktuell IS 'Current odometer reading (integer, must be > matarstallning_inkop if provided)';
