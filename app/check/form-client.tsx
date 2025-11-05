@@ -1305,7 +1305,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
     const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
 
-    return (<Fragment><div className="modal-overlay" /><div 
+    return (<Fragment><div className="modal-overlay" onClick={onCancel} /><div 
         ref={containerRef}
         className="modal-content confirm-modal"
         role="dialog"
@@ -1573,21 +1573,24 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       box-shadow: var(--shadow-md); 
       width: 90%;
       max-width: 650px;
-      max-height: 90vh;
-      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100dvh - 32px);
+      overflow: hidden;
+      -webkit-overflow-scrolling: touch;
     }
     .success-modal { text-align: center; }
     .success-icon { font-size: 3rem; color: var(--color-success); margin-bottom: 1rem; }
     .confirm-modal { text-align: left; }
-    .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); }
+    .confirm-header { text-align: center; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--color-border); flex: 0 0 auto; }
     .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
     .confirm-vehicle-info { font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0 1rem 0; }
     .confirm-warnings-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-    .confirm-details { }
+    .confirm-details { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 0.25rem; max-height: none; }
     .confirm-summary { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
     .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
     .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; flex: 0 0 auto; position: sticky; bottom: 0; background: inherit; padding-top: 1rem; }
     .confirm-damage-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
     .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
     .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
