@@ -63,6 +63,7 @@ ADD COLUMN IF NOT EXISTS antal_bocker SMALLINT DEFAULT 0 CHECK (antal_bocker >= 
 ADD COLUMN IF NOT EXISTS antal_coc SMALLINT DEFAULT 0 CHECK (antal_coc >= 0 AND antal_coc <= 1),
 ADD COLUMN IF NOT EXISTS nycklar_beskrivning TEXT,
 ADD COLUMN IF NOT EXISTS hjul_ej_monterade TEXT,
+ADD COLUMN IF NOT EXISTS hjul_ej_monterade_forvaring TEXT,
 ADD COLUMN IF NOT EXISTS antal_lasbultar SMALLINT DEFAULT 0 CHECK (antal_lasbultar >= 0);
 
 -- Update antal_nycklar and antal_laddkablar to SMALLINT with constraints

@@ -273,6 +273,7 @@ export default function NybilForm() {
         nycklar_beskrivning: nycklarBeskrivning || null,
         antal_laddkablar: antalLaddkablar,
         hjul_ej_monterade: hjulEjMonterade || null,
+        hjul_ej_monterade_forvaring: hjulEjMonterade ? hjulForvaring : null,
         antal_lasbultar: antalLasbultar,
         bransletyp: bransletyp || null,
         laddniva_procent: bransletyp === 'El (full)' ? parseInt(laddnivaProcent, 10) : null,
