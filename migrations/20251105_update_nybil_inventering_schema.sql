@@ -10,15 +10,18 @@ ALTER TABLE public.nybil_inventering
   ADD COLUMN IF NOT EXISTS plats_mottagning_station TEXT,
   ADD COLUMN IF NOT EXISTS matarstallning_inkop TEXT,
   ADD COLUMN IF NOT EXISTS bransletyp TEXT CHECK (bransletyp IN ('Bensin', 'Diesel', 'Hybrid (bensin)', 'Hybrid (diesel)', 'El (full)')),
+  ADD COLUMN IF NOT EXISTS laddniva_procent INTEGER,
   ADD COLUMN IF NOT EXISTS tankstatus TEXT CHECK (tankstatus IN ('mottogs_fulltankad', 'tankad_nu', 'ej_upptankad')),
   ADD COLUMN IF NOT EXISTS upptankning_liter NUMERIC,
   ADD COLUMN IF NOT EXISTS upptankning_literpris NUMERIC,
   ADD COLUMN IF NOT EXISTS antal_insynsskydd INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS antal_bocker INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS antal_coc INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS antal_nycklar INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS nycklar_beskrivning TEXT,
   ADD COLUMN IF NOT EXISTS antal_lasbultar INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS hjul_ej_monterade TEXT CHECK (hjul_ej_monterade IN ('Vinterdäck', 'Sommardäck')),
+  ADD COLUMN IF NOT EXISTS hjul_forvaring TEXT,
   ADD COLUMN IF NOT EXISTS plats_aktuell_ort TEXT,
   ADD COLUMN IF NOT EXISTS plats_aktuell_station TEXT,
   ADD COLUMN IF NOT EXISTS matarstallning_aktuell TEXT;
@@ -62,12 +65,14 @@ COMMENT ON COLUMN public.nybil_inventering.plats_mottagning_ort IS 'City where c
 COMMENT ON COLUMN public.nybil_inventering.plats_mottagning_station IS 'Station where car was received';
 COMMENT ON COLUMN public.nybil_inventering.matarstallning_inkop IS 'Odometer reading at purchase/reception';
 COMMENT ON COLUMN public.nybil_inventering.bransletyp IS 'Fuel type: Bensin, Diesel, Hybrid (bensin), Hybrid (diesel), El (full)';
+COMMENT ON COLUMN public.nybil_inventering.laddniva_procent IS 'Battery charge level (0-100%) for electric vehicles';
 COMMENT ON COLUMN public.nybil_inventering.tankstatus IS 'Fuel tank status: mottogs_fulltankad, tankad_nu, ej_upptankad';
 COMMENT ON COLUMN public.nybil_inventering.upptankning_liter IS 'Liters added when refueled (if tankstatus = tankad_nu)';
 COMMENT ON COLUMN public.nybil_inventering.upptankning_literpris IS 'Price per liter when refueled (if tankstatus = tankad_nu)';
 COMMENT ON COLUMN public.nybil_inventering.antal_insynsskydd IS 'Number of privacy screens (0-2)';
 COMMENT ON COLUMN public.nybil_inventering.antal_bocker IS 'Number of books/manuals (0-3)';
 COMMENT ON COLUMN public.nybil_inventering.antal_coc IS 'Number of COC documents (0-1)';
+COMMENT ON COLUMN public.nybil_inventering.antal_nycklar IS 'Number of keys (0-2)';
 COMMENT ON COLUMN public.nybil_inventering.nycklar_beskrivning IS 'Optional description of keys';
 COMMENT ON COLUMN public.nybil_inventering.antal_lasbultar IS 'Number of locking bolts (0-4)';
 COMMENT ON COLUMN public.nybil_inventering.hjul_ej_monterade IS 'Type of unmounted wheels stored';

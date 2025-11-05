@@ -285,10 +285,10 @@ export default function NybilForm() {
         antal_laddkablar: needsLaddkablar ? antalLaddkablar : 0,
         antal_lasbultar: antalLasbultar,
         bransletyp,
-        laddniva_procent: isElectric ? parseInt(laddnivaProcent, 10) : null,
+        laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
         tankstatus: !isElectric ? tankstatus : null,
-        upptankning_liter: !isElectric && tankstatus === 'tankad_nu' ? parseFloat(upptankningLiter) : null,
-        upptankning_literpris: !isElectric && tankstatus === 'tankad_nu' ? parseFloat(upptankningLiterpris) : null,
+        upptankning_liter: !isElectric && tankstatus === 'tankad_nu' && upptankningLiter ? parseFloat(upptankningLiter) : null,
+        upptankning_literpris: !isElectric && tankstatus === 'tankad_nu' && upptankningLiterpris ? parseFloat(upptankningLiterpris) : null,
         plats_aktuell_ort: platsAktuellOrt,
         plats_aktuell_station: platsAktuellStation,
         matarstallning_aktuell: locationDiffers ? matarstallningAktuell : null,
@@ -461,7 +461,7 @@ export default function NybilForm() {
               onClick={() => { setBransletyp('El (full)'); setTankstatus(null); setUpptankningLiter(''); setUpptankningLiterpris(''); }}
               isActive={bransletyp === 'El (full)'}
               isSet={bransletyp !== null}
-              style={{ width: '100%' }}
+              className="full-width-choice"
             >
               El (full)
             </ChoiceButton>
@@ -1113,6 +1113,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       background-color: var(--color-bg);
       color: var(--color-disabled);
       cursor: default;
+    }
+    
+    .choice-btn.full-width-choice {
+      width: 100%;
     }
     
     .media-section {
