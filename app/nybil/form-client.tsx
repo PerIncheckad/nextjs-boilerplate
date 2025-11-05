@@ -242,8 +242,8 @@ export default function NybilForm() {
       requestAnimationFrame(() => {
         const firstError = document.querySelector('.card[data-error="true"], .field[data-error="true"]') as HTMLElement | null;
         if (firstError) {
-          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          const focusable = firstError.querySelector('input, select, textarea') as HTMLElement | null;
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+          const focusable = firstError.querySelector('input, select, textarea, button') as HTMLElement | null;
           focusable?.focus();
         }
       });
@@ -944,6 +944,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       box-shadow: var(--shadow-md);
       border: 2px solid transparent;
       transition: border-color 0.3s;
+      scroll-margin-top: 96px;
     }
     
     .card[data-error="true"] {
