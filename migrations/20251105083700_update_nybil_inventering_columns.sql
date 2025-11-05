@@ -7,8 +7,8 @@ ALTER TABLE public.nybil_inventering
 ADD COLUMN IF NOT EXISTS bilmarke TEXT,
 ADD COLUMN IF NOT EXISTS modell TEXT;
 
--- Drop old bilmodell column (data migration should be done separately if needed)
--- ALTER TABLE public.nybil_inventering DROP COLUMN IF EXISTS bilmodell;
+-- Note: The old bilmodell column is kept for backward compatibility.
+-- Data migration from bilmodell to bilmarke/modell should be done separately if needed.
 
 -- 2. Update location fields for receiving location
 ALTER TABLE public.nybil_inventering

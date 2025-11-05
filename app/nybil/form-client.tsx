@@ -137,6 +137,18 @@ export default function NybilForm() {
     return platsAktuellOrt && platsAktuellStation && (platsAktuellOrt !== ort || platsAktuellStation !== station);
   }, [platsAktuellOrt, platsAktuellStation, ort, station]);
   
+  // Check for errors in the vehicle status section
+  const hasVehicleStatusError = useMemo(() => {
+    if (!showFieldErrors) return false;
+    if (!matarstallning || !hjultyp || !bransletyp) return true;
+    if (bransletyp === 'El (full)' && !laddnivaProcent) return true;
+    if (bransletyp && bransletyp !== 'El (full)') {
+      if (!tankstatus) return true;
+      if (tankstatus === 'tankad_nu' && (!upptankningLiter || !upptankningLiterpris)) return true;
+    }
+    return false;
+  }, [showFieldErrors, matarstallning, hjultyp, bransletyp, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris]);
+  
   const formIsValid = useMemo(() => {
     // Basic required fields
     if (!regInput || !bilmarke || !modell || !ort || !station || !matarstallning || !hjultyp || !bransletyp) return false;
@@ -265,7 +277,7 @@ export default function NybilForm() {
         plats_mottagning_station: station,
         matarstallning_inkop: parseInt(matarstallning, 10),
         hjultyp,
-        hjul_forvaring: hjulforvaring || null,
+        hjulforvaring: hjulforvaring || null,
         antal_insynsskydd: antalInsynsskydd,
         antal_bocker: antalBocker,
         antal_coc: antalCoc,
@@ -273,7 +285,7 @@ export default function NybilForm() {
         nycklar_beskrivning: nycklarBeskrivning || null,
         antal_laddkablar: antalLaddkablar,
         hjul_ej_monterade: hjulEjMonterade || null,
-        hjul_ej_monterade_forvaring: hjulEjMonterade ? hjulEjMonteradeForvaring : null,
+        hjul_ej_monterade_forvaring: hjulEjMonterade ? (hjulEjMonteradeForvaring || null) : null,
         antal_lasbultar: antalLasbultar,
         bransletyp: bransletyp || null,
         laddniva_procent: bransletyp === 'El (full)' ? parseInt(laddnivaProcent, 10) : null,
@@ -382,7 +394,7 @@ export default function NybilForm() {
         </div>
       </Card>
       
-      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !bransletyp || (bransletyp === 'El (full)' && !laddnivaProcent) || (bransletyp && bransletyp !== 'El (full)' && (!tankstatus || (tankstatus === 'tankad_nu' && (!upptankningLiter || !upptankningLiterpris)))))}>
+      <Card data-error={hasVehicleStatusError}>
         <SectionHeader title="Fordonsstatus" />
         <Field label="Mätarställning (km) *">
           <input
