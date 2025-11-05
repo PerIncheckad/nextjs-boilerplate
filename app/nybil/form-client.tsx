@@ -124,7 +124,14 @@ export default function NybilForm() {
   // Current location
   const [platsAktuellOrt, setPlatsAktuellOrt] = useState('');
   const [platsAktuellStation, setPlatsAktuellStation] = useState('');
+  
+  // Mileage status: 'same' or 'new'
+  const [matarstallningMode, setMatarstallningMode] = useState<'same' | 'new' | null>(null);
   const [matarstallningAktuell, setMatarstallningAktuell] = useState('');
+  
+  // Ready for rental
+  const [klarForUthyrning, setKlarForUthyrning] = useState<boolean | null>(null);
+  const [klarForUthyrningNotering, setKlarForUthyrningNotering] = useState('');
   
   // Notes and media
   const [anteckningar, setAnteckningar] = useState('');
@@ -143,7 +150,6 @@ export default function NybilForm() {
   const isElectric = bransletyp === FUEL_TYPES.EL_FULL;
   const isHybrid = bransletyp === FUEL_TYPES.HYBRID_BENSIN || bransletyp === FUEL_TYPES.HYBRID_DIESEL;
   const needsLaddkablar = isElectric || isHybrid;
-  const locationDiffers = platsAktuellOrt && platsAktuellStation && (platsAktuellOrt !== ort || platsAktuellStation !== station);
   
   const hasFordonStatusErrors = useMemo(() => {
     if (!matarstallning || !hjultyp || !bransletyp) return true;
@@ -185,17 +191,31 @@ export default function NybilForm() {
       }
     }
     
-    // If current location differs: require matarstallning_aktuell
-    if (locationDiffers && !matarstallningAktuell) return false;
-    
-    // If hjul_ej_monterade is set, require hjul_forvaring text
-    if (hjulEjMonterade && !hjulForvaring.trim()) return false;
+    // Required wheels-to-storage: both hjul_ej_monterade and hjul_forvaring must be present
+    if (!hjulEjMonterade || !hjulForvaring.trim()) return false;
     
     // Require current location
     if (!platsAktuellOrt || !platsAktuellStation) return false;
     
+    // Status nu section validations
+    // Require matarstallning mode choice
+    if (!matarstallningMode) return false;
+    
+    // If "new" mileage mode: require value and it must be > matarstallning_inkop
+    if (matarstallningMode === 'new') {
+      const inkop = parseInt(matarstallning, 10);
+      const aktuell = parseInt(matarstallningAktuell, 10);
+      if (!matarstallningAktuell || isNaN(aktuell) || isNaN(inkop) || aktuell <= inkop) return false;
+    }
+    
+    // Require klar_for_uthyrning choice
+    if (klarForUthyrning === null) return false;
+    
+    // If klarForUthyrning is false (NEJ), require notering
+    if (klarForUthyrning === false && !klarForUthyrningNotering.trim()) return false;
+    
     return true;
-  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, hjulEjMonterade, hjulForvaring, platsAktuellOrt, platsAktuellStation]);
+  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, hjulEjMonterade, hjulForvaring, platsAktuellOrt, platsAktuellStation, matarstallningMode, matarstallningAktuell, klarForUthyrning, klarForUthyrningNotering]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -274,7 +294,10 @@ export default function NybilForm() {
     setAntalLasbultar(0);
     setPlatsAktuellOrt('');
     setPlatsAktuellStation('');
+    setMatarstallningMode(null);
     setMatarstallningAktuell('');
+    setKlarForUthyrning(null);
+    setKlarForUthyrningNotering('');
     setAnteckningar('');
     setMedia([]);
     setShowFieldErrors(false);
@@ -303,7 +326,7 @@ export default function NybilForm() {
         plats_mottagning_station: station,
         matarstallning_inkop: matarstallning,
         hjultyp,
-        hjul_forvaring: hjulForvaring || null,
+        hjul_forvaring: hjulForvaring,
         hjul_ej_monterade: hjulEjMonterade,
         antal_insynsskydd: antalInsynsskydd,
         antal_bocker: antalBocker,
@@ -319,7 +342,9 @@ export default function NybilForm() {
         upptankning_literpris: !isElectric && tankstatus === 'tankad_nu' && upptankningLiterpris ? parseFloat(upptankningLiterpris) : null,
         plats_aktuell_ort: platsAktuellOrt,
         plats_aktuell_station: platsAktuellStation,
-        matarstallning_aktuell: locationDiffers ? matarstallningAktuell : null,
+        matarstallning_aktuell: matarstallningMode === 'new' && matarstallningAktuell ? parseInt(matarstallningAktuell, 10) : null,
+        klar_for_uthyrning: klarForUthyrning,
+        klar_for_uthyrning_notering: klarForUthyrning === false ? klarForUthyrningNotering : null,
         anteckningar: anteckningar || null,
         photo_urls: [],
         video_urls: [],
@@ -619,33 +644,34 @@ export default function NybilForm() {
           </Field>
         )}
         
-        <Field label="Hjul ej monterade (frivilligt)">
+        <SubSectionHeader title="Medföljande hjul till förvaring" />
+        <Field label="Typ *">
           <div className="grid-2-col">
             <ChoiceButton
-              onClick={() => hjulEjMonterade === 'Vinterdäck' ? setHjulEjMonterade(null) : setHjulEjMonterade('Vinterdäck')}
+              onClick={() => setHjulEjMonterade('Vinterdäck')}
               isActive={hjulEjMonterade === 'Vinterdäck'}
+              isSet={hjulEjMonterade !== null}
             >
               Vinterdäck
             </ChoiceButton>
             <ChoiceButton
-              onClick={() => hjulEjMonterade === 'Sommardäck' ? setHjulEjMonterade(null) : setHjulEjMonterade('Sommardäck')}
+              onClick={() => setHjulEjMonterade('Sommardäck')}
               isActive={hjulEjMonterade === 'Sommardäck'}
+              isSet={hjulEjMonterade !== null}
             >
               Sommardäck
             </ChoiceButton>
           </div>
         </Field>
         
-        {hjulEjMonterade && (
-          <Field label="Förvaring *">
-            <input
-              type="text"
-              value={hjulForvaring}
-              onChange={e => setHjulForvaring(e.target.value)}
-              placeholder="t.ex. Station Malmö, hylla 3"
-            />
-          </Field>
-        )}
+        <Field label="Förvaring *">
+          <input
+            type="text"
+            value={hjulForvaring}
+            onChange={e => setHjulForvaring(e.target.value)}
+            placeholder="t.ex. Station Malmö, hylla 3"
+          />
+        </Field>
         
         <Field label="Antal låsbultar">
           <div className="grid-5-col">
@@ -684,8 +710,10 @@ export default function NybilForm() {
         </div>
       </Card>
       
-      <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || (locationDiffers && !matarstallningAktuell))}>
-        <SectionHeader title="Var är bilen nu?" />
+      <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || !matarstallningMode || (matarstallningMode === 'new' && (!matarstallningAktuell || parseInt(matarstallningAktuell, 10) <= parseInt(matarstallning, 10))) || klarForUthyrning === null || (klarForUthyrning === false && !klarForUthyrningNotering.trim()))}>
+        <SectionHeader title="Status nu" />
+        
+        <SubSectionHeader title="Var är bilen nu?" />
         <div className="grid-2-col">
           <Field label="Ort *">
             <select value={platsAktuellOrt} onChange={e => { setPlatsAktuellOrt(e.target.value); setPlatsAktuellStation(''); }}>
@@ -701,13 +729,69 @@ export default function NybilForm() {
           </Field>
         </div>
         
-        {locationDiffers && (
-          <Field label="Aktuell mätarställning (km) *">
+        <SubSectionHeader title="Mätarställning nu" />
+        <Field label="Välj alternativ *">
+          <div className="grid-2-col">
+            <ChoiceButton
+              onClick={() => { setMatarstallningMode('same'); setMatarstallningAktuell(''); }}
+              isActive={matarstallningMode === 'same'}
+              isSet={matarstallningMode !== null}
+            >
+              Samma som angavs ovan
+            </ChoiceButton>
+            <ChoiceButton
+              onClick={() => setMatarstallningMode('new')}
+              isActive={matarstallningMode === 'new'}
+              isSet={matarstallningMode !== null}
+            >
+              Ny mätarställning
+            </ChoiceButton>
+          </div>
+        </Field>
+        
+        {matarstallningMode === 'new' && (
+          <Field label="Ny mätarställning (km) *">
             <input
               type="number"
               value={matarstallningAktuell}
               onChange={e => setMatarstallningAktuell(e.target.value)}
-              placeholder="12345"
+              placeholder="Måste vara högre än vid inköp"
+            />
+            {matarstallningAktuell && matarstallning && parseInt(matarstallningAktuell, 10) <= parseInt(matarstallning, 10) && (
+              <div style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                Mätarställningen måste vara högre än vid inköp ({matarstallning} km)
+              </div>
+            )}
+          </Field>
+        )}
+        
+        <SubSectionHeader title="Klar för uthyrning?" />
+        <Field label="Status *">
+          <div className="grid-2-col">
+            <ChoiceButton
+              onClick={() => { setKlarForUthyrning(true); setKlarForUthyrningNotering(''); }}
+              isActive={klarForUthyrning === true}
+              isSet={klarForUthyrning !== null}
+            >
+              JA
+            </ChoiceButton>
+            <ChoiceButton
+              onClick={() => setKlarForUthyrning(false)}
+              isActive={klarForUthyrning === false}
+              isSet={klarForUthyrning !== null}
+            >
+              NEJ
+            </ChoiceButton>
+          </div>
+        </Field>
+        
+        {klarForUthyrning === false && (
+          <Field label="Motivering *">
+            <textarea
+              value={klarForUthyrningNotering}
+              onChange={e => setKlarForUthyrningNotering(e.target.value)}
+              placeholder="Beskriv varför bilen inte är klar för uthyrning..."
+              rows={3}
             />
           </Field>
         )}
