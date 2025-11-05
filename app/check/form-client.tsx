@@ -1265,6 +1265,15 @@ const SpinnerOverlay = () => (<div className="modal-overlay spinner-overlay"><di
 const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: () => void; }> = ({ payload, onConfirm, onCancel }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     
+    // Body scroll lock
+    useEffect(() => {
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, []);
+    
     // Use modal hooks
     useDialogFocus(true, containerRef);
     useModalKeydown(true, onCancel);
@@ -1576,7 +1585,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       display: flex;
       flex-direction: column;
       max-height: calc(100dvh - 32px);
-      overflow: hidden;
+      overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
     .success-modal { text-align: center; }
@@ -1586,11 +1595,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .confirm-modal-title { font-size: 1.5rem; font-weight: 700; margin: 0; }
     .confirm-vehicle-info { font-size: 1.25rem; font-weight: 600; margin: 0.5rem 0 1rem 0; }
     .confirm-warnings-wrapper { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-    .confirm-details { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-right: 0.25rem; max-height: none; }
+    .confirm-details { flex: 1 1 auto; padding-right: 0.25rem; }
     .confirm-summary { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
     .confirm-summary:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
     .confirm-summary p { margin: 0.5rem 0; line-height: 1.5; }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; flex: 0 0 auto; position: sticky; bottom: 0; background: inherit; padding-top: 1rem; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; padding-top: 1rem; flex: 0 0 auto; position: static; }
     .confirm-damage-section { margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
     .confirm-damage-section h4 { margin: 0 0 0.5rem 0; font-size: 1.1rem; }
     .confirm-damage-section ul { margin: 0; padding-left: 1.5rem; }
