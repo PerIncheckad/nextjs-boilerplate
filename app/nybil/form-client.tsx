@@ -103,7 +103,7 @@ export default function NybilForm() {
   const [nycklarBeskrivning, setNycklarBeskrivning] = useState('');
   const [antalLaddkablar, setAntalLaddkablar] = useState<number>(0);
   const [hjulEjMonterade, setHjulEjMonterade] = useState<'Vinterdäck' | 'Sommardäck' | ''>('');
-  const [hjulForvaring, setHjulForvaring] = useState('');
+  const [hjulEjMonteradeForvaring, setHjulEjMonteradeForvaring] = useState('');
   const [antalLasbultar, setAntalLasbultar] = useState<number>(0);
   
   // Fuel/charging
@@ -227,7 +227,7 @@ export default function NybilForm() {
     setNycklarBeskrivning('');
     setAntalLaddkablar(0);
     setHjulEjMonterade('');
-    setHjulForvaring('');
+    setHjulEjMonteradeForvaring('');
     setAntalLasbultar(0);
     setBransletyp('');
     setLaddnivaProcent('');
@@ -273,7 +273,7 @@ export default function NybilForm() {
         nycklar_beskrivning: nycklarBeskrivning || null,
         antal_laddkablar: antalLaddkablar,
         hjul_ej_monterade: hjulEjMonterade || null,
-        hjul_ej_monterade_forvaring: hjulEjMonterade ? hjulForvaring : null,
+        hjul_ej_monterade_forvaring: hjulEjMonterade ? hjulEjMonteradeForvaring : null,
         antal_lasbultar: antalLasbultar,
         bransletyp: bransletyp || null,
         laddniva_procent: bransletyp === 'El (full)' ? parseInt(laddnivaProcent, 10) : null,
@@ -599,8 +599,8 @@ export default function NybilForm() {
             <Field label="Förvaring">
               <input
                 type="text"
-                value={hjulForvaring}
-                onChange={e => setHjulForvaring(e.target.value)}
+                value={hjulEjMonteradeForvaring}
+                onChange={e => setHjulEjMonteradeForvaring(e.target.value)}
                 placeholder="t.ex. Lager B, hylla 5"
               />
             </Field>
