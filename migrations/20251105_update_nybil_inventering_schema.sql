@@ -20,7 +20,7 @@ ALTER TABLE public.nybil_inventering
   ADD COLUMN IF NOT EXISTS antal_nycklar INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS nycklar_beskrivning TEXT,
   ADD COLUMN IF NOT EXISTS antal_lasbultar INTEGER DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS hjul_ej_monterade TEXT CHECK (hjul_ej_monterade IN ('Vinterdäck', 'Sommardäck')),
+  ADD COLUMN IF NOT EXISTS hjul_ej_monterade TEXT CHECK (hjul_ej_monterade IS NULL OR hjul_ej_monterade IN ('Vinterdäck', 'Sommardäck')),
   ADD COLUMN IF NOT EXISTS hjul_forvaring TEXT,
   ADD COLUMN IF NOT EXISTS plats_aktuell_ort TEXT,
   ADD COLUMN IF NOT EXISTS plats_aktuell_station TEXT,

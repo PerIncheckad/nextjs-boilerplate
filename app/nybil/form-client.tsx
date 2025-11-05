@@ -83,6 +83,15 @@ const processFiles = async (files: FileList): Promise<MediaFile[]> => {
 const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 
+// Fuel type constants
+const FUEL_TYPES = {
+  BENSIN: 'Bensin',
+  DIESEL: 'Diesel',
+  HYBRID_BENSIN: 'Hybrid (bensin)',
+  HYBRID_DIESEL: 'Hybrid (diesel)',
+  EL_FULL: 'El (full)'
+} as const;
+
 export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
@@ -131,10 +140,29 @@ export default function NybilForm() {
   const availableStationsAktuell = useMemo(() => STATIONER[platsAktuellOrt] || [], [platsAktuellOrt]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   
-  const isElectric = bransletyp === 'El (full)';
-  const isHybrid = bransletyp === 'Hybrid (bensin)' || bransletyp === 'Hybrid (diesel)';
+  const isElectric = bransletyp === FUEL_TYPES.EL_FULL;
+  const isHybrid = bransletyp === FUEL_TYPES.HYBRID_BENSIN || bransletyp === FUEL_TYPES.HYBRID_DIESEL;
   const needsLaddkablar = isElectric || isHybrid;
   const locationDiffers = platsAktuellOrt && platsAktuellStation && (platsAktuellOrt !== ort || platsAktuellStation !== station);
+  
+  const hasFordonStatusErrors = useMemo(() => {
+    if (!matarstallning || !hjultyp || !bransletyp) return true;
+    if (isElectric && !laddnivaProcent) return true;
+    if (!isElectric && (!tankstatus || (tankstatus === 'tankad_nu' && (!upptankningLiter || !upptankningLiterpris)))) return true;
+    return false;
+  }, [matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris]);
+  
+  const handleLaddningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (val === '') { 
+      setLaddnivaProcent(''); 
+      return; 
+    }
+    const num = parseInt(val, 10);
+    if (!isNaN(num)) {
+      setLaddnivaProcent(num > 100 ? '100' : num < 0 ? '0' : val);
+    }
+  };
   
   const formIsValid = useMemo(() => {
     // Required: regnr, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp
@@ -391,7 +419,7 @@ export default function NybilForm() {
         </div>
       </Card>
       
-      <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !bransletyp || (isElectric && !laddnivaProcent) || (!isElectric && (!tankstatus || (tankstatus === 'tankad_nu' && (!upptankningLiter || !upptankningLiterpris)))))}>
+      <Card data-error={showFieldErrors && hasFordonStatusErrors}>
         <SectionHeader title="Fordonsstatus" />
         <Field label="Mätarställning vid inköp (km) *">
           <input
@@ -426,15 +454,15 @@ export default function NybilForm() {
         <Field label="Drivmedel *">
           <div className="grid-2-col">
             <ChoiceButton
-              onClick={() => { setBransletyp('Bensin'); setTankstatus(null); setLaddnivaProcent(''); }}
-              isActive={bransletyp === 'Bensin'}
+              onClick={() => { setBransletyp(FUEL_TYPES.BENSIN); setTankstatus(null); setLaddnivaProcent(''); }}
+              isActive={bransletyp === FUEL_TYPES.BENSIN}
               isSet={bransletyp !== null}
             >
               Bensin
             </ChoiceButton>
             <ChoiceButton
-              onClick={() => { setBransletyp('Diesel'); setTankstatus(null); setLaddnivaProcent(''); }}
-              isActive={bransletyp === 'Diesel'}
+              onClick={() => { setBransletyp(FUEL_TYPES.DIESEL); setTankstatus(null); setLaddnivaProcent(''); }}
+              isActive={bransletyp === FUEL_TYPES.DIESEL}
               isSet={bransletyp !== null}
             >
               Diesel
@@ -442,15 +470,15 @@ export default function NybilForm() {
           </div>
           <div className="grid-2-col" style={{ marginTop: '0.5rem' }}>
             <ChoiceButton
-              onClick={() => { setBransletyp('Hybrid (bensin)'); setTankstatus(null); setLaddnivaProcent(''); }}
-              isActive={bransletyp === 'Hybrid (bensin)'}
+              onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_BENSIN); setTankstatus(null); setLaddnivaProcent(''); }}
+              isActive={bransletyp === FUEL_TYPES.HYBRID_BENSIN}
               isSet={bransletyp !== null}
             >
               Hybrid (bensin)
             </ChoiceButton>
             <ChoiceButton
-              onClick={() => { setBransletyp('Hybrid (diesel)'); setTankstatus(null); setLaddnivaProcent(''); }}
-              isActive={bransletyp === 'Hybrid (diesel)'}
+              onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_DIESEL); setTankstatus(null); setLaddnivaProcent(''); }}
+              isActive={bransletyp === FUEL_TYPES.HYBRID_DIESEL}
               isSet={bransletyp !== null}
             >
               Hybrid (diesel)
@@ -458,8 +486,8 @@ export default function NybilForm() {
           </div>
           <div style={{ marginTop: '0.5rem' }}>
             <ChoiceButton
-              onClick={() => { setBransletyp('El (full)'); setTankstatus(null); setUpptankningLiter(''); setUpptankningLiterpris(''); }}
-              isActive={bransletyp === 'El (full)'}
+              onClick={() => { setBransletyp(FUEL_TYPES.EL_FULL); setTankstatus(null); setUpptankningLiter(''); setUpptankningLiterpris(''); }}
+              isActive={bransletyp === FUEL_TYPES.EL_FULL}
               isSet={bransletyp !== null}
               className="full-width-choice"
             >
@@ -473,14 +501,7 @@ export default function NybilForm() {
             <input
               type="number"
               value={laddnivaProcent}
-              onChange={e => {
-                const val = e.target.value;
-                if (val === '') { setLaddnivaProcent(''); return; }
-                const num = parseInt(val, 10);
-                if (!isNaN(num)) {
-                  setLaddnivaProcent(num > 100 ? '100' : num < 0 ? '0' : val);
-                }
-              }}
+              onChange={handleLaddningChange}
               placeholder="0-100"
               min="0"
               max="100"
