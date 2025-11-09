@@ -87,9 +87,9 @@ const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f =
 const FUEL_TYPES = {
   BENSIN: 'Bensin',
   DIESEL: 'Diesel',
-  HYBRID_BENSIN: 'Hybrid (bensin)',
-  HYBRID_DIESEL: 'Hybrid (diesel)',
-  EL_FULL: 'El (full)'
+  HYBRID_BENSIN: 'Laddhybrid Bensin',
+  HYBRID_DIESEL: 'Laddhybrid Diesel',
+  EL_FULL: 'Elbil 100%'
 } as const;
 
 export default function NybilForm() {
@@ -104,22 +104,31 @@ export default function NybilForm() {
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   
   // Fuel/charging
-  const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | 'Hybrid (bensin)' | 'Hybrid (diesel)' | 'El (full)' | null>(null);
+  const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | 'Laddhybrid Bensin' | 'Laddhybrid Diesel' | 'Elbil 100%' | null>(null);
   const [laddnivaProcent, setLaddnivaProcent] = useState('');
   const [tankstatus, setTankstatus] = useState<'mottogs_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null>(null);
   const [upptankningLiter, setUpptankningLiter] = useState('');
   const [upptankningLiterpris, setUpptankningLiterpris] = useState('');
   
-  // Equipment inventory - discrete counts
-  const [antalInsynsskydd, setAntalInsynsskydd] = useState<0 | 1 | 2>(0);
-  const [antalBocker, setAntalBocker] = useState<0 | 1 | 2 | 3>(0);
-  const [antalCoc, setAntalCoc] = useState<0 | 1>(0);
-  const [antalNycklar, setAntalNycklar] = useState<0 | 1 | 2>(0);
+  // Equipment inventory - discrete counts (null = not answered yet)
+  const [antalInsynsskydd, setAntalInsynsskydd] = useState<0 | 1 | 2 | null>(null);
+  const [antalBocker, setAntalBocker] = useState<0 | 1 | 2 | 3 | null>(null);
+  const [antalCoc, setAntalCoc] = useState<0 | 1 | null>(null);
+  const [antalNycklar, setAntalNycklar] = useState<0 | 1 | 2 | null>(null);
   const [nycklarBeskrivning, setNycklarBeskrivning] = useState('');
-  const [antalLaddkablar, setAntalLaddkablar] = useState<0 | 1 | 2>(0);
+  const [antalLaddkablar, setAntalLaddkablar] = useState<0 | 1 | 2 | null>(null);
+  const [antalLasbultar, setAntalLasbultar] = useState<0 | 1 | 2 | 3 | 4 | null>(null);
+  
+  // Wheels flow - new implementation
+  const [medfoljandehHjul, setMedfoljandehHjul] = useState<boolean | null>(null);
   const [hjulEjMonterade, setHjulEjMonterade] = useState<'Vinterdäck' | 'Sommardäck' | null>(null);
   const [hjulForvaring, setHjulForvaring] = useState('');
-  const [antalLasbultar, setAntalLasbultar] = useState<0 | 1 | 2 | 3 | 4>(0);
+  const [hjulForvaringOrt, setHjulForvaringOrt] = useState('');
+  const [hjulForvaringStation, setHjulForvaringStation] = useState('');
+  
+  // Charging cable storage
+  const [antalLaddkablarForvaring, setAntalLaddkablarForvaring] = useState<number | null>(null);
+  const [laddkablarForvaringPlats, setLaddkablarForvaringPlats] = useState('');
   
   // Current location
   const [platsAktuellOrt, setPlatsAktuellOrt] = useState('');
@@ -138,6 +147,7 @@ export default function NybilForm() {
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
   const availableStationsAktuell = useMemo(() => STATIONER[platsAktuellOrt] || [], [platsAktuellOrt]);
+  const availableStationsHjulForvaring = useMemo(() => STATIONER[hjulForvaringOrt] || [], [hjulForvaringOrt]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   
   const isElectric = bransletyp === FUEL_TYPES.EL_FULL;
@@ -168,6 +178,19 @@ export default function NybilForm() {
     // Required: regnr, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp
     if (!regInput || !bilmarke || !modell || !ort || !station || !matarstallning || !hjultyp || !bransletyp) return false;
     
+    // Equipment: all required except nycklar_beskrivning (must be explicitly selected, even if 0)
+    if (antalInsynsskydd === null || antalBocker === null || antalCoc === null || antalNycklar === null || antalLasbultar === null) return false;
+    
+    // If electric/hybrid: antal_laddkablar is required
+    if (needsLaddkablar && antalLaddkablar === null) return false;
+    
+    // Charging cable storage
+    if (needsLaddkablar && antalLaddkablar !== null && antalLaddkablar > 0) {
+      if (antalLaddkablarForvaring === null) return false;
+      if (antalLaddkablarForvaring > antalLaddkablar) return false;
+      if (antalLaddkablarForvaring > 0 && !laddkablarForvaringPlats.trim()) return false;
+    }
+    
     // If El (full): require laddniva_procent (0-100)
     if (isElectric) {
       const laddniva = parseInt(laddnivaProcent, 10);
@@ -188,14 +211,18 @@ export default function NybilForm() {
     // If current location differs: require matarstallning_aktuell
     if (locationDiffers && !matarstallningAktuell) return false;
     
-    // If hjul_ej_monterade is set, require hjul_forvaring text
-    if (hjulEjMonterade && !hjulForvaring.trim()) return false;
+    // Wheels flow: medfoljandehHjul must be answered
+    if (medfoljandehHjul === null) return false;
+    // If JA (true): require type, ort, station, forvaring text
+    if (medfoljandehHjul === true) {
+      if (!hjulEjMonterade || !hjulForvaring.trim() || !hjulForvaringOrt || !hjulForvaringStation) return false;
+    }
     
     // Require current location
     if (!platsAktuellOrt || !platsAktuellStation) return false;
     
     return true;
-  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, hjulEjMonterade, hjulForvaring, platsAktuellOrt, platsAktuellStation]);
+  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, medfoljandehHjul, hjulEjMonterade, hjulForvaring, hjulForvaringOrt, hjulForvaringStation, platsAktuellOrt, platsAktuellStation, antalInsynsskydd, antalBocker, antalCoc, antalNycklar, antalLasbultar, needsLaddkablar, antalLaddkablar, antalLaddkablarForvaring, laddkablarForvaringPlats]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -263,15 +290,20 @@ export default function NybilForm() {
     setTankstatus(null);
     setUpptankningLiter('');
     setUpptankningLiterpris('');
-    setAntalInsynsskydd(0);
-    setAntalBocker(0);
-    setAntalCoc(0);
-    setAntalNycklar(0);
+    setAntalInsynsskydd(null);
+    setAntalBocker(null);
+    setAntalCoc(null);
+    setAntalNycklar(null);
     setNycklarBeskrivning('');
-    setAntalLaddkablar(0);
+    setAntalLaddkablar(null);
+    setAntalLasbultar(null);
+    setMedfoljandehHjul(null);
     setHjulEjMonterade(null);
     setHjulForvaring('');
-    setAntalLasbultar(0);
+    setHjulForvaringOrt('');
+    setHjulForvaringStation('');
+    setAntalLaddkablarForvaring(null);
+    setLaddkablarForvaringPlats('');
     setPlatsAktuellOrt('');
     setPlatsAktuellStation('');
     setMatarstallningAktuell('');
@@ -303,15 +335,19 @@ export default function NybilForm() {
         plats_mottagning_station: station,
         matarstallning_inkop: matarstallning,
         hjultyp,
-        hjul_forvaring: hjulForvaring || null,
-        hjul_ej_monterade: hjulEjMonterade,
-        antal_insynsskydd: antalInsynsskydd,
-        antal_bocker: antalBocker,
-        antal_coc: antalCoc,
-        antal_nycklar: antalNycklar,
+        hjul_forvaring: medfoljandehHjul ? hjulForvaring : null,
+        hjul_forvaring_ort: medfoljandehHjul ? hjulForvaringOrt : null,
+        hjul_forvaring_station: medfoljandehHjul ? hjulForvaringStation : null,
+        hjul_ej_monterade: medfoljandehHjul ? hjulEjMonterade : null,
+        antal_insynsskydd: antalInsynsskydd ?? 0,
+        antal_bocker: antalBocker ?? 0,
+        antal_coc: antalCoc ?? 0,
+        antal_nycklar: antalNycklar ?? 0,
         nycklar_beskrivning: nycklarBeskrivning || null,
-        antal_laddkablar: needsLaddkablar ? antalLaddkablar : 0,
-        antal_lasbultar: antalLasbultar,
+        antal_laddkablar: needsLaddkablar ? (antalLaddkablar ?? 0) : 0,
+        antal_laddkablar_forvaring: (needsLaddkablar && antalLaddkablar && antalLaddkablar > 0) ? (antalLaddkablarForvaring ?? 0) : null,
+        laddkablar_forvaring_plats: (needsLaddkablar && antalLaddkablar && antalLaddkablar > 0 && antalLaddkablarForvaring && antalLaddkablarForvaring > 0) ? laddkablarForvaringPlats : null,
+        antal_lasbultar: antalLasbultar ?? 0,
         bransletyp,
         laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
         tankstatus: !isElectric ? tankstatus : null,
@@ -474,14 +510,14 @@ export default function NybilForm() {
               isActive={bransletyp === FUEL_TYPES.HYBRID_BENSIN}
               isSet={bransletyp !== null}
             >
-              Hybrid (bensin)
+              Laddhybrid Bensin
             </ChoiceButton>
             <ChoiceButton
               onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_DIESEL); setTankstatus(null); setLaddnivaProcent(''); }}
               isActive={bransletyp === FUEL_TYPES.HYBRID_DIESEL}
               isSet={bransletyp !== null}
             >
-              Hybrid (diesel)
+              Laddhybrid Diesel
             </ChoiceButton>
           </div>
           <div style={{ marginTop: '0.5rem' }}>
@@ -491,7 +527,7 @@ export default function NybilForm() {
               isSet={bransletyp !== null}
               className="full-width-choice"
             >
-              El (full)
+              Elbil 100%
             </ChoiceButton>
           </div>
         </Field>
@@ -532,7 +568,7 @@ export default function NybilForm() {
                   isActive={tankstatus === 'ej_upptankad'}
                   isSet={tankstatus !== null}
                 >
-                  Ej upptankad vid mottagande
+                  Ej upptankad
                 </ChoiceButton>
               </div>
             </Field>
@@ -568,35 +604,35 @@ export default function NybilForm() {
       <Card>
         <SectionHeader title="Utrustning" />
         
-        <Field label="Antal insynsskydd">
+        <Field label="Antal insynsskydd *">
           <div className="grid-3-col">
-            <ChoiceButton onClick={() => setAntalInsynsskydd(0)} isActive={antalInsynsskydd === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalInsynsskydd(1)} isActive={antalInsynsskydd === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalInsynsskydd(2)} isActive={antalInsynsskydd === 2}>2</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalInsynsskydd(0)} isActive={antalInsynsskydd === 0} isSet={antalInsynsskydd !== null}>0</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalInsynsskydd(1)} isActive={antalInsynsskydd === 1} isSet={antalInsynsskydd !== null}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalInsynsskydd(2)} isActive={antalInsynsskydd === 2} isSet={antalInsynsskydd !== null}>2</ChoiceButton>
           </div>
         </Field>
         
-        <Field label="Antal böcker/manualer">
+        <Field label="Antal böcker/manualer *">
           <div className="grid-4-col">
-            <ChoiceButton onClick={() => setAntalBocker(0)} isActive={antalBocker === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalBocker(1)} isActive={antalBocker === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalBocker(2)} isActive={antalBocker === 2}>2</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalBocker(3)} isActive={antalBocker === 3}>3</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalBocker(0)} isActive={antalBocker === 0} isSet={antalBocker !== null}>0</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalBocker(1)} isActive={antalBocker === 1} isSet={antalBocker !== null}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalBocker(2)} isActive={antalBocker === 2} isSet={antalBocker !== null}>2</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalBocker(3)} isActive={antalBocker === 3} isSet={antalBocker !== null}>3</ChoiceButton>
           </div>
         </Field>
         
-        <Field label="Antal COC-dokument">
+        <Field label="Antal COC-dokument *">
           <div className="grid-2-col">
-            <ChoiceButton onClick={() => setAntalCoc(0)} isActive={antalCoc === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalCoc(1)} isActive={antalCoc === 1}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalCoc(0)} isActive={antalCoc === 0} isSet={antalCoc !== null}>0</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalCoc(1)} isActive={antalCoc === 1} isSet={antalCoc !== null}>1</ChoiceButton>
           </div>
         </Field>
         
-        <Field label="Antal nycklar">
+        <Field label="Antal nycklar *">
           <div className="grid-3-col">
-            <ChoiceButton onClick={() => setAntalNycklar(0)} isActive={antalNycklar === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalNycklar(1)} isActive={antalNycklar === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalNycklar(2)} isActive={antalNycklar === 2}>2</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalNycklar(0)} isActive={antalNycklar === 0} isSet={antalNycklar !== null}>0</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalNycklar(1)} isActive={antalNycklar === 1} isSet={antalNycklar !== null}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalNycklar(2)} isActive={antalNycklar === 2} isSet={antalNycklar !== null}>2</ChoiceButton>
           </div>
         </Field>
         
@@ -610,50 +646,118 @@ export default function NybilForm() {
         </Field>
         
         {needsLaddkablar && (
-          <Field label="Antal laddkablar">
+          <Field label="Antal laddkablar *">
             <div className="grid-3-col">
-              <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0}>0</ChoiceButton>
-              <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1}>1</ChoiceButton>
-              <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2}>2</ChoiceButton>
+              <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
+              <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
+              <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
             </div>
           </Field>
         )}
         
-        <Field label="Hjul ej monterade (frivilligt)">
+        {needsLaddkablar && antalLaddkablar !== null && antalLaddkablar > 0 && (
+          <>
+            <Field label="Antal kablar till förvaring *">
+              <div className="grid-3-col">
+                {Array.from({ length: antalLaddkablar + 1 }, (_, i) => (
+                  <ChoiceButton
+                    key={i}
+                    onClick={() => setAntalLaddkablarForvaring(i)}
+                    isActive={antalLaddkablarForvaring === i}
+                    isSet={antalLaddkablarForvaring !== null}
+                  >
+                    {i}
+                  </ChoiceButton>
+                ))}
+              </div>
+            </Field>
+            
+            {antalLaddkablarForvaring !== null && antalLaddkablarForvaring > 0 && (
+              <Field label="Plats för förvaring av kablar *">
+                <input
+                  type="text"
+                  value={laddkablarForvaringPlats}
+                  onChange={e => setLaddkablarForvaringPlats(e.target.value)}
+                  placeholder="t.ex. Station Malmö, förråd 2"
+                />
+              </Field>
+            )}
+          </>
+        )}
+        
+        <Field label="Medföljande hjul? *">
           <div className="grid-2-col">
             <ChoiceButton
-              onClick={() => hjulEjMonterade === 'Vinterdäck' ? setHjulEjMonterade(null) : setHjulEjMonterade('Vinterdäck')}
-              isActive={hjulEjMonterade === 'Vinterdäck'}
+              onClick={() => { setMedfoljandehHjul(true); }}
+              isActive={medfoljandehHjul === true}
+              isSet={medfoljandehHjul !== null}
             >
-              Vinterdäck
+              JA
             </ChoiceButton>
             <ChoiceButton
-              onClick={() => hjulEjMonterade === 'Sommardäck' ? setHjulEjMonterade(null) : setHjulEjMonterade('Sommardäck')}
-              isActive={hjulEjMonterade === 'Sommardäck'}
+              onClick={() => { setMedfoljandehHjul(false); setHjulEjMonterade(null); setHjulForvaring(''); setHjulForvaringOrt(''); setHjulForvaringStation(''); }}
+              isActive={medfoljandehHjul === false}
+              isSet={medfoljandehHjul !== null}
             >
-              Sommardäck
+              NEJ
             </ChoiceButton>
           </div>
         </Field>
         
-        {hjulEjMonterade && (
-          <Field label="Förvaring *">
-            <input
-              type="text"
-              value={hjulForvaring}
-              onChange={e => setHjulForvaring(e.target.value)}
-              placeholder="t.ex. Station Malmö, hylla 3"
-            />
-          </Field>
+        {medfoljandehHjul === true && (
+          <>
+            <Field label="Hjul till förvaring *">
+              <div className="grid-2-col">
+                <ChoiceButton
+                  onClick={() => setHjulEjMonterade('Sommardäck')}
+                  isActive={hjulEjMonterade === 'Sommardäck'}
+                  isSet={hjulEjMonterade !== null}
+                >
+                  Sommarhjul
+                </ChoiceButton>
+                <ChoiceButton
+                  onClick={() => setHjulEjMonterade('Vinterdäck')}
+                  isActive={hjulEjMonterade === 'Vinterdäck'}
+                  isSet={hjulEjMonterade !== null}
+                >
+                  Vinterhjul
+                </ChoiceButton>
+              </div>
+            </Field>
+            
+            <Field label="Plats för förvaring *">
+              <input
+                type="text"
+                value={hjulForvaring}
+                onChange={e => setHjulForvaring(e.target.value)}
+                placeholder="t.ex. hylla 3"
+              />
+            </Field>
+            
+            <div className="grid-2-col">
+              <Field label="Ort *">
+                <select value={hjulForvaringOrt} onChange={e => { setHjulForvaringOrt(e.target.value); setHjulForvaringStation(''); }}>
+                  <option value="">Välj ort</option>
+                  {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </Field>
+              <Field label="Station *">
+                <select value={hjulForvaringStation} onChange={e => setHjulForvaringStation(e.target.value)} disabled={!hjulForvaringOrt}>
+                  <option value="">Välj station</option>
+                  {availableStationsHjulForvaring.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </Field>
+            </div>
+          </>
         )}
         
-        <Field label="Antal låsbultar">
+        <Field label="Antal låsbultar *">
           <div className="grid-5-col">
-            <ChoiceButton onClick={() => setAntalLasbultar(0)} isActive={antalLasbultar === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(1)} isActive={antalLasbultar === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(2)} isActive={antalLasbultar === 2}>2</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(3)} isActive={antalLasbultar === 3}>3</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(4)} isActive={antalLasbultar === 4}>4</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalLasbultar(0)} isActive={antalLasbultar === 0} isSet={antalLasbultar !== null}>0</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalLasbultar(1)} isActive={antalLasbultar === 1} isSet={antalLasbultar !== null}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalLasbultar(2)} isActive={antalLasbultar === 2} isSet={antalLasbultar !== null}>2</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalLasbultar(3)} isActive={antalLasbultar === 3} isSet={antalLasbultar !== null}>3</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalLasbultar(4)} isActive={antalLasbultar === 4} isSet={antalLasbultar !== null}>4</ChoiceButton>
           </div>
         </Field>
         
@@ -787,7 +891,7 @@ const ChoiceButton: React.FC<{
   let btnClass = 'choice-btn';
   if (className) btnClass += ` ${className}`;
   if (isActive) btnClass += ' active default';
-  else if (isSet) btnClass += ' disabled-choice';
+  else if (isSet && !isActive) btnClass += ' disabled-choice';
   return <button onClick={onClick} className={btnClass}>{children}</button>;
 };
 
