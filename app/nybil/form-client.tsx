@@ -119,7 +119,7 @@ export default function NybilForm() {
   const [antalLaddkablar, setAntalLaddkablar] = useState<0 | 1 | 2>(0);
   const [hjulEjMonterade, setHjulEjMonterade] = useState<'Vinterdäck' | 'Sommardäck' | null>(null);
   const [hjulForvaring, setHjulForvaring] = useState('');
-  const [antalLasbultar, setAntalLasbultar] = useState<0 | 1 | 2 | 3 | 4>(0);
+  const [antalLasbultar, setAntalLasbultar] = useState<null | 0 | 1>(null);
   
   // Current location
   const [platsAktuellOrt, setPlatsAktuellOrt] = useState('');
@@ -165,8 +165,8 @@ export default function NybilForm() {
   };
   
   const formIsValid = useMemo(() => {
-    // Required: regnr, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp
-    if (!regInput || !bilmarke || !modell || !ort || !station || !matarstallning || !hjultyp || !bransletyp) return false;
+    // Required: regnr, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, antal_lasbultar
+    if (!regInput || !bilmarke || !modell || !ort || !station || !matarstallning || !hjultyp || !bransletyp || antalLasbultar === null) return false;
     
     // If El (full): require laddniva_procent (0-100)
     if (isElectric) {
@@ -195,7 +195,7 @@ export default function NybilForm() {
     if (!platsAktuellOrt || !platsAktuellStation) return false;
     
     return true;
-  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, hjulEjMonterade, hjulForvaring, platsAktuellOrt, platsAktuellStation]);
+  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, hjulEjMonterade, hjulForvaring, platsAktuellOrt, platsAktuellStation, antalLasbultar]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -242,9 +242,29 @@ export default function NybilForm() {
       requestAnimationFrame(() => {
         const firstError = document.querySelector('.card[data-error="true"], .field[data-error="true"]') as HTMLElement | null;
         if (firstError) {
-          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          const focusable = firstError.querySelector('input, select, textarea') as HTMLElement | null;
-          focusable?.focus();
+          // Check prefers-reduced-motion
+          const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          
+          // Calculate target scroll position with offset
+          const rect = firstError.getBoundingClientRect();
+          const targetTop = window.scrollY + rect.top - 80;
+          
+          // Perform smooth scroll
+          try {
+            window.scrollTo({
+              top: targetTop,
+              behavior: prefersReducedMotion ? 'auto' : 'smooth'
+            });
+          } catch (e) {
+            // Fallback for browsers that don't support smooth scrolling
+            firstError.scrollIntoView({ block: 'center' });
+          }
+          
+          // Focus first interactive element after scroll settles
+          setTimeout(() => {
+            const focusable = firstError.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])') as HTMLElement | null;
+            focusable?.focus();
+          }, 150);
         }
       });
     });
@@ -271,7 +291,7 @@ export default function NybilForm() {
     setAntalLaddkablar(0);
     setHjulEjMonterade(null);
     setHjulForvaring('');
-    setAntalLasbultar(0);
+    setAntalLasbultar(null);
     setPlatsAktuellOrt('');
     setPlatsAktuellStation('');
     setMatarstallningAktuell('');
@@ -647,13 +667,22 @@ export default function NybilForm() {
           </Field>
         )}
         
-        <Field label="Antal låsbultar">
-          <div className="grid-5-col">
-            <ChoiceButton onClick={() => setAntalLasbultar(0)} isActive={antalLasbultar === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(1)} isActive={antalLasbultar === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(2)} isActive={antalLasbultar === 2}>2</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(3)} isActive={antalLasbultar === 3}>3</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(4)} isActive={antalLasbultar === 4}>4</ChoiceButton>
+        <Field label="Låsbultar med? *">
+          <div className="grid-2-col">
+            <ChoiceButton
+              onClick={() => setAntalLasbultar(1)}
+              isActive={antalLasbultar === 1}
+              isSet={antalLasbultar !== null}
+            >
+              JA
+            </ChoiceButton>
+            <ChoiceButton
+              onClick={() => setAntalLasbultar(0)}
+              isActive={antalLasbultar === 0}
+              isSet={antalLasbultar !== null}
+            >
+              NEJ
+            </ChoiceButton>
           </div>
         </Field>
         
