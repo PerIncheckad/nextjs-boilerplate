@@ -585,7 +585,7 @@ export default function NybilForm() {
         )}
       </Card>
       
-      <Card>
+      <Card data-error={showFieldErrors && (antalLasbultar === null || (hjulEjMonterade && !hjulForvaring.trim()))}>
         <SectionHeader title="Utrustning" />
         
         <Field label="Antal insynsskydd">
