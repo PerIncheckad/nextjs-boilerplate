@@ -433,6 +433,95 @@ export async function POST(request: Request) {
     
     await Promise.all(emailPromises);
 
+    // =================================================================
+    // 5. DATABASE OPERATIONS - Save check-in and damages
+    // =================================================================
+    
+    // Insert check-in record
+    const checkinData = {
+      regnr: payload.regnr,
+      carmodel: payload.carModel || null,
+      inchecker_name: payload.incheckare || payload.firstName || 'Unknown',
+      inchecker_fullname: payload.fullName || payload.full_name || null,
+      checkin_date: date,
+      checkin_time: time,
+      ort: payload.ort,
+      station: payload.station,
+      bilen_star_nu_ort: payload.bilen_star_nu?.ort || null,
+      bilen_star_nu_station: payload.bilen_star_nu?.station || null,
+      bilen_star_nu_kommentar: payload.bilen_star_nu?.kommentar || null,
+      matarstallning: payload.matarstallning || null,
+      hjultyp: payload.hjultyp || null,
+      drivmedelstyp: payload.drivmedel || null,
+      tankniva: payload.tankning?.tankniva || null,
+      liters: payload.tankning?.liters || null,
+      bransletyp: payload.tankning?.bransletyp || null,
+      literpris: payload.tankning?.literpris || null,
+      laddniva: payload.laddning?.laddniva || null,
+      antal_laddkablar: payload.laddning?.antal_laddkablar || null,
+      rekond_behovers: payload.rekond?.behoverRekond || false,
+      rekond_utvandig: payload.rekond?.utvandig || false,
+      rekond_invandig: payload.rekond?.invandig || false,
+      rekond_text: payload.rekond?.text || null,
+      rekond_folder: payload.rekond?.folder || null,
+      husdjur_sanerad: payload.husdjur?.sanerad || false,
+      husdjur_text: payload.husdjur?.text || null,
+      husdjur_folder: payload.husdjur?.folder || null,
+      rokning_sanerad: payload.rokning?.sanerad || false,
+      rokning_text: payload.rokning?.text || null,
+      rokning_folder: payload.rokning?.folder || null,
+      varningslampa_lyser: payload.varningslampa?.lyser || false,
+      varningslampa_beskrivning: payload.varningslampa?.beskrivning || null,
+      rental_unavailable: payload.rental?.unavailable || false,
+      rental_comment: payload.rental?.comment || null,
+      insynsskydd_saknas: payload.status?.insynsskyddSaknas || false,
+      washed: payload.washed || false,
+      other_checklist_items_ok: payload.otherChecklistItemsOK || false,
+      notering: payload.notering || null,
+      vehicle_status: payload.vehicleStatus || null,
+      payload: payload
+    };
+
+    const { data: checkinRecord, error: checkinError } = await supabaseAdmin
+      .from('checkins')
+      .insert([checkinData])
+      .select()
+      .single();
+
+    if (checkinError) {
+      console.error('Error inserting check-in record:', checkinError);
+      // Don't fail the entire request if database insert fails
+      // Email notifications have already been sent successfully
+    } else if (checkinRecord) {
+      console.log('Check-in record saved successfully:', checkinRecord.id);
+
+      // Insert new damages if any
+      const newDamages = payload.nya_skador || [];
+      if (newDamages.length > 0) {
+        const damageRecords = newDamages.map((damage: any) => ({
+          checkin_id: checkinRecord.id,
+          regnr: payload.regnr,
+          damage_type: damage.type || 'Unknown',
+          damage_text: damage.text || null,
+          positions: damage.positions || [],
+          folder: damage.uploads?.folder || null,
+          photo_urls: damage.uploads?.photo_urls || [],
+          video_urls: damage.uploads?.video_urls || [],
+          damage_data: damage
+        }));
+
+        const { error: damagesError } = await supabaseAdmin
+          .from('checkin_damages')
+          .insert(damageRecords);
+
+        if (damagesError) {
+          console.error('Error inserting damage records:', damagesError);
+        } else {
+          console.log(`${damageRecords.length} damage record(s) saved successfully`);
+        }
+      }
+    }
+
     return NextResponse.json({ message: 'Notifications processed successfully.' });
 
   } catch (error) {
