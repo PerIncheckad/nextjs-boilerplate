@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 
@@ -18,6 +18,10 @@ interface MediaFile {
 
 export default function MediaViewer() {
   const params = useParams();
+  const pathname = usePathname();
+  const isPublic = pathname?.startsWith('/public-media');
+  const basePath = isPublic ? '/public-media' : '/media';
+
   const path = params.path as string[];
   const folderPath = path ? path.join('/') : '';
   
@@ -128,12 +132,11 @@ export default function MediaViewer() {
 
   // Build breadcrumb path
   const pathParts = path || [];
-  const isRoot = pathParts.length === 0;
   const breadcrumbs = [
-    { name: 'Media', path: '/media', isRoot: true },
+    { name: 'Media', path: basePath, isRoot: true },
     ...pathParts.map((part, idx) => ({
       name: part,
-      path: `/media/${pathParts.slice(0, idx + 1).join('/')}`,
+      path: `${basePath}/${pathParts.slice(0, idx + 1).join('/')}`,
       isRoot: false
     }))
   ];
@@ -166,10 +169,10 @@ export default function MediaViewer() {
           if (file.isFolder) {
             // Folder card - clickable
             const folderName = file.name.replace(/\/$/, '');
-            const folderPath = path ? `/media/${[...path, folderName].join('/')}` : `/media/${folderName}`;
+            const nestedPath = path ? `${basePath}/${[...path, folderName].join('/')}` : `${basePath}/${folderName}`;
             
             return (
-              <Link href={folderPath} key={idx} className="media-item folder-item">
+              <Link href={nestedPath} key={idx} className="media-item folder-item">
                 <div className="folder-icon">📁</div>
                 <div className="file-name">{folderName}</div>
               </Link>
