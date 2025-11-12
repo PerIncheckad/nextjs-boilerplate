@@ -72,7 +72,15 @@ const formatCheckerName = (payload: any): string => {
 
 const createStorageLink = (folderPath: string | undefined, siteUrl: string): string | null => {
     if (!folderPath) return null;
-    return `${siteUrl}/media/${folderPath}`;
+    return `${siteUrl}/public-media/${folderPath}`;
+}
+
+const hasAnyFiles = (damage: any): boolean => {
+    const uploads = damage?.uploads;
+    if (!uploads) return false;
+    const hasPhotos = Array.isArray(uploads.photo_urls) && uploads.photo_urls.length > 0;
+    const hasVideos = Array.isArray(uploads.video_urls) && uploads.video_urls.length > 0;
+    return hasPhotos || hasVideos;
 }
 
 const createAlertBanner = (condition: boolean, text: string, details?: string, folderPath?: string, siteUrl?: string, count?: number): string => {
@@ -135,7 +143,7 @@ const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fal
   
   const items = damages.map(d => {
     const text = getDamageString(d);
-    const storageLink = createStorageLink(d.uploads?.folder, siteUrl);
+    const storageLink = hasAnyFiles(d) ? createStorageLink(d.uploads?.folder, siteUrl) : null;
     const linkContent = storageLink 
       ? ` <a href="${storageLink}" target="_blank" style="text-decoration: none; color: #2563eb !important; font-weight: bold;">(Visa media 🔗)</a>`
       : '';
@@ -161,13 +169,13 @@ const formatTankning = (tankning: any): string => {
 const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: string): string => {
     const bilagor = [];
     if (rekond.folder && rekond.hasMedia) {
-        bilagor.push(`<li><a href="${siteUrl}/media/${rekond.folder}" target="_blank" style="color: #2563eb !important;">Rekond 🔗</a></li>`);
+        bilagor.push(`<li><a href="${siteUrl}/public-media/${rekond.folder}" target="_blank" style="color: #2563eb !important;">Rekond 🔗</a></li>`);
     }
     if (husdjur.folder && husdjur.hasMedia) {
-        bilagor.push(`<li><a href="${siteUrl}/media/${husdjur.folder}" target="_blank" style="color: #2563eb !important;">Husdjur 🔗</a></li>`);
+        bilagor.push(`<li><a href="${siteUrl}/public-media/${husdjur.folder}" target="_blank" style="color: #2563eb !important;">Husdjur 🔗</a></li>`);
     }
     if (rokning.folder && rokning.hasMedia) {
-        bilagor.push(`<li><a href="${siteUrl}/media/${rokning.folder}" target="_blank" style="color: #2563eb !important;">Rökning 🔗</a></li>`);
+        bilagor.push(`<li><a href="${siteUrl}/public-media/${rokning.folder}" target="_blank" style="color: #2563eb !important;">Rökning 🔗</a></li>`);
     }
     
     if (bilagor.length === 0) return '';
@@ -368,6 +376,33 @@ export async function POST(request: Request) {
     // Get the site URL from the request to ensure media links work correctly
     const siteUrl = getSiteUrl(request);
     console.log('Using site URL for media links:', siteUrl);
+
+    // Log media counts for troubleshooting
+    const countMedia = (damages: any[]) => {
+      let photos = 0;
+      let videos = 0;
+      if (Array.isArray(damages)) {
+        damages.forEach(d => {
+          if (d.uploads?.photo_urls) photos += d.uploads.photo_urls.length;
+          if (d.uploads?.video_urls) videos += d.uploads.video_urls.length;
+        });
+      }
+      return { photos, videos };
+    };
+
+    const nyaSkadorMedia = countMedia(payload.nya_skador || []);
+    const dokumenteradeSkadorMedia = countMedia(payload.dokumenterade_skador || []);
+    const rekondMedia = payload.rekond?.hasMedia ? 'yes' : 'no';
+    const husdjurMedia = payload.husdjur?.hasMedia ? 'yes' : 'no';
+    const rokningMedia = payload.rokning?.hasMedia ? 'yes' : 'no';
+
+    console.log('Media counts received:', {
+      nya_skador: nyaSkadorMedia,
+      dokumenterade_skador: dokumenteradeSkadorMedia,
+      rekond: rekondMedia,
+      husdjur: husdjurMedia,
+      rokning: rokningMedia
+    });
 
     const now = new Date();
     const options: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Stockholm' };

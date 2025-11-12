@@ -125,31 +125,78 @@ const createCommentFile = (content: string): File => {
     return new File([content], "kommentar.txt", { type: "text/plain" });
 };
 
-// Improved uploadOne: handles already existing resources, returns publicUrl or throws when unavailable
+// Improved uploadOne with retry logic: handles already existing resources, returns publicUrl or throws when unavailable
 async function uploadOne(file: File, path: string): Promise<string> {
   const BUCKET = 'damage-photos';
-  try {
-    // try upload with upsert: false to detect already-existing files
-    const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
-    if (error && !/already exists/i.test(error.message || '')) {
-      console.error('Storage upload error for', path, error);
-      // continue to attempt to return public url even on upload error
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000; // Start with 1 second
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // try upload with upsert: false to detect already-existing files
+      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+      
+      // If file already exists, that's OK - continue to get public URL
+      if (error && !/already exists/i.test(error.message || '')) {
+        console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, error);
+        
+        // If this is not the last attempt, wait and retry
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+        
+        // Last attempt failed, throw
+        const isVideo = file.type.startsWith('video');
+        throw new Error(isVideo ? 'Fel vid uppladdning av video. Vänligen försök igen.' : 'Fel vid uppladdning av foto. Vänligen försök igen.');
+      }
+      
+      // Upload succeeded or file already exists - get public URL
+      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      if (urlError) {
+        console.error(`Failed to get public url for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, urlError);
+        
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+        
+        throw new Error('Fel vid uppladdning. Vänligen försök igen.');
+      }
+      
+      if (!data?.publicUrl) {
+        console.warn(`Public url missing for ${path} (attempt ${attempt}/${MAX_RETRIES})`);
+        
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+        
+        throw new Error('Fel vid uppladdning. Vänligen försök igen.');
+      }
+      
+      // Success!
+      return data.publicUrl;
+      
+    } catch (e) {
+      // If this is an error we already threw, re-throw it
+      if (e instanceof Error && e.message.includes('Fel vid uppladdning')) {
+        throw e;
+      }
+      
+      console.error(`Unexpected upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, e);
+      
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+        continue;
+      }
+      
+      throw new Error('Fel vid uppladdning. Vänligen försök igen.');
     }
-  } catch (e) {
-    console.error('Unexpected upload error', e);
   }
-
-  // Always try to fetch public url
-  const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  if (urlError) {
-    console.error('Failed to get public url for', path, urlError);
-    throw urlError;
-  }
-  if (!data?.publicUrl) {
-    console.warn('Public url missing for', path);
-    throw new Error('Public url missing');
-  }
-  return data.publicUrl;
+  
+  // Should never reach here, but TypeScript needs this
+  throw new Error('Fel vid uppladdning. Vänligen försök igen.');
 }
 
 const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
@@ -274,6 +321,7 @@ export default function CheckInForm() {
   // State
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   const [regInput, setRegInput] = useState('');
   const [allRegistrations, setAllRegistrations] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -550,6 +598,7 @@ export default function CheckInForm() {
       const email = user?.email || '';
       setFirstName(getFirstNameFromEmail(email));
       setFullName(getFullNameFromEmail(email));
+      setUserEmail(email);
     };
     getUser();
   }, []);
@@ -754,6 +803,7 @@ export default function CheckInForm() {
       
         const finalPayloadForNotification = {
             ...finalPayloadForUI,
+            user_email: userEmail,
             rekond: { ...finalPayloadForUI.rekond, folder: tempRekondFolder },
             husdjur: { ...finalPayloadForUI.husdjur, folder: tempHusdjurFolder },
             rokning: { ...finalPayloadForUI.rokning, folder: tempRokningFolder },
@@ -767,7 +817,23 @@ export default function CheckInForm() {
         setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
     } catch (error) {
         console.error("Final save failed:", error);
-        alert("Något gick fel vid inskickningen. Vänligen försök igen. Detaljer finns i konsolen.");
+        
+        // Show appropriate error message
+        const errorMessage = error instanceof Error ? error.message : "Något gick fel vid inskickningen. Vänligen försök igen.";
+        alert(errorMessage);
+        
+        // Trigger field errors and scroll to first error section
+        setShowFieldErrors(true);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const firstError = document.querySelector('.card[data-error="true"], .field[data-error="true"]') as HTMLElement | null;
+            if (firstError) {
+              firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const focusable = firstError.querySelector('input, select, textarea') as HTMLElement | null;
+              focusable?.focus();
+            }
+          });
+        });
     } finally {
         setIsFinalSaving(false);
     }
