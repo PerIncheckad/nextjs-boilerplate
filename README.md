@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Incheckad – Next.js app
 
-## Getting Started
+Detta repo innehåller Incheckads Next.js‑applikation för fordonsincheckningar, skadehantering och notifieringar.
 
-First, run the development server:
+## Snabböversikt
+- Frontend: Next.js (App Router)
+- Auth/Storage: Supabase (public bucket: `damage-photos`)
+- E‑post: Resend
+- Hosting: Vercel (preview är skyddat av Vercel Authentication)
+- Media‑visning:
+  - Intern route: `/media/...` (kräver inloggning)
+  - Publik route: `/public-media/...` (ingen inloggning – används i e‑post)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Kom igång (lokalt)
+1. Klona repot och installera:
+   ```bash
+   pnpm install
+   # eller
+   npm install
+   ```
+2. Skapa `.env.local`:
+   ```bash
+   cp .env.example .env.local
+   ```
+   Fyll i:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (endast för server/route)
+   - `RESEND_API_KEY`
+   - `NEXT_PUBLIC_SITE_URL` (valfritt – annars härleds från request)
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Starta:
+   ```bash
+   pnpm dev
+   # eller
+   npm run dev
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Miljövariabler
+| Nyckel | Beskrivning |
+|---|---|
+| NEXT_PUBLIC_SUPABASE_URL | Supabase URL |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | Supabase anon key (klient) |
+| SUPABASE_SERVICE_ROLE_KEY | Service Role (server, API) |
+| RESEND_API_KEY | Resend API Key för e‑post |
+| NEXT_PUBLIC_SITE_URL | Bas-URL (prod/preview). Om ej angiven så byggs dynamiskt från request |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy
+- Preview: Vercel (skyddad av Vercel Authentication om "Standard Protection" är aktiv)
+- Production: [incheckad.se](https://www.incheckad.se)
 
-## Learn More
+Notera att Vercel‑skydd i preview ligger "framför" hela deploymenten – även publika routes. För att testa publika länkar i preview måste du logga in i Vercel (eller tillfälligt stänga av skyddet på just den deployen). I produktion krävs ingen inloggning för `/public-media`.
 
-To learn more about Next.js, take a look at the following resources:
+## Publik media – design
+- E‑postlänkar pekar till `/public-media/<REGNR>/<mapp>/...`
+- Samma galleri‑UI som `/media`, men utan LoginGate
+- Breadcrumbs bevarar kontexten (stannar i `/public-media`)
+- Bucket `damage-photos` är publik; åtkomst styrs av route‑nivå
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notifieringar (e‑post)
+- API: `app/api/notify/route.ts`
+- Bygger HTML (svenskt UI), inkluderar "(Visa media 🔗)" endast när det finns faktiska filer
+- Mottagare:
+  - Bilkontroll: lista (t.ex. `per@incheckad.se`, `latif@incheckad.se`)
+  - Huvudstation: dynamisk lista via ort‑karta (Helsingborg m.fl.)
+- Serverlogg: skriver sammanfattningar (media counts m.m.) i Vercel Logs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Databas – snabbguide
+Se Wiki för detaljer. Kort:
+- `public.damages` – normaliserar både "nya" skador och dokumenterade BUHS‑skador
+- `public.checkins` – en rad per incheckning
+- `public.checkin_damages` – en rad per position för nya skador (statistik)
+- Index/idempotens:
+  - Unika index för (regnr, legacy_damage_source_text) och `legacy_loose_key`
+  - `legacy_loose_key` = `REGNR|original_damage_date` (låser dokumenterad BUHS även om legacy‑text ändras)
 
-## Deploy on Vercel
+## Vanliga tester
+- Öppna e‑postlänk till `/public-media/...` i inkognito → ska fungera utan inloggning
+- Breadcrumb "uppåt" i inkognito → ska stanna inom `/public-media`
+- Uppladdningsfel → blockerar submit, tydligt fel, scrollar till sektion
+- Serverlogg i Vercel → sök "Media counts received" eller "CHECKIN INSERT OK"
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Support & felsökning
+- Preview kräver Vercel‑inloggning (inte app‑inloggning) när deployment security är på
+- 404 på `/public-media` i prod innan merge är förväntat
+- Loggar: Vercel → Logs → filtrera på route (t.ex. `/api/notify`)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Länkar
+- Produktion: [incheckad.se](https://www.incheckad.se)
+- Publik media (exempel): `/public-media/REGNR/...`
+
+Mer detaljer i Wiki.
