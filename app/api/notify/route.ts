@@ -183,7 +183,7 @@ const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: s
     return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;"><h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2><ul style="padding-left: 20px; margin-top: 0;">${bilagor.join('')}</ul></div>`;
 };
 
-const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
+const createBaseLayout = (regnr: string, content: string, checkerFooter?: string): string => `<!DOCTYPE html>
 <html lang="sv">
 <head>
   <meta charset="utf-8">
@@ -241,6 +241,9 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
     <table width="100%" style="color: #000000 !important;">
       <tbody>${content}</tbody>
     </table>
+    ${checkerFooter ? `<div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: left; font-size: 14px; color: #000000 !important;">
+      ${checkerFooter}
+    </div>` : ''}
     <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: left; font-size: 12px; color: #6b7280 !important;">
       &copy; ${new Date().getFullYear()} Albarone AB &mdash; Alla rättigheter förbehållna
     </div>
@@ -262,6 +265,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const nyaSkadorFolder = nya_skador.find((d: any) => d.uploads?.folder)?.uploads?.folder;
   
   const checkerName = formatCheckerName(payload);
+  const checkerFooter = `Incheckad av ${checkerName} kl ${time}, ${date}.`;
 
   const content = `
     ${createAlertBanner(rental?.unavailable, 'Går inte att hyra ut', rental?.comment, undefined, siteUrl)}
@@ -305,7 +309,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       <div style="color:#6b7280 !important; font-size: 12px;">Incheckad av ${checkerName} kl ${time}, ${date}.</div>
     </td></tr>
   `;
-  return createBaseLayout(regnr, content);
+  return createBaseLayout(regnr, content, checkerFooter);
 };
 
 const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
@@ -317,6 +321,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const nyaSkadorFolder = nya_skador.find((d: any) => d.uploads?.folder)?.uploads?.folder;
   
   const checkerName = formatCheckerName(payload);
+  const checkerFooter = `Incheckad av ${checkerName} kl ${time}, ${date}.`;
           
   const content = `
     ${createAdminBanner(unknownRegStatus, 'Reg.nr saknas i "MABISYD Bilkontroll 2024–2025"')}
@@ -362,7 +367,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
       <div style="color:#6b7280 !important; font-size: 12px;">Incheckad av ${checkerName} kl ${time}, ${date}.</div>
     </td></tr>
   `;
-  return createBaseLayout(regnr, content);
+  return createBaseLayout(regnr, content, checkerFooter);
 };
 
 // =================================================================
