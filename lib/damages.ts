@@ -151,6 +151,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   }).filter(d => d.text); // Ensure we don't have empty damage entries
 
   // Step 4: Add new damages from public.damages (where legacy_damage_source_text IS NULL)
+  // These are damages that were documented during check-ins and saved to our database
   if (newDamagesResponse.data) {
     for (const newDamage of newDamagesResponse.data) {
       const positions = (newDamage.user_positions as any[] || [])
