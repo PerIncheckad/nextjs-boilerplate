@@ -79,55 +79,106 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
   // Step 1: Fetch all data concurrently
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse] = await Promise.all([
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, newDamagesResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .from('damages')
-      .select('legacy_damage_source_text, user_type, user_positions')
+      .select('legacy_damage_source_text, legacy_loose_key, user_type, user_positions, original_damage_date')
       .eq('regnr', cleanedRegnr)
-      .not('legacy_damage_source_text', 'is', null)
+      .not('legacy_damage_source_text', 'is', null),
+    supabase
+      .from('damages')
+      .select('id, user_type, user_positions, description, damage_date')
+      .eq('regnr', cleanedRegnr)
+      .is('legacy_damage_source_text', null)
   ]);
 
   // Step 2: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   
-  // Create a lookup map of inventoried damages for efficient access
-  const inventoriedMap = new Map<string, string>();
+  // Create lookup structures for inventoried damages
+  // Map by legacy_damage_source_text for exact match
+  const inventoriedByTextMap = new Map<string, string>();
+  // Map by legacy_loose_key (REGNR|date) for loose match
+  const inventoriedByLooseKeyMap = new Map<string, string>();
+  
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
+      const positions = (inv.user_positions as any[] || [])
+        .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
+        .filter(Boolean)
+        .join(', ');
+      const newText = `${inv.user_type || 'Skada'}: ${positions}`;
+      
       if (inv.legacy_damage_source_text) {
-        const positions = (inv.user_positions as any[] || [])
-          .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
-          .filter(Boolean)
-          .join(', ');
-        const newText = `${inv.user_type || 'Skada'}: ${positions}`;
-        inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        inventoriedByTextMap.set(inv.legacy_damage_source_text, newText);
+      }
+      
+      if (inv.legacy_loose_key) {
+        inventoriedByLooseKeyMap.set(inv.legacy_loose_key, newText);
       }
     }
   }
 
   // Step 3: Consolidate the damage lists
+  // First, process legacy BUHS damages
   const consolidatedDamages: ConsolidatedDamage[] = legacyDamages.map(leg => {
     const originalText = getLegacyDamageText(leg);
-    const isInventoried = inventoriedMap.has(originalText);
-    const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
+    
+    // Check if inventoried by exact text match
+    let isInventoried = inventoriedByTextMap.has(originalText);
+    let displayText = isInventoried ? inventoriedByTextMap.get(originalText)! : originalText;
+    
+    // If not found by text, check by loose key (REGNR|date)
+    if (!isInventoried && leg.damage_date) {
+      const looseKey = `${cleanedRegnr}|${leg.damage_date}`;
+      if (inventoriedByLooseKeyMap.has(looseKey)) {
+        isInventoried = true;
+        displayText = inventoriedByLooseKeyMap.get(looseKey)!;
+      }
+    }
 
     return {
       id: leg.id,
       text: displayText,
-      damage_date: leg.damage_date, // <<< CORRECTED: Use the actual damage_date
+      damage_date: leg.damage_date,
       is_inventoried: isInventoried,
     };
   }).filter(d => d.text); // Ensure we don't have empty damage entries
 
+  // Step 4: Add new damages from public.damages (where legacy_damage_source_text IS NULL)
+  if (newDamagesResponse.data) {
+    for (const newDamage of newDamagesResponse.data) {
+      const positions = (newDamage.user_positions as any[] || [])
+        .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
+        .filter(Boolean)
+        .join(', ');
+      
+      let damageText = `${newDamage.user_type || 'Skada'}`;
+      if (positions) {
+        damageText += `: ${positions}`;
+      }
+      if (newDamage.description) {
+        damageText += ` - ${newDamage.description}`;
+      }
+
+      consolidatedDamages.push({
+        id: newDamage.id,
+        text: damageText,
+        damage_date: newDamage.damage_date,
+        is_inventoried: true, // New damages are already inventoried (in our system)
+      });
+    }
+  }
+
   const latestSaludatum = legacyDamages.length > 0 ? legacyDamages[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
-  // Step 4: Return the final vehicle info object
+  // Step 5: Return the final vehicle info object
   if (vehicleData) {
     return {
       regnr: cleanedRegnr,

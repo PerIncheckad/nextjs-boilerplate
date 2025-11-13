@@ -373,6 +373,20 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const { meta: payload, subjectBase, region } = fullRequestPayload; 
 
+    // =================================================================
+    // DETECT DRY RUN MODE
+    // =================================================================
+    // Check dryRun from query params, body.dryRun, or body.meta.dryRun
+    const url = new URL(request.url);
+    const queryDryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true';
+    const bodyDryRun = fullRequestPayload.dryRun === true;
+    const metaDryRun = fullRequestPayload.meta?.dryRun === true;
+    const dryRun = queryDryRun || bodyDryRun || metaDryRun;
+
+    if (dryRun) {
+      console.log('🔵 DRY RUN MODE ACTIVE: inga DB-skrivningar kommer ske.');
+    }
+
     // Get the site URL from the request to ensure media links work correctly
     const siteUrl = getSiteUrl(request);
     console.log('Using site URL for media links:', siteUrl);
@@ -468,7 +482,191 @@ export async function POST(request: Request) {
     
     await Promise.all(emailPromises);
 
-    return NextResponse.json({ message: 'Notifications processed successfully.' });
+    // =================================================================
+    // DATABASE PERSISTENCE (SKIP IN DRY RUN MODE)
+    // =================================================================
+    if (dryRun) {
+      console.log('✅ DRY RUN: E-post skickade, DB-skrivningar hoppades över.');
+      return NextResponse.json({ ok: true, dryRun: true });
+    }
+
+    // Get today's date in Europe/Stockholm timezone for damage_date
+    const todayDate = new Date().toLocaleDateString('sv-SE', { 
+      timeZone: 'Europe/Stockholm', 
+      year: 'numeric', 
+      month: '2-digit', 
+      day: '2-digit' 
+    });
+
+    try {
+      // 1. Insert into public.checkins
+      const checkinData = {
+        regnr: regNr,
+        completed_at: new Date().toISOString(),
+        current_city: payload.bilen_star_nu?.ort || payload.ort,
+        current_station: payload.bilen_star_nu?.station || payload.station,
+        current_location_note: payload.bilen_star_nu?.kommentar || null,
+        odometer: payload.matarstallning,
+        wheel_type: payload.hjultyp,
+        fuel_type: payload.drivmedel,
+        checker_name: formatCheckerName(payload),
+        checker_email: payload.incheckare || null,
+      };
+
+      const { data: checkinRecord, error: checkinError } = await supabaseAdmin
+        .from('checkins')
+        .insert(checkinData)
+        .select('id')
+        .single();
+
+      if (checkinError) {
+        console.error('❌ CHECKIN INSERT ERROR:', checkinError);
+        throw new Error(`Failed to insert checkin: ${checkinError.message}`);
+      }
+
+      console.log(`✅ CHECKIN INSERT OK: checkin_id=${checkinRecord.id}, regnr=${regNr}`);
+
+      const checkinId = checkinRecord.id;
+
+      // 2. Persist NEW damages (nya_skador)
+      const nyaSkador = payload.nya_skador || [];
+      if (nyaSkador.length > 0) {
+        console.log(`📝 Processing ${nyaSkador.length} new damage(s)...`);
+
+        for (const damage of nyaSkador) {
+          // Insert into public.damages
+          const damageData = {
+            regnr: regNr,
+            damage_date: todayDate,
+            legacy_damage_source_text: null,
+            original_damage_date: null,
+            legacy_loose_key: null,
+            user_type: damage.userType || damage.type,
+            user_positions: damage.userPositions || damage.positions || [],
+            description: damage.userDescription || damage.text || null,
+            inchecker_email: payload.incheckare || null,
+          };
+
+          const { error: damageError } = await supabaseAdmin
+            .from('damages')
+            .insert(damageData);
+
+          if (damageError) {
+            console.error('❌ NEW DAMAGE INSERT ERROR:', damageError);
+            throw new Error(`Failed to insert new damage: ${damageError.message}`);
+          }
+
+          console.log(`✅ NEW DAMAGE INSERTED: type=${damageData.user_type}`);
+
+          // Insert into public.checkin_damages (one row per position)
+          const positions = damage.userPositions || damage.positions || [];
+          for (const pos of positions) {
+            const checkinDamageData = {
+              checkin_id: checkinId,
+              regnr: regNr,
+              user_type: damage.userType || damage.type,
+              carPart: pos.carPart,
+              position: pos.position,
+            };
+
+            const { error: checkinDamageError } = await supabaseAdmin
+              .from('checkin_damages')
+              .insert(checkinDamageData);
+
+            if (checkinDamageError) {
+              console.error('❌ CHECKIN_DAMAGE INSERT ERROR:', checkinDamageError);
+              // Don't throw, just log - this is less critical
+            }
+          }
+        }
+
+        console.log(`✅ ALL NEW DAMAGES PROCESSED (${nyaSkador.length})`);
+      }
+
+      // 3. Persist DOCUMENTED BUHS damages (dokumenterade_skador)
+      const dokumenteradeSkador = payload.dokumenterade_skador || [];
+      if (dokumenteradeSkador.length > 0) {
+        console.log(`📝 Processing ${dokumenteradeSkador.length} documented BUHS damage(s)...`);
+
+        for (const damage of dokumenteradeSkador) {
+          // Build legacy_damage_source_text from original BUHS text
+          const legacyText = damage.fullText || damage.text || damage.type;
+          const originalDamageDate = damage.damage_date;
+          const legacyLooseKey = originalDamageDate ? `${regNr}|${originalDamageDate}` : null;
+
+          // Check for existing damage (idempotence)
+          let exists = false;
+
+          // Check by legacy_damage_source_text
+          if (legacyText) {
+            const { data: existingByText } = await supabaseAdmin
+              .from('damages')
+              .select('id')
+              .eq('regnr', regNr)
+              .eq('legacy_damage_source_text', legacyText)
+              .single();
+
+            if (existingByText) {
+              exists = true;
+              console.log(`⏭️  SKIPPED DOCUMENTED DAMAGE (exists by text): ${legacyText}`);
+            }
+          }
+
+          // Check by legacy_loose_key
+          if (!exists && legacyLooseKey) {
+            const { data: existingByKey } = await supabaseAdmin
+              .from('damages')
+              .select('id')
+              .eq('legacy_loose_key', legacyLooseKey)
+              .single();
+
+            if (existingByKey) {
+              exists = true;
+              console.log(`⏭️  SKIPPED DOCUMENTED DAMAGE (exists by loose key): ${legacyLooseKey}`);
+            }
+          }
+
+          if (!exists) {
+            // Insert into public.damages
+            const damageData = {
+              regnr: regNr,
+              damage_date: todayDate, // when documented
+              legacy_damage_source_text: legacyText,
+              original_damage_date: originalDamageDate,
+              legacy_loose_key: legacyLooseKey,
+              user_type: damage.userType || damage.type,
+              user_positions: damage.userPositions || damage.positions || [],
+              description: damage.userDescription || damage.text || damage.resolvedComment || null,
+            };
+
+            const { error: damageError } = await supabaseAdmin
+              .from('damages')
+              .insert(damageData);
+
+            if (damageError) {
+              console.error('❌ DOCUMENTED DAMAGE INSERT ERROR:', damageError);
+              throw new Error(`Failed to insert documented damage: ${damageError.message}`);
+            }
+
+            console.log(`✅ DOCUMENTED DAMAGE INSERTED: legacy_text="${legacyText}", loose_key="${legacyLooseKey}"`);
+          }
+        }
+
+        console.log(`✅ ALL DOCUMENTED DAMAGES PROCESSED (${dokumenteradeSkador.length})`);
+      }
+
+      console.log('✅ DATABASE PERSISTENCE COMPLETE');
+    } catch (dbError) {
+      console.error('❌ DATABASE ERROR:', dbError);
+      // Don't fail the whole request if DB fails - emails were sent successfully
+      return NextResponse.json({ 
+        ok: true, 
+        warning: 'Emails sent successfully, but database persistence failed',
+        error: dbError instanceof Error ? dbError.message : 'Unknown database error'
+      });
+    }
+
+    return NextResponse.json({ ok: true, message: 'Notifications processed successfully.' });
 
   } catch (error) {
     console.error('FATAL: Uncaught error in API route:', error);
