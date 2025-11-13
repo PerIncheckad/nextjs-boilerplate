@@ -608,7 +608,7 @@ export async function POST(request: Request) {
 
             if (existingByText) {
               exists = true;
-              console.log(`⏭️  SKIPPED DOCUMENTED DAMAGE (exists by text): ${legacyText}`);
+              console.log(`⏭️  SKIPPED: BUHS damage exists by text: ${legacyText}`);
             }
           }
 
@@ -622,7 +622,7 @@ export async function POST(request: Request) {
 
             if (existingByKey) {
               exists = true;
-              console.log(`⏭️  SKIPPED DOCUMENTED DAMAGE (exists by loose key): ${legacyLooseKey}`);
+              console.log(`⏭️  SKIPPED: BUHS damage exists by loose key: ${legacyLooseKey}`);
             }
           }
 
@@ -648,7 +648,7 @@ export async function POST(request: Request) {
               throw new Error(`Failed to insert documented damage: ${damageError.message}`);
             }
 
-            console.log(`✅ DOCUMENTED DAMAGE INSERTED: legacy_text="${legacyText}", loose_key="${legacyLooseKey}"`);
+            console.log(`✅ BUHS DAMAGE INSERT OK: legacy_text="${legacyText}", loose_key="${legacyLooseKey}"`);
           }
         }
 
