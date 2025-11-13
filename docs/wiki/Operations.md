@@ -20,6 +20,12 @@
 - Vercel Instant Rollback, alternativt revert PR
 - Data dupliceras inte pga idempotens + unika index
 
+## Testläge (dryRun)
+- Lägg till `?dryRun=1` på `/check` för att testa utan databas-skrivning
+- E-post skickas som vanligt, men inga ändringar sparas i databasen
+- API svarar med `{ ok: true, dryRun: true }` när testläge är aktivt
+- Användbart för att verifiera e-postflödet utan att påverka produktionsdata
+
 ## Säkerhet
 - `/media` är skyddad
 - `/public-media` är publik (endast galleri, bucket är publik)

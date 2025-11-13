@@ -8,18 +8,34 @@ export const notifyCheckin = async (params: NotifyCheckinParams): Promise<{ succ
   console.log('notifyCheckin called with params:', params);
 
   try {
-    const response = await fetch('/api/notify', {
+    // Detect dryRun from URL query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const dryRun = urlParams.get('dryRun') === '1' || urlParams.get('dryRun') === 'true';
+    
+    // Build API URL with dryRun query parameter if present
+    const apiUrl = dryRun ? '/api/notify?dryRun=1' : '/api/notify';
+    
+    // Prepare request body with dryRun flags
+    const requestBody = {
+      region: params.region,
+      subjectBase: params.subjectBase,
+      meta: {
+        ...params.meta,
+        dryRun: dryRun || undefined,
+      },
+      dryRun: dryRun || undefined,
+    };
+    
+    console.log('DryRun mode:', dryRun);
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       // The API route expects the data to be wrapped in a specific structure.
       // This is the key correction.
-      body: JSON.stringify({
-        region: params.region,
-        subjectBase: params.subjectBase,
-        meta: params.meta,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

@@ -96,9 +96,19 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   
   // Create a lookup map of inventoried damages for efficient access
+  // Filter out completely empty damage rows
   const inventoriedMap = new Map<string, string>();
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
+      // Filter out empty rows where all key fields are NULL/empty
+      const hasUserType = inv.user_type && inv.user_type.trim() !== '';
+      const hasPositions = Array.isArray(inv.user_positions) && inv.user_positions.length > 0;
+      
+      // Skip rows that are completely empty (no user_type and no positions)
+      if (!hasUserType && !hasPositions) {
+        continue;
+      }
+      
       if (inv.legacy_damage_source_text) {
         const positions = (inv.user_positions as any[] || [])
           .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
