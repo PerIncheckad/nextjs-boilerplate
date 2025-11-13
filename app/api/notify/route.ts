@@ -599,12 +599,12 @@ export async function POST(request: Request) {
 
           // Check by legacy_damage_source_text
           if (legacyText) {
-            const { data: existingByText } = await supabaseAdmin
+            const { data: existingByText, error: checkError1 } = await supabaseAdmin
               .from('damages')
               .select('id')
               .eq('regnr', regNr)
               .eq('legacy_damage_source_text', legacyText)
-              .single();
+              .maybeSingle();
 
             if (existingByText) {
               exists = true;
@@ -614,11 +614,11 @@ export async function POST(request: Request) {
 
           // Check by legacy_loose_key
           if (!exists && legacyLooseKey) {
-            const { data: existingByKey } = await supabaseAdmin
+            const { data: existingByKey, error: checkError2 } = await supabaseAdmin
               .from('damages')
               .select('id')
               .eq('legacy_loose_key', legacyLooseKey)
-              .single();
+              .maybeSingle();
 
             if (existingByKey) {
               exists = true;
