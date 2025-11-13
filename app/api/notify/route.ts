@@ -377,6 +377,8 @@ export async function POST(request: Request) {
     // DETECT DRY RUN MODE
     // =================================================================
     // Check dryRun from query params, body.dryRun, or body.meta.dryRun
+    // This allows testers to easily test the API without making database changes
+    // by appending ?dryRun=1 to the URL or setting dryRun: true in the request body
     const url = new URL(request.url);
     const queryDryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true';
     const bodyDryRun = fullRequestPayload.dryRun === true;
