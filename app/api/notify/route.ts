@@ -429,6 +429,145 @@ export async function POST(request: Request) {
     console.log(`Bilkontroll recipients: ${bilkontrollAddress.join(', ')}`);
     // --- SLUT ÄNDRING ---
 
+    // =================================================================
+    // 5. DATABASE WRITES - Persist check-in and damages
+    // =================================================================
+    try {
+      // Step 1: Insert into public.checkins
+      const checkinData = {
+        regnr: payload.regnr,
+        completed_at: now.toISOString(),
+        odometer: payload.matarstallning ? parseInt(payload.matarstallning, 10) : null,
+        has_new_damages: payload.nya_skador && payload.nya_skador.length > 0,
+        city: payload.ort,
+        station: payload.station,
+        destination_city: payload.bilen_star_nu?.ort || payload.ort,
+        destination_station: payload.bilen_star_nu?.station || payload.station,
+        checker_email: payload.user_email,
+        checker_name: formatCheckerName(payload),
+      };
+
+      const { data: checkinRecord, error: checkinError } = await supabaseAdmin
+        .from('checkins')
+        .insert(checkinData)
+        .select('id')
+        .single();
+
+      if (checkinError) {
+        console.error('Failed to insert checkin:', checkinError);
+        throw new Error(`Database error: Failed to insert checkin - ${checkinError.message}`);
+      }
+
+      const checkinId = checkinRecord.id;
+      console.log('Checkin inserted with ID:', checkinId);
+
+      // Step 2: Insert documented BUHS damages into public.damages
+      const dokumenteradeSkador = payload.dokumenterade_skador || [];
+      for (const damage of dokumenteradeSkador) {
+        const legacyDamageSourceText = damage.fullText || '';
+        const originalDamageDate = damage.originalDamageDate || null;
+        const looseKey = originalDamageDate ? `${payload.regnr}|${originalDamageDate}` : null;
+
+        // Check if this damage already exists (by exact text OR loose key)
+        const { data: existingDamages } = await supabaseAdmin
+          .from('damages')
+          .select('id')
+          .eq('regnr', payload.regnr)
+          .or(`legacy_damage_source_text.eq.${legacyDamageSourceText}${looseKey ? `,legacy_loose_key.eq.${looseKey}` : ''}`);
+
+        if (existingDamages && existingDamages.length > 0) {
+          console.log('Documented BUHS damage already exists, skipping:', legacyDamageSourceText);
+          continue;
+        }
+
+        const damageData = {
+          regnr: payload.regnr,
+          legacy_damage_source_text: legacyDamageSourceText,
+          original_damage_date: originalDamageDate,
+          legacy_loose_key: looseKey,
+          user_type: damage.userType,
+          user_positions: damage.userPositions,
+          description: damage.userDescription || null,
+          photo_urls: damage.uploads?.photo_urls || [],
+          video_urls: damage.uploads?.video_urls || [],
+          folder_path: damage.uploads?.folder || null,
+          city: payload.ort,
+          station: payload.station,
+          region: region,
+        };
+
+        const { error: damageError } = await supabaseAdmin
+          .from('damages')
+          .insert(damageData);
+
+        if (damageError) {
+          console.error('Failed to insert documented BUHS damage:', damageError);
+          // Continue with other damages rather than failing entire operation
+        }
+      }
+
+      // Step 3: Insert new damages into public.damages and public.checkin_damages
+      const nyaSkador = payload.nya_skador || [];
+      for (const damage of nyaSkador) {
+        // Insert into damages table
+        const damageData = {
+          regnr: payload.regnr,
+          legacy_damage_source_text: null, // New damages don't have legacy text
+          original_damage_date: null,
+          legacy_loose_key: null,
+          user_type: damage.type,
+          user_positions: damage.positions,
+          description: damage.text || null,
+          photo_urls: damage.uploads?.photo_urls || [],
+          video_urls: damage.uploads?.video_urls || [],
+          folder_path: damage.uploads?.folder || null,
+          city: payload.ort,
+          station: payload.station,
+          region: region,
+        };
+
+        const { data: newDamageRecord, error: newDamageError } = await supabaseAdmin
+          .from('damages')
+          .insert(damageData)
+          .select('id')
+          .single();
+
+        if (newDamageError) {
+          console.error('Failed to insert new damage:', newDamageError);
+          continue;
+        }
+
+        const damageId = newDamageRecord.id;
+
+        // Insert into checkin_damages for each position
+        const positions = damage.positions || [];
+        for (const position of positions) {
+          const checkinDamageData = {
+            checkin_id: checkinId,
+            damage_id: damageId,
+            type: damage.type,
+            car_part: position.carPart,
+            position: position.position,
+            description: damage.text || null,
+          };
+
+          const { error: checkinDamageError } = await supabaseAdmin
+            .from('checkin_damages')
+            .insert(checkinDamageData);
+
+          if (checkinDamageError) {
+            console.error('Failed to insert checkin_damage:', checkinDamageError);
+            // Continue with other positions
+          }
+        }
+      }
+
+      console.log('Database writes completed successfully');
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      // Log but don't fail the entire operation - emails should still be sent
+    }
+
     // Compute station for subject - use "Bilen står nu" station when present
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
     // If station contains "Ort / Station", keep only the Station portion
