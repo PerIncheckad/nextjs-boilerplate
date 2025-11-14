@@ -802,6 +802,33 @@ export default function CheckInForm() {
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
       
+        // NEW: Submit check-in data to database (validation + insert)
+        const submitResponse = await fetch('/api/check-submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                regnr: reg,
+                dokumenterade_skador: legacyDamagesForUpload,
+                nya_skador: newDamagesForUpload,
+                dry_run: false, // Set to true to skip DB writes
+            }),
+        });
+
+        if (!submitResponse.ok) {
+            const errorData = await submitResponse.json();
+            console.error('Check submission failed:', errorData);
+            
+            // If validation failed, show specific error
+            if (errorData.undokumenterade) {
+                throw new Error(`Du måste dokumentera alla befintliga skador innan du kan slutföra incheckningen. ${errorData.undokumenterade_count} skador kvarstår.`);
+            }
+            
+            throw new Error(errorData.error || 'Kunde inte spara incheckningen');
+        }
+
+        const submitResult = await submitResponse.json();
+        console.log('Check submission successful:', submitResult);
+
         const finalPayloadForNotification = {
             ...finalPayloadForUI,
             user_email: userEmail,
