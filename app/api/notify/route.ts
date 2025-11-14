@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import stationer from '@/data/stationer.json';
 
 // =================================================================
 // 1. INITIALIZATION & CONFIGURATION
@@ -12,17 +13,44 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeho
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 // --- E-postmottagare ---
-// Bilkontroll ska nu gå till en lista av mottagare.
-const bilkontrollAddress = ['per@incheckad.se', 'latif@incheckad.se']; 
+// NEW: Updated email routing based on huvudstation_id
+const bilkontrollAddress = ['per@incheckad.se', 'latif.mutlu@incheckad.se']; 
 const defaultHuvudstationAddress = 'per@incheckad.se'; // Fallback och primär mottagare
 
-// Mappning för stationsspecifika e-postadresser.
-// Denna mappning styr vart huvudstation-mejlet skickas baserat på bilens slutdestination.
-const stationEmailMapping: { [ort: string]: string } = {
-  'Helsingborg': 'helsingborg@incheckad.se',
-  'Ängelholm': 'helsingborg@incheckad.se', // Ängelholm ska också gå till Helsingborg tills vidare.
-  // Fler orter kan läggas till här i framtiden, t.ex. 'Malmö': 'malmo@incheckad.se'
+// NEW: Email routing based on huvudstation_id
+// Huvudstation 170 (Helsingborg) and 171 (Ängelholm) route to helsingborg@incheckad.se
+// All other huvudstation_id route to per@incheckad.se only
+const huvudstationEmailMapping: { [huvudstationId: string]: string[] } = {
+  '170': ['per@incheckad.se', 'helsingborg@incheckad.se'], // Helsingborg
+  '171': ['per@incheckad.se', 'helsingborg@incheckad.se'], // Ängelholm
 };
+
+// Helper function to get huvudstation_id from station name
+function getHuvudstationId(stationName: string, ortName: string): string | null {
+  if (!stationName) return null;
+  
+  // Try to find exact match in stationer.json
+  const station = stationer.find((s: any) => 
+    s.type === 'station' && 
+    s.namn.trim().toLowerCase() === stationName.trim().toLowerCase()
+  );
+  
+  if (station && 'huvudstation_id' in station) {
+    return station.huvudstation_id as string;
+  }
+  
+  // Fallback: try case-insensitive name match with partial matching
+  const partialStation = stationer.find((s: any) => 
+    s.type === 'station' && 
+    s.namn.trim().toLowerCase().includes(stationName.trim().toLowerCase())
+  );
+  
+  if (partialStation && 'huvudstation_id' in partialStation) {
+    return partialStation.huvudstation_id as string;
+  }
+  
+  return null;
+}
 
 
 const supabaseProjectId = supabaseUrl.match(/https:\/\/(.*)\.supabase\.co/)?.[1];
@@ -252,8 +280,8 @@ const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE 
 // 3. HTML BUILDERS - SPECIFIC EMAILS
 // =================================================================
 
-const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
-  const { regnr, carModel, ort, station, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, husdjur, rokning, rental, status, nya_skador = [], notering, bilen_star_nu } = payload;
+const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string, checkInDate: Date): string => {
+  const { regnr, carModel, ort, station, matarstallning, hjultyp, tankning, laddning, rekond, varningslampa, husdjur, rokning, rental, status, nya_skador = [], notering, bilen_star_nu, saludatum } = payload;
   
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(laddning.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
@@ -262,6 +290,25 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const nyaSkadorFolder = nya_skador.find((d: any) => d.uploads?.folder)?.uploads?.folder;
   
   const checkerName = formatCheckerName(payload);
+
+  // NEW: Saludatum banner logic - show if saludatum is within 10 days of check-in date
+  let showSaludatumBanner = false;
+  let saludatumFormatted = '';
+  if (saludatum && saludatum !== 'Ingen information') {
+    try {
+      // Parse saludatum (format: YYYY-MM-DD)
+      const saludatumDate = new Date(saludatum);
+      const daysDiff = Math.floor((saludatumDate.getTime() - checkInDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Show banner if saludatum is within 10 days (before or after check-in)
+      if (Math.abs(daysDiff) <= 10) {
+        showSaludatumBanner = true;
+        saludatumFormatted = saludatum; // Already in YYYY-MM-DD format
+      }
+    } catch (e) {
+      console.error('Error parsing saludatum:', e);
+    }
+  }
 
   const content = `
     ${createAlertBanner(rental?.unavailable, 'Går inte att hyra ut', rental?.comment, undefined, siteUrl)}
@@ -273,6 +320,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
     ${createAlertBanner(nya_skador.length > 0, 'Nya skador dokumenterade', undefined, nyaSkadorFolder, siteUrl, nya_skador.length)}
     ${createAlertBanner(husdjur.sanerad, 'Husdjur', husdjur.text, husdjur.folder, siteUrl)}
     ${createAlertBanner(rokning.sanerad, 'Rökning', rokning.text, rokning.folder, siteUrl)}
+    ${createAlertBanner(showSaludatumBanner, `Saludatum: ${saludatumFormatted}`, 'Kontakta Bilkontroll, undvik långa hyror!', undefined, siteUrl)}
 
     <tr><td style="padding: 10px 0;">
       <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 20px;">
@@ -409,25 +457,28 @@ export async function POST(request: Request) {
     const date = now.toLocaleDateString('sv-SE', { ...options, year: 'numeric', month: '2-digit', day: '2-digit' });
     const time = now.toLocaleTimeString('sv-SE', { ...options, hour: '2-digit', minute: '2-digit' });
 
-    // --- ÄNDRING: Logik för att bestämma e-postmottagare ---
-    // 1. Bestäm slutdestinationens ort. Använd "Bilen står nu" om den finns.
+    // --- NEW: Email routing based on huvudstation_id ---
+    // 1. Determine final destination
     const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
+    const finalStation = payload.bilen_star_nu?.station || payload.station;
 
-    // 2. Bygg mottagarlistan för huvudstationen.
-    const huvudstationTo = [defaultHuvudstationAddress];
-    const stationSpecificEmail = stationEmailMapping[finalOrt];
-    if (stationSpecificEmail) {
-      // Lägg till den specifika adressen, men undvik dubbletter.
-      if (!huvudstationTo.includes(stationSpecificEmail)) {
-        huvudstationTo.push(stationSpecificEmail);
-      }
+    // 2. Get huvudstation_id from station name
+    const huvudstationId = getHuvudstationId(finalStation, finalOrt);
+    
+    // 3. Build huvudstation recipient list based on huvudstation_id
+    let huvudstationTo: string[] = [defaultHuvudstationAddress];
+    
+    if (huvudstationId && huvudstationEmailMapping[huvudstationId]) {
+      // Use specific mapping for this huvudstation_id
+      huvudstationTo = huvudstationEmailMapping[huvudstationId];
     }
 
     // Console log to verify recipients
-    console.log(`Final Ort: ${finalOrt}`);
+    console.log(`Final location: ${finalOrt} / ${finalStation}`);
+    console.log(`Huvudstation ID: ${huvudstationId || 'not found'}`);
     console.log(`Huvudstation recipients: ${huvudstationTo.join(', ')}`);
     console.log(`Bilkontroll recipients: ${bilkontrollAddress.join(', ')}`);
-    // --- SLUT ÄNDRING ---
+    // --- END NEW ---
 
     // Compute station for subject - use "Bilen står nu" station when present
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
@@ -458,7 +509,8 @@ export async function POST(request: Request) {
     // E-posthantering
     const emailPromises = [];
     
-    const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
+    // NEW: Pass checkInDate (now) to buildHuvudstationEmail for saludatum banner logic
+    const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl, now);
     // Använd den nya dynamiska mottagarlistan
     emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: huvudstationTo, subject: huvudstationSubject, html: huvudstationHtml }));
     
