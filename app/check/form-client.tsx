@@ -547,11 +547,13 @@ export default function CheckInForm() {
               setExistingDamages(info.existing_damages.map((d: ConsolidatedDamage) => ({ 
                 db_id: d.id,
                 id: Math.random().toString(36).substring(2, 15),
-                fullText: d.text,
-                originalDamageDate: d.damage_date,
-                isInventoried: d.is_inventoried,
-                status: 'not_selected',
-                userPositions: [],
+                fullText: d.fullText,
+                originalDamageDate: d.originalDamageDate,
+                isInventoried: d.isInventoried,
+                status: d.status,
+                userType: d.userType,
+                userPositions: d.userPositions || [],
+                userDescription: d.userDescription,
                 media: [],
                 uploads: { photo_urls: [], video_urls: [], folder: '' }
               })));
@@ -571,11 +573,13 @@ export default function CheckInForm() {
           setExistingDamages(info.existing_damages.map((d: ConsolidatedDamage) => ({ 
               db_id: d.id,
               id: Math.random().toString(36).substring(2, 15),
-              fullText: d.text,
-              originalDamageDate: d.damage_date,
-              isInventoried: d.is_inventoried,
-              status: 'not_selected',
-              userPositions: [],
+              fullText: d.fullText,
+              originalDamageDate: d.originalDamageDate,
+              isInventoried: d.isInventoried,
+              status: d.status,
+              userType: d.userType,
+              userPositions: d.userPositions || [],
+              userDescription: d.userDescription,
               media: [],
               uploads: { photo_urls: [], video_urls: [], folder: '' }
           })));
@@ -1177,7 +1181,7 @@ export default function CheckInForm() {
 
         <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
           <SectionHeader title="Skador" />
-          {vehicleData && existingDamages.some(d => !d.isInventoried) && (<Fragment>
+          {vehicleData && vehicleData.hasUndocumentedBUHS && (<Fragment>
             <SubSectionHeader title="Befintliga skador att hantera" />
             {existingDamages.filter(d => !d.isInventoried).map((d, i) => <DamageItem key={d.id} damage={d} index={i + 1} isExisting={true} onUpdate={updateDamageField} onMediaUpdate={(files) => handleMediaUpdate(d.id, files, true)} onMediaRemove={(idx) => handleMediaRemove(d.id, idx, true)} onAction={handleExistingDamageAction} onAddPosition={(damageId) => addDamagePosition(damageId, true)} onRemovePosition={(damageId, posId) => removeDamagePosition(damageId, posId, true)} />)}
             <hr className="section-divider-strong" />
