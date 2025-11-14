@@ -17,7 +17,9 @@ type LegacyDamage = {
 // Represents an already inventoried damage from our main 'damages' table
 type InventoriedDamage = {
   legacy_damage_source_text: string; // The original text, used as a key
+  legacy_loose_key: string | null; // REGNR|damage_date format
   new_text: string; // The new, structured text (e.g., "Repa: Dörr (Höger fram)")
+  original_damage_date: string | null; // YYYY-MM-DD from BUHS
 };
 
 // The final, consolidated damage object sent to the form client
@@ -70,6 +72,28 @@ function getLegacyDamageText(damage: LegacyDamage): string {
     return uniqueParts.join(' - ');
 }
 
+// NEW: Check if a damage text matches the standardized app pattern
+// Pattern: "Skadetyp - Placering - Position" (e.g., "Repa - Dörr - Höger fram")
+function isStandardizedAppText(text: string): boolean {
+    if (!text) return false;
+    // Regex: matches pattern with exactly 3 parts separated by " - "
+    // where each part contains non-dash characters
+    const pattern = /^[^-]+ - [^-]+ - [^-]+$/;
+    return pattern.test(text.trim());
+}
+
+// NEW: Check if damage text fields indicate standardized app format
+function hasStandardizedTextFields(damage: LegacyDamage): boolean {
+    const texts = [
+        damage.damage_type_raw,
+        damage.note_customer,
+        damage.note_internal
+    ].filter(t => t && t.trim());
+    
+    // Check if any of the text fields match the standardized pattern
+    return texts.some(t => isStandardizedAppText(t || ''));
+}
+
 
 // =================================================================
 // 3. CORE DATA FETCHING FUNCTION
@@ -79,6 +103,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
   // Step 1: Fetch all data concurrently
+  // NEW: Fetch documented damages including legacy_loose_key and original_damage_date
   const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
@@ -86,7 +111,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .from('damages')
-      .select('legacy_damage_source_text, user_type, user_positions')
+      .select('legacy_damage_source_text, legacy_loose_key, original_damage_date, user_type, user_positions')
       .eq('regnr', cleanedRegnr)
       .not('legacy_damage_source_text', 'is', null)
   ]);
@@ -95,34 +120,72 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const vehicleData = vehicleResponse.data?.[0] || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   
-  // Create a lookup map of inventoried damages for efficient access
+  // NEW: Create lookup maps for documented damages
+  // Map by legacy_damage_source_text
   const inventoriedMap = new Map<string, string>();
+  // NEW: Map by legacy_loose_key (REGNR|damage_date) for N2-per-datum support
+  const looseKeyMap = new Map<string, string>();
+  
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
+      const positions = (inv.user_positions as any[] || [])
+        .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
+        .filter(Boolean)
+        .join(', ');
+      const newText = `${inv.user_type || 'Skada'}: ${positions}`;
+      
+      // Store by legacy_damage_source_text
       if (inv.legacy_damage_source_text) {
-        const positions = (inv.user_positions as any[] || [])
-          .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
-          .filter(Boolean)
-          .join(', ');
-        const newText = `${inv.user_type || 'Skada'}: ${positions}`;
         inventoriedMap.set(inv.legacy_damage_source_text, newText);
+      }
+      
+      // NEW: Store by legacy_loose_key (REGNR|damage_date format)
+      if (inv.legacy_loose_key) {
+        looseKeyMap.set(inv.legacy_loose_key, newText);
+      }
+      
+      // NEW: Also generate and store by computed loose key if original_damage_date exists
+      if (inv.original_damage_date && !inv.legacy_loose_key) {
+        const computedKey = `${cleanedRegnr}|${inv.original_damage_date}`;
+        looseKeyMap.set(computedKey, newText);
       }
     }
   }
 
   // Step 3: Consolidate the damage lists
-  const consolidatedDamages: ConsolidatedDamage[] = legacyDamages.map(leg => {
-    const originalText = getLegacyDamageText(leg);
-    const isInventoried = inventoriedMap.has(originalText);
-    const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
+  const consolidatedDamages: ConsolidatedDamage[] = legacyDamages
+    .filter(leg => {
+      // NEW: Filter out BUHS rows that are from the import (have damage_type_raw)
+      // but already match the standardized app pattern
+      if (leg.damage_type_raw && hasStandardizedTextFields(leg)) {
+        return false; // Skip standardized app rows
+      }
+      return true;
+    })
+    .map(leg => {
+      const originalText = getLegacyDamageText(leg);
+      
+      // NEW: Check if documented by legacy_damage_source_text OR by legacy_loose_key
+      let isInventoried = inventoriedMap.has(originalText);
+      let displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
+      
+      // NEW: Also check by loose key (REGNR|damage_date) for N2-per-datum support
+      if (!isInventoried && leg.damage_date) {
+        const looseKey = `${cleanedRegnr}|${leg.damage_date}`;
+        if (looseKeyMap.has(looseKey)) {
+          isInventoried = true;
+          displayText = looseKeyMap.get(looseKey)!;
+        }
+      }
 
-    return {
-      id: leg.id,
-      text: displayText,
-      damage_date: leg.damage_date, // <<< CORRECTED: Use the actual damage_date
-      is_inventoried: isInventoried,
-    };
-  }).filter(d => d.text); // Ensure we don't have empty damage entries
+      return {
+        id: leg.id,
+        text: displayText,
+        damage_date: leg.damage_date,
+        is_inventoried: isInventoried,
+      };
+    })
+    .filter(d => d.text); // Ensure we don't have empty damage entries
 
   const latestSaludatum = legacyDamages.length > 0 ? legacyDamages[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
