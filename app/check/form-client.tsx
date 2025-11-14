@@ -461,7 +461,8 @@ export default function CheckInForm() {
       incheckare: firstName,
       fullName,
       timestamp: new Date().toISOString(),
-      carModel: vehicleData?.model, 
+      carModel: vehicleData?.model,
+      saludatum: vehicleData?.saludatum, // NEW: Include saludatum for email banner logic
       matarstallning, 
       hjultyp, 
       rental: {
