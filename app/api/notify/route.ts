@@ -366,12 +366,241 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
 };
 
 // =================================================================
-// 4. MAIN API FUNCTION
+// 4. DATABASE PERSISTENCE
+// =================================================================
+
+/**
+ * Persists check-in data to the database.
+ * Creates rows in checkins, damages, and checkin_damages tables.
+ * Implements idempotency for documented BUHS damages.
+ */
+async function persistCheckinData(payload: any, timestamp: Date) {
+  try {
+    const regnr = (payload.regnr || '').toUpperCase().trim();
+    const currentDate = timestamp.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // Basic validation
+    if (!regnr) {
+      console.error('Cannot persist checkin: missing regnr');
+      return;
+    }
+
+    const nyaSkador = Array.isArray(payload.nya_skador) ? payload.nya_skador : [];
+    const dokumenteradeSkador = Array.isArray(payload.dokumenterade_skador) ? payload.dokumenterade_skador : [];
+
+    // Validate that all damages have at least one photo
+    const allDamages = [...nyaSkador, ...dokumenteradeSkador];
+    for (const damage of allDamages) {
+      const photoCount = damage.uploads?.photo_urls?.length || 0;
+      if (photoCount < 1) {
+        console.error('Validation failed: damage missing photos', { damage });
+      }
+    }
+
+    // =================================================================
+    // Step 1: Insert into checkins table
+    // =================================================================
+    // TODO: Follow-up issue to switch from full checklist to destillat later
+    const currentCity = payload.bilen_star_nu?.ort || payload.ort || '';
+    const currentStation = payload.bilen_star_nu?.station || payload.station || '';
+    
+    // Build structured drivmedel field
+    let drivmedelData: any = {
+      typ: payload.drivmedel || null
+    };
+    
+    if (payload.drivmedel === 'bensin_diesel') {
+      drivmedelData.tankniva = payload.tankning?.tankniva || null;
+      drivmedelData.liters = payload.tankning?.liters || null;
+      drivmedelData.bransletyp = payload.tankning?.bransletyp || null;
+      drivmedelData.literpris = payload.tankning?.literpris || null;
+    } else if (payload.drivmedel === 'elbil') {
+      drivmedelData.laddniva = payload.laddning?.laddniva || null;
+      drivmedelData.antal_laddkablar = payload.laddning?.antal_laddkablar || null;
+    }
+
+    const checkinInsert = {
+      regnr,
+      current_city: currentCity,
+      current_station: currentStation,
+      odometer_km: payload.matarstallning ? parseInt(payload.matarstallning, 10) : null,
+      hjultyp: payload.hjultyp || null,
+      drivmedel: drivmedelData,
+      checker_name: payload.fullName || payload.incheckare || null,
+      checker_email: payload.user_email || null,
+      notes: payload.notering || null,
+      has_new_damages: nyaSkador.length > 0,
+      has_documented_buhs: dokumenteradeSkador.length > 0,
+      status: 'COMPLETED',
+      completed_at: timestamp.toISOString(),
+      checklist: payload // Store full payload as JSONB
+    };
+
+    const { data: checkinData, error: checkinError } = await supabaseAdmin
+      .from('checkins')
+      .insert([checkinInsert])
+      .select('id')
+      .single();
+
+    if (checkinError) {
+      console.error('Error inserting checkin:', checkinError);
+      throw new Error(`Failed to insert checkin: ${checkinError.message}`);
+    }
+
+    const checkinId = checkinData.id;
+    console.log(`✅ Created checkin record: ${checkinId}`);
+
+    // =================================================================
+    // Step 2: Insert damages (with idempotency for documented BUHS)
+    // =================================================================
+    const damageInserts: any[] = [];
+    const checkinDamageInserts: any[] = [];
+
+    // Helper to extract checker info
+    const checkerName = payload.fullName || payload.incheckare || null;
+    const checkerEmail = payload.user_email || null;
+
+    // Process new damages (nya_skador)
+    for (const skada of nyaSkador) {
+      const positions = Array.isArray(skada.positions) ? skada.positions : [];
+      const photoUrls = Array.isArray(skada.uploads?.photo_urls) ? skada.uploads.photo_urls : [];
+      const videoUrls = Array.isArray(skada.uploads?.video_urls) ? skada.uploads.video_urls : [];
+      
+      // Insert into damages table
+      damageInserts.push({
+        regnr,
+        damage_date: currentDate,
+        legacy_damage_source_text: null, // NULL for new damages
+        user_type: skada.type || null,
+        user_positions: positions,
+        description: skada.text || '',
+        uploads: {
+          photo_urls: photoUrls,
+          video_urls: videoUrls
+        },
+        inchecker_name: checkerName,
+        inchecker_email: checkerEmail
+      });
+
+      // Insert into checkin_damages table (one row per damage, not per position)
+      checkinDamageInserts.push({
+        checkin_id: checkinId,
+        regnr,
+        type: 'new',
+        positions: positions,
+        description: skada.text || '',
+        photo_urls: photoUrls,
+        video_urls: videoUrls
+      });
+    }
+
+    // Process documented BUHS damages (dokumenterade_skador) with idempotency
+    for (const skada of dokumenteradeSkador) {
+      const originalDamageDate = skada.originalDamageDate || null;
+      const legacySourceText = skada.fullText || null;
+      const positions = Array.isArray(skada.userPositions) ? skada.userPositions : [];
+      const photoUrls = Array.isArray(skada.uploads?.photo_urls) ? skada.uploads.photo_urls : [];
+      const videoUrls = Array.isArray(skada.uploads?.video_urls) ? skada.uploads.video_urls : [];
+
+      // Idempotency check
+      let shouldInsert = true;
+      if (originalDamageDate && legacySourceText) {
+        const { data: existing, error: checkError } = await supabaseAdmin
+          .from('damages')
+          .select('id')
+          .eq('regnr', regnr)
+          .eq('original_damage_date', originalDamageDate)
+          .eq('legacy_damage_source_text', legacySourceText)
+          .limit(1);
+
+        if (checkError) {
+          console.error('Error checking for duplicate damage:', checkError);
+        } else if (existing && existing.length > 0) {
+          console.log(`⚠️  Skipping duplicate documented damage: ${regnr} | ${originalDamageDate} | ${legacySourceText}`);
+          shouldInsert = false;
+        }
+      }
+
+      if (shouldInsert) {
+        // Build legacy_loose_key
+        const legacyLooseKey = originalDamageDate ? `${regnr}|${originalDamageDate}` : null;
+
+        damageInserts.push({
+          regnr,
+          original_damage_date: originalDamageDate,
+          legacy_damage_source_text: legacySourceText,
+          legacy_loose_key: legacyLooseKey,
+          user_positions: positions,
+          description: skada.userDescription || '',
+          uploads: {
+            photo_urls: photoUrls,
+            video_urls: videoUrls
+          },
+          inchecker_name: checkerName,
+          inchecker_email: checkerEmail
+        });
+      }
+
+      // Always insert into checkin_damages (for statistics)
+      checkinDamageInserts.push({
+        checkin_id: checkinId,
+        regnr,
+        type: 'documented',
+        positions: positions,
+        description: skada.userDescription || '',
+        photo_urls: photoUrls,
+        video_urls: videoUrls
+      });
+    }
+
+    // Bulk insert damages
+    if (damageInserts.length > 0) {
+      const { error: damagesError } = await supabaseAdmin
+        .from('damages')
+        .insert(damageInserts);
+
+      if (damagesError) {
+        console.error('Error inserting damages:', damagesError);
+        throw new Error(`Failed to insert damages: ${damagesError.message}`);
+      }
+      console.log(`✅ Inserted ${damageInserts.length} damage record(s)`);
+    }
+
+    // Bulk insert checkin_damages
+    if (checkinDamageInserts.length > 0) {
+      const { error: checkinDamagesError } = await supabaseAdmin
+        .from('checkin_damages')
+        .insert(checkinDamageInserts);
+
+      if (checkinDamagesError) {
+        console.error('Error inserting checkin_damages:', checkinDamagesError);
+        throw new Error(`Failed to insert checkin_damages: ${checkinDamagesError.message}`);
+      }
+      console.log(`✅ Inserted ${checkinDamageInserts.length} checkin_damage record(s)`);
+    }
+
+    console.log('✅ Successfully persisted all check-in data to database');
+  } catch (error) {
+    console.error('❌ Error persisting checkin data:', error);
+    // Don't throw - allow the email to be sent even if DB persistence fails
+  }
+}
+
+// =================================================================
+// 5. MAIN API FUNCTION
 // =================================================================
 export async function POST(request: Request) {
   try {
     const fullRequestPayload = await request.json();
     const { meta: payload, subjectBase, region } = fullRequestPayload; 
+
+    // Check for dryRun mode from query parameters
+    const url = new URL(request.url);
+    const isDryRun = url.searchParams.get('dryRun') === '1';
+    
+    if (isDryRun) {
+      console.log('🔶 DRY RUN MODE ACTIVE - Skipping database writes');
+    }
 
     // Get the site URL from the request to ensure media links work correctly
     const siteUrl = getSiteUrl(request);
@@ -423,10 +652,14 @@ export async function POST(request: Request) {
       }
     }
 
+    // Override recipients in dryRun mode
+    const actualHuvudstationTo = isDryRun ? ['per@incheckad.se'] : huvudstationTo;
+    const actualBilkontrollTo = isDryRun ? ['per@incheckad.se'] : bilkontrollAddress;
+
     // Console log to verify recipients
     console.log(`Final Ort: ${finalOrt}`);
-    console.log(`Huvudstation recipients: ${huvudstationTo.join(', ')}`);
-    console.log(`Bilkontroll recipients: ${bilkontrollAddress.join(', ')}`);
+    console.log(`Huvudstation recipients: ${actualHuvudstationTo.join(', ')}`);
+    console.log(`Bilkontroll recipients: ${actualBilkontrollTo.join(', ')}`);
     // --- SLUT ÄNDRING ---
 
     // Compute station for subject - use "Bilen står nu" station when present
@@ -459,16 +692,27 @@ export async function POST(request: Request) {
     const emailPromises = [];
     
     const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
-    // Använd den nya dynamiska mottagarlistan
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: huvudstationTo, subject: huvudstationSubject, html: huvudstationHtml }));
+    // Use actual recipients (overridden in dryRun mode)
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: actualHuvudstationTo, subject: huvudstationSubject, html: huvudstationHtml }));
     
     const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, siteUrl);
-    // Använd listan med mottagare för bilkontroll
-    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: bilkontrollAddress, subject: bilkontrollSubject, html: bilkontrollHtml }));
+    // Use actual recipients (overridden in dryRun mode)
+    emailPromises.push(resend.emails.send({ from: 'incheckning@incheckad.se', to: actualBilkontrollTo, subject: bilkontrollSubject, html: bilkontrollHtml }));
     
     await Promise.all(emailPromises);
 
-    return NextResponse.json({ message: 'Notifications processed successfully.' });
+    // =================================================================
+    // 6. DATABASE PERSISTENCE (skip in dryRun mode)
+    // =================================================================
+    if (!isDryRun) {
+      await persistCheckinData(payload, now);
+    }
+
+    return NextResponse.json({ 
+      message: 'Notifications processed successfully.',
+      ok: true,
+      dryRun: isDryRun
+    });
 
   } catch (error) {
     console.error('FATAL: Uncaught error in API route:', error);
