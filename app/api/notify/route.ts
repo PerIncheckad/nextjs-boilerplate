@@ -200,6 +200,11 @@ export async function POST(request: Request) {
     const { meta: payload } = fullRequestPayload;
     const region = payload.region || null;
 
+    // Extract checker identity
+    const checkerName = formatCheckerName(payload);
+    const checkerEmail = payload.email || payload.user?.email || request.headers.get('x-user-email') || null;
+    console.debug('Checker identity', { checkerName, checkerEmail });
+
     // dryRun (skippa endast DB-skrivningar, skicka fortfarande mejl)
     const url = new URL(request.url);
     const dryRunParam = url.searchParams.get('dryRun');
@@ -287,8 +292,8 @@ export async function POST(request: Request) {
           current_city: payload.bilen_star_nu?.ort || payload.ort || null,
           current_station: payload.bilen_star_nu?.station || payload.station || null,
           current_location_note: payload.bilen_star_nu?.kommentar || null,
-          checker_name: payload.fullName || payload.full_name || payload.incheckare || null,
-          checker_email: payload.email || null,
+          checker_name: checkerName,
+          checker_email: checkerEmail,
           completed_at: now.toISOString(),
           status: 'complete',
           user_type: payload.user_type || null,
@@ -327,8 +332,8 @@ export async function POST(request: Request) {
             damage_type_raw: rawType,
             user_type: rawType,
             description: skada.text || skada.userDescription || null,
-            inchecker_name: checkinData.checker_name,
-            inchecker_email: checkinData.checker_email,
+            inchecker_name: checkerName,
+            inchecker_email: checkerEmail,
             status: 'complete',
             uploads: skada.uploads || null,
             created_at: now.toISOString(),
@@ -381,8 +386,8 @@ export async function POST(request: Request) {
             damage_type_raw: rawType,
             user_type: rawType,
             description: skada.userDescription || skada.text || null,
-            inchecker_name: checkinData.checker_name,
-            inchecker_email: checkinData.checker_email,
+            inchecker_name: checkerName,
+            inchecker_email: checkerEmail,
             status: 'complete',
             uploads: skada.uploads || null,
             legacy_damage_source_text: skada.fullText || null,
