@@ -185,11 +185,49 @@ a { color:#2563eb!important; }
 </html>`;
 
 // =================================================================
-// 3. HTML BUILDERS (kommentar)
+// 3. HTML BUILDERS
 // =================================================================
-// Den här filen förutsätter att buildHuvudstationEmail och buildBilkontrollEmail
-// finns definierade (antingen här eller importerade). Om de är externa:
-// import { buildHuvudstationEmail, buildBilkontrollEmail } from './emailBuilders';
+
+// Declare optional external email builders (if available at runtime)
+declare function buildHuvudstationEmail(payload: any, date: string, time: string, siteUrl: string): string;
+declare function buildBilkontrollEmail(payload: any, date: string, time: string, siteUrl: string): string;
+
+// Fallback email builders (used if external builders are not available)
+const buildHuvudstationEmailBasic = (payload: any, date: string, time: string, siteUrl: string, regNr: string): string => {
+  const checkerName = formatCheckerName(payload);
+  const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
+  const finalStation = payload.bilen_star_nu?.station || payload.station;
+  
+  let content = `<tr><td style="padding:6px 0;"><h1 style="font-size:20px;margin:0 0 20px;">Incheckning: ${regNr}</h1></td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Datum:</strong> ${date} kl ${time}</td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Incheckare:</strong> ${checkerName}</td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Ort:</strong> ${finalOrt || '---'}</td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Station:</strong> ${finalStation || '---'}</td></tr>`;
+  
+  // Add damages if any
+  content += formatDamagesToHtml(payload.nya_skador || [], 'Nya skador', siteUrl, 'Inga nya skador rapporterade');
+  content += formatDamagesToHtml(payload.dokumenterade_skador || [], 'Dokumenterade skador', siteUrl);
+  
+  return createBaseLayout(regNr, content);
+};
+
+const buildBilkontrollEmailBasic = (payload: any, date: string, time: string, siteUrl: string, regNr: string): string => {
+  const checkerName = formatCheckerName(payload);
+  const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
+  const finalStation = payload.bilen_star_nu?.station || payload.station;
+  
+  let content = `<tr><td style="padding:6px 0;"><h1 style="font-size:20px;margin:0 0 20px;">Bilkontroll: ${regNr}</h1></td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Datum:</strong> ${date} kl ${time}</td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Incheckare:</strong> ${checkerName}</td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Ort:</strong> ${finalOrt || '---'}</td></tr>`;
+  content += `<tr><td style="padding:6px 0;"><strong>Station:</strong> ${finalStation || '---'}</td></tr>`;
+  
+  // Add damages if any
+  content += formatDamagesToHtml(payload.nya_skador || [], 'Nya skador', siteUrl, 'Inga nya skador rapporterade');
+  content += formatDamagesToHtml(payload.dokumenterade_skador || [], 'Dokumenterade skador', siteUrl);
+  
+  return createBaseLayout(regNr, content);
+};
 
 // =================================================================
 // 4. MAIN API FUNCTION
@@ -197,8 +235,14 @@ a { color:#2563eb!important; }
 export async function POST(request: Request) {
   try {
     const fullRequestPayload = await request.json();
-    const { meta: payload } = fullRequestPayload;
+    // Backward-compatible payload extraction: accept both {meta: {...}} and {...} formats
+    const payload = fullRequestPayload?.meta ?? fullRequestPayload ?? {};
     const region = payload.region || null;
+
+    // Compute checker identity immediately after payload extraction
+    const checkerName = formatCheckerName(payload);
+    const checkerEmail = payload.email || payload.user?.email || request.headers.get('x-user-email') || null;
+    console.debug('Checker identity', { checkerName, checkerEmail });
 
     // dryRun (skippa endast DB-skrivningar, skicka fortfarande mejl)
     const url = new URL(request.url);
@@ -287,8 +331,8 @@ export async function POST(request: Request) {
           current_city: payload.bilen_star_nu?.ort || payload.ort || null,
           current_station: payload.bilen_star_nu?.station || payload.station || null,
           current_location_note: payload.bilen_star_nu?.kommentar || null,
-          checker_name: payload.fullName || payload.full_name || payload.incheckare || null,
-          checker_email: payload.email || null,
+          checker_name: checkerName,
+          checker_email: checkerEmail,
           completed_at: now.toISOString(),
           status: 'complete',
           user_type: payload.user_type || null,
@@ -327,8 +371,8 @@ export async function POST(request: Request) {
             damage_type_raw: rawType,
             user_type: rawType,
             description: skada.text || skada.userDescription || null,
-            inchecker_name: checkinData.checker_name,
-            inchecker_email: checkinData.checker_email,
+            inchecker_name: checkerName,
+            inchecker_email: checkerEmail,
             status: 'complete',
             uploads: skada.uploads || null,
             created_at: now.toISOString(),
@@ -381,8 +425,8 @@ export async function POST(request: Request) {
             damage_type_raw: rawType,
             user_type: rawType,
             description: skada.userDescription || skada.text || null,
-            inchecker_name: checkinData.checker_name,
-            inchecker_email: checkinData.checker_email,
+            inchecker_name: checkerName,
+            inchecker_email: checkerEmail,
             status: 'complete',
             uploads: skada.uploads || null,
             legacy_damage_source_text: skada.fullText || null,
@@ -455,26 +499,42 @@ export async function POST(request: Request) {
     // =================================================================
     const emailPromises: Promise<any>[] = [];
 
-    // Antag att dessa builders finns. Om de inte finns – importera dem eller ersätt med createBaseLayout.
-    const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
-    emailPromises.push(
-      resend.emails.send({
-        from: 'incheckning@incheckad.se',
-        to: huvudstationTo,
-        subject: huvudstationSubject,
-        html: huvudstationHtml,
-      })
-    );
+    // Use external builders if available, otherwise fallback to basic builders
+    const huvudstationHtml = typeof buildHuvudstationEmail === 'function'
+      ? buildHuvudstationEmail(payload, date, time, siteUrl)
+      : buildHuvudstationEmailBasic(payload, date, time, siteUrl, regNr);
+    
+    try {
+      emailPromises.push(
+        resend.emails.send({
+          from: 'incheckning@incheckad.se',
+          to: huvudstationTo,
+          subject: huvudstationSubject,
+          html: huvudstationHtml,
+        })
+      );
+      console.debug('Huvudstation email queued');
+    } catch (emailError) {
+      console.error('Error sending huvudstation email:', emailError);
+    }
 
-    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, siteUrl);
-    emailPromises.push(
-      resend.emails.send({
-        from: 'incheckning@incheckad.se',
-        to: bilkontrollAddress,
-        subject: bilkontrollSubject,
-        html: bilkontrollHtml,
-      })
-    );
+    const bilkontrollHtml = typeof buildBilkontrollEmail === 'function'
+      ? buildBilkontrollEmail(payload, date, time, siteUrl)
+      : buildBilkontrollEmailBasic(payload, date, time, siteUrl, regNr);
+    
+    try {
+      emailPromises.push(
+        resend.emails.send({
+          from: 'incheckning@incheckad.se',
+          to: bilkontrollAddress,
+          subject: bilkontrollSubject,
+          html: bilkontrollHtml,
+        })
+      );
+      console.debug('Bilkontroll email queued');
+    } catch (emailError) {
+      console.error('Error sending bilkontroll email:', emailError);
+    }
 
     await Promise.all(emailPromises);
 
