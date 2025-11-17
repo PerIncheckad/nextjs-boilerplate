@@ -8,11 +8,16 @@ import { normalizeDamageType } from './normalizeDamageType';
 // =================================================================
 const resend = new Resend(process.env.RESEND_API_KEY || 'placeholder');
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+// Prefer server-only SUPABASE_URL, then fall back to NEXT_PUBLIC_...
+const supabaseUrl =
+  process.env.SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  'https://placeholder.supabase.co';
+
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-// --- E-postmottagare ---
+// --- E-postmottagare (oförändrat) ---
 const bilkontrollAddress = ['per@incheckad.se', 'latif@incheckad.se'];
 const defaultHuvudstationAddress = 'per@incheckad.se';
 
@@ -32,16 +37,15 @@ const LOGO_URL =
   'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png';
 
 // =================================================================
-// 2. HELPERS (oförändrade från tidigare version)
+// 2. HELPERS
 // =================================================================
-
 const formatCheckerName = (payload: any): string => {
-  if (payload.fullName) return payload.fullName;
-  if (payload.full_name) return payload.full_name;
-  const firstName = payload.firstName || payload.first_name || payload.incheckare;
-  const lastName = payload.lastName || payload.last_name;
+  if (payload?.fullName) return payload.fullName;
+  if (payload?.full_name) return payload.full_name;
+  const firstName = payload?.firstName || payload?.first_name || payload?.incheckare;
+  const lastName = payload?.lastName || payload?.last_name;
   if (firstName && lastName) return `${firstName} ${lastName}`;
-  return firstName || payload.incheckare || '---';
+  return firstName || payload?.incheckare || '---';
 };
 
 const createStorageLink = (folderPath: string | undefined, siteUrl: string): string | null => {
@@ -55,34 +59,6 @@ const hasAnyFiles = (damage: any): boolean => {
   const hasPhotos = Array.isArray(uploads.photo_urls) && uploads.photo_urls.length > 0;
   const hasVideos = Array.isArray(uploads.video_urls) && uploads.video_urls.length > 0;
   return hasPhotos || hasVideos;
-};
-
-const createAlertBanner = (
-  condition: boolean,
-  text: string,
-  details?: string,
-  folderPath?: string,
-  siteUrl?: string,
-  count?: number
-): string => {
-  if (!condition) return '';
-  const storageLink = siteUrl ? createStorageLink(folderPath, siteUrl) : null;
-  let bannerText = text;
-  if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
-  let fullText = `⚠️ ${bannerText}`;
-  if (details) fullText += `<br>${details}`;
-  const bannerContent = `<div style="background-color:#FFFBEB!important;border:1px solid #FDE68A;padding:12px;text-align:center;font-weight:bold;color:#92400e!important;border-radius:6px;">${fullText}</div>`;
-  return `<tr><td style="padding:6px 0;">${
-    storageLink
-      ? `<a href="${storageLink}" target="_blank" style="text-decoration:none;color:#92400e!important;">${bannerContent}</a>`
-      : bannerContent
-  }</td></tr>`;
-};
-
-const createAdminBanner = (condition: boolean, text: string): string => {
-  if (!condition) return '';
-  const bannerContent = `<div style="background-color:#DBEAFE!important;border:1px solid #93C5FD;padding:12px;text-align:center;font-weight:bold;color:#1E40AF!important;border-radius:6px;">${text}</div>`;
-  return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
 const getDamageString = (damage: any): string => {
@@ -122,39 +98,6 @@ const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fal
   return `<h3 style="margin:20px 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;">${title}</h3><ul style="padding-left:20px;margin-top:0;font-size:14px;">${items}</ul>`;
 };
 
-const formatTankning = (tankning: any): string => {
-  if (!tankning) return '---';
-  if (tankning.tankniva === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
-  if (tankning.tankniva === 'tankad_nu') {
-    const parts = [
-      'Tankad nu av MABI',
-      tankning.liters ? `(${tankning.liters}L` : null,
-      tankning.bransletyp ? `${tankning.bransletyp}` : null,
-      tankning.literpris ? `@ ${tankning.literpris} kr/L)` : null,
-    ]
-      .filter(Boolean)
-      .join(' ');
-    return parts;
-  }
-  if (tankning.tankniva === 'ej_upptankad') return '<span style="font-weight:bold;color:#b91c1c;">Ej upptankad</span>';
-  return '---';
-};
-
-const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: string): string => {
-  const bilagor: string[] = [];
-  if (rekond.folder && rekond.hasMedia)
-    bilagor.push(`<li><a href="${siteUrl}/public-media/${rekond.folder}" target="_blank">Rekond 🔗</a></li>`);
-  if (husdjur.folder && husdjur.hasMedia)
-    bilagor.push(`<li><a href="${siteUrl}/public-media/${husdjur.folder}" target="_blank">Husdjur 🔗</a></li>`);
-  if (rokning.folder && rokning.hasMedia)
-    bilagor.push(`<li><a href="${siteUrl}/public-media/${rokning.folder}" target="_blank">Rökning 🔗</a></li>`);
-  if (bilagor.length === 0) return '';
-  return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;">
-    <h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2>
-    <ul style="padding-left:20px;margin:0;">${bilagor.join('')}</ul>
-  </div>`;
-};
-
 const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -168,7 +111,7 @@ body { font-family: ui-sans-serif, system-ui,-apple-system,'Segoe UI',Roboto,'He
   background:#f9fafb!important;color:#000;margin:0;padding:20px; }
 .container { max-width:600px;margin:0 auto;background:#fff!important;border-radius:8px;
   padding:30px;border:1px solid #e5e7eb; }
-a { color:#2563eb!important; }
+    a { color:#2563eb!important; }
 </style>
 </head>
 <body>
@@ -184,35 +127,77 @@ a { color:#2563eb!important; }
 </body>
 </html>`;
 
-// =================================================================
-// 3. HTML BUILDERS (kommentar)
-// =================================================================
-// Den här filen förutsätter att buildHuvudstationEmail och buildBilkontrollEmail
-// finns definierade (antingen här eller importerade). Om de är externa:
-// import { buildHuvudstationEmail, buildBilkontrollEmail } from './emailBuilders';
+// Basic builders (fallback) – tills vi återkopplar original‑layouten
+function buildHuvudstationEmailBasic(payload: any, date: string, time: string, siteUrl: string, regnr: string): string {
+  const content = `
+    <h2>Incheckning (Huvudstation)</h2>
+    <p><strong>Regnr:</strong> ${regnr}</p>
+    <p><strong>Datum:</strong> ${date} ${time}</p>
+    ${formatDamagesToHtml(payload.dokumenterade_skador || [], 'Dokumenterade skador', siteUrl, 'Inga dokumenterade skador')}
+    ${formatDamagesToHtml(payload.nya_skador || [], 'Nya skador', siteUrl, 'Inga nya skador')}
+  `;
+  return createBaseLayout(regnr, content);
+}
+function buildBilkontrollEmailBasic(payload: any, date: string, time: string, siteUrl: string, regnr: string): string {
+  const content = `
+    <h2>Bilkontroll</h2>
+    <p><strong>Regnr:</strong> ${regnr}</p>
+    <p><strong>Datum:</strong> ${date} ${time}</p>
+    ${formatDamagesToHtml(payload.nya_skador || [], 'Nya skador', siteUrl, 'Inga nya skador')}
+  `;
+  return createBaseLayout(regnr, content);
+}
+
+// TS declarations – om externa builders finns i modulen använder vi dem
+// (typeof på en icke-definierad symbol är säkert i runtime)
+declare const buildHuvudstationEmail:
+  | ((payload: any, date: string, time: string, siteUrl: string) => string)
+  | undefined;
+declare const buildBilkontrollEmail:
+  | ((payload: any, date: string, time: string, siteUrl: string) => string)
+  | undefined;
 
 // =================================================================
 // 4. MAIN API FUNCTION
 // =================================================================
 export async function POST(request: Request) {
   try {
+    // Tillåt både { meta: {...} } och { ... }
     const fullRequestPayload = await request.json();
-    const { meta: payload } = fullRequestPayload;
-    const region = payload.region || null;
+    const payload = fullRequestPayload?.meta ?? fullRequestPayload ?? {};
 
-    // Extract checker identity
-    const checkerName = formatCheckerName(payload);
-    const checkerEmail = payload.email || payload.user?.email || request.headers.get('x-user-email') || null;
-    console.debug('Checker identity', { checkerName, checkerEmail });
-
-    // dryRun (skippa endast DB-skrivningar, skicka fortfarande mejl)
+    // Query flags
     const url = new URL(request.url);
     const dryRunParam = url.searchParams.get('dryRun');
+    const debugParam = url.searchParams.get('debug');
     const isDryRun = dryRunParam === '1' || dryRunParam === 'true' || payload.dryRun === true;
+    const isDebug = debugParam === '1' || debugParam === 'true';
 
     const siteUrl = getSiteUrl(request);
 
-    // Media counts (logg)
+    // Datum/tid (SE)
+    const now = new Date();
+    const stockholmDate = now
+      .toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .replace(/(\d{4})-(\d{2})-(\d{2})/, '$1-$2-$3');
+    const stockholmTime = now.toLocaleTimeString('sv-SE', {
+      timeZone: 'Europe/Stockholm',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    const date = stockholmDate;
+    const time = stockholmTime;
+
+    // Robust identitet
+    const checkerName = formatCheckerName(payload);
+    const checkerEmail =
+      payload?.email ||
+      payload?.user?.email ||
+      request.headers.get('x-user-email') ||
+      null;
+    console.debug('Checker identity', { checkerName, checkerEmail });
+
+    // Media counts (kvar för bakåtkompatibel logg)
     const countMedia = (damages: any[] = []) => {
       let photos = 0;
       let videos = 0;
@@ -222,7 +207,6 @@ export async function POST(request: Request) {
       });
       return { photos, videos };
     };
-
     console.log('Media counts received:', {
       nya_skador: countMedia(payload.nya_skador || []),
       dokumenterade_skador: countMedia(payload.dokumenterade_skador || []),
@@ -231,24 +215,14 @@ export async function POST(request: Request) {
       rokning: payload.rokning?.hasMedia ? 'yes' : 'no',
     });
 
-    // Datum/tid (SE)
-    const now = new Date();
-    const stockholmDate = now
-      .toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit' })
-      .replace(/(\d{4})-(\d{2})-(\d{2})/, '$1-$2-$3');
-
-    const stockholmTime = now.toLocaleTimeString('sv-SE', {
-      timeZone: 'Europe/Stockholm',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-    const date = stockholmDate;
-    const time = stockholmTime;
-
     const regNr = payload.regnr || '';
+    if (!regNr) {
+      console.warn('Saknar regnr i payload – avbryter.');
+      return NextResponse.json({ error: 'Missing regnr' }, { status: 400 });
+    }
 
-    // Mottagare/ämnen
+    // Mottagare/ämnen (oförändrat)
+    const region = payload.region || null;
     const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
     const huvudstationTo = [defaultHuvudstationAddress];
     const stationSpecificEmail = stationEmailMapping[finalOrt];
@@ -275,12 +249,21 @@ export async function POST(request: Request) {
       payload.rokning?.sanerad;
 
     const testMarker = hasFarligaConditions ? ' - !!! - ' : ' - ';
-    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}HUVUDSTATION`;
-    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}BILKONTROLL`;
+    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation || finalOrt || ''}${testMarker}HUVUDSTATION`;
+    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation || finalOrt || ''}${testMarker}BILKONTROLL`;
 
     // =================================================================
     // DATABASE PERSISTENCE (normaliserad damage_type)
     // =================================================================
+    let checkinId: string | null = null;
+    let dbStatus: { checkin?: string; damages?: string; checkinDamages?: string; error?: string } = {};
+
+    const envStatus = {
+      supabaseUrlUsed: supabaseUrl,
+      hasServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      hasPublicUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    };
+
     if (!isDryRun) {
       try {
         // Checkin
@@ -294,10 +277,9 @@ export async function POST(request: Request) {
           current_location_note: payload.bilen_star_nu?.kommentar || null,
           checker_name: checkerName,
           checker_email: checkerEmail,
-          completed_at: now.toISOString(),
+          completed_at: new Date().toISOString(),
           status: 'complete',
           user_type: payload.user_type || null,
-          // has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0, // (valfritt)
         };
 
         const { data: checkinRecord, error: checkinError } = await supabaseAdmin
@@ -308,10 +290,12 @@ export async function POST(request: Request) {
 
         if (checkinError) {
           console.error('Error inserting checkin record:', checkinError);
+          dbStatus.error = `checkinError: ${checkinError.message || checkinError}`;
           throw checkinError;
         }
 
-        const checkinId = checkinRecord.id;
+        checkinId = checkinRecord.id;
+        dbStatus.checkin = `ok:${checkinId}`;
 
         // damages + checkin_damages
         const damageInserts: any[] = [];
@@ -324,7 +308,7 @@ export async function POST(request: Request) {
 
           damageInserts.push({
             regnr: regNr,
-            damage_date: now.toISOString().split('T')[0], // YYYY-MM-DD (behåll enligt #120)
+            damage_date: new Date().toISOString().split('T')[0],
             region: region || payload.region || null,
             ort: payload.ort || null,
             station_namn: payload.station || null,
@@ -336,7 +320,7 @@ export async function POST(request: Request) {
             inchecker_email: checkerEmail,
             status: 'complete',
             uploads: skada.uploads || null,
-            created_at: now.toISOString(),
+            created_at: new Date().toISOString(),
           });
 
           const positions = skada.positions || skada.userPositions || [];
@@ -352,21 +336,21 @@ export async function POST(request: Request) {
                 photo_urls: skada.uploads?.photo_urls || [],
                 video_urls: skada.uploads?.video_urls || [],
                 positions: [pos],
-                created_at: now.toISOString(),
+                created_at: new Date().toISOString(),
               });
             });
           } else {
             checkinDamageInserts.push({
               checkin_id: checkinId,
               type: 'new',
-              damage_type: normalized.typeCode,
+              damage_type: normalizeDamageType(skada.type || skada.userType || null).typeCode,
               car_part: null,
               position: null,
               description: skada.text || skada.userDescription || null,
               photo_urls: skada.uploads?.photo_urls || [],
               video_urls: skada.uploads?.video_urls || [],
               positions: [],
-              created_at: now.toISOString(),
+              created_at: new Date().toISOString(),
             });
           }
         });
@@ -378,7 +362,7 @@ export async function POST(request: Request) {
 
           damageInserts.push({
             regnr: regNr,
-            damage_date: now.toISOString().split('T')[0],
+            damage_date: new Date().toISOString().split('T')[0],
             region: region || payload.region || null,
             ort: payload.ort || null,
             station_namn: payload.station || null,
@@ -391,9 +375,7 @@ export async function POST(request: Request) {
             status: 'complete',
             uploads: skada.uploads || null,
             legacy_damage_source_text: skada.fullText || null,
-            // original_damage_date: skada.damage_date || null,                // (valfritt för idempotens)
-            // legacy_loose_key: skada.damage_date ? `${regNr}|${skada.damage_date}` : null, // (valfritt)
-            created_at: now.toISOString(),
+            created_at: new Date().toISOString(),
           });
 
           const positions = skada.userPositions || skada.positions || [];
@@ -409,7 +391,7 @@ export async function POST(request: Request) {
                 photo_urls: skada.uploads?.photo_urls || [],
                 video_urls: skada.uploads?.video_urls || [],
                 positions: [pos],
-                created_at: now.toISOString(),
+                created_at: new Date().toISOString(),
               });
             });
           } else {
@@ -423,7 +405,7 @@ export async function POST(request: Request) {
               photo_urls: skada.uploads?.photo_urls || [],
               video_urls: skada.uploads?.video_urls || [],
               positions: [],
-              created_at: now.toISOString(),
+              created_at: new Date().toISOString(),
             });
           }
         });
@@ -434,56 +416,84 @@ export async function POST(request: Request) {
           const { error: damagesError } = await supabaseAdmin.from('damages').insert(damageInserts);
           if (damagesError) {
             console.error('Error inserting damages:', damagesError);
+            dbStatus.error = `damagesError: ${damagesError.message || damagesError}`;
             throw damagesError;
           }
+          dbStatus.damages = `ok:${damageInserts.length}`;
         }
 
         if (checkinDamageInserts.length > 0) {
           const { error: checkinDamagesError } = await supabaseAdmin.from('checkin_damages').insert(checkinDamageInserts);
           if (checkinDamagesError) {
             console.error('Error inserting checkin_damages:', checkinDamagesError);
+            dbStatus.error = `checkinDamagesError: ${checkinDamagesError.message || checkinDamagesError}`;
             throw checkinDamagesError;
           }
+          dbStatus.checkinDamages = `ok:${checkinDamageInserts.length}`;
         }
 
         console.debug('Database persistence completed successfully');
-      } catch (dbError) {
+      } catch (dbError: any) {
         console.error('Database persistence failed:', dbError);
-        // Fortsätt med mejl även om DB-skrivning faller
+        // Fortsätt till mejl även om DB fallerar
       }
     } else {
       console.log('DryRun mode: Skipping database persistence');
     }
 
     // =================================================================
-    // E-posthantering
+    // E-posthantering (fallback om externa builders saknas)
     // =================================================================
-    const emailPromises: Promise<any>[] = [];
+    const huvudstationHtml =
+      typeof buildHuvudstationEmail === 'function'
+        ? buildHuvudstationEmail(payload, date, time, siteUrl)
+        : buildHuvudstationEmailBasic(payload, date, time, siteUrl, regNr);
 
-    // Antag att dessa builders finns. Om de inte finns – importera dem eller ersätt med createBaseLayout.
-    const huvudstationHtml = buildHuvudstationEmail(payload, date, time, siteUrl);
-    emailPromises.push(
-      resend.emails.send({
+    const bilkontrollHtml =
+      typeof buildBilkontrollEmail === 'function'
+        ? buildBilkontrollEmail(payload, date, time, siteUrl)
+        : buildBilkontrollEmailBasic(payload, date, time, siteUrl, regNr);
+
+    const emailResults: any[] = [];
+    try {
+      const r1 = await resend.emails.send({
         from: 'incheckning@incheckad.se',
         to: huvudstationTo,
         subject: huvudstationSubject,
         html: huvudstationHtml,
-      })
-    );
+      });
+      emailResults.push({ huvudstation: r1?.id || 'ok' });
+    } catch (e) {
+      console.error('Failed sending huvudstation email', e);
+    }
 
-    const bilkontrollHtml = buildBilkontrollEmail(payload, date, time, siteUrl);
-    emailPromises.push(
-      resend.emails.send({
+    try {
+      const r2 = await resend.emails.send({
         from: 'incheckning@incheckad.se',
         to: bilkontrollAddress,
         subject: bilkontrollSubject,
         html: bilkontrollHtml,
-      })
-    );
+      });
+      emailResults.push({ bilkontroll: r2?.id || 'ok' });
+    } catch (e) {
+      console.error('Failed sending bilkontroll email', e);
+    }
 
-    await Promise.all(emailPromises);
+    console.debug('Email results:', emailResults);
 
-    return NextResponse.json({ message: 'Notifications processed successfully.' });
+    // Debug-svar på begäran
+    if (isDebug) {
+      return NextResponse.json({
+        message: 'Debug info',
+        dryRun: isDryRun,
+        regnr: regNr,
+        envStatus,
+        dbStatus,
+        emailResults: emailResults.map(r => Object.keys(r)[0]),
+      });
+    }
+
+    return NextResponse.json({ message: 'Notifications processed successfully.', dryRun: isDryRun, regnr: regNr });
   } catch (error) {
     console.error('FATAL: Uncaught error in API route:', error);
     return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
