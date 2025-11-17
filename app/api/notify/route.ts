@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import { normalizeDamageType } from './normalizeDamageType';
 
 // =================================================================
 // 1. INITIALIZATION & CONFIGURATION
@@ -455,6 +456,204 @@ export async function POST(request: Request) {
     const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}HUVUDSTATION`;
     const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}BILKONTROLL`;
 
+    // =================================================================
+    // DATABASE PERSISTENCE
+    // =================================================================
+    // Check for dryRun mode (can be passed in query param or payload)
+    const isDryRun = payload.dryRun === true;
+    
+    if (!isDryRun) {
+      try {
+        // Prepare checkin record
+        const checkinData = {
+          regnr: regNr,
+          region: region || payload.region || null,
+          city: payload.ort || null,
+          station: payload.station || null,
+          current_city: payload.bilen_star_nu?.ort || payload.ort || null,
+          current_station: payload.bilen_star_nu?.station || payload.station || null,
+          current_location_note: payload.bilen_star_nu?.kommentar || null,
+          checker_name: payload.fullName || payload.full_name || payload.incheckare || null,
+          checker_email: payload.email || null,
+          completed_at: now.toISOString(),
+          status: 'complete',
+          user_type: payload.user_type || null,
+        };
+
+        // Insert checkin record
+        const { data: checkinRecord, error: checkinError } = await supabaseAdmin
+          .from('checkins')
+          .insert([checkinData])
+          .select()
+          .single();
+
+        if (checkinError) {
+          console.error('Error inserting checkin record:', checkinError);
+          throw checkinError;
+        }
+
+        const checkinId = checkinRecord.id;
+        console.debug('Created checkin record:', checkinId);
+
+        // Prepare damage records for public.damages and public.checkin_damages
+        const damageInserts: any[] = [];
+        const checkinDamageInserts: any[] = [];
+
+        // Process NEW damages (nya_skador)
+        if (Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0) {
+          payload.nya_skador.forEach((skada: any) => {
+            const rawType = skada.type || skada.userType || null;
+            const normalized = normalizeDamageType(rawType);
+
+            // Insert into public.damages
+            damageInserts.push({
+              regnr: regNr,
+              damage_date: now.toISOString().split('T')[0], // YYYY-MM-DD
+              region: region || payload.region || null,
+              ort: payload.ort || null,
+              station_namn: payload.station || null,
+              damage_type: normalized.typeCode,
+              damage_type_raw: rawType,
+              user_type: rawType,
+              description: skada.text || skada.userDescription || null,
+              inchecker_name: checkinData.checker_name,
+              inchecker_email: checkinData.checker_email,
+              status: 'complete',
+              uploads: skada.uploads || null,
+              created_at: now.toISOString(),
+            });
+
+            // Insert into public.checkin_damages (one per position, or one if no positions)
+            const positions = skada.positions || skada.userPositions || [];
+            if (positions.length > 0) {
+              positions.forEach((pos: any) => {
+                checkinDamageInserts.push({
+                  checkin_id: checkinId,
+                  type: 'new',
+                  damage_type: normalized.typeCode,
+                  car_part: pos.carPart || null,
+                  position: pos.position || null,
+                  description: skada.text || skada.userDescription || null,
+                  photo_urls: skada.uploads?.photo_urls || [],
+                  video_urls: skada.uploads?.video_urls || [],
+                  positions: [pos], // Store as array
+                  created_at: now.toISOString(),
+                });
+              });
+            } else {
+              // No positions specified, insert one record
+              checkinDamageInserts.push({
+                checkin_id: checkinId,
+                type: 'new',
+                damage_type: normalized.typeCode,
+                car_part: null,
+                position: null,
+                description: skada.text || skada.userDescription || null,
+                photo_urls: skada.uploads?.photo_urls || [],
+                video_urls: skada.uploads?.video_urls || [],
+                positions: [],
+                created_at: now.toISOString(),
+              });
+            }
+          });
+        }
+
+        // Process DOCUMENTED BUHS damages (dokumenterade_skador)
+        if (Array.isArray(payload.dokumenterade_skador) && payload.dokumenterade_skador.length > 0) {
+          payload.dokumenterade_skador.forEach((skada: any) => {
+            const rawType = skada.userType || skada.type || null;
+            const normalized = normalizeDamageType(rawType);
+
+            // Insert into public.damages
+            damageInserts.push({
+              regnr: regNr,
+              damage_date: now.toISOString().split('T')[0],
+              region: region || payload.region || null,
+              ort: payload.ort || null,
+              station_namn: payload.station || null,
+              damage_type: normalized.typeCode,
+              damage_type_raw: rawType,
+              user_type: rawType,
+              description: skada.userDescription || skada.text || null,
+              inchecker_name: checkinData.checker_name,
+              inchecker_email: checkinData.checker_email,
+              status: 'complete',
+              uploads: skada.uploads || null,
+              legacy_damage_source_text: skada.fullText || null,
+              created_at: now.toISOString(),
+            });
+
+            // Insert into public.checkin_damages
+            const positions = skada.userPositions || skada.positions || [];
+            if (positions.length > 0) {
+              positions.forEach((pos: any) => {
+                checkinDamageInserts.push({
+                  checkin_id: checkinId,
+                  type: 'documented',
+                  damage_type: normalized.typeCode,
+                  car_part: pos.carPart || null,
+                  position: pos.position || null,
+                  description: skada.userDescription || skada.text || null,
+                  photo_urls: skada.uploads?.photo_urls || [],
+                  video_urls: skada.uploads?.video_urls || [],
+                  positions: [pos],
+                  created_at: now.toISOString(),
+                });
+              });
+            } else {
+              checkinDamageInserts.push({
+                checkin_id: checkinId,
+                type: 'documented',
+                damage_type: normalized.typeCode,
+                car_part: null,
+                position: null,
+                description: skada.userDescription || skada.text || null,
+                photo_urls: skada.uploads?.photo_urls || [],
+                video_urls: skada.uploads?.video_urls || [],
+                positions: [],
+                created_at: now.toISOString(),
+              });
+            }
+          });
+        }
+
+        // Log counts before inserting
+        console.debug(`Inserting ${damageInserts.length} damage records and ${checkinDamageInserts.length} checkin_damage records`);
+
+        // Bulk insert damages
+        if (damageInserts.length > 0) {
+          const { error: damagesError } = await supabaseAdmin
+            .from('damages')
+            .insert(damageInserts);
+
+          if (damagesError) {
+            console.error('Error inserting damages:', damagesError);
+            throw damagesError;
+          }
+        }
+
+        // Bulk insert checkin_damages
+        if (checkinDamageInserts.length > 0) {
+          const { error: checkinDamagesError } = await supabaseAdmin
+            .from('checkin_damages')
+            .insert(checkinDamageInserts);
+
+          if (checkinDamagesError) {
+            console.error('Error inserting checkin_damages:', checkinDamagesError);
+            throw checkinDamagesError;
+          }
+        }
+
+        console.debug('Database persistence completed successfully');
+      } catch (dbError) {
+        console.error('Database persistence failed:', dbError);
+        // Continue with email sending even if DB persistence fails
+      }
+    } else {
+      console.log('DryRun mode: Skipping database persistence');
+    }
+
+    // =================================================================
     // E-posthantering
     const emailPromises = [];
     
