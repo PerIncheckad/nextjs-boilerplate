@@ -374,9 +374,17 @@ export async function POST(request: Request) {
     const fullRequestPayload = await request.json();
     const { meta: payload, subjectBase, region } = fullRequestPayload; 
 
+    // Check for dryRun mode from query param or payload
+    const url = new URL(request.url);
+    const dryRunParam = url.searchParams.get('dryRun');
+    const isDryRun = dryRunParam === '1' || dryRunParam === 'true' || payload.dryRun === true;
+
     // Get the site URL from the request to ensure media links work correctly
     const siteUrl = getSiteUrl(request);
     console.log('Using site URL for media links:', siteUrl);
+    if (isDryRun) {
+      console.log('DryRun mode enabled - will skip database persistence');
+    }
 
     // Log media counts for troubleshooting
     const countMedia = (damages: any[]) => {
@@ -459,9 +467,6 @@ export async function POST(request: Request) {
     // =================================================================
     // DATABASE PERSISTENCE
     // =================================================================
-    // Check for dryRun mode (can be passed in query param or payload)
-    const isDryRun = payload.dryRun === true;
-    
     if (!isDryRun) {
       try {
         // Prepare checkin record
