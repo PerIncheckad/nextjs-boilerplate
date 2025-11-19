@@ -507,7 +507,8 @@ export default function CheckInForm() {
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
       notering: preliminarAvslutNotering,
-      vehicleStatus: vehicleData?.status
+      vehicleStatus: vehicleData?.status,
+      saludatum: vehicleData?.saludatum
   }), [
     normalizedReg, firstName, fullName, vehicleData, matarstallning, hjultyp, 
     garInteAttHyraUt, garInteAttHyraUtKommentar,
