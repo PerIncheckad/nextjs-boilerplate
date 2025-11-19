@@ -13,12 +13,13 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeho
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 // --- E-postmottagare ---
-const bilkontrollAddress = ['per@incheckad.se', 'latif@incheckad.se'];
+const defaultBilkontrollAddress = 'per@incheckad.se';
+const latifBilkontrollAddress = 'latif@incheckad.se';
 const defaultHuvudstationAddress = 'per@incheckad.se';
 
 const stationEmailMapping: { [ort: string]: string } = {
-  Helsingborg: 'helsingborg@incheckad.se',
-  Ängelholm: 'helsingborg@incheckad.se',
+  Helsingborg: 'helsingborg@mabi.se',
+  Ängelholm: 'helsingborg@mabi.se',
 };
 
 const getSiteUrl = (request: Request): string => {
@@ -185,11 +186,437 @@ a { color:#2563eb!important; }
 </html>`;
 
 // =================================================================
-// 3. HTML BUILDERS (kommentar)
+// 3. HTML BUILDERS
 // =================================================================
-// Den här filen förutsätter att buildHuvudstationEmail och buildBilkontrollEmail
-// finns definierade (antingen här eller importerade). Om de är externa:
-// import { buildHuvudstationEmail, buildBilkontrollEmail } from './emailBuilders';
+
+/**
+ * Calculate days difference between two dates
+ */
+const calculateDaysDifference = (date1: Date, date2: Date): number => {
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const utc1 = Date.UTC(date1.getFullYear(), date1.getMonth(), date1.getDate());
+  const utc2 = Date.UTC(date2.getFullYear(), date2.getMonth(), date2.getDate());
+  return Math.floor((utc2 - utc1) / msPerDay);
+};
+
+/**
+ * Get Saludatum warning banner if applicable
+ */
+const getSaludatumWarning = (saludatumStr: string | null | undefined, currentDateStr: string): string => {
+  if (!saludatumStr || saludatumStr === 'Ingen information' || saludatumStr === '---') {
+    return '';
+  }
+
+  try {
+    const saludatum = new Date(saludatumStr);
+    const currentDate = new Date(currentDateStr);
+    
+    // Check if dates are valid
+    if (isNaN(saludatum.getTime()) || isNaN(currentDate.getTime())) {
+      return '';
+    }
+
+    const daysDiff = calculateDaysDifference(currentDate, saludatum);
+
+    // If saludatum has passed (negative or zero days)
+    if (daysDiff <= 0) {
+      return createAlertBanner(
+        true,
+        'Saludatum passerat!',
+        `Saludatum: ${saludatumStr}. Kontakta Bilkontroll! Undvik långa hyror.`
+      );
+    }
+
+    // If saludatum is within 10 days
+    if (daysDiff > 0 && daysDiff <= 10) {
+      return createAlertBanner(
+        true,
+        'Kontakta Bilkontroll',
+        `Saludatum: ${saludatumStr}. Undvik långa hyror på detta reg.nr!`
+      );
+    }
+
+    return '';
+  } catch (error) {
+    console.error('Error calculating saludatum warning:', error);
+    return '';
+  }
+};
+
+/**
+ * Build the Huvudstation email HTML
+ */
+const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
+  const regnr = payload.regnr || '---';
+  const checkerName = formatCheckerName(payload);
+  const station = payload.bilen_star_nu?.station || payload.station || '---';
+  const city = payload.bilen_star_nu?.ort || payload.ort || '---';
+  const locationNote = payload.bilen_star_nu?.kommentar || '---';
+  
+  // Vehicle info
+  const carModel = payload.carModel || '---';
+  const odometer = payload.matarstallning || '---';
+  const wheelType = payload.hjultyp || '---';
+  
+  // Fuel/Charge info
+  const fuelType = payload.drivmedel || 'bensin_diesel';
+  const tankning = payload.tankning || {};
+  const laddning = payload.laddning || {};
+  const tankningSummary = formatTankning(tankning);
+  const chargeLevel = laddning.laddniva || '---';
+  const chargeCables = laddning.antal_laddkablar || '---';
+  
+  // Status flags
+  const rental = payload.rental || {};
+  const varningslampa = payload.varningslampa || {};
+  const status = payload.status || {};
+  const rekond = payload.rekond || {};
+  const husdjur = payload.husdjur || {};
+  const rokning = payload.rokning || {};
+  
+  // Checklist items
+  const washed = payload.washed || false;
+  const otherChecklistItemsOK = payload.otherChecklistItemsOK || false;
+  
+  // Notes
+  const generalNote = payload.notering || '';
+  
+  // Damages
+  const newDamages = payload.nya_skador || [];
+  const documentedDamages = payload.dokumenterade_skador || [];
+  const resolvedDamages = payload.åtgärdade_skador || [];
+  
+  // Warnings/Alerts
+  const showChargeWarning = fuelType === 'elbil' && parseInt(chargeLevel, 10) < 95;
+  const notRefueled = fuelType === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
+  
+  // Get saludatum from vehicle data if available
+  const saludatum = payload.vehicleStatus?.saludatum || payload.saludatum;
+  const saludatumWarning = getSaludatumWarning(saludatum, date);
+  
+  // Build alert banners
+  let alerts = '';
+  
+  // Saludatum warning (only for Huvudstation)
+  alerts += saludatumWarning;
+  
+  // New damages
+  alerts += createAlertBanner(
+    newDamages.length > 0,
+    'NYA SKADOR DOKUMENTERADE',
+    undefined,
+    undefined,
+    undefined,
+    newDamages.length
+  );
+  
+  // Rental unavailable
+  if (rental.unavailable) {
+    alerts += createAlertBanner(
+      true,
+      'GÅR INTE ATT HYRA UT',
+      rental.comment || ''
+    );
+  }
+  
+  // Warning light
+  if (varningslampa.lyser) {
+    alerts += createAlertBanner(
+      true,
+      'VARNINGSLAMPA EJ SLÄCKT',
+      varningslampa.beskrivning || ''
+    );
+  }
+  
+  // Charge warning
+  alerts += createAlertBanner(
+    showChargeWarning,
+    'LÅG LADDNIVÅ',
+    `Laddnivå: ${chargeLevel}%`
+  );
+  
+  // Not refueled
+  alerts += createAlertBanner(
+    notRefueled,
+    'EJ UPPTANKAD'
+  );
+  
+  // Rekond
+  if (rekond.behoverRekond) {
+    const rekondTypes = [];
+    if (rekond.utvandig) rekondTypes.push('Utvändig');
+    if (rekond.invandig) rekondTypes.push('Invändig');
+    const rekondDetail = rekondTypes.length > 0 ? `Typ: ${rekondTypes.join(', ')}` : '';
+    alerts += createAlertBanner(
+      true,
+      'REKOND BEHÖVS',
+      rekondDetail,
+      rekond.folder,
+      siteUrl
+    );
+  }
+  
+  // Husdjur
+  alerts += createAlertBanner(
+    husdjur.sanerad,
+    'HUSDJUR',
+    husdjur.text || '',
+    husdjur.folder,
+    siteUrl
+  );
+  
+  // Rökning
+  alerts += createAlertBanner(
+    rokning.sanerad,
+    'RÖKNING',
+    rokning.text || '',
+    rokning.folder,
+    siteUrl
+  );
+  
+  // Privacy cover missing
+  alerts += createAlertBanner(
+    status.insynsskyddSaknas,
+    'INSYNSSKYDD SAKNAS'
+  );
+  
+  // Admin banner for washed
+  alerts += createAdminBanner(
+    washed,
+    '✓ Tvättad'
+  );
+  
+  // Build damage sections
+  const newDamagesHtml = formatDamagesToHtml(
+    newDamages,
+    'Nya skador',
+    siteUrl,
+    'Inga nya skador'
+  );
+  
+  const documentedDamagesHtml = formatDamagesToHtml(
+    documentedDamages,
+    'Dokumenterade BUHS-skador',
+    siteUrl
+  );
+  
+  const resolvedDamagesHtml = formatDamagesToHtml(
+    resolvedDamages,
+    'Åtgärdade skador',
+    siteUrl
+  );
+  
+  // Build bilagor section
+  const bilagorHtml = buildBilagorSection(rekond, husdjur, rokning, siteUrl);
+  
+  // Build main content
+  const content = `
+    ${alerts}
+    <tr><td style="padding:20px 0 10px;"><h1 style="margin:0;font-size:24px;font-weight:700;">Incheckning: ${regnr}</h1></td></tr>
+    <tr><td style="padding-bottom:20px;border-bottom:1px solid #e5e7eb;">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Bilmodell:</span>
+          <span style="color:#111827;">${carModel}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Mätarställning:</span>
+          <span style="color:#111827;">${odometer} km</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Hjultyp:</span>
+          <span style="color:#111827;">${wheelType}</span>
+        </div>
+        ${fuelType === 'bensin_diesel' ? `
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Tankning:</span>
+          <span style="color:#111827;">${tankningSummary}</span>
+        </div>
+        ` : ''}
+        ${fuelType === 'elbil' ? `
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Laddnivå:</span>
+          <span style="color:#111827;">${chargeLevel}%</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Laddkablar:</span>
+          <span style="color:#111827;">${chargeCables} st</span>
+        </div>
+        ` : ''}
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Bilen står nu:</span>
+          <span style="color:#111827;">${city} / ${station}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Parkeringsinfo:</span>
+          <span style="color:#111827;">${locationNote}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Tvättad:</span>
+          <span style="color:#111827;">${washed ? 'Ja' : 'Nej'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Övrigt OK:</span>
+          <span style="color:#111827;">${otherChecklistItemsOK ? 'Ja' : 'Nej'}</span>
+        </div>
+        ${saludatum && saludatum !== 'Ingen information' ? `
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Saludatum:</span>
+          <span style="color:#111827;">${saludatum}</span>
+        </div>
+        ` : ''}
+      </div>
+    </td></tr>
+    ${bilagorHtml ? `<tr><td style="padding:20px 0;">${bilagorHtml}</td></tr>` : ''}
+    ${newDamagesHtml ? `<tr><td style="padding:20px 0 10px;">${newDamagesHtml}</td></tr>` : ''}
+    ${documentedDamagesHtml ? `<tr><td style="padding:20px 0 10px;">${documentedDamagesHtml}</td></tr>` : ''}
+    ${resolvedDamagesHtml ? `<tr><td style="padding:20px 0 10px;">${resolvedDamagesHtml}</td></tr>` : ''}
+    ${generalNote ? `
+    <tr><td style="padding:20px 0 10px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;">Övrigt</h3>
+      <p style="margin:0;font-size:14px;line-height:1.6;">${generalNote}</p>
+    </td></tr>
+    ` : ''}
+    <tr><td style="padding:30px 0 0;border-top:1px solid #e5e7eb;">
+      <p style="margin:0;font-size:14px;color:#6b7280;">
+        <strong>Incheckad av:</strong> ${checkerName}<br>
+        <strong>Datum:</strong> ${date}<br>
+        <strong>Tid:</strong> ${time}
+      </p>
+    </td></tr>
+  `;
+  
+  return createBaseLayout(regnr, content);
+};
+
+/**
+ * Build the Bilkontroll email HTML
+ */
+const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
+  const regnr = payload.regnr || '---';
+  const checkerName = formatCheckerName(payload);
+  const station = payload.bilen_star_nu?.station || payload.station || '---';
+  const city = payload.bilen_star_nu?.ort || payload.ort || '---';
+  const locationNote = payload.bilen_star_nu?.kommentar || '---';
+  
+  // Vehicle info
+  const carModel = payload.carModel || '---';
+  const odometer = payload.matarstallning || '---';
+  
+  // Damages
+  const newDamages = payload.nya_skador || [];
+  const documentedDamages = payload.dokumenterade_skador || [];
+  const resolvedDamages = payload.åtgärdade_skador || [];
+  
+  // Status flags
+  const rental = payload.rental || {};
+  const varningslampa = payload.varningslampa || {};
+  const rekond = payload.rekond || {};
+  
+  // Build alert banners (no Saludatum for Bilkontroll)
+  let alerts = '';
+  
+  // New damages
+  alerts += createAlertBanner(
+    newDamages.length > 0,
+    'NYA SKADOR DOKUMENTERADE',
+    undefined,
+    undefined,
+    undefined,
+    newDamages.length
+  );
+  
+  // Rental unavailable
+  if (rental.unavailable) {
+    alerts += createAlertBanner(
+      true,
+      'GÅR INTE ATT HYRA UT',
+      rental.comment || ''
+    );
+  }
+  
+  // Warning light
+  if (varningslampa.lyser) {
+    alerts += createAlertBanner(
+      true,
+      'VARNINGSLAMPA EJ SLÄCKT',
+      varningslampa.beskrivning || ''
+    );
+  }
+  
+  // Rekond
+  if (rekond.behoverRekond) {
+    const rekondTypes = [];
+    if (rekond.utvandig) rekondTypes.push('Utvändig');
+    if (rekond.invandig) rekondTypes.push('Invändig');
+    const rekondDetail = rekondTypes.length > 0 ? `Typ: ${rekondTypes.join(', ')}` : '';
+    alerts += createAlertBanner(
+      true,
+      'REKOND BEHÖVS',
+      rekondDetail,
+      rekond.folder,
+      siteUrl
+    );
+  }
+  
+  // Build damage sections
+  const newDamagesHtml = formatDamagesToHtml(
+    newDamages,
+    'Nya skador',
+    siteUrl,
+    'Inga nya skador'
+  );
+  
+  const documentedDamagesHtml = formatDamagesToHtml(
+    documentedDamages,
+    'Dokumenterade BUHS-skador',
+    siteUrl
+  );
+  
+  const resolvedDamagesHtml = formatDamagesToHtml(
+    resolvedDamages,
+    'Åtgärdade skador',
+    siteUrl
+  );
+  
+  // Build main content
+  const content = `
+    ${alerts}
+    <tr><td style="padding:20px 0 10px;"><h1 style="margin:0;font-size:24px;font-weight:700;">Bilkontroll: ${regnr}</h1></td></tr>
+    <tr><td style="padding-bottom:20px;border-bottom:1px solid #e5e7eb;">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Bilmodell:</span>
+          <span style="color:#111827;">${carModel}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Mätarställning:</span>
+          <span style="color:#111827;">${odometer} km</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Bilen står nu:</span>
+          <span style="color:#111827;">${city} / ${station}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Parkeringsinfo:</span>
+          <span style="color:#111827;">${locationNote}</span>
+        </div>
+      </div>
+    </td></tr>
+    ${newDamagesHtml ? `<tr><td style="padding:20px 0 10px;">${newDamagesHtml}</td></tr>` : ''}
+    ${documentedDamagesHtml ? `<tr><td style="padding:20px 0 10px;">${documentedDamagesHtml}</td></tr>` : ''}
+    ${resolvedDamagesHtml ? `<tr><td style="padding:20px 0 10px;">${resolvedDamagesHtml}</td></tr>` : ''}
+    <tr><td style="padding:30px 0 0;border-top:1px solid #e5e7eb;">
+      <p style="margin:0;font-size:14px;color:#6b7280;">
+        <strong>Incheckad av:</strong> ${checkerName}<br>
+        <strong>Datum:</strong> ${date}<br>
+        <strong>Tid:</strong> ${time}
+      </p>
+    </td></tr>
+  `;
+  
+  return createBaseLayout(regnr, content);
+};
 
 // =================================================================
 // 4. MAIN API FUNCTION
@@ -245,10 +672,18 @@ export async function POST(request: Request) {
 
     // Mottagare/ämnen
     const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
+    
+    // Huvudstation recipients
     const huvudstationTo = [defaultHuvudstationAddress];
     const stationSpecificEmail = stationEmailMapping[finalOrt];
     if (stationSpecificEmail && !huvudstationTo.includes(stationSpecificEmail)) {
       huvudstationTo.push(stationSpecificEmail);
+    }
+    
+    // Bilkontroll recipients (Latif only for Helsingborg/Ängelholm)
+    const bilkontrollTo = [defaultBilkontrollAddress];
+    if (finalOrt === 'Helsingborg' || finalOrt === 'Ängelholm') {
+      bilkontrollTo.push(latifBilkontrollAddress);
     }
 
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
@@ -278,7 +713,37 @@ export async function POST(request: Request) {
     // =================================================================
     if (!isDryRun) {
       try {
-        // Checkin
+        // Checkin - build checklist jsonb for new data
+        const checklistData: any = {
+          washed: payload.washed || false,
+          otherChecklistItemsOK: payload.otherChecklistItemsOK || false,
+          rekond: {
+            behoverRekond: payload.rekond?.behoverRekond || false,
+            utvandig: payload.rekond?.utvandig || false,
+            invandig: payload.rekond?.invandig || false,
+            text: payload.rekond?.text || null,
+          },
+          husdjur: {
+            sanerad: payload.husdjur?.sanerad || false,
+            text: payload.husdjur?.text || null,
+          },
+          rokning: {
+            sanerad: payload.rokning?.sanerad || false,
+            text: payload.rokning?.text || null,
+          },
+          varningslampa: {
+            lyser: payload.varningslampa?.lyser || false,
+            beskrivning: payload.varningslampa?.beskrivning || null,
+          },
+          rental: {
+            unavailable: payload.rental?.unavailable || false,
+            comment: payload.rental?.comment || null,
+          },
+          status: {
+            insynsskyddSaknas: payload.status?.insynsskyddSaknas || false,
+          },
+        };
+        
         const checkinData = {
           regnr: regNr,
           region: region || payload.region || null,
@@ -288,11 +753,24 @@ export async function POST(request: Request) {
           current_station: payload.bilen_star_nu?.station || payload.station || null,
           current_location_note: payload.bilen_star_nu?.kommentar || null,
           checker_name: payload.fullName || payload.full_name || payload.incheckare || null,
-          checker_email: payload.email || null,
+          checker_email: payload.email || payload.user_email || null,
           completed_at: now.toISOString(),
           status: 'complete',
           user_type: payload.user_type || null,
-          // has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0, // (valfritt)
+          has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0,
+          has_documented_buhs: Array.isArray(payload.dokumenterade_skador) && payload.dokumenterade_skador.length > 0,
+          odometer_km: payload.matarstallning ? parseInt(payload.matarstallning, 10) : null,
+          fuel_type: payload.drivmedel || null,
+          fuel_level_percent: payload.tankning?.tankniva === 'återlämnades_fulltankad' ? 100 : null,
+          charge_level_percent: payload.laddning?.laddniva ? parseInt(payload.laddning.laddniva, 10) : null,
+          charge_cables_count: payload.laddning?.antal_laddkablar ? parseInt(payload.laddning.antal_laddkablar, 10) : null,
+          hjultyp: payload.hjultyp || null,
+          tvattad: payload.washed || false,
+          rekond_behov: payload.rekond?.behoverRekond || false,
+          wash_needed: payload.rekond?.utvandig || false,
+          vacuum_needed: payload.rekond?.invandig || false,
+          notes: payload.notering || null,
+          checklist: checklistData,
         };
 
         const { data: checkinRecord, error: checkinError } = await supabaseAdmin
@@ -339,6 +817,7 @@ export async function POST(request: Request) {
             positions.forEach((pos: any) => {
               checkinDamageInserts.push({
                 checkin_id: checkinId,
+                regnr: regNr,
                 type: 'new',
                 damage_type: normalized.typeCode,
                 car_part: pos.carPart || null,
@@ -353,6 +832,7 @@ export async function POST(request: Request) {
           } else {
             checkinDamageInserts.push({
               checkin_id: checkinId,
+              regnr: regNr,
               type: 'new',
               damage_type: normalized.typeCode,
               car_part: null,
@@ -366,14 +846,18 @@ export async function POST(request: Request) {
           }
         });
 
-        // Dokumenterade BUHS
+        // Dokumenterade BUHS - RESPECT original damage date from BUHS
         (payload.dokumenterade_skador || []).forEach((skada: any) => {
           const rawType = skada.userType || skada.type || null;
           const normalized = normalizeDamageType(rawType);
+          
+          // Use originalDamageDate if available (from BUHS/CSV), otherwise use today's date
+          const damageDate = skada.originalDamageDate || now.toISOString().split('T')[0];
 
           damageInserts.push({
             regnr: regNr,
-            damage_date: now.toISOString().split('T')[0],
+            damage_date: damageDate, // IMPORTANT: Use original BUHS damage date
+            original_damage_date: skada.originalDamageDate || null, // Store for idempotency
             region: region || payload.region || null,
             ort: payload.ort || null,
             station_namn: payload.station || null,
@@ -386,8 +870,7 @@ export async function POST(request: Request) {
             status: 'complete',
             uploads: skada.uploads || null,
             legacy_damage_source_text: skada.fullText || null,
-            // original_damage_date: skada.damage_date || null,                // (valfritt för idempotens)
-            // legacy_loose_key: skada.damage_date ? `${regNr}|${skada.damage_date}` : null, // (valfritt)
+            legacy_loose_key: skada.originalDamageDate ? `${regNr}|${skada.originalDamageDate}|${rawType}` : null,
             created_at: now.toISOString(),
           });
 
@@ -396,6 +879,7 @@ export async function POST(request: Request) {
             positions.forEach((pos: any) => {
               checkinDamageInserts.push({
                 checkin_id: checkinId,
+                regnr: regNr,
                 type: 'documented',
                 damage_type: normalized.typeCode,
                 car_part: pos.carPart || null,
@@ -410,6 +894,7 @@ export async function POST(request: Request) {
           } else {
             checkinDamageInserts.push({
               checkin_id: checkinId,
+              regnr: regNr,
               type: 'documented',
               damage_type: normalized.typeCode,
               car_part: null,
@@ -470,7 +955,7 @@ export async function POST(request: Request) {
     emailPromises.push(
       resend.emails.send({
         from: 'incheckning@incheckad.se',
-        to: bilkontrollAddress,
+        to: bilkontrollTo,
         subject: bilkontrollSubject,
         html: bilkontrollHtml,
       })
