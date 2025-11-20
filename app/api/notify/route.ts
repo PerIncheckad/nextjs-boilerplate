@@ -458,7 +458,7 @@ const buildHuvudstationEmail = (
 
   const resolvedDamagesHtml = formatDamagesToHtml(
     resolvedDamages,
-    'Åtgärdade skador',
+    'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl,
   );
 
@@ -508,6 +508,10 @@ const buildHuvudstationEmail = (
             : ''
         }
         <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Plats för incheckning:</span>
+          <span style="color:#111827;">${city} / ${station}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
           <span style="font-weight:600;color:#4b5563;">Bilen står nu:</span>
           <span style="color:#111827;">${city} / ${station}</span>
         </div>
@@ -521,10 +525,6 @@ const buildHuvudstationEmail = (
         `
             : ''
         }
-        <div style="display:flex;justify-content:space-between;padding:4px 0;">
-          <span style="font-weight:600;color:#4b5563;">Incheckad vid:</span>
-          <span style="color:#111827;">${date} ${time}</span>
-        </div>
       </div>
     </td></tr>
     ${
@@ -667,7 +667,7 @@ const buildBilkontrollEmail = (
 
   const resolvedDamagesHtml = formatDamagesToHtml(
     resolvedDamages,
-    'Åtgärdade skador',
+    'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl,
   );
 
@@ -685,6 +685,10 @@ const buildBilkontrollEmail = (
         <div style="display:flex;justify-content:space-between;padding:4px 0;">
           <span style="font-weight:600;color:#4b5563;">Mätarställning:</span>
           <span style="color:#111827;">${odometer} km</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Plats för incheckning:</span>
+          <span style="color:#111827;">${city} / ${station}</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding:4px 0;">
           <span style="font-weight:600;color:#4b5563;">Bilen står nu:</span>
@@ -903,7 +907,7 @@ export async function POST(request: Request) {
             payload.fullName || payload.full_name || payload.incheckare || null,
           checker_email: payload.email || payload.user_email || null,
           completed_at: now.toISOString(),
-          status: 'complete',
+          status: 'COMPLETED',
 
           has_new_damages:
             Array.isArray(payload.nya_skador) &&
@@ -974,7 +978,7 @@ export async function POST(request: Request) {
             description: skada.text || skada.userDescription || null,
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
-            status: 'complete',
+            status: 'COMPLETED',
             uploads: skada.uploads || null,
             created_at: now.toISOString(),
             original_damage_date: null,
@@ -1039,7 +1043,7 @@ export async function POST(request: Request) {
             description: skada.userDescription || skada.text || null,
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
-            status: 'complete',
+            status: 'COMPLETED',
             uploads: skada.uploads || null,
             legacy_damage_source_text: skada.fullText || null,
             original_damage_date: originalDamageDate,
