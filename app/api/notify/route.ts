@@ -440,9 +440,19 @@ const buildHuvudstationEmail = (
     'Inga nya skador',
   );
 
-  const documentedDamagesHtml = formatDamagesToHtml(
-    documentedDamages,
-    'Ej dokumenterade befintliga skador från BUHS',
+  // Split dokumenterade_skador into two sections based on hasAnyFiles()
+  const documentedWithMedia = documentedDamages.filter((d: any) => hasAnyFiles(d));
+  const documentedWithoutMedia = documentedDamages.filter((d: any) => !hasAnyFiles(d));
+
+  const documentedWithMediaHtml = formatDamagesToHtml(
+    documentedWithMedia,
+    'Befintliga skador (från BUHS) som dokumenterades',
+    siteUrl,
+  );
+
+  const documentedWithoutMediaHtml = formatDamagesToHtml(
+    documentedWithoutMedia,
+    'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl,
   );
 
@@ -528,8 +538,13 @@ const buildHuvudstationEmail = (
         : ''
     }
     ${
-      documentedDamagesHtml
-        ? `<tr><td style="padding:20px 0 10px;">${documentedDamagesHtml}</td></tr>`
+      documentedWithMediaHtml
+        ? `<tr><td style="padding:20px 0 10px;">${documentedWithMediaHtml}</td></tr>`
+        : ''
+    }
+    ${
+      documentedWithoutMediaHtml
+        ? `<tr><td style="padding:20px 0 10px;">${documentedWithoutMediaHtml}</td></tr>`
         : ''
     }
     ${
@@ -634,9 +649,19 @@ const buildBilkontrollEmail = (
     'Inga nya skador',
   );
 
-  const documentedDamagesHtml = formatDamagesToHtml(
-    documentedDamages,
-    'Ej dokumenterade befintliga skador från BUHS',
+  // Split dokumenterade_skador into two sections based on hasAnyFiles()
+  const documentedWithMedia = documentedDamages.filter((d: any) => hasAnyFiles(d));
+  const documentedWithoutMedia = documentedDamages.filter((d: any) => !hasAnyFiles(d));
+
+  const documentedWithMediaHtml = formatDamagesToHtml(
+    documentedWithMedia,
+    'Befintliga skador (från BUHS) som dokumenterades',
+    siteUrl,
+  );
+
+  const documentedWithoutMediaHtml = formatDamagesToHtml(
+    documentedWithoutMedia,
+    'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl,
   );
 
@@ -683,8 +708,13 @@ const buildBilkontrollEmail = (
         : ''
     }
     ${
-      documentedDamagesHtml
-        ? `<tr><td style="padding:20px 0 10px;">${documentedDamagesHtml}</td></tr>`
+      documentedWithMediaHtml
+        ? `<tr><td style="padding:20px 0 10px;">${documentedWithMediaHtml}</td></tr>`
+        : ''
+    }
+    ${
+      documentedWithoutMediaHtml
+        ? `<tr><td style="padding:20px 0 10px;">${documentedWithoutMediaHtml}</td></tr>`
         : ''
     }
     ${
@@ -899,6 +929,8 @@ export async function POST(request: Request) {
           checklist: checklistData,
         };
 
+        console.log('📝 Attempting to insert checkin record:', checkinData);
+
         const { data: checkinRecord, error: checkinError } = await supabaseAdmin
           .from('checkins')
           .insert([checkinData])
@@ -906,9 +938,18 @@ export async function POST(request: Request) {
           .single();
 
         if (checkinError) {
-          console.error('Error inserting checkin record:', checkinError);
+          console.error('❌ CHECKIN INSERT ERROR:', {
+            error: checkinError,
+            code: checkinError.code,
+            message: checkinError.message,
+            details: checkinError.details,
+            hint: checkinError.hint,
+            data: checkinData
+          });
           throw checkinError;
         }
+
+        console.log('✅ Checkin record inserted successfully:', checkinRecord);
 
         const checkinId = checkinRecord.id as string;
 
@@ -930,7 +971,6 @@ export async function POST(request: Request) {
             station_namn: payload.station || null,
             damage_type: normalized.typeCode,
             damage_type_raw: rawType,
-            user_type: rawType,
             description: skada.text || skada.userDescription || null,
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
@@ -996,7 +1036,6 @@ export async function POST(request: Request) {
             station_namn: payload.station || null,
             damage_type: normalized.typeCode,
             damage_type_raw: rawType,
-            user_type: rawType,
             description: skada.userDescription || skada.text || null,
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
