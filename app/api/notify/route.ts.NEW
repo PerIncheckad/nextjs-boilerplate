@@ -433,6 +433,8 @@ const buildHuvudstationEmail = (
     'INSYNSSKYDD SAKNAS',
   );
 
+  // CHANGE #2: Removed Tvättad admin banner (line removed)
+
   const newDamagesHtml = formatDamagesToHtml(
     newDamages,
     'Nya skador',
@@ -440,25 +442,16 @@ const buildHuvudstationEmail = (
     'Inga nya skador',
   );
 
-  // Split dokumenterade_skador into two sections based on hasAnyFiles()
-  const documentedWithMedia = documentedDamages.filter((d: any) => hasAnyFiles(d));
-  const documentedWithoutMedia = documentedDamages.filter((d: any) => !hasAnyFiles(d));
-
-  const documentedWithMediaHtml = formatDamagesToHtml(
-    documentedWithMedia,
-    'Befintliga skador (från BUHS) som dokumenterades',
-    siteUrl,
-  );
-
-  const documentedWithoutMediaHtml = formatDamagesToHtml(
-    documentedWithoutMedia,
-    'Befintliga skador (från BUHS) som inte dokumenterades',
+  // CHANGE #3: Updated header to 'Ej dokumenterade befintliga skador från BUHS'
+  const documentedDamagesHtml = formatDamagesToHtml(
+    documentedDamages,
+    'Ej dokumenterade befintliga skador från BUHS',
     siteUrl,
   );
 
   const resolvedDamagesHtml = formatDamagesToHtml(
     resolvedDamages,
-    'Befintliga skador (från BUHS) som inte dokumenterades',
+    'Åtgärdade skador',
     siteUrl,
   );
 
@@ -508,10 +501,6 @@ const buildHuvudstationEmail = (
             : ''
         }
         <div style="display:flex;justify-content:space-between;padding:4px 0;">
-          <span style="font-weight:600;color:#4b5563;">Plats för incheckning:</span>
-          <span style="color:#111827;">${city} / ${station}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;">
           <span style="font-weight:600;color:#4b5563;">Bilen står nu:</span>
           <span style="color:#111827;">${city} / ${station}</span>
         </div>
@@ -525,6 +514,10 @@ const buildHuvudstationEmail = (
         `
             : ''
         }
+        <div style="display:flex;justify-content:space-between;padding:4px 0;">
+          <span style="font-weight:600;color:#4b5563;">Incheckad vid:</span>
+          <span style="color:#111827;">${date} ${time}</span>
+        </div>
       </div>
     </td></tr>
     ${
@@ -538,13 +531,8 @@ const buildHuvudstationEmail = (
         : ''
     }
     ${
-      documentedWithMediaHtml
-        ? `<tr><td style="padding:20px 0 10px;">${documentedWithMediaHtml}</td></tr>`
-        : ''
-    }
-    ${
-      documentedWithoutMediaHtml
-        ? `<tr><td style="padding:20px 0 10px;">${documentedWithoutMediaHtml}</td></tr>`
+      documentedDamagesHtml
+        ? `<tr><td style="padding:20px 0 10px;">${documentedDamagesHtml}</td></tr>`
         : ''
     }
     ${
@@ -649,25 +637,16 @@ const buildBilkontrollEmail = (
     'Inga nya skador',
   );
 
-  // Split dokumenterade_skador into two sections based on hasAnyFiles()
-  const documentedWithMedia = documentedDamages.filter((d: any) => hasAnyFiles(d));
-  const documentedWithoutMedia = documentedDamages.filter((d: any) => !hasAnyFiles(d));
-
-  const documentedWithMediaHtml = formatDamagesToHtml(
-    documentedWithMedia,
-    'Befintliga skador (från BUHS) som dokumenterades',
-    siteUrl,
-  );
-
-  const documentedWithoutMediaHtml = formatDamagesToHtml(
-    documentedWithoutMedia,
-    'Befintliga skador (från BUHS) som inte dokumenterades',
+  // CHANGE #3: Updated header to 'Ej dokumenterade befintliga skador från BUHS'
+  const documentedDamagesHtml = formatDamagesToHtml(
+    documentedDamages,
+    'Ej dokumenterade befintliga skador från BUHS',
     siteUrl,
   );
 
   const resolvedDamagesHtml = formatDamagesToHtml(
     resolvedDamages,
-    'Befintliga skador (från BUHS) som inte dokumenterades',
+    'Åtgärdade skador',
     siteUrl,
   );
 
@@ -685,10 +664,6 @@ const buildBilkontrollEmail = (
         <div style="display:flex;justify-content:space-between;padding:4px 0;">
           <span style="font-weight:600;color:#4b5563;">Mätarställning:</span>
           <span style="color:#111827;">${odometer} km</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;">
-          <span style="font-weight:600;color:#4b5563;">Plats för incheckning:</span>
-          <span style="color:#111827;">${city} / ${station}</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding:4px 0;">
           <span style="font-weight:600;color:#4b5563;">Bilen står nu:</span>
@@ -712,13 +687,8 @@ const buildBilkontrollEmail = (
         : ''
     }
     ${
-      documentedWithMediaHtml
-        ? `<tr><td style="padding:20px 0 10px;">${documentedWithMediaHtml}</td></tr>`
-        : ''
-    }
-    ${
-      documentedWithoutMediaHtml
-        ? `<tr><td style="padding:20px 0 10px;">${documentedWithoutMediaHtml}</td></tr>`
+      documentedDamagesHtml
+        ? `<tr><td style="padding:20px 0 10px;">${documentedDamagesHtml}</td></tr>`
         : ''
     }
     ${
@@ -838,6 +808,7 @@ export async function POST(request: Request) {
     const notRefueled =
       drivmedel === 'bensin_diesel' && tankning.tankniva === 'ej_upptankad';
 
+    // CHANGE #1: Add dokumenterade/åtgärdade skador to hasFarligaConditions
     const hasFarligaConditions =
       payload.rental?.unavailable ||
       payload.varningslampa?.lyser ||
@@ -895,6 +866,7 @@ export async function POST(request: Request) {
           },
         };
 
+        // CHANGE #7: Removed user_type from checkinData
         const checkinData = {
           regnr: regNr,
           region: region || payload.region || null,
@@ -907,7 +879,7 @@ export async function POST(request: Request) {
             payload.fullName || payload.full_name || payload.incheckare || null,
           checker_email: payload.email || payload.user_email || null,
           completed_at: now.toISOString(),
-          status: 'COMPLETED',
+          status: 'complete',
 
           has_new_damages:
             Array.isArray(payload.nya_skador) &&
@@ -933,8 +905,6 @@ export async function POST(request: Request) {
           checklist: checklistData,
         };
 
-        console.log('📝 Attempting to insert checkin record:', checkinData);
-
         const { data: checkinRecord, error: checkinError } = await supabaseAdmin
           .from('checkins')
           .insert([checkinData])
@@ -942,18 +912,9 @@ export async function POST(request: Request) {
           .single();
 
         if (checkinError) {
-          console.error('❌ CHECKIN INSERT ERROR:', {
-            error: checkinError,
-            code: checkinError.code,
-            message: checkinError.message,
-            details: checkinError.details,
-            hint: checkinError.hint,
-            data: checkinData
-          });
+          console.error('Error inserting checkin record:', checkinError);
           throw checkinError;
         }
-
-        console.log('✅ Checkin record inserted successfully:', checkinRecord);
 
         const checkinId = checkinRecord.id as string;
 
@@ -975,6 +936,7 @@ export async function POST(request: Request) {
             station_namn: payload.station || null,
             damage_type: normalized.typeCode,
             damage_type_raw: rawType,
+            user_type: rawType,
             description: skada.text || skada.userDescription || null,
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
@@ -1040,6 +1002,7 @@ export async function POST(request: Request) {
             station_namn: payload.station || null,
             damage_type: normalized.typeCode,
             damage_type_raw: rawType,
+            user_type: rawType,
             description: skada.userDescription || skada.text || null,
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
