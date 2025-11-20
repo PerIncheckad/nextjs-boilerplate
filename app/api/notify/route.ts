@@ -35,6 +35,12 @@ const LOGO_URL =
 // 2. HELPERS (oförändrade från tidigare version)
 // =================================================================
 
+/**
+ * Safely extracts a description string from a damage object.
+ * Falls back through multiple fields to ensure a non-null value is returned.
+ * @param skada - Damage object that may contain userDescription, text, or fullText
+ * @returns A description string (never null) - returns empty string if no description is available
+ */
 const getDescription = (skada: any): string => {
   return (
     skada.userDescription ||
