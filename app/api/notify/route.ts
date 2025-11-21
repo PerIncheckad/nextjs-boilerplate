@@ -219,8 +219,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   if (payload.drivmedel === 'elbil') {
     const laddniva = payload.laddning?.laddniva || '---';
     const antalKablar = payload.laddning?.antal_laddkablar || 0;
-    fuelOrChargeInfo = `<tr><td style="padding:4px 0;"><strong>Laddnivå:</strong> ${laddniva}%</td></tr>
-<tr><td style="padding:4px 0;"><strong>Laddkablar:</strong> ${antalKablar} st</td></tr>`;
+    fuelOrChargeInfo = `<tr><td style="padding:4px 0;"><strong>Laddnivå:</strong> ${laddniva}%</td></tr>` +
+                       `<tr><td style="padding:4px 0;"><strong>Laddkablar:</strong> ${antalKablar} st</td></tr>`;
   } else if (payload.drivmedel === 'bensin_diesel') {
     const tankningText = formatTankning(payload.tankning);
     fuelOrChargeInfo = `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
