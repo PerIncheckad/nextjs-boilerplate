@@ -31,6 +31,11 @@ const getSiteUrl = (request: Request): string => {
 const LOGO_URL =
   'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png';
 
+// --- Brand Colors ---
+const BRAND_RED = '#B30E0E';
+const BRAND_BLUE = '#15418C';
+const BRAND_WHITE = '#FFFFFF';
+
 // =================================================================
 // 2. HELPERS (oförändrade från tidigare version)
 // =================================================================
@@ -64,6 +69,15 @@ const createStorageLink = (folderPath: string | undefined, siteUrl: string): str
   return `${siteUrl}/public-media/${folderPath}`;
 };
 
+/**
+ * Calculates the total count of handled damages (documented + resolved)
+ * @param payload - The check-in data payload
+ * @returns Total count of handled damages
+ */
+const getHandledDamagesCount = (payload: any): number => {
+  return (payload.dokumenterade_skador?.length ?? 0) + (payload.åtgärdade_skador?.length ?? 0);
+};
+
 const hasAnyFiles = (damage: any): boolean => {
   const uploads = damage?.uploads;
   if (!uploads) return false;
@@ -86,22 +100,22 @@ const createAlertBanner = (
   if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
   let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
-  const bannerContent = `<div style="background-color:#FFFBEB!important;border:1px solid #FDE68A;padding:12px;text-align:center;font-weight:bold;color:#92400e!important;border-radius:6px;">${fullText}</div>`;
+  const bannerContent = `<div style="background-color:${BRAND_RED}!important;border:1px solid ${BRAND_RED};padding:12px;text-align:center;font-weight:bold;color:${BRAND_WHITE}!important;border-radius:6px;">${fullText}</div>`;
   return `<tr><td style="padding:6px 0;">${
     storageLink
-      ? `<a href="${storageLink}" target="_blank" style="text-decoration:none;color:#92400e!important;">${bannerContent}</a>`
+      ? `<a href="${storageLink}" target="_blank" style="text-decoration:none;color:${BRAND_WHITE}!important;">${bannerContent}</a>`
       : bannerContent
   }</td></tr>`;
 };
 
 const createAdminBanner = (condition: boolean, text: string): string => {
   if (!condition) return '';
-  const bannerContent = `<div style="background-color:#DBEAFE!important;border:1px solid #93C5FD;padding:12px;text-align:center;font-weight:bold;color:#1E40AF!important;border-radius:6px;">${text}</div>`;
+  const bannerContent = `<div style="background-color:${BRAND_BLUE}!important;border:1px solid ${BRAND_BLUE};padding:12px;text-align:center;font-weight:bold;color:${BRAND_WHITE}!important;border-radius:6px;">${text}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
 const getDamageString = (damage: any): string => {
-  let baseString = damage.fullText || damage.type || damage.userType || 'Okänd skada';
+  let baseString = damage.userType || damage.type || damage.fullText || 'Okänd skada';
   const positions = (damage.positions || damage.userPositions || [])
     .map((p: any) => {
       if (p.carPart && p.position) return `${p.carPart} (${p.position})`;
@@ -113,6 +127,11 @@ const getDamageString = (damage: any): string => {
   if (positions) baseString += `: ${positions}`;
   const comment = damage.text || damage.userDescription || damage.resolvedComment;
   if (comment) baseString += `<br><small><strong>Kommentar:</strong> ${comment}</small>`;
+  // If this is a documented damage with both userType and fullText, show the original BUHS info
+  // Trim both values to handle potential whitespace differences
+  if (damage.userType && damage.fullText && damage.userType.trim() !== damage.fullText.trim()) {
+    baseString += `<br><small><strong>Tidigare information:</strong> ${damage.fullText}</small>`;
+  }
   return baseString;
 };
 
@@ -200,11 +219,103 @@ a { color:#2563eb!important; }
 </html>`;
 
 // =================================================================
-// 3. HTML BUILDERS (kommentar)
+// 3. HTML BUILDERS
 // =================================================================
-// Den här filen förutsätter att buildHuvudstationEmail och buildBilkontrollEmail
-// finns definierade (antingen här eller importerade). Om de är externa:
-// import { buildHuvudstationEmail, buildBilkontrollEmail } from './emailBuilders';
+
+/**
+ * Builds the common email content for check-in notifications
+ * @param payload - The check-in data payload
+ * @param date - Formatted date string (YYYY-MM-DD)
+ * @param time - Formatted time string (HH:MM)
+ * @param siteUrl - Base site URL for creating links
+ * @returns HTML string for the email content
+ */
+function buildCommonEmailContent(payload: any, date: string, time: string, siteUrl: string): string {
+  const regNr = payload.regnr || '';
+  const incheckare = formatCheckerName(payload);
+  
+  // Calculate counts for warnings
+  const handledDamagesCount = getHandledDamagesCount(payload);
+  
+  // Build banner rows
+  const banners = [
+    createAlertBanner(payload.rental?.unavailable, 'Går inte att hyra ut', payload.rental?.comment),
+    createAlertBanner(payload.varningslampa?.lyser, 'Varningslampa ej släckt', payload.varningslampa?.beskrivning),
+    createAlertBanner(payload.rekond?.behoverRekond, 'Rekond', payload.rekond?.text, payload.rekond?.folder, siteUrl),
+    createAlertBanner(payload.husdjur?.sanerad, 'Husdjur', payload.husdjur?.text, payload.husdjur?.folder, siteUrl),
+    createAlertBanner(payload.rokning?.sanerad, 'Rökning', payload.rokning?.text, payload.rokning?.folder, siteUrl),
+    createAlertBanner(payload.status?.insynsskyddSaknas, 'Insynsskydd saknas'),
+    createAlertBanner(
+      payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad',
+      'Bilen är ej upptankad'
+    ),
+    createAlertBanner(
+      payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95,
+      'Låg laddnivå',
+      `Säkerställ att bilen omedelbart sätts på laddning! (${payload.laddning?.laddniva || 0}%)`
+    ),
+    createAlertBanner((payload.nya_skador && payload.nya_skador.length > 0), 'Nya skador', undefined, undefined, undefined, payload.nya_skador?.length),
+    createAlertBanner(handledDamagesCount > 0, 'Befintliga skador har hanterats', undefined, undefined, undefined, handledDamagesCount),
+    createAdminBanner(payload.vehicleStatus === 'NO_MATCH', '🚨 Okänt reg.nr. Detta fordon finns inte i Bilkontroll-listan.'),
+  ].filter(Boolean).join('');
+
+  return `
+    ${banners}
+    <tr><td style="padding:15px 0;"><h2 style="font-size:18px;font-weight:600;margin:0 0 10px;">Fordonsinformation</h2></td></tr>
+    <tr><td><strong>Regnr:</strong> ${regNr}</td></tr>
+    <tr><td><strong>Modell:</strong> ${payload.carModel || '---'}</td></tr>
+    <tr><td><strong>Mätarställning:</strong> ${payload.matarstallning || '---'} km</td></tr>
+    <tr><td><strong>Hjul:</strong> ${payload.hjultyp || '---'}</td></tr>
+    ${payload.drivmedel === 'bensin_diesel' ? `<tr><td><strong>Tankning:</strong> ${formatTankning(payload.tankning)}</td></tr>` : ''}
+    ${payload.drivmedel === 'elbil' ? `<tr><td><strong>Laddning:</strong> ${payload.laddning?.laddniva || '---'}%</td></tr><tr><td><strong>Antal laddkablar:</strong> ${payload.laddning?.antal_laddkablar ?? '---'}</td></tr>` : ''}
+    <tr><td style="padding:15px 0;"><h2 style="font-size:18px;font-weight:600;margin:0 0 10px;">Plats</h2></td></tr>
+    <tr><td><strong>Incheckad vid:</strong> ${payload.ort || '---'} / ${payload.station || '---'}</td></tr>
+    <tr><td><strong>Bilen står nu vid:</strong> ${payload.bilen_star_nu?.ort || '---'} / ${payload.bilen_star_nu?.station || '---'}</td></tr>
+    ${payload.bilen_star_nu?.kommentar ? `<tr><td><strong>Parkeringsinfo:</strong> ${payload.bilen_star_nu.kommentar}</td></tr>` : ''}
+    <tr><td style="padding:15px 0;">${buildBilagorSection(payload.rekond, payload.husdjur, payload.rokning, siteUrl)}</td></tr>
+    <tr><td style="padding:15px 0;">${formatDamagesToHtml(payload.nya_skador, '💥 Nya skador', siteUrl)}</td></tr>
+    <tr><td style="padding:15px 0;">${formatDamagesToHtml(payload.dokumenterade_skador, '📋 Dokumenterade skador', siteUrl)}</td></tr>
+    <tr><td style="padding:15px 0;">${formatDamagesToHtml(payload.åtgärdade_skador, '✅ Åtgärdade/Hittas ej', siteUrl)}</td></tr>
+    ${payload.washed ? '<tr><td><strong>✅ Tvättad</strong></td></tr>' : ''}
+    ${payload.otherChecklistItemsOK ? '<tr><td><strong>✅ Övriga kontroller OK!</strong></td></tr>' : ''}
+    ${payload.notering ? `<tr><td style="padding:15px 0;"><strong>Övriga kommentarer:</strong><br>${payload.notering}</td></tr>` : ''}
+    <tr><td style="padding:20px 0 0;border-top:1px solid #e5e7eb;font-size:14px;color:#6b7280;">
+      Incheckad av ${incheckare} kl ${time}, ${date}
+    </td></tr>
+  `;
+}
+
+/**
+ * Builds the email HTML for Huvudstation recipients
+ * Note: Currently identical to buildBilkontrollEmail, but kept separate to allow
+ * future customization of email content for different recipient types.
+ * @param payload - The check-in data payload
+ * @param date - Formatted date string (YYYY-MM-DD)
+ * @param time - Formatted time string (HH:MM)
+ * @param siteUrl - Base site URL for creating links
+ * @returns HTML string for the email
+ */
+function buildHuvudstationEmail(payload: any, date: string, time: string, siteUrl: string): string {
+  const regNr = payload.regnr || '';
+  const content = buildCommonEmailContent(payload, date, time, siteUrl);
+  return createBaseLayout(regNr, content);
+}
+
+/**
+ * Builds the email HTML for Bilkontroll recipients
+ * Note: Currently identical to buildHuvudstationEmail, but kept separate to allow
+ * future customization of email content for different recipient types.
+ * @param payload - The check-in data payload
+ * @param date - Formatted date string (YYYY-MM-DD)
+ * @param time - Formatted time string (HH:MM)
+ * @param siteUrl - Base site URL for creating links
+ * @returns HTML string for the email
+ */
+function buildBilkontrollEmail(payload: any, date: string, time: string, siteUrl: string): string {
+  const regNr = payload.regnr || '';
+  const content = buildCommonEmailContent(payload, date, time, siteUrl);
+  return createBaseLayout(regNr, content);
+}
 
 // =================================================================
 // 4. MAIN API FUNCTION
@@ -273,6 +384,7 @@ export async function POST(request: Request) {
 
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
     const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
+    const hasHandledDamages = getHandledDamagesCount(payload) > 0;
     const hasFarligaConditions =
       payload.rental?.unavailable ||
       payload.varningslampa?.lyser ||
@@ -282,7 +394,8 @@ export async function POST(request: Request) {
       payload.status?.insynsskyddSaknas ||
       (payload.nya_skador && payload.nya_skador.length > 0) ||
       payload.husdjur?.sanerad ||
-      payload.rokning?.sanerad;
+      payload.rokning?.sanerad ||
+      hasHandledDamages;
 
     const testMarker = hasFarligaConditions ? ' - !!! - ' : ' - ';
     const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}HUVUDSTATION`;
