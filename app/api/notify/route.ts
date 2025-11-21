@@ -236,7 +236,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   // Calculate Saludatum warnings
   let saludatumBanners = '';
   const existingDamages = payload.dokumenterade_skador || [];
-  const allDamages = [...(payload.nya_skador || []), ...existingDamages];
+  const resolvedDamages = payload.åtgärdade_skador || [];
+  const allDamages = [...(payload.nya_skador || []), ...existingDamages, ...resolvedDamages];
   
   // Check for Saludatum from any damage
   const today = new Date();
@@ -279,7 +280,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   
   const nyaSkadorCount = (payload.nya_skador || []).length;
   const dokumenteradeSkadorCount = existingDamages.filter((d: any) => hasAnyFiles(d)).length;
-  const ejDokumenteradeSkadorCount = existingDamages.filter((d: any) => !hasAnyFiles(d)).length;
+  const ejDokumenteradeSkadorCount = existingDamages.filter((d: any) => !hasAnyFiles(d)).length + resolvedDamages.length;
   
   const banners = `
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
@@ -304,7 +305,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
     siteUrl
   );
   const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
-    existingDamages.filter((d: any) => !hasAnyFiles(d)),
+    [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
     'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl
   );
@@ -381,6 +382,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   
   // Damage sections
   const existingDamages = payload.dokumenterade_skador || [];
+  const resolvedDamages = payload.åtgärdade_skador || [];
   const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador');
   const dokumenteradeSkadorHtml = formatDamagesToHtml(
     existingDamages.filter((d: any) => hasAnyFiles(d)),
@@ -388,7 +390,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
     siteUrl
   );
   const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
-    existingDamages.filter((d: any) => !hasAnyFiles(d)),
+    [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
     'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl
   );
