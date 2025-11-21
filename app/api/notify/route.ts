@@ -49,6 +49,20 @@ const getDescription = (skada: any): string => {
   );
 };
 
+/**
+ * Escapes HTML special characters to prevent XSS attacks
+ */
+const escapeHtml = (text: string): string => {
+  const htmlEscapeMap: { [key: string]: string } = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEscapeMap[char]);
+};
+
 const formatCheckerName = (payload: any): string => {
   if (payload.fullName) return payload.fullName;
   if (payload.full_name) return payload.full_name;
@@ -118,13 +132,23 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
   
   // For documented BUHS damages, show previous info if different
   if (showPreviousInfo && damage.fullText) {
-    // Normalize both texts for comparison: remove HTML tags, extra spaces, punctuation, lowercase
-    const normalize = (text: string) => 
-      text.replace(/<[^>]*>/g, '')
-          .replace(/[^\w\sÅÄÖåäö]/g, '')
-          .replace(/\s+/g, ' ')
-          .toLowerCase()
-          .trim();
+    // Normalize both texts for comparison (NOT for output - comparison only)
+    // Multiple passes ensure all HTML-like content is removed for comparison purposes
+    const normalize = (text: string) => {
+      let normalized = text;
+      // Remove HTML tags in multiple passes to handle nested/malformed tags
+      let prevLength;
+      do {
+        prevLength = normalized.length;
+        normalized = normalized.replace(/<[^>]*>/g, '');
+      } while (normalized.length < prevLength);
+      // Remove punctuation, normalize spaces, lowercase
+      return normalized
+        .replace(/[^\w\sÅÄÖåäö]/g, '')
+        .replace(/\s+/g, ' ')
+        .toLowerCase()
+        .trim();
+    };
     
     const fullTextNormalized = normalize(damage.fullText);
     const structuredTextNormalized = normalize(structuredText);
@@ -133,7 +157,10 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
     // Check if one is not contained in the other (accounting for order differences)
     if (!structuredTextNormalized.includes(fullTextNormalized) && 
         !fullTextNormalized.includes(structuredTextNormalized)) {
-      structuredText += `<br><small><strong>Tidigare information om skadan:</strong> ${damage.fullText}</small>`;
+      // IMPORTANT: Use escapeHtml() for output to prevent XSS attacks
+      // The normalize() function above is ONLY for comparison, not output
+      const escapedFullText = escapeHtml(damage.fullText);
+      structuredText += `<br><small><strong>Tidigare information om skadan:</strong> ${escapedFullText}</small>`;
     }
   }
   
