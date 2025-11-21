@@ -1347,7 +1347,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
         return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
-            let damageString = d.fullText || d.type || d.userType || 'Okänd skada';
+            let damageString = d.userType || d.type || d.fullText || 'Okänd skada';
             
             const positions = (d.positions || d.userPositions || [])
               .map((p: any) => {
