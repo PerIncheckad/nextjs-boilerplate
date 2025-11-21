@@ -35,6 +35,21 @@ const LOGO_URL =
 // 2. HELPERS (oförändrade från tidigare version)
 // =================================================================
 
+/**
+ * Safely extracts a description string from a damage object.
+ * Falls back through multiple fields to ensure a non-null value is returned.
+ * @param skada - Damage object that may contain userDescription, text, or fullText
+ * @returns A description string (never null) - returns empty string if no description is available
+ */
+const getDescription = (skada: any): string => {
+  return (
+    skada.userDescription ||
+    skada.text ||
+    skada.fullText ||
+    ''
+  );
+};
+
 const formatCheckerName = (payload: any): string => {
   if (payload.fullName) return payload.fullName;
   if (payload.full_name) return payload.full_name;
@@ -326,7 +341,7 @@ export async function POST(request: Request) {
             damage_type: normalized.typeCode,
             damage_type_raw: rawType,
             user_type: rawType,
-            description: skada.text || skada.userDescription || null,
+            description: getDescription(skada),
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
             status: 'complete',
@@ -343,7 +358,7 @@ export async function POST(request: Request) {
                 damage_type: normalized.typeCode,
                 car_part: pos.carPart || null,
                 position: pos.position || null,
-                description: skada.text || skada.userDescription || null,
+                description: getDescription(skada),
                 photo_urls: skada.uploads?.photo_urls || [],
                 video_urls: skada.uploads?.video_urls || [],
                 positions: [pos],
@@ -357,7 +372,7 @@ export async function POST(request: Request) {
               damage_type: normalized.typeCode,
               car_part: null,
               position: null,
-              description: skada.text || skada.userDescription || null,
+              description: getDescription(skada),
               photo_urls: skada.uploads?.photo_urls || [],
               video_urls: skada.uploads?.video_urls || [],
               positions: [],
@@ -380,7 +395,7 @@ export async function POST(request: Request) {
             damage_type: normalized.typeCode,
             damage_type_raw: rawType,
             user_type: rawType,
-            description: skada.userDescription || skada.text || null,
+            description: getDescription(skada),
             inchecker_name: checkinData.checker_name,
             inchecker_email: checkinData.checker_email,
             status: 'complete',
@@ -400,7 +415,7 @@ export async function POST(request: Request) {
                 damage_type: normalized.typeCode,
                 car_part: pos.carPart || null,
                 position: pos.position || null,
-                description: skada.userDescription || skada.text || null,
+                description: getDescription(skada),
                 photo_urls: skada.uploads?.photo_urls || [],
                 video_urls: skada.uploads?.video_urls || [],
                 positions: [pos],
@@ -414,7 +429,7 @@ export async function POST(request: Request) {
               damage_type: normalized.typeCode,
               car_part: null,
               position: null,
-              description: skada.userDescription || skada.text || null,
+              description: getDescription(skada),
               photo_urls: skada.uploads?.photo_urls || [],
               video_urls: skada.uploads?.video_urls || [],
               positions: [],
