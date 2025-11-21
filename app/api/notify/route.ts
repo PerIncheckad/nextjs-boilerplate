@@ -69,6 +69,15 @@ const createStorageLink = (folderPath: string | undefined, siteUrl: string): str
   return `${siteUrl}/public-media/${folderPath}`;
 };
 
+/**
+ * Calculates the total count of handled damages (documented + resolved)
+ * @param payload - The check-in data payload
+ * @returns Total count of handled damages
+ */
+const getHandledDamagesCount = (payload: any): number => {
+  return (payload.dokumenterade_skador?.length ?? 0) + (payload.åtgärdade_skador?.length ?? 0);
+};
+
 const hasAnyFiles = (damage: any): boolean => {
   const uploads = damage?.uploads;
   if (!uploads) return false;
@@ -225,7 +234,7 @@ function buildCommonEmailContent(payload: any, date: string, time: string, siteU
   const incheckare = formatCheckerName(payload);
   
   // Calculate counts for warnings
-  const handledDamagesCount = (payload.dokumenterade_skador?.length || 0) + (payload.åtgärdade_skador?.length || 0);
+  const handledDamagesCount = getHandledDamagesCount(payload);
   
   // Build banner rows
   const banners = [
@@ -370,7 +379,7 @@ export async function POST(request: Request) {
 
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
     const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
-    const hasHandledDamages = ((payload.dokumenterade_skador?.length || 0) + (payload.åtgärdade_skador?.length || 0)) > 0;
+    const hasHandledDamages = getHandledDamagesCount(payload) > 0;
     const hasFarligaConditions =
       payload.rental?.unavailable ||
       payload.varningslampa?.lyser ||
