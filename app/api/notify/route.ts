@@ -128,7 +128,8 @@ const getDamageString = (damage: any): string => {
   const comment = damage.text || damage.userDescription || damage.resolvedComment;
   if (comment) baseString += `<br><small><strong>Kommentar:</strong> ${comment}</small>`;
   // If this is a documented damage with both userType and fullText, show the original BUHS info
-  if (damage.userType && damage.fullText && damage.userType !== damage.fullText) {
+  // Trim both values to handle potential whitespace differences
+  if (damage.userType && damage.fullText && damage.userType.trim() !== damage.fullText.trim()) {
     baseString += `<br><small><strong>Tidigare information:</strong> ${damage.fullText}</small>`;
   }
   return baseString;
@@ -286,6 +287,8 @@ function buildCommonEmailContent(payload: any, date: string, time: string, siteU
 
 /**
  * Builds the email HTML for Huvudstation recipients
+ * Note: Currently identical to buildBilkontrollEmail, but kept separate to allow
+ * future customization of email content for different recipient types.
  * @param payload - The check-in data payload
  * @param date - Formatted date string (YYYY-MM-DD)
  * @param time - Formatted time string (HH:MM)
@@ -300,6 +303,8 @@ function buildHuvudstationEmail(payload: any, date: string, time: string, siteUr
 
 /**
  * Builds the email HTML for Bilkontroll recipients
+ * Note: Currently identical to buildHuvudstationEmail, but kept separate to allow
+ * future customization of email content for different recipient types.
  * @param payload - The check-in data payload
  * @param date - Formatted date string (YYYY-MM-DD)
  * @param time - Formatted time string (HH:MM)
