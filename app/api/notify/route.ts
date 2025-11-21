@@ -49,6 +49,20 @@ const getDescription = (skada: any): string => {
   );
 };
 
+/**
+ * Escapes HTML special characters to prevent XSS attacks
+ */
+const escapeHtml = (text: string): string => {
+  const htmlEscapeMap: { [key: string]: string } = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  };
+  return text.replace(/[&<>"']/g, (char) => htmlEscapeMap[char]);
+};
+
 const formatCheckerName = (payload: any): string => {
   if (payload.fullName) return payload.fullName;
   if (payload.full_name) return payload.full_name;
@@ -85,22 +99,23 @@ const createAlertBanner = (
   if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
   let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
-  const bannerContent = `<div style="background-color:#FFFBEB!important;border:1px solid #FDE68A;padding:12px;text-align:center;font-weight:bold;color:#92400e!important;border-radius:6px;">${fullText}</div>`;
+  const bannerContent = `<div style="background-color:#B30E0E!important;border:1px solid #B30E0E;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${fullText}</div>`;
   return `<tr><td style="padding:6px 0;">${
     storageLink
-      ? `<a href="${storageLink}" target="_blank" style="text-decoration:none;color:#92400e!important;">${bannerContent}</a>`
+      ? `<a href="${storageLink}" target="_blank" style="text-decoration:none;color:#FFFFFF!important;">${bannerContent}</a>`
       : bannerContent
   }</td></tr>`;
 };
 
 const createAdminBanner = (condition: boolean, text: string): string => {
   if (!condition) return '';
-  const bannerContent = `<div style="background-color:#DBEAFE!important;border:1px solid #93C5FD;padding:12px;text-align:center;font-weight:bold;color:#1E40AF!important;border-radius:6px;">${text}</div>`;
+  const bannerContent = `<div style="background-color:#15418C!important;border:1px solid #15418C;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
-const getDamageString = (damage: any): string => {
-  let baseString = damage.fullText || damage.type || damage.userType || 'Okänd skada';
+const getDamageString = (damage: any, showPreviousInfo: boolean = false): string => {
+  // Build new structured description
+  let structuredText = damage.type || damage.userType || 'Okänd skada';
   const positions = (damage.positions || damage.userPositions || [])
     .map((p: any) => {
       if (p.carPart && p.position) return `${p.carPart} (${p.position})`;
@@ -109,13 +124,50 @@ const getDamageString = (damage: any): string => {
     })
     .filter(Boolean)
     .join(', ');
-  if (positions) baseString += `: ${positions}`;
+  if (positions) structuredText += `: ${positions}`;
+  
+  // Add comment if present
   const comment = damage.text || damage.userDescription || damage.resolvedComment;
-  if (comment) baseString += `<br><small><strong>Kommentar:</strong> ${comment}</small>`;
-  return baseString;
+  if (comment) structuredText += `<br><small><strong>Kommentar:</strong> ${comment}</small>`;
+  
+  // For documented BUHS damages, show previous info if different
+  if (showPreviousInfo && damage.fullText) {
+    // Normalize both texts for comparison (NOT for output - comparison only)
+    // Multiple passes ensure all HTML-like content is removed for comparison purposes
+    const normalize = (text: string) => {
+      let normalized = text;
+      // Remove HTML tags in multiple passes to handle nested/malformed tags
+      let prevLength;
+      do {
+        prevLength = normalized.length;
+        normalized = normalized.replace(/<[^>]*>/g, '');
+      } while (normalized.length < prevLength);
+      // Remove punctuation, normalize spaces, lowercase
+      return normalized
+        .replace(/[^\w\sÅÄÖåäö]/g, '')
+        .replace(/\s+/g, ' ')
+        .toLowerCase()
+        .trim();
+    };
+    
+    const fullTextNormalized = normalize(damage.fullText);
+    const structuredTextNormalized = normalize(structuredText);
+    
+    // Only show previous info if texts are substantially different
+    // Check if one is not contained in the other (accounting for order differences)
+    if (!structuredTextNormalized.includes(fullTextNormalized) && 
+        !fullTextNormalized.includes(structuredTextNormalized)) {
+      // IMPORTANT: Use escapeHtml() for output to prevent XSS attacks
+      // The normalize() function above is ONLY for comparison, not output
+      const escapedFullText = escapeHtml(damage.fullText);
+      structuredText += `<br><small><strong>Tidigare information om skadan:</strong> ${escapedFullText}</small>`;
+    }
+  }
+  
+  return structuredText;
 };
 
-const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fallbackText?: string): string => {
+const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fallbackText?: string, showPreviousInfo: boolean = false): string => {
   if (!damages || damages.length === 0) {
     if (fallbackText) {
       return `<h3 style="margin:20px 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;">${title}</h3><p style="margin-top:0;font-size:14px;">${fallbackText}</p>`;
@@ -124,7 +176,7 @@ const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fal
   }
   const items = damages
     .map(d => {
-      const text = getDamageString(d);
+      const text = getDamageString(d, showPreviousInfo);
       const storageLink = hasAnyFiles(d) ? createStorageLink(d.uploads?.folder, siteUrl) : null;
       return `<li style="margin-bottom:8px;">${text}${
         storageLink
@@ -282,10 +334,12 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const dokumenteradeSkadorCount = existingDamages.filter((d: any) => hasAnyFiles(d)).length;
   const ejDokumenteradeSkadorCount = existingDamages.filter((d: any) => !hasAnyFiles(d)).length + resolvedDamages.length;
   
+  // Calculate total handled existing damages for new banner
+  const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
+  
   const banners = `
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
-    ${createAlertBanner(dokumenteradeSkadorCount > 0, 'BEFINTLIGA SKADOR DOKUMENTERADE', '', undefined, siteUrl, dokumenteradeSkadorCount)}
-    ${createAlertBanner(ejDokumenteradeSkadorCount > 0, 'BEFINTLIGA SKADOR EJ DOKUMENTERADE', '', undefined, siteUrl, ejDokumenteradeSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
     ${saludatumBanners}
     ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
     ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
@@ -298,16 +352,20 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   `;
   
   // Damage sections
-  const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador');
+  const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
   const dokumenteradeSkadorHtml = formatDamagesToHtml(
     existingDamages.filter((d: any) => hasAnyFiles(d)),
     'Befintliga skador (från BUHS) som dokumenterades',
-    siteUrl
+    siteUrl,
+    undefined,
+    true  // Show previous info for documented BUHS damages
   );
   const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
     [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
     'Befintliga skador (från BUHS) som inte dokumenterades',
-    siteUrl
+    siteUrl,
+    undefined,
+    false
   );
   
   // Attachments section
@@ -358,6 +416,9 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
         <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
       </div>
+      <p style="margin-top:20px;font-size:14px;">
+        Incheckad av ${checkerName} kl ${time}, ${date}
+      </p>
     </td></tr>
   `;
   
@@ -383,16 +444,31 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   // Damage sections
   const existingDamages = payload.dokumenterade_skador || [];
   const resolvedDamages = payload.åtgärdade_skador || [];
-  const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador');
+  
+  // Calculate counts for banners
+  const nyaSkadorCount = (payload.nya_skador || []).length;
+  const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
+  
+  // Warning banners for Bilkontroll
+  const banners = `
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
+  `;
+  
+  const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
   const dokumenteradeSkadorHtml = formatDamagesToHtml(
     existingDamages.filter((d: any) => hasAnyFiles(d)),
     'Befintliga skador (från BUHS) som dokumenterades',
-    siteUrl
+    siteUrl,
+    undefined,
+    true  // Show previous info for documented BUHS damages
   );
   const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
     [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
     'Befintliga skador (från BUHS) som inte dokumenterades',
-    siteUrl
+    siteUrl,
+    undefined,
+    false
   );
   
   // Comment section
@@ -408,6 +484,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
     <tr><td style="text-align:center;padding-bottom:20px;">
       <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${regNr} incheckad</h1>
     </td></tr>
+    ${banners}
     <tr><td style="padding-top:20px;">
       <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
         <table width="100%" style="font-size:14px;">
@@ -430,6 +507,9 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
         <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
       </div>
+      <p style="margin-top:20px;font-size:14px;">
+        Incheckad av ${checkerName} kl ${time}, ${date}
+      </p>
     </td></tr>
   `;
   
