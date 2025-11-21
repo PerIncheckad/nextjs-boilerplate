@@ -118,12 +118,21 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
   
   // For documented BUHS damages, show previous info if different
   if (showPreviousInfo && damage.fullText) {
-    const fullTextForComparison = damage.fullText.toLowerCase().trim();
-    const structuredTextForComparison = structuredText.replace(/<[^>]*>/g, '').toLowerCase().trim();
+    // Normalize both texts for comparison: remove HTML tags, extra spaces, punctuation, lowercase
+    const normalize = (text: string) => 
+      text.replace(/<[^>]*>/g, '')
+          .replace(/[^\w\sÅÄÖåäö]/g, '')
+          .replace(/\s+/g, ' ')
+          .toLowerCase()
+          .trim();
     
-    // Only show previous info if it's different from the new structured text
-    if (!structuredTextForComparison.includes(fullTextForComparison) && 
-        !fullTextForComparison.includes(structuredTextForComparison)) {
+    const fullTextNormalized = normalize(damage.fullText);
+    const structuredTextNormalized = normalize(structuredText);
+    
+    // Only show previous info if texts are substantially different
+    // Check if one is not contained in the other (accounting for order differences)
+    if (!structuredTextNormalized.includes(fullTextNormalized) && 
+        !fullTextNormalized.includes(structuredTextNormalized)) {
       structuredText += `<br><small><strong>Tidigare information om skadan:</strong> ${damage.fullText}</small>`;
     }
   }
