@@ -13,7 +13,6 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeho
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 // --- E-postmottagare ---
-const bilkontrollAddress = ['per@incheckad.se', 'latif@incheckad.se'];
 const defaultHuvudstationAddress = 'per@incheckad.se';
 
 const stationEmailMapping: { [ort: string]: string } = {
@@ -200,11 +199,242 @@ a { color:#2563eb!important; }
 </html>`;
 
 // =================================================================
-// 3. HTML BUILDERS (kommentar)
+// 3. HTML BUILDERS (Huvudstation & Bilkontroll)
 // =================================================================
-// Den här filen förutsätter att buildHuvudstationEmail och buildBilkontrollEmail
-// finns definierade (antingen här eller importerade). Om de är externa:
-// import { buildHuvudstationEmail, buildBilkontrollEmail } from './emailBuilders';
+
+/**
+ * Build Huvudstation (main station) email with full details including Saludatum warnings
+ */
+const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
+  const regNr = payload.regnr || '';
+  const checkerName = formatCheckerName(payload);
+  
+  // Build fact box content
+  const bilModel = payload.bilmodel || payload.brand_model || '---';
+  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  const hjultyp = payload.hjultyp || '---';
+  
+  // Fuel or charge info
+  let fuelOrChargeInfo = '';
+  if (payload.drivmedel === 'elbil') {
+    const laddniva = payload.laddning?.laddniva || '---';
+    const antalKablar = payload.laddning?.antal_laddkablar || 0;
+    fuelOrChargeInfo = `<tr><td style="padding:4px 0;"><strong>Laddnivå:</strong> ${laddniva}%</td></tr>` +
+                       `<tr><td style="padding:4px 0;"><strong>Laddkablar:</strong> ${antalKablar} st</td></tr>`;
+  } else if (payload.drivmedel === 'bensin_diesel') {
+    const tankningText = formatTankning(payload.tankning);
+    fuelOrChargeInfo = `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
+  }
+  
+  // Location info
+  const platsOrt = payload.ort || '---';
+  const platsStation = payload.station || '---';
+  const bilenStarNuOrt = payload.bilen_star_nu?.ort || platsOrt;
+  const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
+  const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
+  
+  // Calculate Saludatum warnings
+  let saludatumBanners = '';
+  const existingDamages = payload.dokumenterade_skador || [];
+  const resolvedDamages = payload.åtgärdade_skador || [];
+  const allDamages = [...(payload.nya_skador || []), ...existingDamages, ...resolvedDamages];
+  
+  // Check for Saludatum from any damage
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  for (const damage of allDamages) {
+    const saludatum = damage.saludatum || damage.saludatum_date;
+    if (saludatum) {
+      const saludatumDate = new Date(saludatum);
+      saludatumDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays < 0) {
+        // Passed
+        saludatumBanners += createAlertBanner(
+          true,
+          `Saludatum passerat (${saludatum})! Kontakta Bilkontroll! Undvik långa hyror.`,
+          '',
+          undefined,
+          siteUrl
+        );
+        break; // Only show once
+      } else if (diffDays >= 0 && diffDays <= 10) {
+        // Within 10 days
+        saludatumBanners += createAlertBanner(
+          true,
+          `Kontakta Bilkontroll - saludatum: ${saludatum}. Undvik långa hyror på detta reg.nr!`,
+          '',
+          undefined,
+          siteUrl
+        );
+        break; // Only show once
+      }
+    }
+  }
+  
+  // Warning banners
+  const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
+  const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
+  
+  const nyaSkadorCount = (payload.nya_skador || []).length;
+  const dokumenteradeSkadorCount = existingDamages.filter((d: any) => hasAnyFiles(d)).length;
+  const ejDokumenteradeSkadorCount = existingDamages.filter((d: any) => !hasAnyFiles(d)).length + resolvedDamages.length;
+  
+  const banners = `
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(dokumenteradeSkadorCount > 0, 'BEFINTLIGA SKADOR DOKUMENTERADE', '', undefined, siteUrl, dokumenteradeSkadorCount)}
+    ${createAlertBanner(ejDokumenteradeSkadorCount > 0, 'BEFINTLIGA SKADOR EJ DOKUMENTERADE', '', undefined, siteUrl, ejDokumenteradeSkadorCount)}
+    ${saludatumBanners}
+    ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
+    ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
+    ${createAlertBanner(showChargeWarning, 'LÅG LADDNIVÅ', `Laddnivå: ${payload.laddning?.laddniva}%`)}
+    ${createAlertBanner(notRefueled, 'EJ UPPTANKAD')}
+    ${createAlertBanner(payload.rekond?.behoverRekond, 'REKOND BEHÖVS', payload.rekond?.text || '', payload.rekond?.folder, siteUrl)}
+    ${createAlertBanner(payload.husdjur?.sanerad, 'HUSDJUR (SANERING)', payload.husdjur?.text || '', payload.husdjur?.folder, siteUrl)}
+    ${createAlertBanner(payload.rokning?.sanerad, 'RÖKNING (SANERING)', payload.rokning?.text || '', payload.rokning?.folder, siteUrl)}
+    ${createAlertBanner(payload.status?.insynsskyddSaknas, 'INSYNSSKYDD SAKNAS')}
+  `;
+  
+  // Damage sections
+  const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador');
+  const dokumenteradeSkadorHtml = formatDamagesToHtml(
+    existingDamages.filter((d: any) => hasAnyFiles(d)),
+    'Befintliga skador (från BUHS) som dokumenterades',
+    siteUrl
+  );
+  const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
+    [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
+    'Befintliga skador (från BUHS) som inte dokumenterades',
+    siteUrl
+  );
+  
+  // Attachments section
+  const bilagorSection = buildBilagorSection(
+    payload.rekond || {},
+    payload.husdjur || {},
+    payload.rokning || {},
+    siteUrl
+  );
+  
+  // Comment section
+  const commentSection = payload.notering
+    ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;">
+         <h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Kommentar</h2>
+         <p style="margin:0;font-size:14px;">${payload.notering}</p>
+       </div>`
+    : '';
+  
+  // Build content
+  const content = `
+    <tr><td style="text-align:center;padding-bottom:20px;">
+      <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${regNr} incheckad</h1>
+    </td></tr>
+    ${banners}
+    <tr><td style="padding-top:20px;">
+      <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
+        <table width="100%" style="font-size:14px;">
+          <tbody>
+            <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${bilModel}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${matarstallning}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${hjultyp}</td></tr>
+            ${fuelOrChargeInfo}
+            <tr><td style="padding:4px 0;"><strong>Plats för incheckning:</strong> ${platsOrt} / ${platsStation}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+            ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+    </td></tr>
+    <tr><td>
+      ${bilagorSection}
+      ${nyaSkadorHtml}
+      ${dokumenteradeSkadorHtml}
+      ${ejDokumenteradeSkadorHtml}
+      ${commentSection}
+      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
+        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
+        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
+        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
+      </div>
+    </td></tr>
+  `;
+  
+  return createBaseLayout(regNr, content);
+};
+
+/**
+ * Build Bilkontroll email with damage focus (no Saludatum warnings)
+ */
+const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
+  const regNr = payload.regnr || '';
+  const checkerName = formatCheckerName(payload);
+  
+  // Build fact box content
+  const bilModel = payload.bilmodel || payload.brand_model || '---';
+  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  
+  // Location info
+  const bilenStarNuOrt = payload.bilen_star_nu?.ort || payload.ort || '---';
+  const bilenStarNuStation = payload.bilen_star_nu?.station || payload.station || '---';
+  const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
+  
+  // Damage sections
+  const existingDamages = payload.dokumenterade_skador || [];
+  const resolvedDamages = payload.åtgärdade_skador || [];
+  const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador');
+  const dokumenteradeSkadorHtml = formatDamagesToHtml(
+    existingDamages.filter((d: any) => hasAnyFiles(d)),
+    'Befintliga skador (från BUHS) som dokumenterades',
+    siteUrl
+  );
+  const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
+    [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
+    'Befintliga skador (från BUHS) som inte dokumenterades',
+    siteUrl
+  );
+  
+  // Comment section
+  const commentSection = payload.notering
+    ? `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;">
+         <h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Kommentar</h2>
+         <p style="margin:0;font-size:14px;">${payload.notering}</p>
+       </div>`
+    : '';
+  
+  // Build content
+  const content = `
+    <tr><td style="text-align:center;padding-bottom:20px;">
+      <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${regNr} incheckad</h1>
+    </td></tr>
+    <tr><td style="padding-top:20px;">
+      <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
+        <table width="100%" style="font-size:14px;">
+          <tbody>
+            <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${bilModel}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${matarstallning}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+            ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+    </td></tr>
+    <tr><td>
+      ${nyaSkadorHtml}
+      ${dokumenteradeSkadorHtml}
+      ${ejDokumenteradeSkadorHtml}
+      ${commentSection}
+      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
+        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
+        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
+        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
+      </div>
+    </td></tr>
+  `;
+  
+  return createBaseLayout(regNr, content);
+};
 
 // =================================================================
 // 4. MAIN API FUNCTION
@@ -266,6 +496,12 @@ export async function POST(request: Request) {
       huvudstationTo.push(stationSpecificEmail);
     }
 
+    // Bilkontroll recipients: Per always, Latif only for Helsingborg/Ängelholm
+    const bilkontrollTo = ['per@incheckad.se'];
+    if (finalOrt === 'Helsingborg' || finalOrt === 'Ängelholm') {
+      bilkontrollTo.push('latif@incheckad.se');
+    }
+
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
     const cleanStation = stationForSubject?.includes(' / ')
       ? stationForSubject.split(' / ').pop()?.trim()
@@ -281,6 +517,8 @@ export async function POST(request: Request) {
       showChargeWarning ||
       payload.status?.insynsskyddSaknas ||
       (payload.nya_skador && payload.nya_skador.length > 0) ||
+      (payload.dokumenterade_skador && payload.dokumenterade_skador.length > 0) ||
+      (payload.åtgärdade_skador && payload.åtgärdade_skador.length > 0) ||
       payload.husdjur?.sanerad ||
       payload.rokning?.sanerad;
 
@@ -306,7 +544,6 @@ export async function POST(request: Request) {
           checker_email: payload.email || null,
           completed_at: now.toISOString(),
           status: 'complete',
-          user_type: payload.user_type || null,
           // has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0, // (valfritt)
         };
 
@@ -485,7 +722,7 @@ export async function POST(request: Request) {
     emailPromises.push(
       resend.emails.send({
         from: 'incheckning@incheckad.se',
-        to: bilkontrollAddress,
+        to: bilkontrollTo,
         subject: bilkontrollSubject,
         html: bilkontrollHtml,
       })
