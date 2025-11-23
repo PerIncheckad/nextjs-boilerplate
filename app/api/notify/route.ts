@@ -210,19 +210,19 @@ const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: s
   const bilagor: string[] = [];
   if (rekond.folder && rekond.hasMedia) {
     let item = `<li><a href="${siteUrl}/public-media/${rekond.folder}" target="_blank">Rekond 🔗</a>`;
-    if (rekond.text) item += `<br><small><strong>Kommentar:</strong> ${rekond.text}</small>`;
+    if (rekond.text) item += `<br><small><strong>Kommentar:</strong> ${escapeHtml(rekond.text)}</small>`;
     item += `</li>`;
     bilagor.push(item);
   }
   if (husdjur.folder && husdjur.hasMedia) {
     let item = `<li><a href="${siteUrl}/public-media/${husdjur.folder}" target="_blank">Husdjur 🔗</a>`;
-    if (husdjur.text) item += `<br><small><strong>Kommentar:</strong> ${husdjur.text}</small>`;
+    if (husdjur.text) item += `<br><small><strong>Kommentar:</strong> ${escapeHtml(husdjur.text)}</small>`;
     item += `</li>`;
     bilagor.push(item);
   }
   if (rokning.folder && rokning.hasMedia) {
     let item = `<li><a href="${siteUrl}/public-media/${rokning.folder}" target="_blank">Rökning 🔗</a>`;
-    if (rokning.text) item += `<br><small><strong>Kommentar:</strong> ${rokning.text}</small>`;
+    if (rokning.text) item += `<br><small><strong>Kommentar:</strong> ${escapeHtml(rokning.text)}</small>`;
     item += `</li>`;
     bilagor.push(item);
   }
