@@ -208,12 +208,24 @@ const formatTankning = (tankning: any): string => {
 
 const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: string): string => {
   const bilagor: string[] = [];
-  if (rekond.folder && rekond.hasMedia)
-    bilagor.push(`<li><a href="${siteUrl}/public-media/${rekond.folder}" target="_blank">Rekond 🔗</a></li>`);
-  if (husdjur.folder && husdjur.hasMedia)
-    bilagor.push(`<li><a href="${siteUrl}/public-media/${husdjur.folder}" target="_blank">Husdjur 🔗</a></li>`);
-  if (rokning.folder && rokning.hasMedia)
-    bilagor.push(`<li><a href="${siteUrl}/public-media/${rokning.folder}" target="_blank">Rökning 🔗</a></li>`);
+  if (rekond.folder && rekond.hasMedia) {
+    let item = `<li><a href="${siteUrl}/public-media/${rekond.folder}" target="_blank">Rekond 🔗</a>`;
+    if (rekond.text) item += `<br><small><strong>Kommentar:</strong> ${rekond.text}</small>`;
+    item += `</li>`;
+    bilagor.push(item);
+  }
+  if (husdjur.folder && husdjur.hasMedia) {
+    let item = `<li><a href="${siteUrl}/public-media/${husdjur.folder}" target="_blank">Husdjur 🔗</a>`;
+    if (husdjur.text) item += `<br><small><strong>Kommentar:</strong> ${husdjur.text}</small>`;
+    item += `</li>`;
+    bilagor.push(item);
+  }
+  if (rokning.folder && rokning.hasMedia) {
+    let item = `<li><a href="${siteUrl}/public-media/${rokning.folder}" target="_blank">Rökning 🔗</a>`;
+    if (rokning.text) item += `<br><small><strong>Kommentar:</strong> ${rokning.text}</small>`;
+    item += `</li>`;
+    bilagor.push(item);
+  }
   if (bilagor.length === 0) return '';
   return `<div style="border-bottom:1px solid #e5e7eb;padding-bottom:10px;margin-bottom:20px;">
     <h2 style="font-size:16px;font-weight:600;margin-bottom:15px;">Bilagor</h2>
@@ -243,7 +255,7 @@ a { color:#2563eb!important; }
       <img src="${LOGO_URL}" alt="MABI Logo" width="150" style="margin-left:6px;">
     </div>
     <table width="100%"><tbody>${content}</tbody></table>
-    <div style="margin-top:20px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;">
+    <div style="margin-top:20px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280;text-align:center;">
       &copy; ${new Date().getFullYear()} Albarone AB &mdash; Alla rättigheter förbehållna
     </div>
   </div>
@@ -306,20 +318,14 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         // Passed
         saludatumBanners += createAlertBanner(
           true,
-          `Saludatum passerat (${saludatum})! Kontakta Bilkontroll! Undvik långa hyror.`,
-          '',
-          undefined,
-          siteUrl
+          `Saludatum passerat (${saludatum})! Kontakta Bilkontroll! Undvik långa hyror.`
         );
         break; // Only show once
       } else if (diffDays >= 0 && diffDays <= 10) {
         // Within 10 days
         saludatumBanners += createAlertBanner(
           true,
-          `Kontakta Bilkontroll - saludatum: ${saludatum}. Undvik långa hyror på detta reg.nr!`,
-          '',
-          undefined,
-          siteUrl
+          `Kontakta Bilkontroll - saludatum: ${saludatum}. Undvik långa hyror på detta reg.nr!`
         );
         break; // Only show once
       }
@@ -337,17 +343,21 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   // Calculate total handled existing damages for new banner
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
   
+  // Get folder paths for clickable banners
+  const nyaSkadorFolder = (payload.nya_skador || []).find((d: any) => d.uploads?.folder)?.uploads?.folder;
+  const befintligaSkadorFolder = existingDamages.find((d: any) => d.uploads?.folder)?.uploads?.folder;
+  
   const banners = `
-    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
-    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', undefined, nyaSkadorFolder, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', undefined, befintligaSkadorFolder, siteUrl, befintligaSkadorHanteradeCount)}
     ${saludatumBanners}
-    ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
-    ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
-    ${createAlertBanner(showChargeWarning, 'LÅG LADDNIVÅ', `Laddnivå: ${payload.laddning?.laddniva}%`)}
+    ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT')}
+    ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT')}
+    ${createAlertBanner(showChargeWarning, 'LÅG LADDNIVÅ')}
     ${createAlertBanner(notRefueled, 'EJ UPPTANKAD')}
-    ${createAlertBanner(payload.rekond?.behoverRekond, 'REKOND BEHÖVS', payload.rekond?.text || '', payload.rekond?.folder, siteUrl)}
-    ${createAlertBanner(payload.husdjur?.sanerad, 'HUSDJUR (SANERING)', payload.husdjur?.text || '', payload.husdjur?.folder, siteUrl)}
-    ${createAlertBanner(payload.rokning?.sanerad, 'RÖKNING (SANERING)', payload.rokning?.text || '', payload.rokning?.folder, siteUrl)}
+    ${createAlertBanner(payload.rekond?.behoverRekond, 'REKOND BEHÖVS', undefined, payload.rekond?.folder, siteUrl)}
+    ${createAlertBanner(payload.husdjur?.sanerad, 'HUSDJUR (SANERING)', undefined, payload.husdjur?.folder, siteUrl)}
+    ${createAlertBanner(payload.rokning?.sanerad, 'RÖKNING (SANERING)', undefined, payload.rokning?.folder, siteUrl)}
     ${createAlertBanner(payload.status?.insynsskyddSaknas, 'INSYNSSKYDD SAKNAS')}
   `;
   
@@ -411,12 +421,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       ${dokumenteradeSkadorHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
-      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
-        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
-        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
-        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
-      </div>
-      <p style="margin-top:20px;font-size:14px;">
+      <p style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
         Incheckad av ${checkerName} kl ${time}, ${date}
       </p>
     </td></tr>
@@ -449,10 +454,18 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const nyaSkadorCount = (payload.nya_skador || []).length;
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
   
+  // Get folder paths for clickable banners
+  const nyaSkadorFolder = (payload.nya_skador || []).find((d: any) => d.uploads?.folder)?.uploads?.folder;
+  const befintligaSkadorFolder = existingDamages.find((d: any) => d.uploads?.folder)?.uploads?.folder;
+  
+  // Check if reg.nr is missing from Bilkontroll file (brand_model comes from Bilkontroll file)
+  const regNrMissing = !payload.brand_model;
+  
   // Warning banners for Bilkontroll
   const banners = `
-    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
-    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
+    ${createAdminBanner(regNrMissing, 'Reg.nr saknas!')}
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', undefined, nyaSkadorFolder, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', undefined, befintligaSkadorFolder, siteUrl, befintligaSkadorHanteradeCount)}
   `;
   
   const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
@@ -502,12 +515,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
       ${dokumenteradeSkadorHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
-      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
-        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
-        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
-        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
-      </div>
-      <p style="margin-top:20px;font-size:14px;">
+      <p style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
         Incheckad av ${checkerName} kl ${time}, ${date}
       </p>
     </td></tr>
