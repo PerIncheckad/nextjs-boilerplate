@@ -1357,7 +1357,7 @@ const SaludatumInfoRow: React.FC<{ label: string, value: string }> = ({ label, v
     return (
         <Fragment>
             <span className="info-label">{label}</span>
-            <span style={isAtRisk ? { color: '#dc2626', fontWeight: 'bold' } : undefined}>{value}</span>
+            <span style={isAtRisk ? { color: 'var(--color-danger)', fontWeight: 'bold' } : undefined}>{value}</span>
         </Fragment>
     );
 };

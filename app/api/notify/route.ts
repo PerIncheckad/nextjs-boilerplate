@@ -30,6 +30,11 @@ const getSiteUrl = (request: Request): string => {
 const LOGO_URL =
   'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png';
 
+// Banner colors
+const BANNER_COLOR_RED = '#B30E0E';
+const BANNER_COLOR_BLUE = '#15418C';
+const BANNER_COLOR_PURPLE = '#7C3AED';
+
 // =================================================================
 // 2. HELPERS (oförändrade från tidigare version)
 // =================================================================
@@ -99,7 +104,7 @@ const createAlertBanner = (
   if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
   let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
-  const bannerContent = `<div style="background-color:#B30E0E!important;border:1px solid #B30E0E;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${fullText}</div>`;
+  const bannerContent = `<div style="background-color:${BANNER_COLOR_RED}!important;border:1px solid ${BANNER_COLOR_RED};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${fullText}</div>`;
   return `<tr><td style="padding:6px 0;">${
     storageLink
       ? `<a href="${storageLink}" target="_blank" style="text-decoration:none;color:#FFFFFF!important;">${bannerContent}</a>`
@@ -109,13 +114,13 @@ const createAlertBanner = (
 
 const createAdminBanner = (condition: boolean, text: string): string => {
   if (!condition) return '';
-  const bannerContent = `<div style="background-color:#15418C!important;border:1px solid #15418C;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
+  const bannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
 const createPurpleBanner = (condition: boolean, text: string): string => {
   if (!condition) return '';
-  const bannerContent = `<div style="background-color:#7C3AED!important;border:1px solid #7C3AED;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
+  const bannerContent = `<div style="background-color:${BANNER_COLOR_PURPLE}!important;border:1px solid ${BANNER_COLOR_PURPLE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
