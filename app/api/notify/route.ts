@@ -70,12 +70,19 @@ const escapeHtml = (text: string): string => {
  */
 const isSaludatumCritical = (saludatum: string | null | undefined): boolean => {
   if (!saludatum) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const saludatumDate = new Date(saludatum);
-  saludatumDate.setHours(0, 0, 0, 0);
-  const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  return diffDays < 0 || diffDays <= 10;
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const saludatumDate = new Date(saludatum);
+    // Validate that the date is valid
+    if (isNaN(saludatumDate.getTime())) return false;
+    saludatumDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return diffDays < 0 || diffDays <= 10;
+  } catch (error) {
+    console.error('Error checking Saludatum date:', error);
+    return false;
+  }
 };
 
 const formatCheckerName = (payload: any): string => {
