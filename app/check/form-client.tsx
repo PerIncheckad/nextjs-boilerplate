@@ -120,6 +120,30 @@ const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'H
     return '';
 };
 
+/**
+ * Check if a Saludatum is at risk (past or within 10 days from today)
+ * @param saludatumStr - Saludatum string in YYYY-MM-DD format
+ * @returns true if Saludatum is in the past or within 10 days, false otherwise
+ */
+const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => {
+    if (!saludatumStr || saludatumStr === 'Ingen information' || saludatumStr === '---') return false;
+    
+    try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const saludatumDate = new Date(saludatumStr);
+        saludatumDate.setHours(0, 0, 0, 0);
+        
+        const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Risk if past (< 0) or within 10 days (0-10)
+        return diffDays <= 10;
+    } catch (e) {
+        return false;
+    }
+};
+
 
 const createCommentFile = (content: string): File => {
     return new File([content], "kommentar.txt", { type: "text/plain" });
@@ -508,7 +532,9 @@ export default function CheckInForm() {
       otherChecklistItemsOK: otherChecklistItemsOK,
       notering: preliminarAvslutNotering,
       vehicleStatus: vehicleData?.status,
-      regnrSaknas: showUnknownRegHelper // Flag to indicate registration number is missing from Bilkontroll
+      regnrSaknas: showUnknownRegHelper, // Flag to indicate registration number is missing from Bilkontroll
+      saludatum: vehicleData?.saludatum || null,
+      hasRiskSaludatum: isSaludatumAtRisk(vehicleData?.saludatum)
   }), [
     normalizedReg, firstName, fullName, vehicleData, matarstallning, hjultyp, 
     garInteAttHyraUt, garInteAttHyraUtKommentar,
@@ -1132,7 +1158,7 @@ export default function CheckInForm() {
           {vehicleData && (
             <div className="info-box">
               <div className='info-grid'>
-                <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><InfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
+                <InfoRow label="Bilmodell" value={vehicleData.model || '---'} /><InfoRow label="Hjulförvaring" value={vehicleData.wheel_storage_location || '---'} /><SaludatumInfoRow label="Saludatum" value={vehicleData.saludatum || '---'} />
               </div>
               {existingDamages.length > 0 && (
                 <div className="damage-list-info">
@@ -1326,6 +1352,15 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => <div className
 const SubSectionHeader: React.FC<{ title: string }> = ({ title }) => <div className="sub-section-header"><h3>{title}</h3></div>;
 const Field: React.FC<React.PropsWithChildren<{ label: string }>> = ({ label, children }) => <div className="field"><label>{label}</label>{children}</div>;
 const InfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => <Fragment><span className="info-label">{label}</span><span>{value}</span></Fragment>;
+const SaludatumInfoRow: React.FC<{ label: string, value: string }> = ({ label, value }) => {
+    const isAtRisk = isSaludatumAtRisk(value);
+    return (
+        <Fragment>
+            <span className="info-label">{label}</span>
+            <span style={isAtRisk ? { color: 'var(--color-danger)', fontWeight: 'bold' } : undefined}>{value}</span>
+        </Fragment>
+    );
+};
 // *** FIX: Changed the default type to 'button' in the props, and spread the rest of the props to the button element
 const Button: React.FC<React.PropsWithChildren<{ onClick?: () => void, type?: 'button' | 'submit' | 'reset', variant?: string, disabled?: boolean, style?: object, className?: string }>> = ({ onClick, type = 'button', variant = 'primary', disabled, children, style, className }) => <button type={type} onClick={onClick} className={`btn ${variant} ${disabled ? 'disabled' : ''} ${className || ''}`} disabled={disabled} style={style}>{children}</button>;
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (<Fragment><div className="modal-overlay" /><div className="modal-content success-modal"><div className="success-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="48" height="48"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg></div><h3>Tack {firstName}!</h3><p>Incheckningen är skickad.</p></div></Fragment>);
