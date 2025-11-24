@@ -63,6 +63,21 @@ const escapeHtml = (text: string): string => {
   return text.replace(/[&<>"']/g, (char) => htmlEscapeMap[char]);
 };
 
+/**
+ * Check if a Saludatum is critical (passed or within 10 days)
+ * @param saludatum - The Saludatum date string
+ * @returns true if the date is passed or within 0-10 days from today
+ */
+const isSaludatumCritical = (saludatum: string | null | undefined): boolean => {
+  if (!saludatum) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const saludatumDate = new Date(saludatum);
+  saludatumDate.setHours(0, 0, 0, 0);
+  const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return diffDays < 0 || diffDays <= 10;
+};
+
 const formatCheckerName = (payload: any): string => {
   if (payload.fullName) return payload.fullName;
   if (payload.full_name) return payload.full_name;
@@ -139,13 +154,7 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
   // Add Saludatum if present (in red bold if passed or within 10 days)
   const saludatum = damage.saludatum || damage.saludatum_date;
   if (saludatum) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const saludatumDate = new Date(saludatum);
-    saludatumDate.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0 || (diffDays >= 0 && diffDays <= 10)) {
+    if (isSaludatumCritical(saludatum)) {
       // Red bold for passed or within 10 days
       structuredText += `<br><small><strong>Saludatum:</strong> <span style="color:#DC2626;font-weight:bold;">${saludatum}</span></small>`;
     } else {
@@ -217,13 +226,7 @@ const getResolvedDamageString = (damage: any): string => {
   // Add Saludatum if present (in red bold if passed or within 10 days)
   const saludatum = damage.saludatum || damage.saludatum_date;
   if (saludatum) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const saludatumDate = new Date(saludatum);
-    saludatumDate.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 0 || (diffDays >= 0 && diffDays <= 10)) {
+    if (isSaludatumCritical(saludatum)) {
       // Red bold for passed or within 10 days
       result += `<br><small><strong>Saludatum:</strong> <span style="color:#DC2626;font-weight:bold;">${saludatum}</span></small>`;
     } else {
@@ -381,21 +384,12 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const allDamages = [...(payload.nya_skador || []), ...existingDamages, ...resolvedDamages];
   
   // Check for Saludatum from any damage
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
   for (const damage of allDamages) {
     const saludatum = damage.saludatum || damage.saludatum_date;
-    if (saludatum) {
-      const saludatumDate = new Date(saludatum);
-      saludatumDate.setHours(0, 0, 0, 0);
-      const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays < 0 || (diffDays >= 0 && diffDays <= 10)) {
-        // Passed or within 10 days - show purple Saludatum banner
-        saludatumBanners += createSaludatumBanner(true, saludatum);
-        break; // Only show once
-      }
+    if (saludatum && isSaludatumCritical(saludatum)) {
+      // Passed or within 10 days - show purple Saludatum banner
+      saludatumBanners += createSaludatumBanner(true, saludatum);
+      break; // Only show once
     }
   }
   
