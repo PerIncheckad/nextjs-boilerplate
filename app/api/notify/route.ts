@@ -126,9 +126,9 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
     .join(', ');
   if (positions) structuredText += `: ${positions}`;
   
-  // Add comment if present
-  const comment = damage.text || damage.userDescription || damage.resolvedComment;
-  if (comment) structuredText += `<br><small><strong>Kommentar:</strong> ${comment}</small>`;
+  // Add comment if present (but not resolvedComment - that's handled separately)
+  const comment = damage.text || damage.userDescription;
+  if (comment) structuredText += `<br><small><strong>Kommentar:</strong> ${escapeHtml(comment)}</small>`;
   
   // For documented BUHS damages, show previous info if different
   if (showPreviousInfo && damage.fullText) {
@@ -167,6 +167,32 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
   return structuredText;
 };
 
+/**
+ * Format a resolved damage (marked as "Går inte att dokumentera")
+ * Shows BUHS fullText first, then the inchecker's comment explaining why
+ * 
+ * A resolved damage is one that exists in BUHS but cannot be documented during check-in,
+ * typically because it has been repaired or cannot be located. The inchecker provides
+ * a comment explaining why it couldn't be documented.
+ * 
+ * @param damage - Damage object with fullText (BUHS description) and resolvedComment (inchecker explanation)
+ * @returns HTML-formatted string with escaped text, showing primary BUHS description and optional comment
+ */
+const getResolvedDamageString = (damage: any): string => {
+  // Primary text: the original BUHS text
+  const primaryText = damage.fullText || 'Okänd skada';
+  
+  // Secondary text: the resolved comment
+  const resolvedComment = damage.resolvedComment || '';
+  let result = escapeHtml(primaryText);
+  
+  if (resolvedComment) {
+    result += `<br><small><strong>Kommentar:</strong> ${escapeHtml(resolvedComment)}</small>`;
+  }
+  
+  return result;
+};
+
 const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fallbackText?: string, showPreviousInfo: boolean = false): string => {
   if (!damages || damages.length === 0) {
     if (fallbackText) {
@@ -183,6 +209,23 @@ const formatDamagesToHtml = (damages: any[], title: string, siteUrl: string, fal
           ? ` <a href="${storageLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
+    })
+    .join('');
+  return `<h3 style="margin:20px 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;">${title}</h3><ul style="padding-left:20px;margin-top:0;font-size:14px;">${items}</ul>`;
+};
+
+/**
+ * Format resolved damages (marked as "Går inte att dokumentera") to HTML
+ * Uses BUHS fullText + resolved comment instead of structured form data
+ */
+const formatResolvedDamagesToHtml = (damages: any[], title: string): string => {
+  if (!damages || damages.length === 0) {
+    return '';
+  }
+  const items = damages
+    .map(d => {
+      const text = getResolvedDamageString(d);
+      return `<li style="margin-bottom:8px;">${text}</li>`;
     })
     .join('');
   return `<h3 style="margin:20px 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;">${title}</h3><ul style="padding-left:20px;margin-top:0;font-size:14px;">${items}</ul>`;
@@ -360,8 +403,14 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
     undefined,
     true  // Show previous info for documented BUHS damages
   );
+  // Resolved damages in their own section
+  const resolvedDamagesHtml = formatResolvedDamagesToHtml(
+    resolvedDamages,
+    'Befintliga skador (från BUHS) som inte gick att dokumentera'
+  );
+  // Undocumented damages (those without media but not explicitly resolved)
   const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
-    [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
+    existingDamages.filter((d: any) => !hasAnyFiles(d)),
     'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl,
     undefined,
@@ -409,6 +458,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       ${bilagorSection}
       ${nyaSkadorHtml}
       ${dokumenteradeSkadorHtml}
+      ${resolvedDamagesHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
       <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
@@ -451,6 +501,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   
   // Warning banners for Bilkontroll
   const banners = `
+    ${createAdminBanner(payload.regnrSaknas, 'Reg.nr saknas!')}
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
     ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
   `;
@@ -463,8 +514,14 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
     undefined,
     true  // Show previous info for documented BUHS damages
   );
+  // Resolved damages in their own section
+  const resolvedDamagesHtml = formatResolvedDamagesToHtml(
+    resolvedDamages,
+    'Befintliga skador (från BUHS) som inte gick att dokumentera'
+  );
+  // Undocumented damages (those without media but not explicitly resolved)
   const ejDokumenteradeSkadorHtml = formatDamagesToHtml(
-    [...existingDamages.filter((d: any) => !hasAnyFiles(d)), ...resolvedDamages],
+    existingDamages.filter((d: any) => !hasAnyFiles(d)),
     'Befintliga skador (från BUHS) som inte dokumenterades',
     siteUrl,
     undefined,
@@ -500,6 +557,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
     <tr><td>
       ${nyaSkadorHtml}
       ${dokumenteradeSkadorHtml}
+      ${resolvedDamagesHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
       <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
