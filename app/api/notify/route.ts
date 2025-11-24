@@ -99,17 +99,27 @@ const createAlertBanner = (
   if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
   let fullText = `⚠️ ${bannerText}`;
   if (details) fullText += `<br>${details}`;
-  const bannerContent = `<div style="background-color:#B30E0E!important;border:1px solid #B30E0E;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${fullText}</div>`;
-  return `<tr><td style="padding:6px 0;">${
-    storageLink
-      ? `<a href="${storageLink}" target="_blank" style="text-decoration:none;color:#FFFFFF!important;">${bannerContent}</a>`
-      : bannerContent
-  }</td></tr>`;
+  
+  // Make entire banner clickable when storageLink exists
+  if (storageLink) {
+    const bannerContent = `<a href="${storageLink}" target="_blank" style="text-decoration:none;display:block;background-color:#B30E0E!important;border:1px solid #B30E0E;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${fullText}</a>`;
+    return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
+  } else {
+    const bannerContent = `<div style="background-color:#B30E0E!important;border:1px solid #B30E0E;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${fullText}</div>`;
+    return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
+  }
 };
 
 const createAdminBanner = (condition: boolean, text: string): string => {
   if (!condition) return '';
   const bannerContent = `<div style="background-color:#15418C!important;border:1px solid #15418C;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
+  return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
+};
+
+const createSaludatumBanner = (condition: boolean, saludatum: string): string => {
+  if (!condition) return '';
+  const text = `⚠️ Kontakta Bilkontroll! Saludatum: ${saludatum}. Undvik långa hyror!`;
+  const bannerContent = `<div style="background-color:#7C3AED!important;border:1px solid #7C3AED;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
@@ -125,6 +135,24 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
     .filter(Boolean)
     .join(', ');
   if (positions) structuredText += `: ${positions}`;
+  
+  // Add Saludatum if present (in red bold if passed or within 10 days)
+  const saludatum = damage.saludatum || damage.saludatum_date;
+  if (saludatum) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const saludatumDate = new Date(saludatum);
+    saludatumDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0 || (diffDays >= 0 && diffDays <= 10)) {
+      // Red bold for passed or within 10 days
+      structuredText += `<br><small><strong>Saludatum:</strong> <span style="color:#DC2626;font-weight:bold;">${saludatum}</span></small>`;
+    } else {
+      // Normal display for dates more than 10 days away
+      structuredText += `<br><small><strong>Saludatum:</strong> ${saludatum}</small>`;
+    }
+  }
   
   // Add comment if present (but not resolvedComment - that's handled separately)
   const comment = damage.text || damage.userDescription;
@@ -185,6 +213,24 @@ const getResolvedDamageString = (damage: any): string => {
   // Secondary text: the resolved comment
   const resolvedComment = damage.resolvedComment || '';
   let result = escapeHtml(primaryText);
+  
+  // Add Saludatum if present (in red bold if passed or within 10 days)
+  const saludatum = damage.saludatum || damage.saludatum_date;
+  if (saludatum) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const saludatumDate = new Date(saludatum);
+    saludatumDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0 || (diffDays >= 0 && diffDays <= 10)) {
+      // Red bold for passed or within 10 days
+      result += `<br><small><strong>Saludatum:</strong> <span style="color:#DC2626;font-weight:bold;">${saludatum}</span></small>`;
+    } else {
+      // Normal display for dates more than 10 days away
+      result += `<br><small><strong>Saludatum:</strong> ${saludatum}</small>`;
+    }
+  }
   
   if (resolvedComment) {
     result += `<br><small><strong>Kommentar:</strong> ${escapeHtml(resolvedComment)}</small>`;
@@ -345,25 +391,9 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       saludatumDate.setHours(0, 0, 0, 0);
       const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       
-      if (diffDays < 0) {
-        // Passed
-        saludatumBanners += createAlertBanner(
-          true,
-          `Saludatum passerat (${saludatum})! Kontakta Bilkontroll! Undvik långa hyror.`,
-          '',
-          undefined,
-          siteUrl
-        );
-        break; // Only show once
-      } else if (diffDays >= 0 && diffDays <= 10) {
-        // Within 10 days
-        saludatumBanners += createAlertBanner(
-          true,
-          `Kontakta Bilkontroll - saludatum: ${saludatum}. Undvik långa hyror på detta reg.nr!`,
-          '',
-          undefined,
-          siteUrl
-        );
+      if (diffDays < 0 || (diffDays >= 0 && diffDays <= 10)) {
+        // Passed or within 10 days - show purple Saludatum banner
+        saludatumBanners += createSaludatumBanner(true, saludatum);
         break; // Only show once
       }
     }
@@ -380,9 +410,16 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   // Calculate total handled existing damages for new banner
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
   
+  // Find first damage with media for clickable banners
+  const nyaSkadorWithMedia = (payload.nya_skador || []).filter((d: any) => hasAnyFiles(d));
+  const nyaSkadorFolderPath = nyaSkadorWithMedia.length > 0 ? nyaSkadorWithMedia[0].uploads?.folder : undefined;
+  
+  const befintligaSkadorWithMedia = existingDamages.filter((d: any) => hasAnyFiles(d));
+  const befintligaSkadorFolderPath = befintligaSkadorWithMedia.length > 0 ? befintligaSkadorWithMedia[0].uploads?.folder : undefined;
+  
   const banners = `
-    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
-    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', nyaSkadorFolderPath, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', befintligaSkadorFolderPath, siteUrl, befintligaSkadorHanteradeCount)}
     ${saludatumBanners}
     ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
     ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
@@ -461,12 +498,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       ${resolvedDamagesHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
-      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
-        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
-        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
-        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
-      </div>
-      <p style="margin-top:20px;font-size:14px;">
+      <p style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
         Incheckad av ${checkerName} kl ${time}, ${date}
       </p>
     </td></tr>
@@ -485,6 +517,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   // Build fact box content
   const bilModel = payload.bilmodel || payload.brand_model || '---';
   const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  const hjultyp = payload.hjultyp || '---';
   
   // Location info
   const bilenStarNuOrt = payload.bilen_star_nu?.ort || payload.ort || '---';
@@ -499,11 +532,18 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const nyaSkadorCount = (payload.nya_skador || []).length;
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
   
+  // Find first damage with media for clickable banners
+  const nyaSkadorWithMedia = (payload.nya_skador || []).filter((d: any) => hasAnyFiles(d));
+  const nyaSkadorFolderPath = nyaSkadorWithMedia.length > 0 ? nyaSkadorWithMedia[0].uploads?.folder : undefined;
+  
+  const befintligaSkadorWithMedia = existingDamages.filter((d: any) => hasAnyFiles(d));
+  const befintligaSkadorFolderPath = befintligaSkadorWithMedia.length > 0 ? befintligaSkadorWithMedia[0].uploads?.folder : undefined;
+  
   // Warning banners for Bilkontroll
   const banners = `
     ${createAdminBanner(payload.regnrSaknas, 'Reg.nr saknas!')}
-    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
-    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', nyaSkadorFolderPath, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', befintligaSkadorFolderPath, siteUrl, befintligaSkadorHanteradeCount)}
   `;
   
   const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
@@ -548,6 +588,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${bilModel}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${matarstallning}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${hjultyp}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
           </tbody>
@@ -560,12 +601,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
       ${resolvedDamagesHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
-      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
-        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
-        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
-        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
-      </div>
-      <p style="margin-top:20px;font-size:14px;">
+      <p style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
         Incheckad av ${checkerName} kl ${time}, ${date}
       </p>
     </td></tr>
