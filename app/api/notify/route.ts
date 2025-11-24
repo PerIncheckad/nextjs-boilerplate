@@ -341,7 +341,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   
   // Saludatum purple banner (vehicle-level, not damage-specific)
   const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
-    ? createPurpleBanner(true, `Kontakta Bilkontroll! Saludatum: ${payload.saludatum}. Undvik långa hyror!`)
+    ? createPurpleBanner(true, `Kontakta Bilkontroll! Saludatum: ${payload.saludatum}.<br>UNDVIK LÅNGA HYROR!`)
     : '';
   
   // Warning banners
@@ -353,9 +353,13 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const nyaSkadorCount = (payload.nya_skador || []).length;
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
   
+  // Find first damage with media for clickable banners
+  const nyaSkadorWithMedia = (payload.nya_skador || []).find((d: any) => hasAnyFiles(d));
+  const befintligaSkadorWithMedia = [...existingDamages, ...resolvedDamages].find((d: any) => hasAnyFiles(d));
+  
   const banners = `
-    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
-    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', nyaSkadorWithMedia?.uploads?.folder, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', befintligaSkadorWithMedia?.uploads?.folder, siteUrl, befintligaSkadorHanteradeCount)}
     ${saludatumBanner}
     ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
     ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
@@ -434,11 +438,6 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
       ${resolvedDamagesHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
-      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
-        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
-        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
-        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
-      </div>
       <p style="margin-top:20px;font-size:14px;">
         Incheckad av ${checkerName} kl ${time}, ${date}
       </p>
@@ -464,11 +463,6 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const bilenStarNuStation = payload.bilen_star_nu?.station || payload.station || '---';
   const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
   
-  // Saludatum purple banner (vehicle-level, not damage-specific)
-  const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
-    ? createPurpleBanner(true, `Kontakta Bilkontroll! Saludatum: ${payload.saludatum}. Undvik långa hyror!`)
-    : '';
-  
   // Damage sections
   const existingDamages = payload.dokumenterade_skador || [];
   const resolvedDamages = payload.åtgärdade_skador || [];
@@ -477,12 +471,15 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const nyaSkadorCount = (payload.nya_skador || []).length;
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
   
+  // Find first damage with media for clickable banners
+  const nyaSkadorWithMedia = (payload.nya_skador || []).find((d: any) => hasAnyFiles(d));
+  const befintligaSkadorWithMedia = [...existingDamages, ...resolvedDamages].find((d: any) => hasAnyFiles(d));
+  
   // Warning banners for Bilkontroll
   const banners = `
     ${createAdminBanner(payload.regnrSaknas, 'Reg.nr saknas!')}
-    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
-    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
-    ${saludatumBanner}
+    ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', nyaSkadorWithMedia?.uploads?.folder, siteUrl, nyaSkadorCount)}
+    ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', befintligaSkadorWithMedia?.uploads?.folder, siteUrl, befintligaSkadorHanteradeCount)}
   `;
   
   const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
@@ -539,11 +536,6 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
       ${resolvedDamagesHtml}
       ${ejDokumenteradeSkadorHtml}
       ${commentSection}
-      <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;">
-        <p style="margin:0 0 5px;"><strong>Incheckad av:</strong> ${checkerName}</p>
-        <p style="margin:0 0 5px;"><strong>Datum:</strong> ${date}</p>
-        <p style="margin:0;"><strong>Tid:</strong> ${time}</p>
-      </div>
       <p style="margin-top:20px;font-size:14px;">
         Incheckad av ${checkerName} kl ${time}, ${date}
       </p>

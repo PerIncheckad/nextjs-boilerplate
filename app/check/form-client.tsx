@@ -1397,7 +1397,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                         {resolvedComment && (
                             <>
                                 <br />
-                                <small>Går inte att dokumentera. Kommentar: {resolvedComment}</small>
+                                <small>Kommentar: {resolvedComment}</small>
                             </>
                         )}
                     </>
@@ -1477,7 +1477,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 {payload.bilen_star_nu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilen_star_nu.ort} / {payload.bilen_star_nu.station}</p>}
                 {payload.bilen_star_nu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilen_star_nu.kommentar}</small></p>}
             </div>
-            {renderDamageList(payload.nya_skador, '💥 Nya skador', false)}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador', false)}{renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade/Hittas ej', true)}
+            {renderDamageList(payload.nya_skador, '💥 Nya skador', false)}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador', false)}{renderDamageList(payload.åtgärdade_skador, '✅ Går inte att dokumentera', true)}
             <div className="confirm-summary">
                 <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>{getTankningText()}<p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
                 {payload.washed && <p><strong>✅ Tvättad</strong></p>}{payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
