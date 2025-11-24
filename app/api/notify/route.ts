@@ -170,6 +170,13 @@ const getDamageString = (damage: any, showPreviousInfo: boolean = false): string
 /**
  * Format a resolved damage (marked as "Går inte att dokumentera")
  * Shows BUHS fullText first, then the inchecker's comment explaining why
+ * 
+ * A resolved damage is one that exists in BUHS but cannot be documented during check-in,
+ * typically because it has been repaired or cannot be located. The inchecker provides
+ * a comment explaining why it couldn't be documented.
+ * 
+ * @param damage - Damage object with fullText (BUHS description) and resolvedComment (inchecker explanation)
+ * @returns HTML-formatted string with escaped text, showing primary BUHS description and optional comment
  */
 const getResolvedDamageString = (damage: any): string => {
   // Primary text: the original BUHS text

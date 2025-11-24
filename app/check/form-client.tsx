@@ -1347,15 +1347,12 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     useDialogFocus(true, containerRef);
     useModalKeydown(true, onCancel);
     
-    const renderDamageList = (damages: any[], title: string) => {
+    const renderDamageList = (damages: any[], title: string, isResolvedDamages: boolean = false) => {
         if (!damages || damages.length === 0) return null;
         return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
             let damageString: React.ReactNode;
             
-            // Check if this is a resolved damage ("Åtgärdade/Hittas ej")
-            const isResolved = title.includes('Åtgärdade') || title.includes('Hittas ej');
-            
-            if (isResolved) {
+            if (isResolvedDamages) {
                 // For resolved damages: show BUHS fullText first, then fixed phrase + comment
                 const primaryText = d.fullText || 'Okänd skada';
                 const resolvedComment = d.resolvedComment || '';
@@ -1445,7 +1442,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 {payload.bilen_star_nu && <p>✅ <strong>Bilen står nu vid:</strong> {payload.bilen_star_nu.ort} / {payload.bilen_star_nu.station}</p>}
                 {payload.bilen_star_nu?.kommentar && <p style={{paddingLeft: '1.5rem'}}><small><strong>Parkeringsinfo:</strong> {payload.bilen_star_nu.kommentar}</small></p>}
             </div>
-            {renderDamageList(payload.nya_skador, '💥 Nya skador')}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador')}{renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade/Hittas ej')}
+            {renderDamageList(payload.nya_skador, '💥 Nya skador', false)}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador', false)}{renderDamageList(payload.åtgärdade_skador, '✅ Åtgärdade/Hittas ej', true)}
             <div className="confirm-summary">
                 <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>{getTankningText()}<p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
                 {payload.washed && <p><strong>✅ Tvättad</strong></p>}{payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
