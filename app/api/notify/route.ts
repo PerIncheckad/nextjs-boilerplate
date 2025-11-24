@@ -113,6 +113,12 @@ const createAdminBanner = (condition: boolean, text: string): string => {
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
+const createPurpleBanner = (condition: boolean, text: string): string => {
+  if (!condition) return '';
+  const bannerContent = `<div style="background-color:#7C3AED!important;border:1px solid #7C3AED;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
+  return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
+};
+
 const getDamageString = (damage: any, showPreviousInfo: boolean = false): string => {
   // Build new structured description
   let structuredText = damage.type || damage.userType || 'Okänd skada';
@@ -328,62 +334,24 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
   const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
   
-  // Calculate Saludatum warnings
-  let saludatumBanners = '';
-  const existingDamages = payload.dokumenterade_skador || [];
-  const resolvedDamages = payload.åtgärdade_skador || [];
-  const allDamages = [...(payload.nya_skador || []), ...existingDamages, ...resolvedDamages];
-  
-  // Check for Saludatum from any damage
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  for (const damage of allDamages) {
-    const saludatum = damage.saludatum || damage.saludatum_date;
-    if (saludatum) {
-      const saludatumDate = new Date(saludatum);
-      saludatumDate.setHours(0, 0, 0, 0);
-      const diffDays = Math.floor((saludatumDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays < 0) {
-        // Passed
-        saludatumBanners += createAlertBanner(
-          true,
-          `Saludatum passerat (${saludatum})! Kontakta Bilkontroll! Undvik långa hyror.`,
-          '',
-          undefined,
-          siteUrl
-        );
-        break; // Only show once
-      } else if (diffDays >= 0 && diffDays <= 10) {
-        // Within 10 days
-        saludatumBanners += createAlertBanner(
-          true,
-          `Kontakta Bilkontroll - saludatum: ${saludatum}. Undvik långa hyror på detta reg.nr!`,
-          '',
-          undefined,
-          siteUrl
-        );
-        break; // Only show once
-      }
-    }
-  }
+  // Saludatum purple banner (vehicle-level, not damage-specific)
+  const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
+    ? createPurpleBanner(true, `Kontakta Bilkontroll! Saludatum: ${payload.saludatum}. Undvik långa hyror!`)
+    : '';
   
   // Warning banners
+  const existingDamages = payload.dokumenterade_skador || [];
+  const resolvedDamages = payload.åtgärdade_skador || [];
   const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
   const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
   
   const nyaSkadorCount = (payload.nya_skador || []).length;
-  const dokumenteradeSkadorCount = existingDamages.filter((d: any) => hasAnyFiles(d)).length;
-  const ejDokumenteradeSkadorCount = existingDamages.filter((d: any) => !hasAnyFiles(d)).length + resolvedDamages.length;
-  
-  // Calculate total handled existing damages for new banner
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
   
   const banners = `
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
     ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
-    ${saludatumBanners}
+    ${saludatumBanner}
     ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
     ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
     ${createAlertBanner(showChargeWarning, 'LÅG LADDNIVÅ', `Laddnivå: ${payload.laddning?.laddniva}%`)}
@@ -476,7 +444,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
 };
 
 /**
- * Build Bilkontroll email with damage focus (no Saludatum warnings)
+ * Build Bilkontroll email with damage focus and Saludatum warnings
  */
 const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl: string): string => {
   const regNr = payload.regnr || '';
@@ -491,6 +459,11 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const bilenStarNuStation = payload.bilen_star_nu?.station || payload.station || '---';
   const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
   
+  // Saludatum purple banner (vehicle-level, not damage-specific)
+  const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
+    ? createPurpleBanner(true, `Kontakta Bilkontroll! Saludatum: ${payload.saludatum}. Undvik långa hyror!`)
+    : '';
+  
   // Damage sections
   const existingDamages = payload.dokumenterade_skador || [];
   const resolvedDamages = payload.åtgärdade_skador || [];
@@ -504,6 +477,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
     ${createAdminBanner(payload.regnrSaknas, 'Reg.nr saknas!')}
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', undefined, siteUrl, nyaSkadorCount)}
     ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', undefined, siteUrl, befintligaSkadorHanteradeCount)}
+    ${saludatumBanner}
   `;
   
   const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
