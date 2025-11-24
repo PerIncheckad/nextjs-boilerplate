@@ -507,7 +507,8 @@ export default function CheckInForm() {
       washed: washed,
       otherChecklistItemsOK: otherChecklistItemsOK,
       notering: preliminarAvslutNotering,
-      vehicleStatus: vehicleData?.status
+      vehicleStatus: vehicleData?.status,
+      regnrSaknas: showUnknownRegHelper // Flag to indicate registration number is missing from Bilkontroll
   }), [
     normalizedReg, firstName, fullName, vehicleData, matarstallning, hjultyp, 
     garInteAttHyraUt, garInteAttHyraUtKommentar,
@@ -518,7 +519,8 @@ export default function CheckInForm() {
     insynsskyddSaknas,
     drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
-    newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering
+    newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering,
+    showUnknownRegHelper
   ]);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -804,6 +806,7 @@ export default function CheckInForm() {
         const finalPayloadForNotification = {
             ...finalPayloadForUI,
             user_email: userEmail,
+            bilmodel: finalPayloadForUI.carModel, // Map carModel to bilmodel for email compatibility
             rekond: { ...finalPayloadForUI.rekond, folder: tempRekondFolder },
             husdjur: { ...finalPayloadForUI.husdjur, folder: tempHusdjurFolder },
             rokning: { ...finalPayloadForUI.rokning, folder: tempRokningFolder },
@@ -1347,21 +1350,55 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     const renderDamageList = (damages: any[], title: string) => {
         if (!damages || damages.length === 0) return null;
         return (<div className="confirm-damage-section"><h4>{title}</h4><ul>{damages.map((d: any, index: number) => {
-            let damageString = d.fullText || d.type || d.userType || 'Okänd skada';
+            let damageString: React.ReactNode;
             
-            const positions = (d.positions || d.userPositions || [])
-              .map((p: any) => {
-                  if (p.carPart && p.position) return `${p.carPart} (${p.position})`;
-                  if (p.carPart) return p.carPart;
-                  return '';
-              })
-              .filter(Boolean)
-              .join(', ');
+            // Check if this is a resolved damage ("Åtgärdade/Hittas ej")
+            const isResolved = title.includes('Åtgärdade') || title.includes('Hittas ej');
+            
+            if (isResolved) {
+                // For resolved damages: show BUHS fullText first, then fixed phrase + comment
+                const primaryText = d.fullText || 'Okänd skada';
+                const resolvedComment = d.resolvedComment || '';
+                damageString = (
+                    <>
+                        {primaryText}
+                        {resolvedComment && (
+                            <>
+                                <br />
+                                <small>Går inte att dokumentera. Kommentar: {resolvedComment}</small>
+                            </>
+                        )}
+                    </>
+                );
+            } else {
+                // For new damages and documented existing damages: build from form vocabulary
+                const damageType = d.type || d.userType || 'Okänd skada';
+                const positions = (d.positions || d.userPositions || [])
+                  .map((p: any) => {
+                      if (p.carPart && p.position) return `${p.carPart} (${p.position})`;
+                      if (p.carPart) return p.carPart;
+                      return '';
+                  })
+                  .filter(Boolean)
+                  .join(', ');
 
-            if (positions) { damageString += `: ${positions}`; }
+                let primaryText = damageType;
+                if (positions) { primaryText += `: ${positions}`; }
 
-            const comment = d.text || d.userDescription || (title.includes('Åtgärdade') ? d.resolvedComment : '');
-            if (comment) { damageString += ` (${comment})`; }
+                const comment = d.text || d.userDescription || '';
+                
+                damageString = (
+                    <>
+                        {primaryText}
+                        {comment && (
+                            <>
+                                <br />
+                                <small>Kommentar: {comment}</small>
+                            </>
+                        )}
+                    </>
+                );
+            }
 
             return <li key={d.id || index}>{damageString}</li>;
         })}</ul></div>);
