@@ -840,7 +840,10 @@ export default function CheckInForm() {
             nya_skador: newDamagesForUpload,
         };
 
-        await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, meta: finalPayloadForNotification });
+        const notifyResult = await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, meta: finalPayloadForNotification });
+        if (!notifyResult.success) {
+            throw new Error(notifyResult.error || 'Ett okänt fel uppstod vid notifiering.');
+        }
 
         setShowSuccessModal(true);
         setTimeout(() => { setShowSuccessModal(false); resetForm(); }, 3000);
