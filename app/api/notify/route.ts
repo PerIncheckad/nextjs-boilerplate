@@ -649,7 +649,7 @@ export async function POST(request: Request) {
           current_station: payload.bilen_star_nu?.station || payload.station || null,
           current_location_note: payload.bilen_star_nu?.kommentar || null,
           checker_name: payload.fullName || payload.full_name || payload.incheckare || null,
-          checker_email: payload.email || null,
+          checker_email: payload.user_email || payload.email || null,
           completed_at: now.toISOString(),
           status: 'complete',
           // has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0, // (valfritt)
