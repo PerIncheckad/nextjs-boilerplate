@@ -837,6 +837,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Notifications processed successfully.' });
   } catch (error) {
     console.error('FATAL: Uncaught error in API route:', error);
-    return NextResponse.json({ error: 'Failed to process request' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorDetails = error instanceof Error ? error.stack : undefined;
+    return NextResponse.json(
+      { error: errorMessage, details: errorDetails },
+      { status: 500 }
+    );
   }
 }
