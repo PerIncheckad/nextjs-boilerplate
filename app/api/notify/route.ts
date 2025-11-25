@@ -838,7 +838,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('FATAL: Uncaught error in API route:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorDetails = error instanceof Error ? error.stack : undefined;
+    const errorDetails = process.env.NODE_ENV !== 'production' && error instanceof Error ? error.stack : undefined;
     return NextResponse.json(
       { error: errorMessage, details: errorDetails },
       { status: 500 }
