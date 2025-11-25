@@ -639,9 +639,8 @@ export async function POST(request: Request) {
     // DATABASE PERSISTENCE (normaliserad damage_type)
     // =================================================================
     if (!isDryRun) {
-      try {
-        // Checkin
-        const checkinData = {
+      // Checkin
+      const checkinData = {
           regnr: regNr,
           region: region || payload.region || null,
           city: payload.ort || null,
@@ -803,10 +802,6 @@ export async function POST(request: Request) {
         }
 
         console.debug('Database persistence completed successfully');
-      } catch (dbError) {
-        console.error('Database persistence failed:', dbError);
-        // Fortsätt med mejl även om DB-skrivning faller
-      }
     } else {
       console.log('DryRun mode: Skipping database persistence');
     }
