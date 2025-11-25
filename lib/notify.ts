@@ -25,7 +25,8 @@ export const notifyCheckin = async (params: NotifyCheckinParams): Promise<{ succ
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ message: 'Failed to parse error response' }));
       console.error(`API response not OK. Status: ${response.status}`, errorData);
-      throw new Error(`Failed to process request. Server responded with status ${response.status}`);
+      const errorMessage = errorData.error || errorData.message || `Failed to process request. Server responded with status ${response.status}`;
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();
