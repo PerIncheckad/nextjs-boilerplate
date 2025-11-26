@@ -666,7 +666,7 @@ export async function POST(request: Request) {
         if (checkinError) {
           console.error('Error inserting checkin record:', checkinError);
           // Continue without checkinId - damages won't be linked but emails will still be sent
-        } else {
+        } else if (checkinRecord?.id) {
           checkinId = checkinRecord.id;
         }
 
@@ -807,7 +807,7 @@ export async function POST(request: Request) {
 
           console.debug('Database persistence completed');
         } else {
-          console.warn('Skipping damage inserts due to missing checkinId (checkin insert failed)');
+          console.warn('Skipping damage inserts due to missing checkinId (checkin insert failed). Email notifications will still be sent.');
         }
     } else {
       console.log('DryRun mode: Skipping database persistence');
