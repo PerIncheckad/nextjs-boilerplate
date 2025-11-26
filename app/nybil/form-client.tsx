@@ -9,6 +9,21 @@ const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v
 
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
+// Huvudstationer for Planerad Station and Saluinfo
+const HUVUDSTATIONER = [
+  { name: 'Malmö', id: 166 },
+  { name: 'Helsingborg', id: 170 },
+  { name: 'Ängelholm', id: 171 },
+  { name: 'Halmstad', id: 274 },
+  { name: 'Falkenberg', id: 282 },
+  { name: 'Trelleborg', id: 283 },
+  { name: 'Varberg', id: 290 },
+  { name: 'Lund', id: 406 }
+];
+
+// Car brands for dropdown
+const BILMARKEN = ['MB', 'Ford', 'BMW', 'VW', 'KIA', 'MG', 'Renault', 'Peugeot', 'Citroen', 'Opel', 'SEAT', 'Annan'];
+
 const STATIONER: Record<string, string[]> = {
   'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
   'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'Euromaster Helsingborg Däckhotell', 'Bilia Helsingborg', 'Mekonomen Helsingborg Berga', 'Werksta Helsingborg', 'Svensk Bilåtervinning', 'Hedin Helsingborg', 'KKV Helsingborg', 'Hedbergs Helsingborg', 'Bilia Ängelholm', 'Euromaster Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
@@ -18,13 +33,6 @@ const STATIONER: Record<string, string[]> = {
   'Halmstad': ['Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
   'Trelleborg': ['Trelleborg'],
   'Varberg': ['FORD Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
-};
-
-type MediaFile = {
-  file: File;
-  type: 'image' | 'video';
-  preview?: string;
-  thumbnail?: string;
 };
 
 const capitalizeFirstLetter = (str: string): string => {
@@ -50,92 +58,110 @@ const getFullNameFromEmail = (email: string): string => {
   return capitalizeFirstLetter(parts[0]);
 };
 
-const getFileType = (file: File) => file.type.startsWith('video') ? 'video' : 'image';
-
-const createVideoThumbnail = (file: File): Promise<string> => new Promise(resolve => {
-  const video = document.createElement('video');
-  video.src = URL.createObjectURL(file);
-  video.onloadeddata = () => { video.currentTime = 1; };
-  video.onseeked = () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) { resolve(''); return; }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    resolve(canvas.toDataURL());
-    URL.revokeObjectURL(video.src);
-  };
-  video.onerror = () => { resolve(''); URL.revokeObjectURL(video.src); };
-});
-
-const processFiles = async (files: FileList): Promise<MediaFile[]> => {
-  return await Promise.all(Array.from(files).map(async file => {
-    const type = getFileType(file);
-    if (type === 'video') {
-      const thumbnail = await createVideoThumbnail(file);
-      return { file, type, thumbnail };
-    }
-    return { file, type, preview: URL.createObjectURL(file) };
-  }));
-};
-
-const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'image');
-const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
-
 // Fuel type constants
 const FUEL_TYPES = {
   BENSIN: 'Bensin',
   DIESEL: 'Diesel',
   HYBRID_BENSIN: 'Hybrid (bensin)',
   HYBRID_DIESEL: 'Hybrid (diesel)',
-  EL_FULL: 'El (full)'
+  EL_FULL: '100% el'
 } as const;
+
+// Regex for Swedish license plate validation
+const REG_NR_REGEX = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
 
 export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
   const [regInput, setRegInput] = useState('');
   const [bilmarke, setBilmarke] = useState('');
+  const [bilmarkeAnnat, setBilmarkeAnnat] = useState('');
   const [modell, setModell] = useState('');
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
+  
+  // Planerad station
+  const [planeradStation, setPlaneradStation] = useState('');
+  
+  // Vehicle status
   const [matarstallning, setMatarstallning] = useState('');
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   
+  // Wheels to storage (now in Fordonsstatus section)
+  const [hjulTillForvaring, setHjulTillForvaring] = useState<'Vinterdäck' | 'Sommardäck' | 'Inga medföljande hjul' | null>(null);
+  const [hjulForvaringOrt, setHjulForvaringOrt] = useState('');
+  const [hjulForvaringSpec, setHjulForvaringSpec] = useState('');
+  
   // Fuel/charging
-  const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | 'Hybrid (bensin)' | 'Hybrid (diesel)' | 'El (full)' | null>(null);
+  const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | 'Hybrid (bensin)' | 'Hybrid (diesel)' | '100% el' | null>(null);
+  const [vaxel, setVaxel] = useState<'Automat' | 'Manuell' | null>(null);
   const [laddnivaProcent, setLaddnivaProcent] = useState('');
   const [tankstatus, setTankstatus] = useState<'mottogs_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null>(null);
   const [upptankningLiter, setUpptankningLiter] = useState('');
   const [upptankningLiterpris, setUpptankningLiterpris] = useState('');
   
-  // Equipment inventory - now mandatory but start as null (not inventoried yet)
-  const [antalInsynsskydd, setAntalInsynsskydd] = useState<null | 0 | 1 | 2>(null);
-  const [antalBocker, setAntalBocker] = useState<null | 0 | 1 | 2 | 3>(null);
-  const [antalCoc, setAntalCoc] = useState<null | 0 | 1>(null);
-  const [antalNycklar, setAntalNycklar] = useState<null | 0 | 1 | 2>(null);
-  const [nycklarBeskrivning, setNycklarBeskrivning] = useState('');
-  const [antalLaddkablar, setAntalLaddkablar] = useState<null | 0 | 1 | 2>(null); // only required if needsLaddkablar  
+  // Contract terms (AVTALSVILLKOR)
+  const [serviceintervall, setServiceintervall] = useState<'1500' | '2500' | '3000' | 'Annat' | null>(null);
+  const [serviceintervallAnnat, setServiceintervallAnnat] = useState('');
+  const [maxKmManad, setMaxKmManad] = useState<'1200' | '3000' | 'Annat' | null>(null);
+  const [maxKmManadAnnat, setMaxKmManadAnnat] = useState('');
+  const [avgiftOverKm, setAvgiftOverKm] = useState<'1' | '2' | 'Annat' | null>(null);
+  const [avgiftOverKmAnnat, setAvgiftOverKmAnnat] = useState('');
   
-  // Wheels to storage selection (renamed semantics). Tri-state + none option.
-  const [hjulTillForvaring, setHjulTillForvaring] = useState<'Vinterdäck' | 'Sommardäck' | 'Inga medföljande hjul' | null>(null);
-  const [hjulForvaring, setHjulForvaring] = useState('');
-  const [antalLasbultar, setAntalLasbultar] = useState<null | 0 | 1>(null);
+  // Equipment inventory
+  const [antalInsynsskydd, setAntalInsynsskydd] = useState<null | 0 | 1 | 2>(null);
+  const [instruktionsbok, setInstruktionsbok] = useState<boolean | null>(null);
+  const [instruktionsbokForvaringOrt, setInstruktionsbokForvaringOrt] = useState('');
+  const [instruktionsbokForvaringSpec, setInstruktionsbokForvaringSpec] = useState('');
+  const [coc, setCoc] = useState<boolean | null>(null);
+  const [cocForvaringOrt, setCocForvaringOrt] = useState('');
+  const [cocForvaringSpec, setCocForvaringSpec] = useState('');
+  const [antalNycklar, setAntalNycklar] = useState<null | 1 | 2>(null);
+  const [extranyckelForvaringOrt, setExtranyckelForvaringOrt] = useState('');
+  const [extranyckelForvaringSpec, setExtranyckelForvaringSpec] = useState('');
+  const [antalLaddkablar, setAntalLaddkablar] = useState<null | 0 | 1 | 2>(null);
+  const [laddkablarForvaringOrt, setLaddkablarForvaringOrt] = useState('');
+  const [laddkablarForvaringSpec, setLaddkablarForvaringSpec] = useState('');
+  const [lasbultarMed, setLasbultarMed] = useState<boolean | null>(null);
+  const [dragkrok, setDragkrok] = useState<boolean | null>(null);
+  const [gummimattor, setGummimattor] = useState<boolean | null>(null);
+  const [dackkompressor, setDackkompressor] = useState<boolean | null>(null);
+  const [stoldGps, setStoldGps] = useState<boolean | null>(null);
+  const [stoldGpsSpec, setStoldGpsSpec] = useState('');
+  
+  // Connectivity (UPPKOPPLING)
+  const [mbmeAktiverad, setMbmeAktiverad] = useState<boolean | null>(null);
+  const [vwConnectAktiverad, setVwConnectAktiverad] = useState<boolean | null>(null);
   
   // Current location
   const [platsAktuellOrt, setPlatsAktuellOrt] = useState('');
   const [platsAktuellStation, setPlatsAktuellStation] = useState('');
   const [matarstallningAktuell, setMatarstallningAktuell] = useState('');
   
-  // Notes and media
+  // Saluinfo (optional)
+  const [saludatum, setSaludatum] = useState('');
+  const [saluStation, setSaluStation] = useState('');
+  
+  // Buyer info (KÖPARE - optional)
+  const [kopareForetag, setKopareForetag] = useState('');
+  const [returort, setReturort] = useState('');
+  const [returadress, setReturadress] = useState('');
+  const [attention, setAttention] = useState('');
+  const [noteringForsaljning, setNoteringForsaljning] = useState('');
+  
+  // Notes (ÖVRIGT)
   const [anteckningar, setAnteckningar] = useState('');
-  const [media, setMedia] = useState<MediaFile[]>([]);
+  
+  // Ready for rental (KLAR FÖR UTHYRNING)
+  const [klarForUthyrning, setKlarForUthyrning] = useState<boolean | null>(null);
+  const [ejUthyrningsbarAnledning, setEjUthyrningsbarAnledning] = useState('');
   
   // UI state
   const [isSaving, setIsSaving] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showRegWarningModal, setShowRegWarningModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
@@ -144,15 +170,32 @@ export default function NybilForm() {
   
   const isElectric = bransletyp === FUEL_TYPES.EL_FULL;
   const isHybrid = bransletyp === FUEL_TYPES.HYBRID_BENSIN || bransletyp === FUEL_TYPES.HYBRID_DIESEL;
+  const isBensinOrDiesel = bransletyp === FUEL_TYPES.BENSIN || bransletyp === FUEL_TYPES.DIESEL;
   const needsLaddkablar = isElectric || isHybrid;
+  const needsVaxelQuestion = isBensinOrDiesel;
   const locationDiffers = platsAktuellOrt && platsAktuellStation && (platsAktuellOrt !== ort || platsAktuellStation !== station);
+  const wheelsNeedStorage = hjulTillForvaring === 'Vinterdäck' || hjulTillForvaring === 'Sommardäck';
+  
+  // For UPPKOPPLING section visibility
+  const showMbmeQuestion = bilmarke === 'MB';
+  const showVwConnectQuestion = bilmarke === 'VW';
+  const showUppkopplingSection = showMbmeQuestion || showVwConnectQuestion;
+  
+  // Charging cables storage needed check
+  const laddkablarNeedsStorage = useMemo(() => {
+    if (isHybrid && antalLaddkablar !== null && antalLaddkablar >= 1) return true;
+    if (isElectric && antalLaddkablar !== null && antalLaddkablar > 1) return true;
+    return false;
+  }, [isHybrid, isElectric, antalLaddkablar]);
   
   const hasFordonStatusErrors = useMemo(() => {
-    if (!matarstallning || !hjultyp || !bransletyp) return true;
+    if (!matarstallning || !hjultyp || !bransletyp || hjulTillForvaring === null) return true;
+    if (needsVaxelQuestion && vaxel === null) return true;
+    if (wheelsNeedStorage && (!hjulForvaringOrt || !hjulForvaringSpec.trim())) return true;
     if (isElectric && !laddnivaProcent) return true;
     if (!isElectric && (!tankstatus || (tankstatus === 'tankad_nu' && (!upptankningLiter || !upptankningLiterpris)))) return true;
     return false;
-  }, [matarstallning, hjultyp, bransletyp, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris]);
+  }, [matarstallning, hjultyp, bransletyp, hjulTillForvaring, needsVaxelQuestion, vaxel, wheelsNeedStorage, hjulForvaringOrt, hjulForvaringSpec, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris]);
   
   const handleLaddningChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -166,43 +209,70 @@ export default function NybilForm() {
     }
   };
   
-  const equipmentCountsMissing = (
-    antalInsynsskydd === null ||
-    antalBocker === null ||
-    antalCoc === null ||
-    antalNycklar === null ||
-    (needsLaddkablar && antalLaddkablar === null)
-  );
+  const equipmentMissing = useMemo(() => {
+    if (antalInsynsskydd === null) return true;
+    if (instruktionsbok === null) return true;
+    if (instruktionsbok === true && (!instruktionsbokForvaringOrt || !instruktionsbokForvaringSpec.trim())) return true;
+    if (coc === null) return true;
+    if (coc === true && (!cocForvaringOrt || !cocForvaringSpec.trim())) return true;
+    if (antalNycklar === null) return true;
+    if (antalNycklar === 2 && (!extranyckelForvaringOrt || !extranyckelForvaringSpec.trim())) return true;
+    if (needsLaddkablar && antalLaddkablar === null) return true;
+    if (laddkablarNeedsStorage && (!laddkablarForvaringOrt || !laddkablarForvaringSpec.trim())) return true;
+    if (lasbultarMed === null) return true;
+    if (dragkrok === null) return true;
+    if (gummimattor === null) return true;
+    if (dackkompressor === null) return true;
+    if (stoldGps === null) return true;
+    if (stoldGps === true && !stoldGpsSpec.trim()) return true;
+    return false;
+  }, [antalInsynsskydd, instruktionsbok, instruktionsbokForvaringOrt, instruktionsbokForvaringSpec, coc, cocForvaringOrt, cocForvaringSpec, antalNycklar, extranyckelForvaringOrt, extranyckelForvaringSpec, needsLaddkablar, antalLaddkablar, laddkablarNeedsStorage, laddkablarForvaringOrt, laddkablarForvaringSpec, lasbultarMed, dragkrok, gummimattor, dackkompressor, stoldGps, stoldGpsSpec]);
   
-  const wheelsNeedStorage = hjulTillForvaring === 'Vinterdäck' || hjulTillForvaring === 'Sommardäck';
+  const avtalsvillkorMissing = useMemo(() => {
+    if (serviceintervall === null) return true;
+    if (serviceintervall === 'Annat' && !serviceintervallAnnat.trim()) return true;
+    if (maxKmManad === null) return true;
+    if (maxKmManad === 'Annat' && !maxKmManadAnnat.trim()) return true;
+    if (avgiftOverKm === null) return true;
+    if (avgiftOverKm === 'Annat' && !avgiftOverKmAnnat.trim()) return true;
+    return false;
+  }, [serviceintervall, serviceintervallAnnat, maxKmManad, maxKmManadAnnat, avgiftOverKm, avgiftOverKmAnnat]);
+  
+  const uppkopplingMissing = useMemo(() => {
+    if (showMbmeQuestion && mbmeAktiverad === null) return true;
+    if (showVwConnectQuestion && vwConnectAktiverad === null) return true;
+    return false;
+  }, [showMbmeQuestion, mbmeAktiverad, showVwConnectQuestion, vwConnectAktiverad]);
+  
+  const klarForUthyrningMissing = useMemo(() => {
+    if (klarForUthyrning === null) return true;
+    if (klarForUthyrning === false && !ejUthyrningsbarAnledning.trim()) return true;
+    return false;
+  }, [klarForUthyrning, ejUthyrningsbarAnledning]);
   
   const formIsValid = useMemo(() => {
-    // Required basic fields
-    if (!regInput || !bilmarke || !modell || !ort || !station || !matarstallning || !hjultyp || !bransletyp || antalLasbultar === null) return false;
-    // Equipment mandatory
-    if (equipmentCountsMissing) return false;
-    // Laddkablar count only required when needed
-    if (needsLaddkablar && antalLaddkablar === null) return false;
-    // Wheels storage conditional
-    if (wheelsNeedStorage && !hjulForvaring.trim()) return false;
-    // Electric specific
-    if (isElectric) {
-      const laddniva = parseInt(laddnivaProcent, 10);
-      if (!laddnivaProcent || isNaN(laddniva) || laddniva < 0 || laddniva > 100) return false;
-    } else { // Non-electric & hybrids
-      if (!tankstatus) return false;
-      if (tankstatus === 'tankad_nu') {
-        const liter = parseFloat(upptankningLiter);
-        const literpris = parseFloat(upptankningLiterpris);
-        if (!upptankningLiter || !upptankningLiterpris || isNaN(liter) || isNaN(literpris) || liter <= 0 || literpris <= 0) return false;
-      }
-    }
-    // Location differs -> require current odometer
-    if (locationDiffers && !matarstallningAktuell) return false;
-    // Require current location always
+    // Required basic fields - FORDON
+    if (!regInput || !bilmarke || !modell) return false;
+    if (bilmarke === 'Annan' && !bilmarkeAnnat.trim()) return false;
+    // PLATS FÖR MOTTAGNING
+    if (!ort || !station) return false;
+    // PLANERAD STATION
+    if (!planeradStation) return false;
+    // FORDONSSTATUS
+    if (hasFordonStatusErrors) return false;
+    // AVTALSVILLKOR
+    if (avtalsvillkorMissing) return false;
+    // UTRUSTNING
+    if (equipmentMissing) return false;
+    // UPPKOPPLING (conditional)
+    if (showUppkopplingSection && uppkopplingMissing) return false;
+    // VAR ÄR BILEN NU?
     if (!platsAktuellOrt || !platsAktuellStation) return false;
+    if (locationDiffers && !matarstallningAktuell) return false;
+    // KLAR FÖR UTHYRNING
+    if (klarForUthyrningMissing) return false;
     return true;
-  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, antalLasbultar, equipmentCountsMissing, wheelsNeedStorage, hjulForvaring, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, platsAktuellOrt, platsAktuellStation, needsLaddkablar, antalLaddkablar]);
+  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, planeradStation, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -212,29 +282,7 @@ export default function NybilForm() {
       setFullName(getFullNameFromEmail(email));
     };
     getUser();
-    return () => {
-      media.forEach(m => {
-        if (m.preview) URL.revokeObjectURL(m.preview);
-        if (m.thumbnail) URL.revokeObjectURL(m.thumbnail);
-      });
-    };
-  }, [media]);
-  
-  const handleMediaUpdate = async (files: FileList) => {
-    const processed = await processFiles(files);
-    setMedia(prev => [...prev, ...processed]);
-  };
-  
-  const handleMediaRemove = (index: number) => {
-    setMedia(prev => {
-      const newMedia = [...prev];
-      const removedItem = newMedia[index];
-      if (removedItem?.preview) URL.revokeObjectURL(removedItem.preview);
-      if (removedItem?.thumbnail) URL.revokeObjectURL(removedItem.thumbnail);
-      newMedia.splice(index, 1);
-      return newMedia;
-    });
-  };
+  }, []);
   
   const handleShowErrors = () => {
     setShowFieldErrors(true);
@@ -247,7 +295,7 @@ export default function NybilForm() {
           const targetTop = window.scrollY + rect.top - 80;
           try {
             window.scrollTo({ top: targetTop, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
-          } catch (e) {
+          } catch {
             firstError.scrollIntoView({ block: 'center' });
           }
           setTimeout(() => {
@@ -262,71 +310,157 @@ export default function NybilForm() {
   const resetForm = () => {
     setRegInput('');
     setBilmarke('');
+    setBilmarkeAnnat('');
     setModell('');
     setOrt('');
     setStation('');
+    setPlaneradStation('');
     setMatarstallning('');
     setHjultyp(null);
+    setHjulTillForvaring(null);
+    setHjulForvaringOrt('');
+    setHjulForvaringSpec('');
     setBransletyp(null);
+    setVaxel(null);
     setLaddnivaProcent('');
     setTankstatus(null);
     setUpptankningLiter('');
     setUpptankningLiterpris('');
+    setServiceintervall(null);
+    setServiceintervallAnnat('');
+    setMaxKmManad(null);
+    setMaxKmManadAnnat('');
+    setAvgiftOverKm(null);
+    setAvgiftOverKmAnnat('');
     setAntalInsynsskydd(null);
-    setAntalBocker(null);
-    setAntalCoc(null);
+    setInstruktionsbok(null);
+    setInstruktionsbokForvaringOrt('');
+    setInstruktionsbokForvaringSpec('');
+    setCoc(null);
+    setCocForvaringOrt('');
+    setCocForvaringSpec('');
     setAntalNycklar(null);
-    setNycklarBeskrivning('');
+    setExtranyckelForvaringOrt('');
+    setExtranyckelForvaringSpec('');
     setAntalLaddkablar(null);
-    setHjulTillForvaring(null);
-    setHjulForvaring('');
-    setAntalLasbultar(null);
+    setLaddkablarForvaringOrt('');
+    setLaddkablarForvaringSpec('');
+    setLasbultarMed(null);
+    setDragkrok(null);
+    setGummimattor(null);
+    setDackkompressor(null);
+    setStoldGps(null);
+    setStoldGpsSpec('');
+    setMbmeAktiverad(null);
+    setVwConnectAktiverad(null);
     setPlatsAktuellOrt('');
     setPlatsAktuellStation('');
     setMatarstallningAktuell('');
+    setSaludatum('');
+    setSaluStation('');
+    setKopareForetag('');
+    setReturort('');
+    setReturadress('');
+    setAttention('');
+    setNoteringForsaljning('');
     setAnteckningar('');
-    setMedia([]);
+    setKlarForUthyrning(null);
+    setEjUthyrningsbarAnledning('');
     setShowFieldErrors(false);
+    setShowRegWarningModal(false);
+    setShowConfirmModal(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
-  const handleSubmit = async () => {
+  // Check reg nr format before proceeding
+  const isRegNrValid = REG_NR_REGEX.test(normalizedReg);
+  
+  const handleRegisterClick = () => {
     if (!formIsValid) {
       handleShowErrors();
       return;
     }
+    // Check reg nr format
+    if (!isRegNrValid) {
+      setShowRegWarningModal(true);
+      return;
+    }
+    // Show confirmation modal
+    setShowConfirmModal(true);
+  };
+  
+  const handleConfirmAndSubmit = async () => {
+    setShowConfirmModal(false);
+    setShowRegWarningModal(false);
     setIsSaving(true);
     try {
       const now = new Date();
+      const planeradStationObj = HUVUDSTATIONER.find(s => s.name === planeradStation);
+      // Determine effective vaxel value
+      const effectiveVaxel = needsVaxelQuestion ? vaxel : 'Automat';
+      // Determine effective bilmarke
+      const effectiveBilmarke = bilmarke === 'Annan' ? bilmarkeAnnat : bilmarke;
+      
       const inventoryData = {
         regnr: normalizedReg,
-        bilmarke,
+        bilmarke: effectiveBilmarke,
+        bilmarke_annat: bilmarke === 'Annan' ? bilmarkeAnnat : null,
         modell,
         registrerad_av: firstName,
         fullstandigt_namn: fullName,
         registreringsdatum: now.toISOString().split('T')[0],
         plats_mottagning_ort: ort,
         plats_mottagning_station: station,
+        planerad_station: planeradStation,
+        planerad_station_id: planeradStationObj?.id || null,
         matarstallning_inkop: matarstallning,
         hjultyp,
-        hjul_forvaring: wheelsNeedStorage ? (hjulForvaring || null) : null,
-        hjul_ej_monterade: hjulTillForvaring, // renamed semantics stored in same column
-        antal_insynsskydd: antalInsynsskydd,
-        antal_bocker: antalBocker,
-        antal_coc: antalCoc,
-        antal_nycklar: antalNycklar,
-        nycklar_beskrivning: nycklarBeskrivning || null,
-        antal_laddkablar: needsLaddkablar ? (antalLaddkablar ?? 0) : 0,
-        antal_lasbultar: antalLasbultar,
+        hjul_ej_monterade: hjulTillForvaring,
+        hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
+        hjul_forvaring: wheelsNeedStorage ? hjulForvaringSpec : null,
         bransletyp,
+        vaxel: effectiveVaxel,
         laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
         tankstatus: !isElectric ? tankstatus : null,
         upptankning_liter: !isElectric && tankstatus === 'tankad_nu' && upptankningLiter ? parseFloat(upptankningLiter) : null,
         upptankning_literpris: !isElectric && tankstatus === 'tankad_nu' && upptankningLiterpris ? parseFloat(upptankningLiterpris) : null,
+        serviceintervall: serviceintervall === 'Annat' ? serviceintervallAnnat : serviceintervall,
+        max_km_manad: maxKmManad === 'Annat' ? maxKmManadAnnat : maxKmManad,
+        avgift_over_km: avgiftOverKm === 'Annat' ? avgiftOverKmAnnat : avgiftOverKm,
+        antal_insynsskydd: antalInsynsskydd,
+        instruktionsbok: instruktionsbok,
+        instruktionsbok_forvaring_ort: instruktionsbok ? instruktionsbokForvaringOrt : null,
+        instruktionsbok_forvaring_spec: instruktionsbok ? instruktionsbokForvaringSpec : null,
+        coc: coc,
+        coc_forvaring_ort: coc ? cocForvaringOrt : null,
+        coc_forvaring_spec: coc ? cocForvaringSpec : null,
+        antal_nycklar: antalNycklar,
+        extranyckel_forvaring_ort: antalNycklar === 2 ? extranyckelForvaringOrt : null,
+        extranyckel_forvaring_spec: antalNycklar === 2 ? extranyckelForvaringSpec : null,
+        antal_laddkablar: needsLaddkablar ? (antalLaddkablar ?? 0) : 0,
+        laddkablar_forvaring_ort: laddkablarNeedsStorage ? laddkablarForvaringOrt : null,
+        laddkablar_forvaring_spec: laddkablarNeedsStorage ? laddkablarForvaringSpec : null,
+        lasbultar_med: lasbultarMed,
+        dragkrok,
+        gummimattor,
+        dackkompressor,
+        stold_gps: stoldGps,
+        stold_gps_spec: stoldGps ? stoldGpsSpec : null,
+        mbme_aktiverad: showMbmeQuestion ? mbmeAktiverad : null,
+        vw_connect_aktiverad: showVwConnectQuestion ? vwConnectAktiverad : null,
         plats_aktuell_ort: platsAktuellOrt,
         plats_aktuell_station: platsAktuellStation,
         matarstallning_aktuell: locationDiffers ? matarstallningAktuell : null,
+        saludatum: saludatum || null,
+        salu_station: saluStation || null,
+        kopare_foretag: kopareForetag || null,
+        returort: returort || null,
+        returadress: returadress || null,
+        attention: attention || null,
+        notering_forsaljning: noteringForsaljning || null,
         anteckningar: anteckningar || null,
+        klar_for_uthyrning: klarForUthyrning,
+        ej_uthyrningsbar_anledning: klarForUthyrning === false ? ejUthyrningsbarAnledning : null,
         photo_urls: [],
         video_urls: [],
         media_folder: null
@@ -360,29 +494,96 @@ export default function NybilForm() {
     }
   };
   
+  // Get formatted summary for confirmation modal
+  const getFormSummary = () => {
+    const effectiveBilmarke = bilmarke === 'Annan' ? bilmarkeAnnat : bilmarke;
+    const effectiveVaxel = needsVaxelQuestion ? vaxel : 'Automat';
+    const effectiveServiceintervall = serviceintervall === 'Annat' ? serviceintervallAnnat : serviceintervall;
+    const effectiveMaxKm = maxKmManad === 'Annat' ? maxKmManadAnnat : maxKmManad;
+    const effectiveAvgift = avgiftOverKm === 'Annat' ? avgiftOverKmAnnat : avgiftOverKm;
+    
+    return {
+      fordon: {
+        regnr: normalizedReg,
+        bilmarke: effectiveBilmarke,
+        modell
+      },
+      mottagning: {
+        ort,
+        station
+      },
+      planeradStation,
+      status: {
+        matarstallning,
+        hjultyp,
+        hjulTillForvaring,
+        bransletyp,
+        vaxel: effectiveVaxel
+      },
+      avtalsvillkor: {
+        serviceintervall: effectiveServiceintervall,
+        maxKmManad: effectiveMaxKm,
+        avgiftOverKm: effectiveAvgift
+      },
+      klarForUthyrning: klarForUthyrning ? 'Ja' : 'Nej'
+    };
+  };
+  
   return (
     <div className="nybil-form">
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
       {isSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
+      {showRegWarningModal && (
+        <WarningModal
+          title="Registreringsnummer"
+          message={`Är du säker? ${normalizedReg} är inte i standardformat.`}
+          onCancel={() => setShowRegWarningModal(false)}
+          onConfirm={() => {
+            setShowRegWarningModal(false);
+            setShowConfirmModal(true);
+          }}
+          cancelText="Avbryt"
+          confirmText="Fortsätt ändå"
+        />
+      )}
+      {showConfirmModal && (
+        <ConfirmationModal
+          summary={getFormSummary()}
+          onCancel={() => setShowConfirmModal(false)}
+          onConfirm={handleConfirmAndSubmit}
+        />
+      )}
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
         {fullName && <p className="user-info">Inloggad: {fullName}</p>}
       </div>
-      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell)}>
+      
+      {/* FORDON Section */}
+      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell || (bilmarke === 'Annan' && !bilmarkeAnnat.trim()))}>
         <SectionHeader title="Fordon" />
         <Field label="Registreringsnummer *">
           <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} placeholder="ABC 123" className="reg-input" />
         </Field>
         <div className="grid-2-col">
           <Field label="Bilmärke *">
-            <input type="text" value={bilmarke} onChange={(e) => setBilmarke(e.target.value)} placeholder="t.ex. Mercedes-Benz" />
+            <select value={bilmarke} onChange={(e) => { setBilmarke(e.target.value); setBilmarkeAnnat(''); setMbmeAktiverad(null); setVwConnectAktiverad(null); }}>
+              <option value="">Välj bilmärke</option>
+              {BILMARKEN.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
           </Field>
           <Field label="Modell *">
-            <input type="text" value={modell} onChange={(e) => setModell(e.target.value)} placeholder="t.ex. C220" />
+            <input type="text" value={modell} onChange={(e) => setModell(e.target.value)} placeholder="t.ex. T-Cross" />
           </Field>
         </div>
+        {bilmarke === 'Annan' && (
+          <Field label="Specificera bilmärke *">
+            <input type="text" value={bilmarkeAnnat} onChange={(e) => setBilmarkeAnnat(e.target.value)} placeholder="Ange bilmärke" />
+          </Field>
+        )}
       </Card>
+      
+      {/* PLATS FÖR MOTTAGNING Section */}
       <Card data-error={showFieldErrors && (!ort || !station)}>
         <SectionHeader title="Plats för mottagning av ny bil" />
         <div className="grid-2-col">
@@ -400,11 +601,25 @@ export default function NybilForm() {
           </Field>
         </div>
       </Card>
+      
+      {/* PLANERAD STATION Section */}
+      <Card data-error={showFieldErrors && !planeradStation}>
+        <SectionHeader title="Planerad station" />
+        <Field label="Planerad station *">
+          <select value={planeradStation} onChange={e => setPlaneradStation(e.target.value)}>
+            <option value="">Välj planerad station</option>
+            {HUVUDSTATIONER.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </select>
+        </Field>
+      </Card>
+      
+      {/* FORDONSSTATUS Section */}
       <Card data-error={showFieldErrors && hasFordonStatusErrors}>
         <SectionHeader title="Fordonsstatus" />
         <Field label="Mätarställning vid inköp (km) *">
           <input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" />
         </Field>
+        
         <SubSectionHeader title="Däck" />
         <Field label="Däcktyp som sitter på *">
           <div className="grid-2-col">
@@ -412,20 +627,52 @@ export default function NybilForm() {
             <ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton>
           </div>
         </Field>
+        <Field label="Hjul till förvaring *">
+          <div className="grid-3-col">
+            <ChoiceButton onClick={() => { setHjulTillForvaring('Vinterdäck'); setHjulForvaringOrt(''); setHjulForvaringSpec(''); }} isActive={hjulTillForvaring === 'Vinterdäck'} isSet={hjulTillForvaring !== null}>Vinterdäck</ChoiceButton>
+            <ChoiceButton onClick={() => { setHjulTillForvaring('Sommardäck'); setHjulForvaringOrt(''); setHjulForvaringSpec(''); }} isActive={hjulTillForvaring === 'Sommardäck'} isSet={hjulTillForvaring !== null}>Sommardäck</ChoiceButton>
+            <ChoiceButton onClick={() => { setHjulTillForvaring('Inga medföljande hjul'); setHjulForvaringOrt(''); setHjulForvaringSpec(''); }} isActive={hjulTillForvaring === 'Inga medföljande hjul'} isSet={hjulTillForvaring !== null}>Inga medföljande hjul</ChoiceButton>
+          </div>
+        </Field>
+        {wheelsNeedStorage && (
+          <>
+            <Field label="Förvaringsort *">
+              <select value={hjulForvaringOrt} onChange={e => setHjulForvaringOrt(e.target.value)}>
+                <option value="">Välj förvaringsort</option>
+                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Specificera förvaring av hjul *">
+              <input type="text" value={hjulForvaringSpec} onChange={e => setHjulForvaringSpec(e.target.value)} placeholder="t.ex. Hylla 3, rum B" />
+            </Field>
+          </>
+        )}
+        
         <SubSectionHeader title="Drivmedel" />
         <Field label="Drivmedel *">
           <div className="grid-2-col">
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.BENSIN); setTankstatus(null); setLaddnivaProcent(''); }} isActive={bransletyp === FUEL_TYPES.BENSIN} isSet={bransletyp !== null}>Bensin</ChoiceButton>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.DIESEL); setTankstatus(null); setLaddnivaProcent(''); }} isActive={bransletyp === FUEL_TYPES.DIESEL} isSet={bransletyp !== null}>Diesel</ChoiceButton>
+            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.BENSIN); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.BENSIN} isSet={bransletyp !== null}>Bensin</ChoiceButton>
+            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.DIESEL); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.DIESEL} isSet={bransletyp !== null}>Diesel</ChoiceButton>
           </div>
           <div className="grid-2-col" style={{ marginTop: '0.5rem' }}>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_BENSIN); setTankstatus(null); setLaddnivaProcent(''); }} isActive={bransletyp === FUEL_TYPES.HYBRID_BENSIN} isSet={bransletyp !== null}>Hybrid (bensin)</ChoiceButton>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_DIESEL); setTankstatus(null); setLaddnivaProcent(''); }} isActive={bransletyp === FUEL_TYPES.HYBRID_DIESEL} isSet={bransletyp !== null}>Hybrid (diesel)</ChoiceButton>
+            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_BENSIN); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.HYBRID_BENSIN} isSet={bransletyp !== null}>Hybrid (bensin)</ChoiceButton>
+            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_DIESEL); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.HYBRID_DIESEL} isSet={bransletyp !== null}>Hybrid (diesel)</ChoiceButton>
           </div>
           <div style={{ marginTop: '0.5rem' }}>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.EL_FULL); setTankstatus(null); setUpptankningLiter(''); setUpptankningLiterpris(''); }} isActive={bransletyp === FUEL_TYPES.EL_FULL} isSet={bransletyp !== null} className="full-width-choice">El (full)</ChoiceButton>
+            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.EL_FULL); setTankstatus(null); setUpptankningLiter(''); setUpptankningLiterpris(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.EL_FULL} isSet={bransletyp !== null} className="full-width-choice">100% el</ChoiceButton>
           </div>
         </Field>
+        
+        {/* Växel question - only for Bensin/Diesel */}
+        {needsVaxelQuestion && (
+          <Field label="Växel *">
+            <div className="grid-2-col">
+              <ChoiceButton onClick={() => setVaxel('Automat')} isActive={vaxel === 'Automat'} isSet={vaxel !== null}>Automat</ChoiceButton>
+              <ChoiceButton onClick={() => setVaxel('Manuell')} isActive={vaxel === 'Manuell'} isSet={vaxel !== null}>Manuell</ChoiceButton>
+            </div>
+          </Field>
+        )}
+        
         {isElectric && (
           <Field label="Laddnivå (%) *">
             <input type="number" value={laddnivaProcent} onChange={handleLaddningChange} placeholder="0-100" min="0" max="100" />
@@ -437,7 +684,7 @@ export default function NybilForm() {
               <div className="grid-3-col">
                 <ChoiceButton onClick={() => { setTankstatus('mottogs_fulltankad'); setUpptankningLiter(''); setUpptankningLiterpris(''); }} isActive={tankstatus === 'mottogs_fulltankad'} isSet={tankstatus !== null}>Mottogs fulltankad</ChoiceButton>
                 <ChoiceButton onClick={() => setTankstatus('tankad_nu')} isActive={tankstatus === 'tankad_nu'} isSet={tankstatus !== null}>Tankad nu av MABI</ChoiceButton>
-                <ChoiceButton onClick={() => { setTankstatus('ej_upptankad'); setUpptankningLiter(''); setUpptankningLiterpris(''); }} isActive={tankstatus === 'ej_upptankad'} isSet={tankstatus !== null}>Ej upptankad vid mottagande</ChoiceButton>
+                <ChoiceButton onClick={() => { setTankstatus('ej_upptankad'); setUpptankningLiter(''); setUpptankningLiterpris(''); }} isActive={tankstatus === 'ej_upptankad'} isSet={tankstatus !== null}>Ej upptankad</ChoiceButton>
               </div>
             </Field>
             {tankstatus === 'tankad_nu' && (
@@ -453,82 +700,218 @@ export default function NybilForm() {
           </>
         )}
       </Card>
-      <Card data-error={showFieldErrors && (
-        antalLasbultar === null ||
-        equipmentCountsMissing ||
-        (wheelsNeedStorage && !hjulForvaring.trim())
-      )}>
+      
+      {/* AVTALSVILLKOR Section */}
+      <Card data-error={showFieldErrors && avtalsvillkorMissing}>
+        <SectionHeader title="Avtalsvillkor" />
+        <Field label="Serviceintervall *">
+          <div className="grid-4-col">
+            <ChoiceButton onClick={() => { setServiceintervall('1500'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '1500'} isSet={serviceintervall !== null}>1500</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall('2500'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '2500'} isSet={serviceintervall !== null}>2500</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall('3000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '3000'} isSet={serviceintervall !== null}>3000</ChoiceButton>
+            <ChoiceButton onClick={() => setServiceintervall('Annat')} isActive={serviceintervall === 'Annat'} isSet={serviceintervall !== null}>Annat</ChoiceButton>
+          </div>
+        </Field>
+        {serviceintervall === 'Annat' && (
+          <Field label="Specificera serviceintervall *">
+            <input type="text" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange serviceintervall" />
+          </Field>
+        )}
+        <Field label="Max km/månad *">
+          <div className="grid-3-col">
+            <ChoiceButton onClick={() => { setMaxKmManad('1200'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '1200'} isSet={maxKmManad !== null}>1200</ChoiceButton>
+            <ChoiceButton onClick={() => { setMaxKmManad('3000'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '3000'} isSet={maxKmManad !== null}>3000</ChoiceButton>
+            <ChoiceButton onClick={() => setMaxKmManad('Annat')} isActive={maxKmManad === 'Annat'} isSet={maxKmManad !== null}>Annat</ChoiceButton>
+          </div>
+        </Field>
+        {maxKmManad === 'Annat' && (
+          <Field label="Specificera max km/månad *">
+            <input type="text" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange max km/månad" />
+          </Field>
+        )}
+        <Field label="Avgift över-km *">
+          <div className="grid-3-col">
+            <ChoiceButton onClick={() => { setAvgiftOverKm('1'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '1'} isSet={avgiftOverKm !== null}>1 kr</ChoiceButton>
+            <ChoiceButton onClick={() => { setAvgiftOverKm('2'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '2'} isSet={avgiftOverKm !== null}>2 kr</ChoiceButton>
+            <ChoiceButton onClick={() => setAvgiftOverKm('Annat')} isActive={avgiftOverKm === 'Annat'} isSet={avgiftOverKm !== null}>Annat</ChoiceButton>
+          </div>
+        </Field>
+        {avgiftOverKm === 'Annat' && (
+          <Field label="Specificera avgift över-km *">
+            <input type="text" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value)} placeholder="Ange avgift" />
+          </Field>
+        )}
+      </Card>
+      
+      {/* UTRUSTNING Section */}
+      <Card data-error={showFieldErrors && equipmentMissing}>
         <SectionHeader title="Utrustning" />
         <Field label="Antal insynsskydd *">
           <div className="grid-3-col">
-            <ChoiceButton onClick={() => setAntalInsynsskydd(0)} isActive={antalInsynsskydd === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalInsynsskydd(1)} isActive={antalInsynsskydd === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalInsynsskydd(2)} isActive={antalInsynsskydd === 2}>2</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalInsynsskydd(0)} isActive={antalInsynsskydd === 0} isSet={antalInsynsskydd !== null}>0</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalInsynsskydd(1)} isActive={antalInsynsskydd === 1} isSet={antalInsynsskydd !== null}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalInsynsskydd(2)} isActive={antalInsynsskydd === 2} isSet={antalInsynsskydd !== null}>2</ChoiceButton>
           </div>
         </Field>
-        <Field label="Antal böcker/manualer *">
-          <div className="grid-4-col">
-            <ChoiceButton onClick={() => setAntalBocker(0)} isActive={antalBocker === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalBocker(1)} isActive={antalBocker === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalBocker(2)} isActive={antalBocker === 2}>2</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalBocker(3)} isActive={antalBocker === 3}>3</ChoiceButton>
-          </div>
-        </Field>
-        <Field label="Antal COC-dokument *">
+        
+        <Field label="Medföljande Instruktionsbok/Manual? *">
           <div className="grid-2-col">
-            <ChoiceButton onClick={() => setAntalCoc(0)} isActive={antalCoc === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalCoc(1)} isActive={antalCoc === 1}>1</ChoiceButton>
+            <ChoiceButton onClick={() => { setInstruktionsbok(true); }} isActive={instruktionsbok === true} isSet={instruktionsbok !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => { setInstruktionsbok(false); setInstruktionsbokForvaringOrt(''); setInstruktionsbokForvaringSpec(''); }} isActive={instruktionsbok === false} isSet={instruktionsbok !== null}>Nej</ChoiceButton>
           </div>
         </Field>
+        {instruktionsbok === true && (
+          <>
+            <Field label="Förvaringsort *">
+              <select value={instruktionsbokForvaringOrt} onChange={e => setInstruktionsbokForvaringOrt(e.target.value)}>
+                <option value="">Välj förvaringsort</option>
+                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Specificera förvaring av instruktionsbok *">
+              <input type="text" value={instruktionsbokForvaringSpec} onChange={e => setInstruktionsbokForvaringSpec(e.target.value)} placeholder="t.ex. Handskfack" />
+            </Field>
+          </>
+        )}
+        
+        <Field label="Medföljande COC? *">
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => { setCoc(true); }} isActive={coc === true} isSet={coc !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => { setCoc(false); setCocForvaringOrt(''); setCocForvaringSpec(''); }} isActive={coc === false} isSet={coc !== null}>Nej</ChoiceButton>
+          </div>
+        </Field>
+        {coc === true && (
+          <>
+            <Field label="Förvaringsort *">
+              <select value={cocForvaringOrt} onChange={e => setCocForvaringOrt(e.target.value)}>
+                <option value="">Välj förvaringsort</option>
+                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Specificera förvaring av COC *">
+              <input type="text" value={cocForvaringSpec} onChange={e => setCocForvaringSpec(e.target.value)} placeholder="t.ex. Kontoret" />
+            </Field>
+          </>
+        )}
+        
         <Field label="Antal nycklar *">
-          <div className="grid-3-col">
-            <ChoiceButton onClick={() => setAntalNycklar(0)} isActive={antalNycklar === 0}>0</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalNycklar(1)} isActive={antalNycklar === 1}>1</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalNycklar(2)} isActive={antalNycklar === 2}>2</ChoiceButton>
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => { setAntalNycklar(1); setExtranyckelForvaringOrt(''); setExtranyckelForvaringSpec(''); }} isActive={antalNycklar === 1} isSet={antalNycklar !== null}>1</ChoiceButton>
+            <ChoiceButton onClick={() => setAntalNycklar(2)} isActive={antalNycklar === 2} isSet={antalNycklar !== null}>2</ChoiceButton>
           </div>
         </Field>
-        <Field label="Beskrivning av nycklar (frivilligt)">
-          <input type="text" value={nycklarBeskrivning} onChange={e => setNycklarBeskrivning(e.target.value)} placeholder="t.ex. 1 vanlig nyckel, 1 reservnyckel" />
-        </Field>
+        {antalNycklar === 2 && (
+          <>
+            <Field label="Förvaringsort *">
+              <select value={extranyckelForvaringOrt} onChange={e => setExtranyckelForvaringOrt(e.target.value)}>
+                <option value="">Välj förvaringsort</option>
+                {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Specificera förvaring av extranyckel *">
+              <input type="text" value={extranyckelForvaringSpec} onChange={e => setExtranyckelForvaringSpec(e.target.value)} placeholder="t.ex. Nyckelskåp" />
+            </Field>
+          </>
+        )}
+        
+        {/* Laddkablar - different logic for Hybrid vs Electric */}
         {needsLaddkablar && (
-          <Field label="Antal laddkablar *">
-            <div className="grid-3-col">
-              <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0}>0</ChoiceButton>
-              <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1}>1</ChoiceButton>
-              <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2}>2</ChoiceButton>
-            </div>
-          </Field>
+          <>
+            <Field label="Antal laddkablar *">
+              {isHybrid ? (
+                <div className="grid-3-col">
+                  <ChoiceButton onClick={() => { setAntalLaddkablar(0); setLaddkablarForvaringOrt(''); setLaddkablarForvaringSpec(''); }} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
+                  <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
+                  <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
+                </div>
+              ) : (
+                <div className="grid-2-col">
+                  <ChoiceButton onClick={() => { setAntalLaddkablar(1); setLaddkablarForvaringOrt(''); setLaddkablarForvaringSpec(''); }} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
+                  <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
+                </div>
+              )}
+            </Field>
+            {laddkablarNeedsStorage && (
+              <>
+                <Field label="Förvaringsort *">
+                  <select value={laddkablarForvaringOrt} onChange={e => setLaddkablarForvaringOrt(e.target.value)}>
+                    <option value="">Välj förvaringsort</option>
+                    {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </Field>
+                <Field label="Specificera förvaring av laddkabel/laddkablar *">
+                  <input type="text" value={laddkablarForvaringSpec} onChange={e => setLaddkablarForvaringSpec(e.target.value)} placeholder="t.ex. Bagageutrymmet" />
+                </Field>
+              </>
+            )}
+          </>
         )}
-        <Field label="Hjul till förvaring">
-          <div className="grid-3-col">
-            <ChoiceButton onClick={() => setHjulTillForvaring(hjulTillForvaring === 'Vinterdäck' ? null : 'Vinterdäck')} isActive={hjulTillForvaring === 'Vinterdäck'}>Vinterdäck</ChoiceButton>
-            <ChoiceButton onClick={() => setHjulTillForvaring(hjulTillForvaring === 'Sommardäck' ? null : 'Sommardäck')} isActive={hjulTillForvaring === 'Sommardäck'}>Sommardäck</ChoiceButton>
-            <ChoiceButton onClick={() => setHjulTillForvaring(hjulTillForvaring === 'Inga medföljande hjul' ? null : 'Inga medföljande hjul')} isActive={hjulTillForvaring === 'Inga medföljande hjul'}>Inga medföljande hjul</ChoiceButton>
-          </div>
-        </Field>
-        {wheelsNeedStorage && (
-          <Field label="Förvaring *">
-            <input type="text" value={hjulForvaring} onChange={e => setHjulForvaring(e.target.value)} placeholder="t.ex. Station Malmö, hylla 3" />
-          </Field>
-        )}
+        
         <Field label="Låsbultar med? *">
           <div className="grid-2-col">
-            <ChoiceButton onClick={() => setAntalLasbultar(1)} isActive={antalLasbultar === 1} isSet={antalLasbultar !== null}>JA</ChoiceButton>
-            <ChoiceButton onClick={() => setAntalLasbultar(0)} isActive={antalLasbultar === 0} isSet={antalLasbultar !== null}>NEJ</ChoiceButton>
+            <ChoiceButton onClick={() => setLasbultarMed(true)} isActive={lasbultarMed === true} isSet={lasbultarMed !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => setLasbultarMed(false)} isActive={lasbultarMed === false} isSet={lasbultarMed !== null}>Nej</ChoiceButton>
           </div>
         </Field>
-        <div className="media-section">
-          <MediaUpload id="general-photo" onUpload={handleMediaUpdate} hasFile={hasPhoto(media)} fileType="image" label="Lägg till foton" isOptional={true} />
-          <MediaUpload id="general-video" onUpload={handleMediaUpdate} hasFile={hasVideo(media)} fileType="video" label="Lägg till videor" isOptional={true} />
-        </div>
-        <div className="media-previews">
-          {media.map((m, i) => (
-            <MediaButton key={i} onRemove={() => handleMediaRemove(i)}>
-              <img src={m.thumbnail || m.preview} alt="preview" />
-            </MediaButton>
-          ))}
-        </div>
+        
+        <Field label="Dragkrok *">
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => setDragkrok(true)} isActive={dragkrok === true} isSet={dragkrok !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => setDragkrok(false)} isActive={dragkrok === false} isSet={dragkrok !== null}>Nej</ChoiceButton>
+          </div>
+        </Field>
+        
+        <Field label="Gummimattor *">
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => setGummimattor(true)} isActive={gummimattor === true} isSet={gummimattor !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => setGummimattor(false)} isActive={gummimattor === false} isSet={gummimattor !== null}>Nej</ChoiceButton>
+          </div>
+        </Field>
+        
+        <Field label="Däckkompressor *">
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => setDackkompressor(true)} isActive={dackkompressor === true} isSet={dackkompressor !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => setDackkompressor(false)} isActive={dackkompressor === false} isSet={dackkompressor !== null}>Nej</ChoiceButton>
+          </div>
+        </Field>
+        
+        <Field label="Stöld GPS monterad *">
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => setStoldGps(true)} isActive={stoldGps === true} isSet={stoldGps !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => { setStoldGps(false); setStoldGpsSpec(''); }} isActive={stoldGps === false} isSet={stoldGps !== null}>Nej</ChoiceButton>
+          </div>
+        </Field>
+        {stoldGps === true && (
+          <Field label="Specificera *">
+            <input type="text" value={stoldGpsSpec} onChange={e => setStoldGpsSpec(e.target.value)} placeholder="t.ex. Modell, placering" />
+          </Field>
+        )}
       </Card>
+      
+      {/* UPPKOPPLING Section - only for MB or VW */}
+      {showUppkopplingSection && (
+        <Card data-error={showFieldErrors && uppkopplingMissing}>
+          <SectionHeader title="Uppkoppling" />
+          {showMbmeQuestion && (
+            <Field label="MBme aktiverad *">
+              <div className="grid-2-col">
+                <ChoiceButton onClick={() => setMbmeAktiverad(true)} isActive={mbmeAktiverad === true} isSet={mbmeAktiverad !== null}>Ja</ChoiceButton>
+                <ChoiceButton onClick={() => setMbmeAktiverad(false)} isActive={mbmeAktiverad === false} isSet={mbmeAktiverad !== null}>Nej</ChoiceButton>
+              </div>
+            </Field>
+          )}
+          {showVwConnectQuestion && (
+            <Field label="VW Connect aktiverad *">
+              <div className="grid-2-col">
+                <ChoiceButton onClick={() => setVwConnectAktiverad(true)} isActive={vwConnectAktiverad === true} isSet={vwConnectAktiverad !== null}>Ja</ChoiceButton>
+                <ChoiceButton onClick={() => setVwConnectAktiverad(false)} isActive={vwConnectAktiverad === false} isSet={vwConnectAktiverad !== null}>Nej</ChoiceButton>
+              </div>
+            </Field>
+          )}
+        </Card>
+      )}
+      
+      {/* VAR ÄR BILEN NU Section */}
       <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || (locationDiffers && !matarstallningAktuell))}>
         <SectionHeader title="Var är bilen nu?" />
         <div className="grid-2-col">
@@ -551,15 +934,70 @@ export default function NybilForm() {
           </Field>
         )}
       </Card>
+      
+      {/* SALUINFO Section - optional */}
+      <Card>
+        <SectionHeader title="Saluinfo" />
+        <p className="section-note">Frivillig sektion</p>
+        <Field label="Saludatum">
+          <input type="text" value={saludatum} onChange={e => setSaludatum(e.target.value)} placeholder="YYYY-MM-DD" />
+        </Field>
+        <Field label="Station">
+          <select value={saluStation} onChange={e => setSaluStation(e.target.value)}>
+            <option value="">Välj station</option>
+            {HUVUDSTATIONER.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+          </select>
+        </Field>
+      </Card>
+      
+      {/* KÖPARE Section - optional */}
+      <Card>
+        <SectionHeader title="Köpare" />
+        <p className="section-note">Frivillig sektion</p>
+        <Field label="Köpare (företag)">
+          <input type="text" value={kopareForetag} onChange={e => setKopareForetag(e.target.value)} placeholder="Företagsnamn" />
+        </Field>
+        <Field label="Returort för fordonsförsäljning">
+          <input type="text" value={returort} onChange={e => setReturort(e.target.value)} placeholder="Ort" />
+        </Field>
+        <Field label="Returadress försäljning">
+          <input type="text" value={returadress} onChange={e => setReturadress(e.target.value)} placeholder="Adress" />
+        </Field>
+        <Field label="Attention">
+          <input type="text" value={attention} onChange={e => setAttention(e.target.value)} placeholder="Kontaktperson" />
+        </Field>
+        <Field label="Notering fordonsförsäljning">
+          <textarea value={noteringForsaljning} onChange={e => setNoteringForsaljning(e.target.value)} placeholder="Övriga noteringar..." rows={3} />
+        </Field>
+      </Card>
+      
+      {/* ÖVRIGT Section */}
       <Card>
         <SectionHeader title="Övrigt" />
         <Field label="Anteckningar (frivilligt)">
           <textarea value={anteckningar} onChange={e => setAnteckningar(e.target.value)} placeholder="Övrig information om bilen..." rows={4} />
         </Field>
       </Card>
+      
+      {/* KLAR FÖR UTHYRNING Section */}
+      <Card data-error={showFieldErrors && klarForUthyrningMissing}>
+        <SectionHeader title="Klar för uthyrning" />
+        <Field label="Klar för uthyrning? *">
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => { setKlarForUthyrning(true); setEjUthyrningsbarAnledning(''); }} isActive={klarForUthyrning === true} isSet={klarForUthyrning !== null}>Ja</ChoiceButton>
+            <ChoiceButton onClick={() => setKlarForUthyrning(false)} isActive={klarForUthyrning === false} isSet={klarForUthyrning !== null}>Nej</ChoiceButton>
+          </div>
+        </Field>
+        {klarForUthyrning === false && (
+          <Field label="Specificera varför *">
+            <textarea value={ejUthyrningsbarAnledning} onChange={e => setEjUthyrningsbarAnledning(e.target.value)} placeholder="Ange anledning..." rows={3} />
+          </Field>
+        )}
+      </Card>
+      
       <div className="form-actions">
         <Button onClick={handleCancel} variant="secondary">Avbryt</Button>
-        <Button onClick={formIsValid ? handleSubmit : handleShowErrors} disabled={isSaving} variant={formIsValid ? 'success' : 'primary'}>
+        <Button onClick={handleRegisterClick} disabled={isSaving} variant={formIsValid ? 'success' : 'primary'}>
           {isSaving ? 'Sparar...' : (formIsValid ? 'Registrera bil' : 'Visa saknad information')}
         </Button>
       </div>
@@ -597,27 +1035,6 @@ const ChoiceButton: React.FC<{ onClick: () => void; isActive: boolean; children:
   return <button onClick={onClick} className={btnClass}>{children}</button>;
 };
 
-const MediaUpload: React.FC<{ id: string; onUpload: (files: FileList) => void; hasFile: boolean; fileType: 'image' | 'video'; label: string; isOptional?: boolean; }> = ({ id, onUpload, hasFile, fileType, label, isOptional = false }) => {
-  let className = 'media-label';
-  if (hasFile) className += ' active';
-  else if (isOptional) className += ' optional';
-  else className += ' mandatory';
-  const buttonText = hasFile ? `Lägg till ${fileType === 'image' ? 'fler foton' : 'fler videor'}` : label;
-  return (
-    <div className="media-upload">
-      <label htmlFor={id} className={className}>{buttonText}</label>
-      <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
-    </div>
-  );
-};
-
-const MediaButton: React.FC<React.PropsWithChildren<{ onRemove?: () => void }>> = ({ children, onRemove }) => (
-  <div className="media-btn">
-    {children}
-    {onRemove && (<button onClick={onRemove} className="remove-media-btn">×</button>)}
-  </div>
-);
-
 const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
   <>
     <div className="modal-overlay" />
@@ -629,6 +1046,90 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
       </div>
       <h3>Tack {firstName}!</h3>
       <p>Bilregistreringen har sparats.</p>
+    </div>
+  </>
+);
+
+type WarningModalProps = {
+  title: string;
+  message: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+  cancelText?: string;
+  confirmText?: string;
+};
+
+const WarningModal: React.FC<WarningModalProps> = ({ title, message, onCancel, onConfirm, cancelText = 'Avbryt', confirmText = 'Bekräfta' }) => (
+  <>
+    <div className="modal-overlay" />
+    <div className="modal-content warning-modal">
+      <h3>{title}</h3>
+      <p>{message}</p>
+      <div className="modal-actions">
+        <button onClick={onCancel} className="btn secondary">{cancelText}</button>
+        <button onClick={onConfirm} className="btn primary">{confirmText}</button>
+      </div>
+    </div>
+  </>
+);
+
+type FormSummary = {
+  fordon: { regnr: string; bilmarke: string; modell: string };
+  mottagning: { ort: string; station: string };
+  planeradStation: string;
+  status: { matarstallning: string; hjultyp: string | null; hjulTillForvaring: string | null; bransletyp: string | null; vaxel: string | null };
+  avtalsvillkor: { serviceintervall: string | null; maxKmManad: string | null; avgiftOverKm: string | null };
+  klarForUthyrning: string;
+};
+
+type ConfirmationModalProps = {
+  summary: FormSummary;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel, onConfirm }) => (
+  <>
+    <div className="modal-overlay" />
+    <div className="modal-content confirmation-modal">
+      <h3>Bekräfta registrering</h3>
+      <div className="summary-section">
+        <h4>Fordon</h4>
+        <p><strong>Reg.nr:</strong> {summary.fordon.regnr}</p>
+        <p><strong>Bilmärke:</strong> {summary.fordon.bilmarke}</p>
+        <p><strong>Modell:</strong> {summary.fordon.modell}</p>
+      </div>
+      <div className="summary-section">
+        <h4>Plats för mottagning</h4>
+        <p><strong>Ort:</strong> {summary.mottagning.ort}</p>
+        <p><strong>Station:</strong> {summary.mottagning.station}</p>
+      </div>
+      <div className="summary-section">
+        <h4>Planerad station</h4>
+        <p>{summary.planeradStation}</p>
+      </div>
+      <div className="summary-section">
+        <h4>Fordonsstatus</h4>
+        <p><strong>Mätarställning:</strong> {summary.status.matarstallning} km</p>
+        <p><strong>Däcktyp:</strong> {summary.status.hjultyp}</p>
+        <p><strong>Hjul till förvaring:</strong> {summary.status.hjulTillForvaring}</p>
+        <p><strong>Drivmedel:</strong> {summary.status.bransletyp}</p>
+        <p><strong>Växel:</strong> {summary.status.vaxel}</p>
+      </div>
+      <div className="summary-section">
+        <h4>Avtalsvillkor</h4>
+        <p><strong>Serviceintervall:</strong> {summary.avtalsvillkor.serviceintervall}</p>
+        <p><strong>Max km/månad:</strong> {summary.avtalsvillkor.maxKmManad}</p>
+        <p><strong>Avgift över-km:</strong> {summary.avtalsvillkor.avgiftOverKm} kr</p>
+      </div>
+      <div className="summary-section">
+        <h4>Klar för uthyrning</h4>
+        <p>{summary.klarForUthyrning}</p>
+      </div>
+      <div className="modal-actions">
+        <button onClick={onCancel} className="btn secondary">Avbryt</button>
+        <button onClick={onConfirm} className="btn success">Bekräfta</button>
+      </div>
     </div>
   </>
 );
@@ -723,9 +1224,18 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .remove-media-btn { position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; background-color:var(--color-danger); color:white; border:2px solid white; cursor:pointer; font-size:1rem; font-weight:bold; line-height:1; padding:0; }
     .remove-media-btn:hover { background-color:#b91c1c; }
     .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background-color:rgba(0,0,0,0.5); z-index:100; }
-    .modal-content { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:rgba(255,255,255,0.92); padding:2rem; border-radius:12px; z-index:101; box-shadow:var(--shadow-md); width:90%; max-width:600px; }
+    .modal-content { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:rgba(255,255,255,0.98); padding:2rem; border-radius:12px; z-index:101; box-shadow:var(--shadow-md); width:90%; max-width:600px; max-height:80vh; overflow-y:auto; }
     .success-modal { text-align:center; }
     .success-icon { font-size:3rem; color:var(--color-success); margin-bottom:1rem; }
+    .warning-modal h3 { margin-top:0; color:var(--color-warning); }
+    .warning-modal p { margin-bottom:1.5rem; }
+    .confirmation-modal h3 { margin-top:0; color:var(--color-primary); border-bottom:1px solid var(--color-border); padding-bottom:0.75rem; }
+    .confirmation-modal .summary-section { margin-bottom:1rem; padding:0.75rem; background-color:var(--color-bg); border-radius:6px; }
+    .confirmation-modal .summary-section h4 { margin:0 0 0.5rem 0; font-size:0.9rem; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.05em; }
+    .confirmation-modal .summary-section p { margin:0.25rem 0; font-size:0.9rem; }
+    .confirmation-modal .summary-section strong { color:var(--color-text); }
+    .modal-actions { display:flex; gap:1rem; justify-content:flex-end; margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--color-border); }
+    .section-note { font-size:0.85rem; color:var(--color-text-secondary); font-style:italic; margin:-0.5rem 0 1rem 0; }
     .spinner-overlay { display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-size:1.2rem; font-weight:600; }
     .spinner { border:5px solid #f3f3f3; border-top:5px solid var(--color-primary); border-radius:50%; width:50px; height:50px; animation:spin 1s linear infinite; margin-bottom:1rem; }
     @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
