@@ -651,7 +651,7 @@ export async function POST(request: Request) {
           checker_name: payload.fullName || payload.full_name || payload.incheckare || null,
           checker_email: payload.user_email || payload.email || null,
           completed_at: now.toISOString(),
-          status: 'complete',
+          status: 'COMPLETED',
           // has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0, // (valfritt)
         };
 
@@ -661,147 +661,154 @@ export async function POST(request: Request) {
           .select()
           .single();
 
+        // Resilient error handling: log DB errors but continue to send emails
+        let checkinId: string | null = null;
         if (checkinError) {
           console.error('Error inserting checkin record:', checkinError);
-          throw checkinError;
+          // Continue without checkinId - damages won't be linked but emails will still be sent
+        } else {
+          checkinId = checkinRecord.id;
         }
 
-        const checkinId = checkinRecord.id;
+        // Only attempt damage inserts if we have a valid checkinId
+        if (checkinId) {
+          // damages + checkin_damages
+          const damageInserts: any[] = [];
+          const checkinDamageInserts: any[] = [];
 
-        // damages + checkin_damages
-        const damageInserts: any[] = [];
-        const checkinDamageInserts: any[] = [];
+          // Nya skador
+          (payload.nya_skador || []).forEach((skada: any) => {
+            const rawType = skada.type || skada.userType || null;
+            const normalized = normalizeDamageType(rawType);
 
-        // Nya skador
-        (payload.nya_skador || []).forEach((skada: any) => {
-          const rawType = skada.type || skada.userType || null;
-          const normalized = normalizeDamageType(rawType);
+            damageInserts.push({
+              regnr: regNr,
+              damage_date: now.toISOString().split('T')[0], // YYYY-MM-DD (behåll enligt #120)
+              region: region || payload.region || null,
+              ort: payload.ort || null,
+              station_namn: payload.station || null,
+              damage_type: normalized.typeCode,
+              damage_type_raw: rawType,
+              user_type: rawType,
+              description: getDescription(skada),
+              inchecker_name: checkinData.checker_name,
+              inchecker_email: checkinData.checker_email,
+              status: 'complete',
+              uploads: skada.uploads || null,
+              created_at: now.toISOString(),
+            });
 
-          damageInserts.push({
-            regnr: regNr,
-            damage_date: now.toISOString().split('T')[0], // YYYY-MM-DD (behåll enligt #120)
-            region: region || payload.region || null,
-            ort: payload.ort || null,
-            station_namn: payload.station || null,
-            damage_type: normalized.typeCode,
-            damage_type_raw: rawType,
-            user_type: rawType,
-            description: getDescription(skada),
-            inchecker_name: checkinData.checker_name,
-            inchecker_email: checkinData.checker_email,
-            status: 'complete',
-            uploads: skada.uploads || null,
-            created_at: now.toISOString(),
-          });
-
-          const positions = skada.positions || skada.userPositions || [];
-          if (positions.length > 0) {
-            positions.forEach((pos: any) => {
+            const positions = skada.positions || skada.userPositions || [];
+            if (positions.length > 0) {
+              positions.forEach((pos: any) => {
+                checkinDamageInserts.push({
+                  checkin_id: checkinId,
+                  type: 'new',
+                  damage_type: normalized.typeCode,
+                  car_part: pos.carPart || null,
+                  position: pos.position || null,
+                  description: getDescription(skada),
+                  photo_urls: skada.uploads?.photo_urls || [],
+                  video_urls: skada.uploads?.video_urls || [],
+                  positions: [pos],
+                  created_at: now.toISOString(),
+                });
+              });
+            } else {
               checkinDamageInserts.push({
                 checkin_id: checkinId,
                 type: 'new',
                 damage_type: normalized.typeCode,
-                car_part: pos.carPart || null,
-                position: pos.position || null,
+                car_part: null,
+                position: null,
                 description: getDescription(skada),
                 photo_urls: skada.uploads?.photo_urls || [],
                 video_urls: skada.uploads?.video_urls || [],
-                positions: [pos],
+                positions: [],
                 created_at: now.toISOString(),
               });
-            });
-          } else {
-            checkinDamageInserts.push({
-              checkin_id: checkinId,
-              type: 'new',
-              damage_type: normalized.typeCode,
-              car_part: null,
-              position: null,
-              description: getDescription(skada),
-              photo_urls: skada.uploads?.photo_urls || [],
-              video_urls: skada.uploads?.video_urls || [],
-              positions: [],
-              created_at: now.toISOString(),
-            });
-          }
-        });
-
-        // Dokumenterade BUHS
-        (payload.dokumenterade_skador || []).forEach((skada: any) => {
-          const rawType = skada.userType || skada.type || null;
-          const normalized = normalizeDamageType(rawType);
-
-          damageInserts.push({
-            regnr: regNr,
-            damage_date: now.toISOString().split('T')[0],
-            region: region || payload.region || null,
-            ort: payload.ort || null,
-            station_namn: payload.station || null,
-            damage_type: normalized.typeCode,
-            damage_type_raw: rawType,
-            user_type: rawType,
-            description: getDescription(skada),
-            inchecker_name: checkinData.checker_name,
-            inchecker_email: checkinData.checker_email,
-            status: 'complete',
-            uploads: skada.uploads || null,
-            legacy_damage_source_text: skada.fullText || null,
-            // original_damage_date: skada.damage_date || null,                // (valfritt för idempotens)
-            // legacy_loose_key: skada.damage_date ? `${regNr}|${skada.damage_date}` : null, // (valfritt)
-            created_at: now.toISOString(),
+            }
           });
 
-          const positions = skada.userPositions || skada.positions || [];
-          if (positions.length > 0) {
-            positions.forEach((pos: any) => {
+          // Dokumenterade BUHS
+          (payload.dokumenterade_skador || []).forEach((skada: any) => {
+            const rawType = skada.userType || skada.type || null;
+            const normalized = normalizeDamageType(rawType);
+
+            damageInserts.push({
+              regnr: regNr,
+              damage_date: now.toISOString().split('T')[0],
+              region: region || payload.region || null,
+              ort: payload.ort || null,
+              station_namn: payload.station || null,
+              damage_type: normalized.typeCode,
+              damage_type_raw: rawType,
+              user_type: rawType,
+              description: getDescription(skada),
+              inchecker_name: checkinData.checker_name,
+              inchecker_email: checkinData.checker_email,
+              status: 'complete',
+              uploads: skada.uploads || null,
+              legacy_damage_source_text: skada.fullText || null,
+              // original_damage_date: skada.damage_date || null,                // (valfritt för idempotens)
+              // legacy_loose_key: skada.damage_date ? `${regNr}|${skada.damage_date}` : null, // (valfritt)
+              created_at: now.toISOString(),
+            });
+
+            const positions = skada.userPositions || skada.positions || [];
+            if (positions.length > 0) {
+              positions.forEach((pos: any) => {
+                checkinDamageInserts.push({
+                  checkin_id: checkinId,
+                  type: 'documented',
+                  damage_type: normalized.typeCode,
+                  car_part: pos.carPart || null,
+                  position: pos.position || null,
+                  description: getDescription(skada),
+                  photo_urls: skada.uploads?.photo_urls || [],
+                  video_urls: skada.uploads?.video_urls || [],
+                  positions: [pos],
+                  created_at: now.toISOString(),
+                });
+              });
+            } else {
               checkinDamageInserts.push({
                 checkin_id: checkinId,
                 type: 'documented',
                 damage_type: normalized.typeCode,
-                car_part: pos.carPart || null,
-                position: pos.position || null,
+                car_part: null,
+                position: null,
                 description: getDescription(skada),
                 photo_urls: skada.uploads?.photo_urls || [],
                 video_urls: skada.uploads?.video_urls || [],
-                positions: [pos],
+                positions: [],
                 created_at: now.toISOString(),
               });
-            });
-          } else {
-            checkinDamageInserts.push({
-              checkin_id: checkinId,
-              type: 'documented',
-              damage_type: normalized.typeCode,
-              car_part: null,
-              position: null,
-              description: getDescription(skada),
-              photo_urls: skada.uploads?.photo_urls || [],
-              video_urls: skada.uploads?.video_urls || [],
-              positions: [],
-              created_at: now.toISOString(),
-            });
-          }
-        });
+            }
+          });
 
-        console.debug(`Inserting ${damageInserts.length} damage records and ${checkinDamageInserts.length} checkin_damage records`);
+          console.debug(`Inserting ${damageInserts.length} damage records and ${checkinDamageInserts.length} checkin_damage records`);
 
-        if (damageInserts.length > 0) {
-          const { error: damagesError } = await supabaseAdmin.from('damages').insert(damageInserts);
-          if (damagesError) {
-            console.error('Error inserting damages:', damagesError);
-            throw damagesError;
+          if (damageInserts.length > 0) {
+            const { error: damagesError } = await supabaseAdmin.from('damages').insert(damageInserts);
+            if (damagesError) {
+              // Resilient: log error but continue to send emails
+              console.error('Error inserting damages:', damagesError);
+            }
           }
+
+          if (checkinDamageInserts.length > 0) {
+            const { error: checkinDamagesError } = await supabaseAdmin.from('checkin_damages').insert(checkinDamageInserts);
+            if (checkinDamagesError) {
+              // Resilient: log error but continue to send emails
+              console.error('Error inserting checkin_damages:', checkinDamagesError);
+            }
+          }
+
+          console.debug('Database persistence completed');
+        } else {
+          console.warn('Skipping damage inserts due to missing checkinId (checkin insert failed)');
         }
-
-        if (checkinDamageInserts.length > 0) {
-          const { error: checkinDamagesError } = await supabaseAdmin.from('checkin_damages').insert(checkinDamageInserts);
-          if (checkinDamagesError) {
-            console.error('Error inserting checkin_damages:', checkinDamagesError);
-            throw checkinDamagesError;
-          }
-        }
-
-        console.debug('Database persistence completed successfully');
     } else {
       console.log('DryRun mode: Skipping database persistence');
     }
