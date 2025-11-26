@@ -209,6 +209,27 @@ export default function NybilForm() {
     }
   };
   
+  // Helper function to reset fuel-related fields when changing fuel type
+  const handleFuelTypeChange = (newFuelType: typeof bransletyp) => {
+    setBransletyp(newFuelType);
+    setTankstatus(null);
+    setLaddnivaProcent('');
+    setUpptankningLiter('');
+    setUpptankningLiterpris('');
+    setVaxel(null);
+    setAntalLaddkablar(null);
+    setLaddkablarForvaringOrt('');
+    setLaddkablarForvaringSpec('');
+  };
+  
+  // Helper function to handle brand change and reset related fields
+  const handleBrandChange = (newBrand: string) => {
+    setBilmarke(newBrand);
+    setBilmarkeAnnat('');
+    setMbmeAktiverad(null);
+    setVwConnectAktiverad(null);
+  };
+  
   const equipmentMissing = useMemo(() => {
     if (antalInsynsskydd === null) return true;
     if (instruktionsbok === null) return true;
@@ -567,7 +588,7 @@ export default function NybilForm() {
         </Field>
         <div className="grid-2-col">
           <Field label="Bilmärke *">
-            <select value={bilmarke} onChange={(e) => { setBilmarke(e.target.value); setBilmarkeAnnat(''); setMbmeAktiverad(null); setVwConnectAktiverad(null); }}>
+            <select value={bilmarke} onChange={(e) => handleBrandChange(e.target.value)}>
               <option value="">Välj bilmärke</option>
               {BILMARKEN.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
@@ -651,15 +672,15 @@ export default function NybilForm() {
         <SubSectionHeader title="Drivmedel" />
         <Field label="Drivmedel *">
           <div className="grid-2-col">
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.BENSIN); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.BENSIN} isSet={bransletyp !== null}>Bensin</ChoiceButton>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.DIESEL); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.DIESEL} isSet={bransletyp !== null}>Diesel</ChoiceButton>
+            <ChoiceButton onClick={() => handleFuelTypeChange(FUEL_TYPES.BENSIN)} isActive={bransletyp === FUEL_TYPES.BENSIN} isSet={bransletyp !== null}>Bensin</ChoiceButton>
+            <ChoiceButton onClick={() => handleFuelTypeChange(FUEL_TYPES.DIESEL)} isActive={bransletyp === FUEL_TYPES.DIESEL} isSet={bransletyp !== null}>Diesel</ChoiceButton>
           </div>
           <div className="grid-2-col" style={{ marginTop: '0.5rem' }}>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_BENSIN); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.HYBRID_BENSIN} isSet={bransletyp !== null}>Hybrid (bensin)</ChoiceButton>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.HYBRID_DIESEL); setTankstatus(null); setLaddnivaProcent(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.HYBRID_DIESEL} isSet={bransletyp !== null}>Hybrid (diesel)</ChoiceButton>
+            <ChoiceButton onClick={() => handleFuelTypeChange(FUEL_TYPES.HYBRID_BENSIN)} isActive={bransletyp === FUEL_TYPES.HYBRID_BENSIN} isSet={bransletyp !== null}>Hybrid (bensin)</ChoiceButton>
+            <ChoiceButton onClick={() => handleFuelTypeChange(FUEL_TYPES.HYBRID_DIESEL)} isActive={bransletyp === FUEL_TYPES.HYBRID_DIESEL} isSet={bransletyp !== null}>Hybrid (diesel)</ChoiceButton>
           </div>
           <div style={{ marginTop: '0.5rem' }}>
-            <ChoiceButton onClick={() => { setBransletyp(FUEL_TYPES.EL_FULL); setTankstatus(null); setUpptankningLiter(''); setUpptankningLiterpris(''); setVaxel(null); setAntalLaddkablar(null); }} isActive={bransletyp === FUEL_TYPES.EL_FULL} isSet={bransletyp !== null} className="full-width-choice">100% el</ChoiceButton>
+            <ChoiceButton onClick={() => handleFuelTypeChange(FUEL_TYPES.EL_FULL)} isActive={bransletyp === FUEL_TYPES.EL_FULL} isSet={bransletyp !== null} className="full-width-choice">100% el</ChoiceButton>
           </div>
         </Field>
         
