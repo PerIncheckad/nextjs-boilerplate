@@ -407,8 +407,10 @@ export default function NybilForm() {
       return;
     }
     // Validate mätarställning if location differs and aktuell is filled
-    if (locationDiffers && matarstallningAktuell) {
-      if (parseInt(matarstallningAktuell) <= parseInt(matarstallning)) {
+    if (locationDiffers && matarstallningAktuell && matarstallning) {
+      const aktuellValue = parseInt(matarstallningAktuell, 10);
+      const inkopValue = parseInt(matarstallning, 10);
+      if (!isNaN(aktuellValue) && !isNaN(inkopValue) && aktuellValue <= inkopValue) {
         alert('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
         return;
       }
