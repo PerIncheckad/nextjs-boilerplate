@@ -5,7 +5,13 @@ import { supabase } from '@/lib/supabase';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
-const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Svart%20bakgrund%20MB%20grill/MB%20front%20grill%20logo.jpg";
+const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Silver%20logo%20white%20bkgrd/MB-logo-white-logo.jpg";
+
+// Bilmärken - alphabetical order with "Annat" last
+const BILMARKEN = ['BMW', 'Citroen', 'Ford', 'KIA', 'MB', 'MG', 'Opel', 'Peugeot', 'Renault', 'SEAT', 'VW', 'Annat'];
+
+// Huvudstationer - alphabetical order
+const HUVUDSTATIONER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];
 
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
@@ -97,9 +103,11 @@ export default function NybilForm() {
   const [fullName, setFullName] = useState('');
   const [regInput, setRegInput] = useState('');
   const [bilmarke, setBilmarke] = useState('');
+  const [bilmarkeAnnat, setBilmarkeAnnat] = useState('');
   const [modell, setModell] = useState('');
   const [ort, setOrt] = useState('');
   const [station, setStation] = useState('');
+  const [planeradStation, setPlaneradStation] = useState('');
   const [matarstallning, setMatarstallning] = useState('');
   const [hjultyp, setHjultyp] = useState<'Sommardäck' | 'Vinterdäck' | null>(null);
   
@@ -110,13 +118,30 @@ export default function NybilForm() {
   const [upptankningLiter, setUpptankningLiter] = useState('');
   const [upptankningLiterpris, setUpptankningLiterpris] = useState('');
   
+  // Avtalsvillkor
+  const [serviceintervall, setServiceintervall] = useState<'1500' | '2500' | '3000' | 'Annat' | null>(null);
+  const [serviceintervallAnnat, setServiceintervallAnnat] = useState('');
+  const [maxKmManad, setMaxKmManad] = useState<'1200' | '3000' | 'Annat' | null>(null);
+  const [maxKmManadAnnat, setMaxKmManadAnnat] = useState('');
+  const [avgiftOverKm, setAvgiftOverKm] = useState<'1' | '2' | 'Annat' | null>(null);
+  const [avgiftOverKmAnnat, setAvgiftOverKmAnnat] = useState('');
+  
   // Equipment inventory - now mandatory but start as null (not inventoried yet)
   const [antalInsynsskydd, setAntalInsynsskydd] = useState<null | 0 | 1 | 2>(null);
   const [antalBocker, setAntalBocker] = useState<null | 0 | 1 | 2 | 3>(null);
+  const [bockerForvaring, setBockerForvaring] = useState('');
   const [antalCoc, setAntalCoc] = useState<null | 0 | 1>(null);
   const [antalNycklar, setAntalNycklar] = useState<null | 0 | 1 | 2>(null);
   const [nycklarBeskrivning, setNycklarBeskrivning] = useState('');
-  const [antalLaddkablar, setAntalLaddkablar] = useState<null | 0 | 1 | 2>(null); // only required if needsLaddkablar  
+  const [antalLaddkablar, setAntalLaddkablar] = useState<null | 0 | 1 | 2>(null); // only required if needsLaddkablar
+  const [laddkablarForvaring, setLaddkablarForvaring] = useState('');
+  
+  // Stöld-GPS
+  const [stoldGps, setStoldGps] = useState<boolean | null>(null);
+  const [stoldGpsSpec, setStoldGpsSpec] = useState('');
+  
+  // Saludatum
+  const [saludatum, setSaludatum] = useState('');
   
   // Wheels to storage selection (renamed semantics). Tri-state + none option.
   const [hjulTillForvaring, setHjulTillForvaring] = useState<'Vinterdäck' | 'Sommardäck' | 'Inga medföljande hjul' | null>(null);
@@ -128,6 +153,9 @@ export default function NybilForm() {
   const [platsAktuellStation, setPlatsAktuellStation] = useState('');
   const [matarstallningAktuell, setMatarstallningAktuell] = useState('');
   
+  // Mätarställning validation error
+  const [matarstallningError, setMatarstallningError] = useState('');
+  
   // Notes and media
   const [anteckningar, setAnteckningar] = useState('');
   const [media, setMedia] = useState<MediaFile[]>([]);
@@ -136,6 +164,7 @@ export default function NybilForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
@@ -171,20 +200,30 @@ export default function NybilForm() {
     antalBocker === null ||
     antalCoc === null ||
     antalNycklar === null ||
-    (needsLaddkablar && antalLaddkablar === null)
+    (needsLaddkablar && antalLaddkablar === null) ||
+    stoldGps === null
   );
   
   const wheelsNeedStorage = hjulTillForvaring === 'Vinterdäck' || hjulTillForvaring === 'Sommardäck';
   
   const formIsValid = useMemo(() => {
     // Required basic fields
-    if (!regInput || !bilmarke || !modell || !ort || !station || !matarstallning || !hjultyp || !bransletyp || antalLasbultar === null) return false;
+    if (!regInput || !bilmarke || !modell || !ort || !station || !planeradStation || !matarstallning || !hjultyp || !bransletyp || antalLasbultar === null) return false;
+    // Bilmärke "Annat" requires specification
+    if (bilmarke === 'Annat' && !bilmarkeAnnat.trim()) return false;
     // Equipment mandatory
     if (equipmentCountsMissing) return false;
+    // Stöld-GPS follow-up question
+    if (stoldGps === true && !stoldGpsSpec.trim()) return false;
     // Laddkablar count only required when needed
     if (needsLaddkablar && antalLaddkablar === null) return false;
     // Wheels storage conditional
     if (wheelsNeedStorage && !hjulForvaring.trim()) return false;
+    // Avtalsvillkor validation
+    if (serviceintervall === null || maxKmManad === null || avgiftOverKm === null) return false;
+    if (serviceintervall === 'Annat' && !serviceintervallAnnat.trim()) return false;
+    if (maxKmManad === 'Annat' && !maxKmManadAnnat.trim()) return false;
+    if (avgiftOverKm === 'Annat' && !avgiftOverKmAnnat.trim()) return false;
     // Electric specific
     if (isElectric) {
       const laddniva = parseInt(laddnivaProcent, 10);
@@ -199,10 +238,16 @@ export default function NybilForm() {
     }
     // Location differs -> require current odometer
     if (locationDiffers && !matarstallningAktuell) return false;
+    // Mätarställning validation: if location differs and both values are filled, current must be greater
+    if (locationDiffers && matarstallningAktuell && matarstallning) {
+      const inkopValue = parseInt(matarstallning, 10);
+      const aktuellValue = parseInt(matarstallningAktuell, 10);
+      if (!isNaN(inkopValue) && !isNaN(aktuellValue) && aktuellValue <= inkopValue) return false;
+    }
     // Require current location always
     if (!platsAktuellOrt || !platsAktuellStation) return false;
     return true;
-  }, [regInput, bilmarke, modell, ort, station, matarstallning, hjultyp, bransletyp, antalLasbultar, equipmentCountsMissing, wheelsNeedStorage, hjulForvaring, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, platsAktuellOrt, platsAktuellStation, needsLaddkablar, antalLaddkablar]);
+  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, planeradStation, matarstallning, hjultyp, bransletyp, antalLasbultar, equipmentCountsMissing, wheelsNeedStorage, hjulForvaring, isElectric, laddnivaProcent, tankstatus, upptankningLiter, upptankningLiterpris, locationDiffers, matarstallningAktuell, platsAktuellOrt, platsAktuellStation, needsLaddkablar, antalLaddkablar, stoldGps, stoldGpsSpec, serviceintervall, serviceintervallAnnat, maxKmManad, maxKmManadAnnat, avgiftOverKm, avgiftOverKmAnnat]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -262,9 +307,11 @@ export default function NybilForm() {
   const resetForm = () => {
     setRegInput('');
     setBilmarke('');
+    setBilmarkeAnnat('');
     setModell('');
     setOrt('');
     setStation('');
+    setPlaneradStation('');
     setMatarstallning('');
     setHjultyp(null);
     setBransletyp(null);
@@ -272,21 +319,34 @@ export default function NybilForm() {
     setTankstatus(null);
     setUpptankningLiter('');
     setUpptankningLiterpris('');
+    setServiceintervall(null);
+    setServiceintervallAnnat('');
+    setMaxKmManad(null);
+    setMaxKmManadAnnat('');
+    setAvgiftOverKm(null);
+    setAvgiftOverKmAnnat('');
     setAntalInsynsskydd(null);
     setAntalBocker(null);
+    setBockerForvaring('');
     setAntalCoc(null);
     setAntalNycklar(null);
     setNycklarBeskrivning('');
     setAntalLaddkablar(null);
+    setLaddkablarForvaring('');
+    setStoldGps(null);
+    setStoldGpsSpec('');
+    setSaludatum('');
     setHjulTillForvaring(null);
     setHjulForvaring('');
     setAntalLasbultar(null);
     setPlatsAktuellOrt('');
     setPlatsAktuellStation('');
     setMatarstallningAktuell('');
+    setMatarstallningError('');
     setAnteckningar('');
     setMedia([]);
     setShowFieldErrors(false);
+    setShowConfirmModal(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
@@ -295,29 +355,57 @@ export default function NybilForm() {
       handleShowErrors();
       return;
     }
+    
+    // Mätarställning validation: if location differs, current must be greater than purchase
+    if (locationDiffers && matarstallningAktuell && matarstallning) {
+      const inkopValue = parseInt(matarstallning, 10);
+      const aktuellValue = parseInt(matarstallningAktuell, 10);
+      if (!isNaN(inkopValue) && !isNaN(aktuellValue) && aktuellValue <= inkopValue) {
+        setMatarstallningError('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
+        handleShowErrors();
+        return;
+      }
+    }
+    setMatarstallningError('');
+    
+    // Show confirmation modal instead of directly submitting
+    setShowConfirmModal(true);
+  };
+  
+  const confirmAndSubmit = async () => {
+    setShowConfirmModal(false);
     setIsSaving(true);
     try {
       const now = new Date();
       const inventoryData = {
         regnr: normalizedReg,
-        bilmarke,
+        bilmarke: bilmarke === 'Annat' ? `Annat: ${bilmarkeAnnat}` : bilmarke,
         modell,
         registrerad_av: firstName,
         fullstandigt_namn: fullName,
         registreringsdatum: now.toISOString().split('T')[0],
         plats_mottagning_ort: ort,
         plats_mottagning_station: station,
+        planerad_station: planeradStation,
         matarstallning_inkop: matarstallning,
         hjultyp,
         hjul_forvaring: wheelsNeedStorage ? (hjulForvaring || null) : null,
-        hjul_ej_monterade: hjulTillForvaring, // renamed semantics stored in same column
+        hjul_ej_monterade: hjulTillForvaring,
         antal_insynsskydd: antalInsynsskydd,
         antal_bocker: antalBocker,
+        bocker_forvaring: bockerForvaring || null,
         antal_coc: antalCoc,
         antal_nycklar: antalNycklar,
         nycklar_beskrivning: nycklarBeskrivning || null,
         antal_laddkablar: needsLaddkablar ? (antalLaddkablar ?? 0) : 0,
+        laddkablar_forvaring: laddkablarForvaring || null,
         antal_lasbultar: antalLasbultar,
+        stold_gps: stoldGps,
+        stold_gps_spec: stoldGps ? stoldGpsSpec : null,
+        saludatum: saludatum || null,
+        serviceintervall: serviceintervall === 'Annat' ? serviceintervallAnnat : serviceintervall,
+        max_km_manad: maxKmManad === 'Annat' ? maxKmManadAnnat : maxKmManad,
+        avgift_over_km: avgiftOverKm === 'Annat' ? avgiftOverKmAnnat : avgiftOverKm,
         bransletyp,
         laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
         tankstatus: !isElectric ? tankstatus : null,
@@ -365,25 +453,48 @@ export default function NybilForm() {
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
       {isSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
+      {showConfirmModal && <ConfirmModal onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} payload={{
+        regnr: normalizedReg,
+        bilmarke: bilmarke === 'Annat' ? `Annat: ${bilmarkeAnnat}` : bilmarke,
+        modell,
+        ort,
+        station,
+        planeradStation,
+        matarstallning,
+        matarstallningAktuell,
+        hjultyp,
+        bransletyp,
+        stoldGps,
+        stoldGpsSpec,
+        saludatum
+      }} />}
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
         {fullName && <p className="user-info">Inloggad: {fullName}</p>}
       </div>
-      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell)}>
+      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell || (bilmarke === 'Annat' && !bilmarkeAnnat))}>
         <SectionHeader title="Fordon" />
         <Field label="Registreringsnummer *">
           <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} placeholder="ABC 123" className="reg-input" />
         </Field>
         <div className="grid-2-col">
           <Field label="Bilmärke *">
-            <input type="text" value={bilmarke} onChange={(e) => setBilmarke(e.target.value)} placeholder="t.ex. Mercedes-Benz" />
+            <select value={bilmarke} onChange={(e) => { setBilmarke(e.target.value); if (e.target.value !== 'Annat') setBilmarkeAnnat(''); }}>
+              <option value="">Välj bilmärke</option>
+              {BILMARKEN.map(b => <option key={b} value={b}>{b}</option>)}
+            </select>
           </Field>
           <Field label="Modell *">
-            <input type="text" value={modell} onChange={(e) => setModell(e.target.value)} placeholder="t.ex. C220" />
+            <input type="text" value={modell} onChange={(e) => setModell(e.target.value)} placeholder="t.ex. T-Cross" />
           </Field>
         </div>
+        {bilmarke === 'Annat' && (
+          <Field label="Specificera bilmärke *">
+            <input type="text" value={bilmarkeAnnat} onChange={(e) => setBilmarkeAnnat(e.target.value)} placeholder="Ange bilmärke" />
+          </Field>
+        )}
       </Card>
-      <Card data-error={showFieldErrors && (!ort || !station)}>
+      <Card data-error={showFieldErrors && (!ort || !station || !planeradStation)}>
         <SectionHeader title="Plats för mottagning av ny bil" />
         <div className="grid-2-col">
           <Field label="Ort *">
@@ -399,6 +510,12 @@ export default function NybilForm() {
             </select>
           </Field>
         </div>
+        <Field label="Planerad station *">
+          <select value={planeradStation} onChange={e => setPlaneradStation(e.target.value)}>
+            <option value="">Välj planerad station</option>
+            {HUVUDSTATIONER.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </Field>
       </Card>
       <Card data-error={showFieldErrors && hasFordonStatusErrors}>
         <SectionHeader title="Fordonsstatus" />
@@ -453,10 +570,51 @@ export default function NybilForm() {
           </>
         )}
       </Card>
+      <Card data-error={showFieldErrors && (serviceintervall === null || maxKmManad === null || avgiftOverKm === null || (serviceintervall === 'Annat' && !serviceintervallAnnat) || (maxKmManad === 'Annat' && !maxKmManadAnnat) || (avgiftOverKm === 'Annat' && !avgiftOverKmAnnat))}>
+        <SectionHeader title="Avtalsvillkor" />
+        <Field label="Serviceintervall *">
+          <div className="grid-4-col">
+            <ChoiceButton onClick={() => { setServiceintervall('1500'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '1500'} isSet={serviceintervall !== null}>1500</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall('2500'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '2500'} isSet={serviceintervall !== null}>2500</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall('3000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '3000'} isSet={serviceintervall !== null}>3000</ChoiceButton>
+            <ChoiceButton onClick={() => setServiceintervall('Annat')} isActive={serviceintervall === 'Annat'} isSet={serviceintervall !== null}>Annat</ChoiceButton>
+          </div>
+        </Field>
+        {serviceintervall === 'Annat' && (
+          <Field label="Specificera serviceintervall *">
+            <input type="number" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange värde" />
+          </Field>
+        )}
+        <Field label="Max km/månad *">
+          <div className="grid-3-col">
+            <ChoiceButton onClick={() => { setMaxKmManad('1200'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '1200'} isSet={maxKmManad !== null}>1200</ChoiceButton>
+            <ChoiceButton onClick={() => { setMaxKmManad('3000'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '3000'} isSet={maxKmManad !== null}>3000</ChoiceButton>
+            <ChoiceButton onClick={() => setMaxKmManad('Annat')} isActive={maxKmManad === 'Annat'} isSet={maxKmManad !== null}>Annat</ChoiceButton>
+          </div>
+        </Field>
+        {maxKmManad === 'Annat' && (
+          <Field label="Specificera max km/månad *">
+            <input type="number" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange värde" />
+          </Field>
+        )}
+        <Field label="Avgift över-km *">
+          <div className="grid-3-col">
+            <ChoiceButton onClick={() => { setAvgiftOverKm('1'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '1'} isSet={avgiftOverKm !== null}>1 kr</ChoiceButton>
+            <ChoiceButton onClick={() => { setAvgiftOverKm('2'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '2'} isSet={avgiftOverKm !== null}>2 kr</ChoiceButton>
+            <ChoiceButton onClick={() => setAvgiftOverKm('Annat')} isActive={avgiftOverKm === 'Annat'} isSet={avgiftOverKm !== null}>Annat</ChoiceButton>
+          </div>
+        </Field>
+        {avgiftOverKm === 'Annat' && (
+          <Field label="Specificera avgift över-km *">
+            <input type="number" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value)} placeholder="Ange värde" />
+          </Field>
+        )}
+      </Card>
       <Card data-error={showFieldErrors && (
         antalLasbultar === null ||
         equipmentCountsMissing ||
-        (wheelsNeedStorage && !hjulForvaring.trim())
+        (wheelsNeedStorage && !hjulForvaring.trim()) ||
+        (stoldGps === true && !stoldGpsSpec.trim())
       )}>
         <SectionHeader title="Utrustning" />
         <Field label="Antal insynsskydd *">
@@ -474,6 +632,11 @@ export default function NybilForm() {
             <ChoiceButton onClick={() => setAntalBocker(3)} isActive={antalBocker === 3}>3</ChoiceButton>
           </div>
         </Field>
+        {(antalBocker !== null && antalBocker > 0) && (
+          <Field label="Förvaring av böcker/manualer">
+            <input type="text" value={bockerForvaring} onChange={e => setBockerForvaring(e.target.value)} placeholder="t.ex. Hyllplats 18F" />
+          </Field>
+        )}
         <Field label="Antal COC-dokument *">
           <div className="grid-2-col">
             <ChoiceButton onClick={() => setAntalCoc(0)} isActive={antalCoc === 0}>0</ChoiceButton>
@@ -491,13 +654,20 @@ export default function NybilForm() {
           <input type="text" value={nycklarBeskrivning} onChange={e => setNycklarBeskrivning(e.target.value)} placeholder="t.ex. 1 vanlig nyckel, 1 reservnyckel" />
         </Field>
         {needsLaddkablar && (
-          <Field label="Antal laddkablar *">
-            <div className="grid-3-col">
-              <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0}>0</ChoiceButton>
-              <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1}>1</ChoiceButton>
-              <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2}>2</ChoiceButton>
-            </div>
-          </Field>
+          <>
+            <Field label="Antal laddkablar *">
+              <div className="grid-3-col">
+                <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0}>0</ChoiceButton>
+                <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1}>1</ChoiceButton>
+                <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2}>2</ChoiceButton>
+              </div>
+            </Field>
+            {(antalLaddkablar !== null && antalLaddkablar > 0) && (
+              <Field label="Förvaring av laddkablar">
+                <input type="text" value={laddkablarForvaring} onChange={e => setLaddkablarForvaring(e.target.value)} placeholder="t.ex. Hyllplats 9G" />
+              </Field>
+            )}
+          </>
         )}
         <Field label="Hjul till förvaring">
           <div className="grid-3-col">
@@ -517,6 +687,19 @@ export default function NybilForm() {
             <ChoiceButton onClick={() => setAntalLasbultar(0)} isActive={antalLasbultar === 0} isSet={antalLasbultar !== null}>NEJ</ChoiceButton>
           </div>
         </Field>
+        <Field label="Stöld-GPS monterad *">
+          <div className="grid-2-col">
+            <ChoiceButton onClick={() => { setStoldGps(true); }} isActive={stoldGps === true} isSet={stoldGps !== null}>JA</ChoiceButton>
+            <ChoiceButton onClick={() => { setStoldGps(false); setStoldGpsSpec(''); }} isActive={stoldGps === false} isSet={stoldGps !== null}>NEJ</ChoiceButton>
+          </div>
+        </Field>
+        {stoldGps === true && (
+          <div className="follow-up-field">
+            <Field label="Specificera stöld-GPS *">
+              <input type="text" value={stoldGpsSpec} onChange={e => setStoldGpsSpec(e.target.value)} placeholder="Ange detaljer om stöld-GPS" />
+            </Field>
+          </div>
+        )}
         <div className="media-section">
           <MediaUpload id="general-photo" onUpload={handleMediaUpdate} hasFile={hasPhoto(media)} fileType="image" label="Lägg till foton" isOptional={true} />
           <MediaUpload id="general-video" onUpload={handleMediaUpdate} hasFile={hasVideo(media)} fileType="video" label="Lägg till videor" isOptional={true} />
@@ -529,7 +712,7 @@ export default function NybilForm() {
           ))}
         </div>
       </Card>
-      <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || (locationDiffers && !matarstallningAktuell))}>
+      <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || (locationDiffers && !matarstallningAktuell) || !!matarstallningError)}>
         <SectionHeader title="Var är bilen nu?" />
         <div className="grid-2-col">
           <Field label="Ort *">
@@ -547,9 +730,16 @@ export default function NybilForm() {
         </div>
         {locationDiffers && (
           <Field label="Aktuell mätarställning (km) *">
-            <input type="number" value={matarstallningAktuell} onChange={e => setMatarstallningAktuell(e.target.value)} placeholder="12345" />
+            <input type="number" value={matarstallningAktuell} onChange={e => { setMatarstallningAktuell(e.target.value); setMatarstallningError(''); }} placeholder="12345" />
+            {matarstallningError && <p className="error-text">{matarstallningError}</p>}
           </Field>
         )}
+      </Card>
+      <Card>
+        <SectionHeader title="Saluinfo" />
+        <Field label="Saludatum">
+          <input type="date" value={saludatum} onChange={e => setSaludatum(e.target.value)} />
+        </Field>
       </Card>
       <Card>
         <SectionHeader title="Övrigt" />
@@ -633,6 +823,32 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
   </>
 );
 
+const ConfirmModal: React.FC<{ onConfirm: () => void; onCancel: () => void; payload: any }> = ({ onConfirm, onCancel, payload }) => (
+  <>
+    <div className="modal-overlay" onClick={onCancel} />
+    <div className="modal-content confirm-modal">
+      <h3 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>Bekräfta registrering</h3>
+      <div className="confirm-details">
+        <p><strong>Registreringsnummer:</strong> {payload.regnr}</p>
+        <p><strong>Bilmärke:</strong> {payload.bilmarke}</p>
+        <p><strong>Modell:</strong> {payload.modell}</p>
+        <p><strong>Plats för mottagning:</strong> {payload.ort} / {payload.station}</p>
+        <p><strong>Planerad station:</strong> {payload.planeradStation}</p>
+        <p><strong>Mätarställning vid inköp:</strong> {payload.matarstallning} km</p>
+        {payload.matarstallningAktuell && <p><strong>Aktuell mätarställning:</strong> {payload.matarstallningAktuell} km</p>}
+        <p><strong>Hjultyp:</strong> {payload.hjultyp}</p>
+        <p><strong>Drivmedel:</strong> {payload.bransletyp}</p>
+        {payload.stoldGps !== null && <p><strong>Stöld-GPS monterad:</strong> {payload.stoldGps ? `Ja - ${payload.stoldGpsSpec}` : 'Nej'}</p>}
+        {payload.saludatum && <p><strong>Saludatum:</strong> {payload.saludatum}</p>}
+      </div>
+      <div className="modal-actions">
+        <Button onClick={onCancel} variant="secondary">Avbryt</Button>
+        <Button onClick={onConfirm} variant="success">Bekräfta och spara</Button>
+      </div>
+    </div>
+  </>
+);
+
 const SpinnerOverlay = () => (
   <div className="modal-overlay spinner-overlay">
     <div className="spinner"></div>
@@ -663,6 +879,13 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     }
     .background-img { display: none !important; }
+    body { 
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+      background-color: white; 
+      color: var(--color-text); 
+      margin: 0; 
+      padding: 0; 
+    }
     body::before {
       content: '';
       position: fixed;
@@ -671,12 +894,9 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       background-size: cover;
       background-position: center;
       background-repeat: no-repeat;
-      opacity: 0.45;
-      filter: brightness(0.65);
       z-index: -1;
       pointer-events: none;
     }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #e8f5e9; color: var(--color-text); margin:0; padding:0; }
     .nybil-form { max-width:700px; margin:0 auto; padding:1rem; box-sizing:border-box; }
     .main-header { text-align:center; margin-bottom:1.5rem; }
     .main-logo { max-width:188px; height:auto; margin:0 auto 1rem auto; display:block; }
@@ -699,7 +919,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .grid-4-col { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; }
     .grid-5-col { display:grid; grid-template-columns:repeat(5,1fr); gap:1rem; }
     .form-actions { margin-top:2rem; padding-top:1.5rem; border-top:1px solid var(--color-border); display:flex; gap:1rem; justify-content:flex-end; padding-bottom:1.5rem; }
-    .copyright-footer { text-align:center; margin-top:2rem; padding:1.5rem 0 3rem 0; color:var(--color-text-secondary); font-size:.875rem; }
+    .copyright-footer { text-align:center; padding:2rem 1rem; color:var(--color-text-secondary); font-size:.875rem; }
     .btn { padding:.75rem 1.5rem; border:none; border-radius:8px; font-weight:600; cursor:pointer; transition:all .2s; }
     .btn.primary { background-color:var(--color-primary); color:white; }
     .btn.secondary { background-color:var(--color-border); color:var(--color-text); }
@@ -711,6 +931,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .choice-btn.active.default { border-color:var(--color-success); background-color:var(--color-success-light); color:var(--color-success); }
     .choice-btn.disabled-choice { border-color:var(--color-border); background-color:var(--color-bg); color:var(--color-disabled); cursor:default; }
     .choice-btn.full-width-choice { width:100%; }
+    .follow-up-field { margin-left:1.5rem; padding-left:1rem; border-left:3px solid var(--color-border); margin-top:0.5rem; }
+    .error-text { color:var(--color-danger); font-size:0.875rem; margin-top:0.25rem; }
     .media-section { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1rem; }
     .media-label { display:block; text-align:center; padding:1.5rem 1rem; border:2px dashed; border-radius:8px; cursor:pointer; transition:all .2s; font-weight:600; }
     .media-label:hover { filter:brightness(.95); }
@@ -726,6 +948,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .modal-content { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:rgba(255,255,255,0.92); padding:2rem; border-radius:12px; z-index:101; box-shadow:var(--shadow-md); width:90%; max-width:600px; }
     .success-modal { text-align:center; }
     .success-icon { font-size:3rem; color:var(--color-success); margin-bottom:1rem; }
+    .confirm-modal { max-height:90vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+    .confirm-details { margin-bottom:1.5rem; }
+    .confirm-details p { margin:0.5rem 0; }
+    .modal-actions { display:flex; gap:1rem; justify-content:flex-end; padding-top:1rem; border-top:1px solid var(--color-border); }
     .spinner-overlay { display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-size:1.2rem; font-weight:600; }
     .spinner { border:5px solid #f3f3f3; border-top:5px solid var(--color-primary); border-radius:50%; width:50px; height:50px; animation:spin 1s linear infinite; margin-bottom:1rem; }
     @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
