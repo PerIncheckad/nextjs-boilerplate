@@ -162,6 +162,7 @@ export default function NybilForm() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showRegWarningModal, setShowRegWarningModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [matarstallningError, setMatarstallningError] = useState('');
   
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
@@ -305,6 +306,18 @@ export default function NybilForm() {
     getUser();
   }, []);
   
+  // Prevent background scroll when confirm modal is open
+  useEffect(() => {
+    if (showConfirmModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { 
+      document.body.style.overflow = ''; 
+    };
+  }, [showConfirmModal]);
+  
   const handleShowErrors = () => {
     setShowFieldErrors(true);
     requestAnimationFrame(() => {
@@ -397,6 +410,9 @@ export default function NybilForm() {
   const isRegNrValid = REG_NR_REGEX.test(normalizedReg);
   
   const handleRegisterClick = () => {
+    // Reset error
+    setMatarstallningError('');
+    
     if (!formIsValid) {
       handleShowErrors();
       return;
@@ -406,12 +422,18 @@ export default function NybilForm() {
       setShowRegWarningModal(true);
       return;
     }
-    // Validate mätarställning if location differs and aktuell is filled
-    if (locationDiffers && matarstallningAktuell && matarstallning) {
-      const aktuellValue = parseInt(matarstallningAktuell, 10);
+    // Mätarställning validation: current must be greater than purchase
+    if (matarstallningAktuell && matarstallning) {
       const inkopValue = parseInt(matarstallning, 10);
-      if (!isNaN(aktuellValue) && !isNaN(inkopValue) && aktuellValue <= inkopValue) {
-        alert('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
+      const aktuellValue = parseInt(matarstallningAktuell, 10);
+      if (!isNaN(inkopValue) && !isNaN(aktuellValue) && aktuellValue <= inkopValue) {
+        setMatarstallningError('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
+        handleShowErrors();
+        // Scroll to the error field
+        const errorField = document.querySelector('[data-field="matarstallning-aktuell"]');
+        if (errorField) {
+          errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
         return;
       }
     }
@@ -532,6 +554,12 @@ export default function NybilForm() {
     const effectiveMaxKm = maxKmManad === 'Annat' ? maxKmManadAnnat : maxKmManad;
     const effectiveAvgift = avgiftOverKm === 'Annat' ? avgiftOverKmAnnat : avgiftOverKm;
     
+    // Build laddkablar förvaring string
+    let laddkablarForvaring = '';
+    if (laddkablarNeedsStorage && laddkablarForvaringOrt && laddkablarForvaringSpec) {
+      laddkablarForvaring = `${laddkablarForvaringOrt}, ${laddkablarForvaringSpec}`;
+    }
+    
     return {
       fordon: {
         regnr: normalizedReg,
@@ -545,6 +573,7 @@ export default function NybilForm() {
       planeradStation,
       status: {
         matarstallning,
+        matarstallningAktuell: locationDiffers ? matarstallningAktuell : '',
         hjultyp,
         hjulTillForvaring,
         bransletyp,
@@ -555,6 +584,28 @@ export default function NybilForm() {
         maxKmManad: effectiveMaxKm,
         avgiftOverKm: effectiveAvgift
       },
+      stoldGps,
+      stoldGpsSpec,
+      saludatum: saludatum || '',
+      // Utrustning fields
+      antalInsynsskydd,
+      instruktionsbok,
+      instruktionsbokForvaringOrt,
+      instruktionsbokForvaringSpec,
+      coc,
+      cocForvaringOrt,
+      cocForvaringSpec,
+      antalNycklar,
+      extranyckelForvaringOrt,
+      extranyckelForvaringSpec,
+      antalLaddkablar,
+      laddkablarForvaring,
+      lasbultarMed,
+      dragkrok,
+      gummimattor,
+      dackkompressor,
+      hjulForvaringOrt,
+      hjulForvaringSpec,
       klarForUthyrning: klarForUthyrning ? 'Ja' : 'Nej'
     };
   };
@@ -961,9 +1012,16 @@ export default function NybilForm() {
           </Field>
         </div>
         {locationDiffers && (
-          <Field label="Aktuell mätarställning (km) *">
-            <input type="number" value={matarstallningAktuell} onChange={e => setMatarstallningAktuell(e.target.value)} placeholder="12345" />
-          </Field>
+          <div data-field="matarstallning-aktuell">
+            <Field label="Aktuell mätarställning (km) *">
+              <input type="number" value={matarstallningAktuell} onChange={e => setMatarstallningAktuell(e.target.value)} placeholder="12345" />
+            </Field>
+            {matarstallningError && (
+              <p className="error-text" style={{ color: 'var(--color-danger)', marginTop: '0.5rem' }}>
+                {matarstallningError}
+              </p>
+            )}
+          </div>
         )}
       </Card>
       
@@ -1109,8 +1167,30 @@ type FormSummary = {
   fordon: { regnr: string; bilmarke: string; modell: string };
   mottagning: { ort: string; station: string };
   planeradStation: string;
-  status: { matarstallning: string; hjultyp: string | null; hjulTillForvaring: string | null; bransletyp: string | null; vaxel: string | null };
+  status: { matarstallning: string; matarstallningAktuell: string; hjultyp: string | null; hjulTillForvaring: string | null; bransletyp: string | null; vaxel: string | null };
   avtalsvillkor: { serviceintervall: string | null; maxKmManad: string | null; avgiftOverKm: string | null };
+  stoldGps: boolean | null;
+  stoldGpsSpec: string;
+  saludatum: string;
+  // Utrustning fields
+  antalInsynsskydd: number | null;
+  instruktionsbok: boolean | null;
+  instruktionsbokForvaringOrt: string;
+  instruktionsbokForvaringSpec: string;
+  coc: boolean | null;
+  cocForvaringOrt: string;
+  cocForvaringSpec: string;
+  antalNycklar: number | null;
+  extranyckelForvaringOrt: string;
+  extranyckelForvaringSpec: string;
+  antalLaddkablar: number | null;
+  laddkablarForvaring: string;
+  lasbultarMed: boolean | null;
+  dragkrok: boolean | null;
+  gummimattor: boolean | null;
+  dackkompressor: boolean | null;
+  hjulForvaringOrt: string;
+  hjulForvaringSpec: string;
   klarForUthyrning: string;
 };
 
@@ -1143,6 +1223,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
       <div className="summary-section">
         <h4>Fordonsstatus</h4>
         <p><strong>Mätarställning:</strong> {summary.status.matarstallning} km</p>
+        {summary.status.matarstallningAktuell && (
+          <p><strong>Aktuell mätarställning:</strong> {summary.status.matarstallningAktuell} km</p>
+        )}
         <p><strong>Däcktyp:</strong> {summary.status.hjultyp}</p>
         <p><strong>Hjul till förvaring:</strong> {summary.status.hjulTillForvaring}</p>
         <p><strong>Drivmedel:</strong> {summary.status.bransletyp}</p>
@@ -1153,6 +1236,39 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
         <p><strong>Serviceintervall:</strong> {summary.avtalsvillkor.serviceintervall}</p>
         <p><strong>Max km/månad:</strong> {summary.avtalsvillkor.maxKmManad}</p>
         <p><strong>Avgift över-km:</strong> {summary.avtalsvillkor.avgiftOverKm} kr</p>
+      </div>
+      <div className="summary-section">
+        <h4>Utrustning</h4>
+        <p><strong>Antal insynsskydd:</strong> {summary.antalInsynsskydd}</p>
+        <p><strong>Instruktionsbok/Manual:</strong> {summary.instruktionsbok ? 'Ja' : 'Nej'}</p>
+        {summary.instruktionsbok && summary.instruktionsbokForvaringOrt && (
+          <p><strong>Förvaring instruktionsbok:</strong> {summary.instruktionsbokForvaringOrt}, {summary.instruktionsbokForvaringSpec}</p>
+        )}
+        <p><strong>COC-dokument:</strong> {summary.coc ? 'Ja' : 'Nej'}</p>
+        {summary.coc && summary.cocForvaringOrt && (
+          <p><strong>Förvaring COC:</strong> {summary.cocForvaringOrt}, {summary.cocForvaringSpec}</p>
+        )}
+        <p><strong>Antal nycklar:</strong> {summary.antalNycklar}</p>
+        {summary.antalNycklar === 2 && summary.extranyckelForvaringOrt && (
+          <p><strong>Förvaring extranyckel:</strong> {summary.extranyckelForvaringOrt}, {summary.extranyckelForvaringSpec}</p>
+        )}
+        {summary.antalLaddkablar !== null && summary.antalLaddkablar > 0 && (
+          <>
+            <p><strong>Antal laddkablar:</strong> {summary.antalLaddkablar}</p>
+            {summary.laddkablarForvaring && <p><strong>Förvaring laddkablar:</strong> {summary.laddkablarForvaring}</p>}
+          </>
+        )}
+        <p><strong>Låsbultar med:</strong> {summary.lasbultarMed ? 'Ja' : 'Nej'}</p>
+        <p><strong>Dragkrok:</strong> {summary.dragkrok ? 'Ja' : 'Nej'}</p>
+        <p><strong>Gummimattor:</strong> {summary.gummimattor ? 'Ja' : 'Nej'}</p>
+        <p><strong>Däckkompressor:</strong> {summary.dackkompressor ? 'Ja' : 'Nej'}</p>
+        {summary.status.hjulTillForvaring && summary.status.hjulTillForvaring !== 'Inga medföljande hjul' && (
+          <p><strong>Hjul till förvaring:</strong> {summary.status.hjulTillForvaring} - {summary.hjulForvaringOrt}, {summary.hjulForvaringSpec}</p>
+        )}
+        <p><strong>Stöld-GPS:</strong> {summary.stoldGps ? 'Ja' : 'Nej'}</p>
+        {summary.stoldGps && summary.stoldGpsSpec && (
+          <p><strong>Stöld-GPS specifikation:</strong> {summary.stoldGpsSpec}</p>
+        )}
       </div>
       <div className="summary-section">
         <h4>Klar för uthyrning</h4>
