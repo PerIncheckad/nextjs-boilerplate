@@ -309,13 +309,12 @@ export default function NybilForm() {
   // Prevent background scroll when confirm modal is open
   useEffect(() => {
     if (showConfirmModal) {
+      const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+      return () => { 
+        document.body.style.overflow = previousOverflow; 
+      };
     }
-    return () => { 
-      document.body.style.overflow = ''; 
-    };
   }, [showConfirmModal]);
   
   const handleShowErrors = () => {
