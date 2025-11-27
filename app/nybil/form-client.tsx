@@ -70,6 +70,72 @@ const FUEL_TYPES = {
 // Regex for Swedish license plate validation
 const REG_NR_REGEX = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
 
+// Photo types and helpers
+type PhotoFile = {
+  file: File;
+  preview: string;
+};
+
+const formatDateForFolder = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}${month}${day}`;
+};
+
+// Helper function to get file extension
+const getFileExtension = (file: File): string => {
+  return file.name.split('.').pop()?.toLowerCase() || 'jpg';
+};
+
+// Upload function for nybil-photos bucket
+async function uploadNybilPhoto(file: File, path: string): Promise<string> {
+  const BUCKET = 'nybil-photos';
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
+  
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+      
+      if (error && !/already exists/i.test(error.message || '')) {
+        console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, error);
+        
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+        
+        throw new Error('Fel vid uppladdning av foto. Vänligen försök igen.');
+      }
+      
+      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      if (urlError || !data?.publicUrl) {
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+        throw new Error('Fel vid uppladdning. Vänligen försök igen.');
+      }
+      
+      return data.publicUrl;
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('Fel vid uppladdning')) {
+        throw e;
+      }
+      
+      if (attempt < MAX_RETRIES) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+        continue;
+      }
+      
+      throw new Error('Fel vid uppladdning. Vänligen försök igen.');
+    }
+  }
+  
+  throw new Error('Fel vid uppladdning. Vänligen försök igen.');
+}
+
 export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
@@ -164,6 +230,11 @@ export default function NybilForm() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [matarstallningError, setMatarstallningError] = useState('');
   
+  // Photo state
+  const [photoFront, setPhotoFront] = useState<PhotoFile | null>(null);
+  const [photoBack, setPhotoBack] = useState<PhotoFile | null>(null);
+  const [additionalPhotos, setAdditionalPhotos] = useState<PhotoFile[]>([]);
+  
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
   const availableStationsAktuell = useMemo(() => STATIONER[platsAktuellOrt] || [], [platsAktuellOrt]);
@@ -231,6 +302,57 @@ export default function NybilForm() {
     setVwConnectAktiverad(null);
   };
   
+  // Photo handlers
+  const handlePhotoFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Revoke previous preview URL if exists
+      if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
+      setPhotoFront({ file, preview: URL.createObjectURL(file) });
+    }
+    // Reset input value so same file can be selected again
+    e.target.value = '';
+  };
+  
+  const handlePhotoBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
+      setPhotoBack({ file, preview: URL.createObjectURL(file) });
+    }
+    e.target.value = '';
+  };
+  
+  const handleAdditionalPhotosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const newPhotos: PhotoFile[] = Array.from(files).map(file => ({
+        file,
+        preview: URL.createObjectURL(file)
+      }));
+      setAdditionalPhotos(prev => [...prev, ...newPhotos]);
+    }
+    e.target.value = '';
+  };
+  
+  const removeAdditionalPhoto = (index: number) => {
+    setAdditionalPhotos(prev => {
+      const photo = prev[index];
+      if (photo?.preview) URL.revokeObjectURL(photo.preview);
+      return prev.filter((_, i) => i !== index);
+    });
+  };
+  
+  const retakePhotoFront = () => {
+    if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
+    setPhotoFront(null);
+  };
+  
+  const retakePhotoBack = () => {
+    if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
+    setPhotoBack(null);
+  };
+  
   const equipmentMissing = useMemo(() => {
     if (antalInsynsskydd === null) return true;
     if (instruktionsbok === null) return true;
@@ -272,6 +394,11 @@ export default function NybilForm() {
     return false;
   }, [klarForUthyrning, ejUthyrningsbarAnledning]);
   
+  // Photo validation - front and back photos are required
+  const photosMissing = useMemo(() => {
+    return !photoFront || !photoBack;
+  }, [photoFront, photoBack]);
+  
   const formIsValid = useMemo(() => {
     // Required basic fields - FORDON
     if (!regInput || !bilmarke || !modell) return false;
@@ -288,13 +415,15 @@ export default function NybilForm() {
     if (equipmentMissing) return false;
     // UPPKOPPLING (conditional)
     if (showUppkopplingSection && uppkopplingMissing) return false;
+    // FOTON
+    if (photosMissing) return false;
     // VAR ÄR BILEN NU?
     if (!platsAktuellOrt || !platsAktuellStation) return false;
     if (locationDiffers && !matarstallningAktuell) return false;
     // KLAR FÖR UTHYRNING
     if (klarForUthyrningMissing) return false;
     return true;
-  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, planeradStation, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
+  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, planeradStation, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -305,6 +434,15 @@ export default function NybilForm() {
     };
     getUser();
   }, []);
+  
+  // Cleanup photo preview URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
+      if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
+      additionalPhotos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
+    };
+  }, [photoFront, photoBack, additionalPhotos]);
   
   // Prevent background scroll when confirm modal is open
   useEffect(() => {
@@ -386,6 +524,13 @@ export default function NybilForm() {
     setStoldGpsSpec('');
     setMbmeAktiverad(null);
     setVwConnectAktiverad(null);
+    // Reset photos
+    if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
+    if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
+    additionalPhotos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
+    setPhotoFront(null);
+    setPhotoBack(null);
+    setAdditionalPhotos([]);
     setPlatsAktuellOrt('');
     setPlatsAktuellStation('');
     setMatarstallningAktuell('');
@@ -469,6 +614,33 @@ export default function NybilForm() {
       // Determine effective bilmarke
       const effectiveBilmarke = bilmarke === 'Annat' ? bilmarkeAnnat : bilmarke;
       
+      // Upload photos to Supabase Storage
+      const dateStr = formatDateForFolder(now);
+      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
+      const photoUrls: string[] = [];
+      
+      // Upload front photo
+      if (photoFront) {
+        const frontExt = getFileExtension(photoFront.file);
+        const frontUrl = await uploadNybilPhoto(photoFront.file, `${mediaFolder}/framifran.${frontExt}`);
+        photoUrls.push(frontUrl);
+      }
+      
+      // Upload back photo
+      if (photoBack) {
+        const backExt = getFileExtension(photoBack.file);
+        const backUrl = await uploadNybilPhoto(photoBack.file, `${mediaFolder}/bakifran.${backExt}`);
+        photoUrls.push(backUrl);
+      }
+      
+      // Upload additional photos
+      for (let i = 0; i < additionalPhotos.length; i++) {
+        const photo = additionalPhotos[i];
+        const ext = getFileExtension(photo.file);
+        const url = await uploadNybilPhoto(photo.file, `${mediaFolder}/ovriga/${i + 1}.${ext}`);
+        photoUrls.push(url);
+      }
+      
       const inventoryData = {
         regnr: normalizedReg,
         bilmarke: effectiveBilmarke,
@@ -529,9 +701,9 @@ export default function NybilForm() {
         anteckningar: anteckningar || null,
         klar_for_uthyrning: klarForUthyrning,
         ej_uthyrningsbar_anledning: klarForUthyrning === false ? ejUthyrningsbarAnledning : null,
-        photo_urls: [],
+        photo_urls: photoUrls,
         video_urls: [],
-        media_folder: null
+        media_folder: mediaFolder
       };
       const { data, error } = await supabase
         .from('nybil_inventering')
@@ -622,6 +794,12 @@ export default function NybilForm() {
       dackkompressor,
       hjulForvaringOrt,
       hjulForvaringSpec,
+      // Photo summary
+      photos: {
+        hasFront: !!photoFront,
+        hasBack: !!photoBack,
+        additionalCount: additionalPhotos.length
+      },
       klarForUthyrning: klarForUthyrning ? 'Ja' : 'Nej'
     };
   };
@@ -1014,6 +1192,86 @@ export default function NybilForm() {
         </Card>
       )}
       
+      {/* FOTON Section */}
+      <Card data-error={showFieldErrors && photosMissing}>
+        <SectionHeader title="Foton" />
+        <p className="section-note">Ta bilder av bilen framifrån och bakifrån. Du kan även lägga till fler bilder.</p>
+        
+        <div className="photo-grid">
+          {/* Front photo */}
+          <div className="photo-item">
+            <Field label="Ta bild framifrån *">
+              {photoFront ? (
+                <div className="photo-preview-container">
+                  <img src={photoFront.preview} alt="Framifrån" className="photo-preview" />
+                  <button type="button" onClick={retakePhotoFront} className="retake-btn">Ta om</button>
+                </div>
+              ) : (
+                <label className="photo-upload-label mandatory">
+                  <span>📷 Ta bild framifrån</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment" 
+                    onChange={handlePhotoFrontChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              )}
+            </Field>
+          </div>
+          
+          {/* Back photo */}
+          <div className="photo-item">
+            <Field label="Ta bild bakifrån *">
+              {photoBack ? (
+                <div className="photo-preview-container">
+                  <img src={photoBack.preview} alt="Bakifrån" className="photo-preview" />
+                  <button type="button" onClick={retakePhotoBack} className="retake-btn">Ta om</button>
+                </div>
+              ) : (
+                <label className="photo-upload-label mandatory">
+                  <span>📷 Ta bild bakifrån</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment" 
+                    onChange={handlePhotoBackChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              )}
+            </Field>
+          </div>
+        </div>
+        
+        {/* Additional photos */}
+        <Field label="Lägg till fler bilder (frivilligt)">
+          <label className="photo-upload-label optional">
+            <span>📷 {additionalPhotos.length > 0 ? 'Lägg till fler bilder' : 'Lägg till bilder'}</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              capture="environment" 
+              multiple
+              onChange={handleAdditionalPhotosChange}
+              style={{ display: 'none' }}
+            />
+          </label>
+        </Field>
+        
+        {additionalPhotos.length > 0 && (
+          <div className="additional-photos-preview">
+            {additionalPhotos.map((photo, index) => (
+              <div key={index} className="additional-photo-item">
+                <img src={photo.preview} alt={`Övrig bild ${index + 1}`} />
+                <button type="button" onClick={() => removeAdditionalPhoto(index)} className="remove-photo-btn">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      
       {/* VAR ÄR BILEN NU Section */}
       <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || (locationDiffers && !matarstallningAktuell))}>
         <SectionHeader title="Var är bilen nu?" />
@@ -1220,6 +1478,8 @@ type FormSummary = {
   dackkompressor: boolean | null;
   hjulForvaringOrt: string;
   hjulForvaringSpec: string;
+  // Photo summary
+  photos: { hasFront: boolean; hasBack: boolean; additionalCount: number };
   klarForUthyrning: string;
 };
 
@@ -1297,6 +1557,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
         <p><strong>Stöld-GPS:</strong> {summary.stoldGps ? 'Ja' : 'Nej'}</p>
         {summary.stoldGps && summary.stoldGpsSpec && (
           <p><strong>Stöld-GPS specifikation:</strong> {summary.stoldGpsSpec}</p>
+        )}
+      </div>
+      <div className="summary-section">
+        <h4>Foton</h4>
+        <p><strong>Bild framifrån:</strong> {summary.photos.hasFront ? '✅ Ja' : '❌ Nej'}</p>
+        <p><strong>Bild bakifrån:</strong> {summary.photos.hasBack ? '✅ Ja' : '❌ Nej'}</p>
+        {summary.photos.additionalCount > 0 && (
+          <p><strong>Övriga bilder:</strong> {summary.photos.additionalCount} st</p>
         )}
       </div>
       <div className="summary-section">
@@ -1418,6 +1686,23 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .spinner-overlay { display:flex; flex-direction:column; align-items:center; justify-content:center; color:white; font-size:1.2rem; font-weight:600; }
     .spinner { border:5px solid #f3f3f3; border-top:5px solid var(--color-primary); border-radius:50%; width:50px; height:50px; animation:spin 1s linear infinite; margin-bottom:1rem; }
     @keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
-    @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } }
+    /* Photo upload styles */
+    .photo-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem; }
+    .photo-item { }
+    .photo-upload-label { display:flex; align-items:center; justify-content:center; min-height:120px; border:2px dashed; border-radius:8px; cursor:pointer; transition:all .2s; font-weight:600; text-align:center; padding:1rem; }
+    .photo-upload-label:hover { filter:brightness(.95); }
+    .photo-upload-label.mandatory { border-color:var(--color-danger); background-color:var(--color-danger-light); color:var(--color-danger); }
+    .photo-upload-label.optional { border-color:var(--color-warning); background-color:var(--color-warning-light); color:#92400e; }
+    .photo-upload-label.active { border-style:solid; border-color:var(--color-success); background-color:var(--color-success-light); color:var(--color-success); }
+    .photo-preview-container { position:relative; }
+    .photo-preview { width:100%; height:150px; object-fit:cover; border-radius:8px; border:2px solid var(--color-success); }
+    .retake-btn { position:absolute; bottom:8px; right:8px; padding:0.5rem 1rem; background-color:rgba(0,0,0,0.7); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.875rem; }
+    .retake-btn:hover { background-color:rgba(0,0,0,0.85); }
+    .additional-photos-preview { display:flex; flex-wrap:wrap; gap:0.75rem; margin-top:1rem; }
+    .additional-photo-item { position:relative; width:80px; height:80px; border-radius:8px; overflow:hidden; }
+    .additional-photo-item img { width:100%; height:100%; object-fit:cover; }
+    .remove-photo-btn { position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background-color:var(--color-danger); color:white; border:2px solid white; cursor:pointer; font-size:1.1rem; font-weight:bold; line-height:1; padding:0; display:flex; align-items:center; justify-content:center; }
+    .remove-photo-btn:hover { background-color:#b91c1c; }
+    @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } .photo-grid { grid-template-columns:1fr; } }
   `}</style>
 );
