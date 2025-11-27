@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
-import { DAMAGE_OPTIONS } from '@/data/damage-options';
+import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
@@ -77,9 +77,6 @@ type PhotoFile = {
   preview: string;
 };
 
-// Damage types sorted alphabetically in Swedish
-const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort((a, b) => a.localeCompare(b, 'sv'));
-
 // Damage entry type for tracking damage information
 type DamagePosition = {
   id: string;
@@ -107,15 +104,14 @@ const getFileExtension = (file: File): string => {
   return file.name.split('.').pop()?.toLowerCase() || 'jpg';
 };
 
-// Upload function for nybil-photos bucket
-async function uploadNybilPhoto(file: File, path: string): Promise<string> {
-  const BUCKET = 'nybil-photos';
+// Generic upload function for Supabase storage buckets
+async function uploadToStorage(file: File, path: string, bucket: string, upsert: boolean = false): Promise<string> {
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+      const { error } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type, upsert });
       
       if (error && !/already exists/i.test(error.message || '')) {
         console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, error);
@@ -128,7 +124,7 @@ async function uploadNybilPhoto(file: File, path: string): Promise<string> {
         throw new Error('Fel vid uppladdning av foto. Vänligen försök igen.');
       }
       
-      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const { data, error: urlError } = supabase.storage.from(bucket).getPublicUrl(path);
       if (urlError || !data?.publicUrl) {
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
@@ -155,53 +151,11 @@ async function uploadNybilPhoto(file: File, path: string): Promise<string> {
   throw new Error('Fel vid uppladdning. Vänligen försök igen.');
 }
 
+// Upload function for nybil-photos bucket
+const uploadNybilPhoto = (file: File, path: string) => uploadToStorage(file, path, 'nybil-photos', false);
+
 // Upload function for damage-photos bucket (same as /check uses)
-async function uploadDamagePhoto(file: File, path: string): Promise<string> {
-  const BUCKET = 'damage-photos';
-  const MAX_RETRIES = 3;
-  const RETRY_DELAY_MS = 1000;
-  
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: true });
-      
-      if (error && !/already exists/i.test(error.message || '')) {
-        console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, error);
-        
-        if (attempt < MAX_RETRIES) {
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-          continue;
-        }
-        
-        throw new Error('Fel vid uppladdning av skadefoto. Vänligen försök igen.');
-      }
-      
-      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      if (urlError || !data?.publicUrl) {
-        if (attempt < MAX_RETRIES) {
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-          continue;
-        }
-        throw new Error('Fel vid uppladdning. Vänligen försök igen.');
-      }
-      
-      return data.publicUrl;
-    } catch (e) {
-      if (e instanceof Error && e.message.includes('Fel vid uppladdning')) {
-        throw e;
-      }
-      
-      if (attempt < MAX_RETRIES) {
-        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
-        continue;
-      }
-      
-      throw new Error('Fel vid uppladdning. Vänligen försök igen.');
-    }
-  }
-  
-  throw new Error('Fel vid uppladdning. Vänligen försök igen.');
-}
+const uploadDamagePhoto = (file: File, path: string) => uploadToStorage(file, path, 'damage-photos', true);
 
 export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
@@ -577,6 +531,11 @@ export default function NybilForm() {
     });
   };
   
+  // Helper function to cleanup damage photo previews
+  const cleanupDamagePhotoPreviews = (damagesToClean: DamageEntry[]) => {
+    damagesToClean.forEach(d => d.photos.forEach(p => p.preview && URL.revokeObjectURL(p.preview)));
+  };
+  
   const resetForm = () => {
     setRegInput('');
     setBilmarke('');
@@ -630,8 +589,8 @@ export default function NybilForm() {
     setPhotoFront(null);
     setPhotoBack(null);
     setAdditionalPhotos([]);
-    // Reset damages
-    damages.forEach(d => d.photos.forEach(p => p.preview && URL.revokeObjectURL(p.preview)));
+    // Reset damages - cleanup photo previews
+    cleanupDamagePhotoPreviews(damages);
     setHarSkadorVidLeverans(null);
     setDamages([]);
     setShowDamageModal(false);
@@ -678,7 +637,7 @@ export default function NybilForm() {
     setDamages(prev => {
       const damage = prev.find(d => d.id === damageId);
       if (damage) {
-        damage.photos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
+        cleanupDamagePhotoPreviews([damage]);
       }
       return prev.filter(d => d.id !== damageId);
     });
@@ -1607,7 +1566,7 @@ export default function NybilForm() {
             {/* Varning om inga skador dokumenterade */}
             {damages.length === 0 && (
               <p className="warning-text">
-                Du har valt &quot;Skador vid leverans&quot; men ingen skada är dokumenterad.
+                Du har valt &quot;Skador vid leverans&quot; men inga skador är dokumenterade.
               </p>
             )}
           </>
