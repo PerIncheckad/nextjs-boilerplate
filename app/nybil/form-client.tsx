@@ -1422,7 +1422,7 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
         </svg>
       </div>
       <h3>Tack {firstName}!</h3>
-      <p>Bilregistreringen har sparats.</p>
+      <p>Bilen är registrerad!</p>
     </div>
   </>
 );
