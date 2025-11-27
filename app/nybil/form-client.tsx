@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
+import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
@@ -76,6 +77,21 @@ type PhotoFile = {
   preview: string;
 };
 
+// Damage entry type for tracking damage information
+type DamagePosition = {
+  id: string;
+  carPart: string;
+  position: string;
+};
+
+type DamageEntry = {
+  id: string;
+  damageType: string;
+  positions: DamagePosition[];
+  comment: string;
+  photos: PhotoFile[];
+};
+
 const formatDateForFolder = (date: Date): string => {
   const year = date.getFullYear();
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -88,15 +104,14 @@ const getFileExtension = (file: File): string => {
   return file.name.split('.').pop()?.toLowerCase() || 'jpg';
 };
 
-// Upload function for nybil-photos bucket
-async function uploadNybilPhoto(file: File, path: string): Promise<string> {
-  const BUCKET = 'nybil-photos';
+// Generic upload function for Supabase storage buckets
+async function uploadToStorage(file: File, path: string, bucket: string, upsert: boolean = false): Promise<string> {
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
   
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { error } = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+      const { error } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type, upsert });
       
       if (error && !/already exists/i.test(error.message || '')) {
         console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, error);
@@ -109,7 +124,7 @@ async function uploadNybilPhoto(file: File, path: string): Promise<string> {
         throw new Error('Fel vid uppladdning av foto. Vänligen försök igen.');
       }
       
-      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const { data, error: urlError } = supabase.storage.from(bucket).getPublicUrl(path);
       if (urlError || !data?.publicUrl) {
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
@@ -135,6 +150,12 @@ async function uploadNybilPhoto(file: File, path: string): Promise<string> {
   
   throw new Error('Fel vid uppladdning. Vänligen försök igen.');
 }
+
+// Upload function for nybil-photos bucket
+const uploadNybilPhoto = (file: File, path: string) => uploadToStorage(file, path, 'nybil-photos', false);
+
+// Upload function for damage-photos bucket (same as /check uses)
+const uploadDamagePhoto = (file: File, path: string) => uploadToStorage(file, path, 'damage-photos', true);
 
 export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
@@ -234,6 +255,12 @@ export default function NybilForm() {
   const [photoFront, setPhotoFront] = useState<PhotoFile | null>(null);
   const [photoBack, setPhotoBack] = useState<PhotoFile | null>(null);
   const [additionalPhotos, setAdditionalPhotos] = useState<PhotoFile[]>([]);
+  
+  // Damage state
+  const [harSkadorVidLeverans, setHarSkadorVidLeverans] = useState<boolean | null>(null);
+  const [damages, setDamages] = useState<DamageEntry[]>([]);
+  const [showDamageModal, setShowDamageModal] = useState(false);
+  const [currentDamageId, setCurrentDamageId] = useState<string | null>(null);
   
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
@@ -399,6 +426,30 @@ export default function NybilForm() {
     return !photoFront || !photoBack;
   }, [photoFront, photoBack]);
   
+  // Damage validation
+  const damagesMissing = useMemo(() => {
+    // Must answer the question
+    if (harSkadorVidLeverans === null) return true;
+    // If there are damages, at least one must be documented with required fields
+    if (harSkadorVidLeverans === true) {
+      if (damages.length === 0) return true;
+      // Each damage must have type, at least one position with carPart, and at least one photo
+      for (const damage of damages) {
+        if (!damage.damageType) return true;
+        if (damage.positions.length === 0 || damage.positions.some(p => !p.carPart)) return true;
+        // Check if position is required based on damage type and car part
+        for (const pos of damage.positions) {
+          if (pos.carPart) {
+            const availablePositions = DAMAGE_OPTIONS[damage.damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof (typeof DAMAGE_OPTIONS)[keyof typeof DAMAGE_OPTIONS]] || [];
+            if (availablePositions.length > 0 && !pos.position) return true;
+          }
+        }
+        if (damage.photos.length === 0) return true;
+      }
+    }
+    return false;
+  }, [harSkadorVidLeverans, damages]);
+  
   const formIsValid = useMemo(() => {
     // Required basic fields - FORDON
     if (!regInput || !bilmarke || !modell) return false;
@@ -417,13 +468,15 @@ export default function NybilForm() {
     if (showUppkopplingSection && uppkopplingMissing) return false;
     // FOTON
     if (photosMissing) return false;
+    // SKADOR VID LEVERANS
+    if (damagesMissing) return false;
     // VAR ÄR BILEN NU?
     if (!platsAktuellOrt || !platsAktuellStation) return false;
     if (locationDiffers && !matarstallningAktuell) return false;
     // KLAR FÖR UTHYRNING
     if (klarForUthyrningMissing) return false;
     return true;
-  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, planeradStation, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
+  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, planeradStation, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, damagesMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -476,6 +529,11 @@ export default function NybilForm() {
         }
       });
     });
+  };
+  
+  // Helper function to cleanup damage photo previews
+  const cleanupDamagePhotoPreviews = (damagesToClean: DamageEntry[]) => {
+    damagesToClean.forEach(d => d.photos.forEach(p => p.preview && URL.revokeObjectURL(p.preview)));
   };
   
   const resetForm = () => {
@@ -531,6 +589,12 @@ export default function NybilForm() {
     setPhotoFront(null);
     setPhotoBack(null);
     setAdditionalPhotos([]);
+    // Reset damages - cleanup photo previews
+    cleanupDamagePhotoPreviews(damages);
+    setHarSkadorVidLeverans(null);
+    setDamages([]);
+    setShowDamageModal(false);
+    setCurrentDamageId(null);
     setPlatsAktuellOrt('');
     setPlatsAktuellStation('');
     setMatarstallningAktuell('');
@@ -549,6 +613,107 @@ export default function NybilForm() {
     setShowConfirmModal(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+  
+  // Damage handlers
+  const addNewDamage = () => {
+    const newDamage: DamageEntry = {
+      id: `damage-${Date.now()}`,
+      damageType: '',
+      positions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }],
+      comment: '',
+      photos: []
+    };
+    setDamages(prev => [...prev, newDamage]);
+    setCurrentDamageId(newDamage.id);
+    setShowDamageModal(true);
+  };
+  
+  const editDamage = (damageId: string) => {
+    setCurrentDamageId(damageId);
+    setShowDamageModal(true);
+  };
+  
+  const removeDamage = (damageId: string) => {
+    setDamages(prev => {
+      const damage = prev.find(d => d.id === damageId);
+      if (damage) {
+        cleanupDamagePhotoPreviews([damage]);
+      }
+      return prev.filter(d => d.id !== damageId);
+    });
+  };
+  
+  const updateDamageField = (damageId: string, field: keyof DamageEntry, value: any) => {
+    setDamages(prev => prev.map(d => {
+      if (d.id !== damageId) return d;
+      // If changing damageType, reset positions
+      if (field === 'damageType' && value !== d.damageType) {
+        return { ...d, [field]: value, positions: [{ id: `pos-${Date.now()}`, carPart: '', position: '' }] };
+      }
+      return { ...d, [field]: value };
+    }));
+  };
+  
+  const updateDamagePosition = (damageId: string, positionId: string, field: 'carPart' | 'position', value: string) => {
+    setDamages(prev => prev.map(d => {
+      if (d.id !== damageId) return d;
+      const updatedPositions = d.positions.map(p => {
+        if (p.id !== positionId) return p;
+        // If changing carPart, reset position
+        if (field === 'carPart') {
+          return { ...p, carPart: value, position: '' };
+        }
+        return { ...p, [field]: value };
+      });
+      return { ...d, positions: updatedPositions };
+    }));
+  };
+  
+  const addDamagePosition = (damageId: string) => {
+    setDamages(prev => prev.map(d => {
+      if (d.id !== damageId) return d;
+      return { ...d, positions: [...d.positions, { id: `pos-${Date.now()}`, carPart: '', position: '' }] };
+    }));
+  };
+  
+  const removeDamagePosition = (damageId: string, positionId: string) => {
+    setDamages(prev => prev.map(d => {
+      if (d.id !== damageId) return d;
+      if (d.positions.length <= 1) return d;
+      return { ...d, positions: d.positions.filter(p => p.id !== positionId) };
+    }));
+  };
+  
+  const handleDamagePhotoChange = (damageId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const newPhotos: PhotoFile[] = Array.from(files).map(file => ({
+        file,
+        preview: URL.createObjectURL(file)
+      }));
+      setDamages(prev => prev.map(d => {
+        if (d.id !== damageId) return d;
+        return { ...d, photos: [...d.photos, ...newPhotos] };
+      }));
+    }
+    e.target.value = '';
+  };
+  
+  const removeDamagePhoto = (damageId: string, photoIndex: number) => {
+    setDamages(prev => prev.map(d => {
+      if (d.id !== damageId) return d;
+      const photo = d.photos[photoIndex];
+      if (photo?.preview) URL.revokeObjectURL(photo.preview);
+      return { ...d, photos: d.photos.filter((_, i) => i !== photoIndex) };
+    }));
+  };
+  
+  const closeDamageModal = () => {
+    setShowDamageModal(false);
+    setCurrentDamageId(null);
+  };
+  
+  const getCurrentDamage = () => damages.find(d => d.id === currentDamageId);
   
   // Check reg nr format before proceeding
   const isRegNrValid = REG_NR_REGEX.test(normalizedReg);
@@ -641,6 +806,9 @@ export default function NybilForm() {
         photoUrls.push(url);
       }
       
+      // Upload damage photos to damage-photos bucket and save to damages table
+      let savedNybilId: number | null = null;
+      
       const inventoryData = {
         regnr: normalizedReg,
         bilmarke: effectiveBilmarke,
@@ -701,6 +869,7 @@ export default function NybilForm() {
         anteckningar: anteckningar || null,
         klar_for_uthyrning: klarForUthyrning,
         ej_uthyrningsbar_anledning: klarForUthyrning === false ? ejUthyrningsbarAnledning : null,
+        har_skador_vid_leverans: harSkadorVidLeverans === true && damages.length > 0,
         photo_urls: photoUrls,
         video_urls: [],
         media_folder: mediaFolder
@@ -714,6 +883,52 @@ export default function NybilForm() {
         alert(`Fel vid sparande: ${error.message}`);
         return;
       }
+      
+      savedNybilId = data?.[0]?.id || null;
+      
+      // Upload damage photos and save to damages table
+      if (harSkadorVidLeverans && damages.length > 0) {
+        const damageFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
+        
+        for (let i = 0; i < damages.length; i++) {
+          const damage = damages[i];
+          const skadaFolder = `${damageFolder}/skada-${i + 1}`;
+          const damagePhotoUrls: string[] = [];
+          
+          // Upload each photo for this damage
+          for (let j = 0; j < damage.photos.length; j++) {
+            const photo = damage.photos[j];
+            const ext = getFileExtension(photo.file);
+            const damagePhotoUrl = await uploadDamagePhoto(photo.file, `${skadaFolder}/${j + 1}.${ext}`);
+            damagePhotoUrls.push(damagePhotoUrl);
+          }
+          
+          // Build placement and position strings from all positions
+          const placementParts = damage.positions.map(p => p.carPart).filter(Boolean);
+          const positionParts = damage.positions.map(p => p.position).filter(Boolean);
+          const placementStr = placementParts.join(', ');
+          const positionStr = positionParts.join(', ');
+          
+          // Save to damages table
+          const { error: damageError } = await supabase.from('damages').insert({
+            regnr: normalizedReg,
+            damage_type: damage.damageType,
+            placement: placementStr,
+            position: positionStr,
+            comment: damage.comment || null,
+            photo_urls: damagePhotoUrls,
+            source: 'NYBIL',
+            reported_by: fullName,
+            nybil_inventering_id: savedNybilId
+          });
+          
+          if (damageError) {
+            console.error('Error saving damage:', damageError);
+            // Continue with other damages even if one fails
+          }
+        }
+      }
+      
       console.log('Successfully saved:', data);
       setShowSuccessModal(true);
       setTimeout(() => {
@@ -800,6 +1015,15 @@ export default function NybilForm() {
         hasBack: !!photoBack,
         additionalCount: additionalPhotos.length
       },
+      // Damages summary
+      damages: harSkadorVidLeverans && damages.length > 0 ? damages.map(d => ({
+        damageType: d.damageType,
+        placement: d.positions.map(p => p.carPart).filter(Boolean).join(', '),
+        position: d.positions.map(p => p.position).filter(Boolean).join(', '),
+        comment: d.comment,
+        photoCount: d.photos.length
+      })) : [],
+      harSkadorVidLeverans,
       klarForUthyrning: klarForUthyrning ? 'Ja' : 'Nej'
     };
   };
@@ -809,6 +1033,18 @@ export default function NybilForm() {
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
       {isSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
+      {showDamageModal && currentDamageId && (
+        <DamageModal
+          damage={getCurrentDamage()!}
+          onClose={closeDamageModal}
+          onUpdateField={(field, value) => updateDamageField(currentDamageId, field, value)}
+          onUpdatePosition={(positionId, field, value) => updateDamagePosition(currentDamageId, positionId, field, value)}
+          onAddPosition={() => addDamagePosition(currentDamageId)}
+          onRemovePosition={(positionId) => removeDamagePosition(currentDamageId, positionId)}
+          onPhotoChange={(e) => handleDamagePhotoChange(currentDamageId, e)}
+          onRemovePhoto={(index) => removeDamagePhoto(currentDamageId, index)}
+        />
+      )}
       {showRegWarningModal && (
         <WarningModal
           title="Registreringsnummer"
@@ -1272,6 +1508,71 @@ export default function NybilForm() {
         )}
       </Card>
       
+      {/* SKADOR VID LEVERANS Section */}
+      <Card data-error={showFieldErrors && damagesMissing}>
+        <SectionHeader title="Skador vid leverans" />
+        <Field label="Har bilen skador vid leverans? *">
+          <div className="grid-2-col">
+            <ChoiceButton 
+              onClick={() => { setHarSkadorVidLeverans(false); setDamages([]); }} 
+              isActive={harSkadorVidLeverans === false} 
+              isSet={harSkadorVidLeverans !== null}
+            >
+              Inga skador
+            </ChoiceButton>
+            <ChoiceButton 
+              onClick={() => setHarSkadorVidLeverans(true)} 
+              isActive={harSkadorVidLeverans === true} 
+              isSet={harSkadorVidLeverans !== null}
+            >
+              Skador vid leverans
+            </ChoiceButton>
+          </div>
+        </Field>
+        
+        {harSkadorVidLeverans === true && (
+          <>
+            {/* Lista befintliga skador */}
+            {damages.length > 0 && (
+              <div className="damage-list">
+                {damages.map((damage, index) => (
+                  <div key={damage.id} className="damage-item-card">
+                    <div className="damage-info">
+                      <strong>Skada {index + 1}:</strong> {damage.damageType || 'Ej vald'}
+                      <span className="damage-location">
+                        {damage.positions.map(p => p.carPart).filter(Boolean).join(', ') || 'Placering ej vald'}
+                        {damage.positions.some(p => p.position) && ` - ${damage.positions.map(p => p.position).filter(Boolean).join(', ')}`}
+                      </span>
+                      <span className="damage-photos">{damage.photos.length} foto(n)</span>
+                    </div>
+                    <div className="damage-actions">
+                      <button type="button" onClick={() => editDamage(damage.id)} className="damage-edit-btn">Redigera</button>
+                      <button type="button" onClick={() => removeDamage(damage.id)} className="damage-remove-btn">Ta bort</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Knapp för att lägga till skada */}
+            <button 
+              type="button" 
+              className="add-damage-btn"
+              onClick={addNewDamage}
+            >
+              + Lägg till skada
+            </button>
+            
+            {/* Varning om inga skador dokumenterade */}
+            {damages.length === 0 && (
+              <p className="warning-text">
+                Du har valt &quot;Skador vid leverans&quot; men inga skador är dokumenterade.
+              </p>
+            )}
+          </>
+        )}
+      </Card>
+      
       {/* VAR ÄR BILEN NU Section */}
       <Card data-error={showFieldErrors && (!platsAktuellOrt || !platsAktuellStation || (locationDiffers && !matarstallningAktuell))}>
         <SectionHeader title="Var är bilen nu?" />
@@ -1450,6 +1751,14 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, message, onCancel, o
   </>
 );
 
+type DamageSummary = {
+  damageType: string;
+  placement: string;
+  position: string;
+  comment: string;
+  photoCount: number;
+};
+
 type FormSummary = {
   fordon: { regnr: string; bilmarke: string; modell: string };
   mottagning: { ort: string; station: string };
@@ -1480,6 +1789,9 @@ type FormSummary = {
   hjulForvaringSpec: string;
   // Photo summary
   photos: { hasFront: boolean; hasBack: boolean; additionalCount: number };
+  // Damages summary
+  damages: DamageSummary[];
+  harSkadorVidLeverans: boolean | null;
   klarForUthyrning: string;
 };
 
@@ -1567,6 +1879,19 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
           <p><strong>Övriga bilder:</strong> {summary.photos.additionalCount} st</p>
         )}
       </div>
+      {summary.damages && summary.damages.length > 0 && (
+        <div className="summary-section summary-section-warning">
+          <h4>⚠️ Skador vid leverans</h4>
+          {summary.damages.map((d, i) => (
+            <p key={i}>
+              <strong>Skada {i + 1}:</strong> {d.damageType} - {d.placement}
+              {d.position && `, ${d.position}`}
+              {d.comment && <span> ({d.comment})</span>}
+              <span className="damage-photo-count"> [{d.photoCount} foto(n)]</span>
+            </p>
+          ))}
+        </div>
+      )}
       <div className="summary-section">
         <h4>Klar för uthyrning</h4>
         <p>{summary.klarForUthyrning}</p>
@@ -1578,6 +1903,157 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
     </div>
   </>
 );
+
+type DamageModalProps = {
+  damage: DamageEntry;
+  onClose: () => void;
+  onUpdateField: (field: keyof DamageEntry, value: any) => void;
+  onUpdatePosition: (positionId: string, field: 'carPart' | 'position', value: string) => void;
+  onAddPosition: () => void;
+  onRemovePosition: (positionId: string) => void;
+  onPhotoChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onRemovePhoto: (index: number) => void;
+};
+
+const DamageModal: React.FC<DamageModalProps> = ({ 
+  damage, 
+  onClose, 
+  onUpdateField, 
+  onUpdatePosition, 
+  onAddPosition, 
+  onRemovePosition, 
+  onPhotoChange, 
+  onRemovePhoto 
+}) => {
+  const availablePlaceringar = damage.damageType 
+    ? Object.keys(DAMAGE_OPTIONS[damage.damageType as keyof typeof DAMAGE_OPTIONS] || {}).sort((a, b) => a.localeCompare(b, 'sv')) 
+    : [];
+  
+  return (
+    <>
+      <div className="modal-overlay" onClick={onClose} />
+      <div className="modal-content damage-modal">
+        <h3>Dokumentera skada</h3>
+        
+        <div className="field">
+          <label>Typ av skada *</label>
+          <select 
+            value={damage.damageType} 
+            onChange={e => onUpdateField('damageType', e.target.value)}
+          >
+            <option value="">Välj skadetyp</option>
+            {DAMAGE_TYPES.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </div>
+        
+        {damage.positions.map((pos, index) => {
+          const rawPositioner = (damage.damageType && pos.carPart && DAMAGE_OPTIONS[damage.damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof (typeof DAMAGE_OPTIONS)[keyof typeof DAMAGE_OPTIONS]] || []);
+          const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
+          const showPositionDropdown = availablePositioner.length > 0;
+          
+          return (
+            <div key={pos.id} className="damage-position-row">
+              <div className={showPositionDropdown ? "grid-2-col" : ""}>
+                <div className="field">
+                  <label>{index === 0 ? 'Placering *' : ''}</label>
+                  <select 
+                    value={pos.carPart} 
+                    onChange={e => onUpdatePosition(pos.id, 'carPart', e.target.value)}
+                    disabled={!damage.damageType}
+                  >
+                    <option value="">Välj placering...</option>
+                    {availablePlaceringar.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                {showPositionDropdown && (
+                  <div className="field">
+                    <label>{index === 0 ? 'Position *' : ''}</label>
+                    <select 
+                      value={pos.position} 
+                      onChange={e => onUpdatePosition(pos.id, 'position', e.target.value)}
+                    >
+                      <option value="">Välj position...</option>
+                      {availablePositioner.map(posOpt => (
+                        <option key={posOpt} value={posOpt}>{posOpt}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              {damage.positions.length > 1 && (
+                <button 
+                  type="button" 
+                  onClick={() => onRemovePosition(pos.id)} 
+                  className="remove-position-btn"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
+        
+        <button 
+          type="button" 
+          onClick={onAddPosition} 
+          className="add-position-btn"
+        >
+          + Lägg till position
+        </button>
+        
+        <div className="field">
+          <label>Kommentar (frivilligt)</label>
+          <textarea 
+            value={damage.comment} 
+            onChange={e => onUpdateField('comment', e.target.value)}
+            placeholder="Beskriv skadan..."
+            rows={2}
+          />
+        </div>
+        
+        <div className="field">
+          <label>Foton * (minst ett foto krävs)</label>
+          <label className={`photo-upload-label ${damage.photos.length > 0 ? 'active' : 'mandatory'}`}>
+            <span>📷 {damage.photos.length > 0 ? 'Lägg till fler foton' : 'Ta foto av skadan'}</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              capture="environment"
+              multiple
+              onChange={onPhotoChange}
+              style={{ display: 'none' }}
+            />
+          </label>
+        </div>
+        
+        {damage.photos.length > 0 && (
+          <div className="damage-photo-previews">
+            {damage.photos.map((photo, index) => (
+              <div key={index} className="damage-photo-item">
+                <img src={photo.preview} alt={`Skadefoto ${index + 1}`} />
+                <button 
+                  type="button" 
+                  onClick={() => onRemovePhoto(index)} 
+                  className="remove-photo-btn"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <div className="modal-actions">
+          <button onClick={onClose} className="btn primary">Klar</button>
+        </div>
+      </div>
+    </>
+  );
+};
 
 const SpinnerOverlay = () => (
   <div className="modal-overlay spinner-overlay">
@@ -1703,6 +2179,34 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .additional-photo-item img { width:100%; height:100%; object-fit:cover; }
     .remove-photo-btn { position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:50%; background-color:var(--color-danger); color:white; border:2px solid white; cursor:pointer; font-size:1.1rem; font-weight:bold; line-height:1; padding:0; display:flex; align-items:center; justify-content:center; }
     .remove-photo-btn:hover { background-color:#b91c1c; }
-    @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } .photo-grid { grid-template-columns:1fr; } }
+    /* Damage documentation styles */
+    .damage-list { margin:1rem 0; }
+    .damage-item-card { display:flex; justify-content:space-between; align-items:center; padding:0.75rem; background-color:var(--color-bg); border-radius:8px; margin-bottom:0.5rem; border:1px solid var(--color-border); }
+    .damage-info { display:flex; flex-direction:column; gap:0.25rem; flex:1; }
+    .damage-location { font-size:0.875rem; color:var(--color-text-secondary); }
+    .damage-photos { font-size:0.75rem; color:var(--color-primary); }
+    .damage-actions { display:flex; gap:0.5rem; flex-shrink:0; }
+    .damage-edit-btn { padding:0.5rem 1rem; border-radius:6px; border:1px solid var(--color-border); background:white; cursor:pointer; font-size:0.875rem; }
+    .damage-edit-btn:hover { background-color:var(--color-bg); }
+    .damage-remove-btn { padding:0.5rem 1rem; border-radius:6px; border:1px solid var(--color-danger); background:var(--color-danger-light); color:var(--color-danger); cursor:pointer; font-size:0.875rem; }
+    .damage-remove-btn:hover { background-color:var(--color-danger); color:white; }
+    .add-damage-btn { width:100%; padding:1rem; border:2px dashed var(--color-primary); border-radius:8px; background-color:var(--color-primary-light); color:var(--color-primary); font-weight:600; cursor:pointer; margin-top:1rem; }
+    .add-damage-btn:hover { background-color:#dbeafe; }
+    .warning-text { color:var(--color-warning); font-size:0.875rem; margin-top:0.5rem; font-style:italic; }
+    /* Damage modal styles */
+    .damage-modal { max-height:90vh; overflow-y:auto; }
+    .damage-modal h3 { text-align:center; margin-bottom:1.5rem; }
+    .damage-position-row { position:relative; padding-right:2.5rem; margin-bottom:0.5rem; }
+    .damage-position-row .remove-position-btn { position:absolute; top:50%; right:0; transform:translateY(-50%); width:28px; height:28px; border-radius:50%; background-color:var(--color-danger-light); color:var(--color-danger); border:none; cursor:pointer; font-size:1.25rem; line-height:1; }
+    .damage-position-row .remove-position-btn:hover { background-color:var(--color-danger); color:white; }
+    .add-position-btn { width:100%; margin:0.5rem 0 1rem 0; font-size:0.875rem; padding:0.5rem; border:1px solid var(--color-border); border-radius:6px; background:var(--color-bg); cursor:pointer; }
+    .add-position-btn:hover { background-color:#e5e7eb; }
+    .damage-photo-previews { display:flex; flex-wrap:wrap; gap:0.75rem; margin-top:0.5rem; }
+    .damage-photo-item { position:relative; width:80px; height:80px; border-radius:8px; overflow:hidden; }
+    .damage-photo-item img { width:100%; height:100%; object-fit:cover; }
+    .damage-photo-count { font-size:0.75rem; color:var(--color-text-secondary); }
+    .summary-section-warning { background-color:var(--color-danger-light); padding:1rem; border-radius:8px; border:1px solid var(--color-danger); }
+    .summary-section-warning h4 { color:var(--color-danger); margin:0 0 0.5rem 0; }
+    @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } .photo-grid { grid-template-columns:1fr; } .damage-item-card { flex-direction:column; align-items:flex-start; gap:0.5rem; } .damage-actions { width:100%; } .damage-actions button { flex:1; } }
   `}</style>
 );
