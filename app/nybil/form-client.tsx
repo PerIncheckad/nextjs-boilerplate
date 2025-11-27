@@ -408,6 +408,30 @@ export default function NybilForm() {
   // Check reg nr format before proceeding
   const isRegNrValid = REG_NR_REGEX.test(normalizedReg);
   
+  // Mätarställning validation function - reused by handleRegisterClick and WarningModal onConfirm
+  const validateMatarstallning = (): boolean => {
+    // Check if both values exist and current is less than or equal to purchase
+    if (matarstallningAktuell && matarstallning) {
+      const inkopValue = parseInt(matarstallning, 10);
+      const aktuellValue = parseInt(matarstallningAktuell, 10);
+      if (!isNaN(inkopValue) && !isNaN(aktuellValue) && aktuellValue <= inkopValue) {
+        setMatarstallningError('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
+        // Scroll to the error field
+        setTimeout(() => {
+          const errorField = document.getElementById('matarstallning-aktuell-field');
+          if (errorField) {
+            errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Focus the input
+            const input = errorField.querySelector('input');
+            if (input) input.focus();
+          }
+        }, 100);
+        return false; // Validation failed
+      }
+    }
+    return true; // Validation passed
+  };
+
   const handleRegisterClick = () => {
     // Reset error
     setMatarstallningError('');
@@ -416,27 +440,16 @@ export default function NybilForm() {
       handleShowErrors();
       return;
     }
-    // Check reg nr format
+    // Step 1: Check reg nr format - if invalid, show warning modal (user can confirm to proceed)
     if (!isRegNrValid) {
       setShowRegWarningModal(true);
       return;
     }
-    // Mätarställning validation: current must be greater than purchase
-    if (matarstallningAktuell && matarstallning) {
-      const inkopValue = parseInt(matarstallning, 10);
-      const aktuellValue = parseInt(matarstallningAktuell, 10);
-      if (!isNaN(inkopValue) && !isNaN(aktuellValue) && aktuellValue <= inkopValue) {
-        setMatarstallningError('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
-        handleShowErrors();
-        // Scroll to the error field
-        const errorField = document.querySelector('[data-field="matarstallning-aktuell"]');
-        if (errorField) {
-          errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        return;
-      }
+    // Step 2: Mätarställning validation - this BLOCKS submission
+    if (!validateMatarstallning()) {
+      return;
     }
-    // Show confirmation modal
+    // Step 3: All validations passed - show confirmation modal
     setShowConfirmModal(true);
   };
   
@@ -621,6 +634,10 @@ export default function NybilForm() {
           onCancel={() => setShowRegWarningModal(false)}
           onConfirm={() => {
             setShowRegWarningModal(false);
+            // After confirming reg.nr warning, run mätarställning validation
+            if (!validateMatarstallning()) {
+              return; // Block if mätarställning validation fails
+            }
             setShowConfirmModal(true);
           }}
           cancelText="Avbryt"
@@ -1011,12 +1028,21 @@ export default function NybilForm() {
           </Field>
         </div>
         {locationDiffers && (
-          <div data-field="matarstallning-aktuell">
+          <div id="matarstallning-aktuell-field">
             <Field label="Aktuell mätarställning (km) *">
-              <input type="number" value={matarstallningAktuell} onChange={e => setMatarstallningAktuell(e.target.value)} placeholder="12345" />
+              <input 
+                type="number" 
+                value={matarstallningAktuell} 
+                onChange={e => { 
+                  setMatarstallningAktuell(e.target.value); 
+                  setMatarstallningError(''); // Clear error when user types
+                }} 
+                placeholder="12345"
+                style={matarstallningError ? { borderColor: 'var(--color-danger)', borderWidth: '2px' } : {}}
+              />
             </Field>
             {matarstallningError && (
-              <p className="error-text" style={{ color: 'var(--color-danger)', marginTop: '0.5rem' }}>
+              <p className="error-text" style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
                 {matarstallningError}
               </p>
             )}
