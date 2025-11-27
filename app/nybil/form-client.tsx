@@ -11,24 +11,18 @@ const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v
 const BILMARKEN = ['BMW', 'Citroen', 'Ford', 'KIA', 'MB', 'MG', 'Opel', 'Peugeot', 'Renault', 'SEAT', 'VW', 'Annat'];
 
 // Huvudstationer - alphabetical order
-const HUVUDSTATIONER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];
-
-const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
-
-// Huvudstationer for Planerad Station and Saluinfo
 const HUVUDSTATIONER = [
-  { name: 'Malmö', id: 166 },
-  { name: 'Helsingborg', id: 170 },
-  { name: 'Ängelholm', id: 171 },
-  { name: 'Halmstad', id: 274 },
   { name: 'Falkenberg', id: 282 },
+  { name: 'Halmstad', id: 274 },
+  { name: 'Helsingborg', id: 170 },
+  { name: 'Lund', id: 406 },
+  { name: 'Malmö', id: 166 },
   { name: 'Trelleborg', id: 283 },
   { name: 'Varberg', id: 290 },
-  { name: 'Lund', id: 406 }
+  { name: 'Ängelholm', id: 171 }
 ];
 
-// Car brands for dropdown
-const BILMARKEN = ['MB', 'Ford', 'BMW', 'VW', 'KIA', 'MG', 'Renault', 'Peugeot', 'Citroen', 'Opel', 'SEAT', 'Annan'];
+const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
 const STATIONER: Record<string, string[]> = {
   'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
@@ -651,7 +645,7 @@ export default function NybilForm() {
         <Field label="Planerad station *">
           <select value={planeradStation} onChange={e => setPlaneradStation(e.target.value)}>
             <option value="">Välj planerad station</option>
-            {HUVUDSTATIONER.map(s => <option key={s} value={s}>{s}</option>)}
+            {HUVUDSTATIONER.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
           </select>
         </Field>
       </Card>
