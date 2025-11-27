@@ -5,24 +5,24 @@ import { supabase } from '@/lib/supabase';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
-const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Svart%20bakgrund%20MB%20grill/MB%20front%20grill%20logo.jpg";
+const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Silver%20logo%20white%20bkgrd/MB-logo-white-logo.jpg";
 
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
 // Huvudstationer for Planerad Station and Saluinfo
 const HUVUDSTATIONER = [
-  { name: 'Malmö', id: 166 },
-  { name: 'Helsingborg', id: 170 },
-  { name: 'Ängelholm', id: 171 },
-  { name: 'Halmstad', id: 274 },
   { name: 'Falkenberg', id: 282 },
+  { name: 'Halmstad', id: 274 },
+  { name: 'Helsingborg', id: 170 },
+  { name: 'Lund', id: 406 },
+  { name: 'Malmö', id: 166 },
   { name: 'Trelleborg', id: 283 },
   { name: 'Varberg', id: 290 },
-  { name: 'Lund', id: 406 }
+  { name: 'Ängelholm', id: 171 }
 ];
 
 // Car brands for dropdown
-const BILMARKEN = ['MB', 'Ford', 'BMW', 'VW', 'KIA', 'MG', 'Renault', 'Peugeot', 'Citroen', 'Opel', 'SEAT', 'Annan'];
+const BILMARKEN = ['BMW', 'Citroen', 'Ford', 'KIA', 'MB', 'MG', 'Opel', 'Peugeot', 'Renault', 'SEAT', 'VW', 'Annat'];
 
 const STATIONER: Record<string, string[]> = {
   'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
@@ -274,7 +274,7 @@ export default function NybilForm() {
   const formIsValid = useMemo(() => {
     // Required basic fields - FORDON
     if (!regInput || !bilmarke || !modell) return false;
-    if (bilmarke === 'Annan' && !bilmarkeAnnat.trim()) return false;
+    if (bilmarke === 'Annat' && !bilmarkeAnnat.trim()) return false;
     // PLATS FÖR MOTTAGNING
     if (!ort || !station) return false;
     // PLANERAD STATION
@@ -406,6 +406,15 @@ export default function NybilForm() {
       setShowRegWarningModal(true);
       return;
     }
+    // Validate mätarställning if location differs and aktuell is filled
+    if (locationDiffers && matarstallningAktuell && matarstallning) {
+      const aktuellValue = parseInt(matarstallningAktuell, 10);
+      const inkopValue = parseInt(matarstallning, 10);
+      if (!isNaN(aktuellValue) && !isNaN(inkopValue) && aktuellValue <= inkopValue) {
+        alert('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
+        return;
+      }
+    }
     // Show confirmation modal
     setShowConfirmModal(true);
   };
@@ -420,12 +429,12 @@ export default function NybilForm() {
       // Determine effective vaxel value
       const effectiveVaxel = needsVaxelQuestion ? vaxel : 'Automat';
       // Determine effective bilmarke
-      const effectiveBilmarke = bilmarke === 'Annan' ? bilmarkeAnnat : bilmarke;
+      const effectiveBilmarke = bilmarke === 'Annat' ? bilmarkeAnnat : bilmarke;
       
       const inventoryData = {
         regnr: normalizedReg,
         bilmarke: effectiveBilmarke,
-        bilmarke_annat: bilmarke === 'Annan' ? bilmarkeAnnat : null,
+        bilmarke_annat: bilmarke === 'Annat' ? bilmarkeAnnat : null,
         modell,
         registrerad_av: firstName,
         fullstandigt_namn: fullName,
@@ -517,7 +526,7 @@ export default function NybilForm() {
   
   // Get formatted summary for confirmation modal
   const getFormSummary = () => {
-    const effectiveBilmarke = bilmarke === 'Annan' ? bilmarkeAnnat : bilmarke;
+    const effectiveBilmarke = bilmarke === 'Annat' ? bilmarkeAnnat : bilmarke;
     const effectiveVaxel = needsVaxelQuestion ? vaxel : 'Automat';
     const effectiveServiceintervall = serviceintervall === 'Annat' ? serviceintervallAnnat : serviceintervall;
     const effectiveMaxKm = maxKmManad === 'Annat' ? maxKmManadAnnat : maxKmManad;
@@ -581,7 +590,7 @@ export default function NybilForm() {
       </div>
       
       {/* FORDON Section */}
-      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell || (bilmarke === 'Annan' && !bilmarkeAnnat.trim()))}>
+      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell || (bilmarke === 'Annat' && !bilmarkeAnnat.trim()))}>
         <SectionHeader title="Fordon" />
         <Field label="Registreringsnummer *">
           <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} placeholder="ABC 123" className="reg-input" />
@@ -597,7 +606,7 @@ export default function NybilForm() {
             <input type="text" value={modell} onChange={(e) => setModell(e.target.value)} placeholder="t.ex. T-Cross" />
           </Field>
         </div>
-        {bilmarke === 'Annan' && (
+        {bilmarke === 'Annat' && (
           <Field label="Specificera bilmärke *">
             <input type="text" value={bilmarkeAnnat} onChange={(e) => setBilmarkeAnnat(e.target.value)} placeholder="Ange bilmärke" />
           </Field>
@@ -735,7 +744,7 @@ export default function NybilForm() {
         </Field>
         {serviceintervall === 'Annat' && (
           <Field label="Specificera serviceintervall *">
-            <input type="text" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange serviceintervall" />
+            <input type="number" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange serviceintervall" />
           </Field>
         )}
         <Field label="Max km/månad *">
@@ -747,7 +756,7 @@ export default function NybilForm() {
         </Field>
         {maxKmManad === 'Annat' && (
           <Field label="Specificera max km/månad *">
-            <input type="text" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange max km/månad" />
+            <input type="number" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange max km/månad" />
           </Field>
         )}
         <Field label="Avgift över-km *">
@@ -759,7 +768,7 @@ export default function NybilForm() {
         </Field>
         {avgiftOverKm === 'Annat' && (
           <Field label="Specificera avgift över-km *">
-            <input type="text" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value)} placeholder="Ange avgift" />
+            <input type="number" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value)} placeholder="Ange avgift" />
           </Field>
         )}
       </Card>
@@ -790,7 +799,7 @@ export default function NybilForm() {
               </select>
             </Field>
             <Field label="Specificera förvaring av instruktionsbok *">
-              <input type="text" value={instruktionsbokForvaringSpec} onChange={e => setInstruktionsbokForvaringSpec(e.target.value)} placeholder="t.ex. Handskfack" />
+              <input type="text" value={instruktionsbokForvaringSpec} onChange={e => setInstruktionsbokForvaringSpec(e.target.value)} placeholder="t.ex. Hyllplats 18F" />
             </Field>
           </>
         )}
@@ -861,7 +870,7 @@ export default function NybilForm() {
                   </select>
                 </Field>
                 <Field label="Specificera förvaring av laddkabel/laddkablar *">
-                  <input type="text" value={laddkablarForvaringSpec} onChange={e => setLaddkablarForvaringSpec(e.target.value)} placeholder="t.ex. Bagageutrymmet" />
+                  <input type="text" value={laddkablarForvaringSpec} onChange={e => setLaddkablarForvaringSpec(e.target.value)} placeholder="t.ex. Hyllplats 9G" />
                 </Field>
               </>
             )}
@@ -896,16 +905,18 @@ export default function NybilForm() {
           </div>
         </Field>
         
-        <Field label="Stöld GPS monterad *">
+        <Field label="Stöld-GPS monterad *">
           <div className="grid-2-col">
             <ChoiceButton onClick={() => setStoldGps(true)} isActive={stoldGps === true} isSet={stoldGps !== null}>Ja</ChoiceButton>
             <ChoiceButton onClick={() => { setStoldGps(false); setStoldGpsSpec(''); }} isActive={stoldGps === false} isSet={stoldGps !== null}>Nej</ChoiceButton>
           </div>
         </Field>
         {stoldGps === true && (
-          <Field label="Specificera *">
-            <input type="text" value={stoldGpsSpec} onChange={e => setStoldGpsSpec(e.target.value)} placeholder="t.ex. Modell, placering" />
-          </Field>
+          <div className="follow-up-field">
+            <Field label="Specificera stöld-GPS *">
+              <input type="text" value={stoldGpsSpec} onChange={e => setStoldGpsSpec(e.target.value)} placeholder="t.ex. Modell, placering" />
+            </Field>
+          </div>
         )}
       </Card>
       
@@ -961,7 +972,7 @@ export default function NybilForm() {
         <SectionHeader title="Saluinfo" />
         <p className="section-note">Frivillig sektion</p>
         <Field label="Saludatum">
-          <input type="text" value={saludatum} onChange={e => setSaludatum(e.target.value)} placeholder="YYYY-MM-DD" />
+          <input type="date" value={saludatum} onChange={e => setSaludatum(e.target.value)} />
         </Field>
         <Field label="Station">
           <select value={saluStation} onChange={e => setSaluStation(e.target.value)}>
@@ -1198,7 +1209,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       z-index: -1;
       pointer-events: none;
     }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #e8f5e9; color: var(--color-text); margin:0; padding:0; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: white; color: var(--color-text); margin:0; padding:0; }
     .nybil-form { max-width:700px; margin:0 auto; padding:1rem; box-sizing:border-box; }
     .main-header { text-align:center; margin-bottom:1.5rem; }
     .main-logo { max-width:188px; height:auto; margin:0 auto 1rem auto; display:block; }
@@ -1212,6 +1223,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .sub-section-header h3 { font-size:1rem; font-weight:600; color:var(--color-text); margin:0; }
     .field { margin-bottom:1rem; }
     .field label { display:block; margin-bottom:.5rem; font-weight:500; font-size:.875rem; }
+    .follow-up-field { margin-left:1.5rem; }
     .field input, .field select, .field textarea { width:100%; padding:.75rem; border:1px solid var(--color-border); border-radius:6px; font-size:1rem; background-color:white; box-sizing:border-box; }
     .field input:focus, .field select:focus, .field textarea:focus { outline:2px solid var(--color-border-focus); border-color:transparent; }
     .field select[disabled] { background-color:var(--color-disabled-light); cursor:not-allowed; }
@@ -1245,7 +1257,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .remove-media-btn { position:absolute; top:2px; right:2px; width:22px; height:22px; border-radius:50%; background-color:var(--color-danger); color:white; border:2px solid white; cursor:pointer; font-size:1rem; font-weight:bold; line-height:1; padding:0; }
     .remove-media-btn:hover { background-color:#b91c1c; }
     .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background-color:rgba(0,0,0,0.5); z-index:100; }
-    .modal-content { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:rgba(255,255,255,0.98); padding:2rem; border-radius:12px; z-index:101; box-shadow:var(--shadow-md); width:90%; max-width:600px; max-height:80vh; overflow-y:auto; }
+    .modal-content { position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background-color:rgba(255,255,255,0.98); padding:2rem; border-radius:12px; z-index:101; box-shadow:var(--shadow-md); width:90%; max-width:600px; max-height:90vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
     .success-modal { text-align:center; }
     .success-icon { font-size:3rem; color:var(--color-success); margin-bottom:1rem; }
     .warning-modal h3 { margin-top:0; color:var(--color-warning); }
