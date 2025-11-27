@@ -416,16 +416,20 @@ export default function NybilForm() {
       const aktuellValue = parseInt(matarstallningAktuell, 10);
       if (!isNaN(inkopValue) && !isNaN(aktuellValue) && aktuellValue <= inkopValue) {
         setMatarstallningError('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
-        // Scroll to the error field
-        setTimeout(() => {
-          const errorField = document.getElementById('matarstallning-aktuell-field');
-          if (errorField) {
-            errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            // Focus the input
-            const input = errorField.querySelector('input');
-            if (input) input.focus();
-          }
-        }, 100);
+        // Scroll to the error field using requestAnimationFrame (same pattern as handleShowErrors)
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const errorField = document.getElementById('matarstallning-aktuell-field');
+            if (errorField) {
+              errorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              // Focus the input after scroll animation
+              setTimeout(() => {
+                const input = errorField.querySelector('input') as HTMLInputElement | null;
+                input?.focus();
+              }, 150);
+            }
+          });
+        });
         return false; // Validation failed
       }
     }
@@ -1038,7 +1042,7 @@ export default function NybilForm() {
                   setMatarstallningError(''); // Clear error when user types
                 }} 
                 placeholder="12345"
-                style={matarstallningError ? { borderColor: 'var(--color-danger)', borderWidth: '2px' } : {}}
+                data-error={!!matarstallningError}
               />
             </Field>
             {matarstallningError && (
@@ -1358,6 +1362,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .card { background-color:rgba(255,255,255,0.92); padding:1.5rem; border-radius:12px; margin-bottom:1.5rem; box-shadow:var(--shadow-md); border:2px solid transparent; transition:border-color .3s; }
     .card[data-error="true"] { border:2px solid var(--color-danger); }
     .field[data-error="true"] input, .field[data-error="true"] select, .field[data-error="true"] textarea { border:2px solid var(--color-danger)!important; }
+    input[data-error="true"] { border:2px solid var(--color-danger)!important; }
     .section-header { padding-bottom:.75rem; border-bottom:1px solid var(--color-border); margin-bottom:1.5rem; }
     .section-header h2 { font-size:1.25rem; font-weight:700; color:var(--color-text); text-transform:uppercase; letter-spacing:.05em; margin:0; }
     .sub-section-header { margin-top:2rem; margin-bottom:1rem; }
