@@ -99,6 +99,28 @@ const formatDateForFolder = (date: Date): string => {
   return `${year}${month}${day}`;
 };
 
+// Slugify function - same as /check implementation for consistency
+function slugify(str: string): string {
+  if (!str) return '';
+  const replacements: Record<string, string> = {
+    'å': 'a', 'ä': 'a', 'ö': 'o',
+    'Å': 'A', 'Ä': 'A', 'Ö': 'O',
+    ' ': '-'
+  };
+  
+  let result = str.toString();
+  for (const [char, replacement] of Object.entries(replacements)) {
+    result = result.split(char).join(replacement);
+  }
+  
+  return result.toLowerCase()
+    .replace(/&/g, '-and-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/_+$/g, '');
+}
+
 // Helper function to get file extension
 const getFileExtension = (file: File): string => {
   return file.name.split('.').pop()?.toLowerCase() || 'jpg';
@@ -887,23 +909,30 @@ export default function NybilForm() {
       savedNybilId = data?.[0]?.id || null;
       
       // Upload damage photos and save to damages table
+      // Folder structure matching /check format:
+      // damage-photos/REGNR/REGNR-DATE/DATE-damageType-carPart-position-NYBIL-firstName/REGNR-DATE-damageType-carPart-position_1.jpg
       if (harSkadorVidLeverans && damages.length > 0) {
-        const damageFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
+        const dateEventFolderName = `${normalizedReg}-${dateStr}`;
         
         for (let i = 0; i < damages.length; i++) {
           const damage = damages[i];
-          const skadaFolder = `${damageFolder}/skada-${i + 1}`;
           const damagePhotoUrls: string[] = [];
           
-          // Upload each photo for this damage
+          // Build position string from all positions (matching /check format)
+          const positionString = slugify(damage.positions.map(p => `${p.carPart}-${p.position}`).join('_'));
+          const eventFolderName = slugify(`${dateStr}-${damage.damageType}-${positionString}-NYBIL-${firstName}`);
+          const damagePath = `${normalizedReg}/${dateEventFolderName}/${eventFolderName}`;
+          
+          // Upload each photo for this damage with correct naming
           for (let j = 0; j < damage.photos.length; j++) {
             const photo = damage.photos[j];
             const ext = getFileExtension(photo.file);
-            const damagePhotoUrl = await uploadDamagePhoto(photo.file, `${skadaFolder}/${j + 1}.${ext}`);
+            const fileName = `${normalizedReg}-${dateStr}-${slugify(damage.damageType)}-${positionString}_${j + 1}.${ext}`;
+            const damagePhotoUrl = await uploadDamagePhoto(photo.file, `${damagePath}/${fileName}`);
             damagePhotoUrls.push(damagePhotoUrl);
           }
           
-          // Build placement and position strings from all positions
+          // Build placement and position strings from all positions for database
           const placementParts = damage.positions.map(p => p.carPart).filter(Boolean);
           const positionParts = damage.positions.map(p => p.position).filter(Boolean);
           const placementStr = placementParts.join(', ');
@@ -913,12 +942,14 @@ export default function NybilForm() {
           const { error: damageError } = await supabase.from('damages').insert({
             regnr: normalizedReg,
             damage_type: damage.damageType,
-            placement: placementStr,
+            car_part: placementStr,
             position: positionStr,
-            comment: damage.comment || null,
+            description: damage.comment || null,
             photo_urls: damagePhotoUrls,
+            video_urls: [],
             source: 'NYBIL',
-            reported_by: fullName,
+            damage_date: now.toISOString().split('T')[0],
+            inchecker_name: fullName,
             nybil_inventering_id: savedNybilId
           });
           
