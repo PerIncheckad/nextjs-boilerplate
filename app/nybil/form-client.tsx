@@ -83,6 +83,11 @@ const formatDateForFolder = (date: Date): string => {
   return `${year}${month}${day}`;
 };
 
+// Helper function to get file extension
+const getFileExtension = (file: File): string => {
+  return file.name.split('.').pop()?.toLowerCase() || 'jpg';
+};
+
 // Upload function for nybil-photos bucket
 async function uploadNybilPhoto(file: File, path: string): Promise<string> {
   const BUCKET = 'nybil-photos';
@@ -430,6 +435,15 @@ export default function NybilForm() {
     getUser();
   }, []);
   
+  // Cleanup photo preview URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
+      if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
+      additionalPhotos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
+    };
+  }, [photoFront, photoBack, additionalPhotos]);
+  
   // Prevent background scroll when confirm modal is open
   useEffect(() => {
     if (showConfirmModal) {
@@ -607,14 +621,14 @@ export default function NybilForm() {
       
       // Upload front photo
       if (photoFront) {
-        const frontExt = photoFront.file.name.split('.').pop() || 'jpg';
+        const frontExt = getFileExtension(photoFront.file);
         const frontUrl = await uploadNybilPhoto(photoFront.file, `${mediaFolder}/framifran.${frontExt}`);
         photoUrls.push(frontUrl);
       }
       
       // Upload back photo
       if (photoBack) {
-        const backExt = photoBack.file.name.split('.').pop() || 'jpg';
+        const backExt = getFileExtension(photoBack.file);
         const backUrl = await uploadNybilPhoto(photoBack.file, `${mediaFolder}/bakifran.${backExt}`);
         photoUrls.push(backUrl);
       }
@@ -622,7 +636,7 @@ export default function NybilForm() {
       // Upload additional photos
       for (let i = 0; i < additionalPhotos.length; i++) {
         const photo = additionalPhotos[i];
-        const ext = photo.file.name.split('.').pop() || 'jpg';
+        const ext = getFileExtension(photo.file);
         const url = await uploadNybilPhoto(photo.file, `${mediaFolder}/ovriga/${i + 1}.${ext}`);
         photoUrls.push(url);
       }
