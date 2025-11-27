@@ -33,6 +33,22 @@ type MediaFile = {
   thumbnail?: string;
 };
 
+type ConfirmModalPayload = {
+  regnr: string;
+  bilmarke: string;
+  modell: string;
+  ort: string;
+  station: string;
+  planeradStation: string;
+  matarstallning: string;
+  matarstallningAktuell: string;
+  hjultyp: 'Sommardäck' | 'Vinterdäck' | null;
+  bransletyp: 'Bensin' | 'Diesel' | 'Hybrid (bensin)' | 'Hybrid (diesel)' | 'El (full)' | null;
+  stoldGps: boolean | null;
+  stoldGpsSpec: string;
+  saludatum: string;
+};
+
 const capitalizeFirstLetter = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
@@ -485,7 +501,7 @@ export default function NybilForm() {
             </select>
           </Field>
           <Field label="Modell *">
-            <input type="text" value={modell} onChange={(e) => setModell(e.target.value)} placeholder="t.ex. T-Cross" />
+            <input type="text" value={modell} onChange={(e) => setModell(e.target.value)} placeholder="t.ex. C220" />
           </Field>
         </div>
         {bilmarke === 'Annat' && (
@@ -823,7 +839,7 @@ const SuccessModal: React.FC<{ firstName: string }> = ({ firstName }) => (
   </>
 );
 
-const ConfirmModal: React.FC<{ onConfirm: () => void; onCancel: () => void; payload: any }> = ({ onConfirm, onCancel, payload }) => (
+const ConfirmModal: React.FC<{ onConfirm: () => void; onCancel: () => void; payload: ConfirmModalPayload }> = ({ onConfirm, onCancel, payload }) => (
   <>
     <div className="modal-overlay" onClick={onCancel} />
     <div className="modal-content confirm-modal">
