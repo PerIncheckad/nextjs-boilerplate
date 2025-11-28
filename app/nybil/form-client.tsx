@@ -803,16 +803,22 @@ export default function NybilForm() {
     previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
   }> => {
     const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
+    console.log('Checking duplicate for:', normalizedRegnr);
     
     // Check vehicles table (Bilkontroll-filen) - use ilike for case-insensitive matching
-    const { data: vehicleMatch } = await supabase
+    const { data: vehicleMatch, error: vehicleError } = await supabase
       .from('vehicles')
       .select('regnr')
       .ilike('regnr', normalizedRegnr)
       .maybeSingle();
     
+    if (vehicleError) {
+      console.error('Error checking vehicles table:', vehicleError);
+    }
+    console.log('Vehicle match:', vehicleMatch);
+    
     // Check nybil_inventering table - use ilike for case-insensitive matching
-    const { data: nybilMatch } = await supabase
+    const { data: nybilMatch, error: nybilError } = await supabase
       .from('nybil_inventering')
       .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id')
       .ilike('regnr', normalizedRegnr)
@@ -820,36 +826,51 @@ export default function NybilForm() {
       .limit(1)
       .maybeSingle();
     
-    return {
+    if (nybilError) {
+      console.error('Error checking nybil_inventering table:', nybilError);
+    }
+    console.log('Nybil match:', nybilMatch);
+    
+    const result = {
       existsInBilkontroll: !!vehicleMatch,
       existsInNybil: !!nybilMatch,
       previousRegistration: nybilMatch
     };
+    console.log('Duplicate result:', result);
+    
+    return result;
   };
 
   const handleRegisterClick = async () => {
+    console.log('handleRegisterClick called');
     // Reset error and duplicate state
     setMatarstallningError('');
     setIsDuplicate(false);
     setDuplicateInfo(null);
     
     if (!formIsValid) {
+      console.log('Form is not valid, showing errors');
       handleShowErrors();
       return;
     }
     // Step 1: Check reg nr format - if invalid, show warning modal (user can confirm to proceed)
     if (!isRegNrValid) {
+      console.log('Reg nr format invalid, showing warning modal');
       setShowRegWarningModal(true);
       return;
     }
     // Step 2: Mätarställning validation - this BLOCKS submission
     if (!validateMatarstallning()) {
+      console.log('Mätarställning validation failed');
       return;
     }
     // Step 3: Check for duplicates
+    console.log('Checking for duplicates with normalizedReg:', normalizedReg);
     try {
       const duplicateResult = await checkForDuplicate(normalizedReg);
+      console.log('Duplicate check completed:', duplicateResult);
       if (duplicateResult.existsInBilkontroll || duplicateResult.existsInNybil) {
+        console.log('Duplicate found! Showing duplicate modal');
         setDuplicateInfo(duplicateResult);
         setShowDuplicateModal(true);
         return;
@@ -859,6 +880,7 @@ export default function NybilForm() {
       // Continue anyway - don't block registration if duplicate check fails
     }
     // Step 4: All validations passed - show confirmation modal
+    console.log('No duplicate found, showing confirmation modal');
     setShowConfirmModal(true);
   };
 
