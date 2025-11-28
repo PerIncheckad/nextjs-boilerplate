@@ -146,23 +146,32 @@ async function uploadToStorage(file: File, path: string, bucket: string, upsert:
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
   
+  console.log(`Uploading to bucket: ${bucket}, path: ${path}, file: ${file.name}, type: ${file.type}, size: ${file.size}`);
+  
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { error } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type, upsert });
+      const { error, data: uploadData } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type, upsert });
+      
+      console.log(`Upload attempt ${attempt}/${MAX_RETRIES} - result:`, { error, uploadData });
       
       if (error && !/already exists/i.test(error.message || '')) {
-        console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, error);
+        console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, {
+          message: error.message,
+          name: error.name,
+          error: JSON.stringify(error)
+        });
         
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
         }
         
-        throw new Error('Fel vid uppladdning av foto. Vänligen försök igen.');
+        throw new Error(`Fel vid uppladdning av foto: ${error.message}`);
       }
       
       const { data, error: urlError } = supabase.storage.from(bucket).getPublicUrl(path);
       if (urlError || !data?.publicUrl) {
+        console.error(`Error getting public URL for ${path}:`, urlError);
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
@@ -170,8 +179,11 @@ async function uploadToStorage(file: File, path: string, bucket: string, upsert:
         throw new Error('Fel vid uppladdning. Vänligen försök igen.');
       }
       
+      console.log(`Upload successful, public URL: ${data.publicUrl}`);
       return data.publicUrl;
     } catch (e) {
+      console.error(`Upload exception (attempt ${attempt}/${MAX_RETRIES}):`, e);
+      
       if (e instanceof Error && e.message.includes('Fel vid uppladdning')) {
         throw e;
       }
