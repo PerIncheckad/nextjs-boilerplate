@@ -920,8 +920,10 @@ export default function NybilForm() {
       
       // Upload photos to Supabase Storage
       const dateStr = formatDateForFolder(now);
+      // Add unix timestamp to make folder unique for duplicate registrations
+      const timestamp = Math.floor(now.getTime() / 1000);
       console.log('Creating media folder with normalizedReg:', normalizedReg, 'regInput:', regInput);
-      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
+      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL-${timestamp}`;
       console.log('Media folder path:', mediaFolder);
       const photoUrls: string[] = [];
       
@@ -1063,11 +1065,11 @@ export default function NybilForm() {
           const damagePhotoUrls: string[] = [];
           
           // Build folder name for NYBIL damage photos:
-          // REGNR/REGNR-YYYYMMDD-NYBIL/YYYYMMDD-skadetyp-placering-position-förnamn/
+          // REGNR/REGNR-YYYYMMDD-NYBIL-timestamp/YYYYMMDD-skadetyp-placering-position-förnamn/
           const skadetyp = slugify(damage.damageType);
           const positionString = buildPositionString(damage.positions);
           
-          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
+          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL-${timestamp}/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
           
           // Build filename: REGNR-YYYYMMDD-skadetyp-placering_N.ext
           const baseFileName = `${normalizedReg}-${dateStr}-${skadetyp}-${positionString}`;
