@@ -887,6 +887,9 @@ export default function NybilForm() {
       savedNybilId = data?.[0]?.id || null;
       
       // Upload damage photos and save to damages table
+      // Track uploaded damage photo URLs for email notification
+      const uploadedDamagePhotoUrls: Record<string, string[]> = {};
+      
       if (harSkadorVidLeverans && damages.length > 0) {
         const damageFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
         
@@ -902,6 +905,9 @@ export default function NybilForm() {
             const damagePhotoUrl = await uploadDamagePhoto(photo.file, `${skadaFolder}/${j + 1}.${ext}`);
             damagePhotoUrls.push(damagePhotoUrl);
           }
+          
+          // Store for email notification
+          uploadedDamagePhotoUrls[damage.id] = damagePhotoUrls;
           
           // Save to damages table with correct column names matching schema
           const { error: damageError } = await supabase.from('damages').insert({
@@ -932,6 +938,74 @@ export default function NybilForm() {
             // Continue with other damages even if one fails
           }
         }
+      }
+      
+      // Send confirmation email notification
+      try {
+        const emailPayload = {
+          regnr: normalizedReg,
+          bilmarke: effectiveBilmarke,
+          modell,
+          matarstallning,
+          hjultyp,
+          bransletyp,
+          vaxel: effectiveVaxel,
+          plats_mottagning_ort: ort,
+          plats_mottagning_station: station,
+          planerad_station: planeradStation,
+          plats_aktuell_ort: platsAktuellOrt,
+          plats_aktuell_station: platsAktuellStation,
+          // Contract terms
+          serviceintervall: serviceintervall === 'Annat' ? serviceintervallAnnat : serviceintervall,
+          max_km_manad: maxKmManad === 'Annat' ? maxKmManadAnnat : maxKmManad,
+          avgift_over_km: avgiftOverKm === 'Annat' ? avgiftOverKmAnnat : avgiftOverKm,
+          // Equipment
+          antal_nycklar: antalNycklar,
+          antal_laddkablar: needsLaddkablar ? antalLaddkablar : 0,
+          dragkrok,
+          gummimattor,
+          dackkompressor,
+          stold_gps: stoldGps,
+          stold_gps_spec: stoldGps ? stoldGpsSpec : null,
+          antal_insynsskydd: antalInsynsskydd,
+          lasbultar_med: lasbultarMed,
+          instruktionsbok,
+          coc,
+          // Damages
+          har_skador_vid_leverans: harSkadorVidLeverans === true && damages.length > 0,
+          skador: damages.map(d => ({
+            damageType: d.damageType,
+            positions: d.positions.map(p => ({
+              carPart: p.carPart,
+              position: p.position
+            })),
+            comment: d.comment,
+            photoUrls: uploadedDamagePhotoUrls[d.id] || []
+          })),
+          // Rental status
+          klar_for_uthyrning: klarForUthyrning,
+          ej_uthyrningsbar_anledning: klarForUthyrning === false ? ejUthyrningsbarAnledning : null,
+          // Metadata
+          registrerad_av: fullName,
+          photo_urls: photoUrls,
+          media_folder: mediaFolder
+        };
+
+        const notifyResponse = await fetch('/api/notify-nybil', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(emailPayload)
+        });
+
+        if (!notifyResponse.ok) {
+          console.error('Email notification failed:', await notifyResponse.text());
+          // Continue - email failure shouldn't block success
+        } else {
+          console.log('Email notification sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending email notification:', emailError);
+        // Continue - email failure shouldn't block success
       }
       
       console.log('Successfully saved:', data);
