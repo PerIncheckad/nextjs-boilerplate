@@ -934,12 +934,12 @@ export default function NybilForm() {
           const damage = damages[i];
           const damagePhotoUrls: string[] = [];
           
-          // Build folder name following /check pattern:
-          // REGNR/REGNR-YYYYMMDD/YYYYMMDD-skadetyp-placering-position-förnamn/
+          // Build folder name for NYBIL damage photos:
+          // REGNR/REGNR-YYYYMMDD-NYBIL/YYYYMMDD-skadetyp-placering-position-förnamn/
           const skadetyp = slugify(damage.damageType);
           const positionString = buildPositionString(damage.positions);
           
-          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
+          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
           
           // Build filename: REGNR-YYYYMMDD-skadetyp-placering_N.ext
           const baseFileName = `${normalizedReg}-${dateStr}-${skadetyp}-${positionString}`;
