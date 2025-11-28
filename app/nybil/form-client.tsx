@@ -905,7 +905,9 @@ export default function NybilForm() {
       
       // Upload photos to Supabase Storage
       const dateStr = formatDateForFolder(now);
+      console.log('Creating media folder with normalizedReg:', normalizedReg, 'regInput:', regInput);
       const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
+      console.log('Media folder path:', mediaFolder);
       const photoUrls: string[] = [];
       
       // Upload front photo
@@ -1293,11 +1295,26 @@ export default function NybilForm() {
           title="Registreringsnummer"
           message={`Är du säker? ${normalizedReg} är inte i standardformat.`}
           onCancel={() => setShowRegWarningModal(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
             setShowRegWarningModal(false);
             // After confirming reg.nr warning, run mätarställning validation
             if (!validateMatarstallning()) {
               return; // Block if mätarställning validation fails
+            }
+            // Check for duplicates before showing confirmation modal
+            console.log('Reg warning confirmed, checking for duplicates with:', normalizedReg);
+            try {
+              const duplicateResult = await checkForDuplicate(normalizedReg);
+              console.log('Duplicate check result after reg warning:', duplicateResult);
+              if (duplicateResult.existsInBilkontroll || duplicateResult.existsInNybil) {
+                console.log('Duplicate found after reg warning! Showing duplicate modal');
+                setDuplicateInfo(duplicateResult);
+                setShowDuplicateModal(true);
+                return;
+              }
+            } catch (error) {
+              console.error('Error checking for duplicates after reg warning:', error);
+              // Continue anyway - don't block registration if duplicate check fails
             }
             setShowConfirmModal(true);
           }}
