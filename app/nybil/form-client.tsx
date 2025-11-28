@@ -804,18 +804,18 @@ export default function NybilForm() {
   }> => {
     const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
     
-    // Check vehicles table (Bilkontroll-filen)
+    // Check vehicles table (Bilkontroll-filen) - use ilike for case-insensitive matching
     const { data: vehicleMatch } = await supabase
       .from('vehicles')
       .select('regnr')
       .ilike('regnr', normalizedRegnr)
       .maybeSingle();
     
-    // Check nybil_inventering table
+    // Check nybil_inventering table - use ilike for case-insensitive matching
     const { data: nybilMatch } = await supabase
       .from('nybil_inventering')
       .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id')
-      .eq('regnr', normalizedRegnr)
+      .ilike('regnr', normalizedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -2006,10 +2006,16 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
   let message = '';
   if (existsInBilkontroll && existsInNybil && previousRegistration) {
     message = `${regnr} finns både i Bilkontroll-listan och är registrerad i systemet (${previousRegistration.registreringsdatum}).`;
+  } else if (existsInBilkontroll && existsInNybil) {
+    // Edge case: existsInNybil is true but previousRegistration is null
+    message = `${regnr} finns både i Bilkontroll-listan och i systemet.`;
   } else if (existsInBilkontroll) {
     message = `${regnr} finns redan i Bilkontroll-listan.`;
   } else if (existsInNybil && previousRegistration) {
     message = `${regnr} är redan registrerad i systemet (${previousRegistration.registreringsdatum}).`;
+  } else if (existsInNybil) {
+    // Edge case: existsInNybil is true but previousRegistration is null
+    message = `${regnr} är redan registrerad i systemet.`;
   }
 
   return (
