@@ -920,10 +920,34 @@ export default function NybilForm() {
       
       // Upload photos to Supabase Storage
       const dateStr = formatDateForFolder(now);
-      // Add unix timestamp to make folder unique for duplicate registrations
-      const timestamp = Math.floor(now.getTime() / 1000);
+      
+      // Determine folder suffix for duplicates
+      // For duplicates, query to count existing registrations for this regnr+date
+      let folderSuffix = '';
+      if (isDuplicate) {
+        try {
+          const { data: existingRegs, error } = await supabase
+            .from('nybil_inventering')
+            .select('id')
+            .eq('regnr', normalizedReg)
+            .eq('registreringsdatum', now.toISOString().split('T')[0]);
+          
+          if (!error && existingRegs) {
+            const duplicateCount = existingRegs.length;
+            folderSuffix = `-DUBBLETT-${duplicateCount}`;
+          } else {
+            // Fallback to timestamp if query fails
+            folderSuffix = `-DUBBLETT-${Math.floor(now.getTime() / 1000)}`;
+          }
+        } catch (e) {
+          console.error('Error counting duplicates:', e);
+          // Fallback to timestamp
+          folderSuffix = `-DUBBLETT-${Math.floor(now.getTime() / 1000)}`;
+        }
+      }
+      
       console.log('Creating media folder with normalizedReg:', normalizedReg, 'regInput:', regInput);
-      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL-${timestamp}`;
+      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL${folderSuffix}`;
       console.log('Media folder path:', mediaFolder);
       const photoUrls: string[] = [];
       
@@ -1065,11 +1089,11 @@ export default function NybilForm() {
           const damagePhotoUrls: string[] = [];
           
           // Build folder name for NYBIL damage photos:
-          // REGNR/REGNR-YYYYMMDD-NYBIL-timestamp/YYYYMMDD-skadetyp-placering-position-förnamn/
+          // REGNR/REGNR-YYYYMMDD-NYBIL{-DUBBLETT-N}/YYYYMMDD-skadetyp-placering-position-förnamn/
           const skadetyp = slugify(damage.damageType);
           const positionString = buildPositionString(damage.positions);
           
-          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL-${timestamp}/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
+          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL${folderSuffix}/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
           
           // Build filename: REGNR-YYYYMMDD-skadetyp-placering_N.ext
           const baseFileName = `${normalizedReg}-${dateStr}-${skadetyp}-${positionString}`;

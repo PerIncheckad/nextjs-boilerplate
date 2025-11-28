@@ -583,20 +583,40 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
 
 /**
  * Build the email for duplicate Nybil registration - BILKONTROLL version
- * Has blue banner instead of red, with info about the duplicate
+ * Has blue banner for duplicate, plus all the same content as regular Bilkontroll email
  */
 const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: string, siteUrl: string): string => {
   const regNr = payload.regnr || '';
   const registreradAv = payload.registrerad_av || '---';
+  
+  // Build fact box content (same as Bilkontroll email)
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
+  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  const hjultyp = payload.hjultyp || '---';
+  const drivmedel = payload.bransletyp || '---';
+  const vaxel = payload.vaxel || '---';
+  const platsMottagningOrt = payload.plats_mottagning_ort || '---';
   const planeradStation = payload.planerad_station || '---';
+  const bilenStarNuOrt = payload.plats_aktuell_ort || '---';
+  const bilenStarNuStation = payload.plats_aktuell_station || '---';
   
   // Blue banner for duplicate
   const duplicateBannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">DUBBLETT SKAPAD</div>`;
   const duplicateBanner = `<tr><td style="padding:6px 0;">${duplicateBannerContent}</td></tr>`;
   
-  // Previous registration info
+  // Determine if there are dangerous conditions (red banners - same as Bilkontroll)
+  const hasSkador = payload.har_skador_vid_leverans === true && (payload.skador?.length ?? 0) > 0;
+  const skadorCount = payload.skador?.length ?? 0;
+  const ejKlarForUthyrning = payload.klar_for_uthyrning === false;
+  
+  // Warning banners
+  const alertBanners = `
+    ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, payload.media_folder, siteUrl)}
+    ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
+  `;
+  
+  // Previous registration info (specific to duplicate)
   let previousRegSection = '';
   if (payload.previous_registration) {
     previousRegSection = `
@@ -619,6 +639,118 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     bilkontrollNote = `<tr><td style="padding:4px 0;color:#6b7280;font-style:italic;">Finns även i Bilkontroll-listan</td></tr>`;
   }
   
+  // Contract terms section (same as Bilkontroll)
+  const serviceintervall = payload.serviceintervall || '---';
+  const maxKmManad = payload.max_km_manad || '---';
+  const avgiftOverKm = payload.avgift_over_km ? `${payload.avgift_over_km} kr` : '---';
+  
+  const contractSection = `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Avtalsvillkor</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>
+          <tr><td style="padding:4px 0;"><strong>Serviceintervall:</strong> ${escapeHtml(serviceintervall)}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Max km/månad:</strong> ${escapeHtml(maxKmManad)}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Avgift över-km:</strong> ${escapeHtml(avgiftOverKm)}</td></tr>
+        </tbody>
+      </table>
+    </td></tr>
+  `;
+  
+  // Equipment section (same as Bilkontroll)
+  const antalNycklar = payload.antal_nycklar ?? '---';
+  const antalLaddkablar = payload.antal_laddkablar ?? 0;
+  const dragkrok = payload.dragkrok ? 'Ja' : 'Nej';
+  const gummimattor = payload.gummimattor ? 'Ja' : 'Nej';
+  const dackkompressor = payload.dackkompressor ? 'Ja' : 'Nej';
+  const stoldGps = payload.stold_gps ? 'Ja' : 'Nej';
+  const antalInsynsskydd = payload.antal_insynsskydd ?? 0;
+  const lasbultarMed = payload.lasbultar_med ? 'Ja' : 'Nej';
+  const instruktionsbok = payload.instruktionsbok ? 'Ja' : 'Nej';
+  const coc = payload.coc ? 'Ja' : 'Nej';
+  
+  const equipmentSection = `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Utrustning</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>
+          <tr><td style="padding:4px 0;"><strong>Antal nycklar:</strong> ${antalNycklar}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Antal laddkablar:</strong> ${antalLaddkablar}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Dragkrok:</strong> ${dragkrok}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Gummimattor:</strong> ${gummimattor}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Däckkompressor:</strong> ${dackkompressor}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Stöld-GPS:</strong> ${stoldGps}${payload.stold_gps && payload.stold_gps_spec ? ` (${escapeHtml(payload.stold_gps_spec)})` : ''}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Antal insynsskydd:</strong> ${antalInsynsskydd}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Låsbultar med:</strong> ${lasbultarMed}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>Instruktionsbok:</strong> ${instruktionsbok}</td></tr>
+          <tr><td style="padding:4px 0;"><strong>COC-dokument:</strong> ${coc}</td></tr>
+        </tbody>
+      </table>
+    </td></tr>
+  `;
+  
+  // Damages section (same as Bilkontroll)
+  let damagesSection = '';
+  if (hasSkador && payload.skador && payload.skador.length > 0) {
+    const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
+    
+    const damageItems = payload.skador.map((skada) => {
+      const positions = (skada.positions || [])
+        .map(p => {
+          if (p.carPart && p.position) return `${escapeHtml(p.carPart)} (${escapeHtml(p.position)})`;
+          if (p.carPart) return escapeHtml(p.carPart);
+          return '';
+        })
+        .filter(Boolean)
+        .join(', ');
+      
+      let damageText = `${escapeHtml(skada.damageType)}`;
+      if (positions) damageText += `: ${positions}`;
+      if (skada.comment) damageText += `<br><small><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}</small>`;
+      
+      const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
+      
+      return `<li style="margin-bottom:8px;">${damageText}${
+        hasPhotos && mediaFolderLink
+          ? ` <a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+          : ''
+      }</li>`;
+    }).join('');
+    
+    damagesSection = `
+      <tr><td style="padding-top:20px;">
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;color:#dc2626;">Skador vid leverans</h3>
+        <ul style="padding-left:20px;margin-top:0;font-size:14px;">${damageItems}</ul>
+      </td></tr>
+    `;
+  }
+  
+  // Klar för uthyrning section (same as Bilkontroll)
+  const klarForUthyrningText = payload.klar_for_uthyrning === true ? 'Ja' : (payload.klar_for_uthyrning === false ? 'Nej' : '---');
+  const klarForUthyrningSection = `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Klar för uthyrning</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>
+          <tr><td style="padding:4px 0;"><strong>Klar för uthyrning:</strong> ${klarForUthyrningText}</td></tr>
+          ${payload.klar_for_uthyrning === false && payload.ej_uthyrningsbar_anledning ? `<tr><td style="padding:4px 0;"><strong>Anledning:</strong> ${escapeHtml(payload.ej_uthyrningsbar_anledning)}</td></tr>` : ''}
+        </tbody>
+      </table>
+    </td></tr>
+  `;
+  
+  // Övrigt section (same as Bilkontroll)
+  const ovrigtSection = payload.anteckningar ? `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Övrigt</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>
+          <tr><td style="padding:4px 0;">${escapeHtml(payload.anteckningar)}</td></tr>
+        </tbody>
+      </table>
+    </td></tr>
+  ` : '';
+  
   // Status link placeholder
   const statusLinkSection = `
     <tr><td style="padding-top:20px;text-align:center;">
@@ -632,20 +764,32 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
       <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${escapeHtml(regNr)} - Dubblett skapad</h1>
     </td></tr>
     ${duplicateBanner}
+    ${alertBanners}
+    ${previousRegSection}
+    ${bilkontrollNote ? `<tr><td style="padding:4px 0;color:#6b7280;font-style:italic;">Finns även i Bilkontroll-listan</td></tr>` : ''}
     <tr><td style="padding-top:20px;">
       <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
         <table width="100%" style="font-size:14px;">
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${escapeHtml(matarstallning)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Växel:</strong> ${escapeHtml(vaxel)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Plats för mottagning:</strong> ${escapeHtml(platsMottagningOrt)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Planerad station:</strong> ${escapeHtml(planeradStation)}</td></tr>
-            ${bilkontrollNote}
+            <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${escapeHtml(bilenStarNuOrt)} / ${escapeHtml(bilenStarNuStation)}</td></tr>
           </tbody>
         </table>
       </div>
     </td></tr>
-    ${previousRegSection}
+    ${contractSection}
+    ${equipmentSection}
+    ${klarForUthyrningSection}
+    ${ovrigtSection}
     ${statusLinkSection}
+    ${damagesSection}
     <tr><td>
       <p style="margin-top:20px;font-size:14px;">
         Registrerad av ${escapeHtml(registreradAv)} kl ${time}, ${date}
