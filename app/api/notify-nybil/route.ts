@@ -11,8 +11,9 @@ const resend = new Resend(process.env.RESEND_API_KEY || 'placeholder');
 const DEV_EMAIL = 'per@incheckad.se';
 const BILKONTROLL_EMAIL = 'latif@incheckad.se';
 
-// Station email mapping for production (not used during development)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+// Station email mapping for production
+// TODO: Activate this mapping when switching from development mode to production
+// Currently all emails are sent to DEV_EMAIL (per@incheckad.se) during development
 const stationEmailMapping: Record<string, string> = {
   'Malmö': 'malmo@mabi.se',
   'Helsingborg': 'helsingborg@mabi.se',
