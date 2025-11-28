@@ -959,6 +959,9 @@ export default function NybilForm() {
           serviceintervall: serviceintervall === 'Annat' ? serviceintervallAnnat : serviceintervall,
           max_km_manad: maxKmManad === 'Annat' ? maxKmManadAnnat : maxKmManad,
           avgift_over_km: avgiftOverKm === 'Annat' ? avgiftOverKmAnnat : avgiftOverKm,
+          // Fuel/charging status
+          tankstatus: !isElectric ? tankstatus : null,
+          laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
           // Equipment
           antal_nycklar: antalNycklar,
           antal_laddkablar: needsLaddkablar ? antalLaddkablar : 0,
@@ -985,6 +988,8 @@ export default function NybilForm() {
           // Rental status
           klar_for_uthyrning: klarForUthyrning,
           ej_uthyrningsbar_anledning: klarForUthyrning === false ? ejUthyrningsbarAnledning : null,
+          // Notes
+          anteckningar: anteckningar || null,
           // Metadata
           registrerad_av: fullName,
           photo_urls: photoUrls,
