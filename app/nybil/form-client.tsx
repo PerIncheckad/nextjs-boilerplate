@@ -903,23 +903,28 @@ export default function NybilForm() {
             damagePhotoUrls.push(damagePhotoUrl);
           }
           
-          // Build placement and position strings from all positions
-          const placementParts = damage.positions.map(p => p.carPart).filter(Boolean);
-          const positionParts = damage.positions.map(p => p.position).filter(Boolean);
-          const placementStr = placementParts.join(', ');
-          const positionStr = positionParts.join(', ');
-          
-          // Save to damages table
+          // Save to damages table with correct column names matching schema
           const { error: damageError } = await supabase.from('damages').insert({
             regnr: normalizedReg,
+            damage_date: now.toISOString().split('T')[0],
             damage_type: damage.damageType,
-            placement: placementStr,
-            position: positionStr,
-            comment: damage.comment || null,
-            photo_urls: damagePhotoUrls,
+            damage_type_raw: damage.damageType,
+            user_type: damage.damageType,
+            description: damage.comment || null,
+            inchecker_name: fullName,
+            status: 'complete',
+            uploads: {
+              photo_urls: damagePhotoUrls,
+              video_urls: [],
+              folder: skadaFolder
+            },
+            user_positions: damage.positions.map(pos => ({
+              carPart: pos.carPart,
+              position: pos.position
+            })),
             source: 'NYBIL',
-            reported_by: fullName,
-            nybil_inventering_id: savedNybilId
+            nybil_inventering_id: savedNybilId,
+            created_at: now.toISOString()
           });
           
           if (damageError) {
