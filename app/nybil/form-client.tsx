@@ -892,6 +892,9 @@ export default function NybilForm() {
   };
   
   const handleConfirmAndSubmit = async () => {
+    console.log('handleConfirmAndSubmit called');
+    console.log('isDuplicate:', isDuplicate);
+    console.log('duplicateInfo:', duplicateInfo);
     setShowConfirmModal(false);
     setShowRegWarningModal(false);
     setIsSaving(true);
@@ -1009,10 +1012,12 @@ export default function NybilForm() {
         duplicate_group_id: duplicateGroupId,
         original_registration_id: isDuplicate ? (duplicateInfo?.previousRegistration?.id || null) : null
       };
+      console.log('Attempting to insert inventoryData:', inventoryData);
       const { data, error } = await supabase
         .from('nybil_inventering')
         .insert([inventoryData])
         .select();
+      console.log('Database insert result - data:', data, 'error:', error);
       if (error) {
         console.error('Database error:', error);
         alert(`Fel vid sparande: ${error.message}`);
@@ -1020,6 +1025,7 @@ export default function NybilForm() {
       }
       
       savedNybilId = data?.[0]?.id || null;
+      console.log('Saved nybil ID:', savedNybilId);
       
       // Upload damage photos and save to damages table
       // Track uploaded damage photo URLs for email notification
@@ -1157,6 +1163,7 @@ export default function NybilForm() {
           exists_in_bilkontroll: duplicateInfo?.existsInBilkontroll || false
         };
 
+        console.log('Sending email notification with payload:', emailPayload);
         const notifyResponse = await fetch('/api/notify-nybil', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1164,7 +1171,8 @@ export default function NybilForm() {
         });
 
         if (!notifyResponse.ok) {
-          console.error('Email notification failed:', await notifyResponse.text());
+          const errorText = await notifyResponse.text();
+          console.error('Email notification failed:', errorText);
           // Continue - email failure shouldn't block success
         } else {
           console.log('Email notification sent successfully');
@@ -1174,7 +1182,7 @@ export default function NybilForm() {
         // Continue - email failure shouldn't block success
       }
       
-      console.log('Successfully saved:', data);
+      console.log('Registration complete, showing success modal');
       setShowSuccessModal(true);
       setTimeout(() => {
         setShowSuccessModal(false);
