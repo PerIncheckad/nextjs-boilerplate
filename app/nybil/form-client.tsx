@@ -998,15 +998,18 @@ export default function NybilForm() {
         bilmarke: effectiveBilmarke,
         bilmarke_annat: bilmarke === 'Annat' ? bilmarkeAnnat : null,
         modell,
+        bilmodell: modell, // Alias for modell column
         registrerad_av: firstName,
         fullstandigt_namn: fullName,
         registreringsdatum: now.toISOString().split('T')[0],
+        ankomstdatum: now.toISOString().split('T')[0], // Alias for registreringsdatum
         plats_mottagning_ort: ort,
         plats_mottagning_station: station,
         planerad_station: planeradStation,
         planerad_station_id: planeradStationObj?.id || null,
         matarstallning_inkop: matarstallning,
         hjultyp,
+        monterade_dack: hjultyp, // Alias for hjultyp (what tires are mounted)
         hjul_ej_monterade: hjulTillForvaring,
         hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
         hjul_forvaring: wheelsNeedStorage ? hjulForvaringSpec : null,
@@ -1036,6 +1039,7 @@ export default function NybilForm() {
         dragkrok,
         gummimattor,
         dackkompressor,
+        kompressor: dackkompressor, // Alias for dackkompressor column
         stold_gps: stoldGps,
         stold_gps_spec: stoldGps ? stoldGpsSpec : null,
         mbme_aktiverad: showMbmeQuestion ? mbmeAktiverad : null,
