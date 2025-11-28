@@ -88,6 +88,15 @@ const createAdminBanner = (condition: boolean, text: string): string => {
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
+// Create admin banner with two centered lines for charge level
+const createChargeLevelBanner = (condition: boolean, laddnivaProcent: number | null | undefined): string => {
+  if (!condition) return '';
+  const line1 = 'Säkerställ bilens laddnivå!';
+  const line2 = `${laddnivaProcent ?? 0}% vid ankomst.`;
+  const bannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${line1}<br>${line2}</div>`;
+  return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
+};
+
 const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -209,7 +218,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, payload.media_folder, siteUrl)}
     ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
     ${createAdminBanner(needsFueling, 'Måste tankas!')}
-    ${createAdminBanner(needsCharging, 'Säkerställ bilens laddnivå')}
+    ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
   `;
   
   // Contract terms section

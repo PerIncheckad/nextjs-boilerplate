@@ -40,6 +40,43 @@ const capitalizeFirstLetter = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
 
+// Slugify function for consistent folder/file naming (same as /check)
+const slugify = (str: string): string => {
+  if (!str) return '';
+  const replacements: Record<string, string> = {
+    'å': 'a', 'ä': 'a', 'ö': 'o',
+    'Å': 'A', 'Ä': 'A', 'Ö': 'O',
+    ' ': '-'
+  };
+  
+  let result = str.toString();
+  for (const [char, replacement] of Object.entries(replacements)) {
+    result = result.split(char).join(replacement);
+  }
+  
+  return result.toLowerCase()
+    .replace(/&/g, '-and-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+// Map fuel type from UI display to database value
+const mapBransletypForDb = (uiValue: string | null): string | null => {
+  if (uiValue === '100% el') return 'El (full)';
+  return uiValue; // 'Bensin', 'Diesel', 'Hybrid (bensin)', 'Hybrid (diesel)' are the same
+};
+
+// Build position string for damage folder/file naming
+const buildPositionString = (positions: Array<{ carPart: string; position: string }>): string => {
+  const result = slugify(positions.map(p => {
+    const part = p.carPart || '';
+    const pos = p.position || '';
+    return pos ? `${part}-${pos}` : part;
+  }).filter(Boolean).join('-'));
+  return result || 'okand';
+};
+
 const getFirstNameFromEmail = (email: string): string => {
   if (!email) return 'Okänd';
   const namePart = email.split('@')[0];
@@ -826,7 +863,7 @@ export default function NybilForm() {
         hjul_ej_monterade: hjulTillForvaring,
         hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
         hjul_forvaring: wheelsNeedStorage ? hjulForvaringSpec : null,
-        bransletyp,
+        bransletyp: mapBransletypForDb(bransletyp),
         vaxel: effectiveVaxel,
         laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
         tankstatus: !isElectric ? tankstatus : null,
@@ -891,19 +928,36 @@ export default function NybilForm() {
       const uploadedDamagePhotoUrls: Record<string, string[]> = {};
       
       if (harSkadorVidLeverans && damages.length > 0) {
-        const damageFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
+        const firstNameLower = fullName.split(' ')[0].toLowerCase();
         
         for (let i = 0; i < damages.length; i++) {
           const damage = damages[i];
-          const skadaFolder = `${damageFolder}/skada-${i + 1}`;
           const damagePhotoUrls: string[] = [];
+          
+          // Build folder name for NYBIL damage photos:
+          // REGNR/REGNR-YYYYMMDD-NYBIL/YYYYMMDD-skadetyp-placering-position-förnamn/
+          const skadetyp = slugify(damage.damageType);
+          const positionString = buildPositionString(damage.positions);
+          
+          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
+          
+          // Build filename: REGNR-YYYYMMDD-skadetyp-placering_N.ext
+          const baseFileName = `${normalizedReg}-${dateStr}-${skadetyp}-${positionString}`;
           
           // Upload each photo for this damage
           for (let j = 0; j < damage.photos.length; j++) {
             const photo = damage.photos[j];
             const ext = getFileExtension(photo.file);
-            const damagePhotoUrl = await uploadDamagePhoto(photo.file, `${skadaFolder}/${j + 1}.${ext}`);
+            const fileName = `${baseFileName}_${j + 1}.${ext}`;
+            const damagePhotoUrl = await uploadDamagePhoto(photo.file, `${skadaFolder}/${fileName}`);
             damagePhotoUrls.push(damagePhotoUrl);
+          }
+          
+          // Upload kommentar.txt if comment exists
+          if (damage.comment && damage.comment.trim()) {
+            const commentBlob = new Blob([damage.comment], { type: 'text/plain' });
+            const commentFile = new File([commentBlob], 'kommentar.txt', { type: 'text/plain' });
+            await uploadDamagePhoto(commentFile, `${skadaFolder}/kommentar.txt`);
           }
           
           // Store for email notification
@@ -1733,14 +1787,6 @@ export default function NybilForm() {
         </Field>
       </Card>
       
-      {/* ÖVRIGT Section */}
-      <Card>
-        <SectionHeader title="Övrigt" />
-        <Field label="Anteckningar (frivilligt)">
-          <textarea value={anteckningar} onChange={e => setAnteckningar(e.target.value)} placeholder="Övrig information om bilen..." rows={4} />
-        </Field>
-      </Card>
-      
       {/* KLAR FÖR UTHYRNING Section */}
       <Card data-error={showFieldErrors && klarForUthyrningMissing}>
         <SectionHeader title="Klar för uthyrning" />
@@ -1755,6 +1801,14 @@ export default function NybilForm() {
             <textarea value={ejUthyrningsbarAnledning} onChange={e => setEjUthyrningsbarAnledning(e.target.value)} placeholder="Ange anledning..." rows={3} />
           </Field>
         )}
+      </Card>
+      
+      {/* ÖVRIGT Section */}
+      <Card>
+        <SectionHeader title="Övrigt" />
+        <Field label="Anteckningar (frivilligt)">
+          <textarea value={anteckningar} onChange={e => setAnteckningar(e.target.value)} placeholder="Övrig information om bilen..." rows={4} />
+        </Field>
       </Card>
       
       <div className="form-actions">
