@@ -943,6 +943,18 @@ export default function NybilForm() {
         ? (duplicateInfo?.previousRegistration?.duplicate_group_id || crypto.randomUUID())
         : null;
       
+      // Get the numeric ID from the previous registration (for original_registration_id)
+      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id
+        ? Number(duplicateInfo.previousRegistration.id)
+        : null;
+      
+      console.log('Duplicate fields:', {
+        isDuplicate,
+        duplicateGroupId,
+        originalRegistrationId,
+        previousRegistration: duplicateInfo?.previousRegistration
+      });
+      
       const inventoryData = {
         regnr: normalizedReg,
         bilmarke: effectiveBilmarke,
@@ -1010,7 +1022,7 @@ export default function NybilForm() {
         // Duplicate handling fields
         is_duplicate: isDuplicate,
         duplicate_group_id: duplicateGroupId,
-        original_registration_id: isDuplicate ? (duplicateInfo?.previousRegistration?.id || null) : null
+        original_registration_id: originalRegistrationId
       };
       console.log('Attempting to insert inventoryData:', inventoryData);
       const { data, error } = await supabase
