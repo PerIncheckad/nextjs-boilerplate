@@ -288,6 +288,15 @@ export default function NybilForm() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [matarstallningError, setMatarstallningError] = useState('');
   
+  // Duplicate detection state
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    existsInBilkontroll: boolean;
+    existsInNybil: boolean;
+    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
+  } | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
+  
   // Photo state
   const [photoFront, setPhotoFront] = useState<PhotoFile | null>(null);
   const [photoBack, setPhotoBack] = useState<PhotoFile | null>(null);
@@ -648,6 +657,10 @@ export default function NybilForm() {
     setShowFieldErrors(false);
     setShowRegWarningModal(false);
     setShowConfirmModal(false);
+    // Reset duplicate state
+    setShowDuplicateModal(false);
+    setDuplicateInfo(null);
+    setIsDuplicate(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
@@ -783,9 +796,42 @@ export default function NybilForm() {
     return true; // Validation passed
   };
 
-  const handleRegisterClick = () => {
-    // Reset error
+  // Check for duplicate registrations
+  const checkForDuplicate = async (regnr: string): Promise<{
+    existsInBilkontroll: boolean;
+    existsInNybil: boolean;
+    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
+  }> => {
+    const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
+    
+    // Check vehicles table (Bilkontroll-filen)
+    const { data: vehicleMatch } = await supabase
+      .from('vehicles')
+      .select('regnr')
+      .ilike('regnr', normalizedRegnr)
+      .maybeSingle();
+    
+    // Check nybil_inventering table
+    const { data: nybilMatch } = await supabase
+      .from('nybil_inventering')
+      .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id')
+      .eq('regnr', normalizedRegnr)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    return {
+      existsInBilkontroll: !!vehicleMatch,
+      existsInNybil: !!nybilMatch,
+      previousRegistration: nybilMatch
+    };
+  };
+
+  const handleRegisterClick = async () => {
+    // Reset error and duplicate state
     setMatarstallningError('');
+    setIsDuplicate(false);
+    setDuplicateInfo(null);
     
     if (!formIsValid) {
       handleShowErrors();
@@ -800,7 +846,26 @@ export default function NybilForm() {
     if (!validateMatarstallning()) {
       return;
     }
-    // Step 3: All validations passed - show confirmation modal
+    // Step 3: Check for duplicates
+    try {
+      const duplicateResult = await checkForDuplicate(normalizedReg);
+      if (duplicateResult.existsInBilkontroll || duplicateResult.existsInNybil) {
+        setDuplicateInfo(duplicateResult);
+        setShowDuplicateModal(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      // Continue anyway - don't block registration if duplicate check fails
+    }
+    // Step 4: All validations passed - show confirmation modal
+    setShowConfirmModal(true);
+  };
+
+  // Handle creating a duplicate registration
+  const handleCreateDuplicate = () => {
+    setShowDuplicateModal(false);
+    setIsDuplicate(true);
     setShowConfirmModal(true);
   };
   
@@ -845,6 +910,11 @@ export default function NybilForm() {
       
       // Upload damage photos to damage-photos bucket and save to damages table
       let savedNybilId: number | null = null;
+      
+      // Generate duplicate_group_id if this is a duplicate
+      const duplicateGroupId = isDuplicate 
+        ? (duplicateInfo?.previousRegistration?.duplicate_group_id || crypto.randomUUID())
+        : null;
       
       const inventoryData = {
         regnr: normalizedReg,
@@ -909,7 +979,11 @@ export default function NybilForm() {
         har_skador_vid_leverans: harSkadorVidLeverans === true && damages.length > 0,
         photo_urls: photoUrls,
         video_urls: [],
-        media_folder: mediaFolder
+        media_folder: mediaFolder,
+        // Duplicate handling fields
+        is_duplicate: isDuplicate,
+        duplicate_group_id: duplicateGroupId,
+        original_registration_id: isDuplicate ? (duplicateInfo?.previousRegistration?.id || null) : null
       };
       const { data, error } = await supabase
         .from('nybil_inventering')
@@ -1047,7 +1121,16 @@ export default function NybilForm() {
           // Metadata
           registrerad_av: fullName,
           photo_urls: photoUrls,
-          media_folder: mediaFolder
+          media_folder: mediaFolder,
+          // Duplicate info
+          is_duplicate: isDuplicate,
+          previous_registration: isDuplicate && duplicateInfo?.previousRegistration ? {
+            regnr: duplicateInfo.previousRegistration.regnr,
+            registreringsdatum: duplicateInfo.previousRegistration.registreringsdatum,
+            bilmarke: duplicateInfo.previousRegistration.bilmarke,
+            modell: duplicateInfo.previousRegistration.modell
+          } : null,
+          exists_in_bilkontroll: duplicateInfo?.existsInBilkontroll || false
         };
 
         const notifyResponse = await fetch('/api/notify-nybil', {
@@ -1198,6 +1281,19 @@ export default function NybilForm() {
           }}
           cancelText="Avbryt"
           confirmText="Fortsätt ändå"
+        />
+      )}
+      {showDuplicateModal && duplicateInfo && (
+        <DuplicateWarningModal
+          regnr={normalizedReg}
+          existsInBilkontroll={duplicateInfo.existsInBilkontroll}
+          existsInNybil={duplicateInfo.existsInNybil}
+          previousRegistration={duplicateInfo.previousRegistration}
+          onCancel={() => {
+            setShowDuplicateModal(false);
+            setDuplicateInfo(null);
+          }}
+          onConfirm={handleCreateDuplicate}
         />
       )}
       {showConfirmModal && (
@@ -1889,6 +1985,54 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, message, onCancel, o
   </>
 );
 
+type DuplicateWarningModalProps = {
+  regnr: string;
+  existsInBilkontroll: boolean;
+  existsInNybil: boolean;
+  previousRegistration: { regnr: string; registreringsdatum: string; bilmarke: string; modell: string } | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ 
+  regnr, 
+  existsInBilkontroll, 
+  existsInNybil, 
+  previousRegistration, 
+  onCancel, 
+  onConfirm 
+}) => {
+  // Build message based on where duplicate was found
+  let message = '';
+  if (existsInBilkontroll && existsInNybil && previousRegistration) {
+    message = `${regnr} finns både i Bilkontroll-listan och är registrerad i systemet (${previousRegistration.registreringsdatum}).`;
+  } else if (existsInBilkontroll) {
+    message = `${regnr} finns redan i Bilkontroll-listan.`;
+  } else if (existsInNybil && previousRegistration) {
+    message = `${regnr} är redan registrerad i systemet (${previousRegistration.registreringsdatum}).`;
+  }
+
+  return (
+    <>
+      <div className="modal-overlay" />
+      <div className="modal-content warning-modal duplicate-warning-modal">
+        <h3>Registreringsnummer finns redan</h3>
+        <p>{message}</p>
+        {previousRegistration && (
+          <div className="duplicate-info">
+            <p><strong>Tidigare registrering:</strong></p>
+            <p>{previousRegistration.bilmarke} {previousRegistration.modell}</p>
+          </div>
+        )}
+        <div className="modal-actions">
+          <button onClick={onCancel} className="btn secondary">Avbryt</button>
+          <button onClick={onConfirm} className="btn primary">Skapa dubblett</button>
+        </div>
+      </div>
+    </>
+  );
+};
+
 type DamageSummary = {
   damageType: string;
   placement: string;
@@ -2345,6 +2489,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-photo-count { font-size:0.75rem; color:var(--color-text-secondary); }
     .summary-section-warning { background-color:var(--color-danger-light); padding:1rem; border-radius:8px; border:1px solid var(--color-danger); }
     .summary-section-warning h4 { color:var(--color-danger); margin:0 0 0.5rem 0; }
+    /* Duplicate warning modal styles */
+    .duplicate-warning-modal h3 { color:var(--color-warning); }
+    .duplicate-warning-modal .duplicate-info { background-color:var(--color-bg); padding:0.75rem; border-radius:6px; margin:1rem 0; }
+    .duplicate-warning-modal .duplicate-info p { margin:0.25rem 0; font-size:0.9rem; }
     @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } .photo-grid { grid-template-columns:1fr; } .damage-item-card { flex-direction:column; align-items:flex-start; gap:0.5rem; } .damage-actions { width:100%; } .damage-actions button { flex:1; } }
   `}</style>
 );

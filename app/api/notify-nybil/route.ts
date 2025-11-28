@@ -91,7 +91,7 @@ const createAdminBanner = (condition: boolean, text: string): string => {
 // Create admin banner with two centered lines for charge level
 const createChargeLevelBanner = (condition: boolean, laddnivaProcent: number | null | undefined): string => {
   if (!condition) return '';
-  const line1 = 'Säkerställ bilens laddnivå!';
+  const line1 = 'KOLLA BILENS LADDNIVÅ!';
   const line2 = `${laddnivaProcent ?? 0}% vid ankomst.`;
   const bannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${line1}<br>${line2}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
@@ -181,6 +181,15 @@ interface NybilPayload {
   registrerad_av: string;
   photo_urls?: string[];
   media_folder?: string;
+  // Duplicate handling
+  is_duplicate?: boolean;
+  previous_registration?: {
+    regnr: string;
+    registreringsdatum: string;
+    bilmarke: string;
+    modell: string;
+  } | null;
+  exists_in_bilkontroll?: boolean;
 }
 
 /**
@@ -217,7 +226,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
   const banners = `
     ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, payload.media_folder, siteUrl)}
     ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
-    ${createAdminBanner(needsFueling, 'Måste tankas!')}
+    ${createAdminBanner(needsFueling, 'MÅSTE TANKAS!')}
     ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
   `;
   
@@ -572,6 +581,81 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   return createBaseLayout(regNr, content);
 };
 
+/**
+ * Build the email for duplicate Nybil registration - BILKONTROLL version
+ * Has blue banner instead of red, with info about the duplicate
+ */
+const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: string, siteUrl: string): string => {
+  const regNr = payload.regnr || '';
+  const registreradAv = payload.registrerad_av || '---';
+  const bilmarke = payload.bilmarke || '---';
+  const modell = payload.modell || '---';
+  const planeradStation = payload.planerad_station || '---';
+  
+  // Blue banner for duplicate
+  const duplicateBannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">DUBBLETT SKAPAD</div>`;
+  const duplicateBanner = `<tr><td style="padding:6px 0;">${duplicateBannerContent}</td></tr>`;
+  
+  // Previous registration info
+  let previousRegSection = '';
+  if (payload.previous_registration) {
+    previousRegSection = `
+      <tr><td style="padding-top:20px;">
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Tidigare registrering</h3>
+        <table width="100%" style="font-size:14px;">
+          <tbody>
+            <tr><td style="padding:4px 0;"><strong>Datum:</strong> ${escapeHtml(payload.previous_registration.registreringsdatum)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(payload.previous_registration.bilmarke)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(payload.previous_registration.modell)}</td></tr>
+          </tbody>
+        </table>
+      </td></tr>
+    `;
+  }
+  
+  // Exists in Bilkontroll info
+  let bilkontrollNote = '';
+  if (payload.exists_in_bilkontroll) {
+    bilkontrollNote = `<tr><td style="padding:4px 0;color:#6b7280;font-style:italic;">Finns även i Bilkontroll-listan</td></tr>`;
+  }
+  
+  // Status link placeholder
+  const statusLinkSection = `
+    <tr><td style="padding-top:20px;text-align:center;">
+      <a href="https://incheckad.se/status/${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
+      <p style="font-size:12px;color:#6b7280;margin-top:8px;">(Funktionen kommer snart)</p>
+    </td></tr>
+  `;
+  
+  const content = `
+    <tr><td style="text-align:center;padding-bottom:20px;">
+      <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${escapeHtml(regNr)} - Dubblett skapad</h1>
+    </td></tr>
+    ${duplicateBanner}
+    <tr><td style="padding-top:20px;">
+      <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
+        <table width="100%" style="font-size:14px;">
+          <tbody>
+            <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Planerad station:</strong> ${escapeHtml(planeradStation)}</td></tr>
+            ${bilkontrollNote}
+          </tbody>
+        </table>
+      </div>
+    </td></tr>
+    ${previousRegSection}
+    ${statusLinkSection}
+    <tr><td>
+      <p style="margin-top:20px;font-size:14px;">
+        Registrerad av ${escapeHtml(registreradAv)} kl ${time}, ${date}
+      </p>
+    </td></tr>
+  `;
+  
+  return createBaseLayout(regNr, content);
+};
+
 // =================================================================
 // 4. MAIN API FUNCTION
 // =================================================================
@@ -638,6 +722,21 @@ export async function POST(request: Request) {
           to: [DEV_EMAIL], // Under utveckling: per@incheckad.se
           subject: huvudstationSubject,
           html: huvudstationHtml,
+        })
+      );
+    }
+
+    // E-post för dubblett till Bilkontroll (om is_duplicate === true)
+    if (payload.is_duplicate === true) {
+      const duplicateHtml = buildNybilDuplicateEmail(payload, date, time, siteUrl);
+      const duplicateSubject = `DUBBLETT SKAPAD FÖR ${regNr} - ${bilmarke} ${modell} | BILKONTROLL`;
+      console.log(`Sending DUPLICATE email to ${DEV_EMAIL} (actual: ${BILKONTROLL_EMAIL})`);
+      emailPromises.push(
+        resend.emails.send({
+          from: 'nybil@incheckad.se',
+          to: [DEV_EMAIL], // Under utveckling: per@incheckad.se
+          subject: duplicateSubject,
+          html: duplicateHtml,
         })
       );
     }
