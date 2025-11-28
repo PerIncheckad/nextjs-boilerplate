@@ -74,6 +74,19 @@ Se Wiki för detaljer. Kort:
   - Unika index för (regnr, legacy_damage_source_text) och `legacy_loose_key`
   - `legacy_loose_key` = `REGNR|original_damage_date` (låser dokumenterad BUHS även om legacy‑text ändras)
 
+## Unified Damage Model
+`lib/damages.ts` implementerar en unified damage model som kombinerar:
+- **BUHS-skador** (externa/legacy från RPC)
+- **Dokumenterade BUHS** (inventerade via /check-formuläret)
+- **Nya skador** (användarskapade vid incheckning)
+
+UI-logik:
+- "Befintliga skador att hantera" visas endast när `hasUndocumentedBUHS === true`
+- När alla BUHS är dokumenterade döljs sektionen automatiskt
+- "Nya skador" visas alltid (oavsett BUHS-status)
+
+Se Wiki → Database.md för detaljer om matchningsstrategi och idempotens.
+
 ## Vanliga tester
 - Öppna e‑postlänk till `/public-media/...` i inkognito → ska fungera utan inloggning
 - Breadcrumb "uppåt" i inkognito → ska stanna inom `/public-media`
