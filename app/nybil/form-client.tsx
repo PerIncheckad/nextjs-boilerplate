@@ -1163,6 +1163,9 @@ export default function NybilForm() {
           modell,
           matarstallning,
           hjultyp,
+          hjul_till_forvaring: hjulTillForvaring,
+          hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
+          hjul_forvaring_spec: wheelsNeedStorage ? hjulForvaringSpec : null,
           bransletyp,
           vaxel: effectiveVaxel,
           plats_mottagning_ort: ort,
@@ -1177,9 +1180,16 @@ export default function NybilForm() {
           // Fuel/charging status
           tankstatus: !isElectric ? tankstatus : null,
           laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
+          // MB/VW Connect status
+          mbme_aktiverad: showMbmeQuestion ? mbmeAktiverad : null,
+          vw_connect_aktiverad: showVwConnectQuestion ? vwConnectAktiverad : null,
           // Equipment
           antal_nycklar: antalNycklar,
+          extranyckel_forvaring_ort: antalNycklar === 2 ? extranyckelForvaringOrt : null,
+          extranyckel_forvaring_spec: antalNycklar === 2 ? extranyckelForvaringSpec : null,
           antal_laddkablar: needsLaddkablar ? antalLaddkablar : 0,
+          laddkablar_forvaring_ort: laddkablarNeedsStorage ? laddkablarForvaringOrt : null,
+          laddkablar_forvaring_spec: laddkablarNeedsStorage ? laddkablarForvaringSpec : null,
           dragkrok,
           gummimattor,
           dackkompressor,
@@ -1188,7 +1198,19 @@ export default function NybilForm() {
           antal_insynsskydd: antalInsynsskydd,
           lasbultar_med: lasbultarMed,
           instruktionsbok,
+          instruktionsbok_forvaring_ort: instruktionsbok ? instruktionsbokForvaringOrt : null,
+          instruktionsbok_forvaring_spec: instruktionsbok ? instruktionsbokForvaringSpec : null,
           coc,
+          coc_forvaring_ort: coc ? cocForvaringOrt : null,
+          coc_forvaring_spec: coc ? cocForvaringSpec : null,
+          // Saluinfo
+          saludatum: saludatum || null,
+          salu_station: saluStation || null,
+          kopare_foretag: kopareForetag || null,
+          attention: attention || null,
+          returort: returort || null,
+          returadress: returadress || null,
+          notering_forsaljning: noteringForsaljning || null,
           // Damages
           har_skador_vid_leverans: harSkadorVidLeverans === true && damages.length > 0,
           skador: damages.map(d => ({
@@ -2106,36 +2128,27 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
   onCancel, 
   onConfirm 
 }) => {
-  // Format previous registration date and time
-  const formatPreviousDateTime = () => {
+  // Format previous registration time and date (e.g. "kl 12:51, 2025-11-29")
+  const formatPreviousTimeDate = () => {
     if (!previousRegistration) return '';
     
-    let dateTimeStr = previousRegistration.registreringsdatum;
     if (previousRegistration.created_at) {
       const createdDate = new Date(previousRegistration.created_at);
       const hours = createdDate.getHours().toString().padStart(2, '0');
       const minutes = createdDate.getMinutes().toString().padStart(2, '0');
-      dateTimeStr = `${previousRegistration.registreringsdatum} kl ${hours}:${minutes}`;
+      return `kl ${hours}:${minutes}, ${previousRegistration.registreringsdatum}`;
     }
-    return dateTimeStr;
+    return previousRegistration.registreringsdatum;
   };
 
-  // Build message based on where duplicate was found
-  let message = '';
-  const dateTimeStr = formatPreviousDateTime();
-  
-  if (existsInBilkontroll && existsInNybil && previousRegistration) {
-    message = `${regnr} finns både i Bilkontroll-listan och är registrerad i systemet (${dateTimeStr}).`;
-  } else if (existsInBilkontroll && existsInNybil) {
-    // Edge case: existsInNybil is true but previousRegistration is null
-    message = `${regnr} finns både i Bilkontroll-listan och i systemet.`;
+  // Build simple main message
+  let mainMessage = '';
+  if (existsInBilkontroll && existsInNybil) {
+    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat i både Bilkontroll-listan och systemet.`;
   } else if (existsInBilkontroll) {
-    message = `${regnr} finns redan i Bilkontroll-listan.`;
-  } else if (existsInNybil && previousRegistration) {
-    message = `${regnr} är redan registrerad i systemet (${dateTimeStr}).`;
+    mainMessage = `Registreringsnummer ${regnr} finns redan i Bilkontroll-listan.`;
   } else if (existsInNybil) {
-    // Edge case: existsInNybil is true but previousRegistration is null
-    message = `${regnr} är redan registrerad i systemet.`;
+    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat.`;
   }
 
   return (
@@ -2143,14 +2156,13 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
       <div className="modal-overlay" />
       <div className="modal-content warning-modal duplicate-warning-modal">
         <h3>Registreringsnummer finns redan</h3>
-        <p>{message}</p>
+        <p>{mainMessage}</p>
         {previousRegistration && (
-          <div className="duplicate-info">
-            <p><strong>Tidigare registrering:</strong></p>
-            <p>{previousRegistration.bilmarke} {previousRegistration.modell}</p>
-            {previousRegistration.fullstandigt_namn && (
-              <p><strong>Registrerad av:</strong> {previousRegistration.fullstandigt_namn}</p>
-            )}
+          <div className="duplicate-info" style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+            <p style={{ margin: '0 0 4px 0' }}><strong>Tidigare registrering:</strong> {previousRegistration.bilmarke} {previousRegistration.modell}</p>
+            <p style={{ margin: 0, color: '#6b7280' }}>
+              Registrerad av {previousRegistration.fullstandigt_namn || 'okänd'} {formatPreviousTimeDate()}
+            </p>
           </div>
         )}
         <div className="modal-actions">

@@ -143,6 +143,9 @@ interface NybilPayload {
   modell: string;
   matarstallning: string;
   hjultyp: string;
+  hjul_till_forvaring?: string | null;
+  hjul_forvaring_ort?: string | null;
+  hjul_forvaring_spec?: string | null;
   bransletyp: string;
   vaxel: string;
   plats_mottagning_ort: string;
@@ -157,9 +160,16 @@ interface NybilPayload {
   // Fuel/charging status
   tankstatus?: 'mottogs_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null;
   laddniva_procent?: number | null;
+  // MB/VW Connect
+  mbme_aktiverad?: boolean | null;
+  vw_connect_aktiverad?: boolean | null;
   // Equipment
   antal_nycklar?: number;
+  extranyckel_forvaring_ort?: string | null;
+  extranyckel_forvaring_spec?: string | null;
   antal_laddkablar?: number;
+  laddkablar_forvaring_ort?: string | null;
+  laddkablar_forvaring_spec?: string | null;
   dragkrok?: boolean;
   gummimattor?: boolean;
   dackkompressor?: boolean;
@@ -168,7 +178,19 @@ interface NybilPayload {
   antal_insynsskydd?: number;
   lasbultar_med?: boolean;
   instruktionsbok?: boolean;
+  instruktionsbok_forvaring_ort?: string | null;
+  instruktionsbok_forvaring_spec?: string | null;
   coc?: boolean;
+  coc_forvaring_ort?: string | null;
+  coc_forvaring_spec?: string | null;
+  // Saluinfo
+  saludatum?: string | null;
+  salu_station?: string | null;
+  kopare_foretag?: string | null;
+  attention?: string | null;
+  returort?: string | null;
+  returadress?: string | null;
+  notering_forsaljning?: string | null;
   // Damages
   har_skador_vid_leverans?: boolean;
   skador?: DamageInfo[];
@@ -191,6 +213,136 @@ interface NybilPayload {
   } | null;
   exists_in_bilkontroll?: boolean;
 }
+
+/**
+ * Helper function to build hjulförvaring section for email
+ */
+const buildHjulForvaringSection = (payload: NybilPayload): string => {
+  if (!payload.hjul_till_forvaring) return '';
+  
+  let content = `<tr><td style="padding:4px 0;"><strong>Hjul till förvaring:</strong> ${escapeHtml(payload.hjul_till_forvaring)}</td></tr>`;
+  
+  if (payload.hjul_forvaring_ort) {
+    content += `<tr><td style="padding:4px 0;"><strong>Förvaringsort:</strong> ${escapeHtml(payload.hjul_forvaring_ort)}</td></tr>`;
+  }
+  if (payload.hjul_forvaring_spec) {
+    content += `<tr><td style="padding:4px 0;"><strong>Förvaringsspecifikation:</strong> ${escapeHtml(payload.hjul_forvaring_spec)}</td></tr>`;
+  }
+  
+  return `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Hjulförvaring</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>${content}</tbody>
+      </table>
+    </td></tr>
+  `;
+};
+
+/**
+ * Helper function to build MB/VW Connect status section for email
+ */
+const buildConnectStatusSection = (payload: NybilPayload): string => {
+  const hasMbme = payload.mbme_aktiverad !== null && payload.mbme_aktiverad !== undefined;
+  const hasVwConnect = payload.vw_connect_aktiverad !== null && payload.vw_connect_aktiverad !== undefined;
+  const hasLaddniva = payload.laddniva_procent !== null && payload.laddniva_procent !== undefined;
+  
+  if (!hasMbme && !hasVwConnect && !hasLaddniva) return '';
+  
+  let content = '';
+  if (hasMbme) {
+    content += `<tr><td style="padding:4px 0;"><strong>MBme aktiverad:</strong> ${payload.mbme_aktiverad ? 'Ja' : 'Nej'}</td></tr>`;
+  }
+  if (hasVwConnect) {
+    content += `<tr><td style="padding:4px 0;"><strong>VW Connect aktiverad:</strong> ${payload.vw_connect_aktiverad ? 'Ja' : 'Nej'}</td></tr>`;
+  }
+  if (hasLaddniva) {
+    content += `<tr><td style="padding:4px 0;"><strong>Laddnivå vid ankomst:</strong> ${payload.laddniva_procent}%</td></tr>`;
+  }
+  
+  return `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Bilstatus</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>${content}</tbody>
+      </table>
+    </td></tr>
+  `;
+};
+
+/**
+ * Helper function to build saluinfo section for email
+ */
+const buildSaluinfoSection = (payload: NybilPayload): string => {
+  if (!payload.saludatum && !payload.salu_station && !payload.kopare_foretag) return '';
+  
+  let content = '';
+  if (payload.saludatum) {
+    content += `<tr><td style="padding:4px 0;"><strong>Saludatum:</strong> ${escapeHtml(payload.saludatum)}</td></tr>`;
+  }
+  if (payload.salu_station) {
+    content += `<tr><td style="padding:4px 0;"><strong>Salustation:</strong> ${escapeHtml(payload.salu_station)}</td></tr>`;
+  }
+  if (payload.kopare_foretag) {
+    content += `<tr><td style="padding:4px 0;"><strong>Köpare:</strong> ${escapeHtml(payload.kopare_foretag)}</td></tr>`;
+  }
+  if (payload.attention) {
+    content += `<tr><td style="padding:4px 0;"><strong>Attention:</strong> ${escapeHtml(payload.attention)}</td></tr>`;
+  }
+  if (payload.returort) {
+    content += `<tr><td style="padding:4px 0;"><strong>Returort:</strong> ${escapeHtml(payload.returort)}</td></tr>`;
+  }
+  if (payload.returadress) {
+    content += `<tr><td style="padding:4px 0;"><strong>Returadress:</strong> ${escapeHtml(payload.returadress)}</td></tr>`;
+  }
+  if (payload.notering_forsaljning) {
+    content += `<tr><td style="padding:4px 0;"><strong>Notering försäljning:</strong> ${escapeHtml(payload.notering_forsaljning)}</td></tr>`;
+  }
+  
+  return `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Saluinfo</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>${content}</tbody>
+      </table>
+    </td></tr>
+  `;
+};
+
+/**
+ * Helper function to build förvaring details section for email
+ */
+const buildForvaringDetailsSection = (payload: NybilPayload): string => {
+  const hasExtranyckelForvaring = payload.extranyckel_forvaring_ort || payload.extranyckel_forvaring_spec;
+  const hasLaddkablarForvaring = payload.laddkablar_forvaring_ort || payload.laddkablar_forvaring_spec;
+  const hasInstruktionsbokForvaring = payload.instruktionsbok_forvaring_ort || payload.instruktionsbok_forvaring_spec;
+  const hasCocForvaring = payload.coc_forvaring_ort || payload.coc_forvaring_spec;
+  
+  if (!hasExtranyckelForvaring && !hasLaddkablarForvaring && !hasInstruktionsbokForvaring && !hasCocForvaring) return '';
+  
+  let content = '';
+  if (hasExtranyckelForvaring) {
+    content += `<tr><td style="padding:4px 0;"><strong>Extranyckel förvaring:</strong> ${escapeHtml(payload.extranyckel_forvaring_ort || '')}${payload.extranyckel_forvaring_spec ? ` - ${escapeHtml(payload.extranyckel_forvaring_spec)}` : ''}</td></tr>`;
+  }
+  if (hasLaddkablarForvaring) {
+    content += `<tr><td style="padding:4px 0;"><strong>Laddkablar förvaring:</strong> ${escapeHtml(payload.laddkablar_forvaring_ort || '')}${payload.laddkablar_forvaring_spec ? ` - ${escapeHtml(payload.laddkablar_forvaring_spec)}` : ''}</td></tr>`;
+  }
+  if (hasInstruktionsbokForvaring) {
+    content += `<tr><td style="padding:4px 0;"><strong>Instruktionsbok förvaring:</strong> ${escapeHtml(payload.instruktionsbok_forvaring_ort || '')}${payload.instruktionsbok_forvaring_spec ? ` - ${escapeHtml(payload.instruktionsbok_forvaring_spec)}` : ''}</td></tr>`;
+  }
+  if (hasCocForvaring) {
+    content += `<tr><td style="padding:4px 0;"><strong>COC-dokument förvaring:</strong> ${escapeHtml(payload.coc_forvaring_ort || '')}${payload.coc_forvaring_spec ? ` - ${escapeHtml(payload.coc_forvaring_spec)}` : ''}</td></tr>`;
+  }
+  
+  return `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Förvaringsdetaljer</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>${content}</tbody>
+      </table>
+    </td></tr>
+  `;
+};
 
 /**
  * Build the email for Nybil registration - HUVUDSTATION version
@@ -351,6 +503,12 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     </td></tr>
   ` : '';
   
+  // Additional sections using helper functions
+  const hjulForvaringSection = buildHjulForvaringSection(payload);
+  const connectStatusSection = buildConnectStatusSection(payload);
+  const saluinfoSection = buildSaluinfoSection(payload);
+  const forvaringDetailsSection = buildForvaringDetailsSection(payload);
+  
   // Build content - Klar för uthyrning comes BEFORE Övrigt
   const content = `
     <tr><td style="text-align:center;padding-bottom:20px;">
@@ -374,8 +532,12 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
         </table>
       </div>
     </td></tr>
+    ${hjulForvaringSection}
+    ${connectStatusSection}
     ${contractSection}
     ${equipmentSection}
+    ${forvaringDetailsSection}
+    ${saluinfoSection}
     ${klarForUthyrningSection}
     ${ovrigtSection}
     ${statusLinkSection}
@@ -542,6 +704,12 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     </td></tr>
   ` : '';
   
+  // Additional sections using helper functions
+  const hjulForvaringSection = buildHjulForvaringSection(payload);
+  const connectStatusSection = buildConnectStatusSection(payload);
+  const saluinfoSection = buildSaluinfoSection(payload);
+  const forvaringDetailsSection = buildForvaringDetailsSection(payload);
+  
   // Build content - Klar för uthyrning comes BEFORE Övrigt
   const content = `
     <tr><td style="text-align:center;padding-bottom:20px;">
@@ -565,8 +733,12 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
         </table>
       </div>
     </td></tr>
+    ${hjulForvaringSection}
+    ${connectStatusSection}
     ${contractSection}
     ${equipmentSection}
+    ${forvaringDetailsSection}
+    ${saluinfoSection}
     ${klarForUthyrningSection}
     ${ovrigtSection}
     ${statusLinkSection}
@@ -759,6 +931,12 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     </td></tr>
   `;
   
+  // Additional sections using helper functions
+  const hjulForvaringSection = buildHjulForvaringSection(payload);
+  const connectStatusSection = buildConnectStatusSection(payload);
+  const saluinfoSection = buildSaluinfoSection(payload);
+  const forvaringDetailsSection = buildForvaringDetailsSection(payload);
+  
   const content = `
     <tr><td style="text-align:center;padding-bottom:20px;">
       <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${escapeHtml(regNr)} - Dubblett skapad</h1>
@@ -784,8 +962,12 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
         </table>
       </div>
     </td></tr>
+    ${hjulForvaringSection}
+    ${connectStatusSection}
     ${contractSection}
     ${equipmentSection}
+    ${forvaringDetailsSection}
+    ${saluinfoSection}
     ${klarForUthyrningSection}
     ${ovrigtSection}
     ${statusLinkSection}
