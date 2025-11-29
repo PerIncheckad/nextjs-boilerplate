@@ -812,7 +812,7 @@ export default function NybilForm() {
   const checkForDuplicate = async (regnr: string): Promise<{
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
-    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
+    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
   }> => {
     const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
     console.log('Checking duplicate for:', normalizedRegnr);
@@ -830,9 +830,10 @@ export default function NybilForm() {
     console.log('Vehicle match:', vehicleMatch);
     
     // Check nybil_inventering table - use ilike for case-insensitive matching
+    // Include created_at and fullstandigt_namn for modal display
     const { data: nybilMatch, error: nybilError } = await supabase
       .from('nybil_inventering')
-      .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id')
+      .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id, created_at, fullstandigt_namn')
       .ilike('regnr', normalizedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -1011,7 +1012,9 @@ export default function NybilForm() {
         hjultyp,
         monterade_dack: hjultyp, // Alias for hjultyp (what tires are mounted)
         hjul_ej_monterade: hjulTillForvaring,
+        hjul_till_forvaring: hjulTillForvaring, // Alias for hjul_ej_monterade column
         hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
+        hjul_forvaring_station: wheelsNeedStorage ? hjulForvaringOrt : null, // Alias for hjul_forvaring_ort column
         hjul_forvaring: wheelsNeedStorage ? hjulForvaringSpec : null,
         bransletyp: mapBransletypForDb(bransletyp),
         vaxel: effectiveVaxel,
@@ -2090,7 +2093,7 @@ type DuplicateWarningModalProps = {
   regnr: string;
   existsInBilkontroll: boolean;
   existsInNybil: boolean;
-  previousRegistration: { regnr: string; registreringsdatum: string; bilmarke: string; modell: string } | null;
+  previousRegistration: { regnr: string; registreringsdatum: string; bilmarke: string; modell: string; created_at?: string; fullstandigt_namn?: string } | null;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -2103,17 +2106,33 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
   onCancel, 
   onConfirm 
 }) => {
+  // Format previous registration date and time
+  const formatPreviousDateTime = () => {
+    if (!previousRegistration) return '';
+    
+    let dateTimeStr = previousRegistration.registreringsdatum;
+    if (previousRegistration.created_at) {
+      const createdDate = new Date(previousRegistration.created_at);
+      const hours = createdDate.getHours().toString().padStart(2, '0');
+      const minutes = createdDate.getMinutes().toString().padStart(2, '0');
+      dateTimeStr = `${previousRegistration.registreringsdatum} kl ${hours}:${minutes}`;
+    }
+    return dateTimeStr;
+  };
+
   // Build message based on where duplicate was found
   let message = '';
+  const dateTimeStr = formatPreviousDateTime();
+  
   if (existsInBilkontroll && existsInNybil && previousRegistration) {
-    message = `${regnr} finns både i Bilkontroll-listan och är registrerad i systemet (${previousRegistration.registreringsdatum}).`;
+    message = `${regnr} finns både i Bilkontroll-listan och är registrerad i systemet (${dateTimeStr}).`;
   } else if (existsInBilkontroll && existsInNybil) {
     // Edge case: existsInNybil is true but previousRegistration is null
     message = `${regnr} finns både i Bilkontroll-listan och i systemet.`;
   } else if (existsInBilkontroll) {
     message = `${regnr} finns redan i Bilkontroll-listan.`;
   } else if (existsInNybil && previousRegistration) {
-    message = `${regnr} är redan registrerad i systemet (${previousRegistration.registreringsdatum}).`;
+    message = `${regnr} är redan registrerad i systemet (${dateTimeStr}).`;
   } else if (existsInNybil) {
     // Edge case: existsInNybil is true but previousRegistration is null
     message = `${regnr} är redan registrerad i systemet.`;
@@ -2129,6 +2148,9 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
           <div className="duplicate-info">
             <p><strong>Tidigare registrering:</strong></p>
             <p>{previousRegistration.bilmarke} {previousRegistration.modell}</p>
+            {previousRegistration.fullstandigt_namn && (
+              <p><strong>Registrerad av:</strong> {previousRegistration.fullstandigt_namn}</p>
+            )}
           </div>
         )}
         <div className="modal-actions">
