@@ -845,10 +845,17 @@ export default function NybilForm() {
     console.log('Nybil match:', nybilMatch);
     console.log('Nybil match id type:', typeof nybilMatch?.id, 'value:', nybilMatch?.id);
     
+    // Helper function to safely convert ID (handles BigInt strings from Supabase)
+    const safeParseId = (id: unknown): number | null => {
+      if (id == null) return null;
+      const parsed = Number(id);
+      return isNaN(parsed) ? null : parsed;
+    };
+    
     // Ensure id is converted to number (Supabase might return BigInt as string)
     const previousRegistration = nybilMatch ? {
       ...nybilMatch,
-      id: nybilMatch.id ? Number(nybilMatch.id) : null
+      id: safeParseId(nybilMatch.id)
     } : null;
     
     const result = {
@@ -992,17 +999,15 @@ export default function NybilForm() {
       
       // Get the numeric ID from the previous registration (for original_registration_id)
       // This references the FIRST registration for this reg.nr
-      const previousRegId = duplicateInfo?.previousRegistration?.id;
-      const originalRegistrationId = isDuplicate && previousRegId != null && !isNaN(Number(previousRegId))
-        ? Number(previousRegId)
+      // Note: ID was already converted to number in checkForDuplicate() before storing in state
+      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id != null
+        ? duplicateInfo.previousRegistration.id
         : null;
       
       console.log('Duplicate fields:', {
         isDuplicate,
         duplicateGroupId,
         originalRegistrationId,
-        previousRegIdRaw: previousRegId,
-        previousRegIdType: typeof previousRegId,
         previousRegistration: duplicateInfo?.previousRegistration
       });
       
