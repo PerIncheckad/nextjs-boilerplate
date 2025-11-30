@@ -146,23 +146,32 @@ async function uploadToStorage(file: File, path: string, bucket: string, upsert:
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000;
   
+  console.log(`Uploading to bucket: ${bucket}, path: ${path}, file: ${file.name}, type: ${file.type}, size: ${file.size}`);
+  
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const { error } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type, upsert });
+      const { error, data: uploadData } = await supabase.storage.from(bucket).upload(path, file, { contentType: file.type, upsert });
+      
+      console.log(`Upload attempt ${attempt}/${MAX_RETRIES} - result:`, { error, uploadData });
       
       if (error && !/already exists/i.test(error.message || '')) {
-        console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, error);
+        console.error(`Storage upload error for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, {
+          message: error.message,
+          name: error.name,
+          error: JSON.stringify(error)
+        });
         
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
         }
         
-        throw new Error('Fel vid uppladdning av foto. Vänligen försök igen.');
+        throw new Error(`Fel vid uppladdning av foto: ${error.message}`);
       }
       
       const { data, error: urlError } = supabase.storage.from(bucket).getPublicUrl(path);
       if (urlError || !data?.publicUrl) {
+        console.error(`Error getting public URL for ${path}:`, urlError);
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
@@ -170,8 +179,11 @@ async function uploadToStorage(file: File, path: string, bucket: string, upsert:
         throw new Error('Fel vid uppladdning. Vänligen försök igen.');
       }
       
+      console.log(`Upload successful, public URL: ${data.publicUrl}`);
       return data.publicUrl;
     } catch (e) {
+      console.error(`Upload exception (attempt ${attempt}/${MAX_RETRIES}):`, e);
+      
       if (e instanceof Error && e.message.includes('Fel vid uppladdning')) {
         throw e;
       }
@@ -287,6 +299,15 @@ export default function NybilForm() {
   const [showRegWarningModal, setShowRegWarningModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [matarstallningError, setMatarstallningError] = useState('');
+  
+  // Duplicate detection state
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    existsInBilkontroll: boolean;
+    existsInNybil: boolean;
+    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
+  } | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
   
   // Photo state
   const [photoFront, setPhotoFront] = useState<PhotoFile | null>(null);
@@ -648,6 +669,10 @@ export default function NybilForm() {
     setShowFieldErrors(false);
     setShowRegWarningModal(false);
     setShowConfirmModal(false);
+    // Reset duplicate state
+    setShowDuplicateModal(false);
+    setDuplicateInfo(null);
+    setIsDuplicate(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
   
@@ -783,28 +808,106 @@ export default function NybilForm() {
     return true; // Validation passed
   };
 
-  const handleRegisterClick = () => {
-    // Reset error
+  // Check for duplicate registrations
+  const checkForDuplicate = async (regnr: string): Promise<{
+    existsInBilkontroll: boolean;
+    existsInNybil: boolean;
+    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
+  }> => {
+    const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
+    console.log('Checking duplicate for:', normalizedRegnr);
+    
+    // Check vehicles table (Bilkontroll-filen) - use ilike for case-insensitive matching
+    const { data: vehicleMatch, error: vehicleError } = await supabase
+      .from('vehicles')
+      .select('regnr')
+      .ilike('regnr', normalizedRegnr)
+      .maybeSingle();
+    
+    if (vehicleError) {
+      console.error('Error checking vehicles table:', vehicleError);
+    }
+    console.log('Vehicle match:', vehicleMatch);
+    
+    // Check nybil_inventering table - use ilike for case-insensitive matching
+    // Include created_at and fullstandigt_namn for modal display
+    const { data: nybilMatch, error: nybilError } = await supabase
+      .from('nybil_inventering')
+      .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id, created_at, fullstandigt_namn')
+      .ilike('regnr', normalizedRegnr)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (nybilError) {
+      console.error('Error checking nybil_inventering table:', nybilError);
+    }
+    console.log('Nybil match:', nybilMatch);
+    
+    const result = {
+      existsInBilkontroll: !!vehicleMatch,
+      existsInNybil: !!nybilMatch,
+      previousRegistration: nybilMatch
+    };
+    console.log('Duplicate result:', result);
+    
+    return result;
+  };
+
+  const handleRegisterClick = async () => {
+    console.log('handleRegisterClick called');
+    // Reset error and duplicate state
     setMatarstallningError('');
+    setIsDuplicate(false);
+    setDuplicateInfo(null);
     
     if (!formIsValid) {
+      console.log('Form is not valid, showing errors');
       handleShowErrors();
       return;
     }
     // Step 1: Check reg nr format - if invalid, show warning modal (user can confirm to proceed)
     if (!isRegNrValid) {
+      console.log('Reg nr format invalid, showing warning modal');
       setShowRegWarningModal(true);
       return;
     }
     // Step 2: Mätarställning validation - this BLOCKS submission
     if (!validateMatarstallning()) {
+      console.log('Mätarställning validation failed');
       return;
     }
-    // Step 3: All validations passed - show confirmation modal
+    // Step 3: Check for duplicates
+    console.log('Checking for duplicates with normalizedReg:', normalizedReg);
+    try {
+      const duplicateResult = await checkForDuplicate(normalizedReg);
+      console.log('Duplicate check completed:', duplicateResult);
+      if (duplicateResult.existsInBilkontroll || duplicateResult.existsInNybil) {
+        console.log('Duplicate found! Showing duplicate modal');
+        setDuplicateInfo(duplicateResult);
+        setShowDuplicateModal(true);
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking for duplicates:', error);
+      // Continue anyway - don't block registration if duplicate check fails
+    }
+    // Step 4: All validations passed - show confirmation modal
+    console.log('No duplicate found, showing confirmation modal');
+    setShowConfirmModal(true);
+  };
+
+  // Handle creating a duplicate registration
+  const handleCreateDuplicate = () => {
+    setShowDuplicateModal(false);
+    setIsDuplicate(true);
     setShowConfirmModal(true);
   };
   
   const handleConfirmAndSubmit = async () => {
+    console.log('handleConfirmAndSubmit called');
+    console.log('isDuplicate:', isDuplicate);
+    console.log('duplicateInfo:', duplicateInfo);
     setShowConfirmModal(false);
     setShowRegWarningModal(false);
     setIsSaving(true);
@@ -818,7 +921,35 @@ export default function NybilForm() {
       
       // Upload photos to Supabase Storage
       const dateStr = formatDateForFolder(now);
-      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL`;
+      
+      // Determine folder suffix for duplicates
+      // For duplicates, query to count existing registrations for this regnr+date
+      let folderSuffix = '';
+      if (isDuplicate) {
+        try {
+          const { data: existingRegs, error } = await supabase
+            .from('nybil_inventering')
+            .select('id')
+            .eq('regnr', normalizedReg)
+            .eq('registreringsdatum', now.toISOString().split('T')[0]);
+          
+          if (!error && existingRegs) {
+            const duplicateCount = existingRegs.length;
+            folderSuffix = `-DUBBLETT-${duplicateCount}`;
+          } else {
+            // Fallback to timestamp if query fails
+            folderSuffix = `-DUBBLETT-${Math.floor(now.getTime() / 1000)}`;
+          }
+        } catch (e) {
+          console.error('Error counting duplicates:', e);
+          // Fallback to timestamp
+          folderSuffix = `-DUBBLETT-${Math.floor(now.getTime() / 1000)}`;
+        }
+      }
+      
+      console.log('Creating media folder with normalizedReg:', normalizedReg, 'regInput:', regInput);
+      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL${folderSuffix}`;
+      console.log('Media folder path:', mediaFolder);
       const photoUrls: string[] = [];
       
       // Upload front photo
@@ -846,22 +977,44 @@ export default function NybilForm() {
       // Upload damage photos to damage-photos bucket and save to damages table
       let savedNybilId: number | null = null;
       
+      // Generate duplicate_group_id if this is a duplicate
+      const duplicateGroupId = isDuplicate 
+        ? (duplicateInfo?.previousRegistration?.duplicate_group_id || crypto.randomUUID())
+        : null;
+      
+      // Get the numeric ID from the previous registration (for original_registration_id)
+      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id
+        ? Number(duplicateInfo.previousRegistration.id)
+        : null;
+      
+      console.log('Duplicate fields:', {
+        isDuplicate,
+        duplicateGroupId,
+        originalRegistrationId,
+        previousRegistration: duplicateInfo?.previousRegistration
+      });
+      
       const inventoryData = {
         regnr: normalizedReg,
         bilmarke: effectiveBilmarke,
         bilmarke_annat: bilmarke === 'Annat' ? bilmarkeAnnat : null,
         modell,
+        bilmodell: modell, // Alias for modell column
         registrerad_av: firstName,
         fullstandigt_namn: fullName,
         registreringsdatum: now.toISOString().split('T')[0],
+        ankomstdatum: now.toISOString().split('T')[0], // Alias for registreringsdatum
         plats_mottagning_ort: ort,
         plats_mottagning_station: station,
         planerad_station: planeradStation,
         planerad_station_id: planeradStationObj?.id || null,
         matarstallning_inkop: matarstallning,
         hjultyp,
+        monterade_dack: hjultyp, // Alias for hjultyp (what tires are mounted)
         hjul_ej_monterade: hjulTillForvaring,
+        hjul_till_forvaring: hjulTillForvaring, // Alias for hjul_ej_monterade column
         hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
+        hjul_forvaring_station: wheelsNeedStorage ? hjulForvaringOrt : null, // Alias for hjul_forvaring_ort column
         hjul_forvaring: wheelsNeedStorage ? hjulForvaringSpec : null,
         bransletyp: mapBransletypForDb(bransletyp),
         vaxel: effectiveVaxel,
@@ -889,6 +1042,7 @@ export default function NybilForm() {
         dragkrok,
         gummimattor,
         dackkompressor,
+        kompressor: dackkompressor, // Alias for dackkompressor column
         stold_gps: stoldGps,
         stold_gps_spec: stoldGps ? stoldGpsSpec : null,
         mbme_aktiverad: showMbmeQuestion ? mbmeAktiverad : null,
@@ -909,12 +1063,18 @@ export default function NybilForm() {
         har_skador_vid_leverans: harSkadorVidLeverans === true && damages.length > 0,
         photo_urls: photoUrls,
         video_urls: [],
-        media_folder: mediaFolder
+        media_folder: mediaFolder,
+        // Duplicate handling fields
+        is_duplicate: isDuplicate,
+        duplicate_group_id: duplicateGroupId,
+        original_registration_id: originalRegistrationId
       };
+      console.log('Attempting to insert inventoryData:', inventoryData);
       const { data, error } = await supabase
         .from('nybil_inventering')
         .insert([inventoryData])
         .select();
+      console.log('Database insert result - data:', data, 'error:', error);
       if (error) {
         console.error('Database error:', error);
         alert(`Fel vid sparande: ${error.message}`);
@@ -922,6 +1082,7 @@ export default function NybilForm() {
       }
       
       savedNybilId = data?.[0]?.id || null;
+      console.log('Saved nybil ID:', savedNybilId);
       
       // Upload damage photos and save to damages table
       // Track uploaded damage photo URLs for email notification
@@ -935,11 +1096,11 @@ export default function NybilForm() {
           const damagePhotoUrls: string[] = [];
           
           // Build folder name for NYBIL damage photos:
-          // REGNR/REGNR-YYYYMMDD-NYBIL/YYYYMMDD-skadetyp-placering-position-förnamn/
+          // REGNR/REGNR-YYYYMMDD-NYBIL{-DUBBLETT-N}/YYYYMMDD-skadetyp-placering-position-förnamn/
           const skadetyp = slugify(damage.damageType);
           const positionString = buildPositionString(damage.positions);
           
-          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
+          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL${folderSuffix}/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
           
           // Build filename: REGNR-YYYYMMDD-skadetyp-placering_N.ext
           const baseFileName = `${normalizedReg}-${dateStr}-${skadetyp}-${positionString}`;
@@ -1002,6 +1163,9 @@ export default function NybilForm() {
           modell,
           matarstallning,
           hjultyp,
+          hjul_till_forvaring: hjulTillForvaring,
+          hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
+          hjul_forvaring_spec: wheelsNeedStorage ? hjulForvaringSpec : null,
           bransletyp,
           vaxel: effectiveVaxel,
           plats_mottagning_ort: ort,
@@ -1016,9 +1180,16 @@ export default function NybilForm() {
           // Fuel/charging status
           tankstatus: !isElectric ? tankstatus : null,
           laddniva_procent: isElectric && laddnivaProcent ? parseInt(laddnivaProcent, 10) : null,
+          // MB/VW Connect status
+          mbme_aktiverad: showMbmeQuestion ? mbmeAktiverad : null,
+          vw_connect_aktiverad: showVwConnectQuestion ? vwConnectAktiverad : null,
           // Equipment
           antal_nycklar: antalNycklar,
+          extranyckel_forvaring_ort: antalNycklar === 2 ? extranyckelForvaringOrt : null,
+          extranyckel_forvaring_spec: antalNycklar === 2 ? extranyckelForvaringSpec : null,
           antal_laddkablar: needsLaddkablar ? antalLaddkablar : 0,
+          laddkablar_forvaring_ort: laddkablarNeedsStorage ? laddkablarForvaringOrt : null,
+          laddkablar_forvaring_spec: laddkablarNeedsStorage ? laddkablarForvaringSpec : null,
           dragkrok,
           gummimattor,
           dackkompressor,
@@ -1027,7 +1198,19 @@ export default function NybilForm() {
           antal_insynsskydd: antalInsynsskydd,
           lasbultar_med: lasbultarMed,
           instruktionsbok,
+          instruktionsbok_forvaring_ort: instruktionsbok ? instruktionsbokForvaringOrt : null,
+          instruktionsbok_forvaring_spec: instruktionsbok ? instruktionsbokForvaringSpec : null,
           coc,
+          coc_forvaring_ort: coc ? cocForvaringOrt : null,
+          coc_forvaring_spec: coc ? cocForvaringSpec : null,
+          // Saluinfo
+          saludatum: saludatum || null,
+          salu_station: saluStation || null,
+          kopare_foretag: kopareForetag || null,
+          attention: attention || null,
+          returort: returort || null,
+          returadress: returadress || null,
+          notering_forsaljning: noteringForsaljning || null,
           // Damages
           har_skador_vid_leverans: harSkadorVidLeverans === true && damages.length > 0,
           skador: damages.map(d => ({
@@ -1047,9 +1230,19 @@ export default function NybilForm() {
           // Metadata
           registrerad_av: fullName,
           photo_urls: photoUrls,
-          media_folder: mediaFolder
+          media_folder: mediaFolder,
+          // Duplicate info
+          is_duplicate: isDuplicate,
+          previous_registration: isDuplicate && duplicateInfo?.previousRegistration ? {
+            regnr: duplicateInfo.previousRegistration.regnr,
+            registreringsdatum: duplicateInfo.previousRegistration.registreringsdatum,
+            bilmarke: duplicateInfo.previousRegistration.bilmarke,
+            modell: duplicateInfo.previousRegistration.modell
+          } : null,
+          exists_in_bilkontroll: duplicateInfo?.existsInBilkontroll || false
         };
 
+        console.log('Sending email notification with payload:', emailPayload);
         const notifyResponse = await fetch('/api/notify-nybil', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1057,7 +1250,8 @@ export default function NybilForm() {
         });
 
         if (!notifyResponse.ok) {
-          console.error('Email notification failed:', await notifyResponse.text());
+          const errorText = await notifyResponse.text();
+          console.error('Email notification failed:', errorText);
           // Continue - email failure shouldn't block success
         } else {
           console.log('Email notification sent successfully');
@@ -1067,7 +1261,7 @@ export default function NybilForm() {
         // Continue - email failure shouldn't block success
       }
       
-      console.log('Successfully saved:', data);
+      console.log('Registration complete, showing success modal');
       setShowSuccessModal(true);
       setTimeout(() => {
         setShowSuccessModal(false);
@@ -1188,16 +1382,44 @@ export default function NybilForm() {
           title="Registreringsnummer"
           message={`Är du säker? ${normalizedReg} är inte i standardformat.`}
           onCancel={() => setShowRegWarningModal(false)}
-          onConfirm={() => {
+          onConfirm={async () => {
             setShowRegWarningModal(false);
             // After confirming reg.nr warning, run mätarställning validation
             if (!validateMatarstallning()) {
               return; // Block if mätarställning validation fails
             }
+            // Check for duplicates before showing confirmation modal
+            console.log('Reg warning confirmed, checking for duplicates with:', normalizedReg);
+            try {
+              const duplicateResult = await checkForDuplicate(normalizedReg);
+              console.log('Duplicate check result after reg warning:', duplicateResult);
+              if (duplicateResult.existsInBilkontroll || duplicateResult.existsInNybil) {
+                console.log('Duplicate found after reg warning! Showing duplicate modal');
+                setDuplicateInfo(duplicateResult);
+                setShowDuplicateModal(true);
+                return;
+              }
+            } catch (error) {
+              console.error('Error checking for duplicates after reg warning:', error);
+              // Continue anyway - don't block registration if duplicate check fails
+            }
             setShowConfirmModal(true);
           }}
           cancelText="Avbryt"
           confirmText="Fortsätt ändå"
+        />
+      )}
+      {showDuplicateModal && duplicateInfo && (
+        <DuplicateWarningModal
+          regnr={normalizedReg}
+          existsInBilkontroll={duplicateInfo.existsInBilkontroll}
+          existsInNybil={duplicateInfo.existsInNybil}
+          previousRegistration={duplicateInfo.previousRegistration}
+          onCancel={() => {
+            setShowDuplicateModal(false);
+            setDuplicateInfo(null);
+          }}
+          onConfirm={handleCreateDuplicate}
         />
       )}
       {showConfirmModal && (
@@ -1889,6 +2111,69 @@ const WarningModal: React.FC<WarningModalProps> = ({ title, message, onCancel, o
   </>
 );
 
+type DuplicateWarningModalProps = {
+  regnr: string;
+  existsInBilkontroll: boolean;
+  existsInNybil: boolean;
+  previousRegistration: { regnr: string; registreringsdatum: string; bilmarke: string; modell: string; created_at?: string; fullstandigt_namn?: string } | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+};
+
+const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({ 
+  regnr, 
+  existsInBilkontroll, 
+  existsInNybil, 
+  previousRegistration, 
+  onCancel, 
+  onConfirm 
+}) => {
+  // Format previous registration time and date (e.g. "kl 12:51, 2025-11-29")
+  const formatPreviousTimeDate = () => {
+    if (!previousRegistration) return '';
+    
+    if (previousRegistration.created_at) {
+      const createdDate = new Date(previousRegistration.created_at);
+      const hours = createdDate.getHours().toString().padStart(2, '0');
+      const minutes = createdDate.getMinutes().toString().padStart(2, '0');
+      return `kl ${hours}:${minutes}, ${previousRegistration.registreringsdatum}`;
+    }
+    return previousRegistration.registreringsdatum;
+  };
+
+  // Build simple main message
+  let mainMessage = '';
+  if (existsInBilkontroll && existsInNybil) {
+    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat i både Bilkontroll-listan och systemet.`;
+  } else if (existsInBilkontroll) {
+    mainMessage = `Registreringsnummer ${regnr} finns redan i Bilkontroll-listan.`;
+  } else if (existsInNybil) {
+    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat.`;
+  }
+
+  return (
+    <>
+      <div className="modal-overlay" />
+      <div className="modal-content warning-modal duplicate-warning-modal">
+        <h3>Registreringsnummer finns redan</h3>
+        <p>{mainMessage}</p>
+        {previousRegistration && (
+          <div className="duplicate-info" style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+            <p style={{ margin: '0 0 4px 0' }}><strong>Tidigare registrering:</strong> {previousRegistration.bilmarke} {previousRegistration.modell}</p>
+            <p style={{ margin: 0, color: '#6b7280' }}>
+              Registrerad av {previousRegistration.fullstandigt_namn || 'okänd'} {formatPreviousTimeDate()}
+            </p>
+          </div>
+        )}
+        <div className="modal-actions">
+          <button onClick={onCancel} className="btn secondary">Avbryt</button>
+          <button onClick={onConfirm} className="btn primary">Skapa dubblett</button>
+        </div>
+      </div>
+    </>
+  );
+};
+
 type DamageSummary = {
   damageType: string;
   placement: string;
@@ -2345,6 +2630,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-photo-count { font-size:0.75rem; color:var(--color-text-secondary); }
     .summary-section-warning { background-color:var(--color-danger-light); padding:1rem; border-radius:8px; border:1px solid var(--color-danger); }
     .summary-section-warning h4 { color:var(--color-danger); margin:0 0 0.5rem 0; }
+    /* Duplicate warning modal styles */
+    .duplicate-warning-modal h3 { color:var(--color-warning); }
+    .duplicate-warning-modal .duplicate-info { background-color:var(--color-bg); padding:0.75rem; border-radius:6px; margin:1rem 0; }
+    .duplicate-warning-modal .duplicate-info p { margin:0.25rem 0; font-size:0.9rem; }
     @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } .photo-grid { grid-template-columns:1fr; } .damage-item-card { flex-direction:column; align-items:flex-start; gap:0.5rem; } .damage-actions { width:100%; } .damage-actions button { flex:1; } }
   `}</style>
 );
