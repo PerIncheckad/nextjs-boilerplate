@@ -843,13 +843,28 @@ export default function NybilForm() {
       console.error('Error checking nybil_inventering table:', nybilError);
     }
     console.log('Nybil match:', nybilMatch);
+    console.log('Nybil match id type:', typeof nybilMatch?.id, 'value:', nybilMatch?.id);
+    
+    // Helper function to safely convert ID (handles BigInt strings from Supabase)
+    const safeParseId = (id: unknown): number | null => {
+      if (id == null) return null;
+      const parsed = Number(id);
+      return isNaN(parsed) ? null : parsed;
+    };
+    
+    // Ensure id is converted to number (Supabase might return BigInt as string)
+    const previousRegistration = nybilMatch ? {
+      ...nybilMatch,
+      id: safeParseId(nybilMatch.id)
+    } : null;
     
     const result = {
       existsInBilkontroll: !!vehicleMatch,
       existsInNybil: !!nybilMatch,
-      previousRegistration: nybilMatch
+      previousRegistration: previousRegistration as { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null
     };
     console.log('Duplicate result:', result);
+    console.log('previousRegistration.id:', previousRegistration?.id, 'type:', typeof previousRegistration?.id);
     
     return result;
   };
@@ -983,8 +998,10 @@ export default function NybilForm() {
         : null;
       
       // Get the numeric ID from the previous registration (for original_registration_id)
-      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id
-        ? Number(duplicateInfo.previousRegistration.id)
+      // This references the FIRST registration for this reg.nr
+      // Note: ID was already converted to number in checkForDuplicate() before storing in state
+      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id != null
+        ? duplicateInfo.previousRegistration.id
         : null;
       
       console.log('Duplicate fields:', {
@@ -2141,22 +2158,11 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
     return previousRegistration.registreringsdatum;
   };
 
-  // Build simple main message
-  let mainMessage = '';
-  if (existsInBilkontroll && existsInNybil) {
-    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat i både Bilkontroll-listan och systemet.`;
-  } else if (existsInBilkontroll) {
-    mainMessage = `Registreringsnummer ${regnr} finns redan i Bilkontroll-listan.`;
-  } else if (existsInNybil) {
-    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat.`;
-  }
-
   return (
     <>
       <div className="modal-overlay" />
       <div className="modal-content warning-modal duplicate-warning-modal">
-        <h3>Registreringsnummer finns redan</h3>
-        <p>{mainMessage}</p>
+        <h3>Reg.nr {regnr} är redan registrerat</h3>
         {previousRegistration && (
           <div className="duplicate-info" style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
             <p style={{ margin: '0 0 4px 0' }}><strong>Tidigare registrering:</strong> {previousRegistration.bilmarke} {previousRegistration.modell}</p>
@@ -2164,6 +2170,11 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
               Registrerad av {previousRegistration.fullstandigt_namn || 'okänd'} {formatPreviousTimeDate()}
             </p>
           </div>
+        )}
+        {existsInBilkontroll && !existsInNybil && (
+          <p style={{ marginTop: '16px', color: '#6b7280', fontStyle: 'italic' }}>
+            Finns i Bilkontroll-listan.
+          </p>
         )}
         <div className="modal-actions">
           <button onClick={onCancel} className="btn secondary">Avbryt</button>

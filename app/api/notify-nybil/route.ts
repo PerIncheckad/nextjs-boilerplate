@@ -346,20 +346,16 @@ const buildForvaringDetailsSection = (payload: NybilPayload): string => {
 
 /**
  * Build the email for Nybil registration - HUVUDSTATION version
- * Includes blue banners for "Måste tankas!" and "Säkerställ bilens laddnivå"
+ * SHORT email with only basic info (bilmärke, modell, planerad station, foton)
+ * Includes blue banners for "Måste tankas!" and "Kolla bilens laddnivå"
  */
 const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: string, siteUrl: string): string => {
   const regNr = payload.regnr || '';
   const registreradAv = payload.registrerad_av || '---';
   
-  // Build fact box content
+  // Build basic fact box content (simplified for huvudstation)
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
-  const hjultyp = payload.hjultyp || '---';
-  const drivmedel = payload.bransletyp || '---';
-  const vaxel = payload.vaxel || '---';
-  const platsMottagningOrt = payload.plats_mottagning_ort || '---';
   const planeradStation = payload.planerad_station || '---';
   const bilenStarNuOrt = payload.plats_aktuell_ort || '---';
   const bilenStarNuStation = payload.plats_aktuell_station || '---';
@@ -382,65 +378,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
   `;
   
-  // Contract terms section
-  const serviceintervall = payload.serviceintervall || '---';
-  const maxKmManad = payload.max_km_manad || '---';
-  const avgiftOverKm = payload.avgift_over_km ? `${payload.avgift_over_km} kr` : '---';
-  
-  const contractSection = `
-    <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Avtalsvillkor</h3>
-      <table width="100%" style="font-size:14px;">
-        <tbody>
-          <tr><td style="padding:4px 0;"><strong>Serviceintervall:</strong> ${escapeHtml(serviceintervall)}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Max km/månad:</strong> ${escapeHtml(maxKmManad)}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Avgift över-km:</strong> ${escapeHtml(avgiftOverKm)}</td></tr>
-        </tbody>
-      </table>
-    </td></tr>
-  `;
-  
-  // Equipment section
-  const antalNycklar = payload.antal_nycklar ?? '---';
-  const antalLaddkablar = payload.antal_laddkablar ?? 0;
-  const dragkrok = payload.dragkrok ? 'Ja' : 'Nej';
-  const gummimattor = payload.gummimattor ? 'Ja' : 'Nej';
-  const dackkompressor = payload.dackkompressor ? 'Ja' : 'Nej';
-  const stoldGps = payload.stold_gps ? 'Ja' : 'Nej';
-  const antalInsynsskydd = payload.antal_insynsskydd ?? 0;
-  const lasbultarMed = payload.lasbultar_med ? 'Ja' : 'Nej';
-  const instruktionsbok = payload.instruktionsbok ? 'Ja' : 'Nej';
-  const coc = payload.coc ? 'Ja' : 'Nej';
-  
-  const equipmentSection = `
-    <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Utrustning</h3>
-      <table width="100%" style="font-size:14px;">
-        <tbody>
-          <tr><td style="padding:4px 0;"><strong>Antal nycklar:</strong> ${antalNycklar}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Antal laddkablar:</strong> ${antalLaddkablar}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Dragkrok:</strong> ${dragkrok}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Gummimattor:</strong> ${gummimattor}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Däckkompressor:</strong> ${dackkompressor}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Stöld-GPS:</strong> ${stoldGps}${payload.stold_gps && payload.stold_gps_spec ? ` (${escapeHtml(payload.stold_gps_spec)})` : ''}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Antal insynsskydd:</strong> ${antalInsynsskydd}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Låsbultar med:</strong> ${lasbultarMed}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>Instruktionsbok:</strong> ${instruktionsbok}</td></tr>
-          <tr><td style="padding:4px 0;"><strong>COC-dokument:</strong> ${coc}</td></tr>
-        </tbody>
-      </table>
-    </td></tr>
-  `;
-  
-  // Status link placeholder
-  const statusLinkSection = `
-    <tr><td style="padding-top:20px;text-align:center;">
-      <a href="https://incheckad.se/status/${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
-      <p style="font-size:12px;color:#6b7280;margin-top:8px;">(Funktionen kommer snart)</p>
-    </td></tr>
-  `;
-  
-  // Damages section with updated photo links
+  // Damages section (simplified)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
     const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
@@ -457,9 +395,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
       
       let damageText = `${escapeHtml(skada.damageType)}`;
       if (positions) damageText += `: ${positions}`;
-      if (skada.comment) damageText += `<br><small><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}</small>`;
       
-      // Photo link - now links to folder with "(Visa media 🔗)" style
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
       
       return `<li style="margin-bottom:8px;">${damageText}${
@@ -477,39 +413,20 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     `;
   }
   
-  // Klar för uthyrning section
-  const klarForUthyrningText = payload.klar_for_uthyrning === true ? 'Ja' : (payload.klar_for_uthyrning === false ? 'Nej' : '---');
-  const klarForUthyrningSection = `
-    <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Klar för uthyrning</h3>
-      <table width="100%" style="font-size:14px;">
-        <tbody>
-          <tr><td style="padding:4px 0;"><strong>Klar för uthyrning:</strong> ${klarForUthyrningText}</td></tr>
-          ${payload.klar_for_uthyrning === false && payload.ej_uthyrningsbar_anledning ? `<tr><td style="padding:4px 0;"><strong>Anledning:</strong> ${escapeHtml(payload.ej_uthyrningsbar_anledning)}</td></tr>` : ''}
-        </tbody>
-      </table>
-    </td></tr>
-  `;
+  // Photo link section
+  let photoSection = '';
+  if (payload.photo_urls && payload.photo_urls.length > 0 && payload.media_folder) {
+    const mediaFolderLink = createStorageLink(payload.media_folder, siteUrl);
+    photoSection = `
+      <tr><td style="padding-top:20px;">
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Foton</h3>
+        <p style="font-size:14px;"><a href="${mediaFolderLink}" target="_blank" style="color:#2563eb!important;font-weight:bold;">Visa foton (${payload.photo_urls.length} st) 🔗</a></p>
+      </td></tr>
+    `;
+  }
   
-  // Övrigt section (only if anteckningar exists)
-  const ovrigtSection = payload.anteckningar ? `
-    <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Övrigt</h3>
-      <table width="100%" style="font-size:14px;">
-        <tbody>
-          <tr><td style="padding:4px 0;">${escapeHtml(payload.anteckningar)}</td></tr>
-        </tbody>
-      </table>
-    </td></tr>
-  ` : '';
-  
-  // Additional sections using helper functions
-  const hjulForvaringSection = buildHjulForvaringSection(payload);
-  const connectStatusSection = buildConnectStatusSection(payload);
-  const saluinfoSection = buildSaluinfoSection(payload);
-  const forvaringDetailsSection = buildForvaringDetailsSection(payload);
-  
-  // Build content - Klar för uthyrning comes BEFORE Övrigt
+  // HUVUDSTATION email - only basic info (bilmärke, modell, planerad station, foton)
+  // NO extra sections like Saluinfo, Köpare, förvaringsdetaljer, avtalsvillkor, utrustning etc.
   const content = `
     <tr><td style="text-align:center;padding-bottom:20px;">
       <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${escapeHtml(regNr)} registrerad</h1>
@@ -521,26 +438,13 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${escapeHtml(matarstallning)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Växel:</strong> ${escapeHtml(vaxel)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Plats för mottagning:</strong> ${escapeHtml(platsMottagningOrt)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Planerad station:</strong> ${escapeHtml(planeradStation)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${escapeHtml(bilenStarNuOrt)} / ${escapeHtml(bilenStarNuStation)}</td></tr>
           </tbody>
         </table>
       </div>
     </td></tr>
-    ${hjulForvaringSection}
-    ${connectStatusSection}
-    ${contractSection}
-    ${equipmentSection}
-    ${forvaringDetailsSection}
-    ${saluinfoSection}
-    ${klarForUthyrningSection}
-    ${ovrigtSection}
-    ${statusLinkSection}
+    ${photoSection}
     ${damagesSection}
     <tr><td>
       <p style="margin-top:20px;font-size:14px;">
