@@ -434,7 +434,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     const mediaFolderLink = createStorageLink(payload.media_folder, siteUrl);
     photoSection = `
       <tr><td style="padding-top:20px;">
-        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Foton</h3>
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Nybilsfoton</h3>
         <p style="font-size:14px;"><a href="${mediaFolderLink}" target="_blank" style="color:#2563eb!important;font-weight:bold;">Visa foton (${payload.photo_urls.length} st) 🔗</a></p>
       </td></tr>
     `;
@@ -510,7 +510,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   // Build fact box content
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  // Show BOTH mätarställning vid inköp AND aktuell mätarställning in Bilkontroll
+  // Show BOTH mätarställning vid leverans AND aktuell mätarställning in Bilkontroll
   const matarstallningInkop = payload.matarstallning ? `${payload.matarstallning} km` : '---';
   const matarstallningAktuell = payload.matarstallning_aktuell ? `${payload.matarstallning_aktuell} km` : null;
   const hjultyp = payload.hjultyp || '---';
@@ -653,6 +653,18 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     </td></tr>
   ` : '';
   
+  // Photo link section
+  let photoSection = '';
+  if (payload.photo_urls && payload.photo_urls.length > 0 && payload.media_folder) {
+    const mediaFolderLink = createStorageLink(payload.media_folder, siteUrl);
+    photoSection = `
+      <tr><td style="padding-top:20px;">
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Nybilsfoton</h3>
+        <p style="font-size:14px;"><a href="${mediaFolderLink}" target="_blank" style="color:#2563eb!important;font-weight:bold;">Visa foton (${payload.photo_urls.length} st) 🔗</a></p>
+      </td></tr>
+    `;
+  }
+  
   // Additional sections using helper functions
   const hjulForvaringSection = buildHjulForvaringSection(payload);
   const connectStatusSection = buildConnectStatusSection(payload);
@@ -671,7 +683,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning vid inköp:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning vid leverans:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
             ${matarstallningAktuell ? `<tr><td style="padding:4px 0;"><strong>Aktuell mätarställning:</strong> ${escapeHtml(matarstallningAktuell)}</td></tr>` : ''}
             <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
@@ -691,6 +703,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     ${saluinfoSection}
     ${klarForUthyrningSection}
     ${ovrigtSection}
+    ${photoSection}
     ${statusLinkSection}
     ${damagesSection}
     <tr><td>
@@ -714,7 +727,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   // Build fact box content (same as Bilkontroll email)
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  // Show BOTH mätarställning vid inköp AND aktuell mätarställning
+  // Show BOTH mätarställning vid leverans AND aktuell mätarställning
   const matarstallningInkop = payload.matarstallning ? `${payload.matarstallning} km` : '---';
   const matarstallningAktuell = payload.matarstallning_aktuell ? `${payload.matarstallning_aktuell} km` : null;
   const hjultyp = payload.hjultyp || '---';
@@ -875,6 +888,18 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     </td></tr>
   ` : '';
   
+  // Photo link section
+  let photoSection = '';
+  if (payload.photo_urls && payload.photo_urls.length > 0 && payload.media_folder) {
+    const mediaFolderLink = createStorageLink(payload.media_folder, siteUrl);
+    photoSection = `
+      <tr><td style="padding-top:20px;">
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Nybilsfoton</h3>
+        <p style="font-size:14px;"><a href="${mediaFolderLink}" target="_blank" style="color:#2563eb!important;font-weight:bold;">Visa foton (${payload.photo_urls.length} st) 🔗</a></p>
+      </td></tr>
+    `;
+  }
+  
   // Status link placeholder
   const statusLinkSection = `
     <tr><td style="padding-top:20px;text-align:center;">
@@ -903,7 +928,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning vid inköp:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning vid leverans:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
             ${matarstallningAktuell ? `<tr><td style="padding:4px 0;"><strong>Aktuell mätarställning:</strong> ${escapeHtml(matarstallningAktuell)}</td></tr>` : ''}
             <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
@@ -923,6 +948,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     ${saluinfoSection}
     ${klarForUthyrningSection}
     ${ovrigtSection}
+    ${photoSection}
     ${statusLinkSection}
     ${damagesSection}
     <tr><td>
