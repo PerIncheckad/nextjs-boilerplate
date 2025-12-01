@@ -434,7 +434,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     const mediaFolderLink = createStorageLink(payload.media_folder, siteUrl);
     photoSection = `
       <tr><td style="padding-top:20px;">
-        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Foton</h3>
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Nybilsfoton</h3>
         <p style="font-size:14px;"><a href="${mediaFolderLink}" target="_blank" style="color:#2563eb!important;font-weight:bold;">Visa foton (${payload.photo_urls.length} st) 🔗</a></p>
       </td></tr>
     `;
@@ -659,7 +659,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     const mediaFolderLink = createStorageLink(payload.media_folder, siteUrl);
     photoSection = `
       <tr><td style="padding-top:20px;">
-        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Foton</h3>
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Nybilsfoton</h3>
         <p style="font-size:14px;"><a href="${mediaFolderLink}" target="_blank" style="color:#2563eb!important;font-weight:bold;">Visa foton (${payload.photo_urls.length} st) 🔗</a></p>
       </td></tr>
     `;
@@ -894,7 +894,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     const mediaFolderLink = createStorageLink(payload.media_folder, siteUrl);
     photoSection = `
       <tr><td style="padding-top:20px;">
-        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Foton</h3>
+        <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Nybilsfoton</h3>
         <p style="font-size:14px;"><a href="${mediaFolderLink}" target="_blank" style="color:#2563eb!important;font-weight:bold;">Visa foton (${payload.photo_urls.length} st) 🔗</a></p>
       </td></tr>
     `;
