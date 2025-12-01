@@ -831,11 +831,12 @@ export default function NybilForm() {
     
     // Check nybil_inventering table - use ilike for case-insensitive matching
     // Include created_at and fullstandigt_namn for modal display
+    // Order by created_at ASCENDING to get the FIRST (original) registration for original_registration_id
     const { data: nybilMatch, error: nybilError } = await supabase
       .from('nybil_inventering')
       .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id, created_at, fullstandigt_namn')
       .ilike('regnr', normalizedRegnr)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
     

@@ -346,19 +346,29 @@ const buildForvaringDetailsSection = (payload: NybilPayload): string => {
 
 /**
  * Build the email for Nybil registration - HUVUDSTATION version
- * SHORT email with only basic info (bilmärke, modell, planerad station, foton)
+ * Contains ONLY:
+ * - Fordon (reg. nr, bilmärke, modell)
+ * - Plats för mottagning
+ * - Var är bilen (plats_aktuell_ort, plats_aktuell_station)
+ * - Aktuell mätarställning
+ * - Klar för uthyrning
+ * - Övriga anteckningar
+ * - Registrerad av...
+ * - Photos
+ * - Damage details (if any)
  * Includes blue banners for "Måste tankas!" and "Kolla bilens laddnivå"
  */
 const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: string, siteUrl: string): string => {
   const regNr = payload.regnr || '';
   const registreradAv = payload.registrerad_av || '---';
   
-  // Build basic fact box content (simplified for huvudstation)
+  // Build basic fact box content
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  const planeradStation = payload.planerad_station || '---';
+  const platsMottagningOrt = payload.plats_mottagning_ort || '---';
   const bilenStarNuOrt = payload.plats_aktuell_ort || '---';
   const bilenStarNuStation = payload.plats_aktuell_station || '---';
+  const matarstallningAktuell = payload.matarstallning ? `${payload.matarstallning} km` : '---';
   
   // Determine if there are dangerous conditions (red banners)
   const hasSkador = payload.har_skador_vid_leverans === true && (payload.skador?.length ?? 0) > 0;
@@ -378,7 +388,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
   `;
   
-  // Damages section (simplified)
+  // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
     const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
@@ -393,14 +403,15 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
         .filter(Boolean)
         .join(', ');
       
-      let damageText = `${escapeHtml(skada.damageType)}`;
-      if (positions) damageText += `: ${positions}`;
+      let damageText = `<strong>Skadetyp:</strong> ${escapeHtml(skada.damageType)}`;
+      if (positions) damageText += `<br><strong>Placering:</strong> ${positions}`;
+      if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
       
-      return `<li style="margin-bottom:8px;">${damageText}${
+      return `<li style="margin-bottom:12px;">${damageText}${
         hasPhotos && mediaFolderLink
-          ? ` <a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
@@ -425,8 +436,33 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     `;
   }
   
-  // HUVUDSTATION email - only basic info (bilmärke, modell, planerad station, foton)
-  // NO extra sections like Saluinfo, Köpare, förvaringsdetaljer, avtalsvillkor, utrustning etc.
+  // Klar för uthyrning section
+  const klarForUthyrningText = payload.klar_for_uthyrning === true ? 'Ja' : (payload.klar_for_uthyrning === false ? 'Nej' : '---');
+  const klarForUthyrningSection = `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Klar för uthyrning</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>
+          <tr><td style="padding:4px 0;"><strong>Klar för uthyrning:</strong> ${klarForUthyrningText}</td></tr>
+          ${payload.klar_for_uthyrning === false && payload.ej_uthyrningsbar_anledning ? `<tr><td style="padding:4px 0;"><strong>Anledning:</strong> ${escapeHtml(payload.ej_uthyrningsbar_anledning)}</td></tr>` : ''}
+        </tbody>
+      </table>
+    </td></tr>
+  `;
+  
+  // Övrigt section (only if anteckningar exists)
+  const ovrigtSection = payload.anteckningar ? `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Övriga anteckningar</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>
+          <tr><td style="padding:4px 0;">${escapeHtml(payload.anteckningar)}</td></tr>
+        </tbody>
+      </table>
+    </td></tr>
+  ` : '';
+  
+  // HUVUDSTATION email - only basic info as specified
   const content = `
     <tr><td style="text-align:center;padding-bottom:20px;">
       <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">${escapeHtml(regNr)} registrerad</h1>
@@ -438,12 +474,15 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Planerad station:</strong> ${escapeHtml(planeradStation)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Plats för mottagning:</strong> ${escapeHtml(platsMottagningOrt)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${escapeHtml(bilenStarNuOrt)} / ${escapeHtml(bilenStarNuStation)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Aktuell mätarställning:</strong> ${escapeHtml(matarstallningAktuell)}</td></tr>
           </tbody>
         </table>
       </div>
     </td></tr>
+    ${klarForUthyrningSection}
+    ${ovrigtSection}
     ${photoSection}
     ${damagesSection}
     <tr><td>
@@ -545,7 +584,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     </td></tr>
   `;
   
-  // Damages section with updated photo links
+  // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
     const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
@@ -560,16 +599,16 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
         .filter(Boolean)
         .join(', ');
       
-      let damageText = `${escapeHtml(skada.damageType)}`;
-      if (positions) damageText += `: ${positions}`;
-      if (skada.comment) damageText += `<br><small><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}</small>`;
+      let damageText = `<strong>Skadetyp:</strong> ${escapeHtml(skada.damageType)}`;
+      if (positions) damageText += `<br><strong>Placering:</strong> ${positions}`;
+      if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       // Photo link - now links to folder with "(Visa media 🔗)" style
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
       
-      return `<li style="margin-bottom:8px;">${damageText}${
+      return `<li style="margin-bottom:12px;">${damageText}${
         hasPhotos && mediaFolderLink
-          ? ` <a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
@@ -765,7 +804,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     </td></tr>
   `;
   
-  // Damages section (same as Bilkontroll)
+  // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
     const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
@@ -780,15 +819,15 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
         .filter(Boolean)
         .join(', ');
       
-      let damageText = `${escapeHtml(skada.damageType)}`;
-      if (positions) damageText += `: ${positions}`;
-      if (skada.comment) damageText += `<br><small><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}</small>`;
+      let damageText = `<strong>Skadetyp:</strong> ${escapeHtml(skada.damageType)}`;
+      if (positions) damageText += `<br><strong>Placering:</strong> ${positions}`;
+      if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
       
-      return `<li style="margin-bottom:8px;">${damageText}${
+      return `<li style="margin-bottom:12px;">${damageText}${
         hasPhotos && mediaFolderLink
-          ? ` <a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
