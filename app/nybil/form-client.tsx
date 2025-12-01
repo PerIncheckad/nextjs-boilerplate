@@ -787,7 +787,7 @@ export default function NybilForm() {
       const inkopValue = parseInt(matarstallning, 10);
       const aktuellValue = parseInt(matarstallningAktuell, 10);
       if (!isNaN(inkopValue) && !isNaN(aktuellValue) && aktuellValue <= inkopValue) {
-        setMatarstallningError('Aktuell mätarställning måste vara större än mätarställning vid inköp.');
+        setMatarstallningError('Aktuell mätarställning måste vara större än mätarställning vid leverans.');
         // Scroll to the error field using requestAnimationFrame (same pattern as handleShowErrors)
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
@@ -1515,7 +1515,7 @@ export default function NybilForm() {
       {/* FORDONSSTATUS Section */}
       <Card data-error={showFieldErrors && hasFordonStatusErrors}>
         <SectionHeader title="Fordonsstatus" />
-        <Field label="Mätarställning vid inköp (km) *">
+        <Field label="Mätarställning vid leverans (km) *">
           <input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" />
         </Field>
         

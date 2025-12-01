@@ -40,6 +40,8 @@ export default function MediaViewer() {
         
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         
+        console.log('MediaViewer: Loading media from folderPath:', folderPath);
+        
         // List files from BOTH buckets: damage-photos and nybil-photos
         const [damageResult, nybilResult] = await Promise.all([
           supabase.storage.from('damage-photos').list(folderPath, {
@@ -51,6 +53,16 @@ export default function MediaViewer() {
             sortBy: { column: 'name', order: 'asc' }
           })
         ]);
+        
+        console.log('MediaViewer: damage-photos result:', { error: damageResult.error, dataLength: damageResult.data?.length });
+        console.log('MediaViewer: nybil-photos result:', { error: nybilResult.error, dataLength: nybilResult.data?.length });
+        
+        if (damageResult.error) {
+          console.warn('MediaViewer: Error listing damage-photos:', damageResult.error.message);
+        }
+        if (nybilResult.error) {
+          console.warn('MediaViewer: Error listing nybil-photos:', nybilResult.error.message);
+        }
 
         // Combine files from both buckets
         const allFiles: MediaFile[] = [];
