@@ -44,6 +44,24 @@ const createStorageLink = (folderPath: string | undefined, siteUrl: string): str
   return `${siteUrl}/public-media/${folderPath}`;
 };
 
+/**
+ * Get the appropriate folder link for a damage item.
+ * Uses individual damage folder if available, otherwise falls back to general media folder.
+ */
+const getDamageFolderLink = (
+  skadaFolder: string | null | undefined,
+  mediaFolder: string | undefined,
+  siteUrl: string
+): string | null => {
+  if (skadaFolder) {
+    return createStorageLink(skadaFolder, siteUrl);
+  }
+  if (mediaFolder) {
+    return createStorageLink(mediaFolder, siteUrl);
+  }
+  return null;
+};
+
 // =================================================================
 // 2. HELPERS
 // =================================================================
@@ -411,10 +429,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
-      // Use individual damage folder if available, otherwise fall back to general media folder
-      const damageFolderLink = skada.folder 
-        ? createStorageLink(skada.folder, siteUrl) 
-        : (payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null);
+      const damageFolderLink = getDamageFolderLink(skada.folder, payload.media_folder, siteUrl);
       
       return `<li style="margin-bottom:12px;">${damageText}${
         hasPhotos && damageFolderLink
@@ -610,11 +625,8 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
       if (positions) damageText += `<br><strong>Placering:</strong> ${positions}`;
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
-      // Photo link - use individual damage folder if available
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
-      const damageFolderLink = skada.folder 
-        ? createStorageLink(skada.folder, siteUrl) 
-        : (payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null);
+      const damageFolderLink = getDamageFolderLink(skada.folder, payload.media_folder, siteUrl);
       
       return `<li style="margin-bottom:12px;">${damageText}${
         hasPhotos && damageFolderLink
@@ -848,10 +860,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
-      // Use individual damage folder if available
-      const damageFolderLink = skada.folder 
-        ? createStorageLink(skada.folder, siteUrl) 
-        : (payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null);
+      const damageFolderLink = getDamageFolderLink(skada.folder, payload.media_folder, siteUrl);
       
       return `<li style="margin-bottom:12px;">${damageText}${
         hasPhotos && damageFolderLink

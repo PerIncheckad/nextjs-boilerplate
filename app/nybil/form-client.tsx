@@ -965,7 +965,8 @@ export default function NybilForm() {
       const nybilEventFolder = `${dateStr}-NYBIL${folderSuffix}`;
       const referensFolder = `${normalizedReg}/NYBIL-REFERENS/${nybilEventFolder}`;
       
-      // Legacy mediaFolder for backward compatibility (points to reference folder for general media link)
+      // mediaFolder is used by the email notification (notify-nybil route) for the 
+      // "Nybilsfoton" link. It points to the reference photos folder.
       const mediaFolder = referensFolder;
       console.log('Reference folder path:', referensFolder);
       const photoUrls: string[] = [];
