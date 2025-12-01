@@ -31,6 +31,7 @@ const LOGO_URL =
 // Banner colors
 const BANNER_COLOR_RED = '#B30E0E';
 const BANNER_COLOR_BLUE = '#15418C';
+const BANNER_COLOR_GREEN = '#15803D';
 
 const getSiteUrl = (request: Request): string => {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
@@ -42,6 +43,32 @@ const getSiteUrl = (request: Request): string => {
 const createStorageLink = (folderPath: string | undefined, siteUrl: string): string | null => {
   if (!folderPath) return null;
   return `${siteUrl}/public-media/${folderPath}`;
+};
+
+/**
+ * Get the appropriate folder link for a damage item.
+ * Uses individual damage folder if available, otherwise falls back to general media folder.
+ */
+const getDamageFolderLink = (
+  skadaFolder: string | null | undefined,
+  mediaFolder: string | undefined,
+  siteUrl: string
+): string | null => {
+  if (skadaFolder) {
+    return createStorageLink(skadaFolder, siteUrl);
+  }
+  if (mediaFolder) {
+    return createStorageLink(mediaFolder, siteUrl);
+  }
+  return null;
+};
+
+/**
+ * Get the SKADOR folder path for a vehicle.
+ * Returns REGNR/SKADOR/ path.
+ */
+const getSkadorFolderPath = (regnr: string): string => {
+  return `${regnr}/SKADOR`;
 };
 
 // =================================================================
@@ -97,6 +124,13 @@ const createChargeLevelBanner = (condition: boolean, laddnivaProcent: number | n
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
+// Create green success banner for "Klar för uthyrning"
+const createSuccessBanner = (condition: boolean, text: string): string => {
+  if (!condition) return '';
+  const bannerContent = `<div style="background-color:${BANNER_COLOR_GREEN}!important;border:1px solid ${BANNER_COLOR_GREEN};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">✅ ${text}</div>`;
+  return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
+};
+
 const createBaseLayout = (regnr: string, content: string): string => `<!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -135,6 +169,7 @@ interface DamageInfo {
   positions: Array<{ carPart: string; position: string }>;
   comment?: string;
   photoUrls?: string[];
+  folder?: string | null;
 }
 
 interface NybilPayload {
@@ -378,15 +413,20 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
   const hasSkador = payload.har_skador_vid_leverans === true && (payload.skador?.length ?? 0) > 0;
   const skadorCount = payload.skador?.length ?? 0;
   const ejKlarForUthyrning = payload.klar_for_uthyrning === false;
+  const klarForUthyrning = payload.klar_for_uthyrning === true;
   
   // Blue banner conditions (HUVUDSTATION only)
   const isElectric = payload.bransletyp === '100% el';
   const needsCharging = isElectric && typeof payload.laddniva_procent === 'number' && payload.laddniva_procent < 95;
   const needsFueling = !isElectric && payload.tankstatus === 'ej_upptankad';
   
-  // Warning banners
+  // SKADOR folder path for banner link
+  const skadorFolderPath = getSkadorFolderPath(regNr);
+  
+  // Warning banners - Green "KLAR FÖR UTHYRNING!" banner at top (HUVUDSTATION only)
   const banners = `
-    ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, payload.media_folder, siteUrl)}
+    ${createSuccessBanner(klarForUthyrning, 'KLAR FÖR UTHYRNING!')}
+    ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
     ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
     ${createAdminBanner(needsFueling, 'MÅSTE TANKAS!')}
     ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
@@ -395,8 +435,6 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
   // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
-    const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
-    
     const damageItems = payload.skador.map((skada) => {
       const positions = (skada.positions || [])
         .map(p => {
@@ -412,10 +450,11 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
+      const damageFolderLink = getDamageFolderLink(skada.folder, payload.media_folder, siteUrl);
       
       return `<li style="margin-bottom:12px;">${damageText}${
-        hasPhotos && mediaFolderLink
-          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+        hasPhotos && damageFolderLink
+          ? `<br><a href="${damageFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
@@ -526,9 +565,12 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   const skadorCount = payload.skador?.length ?? 0;
   const ejKlarForUthyrning = payload.klar_for_uthyrning === false;
   
-  // Warning banners (NO blue banners for BILKONTROLL)
+  // SKADOR folder path for banner link
+  const skadorFolderPath = getSkadorFolderPath(regNr);
+  
+  // Warning banners (NO blue banners for BILKONTROLL, NO green banner for BILKONTROLL)
   const banners = `
-    ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, payload.media_folder, siteUrl)}
+    ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
     ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
   `;
   
@@ -593,8 +635,6 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
-    const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
-    
     const damageItems = payload.skador.map((skada) => {
       const positions = (skada.positions || [])
         .map(p => {
@@ -609,12 +649,12 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
       if (positions) damageText += `<br><strong>Placering:</strong> ${positions}`;
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
-      // Photo link - now links to folder with "(Visa media 🔗)" style
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
+      const damageFolderLink = getDamageFolderLink(skada.folder, payload.media_folder, siteUrl);
       
       return `<li style="margin-bottom:12px;">${damageText}${
-        hasPhotos && mediaFolderLink
-          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+        hasPhotos && damageFolderLink
+          ? `<br><a href="${damageFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
@@ -747,9 +787,12 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   const skadorCount = payload.skador?.length ?? 0;
   const ejKlarForUthyrning = payload.klar_for_uthyrning === false;
   
+  // SKADOR folder path for banner link
+  const skadorFolderPath = getSkadorFolderPath(regNr);
+  
   // Warning banners
   const alertBanners = `
-    ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, payload.media_folder, siteUrl)}
+    ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
     ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
   `;
   
@@ -829,8 +872,6 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
-    const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
-    
     const damageItems = payload.skador.map((skada) => {
       const positions = (skada.positions || [])
         .map(p => {
@@ -846,10 +887,11 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
+      const damageFolderLink = getDamageFolderLink(skada.folder, payload.media_folder, siteUrl);
       
       return `<li style="margin-bottom:12px;">${damageText}${
-        hasPhotos && mediaFolderLink
-          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+        hasPhotos && damageFolderLink
+          ? `<br><a href="${damageFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
