@@ -510,7 +510,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   // Build fact box content
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  // Show BOTH mätarställning vid inköp AND aktuell mätarställning in Bilkontroll
+  // Show BOTH mätarställning vid leverans AND aktuell mätarställning in Bilkontroll
   const matarstallningInkop = payload.matarstallning ? `${payload.matarstallning} km` : '---';
   const matarstallningAktuell = payload.matarstallning_aktuell ? `${payload.matarstallning_aktuell} km` : null;
   const hjultyp = payload.hjultyp || '---';
@@ -683,7 +683,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning vid inköp:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning vid leverans:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
             ${matarstallningAktuell ? `<tr><td style="padding:4px 0;"><strong>Aktuell mätarställning:</strong> ${escapeHtml(matarstallningAktuell)}</td></tr>` : ''}
             <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
@@ -727,7 +727,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   // Build fact box content (same as Bilkontroll email)
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  // Show BOTH mätarställning vid inköp AND aktuell mätarställning
+  // Show BOTH mätarställning vid leverans AND aktuell mätarställning
   const matarstallningInkop = payload.matarstallning ? `${payload.matarstallning} km` : '---';
   const matarstallningAktuell = payload.matarstallning_aktuell ? `${payload.matarstallning_aktuell} km` : null;
   const hjultyp = payload.hjultyp || '---';
@@ -928,7 +928,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning vid inköp:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning vid leverans:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
             ${matarstallningAktuell ? `<tr><td style="padding:4px 0;"><strong>Aktuell mätarställning:</strong> ${escapeHtml(matarstallningAktuell)}</td></tr>` : ''}
             <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
