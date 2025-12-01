@@ -305,7 +305,7 @@ export default function NybilForm() {
   const [duplicateInfo, setDuplicateInfo] = useState<{
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
-    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
+    previousRegistration: { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
   } | null>(null);
   const [isDuplicate, setIsDuplicate] = useState(false);
   
@@ -812,7 +812,7 @@ export default function NybilForm() {
   const checkForDuplicate = async (regnr: string): Promise<{
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
-    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
+    previousRegistration: { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
   }> => {
     const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
     console.log('Checking duplicate for:', normalizedRegnr);
@@ -831,11 +831,12 @@ export default function NybilForm() {
     
     // Check nybil_inventering table - use ilike for case-insensitive matching
     // Include created_at and fullstandigt_namn for modal display
+    // Order by created_at ASCENDING to get the FIRST (original) registration for original_registration_id
     const { data: nybilMatch, error: nybilError } = await supabase
       .from('nybil_inventering')
       .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id, created_at, fullstandigt_namn')
       .ilike('regnr', normalizedRegnr)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
     
@@ -843,13 +844,21 @@ export default function NybilForm() {
       console.error('Error checking nybil_inventering table:', nybilError);
     }
     console.log('Nybil match:', nybilMatch);
+    console.log('Nybil match id type:', typeof nybilMatch?.id, 'value:', nybilMatch?.id);
+    
+    // The ID is a UUID string from Supabase, keep it as-is
+    const previousRegistration = nybilMatch ? {
+      ...nybilMatch,
+      id: String(nybilMatch.id) // Ensure it's a string (UUID)
+    } : null;
     
     const result = {
       existsInBilkontroll: !!vehicleMatch,
       existsInNybil: !!nybilMatch,
-      previousRegistration: nybilMatch
+      previousRegistration: previousRegistration as { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null
     };
     console.log('Duplicate result:', result);
+    console.log('previousRegistration.id:', previousRegistration?.id, 'type:', typeof previousRegistration?.id);
     
     return result;
   };
@@ -952,25 +961,28 @@ export default function NybilForm() {
       console.log('Media folder path:', mediaFolder);
       const photoUrls: string[] = [];
       
-      // Upload front photo
+      // Reference photos subfolder for main nybil photos
+      const referensFolder = `${mediaFolder}/REFERENS-NYBIL`;
+      
+      // Upload front photo to REFERENS-NYBIL subfolder
       if (photoFront) {
         const frontExt = getFileExtension(photoFront.file);
-        const frontUrl = await uploadNybilPhoto(photoFront.file, `${mediaFolder}/framifran.${frontExt}`);
+        const frontUrl = await uploadNybilPhoto(photoFront.file, `${referensFolder}/framifran.${frontExt}`);
         photoUrls.push(frontUrl);
       }
       
-      // Upload back photo
+      // Upload back photo to REFERENS-NYBIL subfolder
       if (photoBack) {
         const backExt = getFileExtension(photoBack.file);
-        const backUrl = await uploadNybilPhoto(photoBack.file, `${mediaFolder}/bakifran.${backExt}`);
+        const backUrl = await uploadNybilPhoto(photoBack.file, `${referensFolder}/bakifran.${backExt}`);
         photoUrls.push(backUrl);
       }
       
-      // Upload additional photos
+      // Upload additional photos to REFERENS-NYBIL/ovriga subfolder
       for (let i = 0; i < additionalPhotos.length; i++) {
         const photo = additionalPhotos[i];
         const ext = getFileExtension(photo.file);
-        const url = await uploadNybilPhoto(photo.file, `${mediaFolder}/ovriga/${i + 1}.${ext}`);
+        const url = await uploadNybilPhoto(photo.file, `${referensFolder}/ovriga/${i + 1}.${ext}`);
         photoUrls.push(url);
       }
       
@@ -982,15 +994,9 @@ export default function NybilForm() {
         ? (duplicateInfo?.previousRegistration?.duplicate_group_id || crypto.randomUUID())
         : null;
       
-      // Get the numeric ID from the previous registration (for original_registration_id)
-      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id
-        ? Number(duplicateInfo.previousRegistration.id)
-        : null;
-      
       console.log('Duplicate fields:', {
         isDuplicate,
         duplicateGroupId,
-        originalRegistrationId,
         previousRegistration: duplicateInfo?.previousRegistration
       });
       
@@ -1066,8 +1072,8 @@ export default function NybilForm() {
         media_folder: mediaFolder,
         // Duplicate handling fields
         is_duplicate: isDuplicate,
-        duplicate_group_id: duplicateGroupId,
-        original_registration_id: originalRegistrationId
+        duplicate_group_id: duplicateGroupId
+        // Note: original_registration_id is NOT set - use duplicate_group_id instead for tracking duplicates
       };
       console.log('Attempting to insert inventoryData:', inventoryData);
       const { data, error } = await supabase
@@ -1083,6 +1089,23 @@ export default function NybilForm() {
       
       savedNybilId = data?.[0]?.id || null;
       console.log('Saved nybil ID:', savedNybilId);
+      
+      // If this is a duplicate, update the first registration to have the same duplicate_group_id
+      if (isDuplicate && duplicateGroupId && duplicateInfo?.previousRegistration?.id) {
+        // Only update if the first registration doesn't already have a duplicate_group_id
+        if (!duplicateInfo.previousRegistration.duplicate_group_id) {
+          const { error: updateError } = await supabase
+            .from('nybil_inventering')
+            .update({ duplicate_group_id: duplicateGroupId })
+            .eq('id', duplicateInfo.previousRegistration.id);
+          
+          if (updateError) {
+            console.error('Error updating first registration with duplicate_group_id:', updateError);
+          } else {
+            console.log('Updated first registration with duplicate_group_id:', duplicateGroupId);
+          }
+        }
+      }
       
       // Upload damage photos and save to damages table
       // Track uploaded damage photo URLs for email notification
@@ -1162,6 +1185,7 @@ export default function NybilForm() {
           bilmarke: effectiveBilmarke,
           modell,
           matarstallning,
+          matarstallning_aktuell: locationDiffers ? matarstallningAktuell : null,
           hjultyp,
           hjul_till_forvaring: hjulTillForvaring,
           hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
@@ -2141,22 +2165,11 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
     return previousRegistration.registreringsdatum;
   };
 
-  // Build simple main message
-  let mainMessage = '';
-  if (existsInBilkontroll && existsInNybil) {
-    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat i både Bilkontroll-listan och systemet.`;
-  } else if (existsInBilkontroll) {
-    mainMessage = `Registreringsnummer ${regnr} finns redan i Bilkontroll-listan.`;
-  } else if (existsInNybil) {
-    mainMessage = `Registreringsnummer ${regnr} finns redan registrerat.`;
-  }
-
   return (
     <>
       <div className="modal-overlay" />
       <div className="modal-content warning-modal duplicate-warning-modal">
-        <h3>Registreringsnummer finns redan</h3>
-        <p>{mainMessage}</p>
+        <h3>Reg.nr {regnr} är redan registrerat</h3>
         {previousRegistration && (
           <div className="duplicate-info" style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
             <p style={{ margin: '0 0 4px 0' }}><strong>Tidigare registrering:</strong> {previousRegistration.bilmarke} {previousRegistration.modell}</p>
@@ -2164,6 +2177,11 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
               Registrerad av {previousRegistration.fullstandigt_namn || 'okänd'} {formatPreviousTimeDate()}
             </p>
           </div>
+        )}
+        {existsInBilkontroll && !existsInNybil && (
+          <p style={{ marginTop: '16px', color: '#6b7280', fontStyle: 'italic' }}>
+            Finns i Bilkontroll-listan.
+          </p>
         )}
         <div className="modal-actions">
           <button onClick={onCancel} className="btn secondary">Avbryt</button>

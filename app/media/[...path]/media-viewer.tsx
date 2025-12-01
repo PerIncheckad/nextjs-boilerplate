@@ -14,6 +14,7 @@ interface MediaFile {
   isVideo: boolean;
   isFolder: boolean;
   isKommentar: boolean;
+  bucket: string;
 }
 
 export default function MediaViewer() {
@@ -39,45 +40,80 @@ export default function MediaViewer() {
         
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         
-        // List files in the folder
-        const { data, error: listError } = await supabase.storage
-          .from('damage-photos')
-          .list(folderPath, {
+        // List files from BOTH buckets: damage-photos and nybil-photos
+        const [damageResult, nybilResult] = await Promise.all([
+          supabase.storage.from('damage-photos').list(folderPath, {
             limit: 100,
             sortBy: { column: 'name', order: 'asc' }
+          }),
+          supabase.storage.from('nybil-photos').list(folderPath, {
+            limit: 100,
+            sortBy: { column: 'name', order: 'asc' }
+          })
+        ]);
+
+        // Combine files from both buckets
+        const allFiles: MediaFile[] = [];
+        
+        // Process damage-photos bucket
+        if (!damageResult.error && damageResult.data) {
+          const damageFiles = damageResult.data.map(file => {
+            const fullPath = folderPath ? `${folderPath}/${file.name}` : file.name;
+            const { data: urlData } = supabase.storage.from('damage-photos').getPublicUrl(fullPath);
+            const isFolder = file.id === null || file.name.endsWith('/');
+            const isKommentar = file.name === 'kommentar.txt';
+            
+            return {
+              name: file.name,
+              url: urlData.publicUrl,
+              isImage: /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name),
+              isVideo: /\.(mp4|webm|mov)$/i.test(file.name),
+              isFolder,
+              isKommentar,
+              bucket: 'damage-photos'
+            } as MediaFile;
           });
-
-        if (listError) throw listError;
-
-        // Get public URLs for all files and detect folders
-        const filesWithUrls: MediaFile[] = data?.map(file => {
-          const fullPath = folderPath ? `${folderPath}/${file.name}` : file.name;
-          const { data: urlData } = supabase.storage
-            .from('damage-photos')
-            .getPublicUrl(fullPath);
+          allFiles.push(...damageFiles);
+        }
+        
+        // Process nybil-photos bucket
+        if (!nybilResult.error && nybilResult.data) {
+          const nybilFiles = nybilResult.data.map(file => {
+            const fullPath = folderPath ? `${folderPath}/${file.name}` : file.name;
+            const { data: urlData } = supabase.storage.from('nybil-photos').getPublicUrl(fullPath);
+            const isFolder = file.id === null || file.name.endsWith('/');
+            const isKommentar = file.name === 'kommentar.txt';
+            
+            return {
+              name: file.name,
+              url: urlData.publicUrl,
+              isImage: /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name),
+              isVideo: /\.(mp4|webm|mov)$/i.test(file.name),
+              isFolder,
+              isKommentar,
+              bucket: 'nybil-photos'
+            } as MediaFile;
+          });
           
-          // Check if it's a folder by looking at metadata
-          const isFolder = file.id === null || file.name.endsWith('/');
-          const isKommentar = file.name === 'kommentar.txt';
-          
-          return {
-            name: file.name,
-            url: urlData.publicUrl,
-            isImage: /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name),
-            isVideo: /\.(mp4|webm|mov)$/i.test(file.name),
-            isFolder,
-            isKommentar,
-          } as MediaFile;
-        }) || [];
+          // Merge nybil files, avoiding duplicates by name
+          nybilFiles.forEach(nf => {
+            if (!allFiles.some(f => f.name === nf.name)) {
+              allFiles.push(nf);
+            }
+          });
+        }
+        
+        // Sort combined files by name
+        allFiles.sort((a, b) => a.name.localeCompare(b.name));
 
-        setFiles(filesWithUrls);
+        setFiles(allFiles);
         
         // Load kommentar.txt files content in parallel
-        const kommentarFiles = filesWithUrls.filter(f => f.isKommentar);
+        const kommentarFiles = allFiles.filter(f => f.isKommentar);
         const kommentarPromises = kommentarFiles.map(async (file) => {
           const fullPath = folderPath ? `${folderPath}/${file.name}` : file.name;
           const { data: downloadData, error: downloadError } = await supabase.storage
-            .from('damage-photos')
+            .from(file.bucket)
             .download(fullPath);
           
           if (!downloadError && downloadData) {
