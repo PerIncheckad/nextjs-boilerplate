@@ -142,6 +142,7 @@ interface NybilPayload {
   bilmarke: string;
   modell: string;
   matarstallning: string;
+  matarstallning_aktuell?: string | null;
   hjultyp: string;
   hjul_till_forvaring?: string | null;
   hjul_forvaring_ort?: string | null;
@@ -368,7 +369,10 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
   const platsMottagningOrt = payload.plats_mottagning_ort || '---';
   const bilenStarNuOrt = payload.plats_aktuell_ort || '---';
   const bilenStarNuStation = payload.plats_aktuell_station || '---';
-  const matarstallningAktuell = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  // Show ONLY aktuell mätarställning (current) for huvudstation, use matarstallning_aktuell if available, else matarstallning
+  const matarstallningAktuell = payload.matarstallning_aktuell 
+    ? `${payload.matarstallning_aktuell} km`
+    : (payload.matarstallning ? `${payload.matarstallning} km` : '---');
   
   // Determine if there are dangerous conditions (red banners)
   const hasSkador = payload.har_skador_vid_leverans === true && (payload.skador?.length ?? 0) > 0;
@@ -506,7 +510,9 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   // Build fact box content
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  // Show BOTH mätarställning vid inköp AND aktuell mätarställning in Bilkontroll
+  const matarstallningInkop = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  const matarstallningAktuell = payload.matarstallning_aktuell ? `${payload.matarstallning_aktuell} km` : null;
   const hjultyp = payload.hjultyp || '---';
   const drivmedel = payload.bransletyp || '---';
   const vaxel = payload.vaxel || '---';
@@ -665,7 +671,8 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${escapeHtml(matarstallning)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning vid inköp:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
+            ${matarstallningAktuell ? `<tr><td style="padding:4px 0;"><strong>Aktuell mätarställning:</strong> ${escapeHtml(matarstallningAktuell)}</td></tr>` : ''}
             <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Växel:</strong> ${escapeHtml(vaxel)}</td></tr>
@@ -707,7 +714,9 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   // Build fact box content (same as Bilkontroll email)
   const bilmarke = payload.bilmarke || '---';
   const modell = payload.modell || '---';
-  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  // Show BOTH mätarställning vid inköp AND aktuell mätarställning
+  const matarstallningInkop = payload.matarstallning ? `${payload.matarstallning} km` : '---';
+  const matarstallningAktuell = payload.matarstallning_aktuell ? `${payload.matarstallning_aktuell} km` : null;
   const hjultyp = payload.hjultyp || '---';
   const drivmedel = payload.bransletyp || '---';
   const vaxel = payload.vaxel || '---';
@@ -894,7 +903,8 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmärke:</strong> ${escapeHtml(bilmarke)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Modell:</strong> ${escapeHtml(modell)}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${escapeHtml(matarstallning)}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Mätarställning vid inköp:</strong> ${escapeHtml(matarstallningInkop)}</td></tr>
+            ${matarstallningAktuell ? `<tr><td style="padding:4px 0;"><strong>Aktuell mätarställning:</strong> ${escapeHtml(matarstallningAktuell)}</td></tr>` : ''}
             <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${escapeHtml(hjultyp)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Drivmedel:</strong> ${escapeHtml(drivmedel)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Växel:</strong> ${escapeHtml(vaxel)}</td></tr>

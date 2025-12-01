@@ -968,25 +968,28 @@ export default function NybilForm() {
       console.log('Media folder path:', mediaFolder);
       const photoUrls: string[] = [];
       
-      // Upload front photo
+      // Reference photos subfolder for main nybil photos
+      const referensFolder = `${mediaFolder}/REFERENS-NYBIL`;
+      
+      // Upload front photo to REFERENS-NYBIL subfolder
       if (photoFront) {
         const frontExt = getFileExtension(photoFront.file);
-        const frontUrl = await uploadNybilPhoto(photoFront.file, `${mediaFolder}/framifran.${frontExt}`);
+        const frontUrl = await uploadNybilPhoto(photoFront.file, `${referensFolder}/framifran.${frontExt}`);
         photoUrls.push(frontUrl);
       }
       
-      // Upload back photo
+      // Upload back photo to REFERENS-NYBIL subfolder
       if (photoBack) {
         const backExt = getFileExtension(photoBack.file);
-        const backUrl = await uploadNybilPhoto(photoBack.file, `${mediaFolder}/bakifran.${backExt}`);
+        const backUrl = await uploadNybilPhoto(photoBack.file, `${referensFolder}/bakifran.${backExt}`);
         photoUrls.push(backUrl);
       }
       
-      // Upload additional photos
+      // Upload additional photos to REFERENS-NYBIL/ovriga subfolder
       for (let i = 0; i < additionalPhotos.length; i++) {
         const photo = additionalPhotos[i];
         const ext = getFileExtension(photo.file);
-        const url = await uploadNybilPhoto(photo.file, `${mediaFolder}/ovriga/${i + 1}.${ext}`);
+        const url = await uploadNybilPhoto(photo.file, `${referensFolder}/ovriga/${i + 1}.${ext}`);
         photoUrls.push(url);
       }
       
@@ -1180,6 +1183,7 @@ export default function NybilForm() {
           bilmarke: effectiveBilmarke,
           modell,
           matarstallning,
+          matarstallning_aktuell: locationDiffers ? matarstallningAktuell : null,
           hjultyp,
           hjul_till_forvaring: hjulTillForvaring,
           hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
