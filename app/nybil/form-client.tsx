@@ -305,7 +305,7 @@ export default function NybilForm() {
   const [duplicateInfo, setDuplicateInfo] = useState<{
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
-    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
+    previousRegistration: { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
   } | null>(null);
   const [isDuplicate, setIsDuplicate] = useState(false);
   
@@ -812,7 +812,7 @@ export default function NybilForm() {
   const checkForDuplicate = async (regnr: string): Promise<{
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
-    previousRegistration: { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
+    previousRegistration: { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
   }> => {
     const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
     console.log('Checking duplicate for:', normalizedRegnr);
@@ -846,23 +846,16 @@ export default function NybilForm() {
     console.log('Nybil match:', nybilMatch);
     console.log('Nybil match id type:', typeof nybilMatch?.id, 'value:', nybilMatch?.id);
     
-    // Helper function to safely convert ID (handles BigInt strings from Supabase)
-    const safeParseId = (id: unknown): number | null => {
-      if (id == null) return null;
-      const parsed = Number(id);
-      return isNaN(parsed) ? null : parsed;
-    };
-    
-    // Ensure id is converted to number (Supabase might return BigInt as string)
+    // The ID is a UUID string from Supabase, keep it as-is
     const previousRegistration = nybilMatch ? {
       ...nybilMatch,
-      id: safeParseId(nybilMatch.id)
+      id: String(nybilMatch.id) // Ensure it's a string (UUID)
     } : null;
     
     const result = {
       existsInBilkontroll: !!vehicleMatch,
       existsInNybil: !!nybilMatch,
-      previousRegistration: previousRegistration as { id: number; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null
+      previousRegistration: previousRegistration as { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null
     };
     console.log('Duplicate result:', result);
     console.log('previousRegistration.id:', previousRegistration?.id, 'type:', typeof previousRegistration?.id);
@@ -1001,10 +994,9 @@ export default function NybilForm() {
         ? (duplicateInfo?.previousRegistration?.duplicate_group_id || crypto.randomUUID())
         : null;
       
-      // Get the numeric ID from the previous registration (for original_registration_id)
+      // Get the UUID from the previous registration (for original_registration_id)
       // This references the FIRST registration for this reg.nr
-      // Note: ID was already converted to number in checkForDuplicate() before storing in state
-      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id != null
+      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id
         ? duplicateInfo.previousRegistration.id
         : null;
       
@@ -1104,6 +1096,23 @@ export default function NybilForm() {
       
       savedNybilId = data?.[0]?.id || null;
       console.log('Saved nybil ID:', savedNybilId);
+      
+      // If this is a duplicate, update the first registration to have the same duplicate_group_id
+      if (isDuplicate && duplicateGroupId && duplicateInfo?.previousRegistration?.id) {
+        // Only update if the first registration doesn't already have a duplicate_group_id
+        if (!duplicateInfo.previousRegistration.duplicate_group_id) {
+          const { error: updateError } = await supabase
+            .from('nybil_inventering')
+            .update({ duplicate_group_id: duplicateGroupId })
+            .eq('id', duplicateInfo.previousRegistration.id);
+          
+          if (updateError) {
+            console.error('Error updating first registration with duplicate_group_id:', updateError);
+          } else {
+            console.log('Updated first registration with duplicate_group_id:', duplicateGroupId);
+          }
+        }
+      }
       
       // Upload damage photos and save to damages table
       // Track uploaded damage photo URLs for email notification
