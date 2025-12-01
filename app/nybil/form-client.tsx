@@ -994,16 +994,9 @@ export default function NybilForm() {
         ? (duplicateInfo?.previousRegistration?.duplicate_group_id || crypto.randomUUID())
         : null;
       
-      // Get the UUID from the previous registration (for original_registration_id)
-      // This references the FIRST registration for this reg.nr
-      const originalRegistrationId = isDuplicate && duplicateInfo?.previousRegistration?.id
-        ? duplicateInfo.previousRegistration.id
-        : null;
-      
       console.log('Duplicate fields:', {
         isDuplicate,
         duplicateGroupId,
-        originalRegistrationId,
         previousRegistration: duplicateInfo?.previousRegistration
       });
       
@@ -1079,8 +1072,8 @@ export default function NybilForm() {
         media_folder: mediaFolder,
         // Duplicate handling fields
         is_duplicate: isDuplicate,
-        duplicate_group_id: duplicateGroupId,
-        original_registration_id: originalRegistrationId
+        duplicate_group_id: duplicateGroupId
+        // Note: original_registration_id is NOT set - use duplicate_group_id instead for tracking duplicates
       };
       console.log('Attempting to insert inventoryData:', inventoryData);
       const { data, error } = await supabase
