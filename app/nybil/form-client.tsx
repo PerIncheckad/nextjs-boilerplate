@@ -957,28 +957,34 @@ export default function NybilForm() {
       }
       
       console.log('Creating media folder with normalizedReg:', normalizedReg, 'regInput:', regInput);
-      const mediaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL${folderSuffix}`;
-      console.log('Media folder path:', mediaFolder);
+      
+      // NEW folder structure:
+      // Reference photos: REGNR/NYBIL-REFERENS/YYYYMMDD-NYBIL{-DUBBLETT-N}/
+      // Damage photos: REGNR/SKADOR/YYYYMMDD-skadetyp-etc-NYBIL{-DUBBLETT-N}/
+      
+      const nybilEventFolder = `${dateStr}-NYBIL${folderSuffix}`;
+      const referensFolder = `${normalizedReg}/NYBIL-REFERENS/${nybilEventFolder}`;
+      
+      // Legacy mediaFolder for backward compatibility (points to reference folder for general media link)
+      const mediaFolder = referensFolder;
+      console.log('Reference folder path:', referensFolder);
       const photoUrls: string[] = [];
       
-      // Reference photos subfolder for main nybil photos
-      const referensFolder = `${mediaFolder}/REFERENS-NYBIL`;
-      
-      // Upload front photo to REFERENS-NYBIL subfolder
+      // Upload front photo to NYBIL-REFERENS subfolder
       if (photoFront) {
         const frontExt = getFileExtension(photoFront.file);
         const frontUrl = await uploadNybilPhoto(photoFront.file, `${referensFolder}/framifran.${frontExt}`);
         photoUrls.push(frontUrl);
       }
       
-      // Upload back photo to REFERENS-NYBIL subfolder
+      // Upload back photo to NYBIL-REFERENS subfolder
       if (photoBack) {
         const backExt = getFileExtension(photoBack.file);
         const backUrl = await uploadNybilPhoto(photoBack.file, `${referensFolder}/bakifran.${backExt}`);
         photoUrls.push(backUrl);
       }
       
-      // Upload additional photos to REFERENS-NYBIL/ovriga subfolder
+      // Upload additional photos to NYBIL-REFERENS/ovriga subfolder
       for (let i = 0; i < additionalPhotos.length; i++) {
         const photo = additionalPhotos[i];
         const ext = getFileExtension(photo.file);
@@ -1108,8 +1114,9 @@ export default function NybilForm() {
       }
       
       // Upload damage photos and save to damages table
-      // Track uploaded damage photo URLs for email notification
+      // Track uploaded damage photo URLs and folders for email notification
       const uploadedDamagePhotoUrls: Record<string, string[]> = {};
+      const uploadedDamageFolders: Record<string, string> = {};
       
       if (harSkadorVidLeverans && damages.length > 0) {
         const firstNameLower = fullName.split(' ')[0].toLowerCase();
@@ -1118,12 +1125,12 @@ export default function NybilForm() {
           const damage = damages[i];
           const damagePhotoUrls: string[] = [];
           
-          // Build folder name for NYBIL damage photos:
-          // REGNR/REGNR-YYYYMMDD-NYBIL{-DUBBLETT-N}/YYYYMMDD-skadetyp-placering-position-förnamn/
+          // NEW folder structure for NYBIL damage photos:
+          // REGNR/SKADOR/YYYYMMDD-skadetyp-placering-position-förnamn-NYBIL{-DUBBLETT-N}/
           const skadetyp = slugify(damage.damageType);
           const positionString = buildPositionString(damage.positions);
           
-          const skadaFolder = `${normalizedReg}/${normalizedReg}-${dateStr}-NYBIL${folderSuffix}/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}`;
+          const skadaFolder = `${normalizedReg}/SKADOR/${dateStr}-${skadetyp}-${positionString}-${firstNameLower}-NYBIL${folderSuffix}`;
           
           // Build filename: REGNR-YYYYMMDD-skadetyp-placering_N.ext
           const baseFileName = `${normalizedReg}-${dateStr}-${skadetyp}-${positionString}`;
@@ -1146,6 +1153,7 @@ export default function NybilForm() {
           
           // Store for email notification
           uploadedDamagePhotoUrls[damage.id] = damagePhotoUrls;
+          uploadedDamageFolders[damage.id] = skadaFolder;
           
           // Save to damages table with correct column names matching schema
           const { error: damageError } = await supabase.from('damages').insert({
@@ -1244,7 +1252,8 @@ export default function NybilForm() {
               position: p.position
             })),
             comment: d.comment,
-            photoUrls: uploadedDamagePhotoUrls[d.id] || []
+            photoUrls: uploadedDamagePhotoUrls[d.id] || [],
+            folder: uploadedDamageFolders[d.id] || null
           })),
           // Rental status
           klar_for_uthyrning: klarForUthyrning,

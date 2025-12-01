@@ -135,6 +135,7 @@ interface DamageInfo {
   positions: Array<{ carPart: string; position: string }>;
   comment?: string;
   photoUrls?: string[];
+  folder?: string | null;
 }
 
 interface NybilPayload {
@@ -395,8 +396,6 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
   // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
-    const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
-    
     const damageItems = payload.skador.map((skada) => {
       const positions = (skada.positions || [])
         .map(p => {
@@ -412,10 +411,14 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
+      // Use individual damage folder if available, otherwise fall back to general media folder
+      const damageFolderLink = skada.folder 
+        ? createStorageLink(skada.folder, siteUrl) 
+        : (payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null);
       
       return `<li style="margin-bottom:12px;">${damageText}${
-        hasPhotos && mediaFolderLink
-          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+        hasPhotos && damageFolderLink
+          ? `<br><a href="${damageFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
@@ -593,8 +596,6 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
-    const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
-    
     const damageItems = payload.skador.map((skada) => {
       const positions = (skada.positions || [])
         .map(p => {
@@ -609,12 +610,15 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
       if (positions) damageText += `<br><strong>Placering:</strong> ${positions}`;
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
-      // Photo link - now links to folder with "(Visa media 🔗)" style
+      // Photo link - use individual damage folder if available
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
+      const damageFolderLink = skada.folder 
+        ? createStorageLink(skada.folder, siteUrl) 
+        : (payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null);
       
       return `<li style="margin-bottom:12px;">${damageText}${
-        hasPhotos && mediaFolderLink
-          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+        hasPhotos && damageFolderLink
+          ? `<br><a href="${damageFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
@@ -829,8 +833,6 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   // Damages section with full details (skadetyp, placering, position, kommentar)
   let damagesSection = '';
   if (hasSkador && payload.skador && payload.skador.length > 0) {
-    const mediaFolderLink = payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null;
-    
     const damageItems = payload.skador.map((skada) => {
       const positions = (skada.positions || [])
         .map(p => {
@@ -846,10 +848,14 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
       if (skada.comment) damageText += `<br><strong>Kommentar:</strong> ${escapeHtml(skada.comment)}`;
       
       const hasPhotos = skada.photoUrls && skada.photoUrls.length > 0;
+      // Use individual damage folder if available
+      const damageFolderLink = skada.folder 
+        ? createStorageLink(skada.folder, siteUrl) 
+        : (payload.media_folder ? createStorageLink(payload.media_folder, siteUrl) : null);
       
       return `<li style="margin-bottom:12px;">${damageText}${
-        hasPhotos && mediaFolderLink
-          ? `<br><a href="${mediaFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
+        hasPhotos && damageFolderLink
+          ? `<br><a href="${damageFolderLink}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">(Visa media 🔗)</a>`
           : ''
       }</li>`;
     }).join('');
