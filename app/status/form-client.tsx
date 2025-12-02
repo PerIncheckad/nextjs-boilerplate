@@ -63,6 +63,10 @@ const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => 
 /**
  * Build the public media URL for a damage based on regnr and damage date.
  * Returns the URL path or null if no valid date is available.
+ * 
+ * @param regnr - Vehicle registration number (e.g., "ABC123")
+ * @param datumStr - Damage date in YYYY-MM-DD format or "---" if unknown
+ * @returns URL path to public media browser, or null if regnr is empty
  */
 const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined): string | null => {
   if (!regnr) return null;
@@ -78,6 +82,7 @@ const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined)
   const datePart = datumStr.replace(/-/g, '');
   
   // Validate it looks like a valid date (8 digits)
+  // Note: The date comes from formatDate() in lib/vehicle-status.ts which ensures proper formatting
   if (!/^\d{8}$/.test(datePart)) {
     return `/public-media/${encodeURIComponent(normalizedReg)}`;
   }
@@ -786,8 +791,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-size: 0.75rem;
       text-decoration: none;
       font-weight: 500;
-      margin-top: 0.25rem;
-      display: inline-block;
     }
 
     .damage-media-link:hover {
