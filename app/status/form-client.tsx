@@ -60,6 +60,33 @@ const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => 
   }
 };
 
+/**
+ * Build the public media URL for a damage based on regnr and damage date.
+ * Returns the URL path or null if no valid date is available.
+ */
+const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined): string | null => {
+  if (!regnr) return null;
+  
+  const normalizedReg = regnr.toUpperCase().replace(/\s/g, '');
+  
+  // If no valid date, link to the vehicle's root folder
+  if (!datumStr || datumStr === '---') {
+    return `/public-media/${encodeURIComponent(normalizedReg)}`;
+  }
+  
+  // Convert YYYY-MM-DD to YYYYMMDD
+  const datePart = datumStr.replace(/-/g, '');
+  
+  // Validate it looks like a valid date (8 digits)
+  if (!/^\d{8}$/.test(datePart)) {
+    return `/public-media/${encodeURIComponent(normalizedReg)}`;
+  }
+  
+  // Build folder path: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}
+  // Each segment should be encoded separately to preserve the path structure
+  return `/public-media/${encodeURIComponent(normalizedReg)}/${encodeURIComponent(`${normalizedReg}-${datePart}`)}`;
+};
+
 // =================================================================
 // 3. MAIN COMPONENT
 // =================================================================
@@ -266,7 +293,7 @@ export default function StatusForm() {
             ) : (
               <div className="damage-list">
                 {vehicleStatus.damages.map((damage) => (
-                  <DamageItem key={damage.id} damage={damage} />
+                  <DamageItem key={damage.id} damage={damage} regnr={vehicleStatus.vehicle?.regnr || normalizedReg} />
                 ))}
               </div>
             )}
@@ -392,27 +419,31 @@ const getDamageStatusClass = (status: string): string => {
   }
 };
 
-const DamageItem: React.FC<{ damage: DamageRecord }> = ({ damage }) => (
-  <div className="damage-item">
-    <div className="damage-info">
-      <span className="damage-type">{damage.skadetyp}</span>
-      <span className="damage-date">{damage.datum}</span>
-      <span className={`damage-status ${getDamageStatusClass(damage.status)}`}>
-        {damage.status}
-      </span>
+const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage, regnr }) => {
+  const mediaUrl = buildDamageMediaUrl(regnr, damage.datum);
+  
+  return (
+    <div className="damage-item">
+      <div className="damage-info">
+        <span className="damage-type">{damage.skadetyp}</span>
+        <span className="damage-date">{damage.datum}</span>
+        <span className={`damage-status ${getDamageStatusClass(damage.status)}`}>
+          {damage.status}
+        </span>
+        {mediaUrl && (
+          <a
+            href={mediaUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="damage-media-link"
+          >
+            📁 Visa media
+          </a>
+        )}
+      </div>
     </div>
-    {damage.folder && (
-      <a
-        href={`/media/${encodeURIComponent(damage.folder)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="damage-link"
-      >
-        Visa media →
-      </a>
-    )}
-  </div>
-);
+  );
+};
 
 const HistoryItem: React.FC<{ record: HistoryRecord }> = ({ record }) => {
   const getTypeLabel = (typ: string) => {
@@ -747,6 +778,19 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     }
 
     .damage-link:hover {
+      text-decoration: underline;
+    }
+
+    .damage-media-link {
+      color: var(--color-primary);
+      font-size: 0.75rem;
+      text-decoration: none;
+      font-weight: 500;
+      margin-top: 0.25rem;
+      display: inline-block;
+    }
+
+    .damage-media-link:hover {
       text-decoration: underline;
     }
 
