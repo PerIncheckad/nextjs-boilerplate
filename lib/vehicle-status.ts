@@ -113,7 +113,7 @@ function getLegacyDamageText(damage: LegacyDamage): string {
     damage.damage_type_raw,
     damage.note_customer,
     damage.note_internal,
-  ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
+  ].filter((p): p is string => typeof p === 'string' && p.trim() !== '' && p.trim() !== '-');
   const uniqueParts = [...new Set(parts)];
   return uniqueParts.join(' - ');
 }
@@ -212,8 +212,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     regnr: cleanedRegnr,
     
     // Bilmärke & Modell: nybil_inventering → vehicles (using formatModel for consistent display)
-    bilmarkeModell: nybilData?.bilmarke && nybilData?.modell
-      ? `${nybilData.bilmarke} ${nybilData.modell}`
+    bilmarkeModell: nybilData?.bilmarke || nybilData?.modell
+      ? formatModel(nybilData?.bilmarke ?? null, nybilData?.modell ?? null)
       : nybilData?.bilmodell
         ? nybilData.bilmodell
         : vehicleData

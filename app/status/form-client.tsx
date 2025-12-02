@@ -381,12 +381,20 @@ const FilterButton: React.FC<React.PropsWithChildren<{ active: boolean; onClick:
   </button>
 );
 
+const getDamageStatusClass = (status: string): string => {
+  switch (status) {
+    case 'Dokumenterad': return 'documented';
+    case 'Befintlig': return 'legacy';
+    default: return 'not-documented';
+  }
+};
+
 const DamageItem: React.FC<{ damage: DamageRecord }> = ({ damage }) => (
   <div className="damage-item">
     <div className="damage-info">
       <span className="damage-type">{damage.skadetyp}</span>
       <span className="damage-date">{damage.datum}</span>
-      <span className={`damage-status ${damage.status === 'Dokumenterad' ? 'documented' : damage.status === 'Befintlig' ? 'legacy' : 'not-documented'}`}>
+      <span className={`damage-status ${getDamageStatusClass(damage.status)}`}>
         {damage.status}
       </span>
     </div>
