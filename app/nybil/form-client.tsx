@@ -513,8 +513,7 @@ export default function NybilForm() {
     if (bilmarke === 'Annat' && !bilmarkeAnnat.trim()) return false;
     // PLATS FÖR MOTTAGNING
     if (!ort || !station) return false;
-    // PLANERAD STATION
-    if (!planeradStation) return false;
+    // PLANERAD STATION - now optional, no validation needed
     // FORDONSSTATUS
     if (hasFordonStatusErrors) return false;
     // AVTALSVILLKOR
@@ -533,7 +532,7 @@ export default function NybilForm() {
     // KLAR FÖR UTHYRNING
     if (klarForUthyrningMissing) return false;
     return true;
-  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, planeradStation, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, damagesMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
+  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, damagesMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -1512,9 +1511,9 @@ export default function NybilForm() {
       </Card>
       
       {/* PLANERAD STATION Section */}
-      <Card data-error={showFieldErrors && !planeradStation}>
+      <Card>
         <SectionHeader title="Planerad station" />
-        <Field label="Planerad station *">
+        <Field label="Planerad station">
           <select value={planeradStation} onChange={e => setPlaneradStation(e.target.value)}>
             <option value="">Välj planerad station</option>
             {HUVUDSTATIONER.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
@@ -1655,7 +1654,7 @@ export default function NybilForm() {
       {/* UTRUSTNING Section */}
       <Card data-error={showFieldErrors && equipmentMissing}>
         <SectionHeader title="Utrustning" />
-        <Field label="Antal insynsskydd *">
+        <Field label="Antal insynsskydd * (räkna inte lastnät)">
           <div className="grid-3-col">
             <ChoiceButton onClick={() => setAntalInsynsskydd(0)} isActive={antalInsynsskydd === 0} isSet={antalInsynsskydd !== null}>0</ChoiceButton>
             <ChoiceButton onClick={() => setAntalInsynsskydd(1)} isActive={antalInsynsskydd === 1} isSet={antalInsynsskydd !== null}>1</ChoiceButton>

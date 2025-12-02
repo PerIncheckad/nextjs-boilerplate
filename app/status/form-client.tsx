@@ -249,7 +249,9 @@ export default function StatusForm() {
                   ? 'Nybilsregistrering + Bilkontroll' 
                   : vehicleStatus.source === 'nybil_inventering' 
                     ? 'Nybilsregistrering' 
-                    : 'Bilkontroll'}
+                    : vehicleStatus.source === 'checkins'
+                      ? 'Incheckning (saknas i Bilkontroll)'
+                      : 'Bilkontroll'}
               </small>
             </div>
           </Card>

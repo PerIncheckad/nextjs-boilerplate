@@ -43,7 +43,7 @@ export type HistoryRecord = {
 
 export type VehicleStatusResult = {
   found: boolean;
-  source: 'nybil_inventering' | 'vehicles' | 'both' | 'none';
+  source: 'nybil_inventering' | 'vehicles' | 'both' | 'checkins' | 'none';
   vehicle: VehicleStatusData | null;
   damages: DamageRecord[];
   history: HistoryRecord[];
@@ -189,10 +189,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
 
   // Determine source
-  let source: 'nybil_inventering' | 'vehicles' | 'both' | 'none' = 'none';
+  let source: 'nybil_inventering' | 'vehicles' | 'both' | 'checkins' | 'none' = 'none';
   if (nybilData && vehicleData) source = 'both';
   else if (nybilData) source = 'nybil_inventering';
   else if (vehicleData) source = 'vehicles';
+  else if (checkins.length > 0) source = 'checkins';
 
   if (source === 'none') {
     return {
@@ -206,6 +207,94 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Get latest checkin for current location and odometer
   const latestCheckin = checkins[0] || null;
+
+  // If source is 'checkins', build a minimal vehicle data from checkin records
+  if (source === 'checkins') {
+    // Build vehicle status data from checkin records
+    const vehicle: VehicleStatusData = {
+      regnr: cleanedRegnr,
+      
+      // Bilmärke & Modell: from checkins.car_model if available
+      bilmarkeModell: latestCheckin?.car_model || '---',
+      
+      // Bilen står nu: from latest checkin
+      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station
+        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
+        : '---',
+      
+      // Mätarställning: from latest checkin
+      matarstallning: latestCheckin?.odometer_km
+        ? `${latestCheckin.odometer_km} km`
+        : '---',
+      
+      // Däck som sitter på: from latest checkin
+      hjultyp: latestCheckin?.hjultyp || '---',
+      
+      // Hjulförvaring: not available from checkins
+      hjulforvaring: '---',
+      
+      // Drivmedel: not available from checkins
+      drivmedel: '---',
+      
+      // Serviceintervall: not available from checkins
+      serviceintervall: '---',
+      
+      // Max km/månad: not available from checkins
+      maxKmManad: '---',
+      
+      // Avgift över-km: not available from checkins
+      avgiftOverKm: '---',
+      
+      // Saludatum: from legacy damages if available
+      saludatum: legacySaludatum
+        ? formatDate(legacySaludatum)
+        : '---',
+      
+      // Antal registrerade skador: count legacy damages (BUHS)
+      antalSkador: legacyDamages.length,
+      
+      // Stöld-GPS monterad: not available from checkins
+      stoldGps: '---',
+      
+      // Klar för uthyrning: not available from checkins
+      klarForUthyrning: '---',
+    };
+
+    // Build damage records from legacy damages (BUHS)
+    const damageRecords: DamageRecord[] = legacyDamages.map((d: LegacyDamage) => ({
+      id: d.id,
+      regnr: cleanedRegnr,
+      skadetyp: getLegacyDamageText(d) || 'Okänd',
+      datum: formatDate(d.damage_date),
+      status: 'Befintlig',
+      source: 'legacy' as const,
+    }));
+
+    // Build history records from checkins only
+    const historyRecords: HistoryRecord[] = checkins.map(checkin => ({
+      id: `checkin-${checkin.id}`,
+      datum: formatDateTime(checkin.created_at),
+      rawTimestamp: checkin.created_at || '',
+      typ: 'incheckning' as const,
+      sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+      utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
+    }));
+
+    // Sort history by rawTimestamp (newest first)
+    historyRecords.sort((a, b) => {
+      const dateA = new Date(a.rawTimestamp);
+      const dateB = new Date(b.rawTimestamp);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    return {
+      found: true,
+      source,
+      vehicle,
+      damages: damageRecords,
+      history: historyRecords,
+    };
+  }
 
   // Build vehicle status data using priority order
   const vehicle: VehicleStatusData = {
