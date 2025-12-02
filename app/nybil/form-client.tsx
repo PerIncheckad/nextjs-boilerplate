@@ -26,7 +26,7 @@ const HUVUDSTATIONER = [
 const BILMARKEN = ['BMW', 'Citroen', 'Ford', 'KIA', 'MB', 'MG', 'Opel', 'Peugeot', 'Renault', 'SEAT', 'VW', 'Annat'];
 
 const STATIONER: Record<string, string[]> = {
-  'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
+  'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
   'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'Euromaster Helsingborg Däckhotell', 'Bilia Helsingborg', 'Mekonomen Helsingborg Berga', 'Werksta Helsingborg', 'Svensk Bilåtervinning', 'Hedin Helsingborg', 'KKV Helsingborg', 'Hedbergs Helsingborg', 'Bilia Ängelholm', 'Euromaster Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
   'Lund': ['FORD Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
   'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
@@ -237,7 +237,7 @@ export default function NybilForm() {
   const [upptankningLiterpris, setUpptankningLiterpris] = useState('');
   
   // Contract terms (AVTALSVILLKOR)
-  const [serviceintervall, setServiceintervall] = useState<'1500' | '2500' | '3000' | 'Annat' | null>(null);
+  const [serviceintervall, setServiceintervall] = useState<'15000' | '25000' | '30000' | 'Annat' | null>(null);
   const [serviceintervallAnnat, setServiceintervallAnnat] = useState('');
   const [maxKmManad, setMaxKmManad] = useState<'1200' | '3000' | 'Annat' | null>(null);
   const [maxKmManadAnnat, setMaxKmManadAnnat] = useState('');
@@ -458,11 +458,10 @@ export default function NybilForm() {
   }, [antalInsynsskydd, instruktionsbok, instruktionsbokForvaringOrt, instruktionsbokForvaringSpec, coc, cocForvaringOrt, cocForvaringSpec, antalNycklar, extranyckelForvaringOrt, extranyckelForvaringSpec, needsLaddkablar, antalLaddkablar, laddkablarNeedsStorage, laddkablarForvaringOrt, laddkablarForvaringSpec, lasbultarMed, dragkrok, gummimattor, dackkompressor, stoldGps, stoldGpsSpec]);
   
   const avtalsvillkorMissing = useMemo(() => {
-    if (serviceintervall === null) return true;
+    // All Avtalsvillkor fields are now optional
+    // Only check "Annat" fields if the corresponding option is selected
     if (serviceintervall === 'Annat' && !serviceintervallAnnat.trim()) return true;
-    if (maxKmManad === null) return true;
     if (maxKmManad === 'Annat' && !maxKmManadAnnat.trim()) return true;
-    if (avgiftOverKm === null) return true;
     if (avgiftOverKm === 'Annat' && !avgiftOverKmAnnat.trim()) return true;
     return false;
   }, [serviceintervall, serviceintervallAnnat, maxKmManad, maxKmManadAnnat, avgiftOverKm, avgiftOverKmAnnat]);
@@ -1465,6 +1464,7 @@ export default function NybilForm() {
       )}
       <div className="main-header">
         <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+        <h1 className="page-title">NY BIL</h1>
         {fullName && <p className="user-info">Inloggad: {fullName}</p>}
       </div>
       
@@ -1613,20 +1613,20 @@ export default function NybilForm() {
       {/* AVTALSVILLKOR Section */}
       <Card data-error={showFieldErrors && avtalsvillkorMissing}>
         <SectionHeader title="Avtalsvillkor" />
-        <Field label="Serviceintervall *">
+        <Field label="Serviceintervall km">
           <div className="grid-4-col">
-            <ChoiceButton onClick={() => { setServiceintervall('1500'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '1500'} isSet={serviceintervall !== null}>1500</ChoiceButton>
-            <ChoiceButton onClick={() => { setServiceintervall('2500'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '2500'} isSet={serviceintervall !== null}>2500</ChoiceButton>
-            <ChoiceButton onClick={() => { setServiceintervall('3000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '3000'} isSet={serviceintervall !== null}>3000</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall('15000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '15000'} isSet={serviceintervall !== null}>15000</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall('25000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '25000'} isSet={serviceintervall !== null}>25000</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall('30000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '30000'} isSet={serviceintervall !== null}>30000</ChoiceButton>
             <ChoiceButton onClick={() => setServiceintervall('Annat')} isActive={serviceintervall === 'Annat'} isSet={serviceintervall !== null}>Annat</ChoiceButton>
           </div>
         </Field>
         {serviceintervall === 'Annat' && (
-          <Field label="Specificera serviceintervall *">
+          <Field label="Specificera serviceintervall">
             <input type="number" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange serviceintervall" />
           </Field>
         )}
-        <Field label="Max km/månad *">
+        <Field label="Max km/månad">
           <div className="grid-3-col">
             <ChoiceButton onClick={() => { setMaxKmManad('1200'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '1200'} isSet={maxKmManad !== null}>1200</ChoiceButton>
             <ChoiceButton onClick={() => { setMaxKmManad('3000'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '3000'} isSet={maxKmManad !== null}>3000</ChoiceButton>
@@ -1634,11 +1634,11 @@ export default function NybilForm() {
           </div>
         </Field>
         {maxKmManad === 'Annat' && (
-          <Field label="Specificera max km/månad *">
+          <Field label="Specificera max km/månad">
             <input type="number" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange max km/månad" />
           </Field>
         )}
-        <Field label="Avgift över-km *">
+        <Field label="Avgift över-km">
           <div className="grid-3-col">
             <ChoiceButton onClick={() => { setAvgiftOverKm('1'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '1'} isSet={avgiftOverKm !== null}>1 kr</ChoiceButton>
             <ChoiceButton onClick={() => { setAvgiftOverKm('2'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '2'} isSet={avgiftOverKm !== null}>2 kr</ChoiceButton>
@@ -1646,7 +1646,7 @@ export default function NybilForm() {
           </div>
         </Field>
         {avgiftOverKm === 'Annat' && (
-          <Field label="Specificera avgift över-km *">
+          <Field label="Specificera avgift över-km">
             <input type="number" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value)} placeholder="Ange avgift" />
           </Field>
         )}
@@ -2554,6 +2554,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .main-header { text-align:center; margin-bottom:1.5rem; }
     .main-logo { max-width:188px; height:auto; margin:0 auto 1rem auto; display:block; }
     .user-info { font-weight:500; color:var(--color-text-secondary); margin:0; }
+    .page-title { font-size:1.25rem; font-weight:700; color:var(--color-text); text-transform:uppercase; letter-spacing:.05em; margin:0 0 .5rem 0; }
     .card { background-color:rgba(255,255,255,0.92); padding:1.5rem; border-radius:12px; margin-bottom:1.5rem; box-shadow:var(--shadow-md); border:2px solid transparent; transition:border-color .3s; }
     .card[data-error="true"] { border:2px solid var(--color-danger); }
     .field[data-error="true"] input, .field[data-error="true"] select, .field[data-error="true"] textarea { border:2px solid var(--color-danger)!important; }
