@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getVehicleStatus, searchVehicles, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
+import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
 
 // =================================================================
 // 1. CONSTANTS

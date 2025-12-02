@@ -33,6 +33,7 @@ export type DamageRecord = {
 export type HistoryRecord = {
   id: string;
   datum: string;
+  rawTimestamp: string; // ISO string for sorting
   typ: 'incheckning' | 'nybil' | 'manual';
   sammanfattning: string;
   utfordAv: string;
@@ -112,7 +113,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
 
   // Fetch data from all sources concurrently
-  const [nybilResponse, vehicleResponse, damagesResponse, checkinsResponse] = await Promise.all([
+  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse] = await Promise.all([
     // nybil_inventering - newest first
     supabase
       .from('nybil_inventering')
@@ -126,12 +127,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     
-    // damages
+    // damages (from our damages table)
     supabase
       .from('damages')
       .select('*')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false }),
+    
+    // legacy damages (from BUHS via RPC) - includes saludatum
+    supabase
+      .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     
     // checkins
     supabase
@@ -144,7 +149,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const nybilData = nybilResponse.data;
   const vehicleData = vehicleResponse.data?.[0] || null;
   const damages = damagesResponse.data || [];
+  const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
+  
+  // Get saludatum from legacy damages if available
+  const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
 
   // Determine source
   let source: 'nybil_inventering' | 'vehicles' | 'both' | 'none' = 'none';
@@ -215,11 +224,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? `${nybilData.avgift_over_km} kr`
       : '---',
     
-    // Saludatum: nybil_inventering.saludatum → damages.saludatum (senaste)
+    // Saludatum: nybil_inventering.saludatum → legacy damages.saludatum (senaste)
     saludatum: nybilData?.saludatum
       ? formatDate(nybilData.saludatum)
-      : damages.length > 0 && damages[0].saludatum
-        ? formatDate(damages[0].saludatum)
+      : legacySaludatum
+        ? formatDate(legacySaludatum)
         : '---',
     
     // Antal registrerade skador
@@ -258,6 +267,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     historyRecords.push({
       id: `checkin-${checkin.id}`,
       datum: formatDateTime(checkin.created_at),
+      rawTimestamp: checkin.created_at || '',
       typ: 'incheckning',
       sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
       utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
@@ -269,16 +279,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     historyRecords.push({
       id: `nybil-${nybilData.id}`,
       datum: formatDateTime(nybilData.created_at),
+      rawTimestamp: nybilData.created_at || '',
       typ: 'nybil',
       sammanfattning: `Nybilsregistrering: ${nybilData.bilmarke || ''} ${nybilData.modell || ''}. Mottagen vid ${nybilData.plats_mottagning_ort || '?'} / ${nybilData.plats_mottagning_station || '?'}`,
       utfordAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
     });
   }
 
-  // Sort history by date (newest first)
+  // Sort history by rawTimestamp (newest first)
   historyRecords.sort((a, b) => {
-    const dateA = new Date(a.datum.replace(' ', 'T'));
-    const dateB = new Date(b.datum.replace(' ', 'T'));
+    const dateA = new Date(a.rawTimestamp);
+    const dateB = new Date(b.rawTimestamp);
     return dateB.getTime() - dateA.getTime();
   });
 
