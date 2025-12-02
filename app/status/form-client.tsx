@@ -232,6 +232,7 @@ export default function StatusForm() {
               <InfoRow label="Bilen står nu" value={vehicleStatus.vehicle.bilenStarNu} />
               <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
+              <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulforvaring} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
@@ -385,7 +386,7 @@ const DamageItem: React.FC<{ damage: DamageRecord }> = ({ damage }) => (
     <div className="damage-info">
       <span className="damage-type">{damage.skadetyp}</span>
       <span className="damage-date">{damage.datum}</span>
-      <span className={`damage-status ${damage.status === 'Dokumenterad' ? 'documented' : 'not-documented'}`}>
+      <span className={`damage-status ${damage.status === 'Dokumenterad' ? 'documented' : damage.status === 'Befintlig' ? 'legacy' : 'not-documented'}`}>
         {damage.status}
       </span>
     </div>
@@ -711,6 +712,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-status.not-documented {
       background-color: var(--color-warning-light);
       color: #92400e;
+    }
+
+    .damage-status.legacy {
+      background-color: var(--color-primary-light);
+      color: var(--color-primary);
     }
 
     .damage-link {

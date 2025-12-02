@@ -11,6 +11,7 @@ export type VehicleStatusData = {
   bilenStarNu: string; // ort + station
   matarstallning: string;
   hjultyp: string;
+  hjulforvaring: string;
   drivmedel: string;
   serviceintervall: string;
   maxKmManad: string;
@@ -28,6 +29,7 @@ export type DamageRecord = {
   datum: string;
   status: string;
   folder?: string;
+  source: 'legacy' | 'damages';
 };
 
 export type HistoryRecord = {
@@ -93,6 +95,37 @@ function getFullNameFromEmail(email: string): string {
     return `${firstName} ${lastName}`;
   }
   return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+}
+
+// Raw damage data from the legacy source (BUHS)
+type LegacyDamage = {
+  id: number;
+  damage_type_raw: string | null;
+  note_customer: string | null;
+  note_internal: string | null;
+  saludatum: string | null;
+  damage_date: string | null;
+};
+
+// Helper to combine the raw text fields from a legacy damage object (same as /check)
+function getLegacyDamageText(damage: LegacyDamage): string {
+  const parts = [
+    damage.damage_type_raw,
+    damage.note_customer,
+    damage.note_internal,
+  ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
+  const uniqueParts = [...new Set(parts)];
+  return uniqueParts.join(' - ');
+}
+
+// Format model as "Brand Model" or "Brand -" if model is missing (same as /check)
+function formatModel(brand: string | null, model: string | null): string {
+  const cleanBrand = brand?.trim();
+  const cleanModel = model?.trim();
+  if (cleanBrand && cleanModel) return `${cleanBrand} ${cleanModel}`;
+  if (cleanBrand) return `${cleanBrand} -`;
+  if (cleanModel) return `- ${cleanModel}`;
+  return '---';
 }
 
 // =================================================================
@@ -178,13 +211,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const vehicle: VehicleStatusData = {
     regnr: cleanedRegnr,
     
-    // Bilmärke & Modell: nybil_inventering → vehicles
+    // Bilmärke & Modell: nybil_inventering → vehicles (using formatModel for consistent display)
     bilmarkeModell: nybilData?.bilmarke && nybilData?.modell
       ? `${nybilData.bilmarke} ${nybilData.modell}`
       : nybilData?.bilmodell
         ? nybilData.bilmodell
         : vehicleData
-          ? `${vehicleData.brand || ''} ${vehicleData.model || ''}`.trim() || '---'
+          ? formatModel(vehicleData.brand, vehicleData.model)
           : '---',
     
     // Bilen står nu: checkins.current_station (senaste) → nybil_inventering.plats_aktuell_station
@@ -205,6 +238,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Däck som sitter på: checkins.hjultyp (senaste) → nybil_inventering.hjultyp
     hjultyp: latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
+    
+    // Hjulförvaring: vehicles.wheel_storage_location
+    hjulforvaring: vehicleData?.wheel_storage_location || '---',
     
     // Drivmedel: nybil_inventering.bransletyp
     drivmedel: nybilData?.bransletyp || '---',
@@ -231,8 +267,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? formatDate(legacySaludatum)
         : '---',
     
-    // Antal registrerade skador
-    antalSkador: damages.length,
+    // Antal registrerade skador: count legacy damages (BUHS) like /check does
+    antalSkador: legacyDamages.length,
     
     // Stöld-GPS monterad: nybil_inventering.stold_gps
     stoldGps: nybilData?.stold_gps === true
@@ -249,14 +285,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         : '---',
   };
 
-  // Build damage records
-  const damageRecords: DamageRecord[] = damages.map((d: any) => ({
+  // Build damage records from legacy damages (BUHS) - same source as /check
+  const damageRecords: DamageRecord[] = legacyDamages.map((d: LegacyDamage) => ({
     id: d.id,
-    regnr: d.regnr,
-    skadetyp: d.user_type || d.damage_type || 'Okänd',
-    datum: formatDate(d.damage_date || d.created_at),
-    status: d.is_documented ? 'Dokumenterad' : 'Ej dokumenterad',
-    folder: d.folder || undefined,
+    regnr: cleanedRegnr,
+    skadetyp: getLegacyDamageText(d) || 'Okänd',
+    datum: formatDate(d.damage_date),
+    status: 'Befintlig',
+    source: 'legacy' as const,
   }));
 
   // Build history records
