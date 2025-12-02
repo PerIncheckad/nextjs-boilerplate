@@ -17,7 +17,7 @@ const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
 const STATIONER: Record<string, string[]> = {
-  'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Mercedes Malmö', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
+  'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
   'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B/S Helsingborg', 'Werksta Helsingborg', 'Båstad'],
   'Lund': ['FORD Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
   'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
@@ -1143,6 +1143,7 @@ export default function CheckInForm() {
       <div className="checkin-form">
         <div className="main-header">
           <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+          <h1 className="page-title">INCHECKNING</h1>
           {fullName && <p className="user-info">Inloggad: {fullName}</p>}
         </div>
 
@@ -1636,6 +1637,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .main-header { text-align: center; margin-bottom: 1.5rem; }
     .main-logo { max-width: 188px; height: auto; margin: 0 auto 1rem auto; display: block; }
     .user-info { font-weight: 500; color: var(--color-text-secondary); margin: 0; }
+    .page-title { font-size: 1.25rem; font-weight: 700; color: var(--color-text); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 0.5rem 0; }
     .card { background-color: rgba(255, 255, 255, 0.92); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: var(--shadow-md); border: 2px solid transparent; transition: border-color 0.2s; }
     .card[data-error="true"] { border: 2px solid var(--color-danger); }
     .field[data-error="true"] input, .field[data-error="true"] select, .field[data-error="true"] textarea { border: 2px solid var(--color-danger) !important; }

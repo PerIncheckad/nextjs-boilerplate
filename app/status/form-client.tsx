@@ -184,6 +184,7 @@ export default function StatusForm() {
       <div className="status-form">
         <div className="main-header">
           <img src={MABI_LOGO_URL} alt="MABI Logo" className="main-logo" />
+          <h1 className="page-title">STATUS</h1>
           {fullName && <p className="user-info">Inloggad: {fullName}</p>}
         </div>
 
@@ -517,6 +518,15 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-weight: 500;
       color: var(--color-text-secondary);
       margin: 0;
+    }
+
+    .page-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-text);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 0.5rem 0;
     }
 
     .card {
