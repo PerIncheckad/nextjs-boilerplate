@@ -238,7 +238,7 @@ export default function StatusForm() {
         </div>
 
         {/* Search Section */}
-        <Card>
+        <Card className="search-form-card">
           <SectionHeader title="Sök fordon" />
           <div style={{ position: 'relative' }}>
             <Field label="Registreringsnummer">
@@ -325,7 +325,7 @@ export default function StatusForm() {
 
         {/* Damages Section */}
         {vehicleStatus?.found && (
-          <Card>
+          <Card className="damages-card">
             <SectionHeader title={`Skador (${vehicleStatus.damages.length})`} />
             {vehicleStatus.damages.length === 0 ? (
               <p className="no-data-text">Inga registrerade skador</p>
@@ -1003,9 +1003,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
-      /* Hide search section (first card after print-header) */
-      .status-form > div:not(.print-header) > .card:first-of-type,
-      .status-form > .card:nth-of-type(1) {
+      /* Hide search form in print */
+      .search-form-card {
         display: none !important;
       }
 
@@ -1123,7 +1122,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       }
 
       /* Force damages section to start on new page */
-      .card:nth-of-type(3) {
+      .damages-card {
         page-break-before: always;
       }
 
