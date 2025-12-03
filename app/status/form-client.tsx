@@ -363,7 +363,18 @@ export default function StatusForm() {
         )}
 
         {/* Equipment Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.utrustning !== '---' && (
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.antalNycklar !== '---' ||
+          vehicleStatus.vehicle.antalLaddkablar !== '---' ||
+          vehicleStatus.vehicle.antalInsynsskydd !== '---' ||
+          vehicleStatus.vehicle.harInstruktionsbok !== '---' ||
+          vehicleStatus.vehicle.harCoc !== '---' ||
+          vehicleStatus.vehicle.harLasbultar !== '---' ||
+          vehicleStatus.vehicle.harDragkrok !== '---' ||
+          vehicleStatus.vehicle.harGummimattor !== '---' ||
+          vehicleStatus.vehicle.harDackkompressor !== '---' ||
+          vehicleStatus.vehicle.stoldGps !== '---'
+        ) && (
           <Card>
             <SectionHeader title="Utrustning" />
             <div className="info-grid">
@@ -376,7 +387,7 @@ export default function StatusForm() {
               {vehicleStatus.vehicle.harDragkrok !== '---' && <InfoRow label="Dragkrok" value={vehicleStatus.vehicle.harDragkrok} />}
               {vehicleStatus.vehicle.harGummimattor !== '---' && <InfoRow label="Gummimattor" value={vehicleStatus.vehicle.harGummimattor} />}
               {vehicleStatus.vehicle.harDackkompressor !== '---' && <InfoRow label="Däckkompressor" value={vehicleStatus.vehicle.harDackkompressor} />}
-              <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
+              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
             </div>
           </Card>
         )}

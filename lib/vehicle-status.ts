@@ -609,9 +609,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : '---',
     
     // Equipment details (individual fields for separate section)
-    antalNycklar: nybilData?.antal_nycklar ? `${nybilData.antal_nycklar} st` : '---',
-    antalLaddkablar: nybilData?.antal_laddkablar ? `${nybilData.antal_laddkablar} st` : '---',
-    antalInsynsskydd: nybilData?.antal_insynsskydd ? `${nybilData.antal_insynsskydd} st` : '---',
+    antalNycklar: nybilData?.antal_nycklar != null ? `${nybilData.antal_nycklar} st` : '---',
+    antalLaddkablar: nybilData?.antal_laddkablar != null ? `${nybilData.antal_laddkablar} st` : '---',
+    antalInsynsskydd: nybilData?.antal_insynsskydd != null ? `${nybilData.antal_insynsskydd} st` : '---',
     harInstruktionsbok: nybilData?.instruktionsbok === true ? 'Ja' : nybilData?.instruktionsbok === false ? 'Nej' : '---',
     harCoc: nybilData?.coc === true ? 'Ja' : nybilData?.coc === false ? 'Nej' : '---',
     harLasbultar: nybilData?.lasbultar_med === true ? 'Ja' : nybilData?.lasbultar_med === false ? 'Nej' : '---',
