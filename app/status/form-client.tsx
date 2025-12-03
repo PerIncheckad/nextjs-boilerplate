@@ -290,8 +290,8 @@ export default function StatusForm() {
         )}
 
         {/* Nybil Reference Photos Section */}
-        {vehicleStatus?.found && vehicleStatus.nybilPhotos && vehicleStatus.nybilPhotos.photoUrls.length > 0 && (
-          <Card>
+        {vehicleStatus?.found && vehicleStatus.nybilPhotos?.photoUrls?.length > 0 && (
+          <Card className="nybil-photos-card">
             <SectionHeader title="Nybilsfoton" />
             <div className="nybil-photos-grid">
               {vehicleStatus.nybilPhotos.photoUrls.map((url, index) => (
@@ -1181,8 +1181,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         page-break-inside: avoid;
       }
 
-      /* Hide nybil photos in print */
-      .nybil-photos-grid {
+      /* Hide nybil photos section entirely in print */
+      .nybil-photos-card {
         display: none !important;
       }
     }

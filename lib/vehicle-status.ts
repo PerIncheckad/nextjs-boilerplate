@@ -97,6 +97,8 @@ type NybilInventeringData = {
   returadress?: string;
   fullstandigt_namn?: string;
   registrerad_av?: string;
+  photo_urls?: string[];
+  media_folder?: string | null;
 };
 
 // =================================================================
