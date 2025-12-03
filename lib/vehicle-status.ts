@@ -34,6 +34,8 @@ export type DamageRecord = {
   status: string;
   folder?: string;
   source: 'legacy' | 'damages';
+  // Source info for display
+  sourceInfo?: string; // e.g., "Källa: BUHS" or "Incheckad av Per Andersson 2025-12-03 14:30"
 };
 
 export type HistoryRecord = {
@@ -364,6 +366,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDate(d.damage_date),
       status: 'Befintlig',
       source: 'legacy' as const,
+      sourceInfo: 'Källa: BUHS',
     }));
 
     // Build history records from checkins only
@@ -489,6 +492,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     datum: formatDate(d.damage_date),
     status: 'Befintlig',
     source: 'legacy' as const,
+    sourceInfo: 'Källa: BUHS',
   }));
 
   // Build history records

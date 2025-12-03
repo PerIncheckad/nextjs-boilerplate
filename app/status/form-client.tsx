@@ -453,14 +453,6 @@ const FilterButton: React.FC<React.PropsWithChildren<{ active: boolean; onClick:
   </button>
 );
 
-const getDamageStatusClass = (status: string): string => {
-  switch (status) {
-    case 'Dokumenterad': return 'documented';
-    case 'Befintlig': return 'legacy';
-    default: return 'not-documented';
-  }
-};
-
 const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage, regnr }) => {
   const mediaUrl = buildDamageMediaUrl(regnr, damage.datum);
   
@@ -469,9 +461,9 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
       <div className="damage-info">
         <span className="damage-type">{damage.skadetyp}</span>
         <span className="damage-date">{damage.datum}</span>
-        <span className={`damage-status ${getDamageStatusClass(damage.status)}`}>
-          {damage.status}
-        </span>
+        {damage.sourceInfo && (
+          <span className="damage-source">{damage.sourceInfo}</span>
+        )}
         {mediaUrl && (
           <a
             href={mediaUrl}
@@ -605,7 +597,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     }
 
     .card {
-      background-color: rgba(255, 255, 255, 0.92);
+      background-color: rgba(255, 255, 255, 0.98);
       padding: 1.5rem;
       border-radius: 12px;
       margin-bottom: 1.5rem;
@@ -790,26 +782,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       color: var(--color-text-secondary);
     }
 
-    .damage-status {
+    .damage-source {
       font-size: 0.75rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      width: fit-content;
-    }
-
-    .damage-status.documented {
-      background-color: var(--color-success-light);
-      color: var(--color-success);
-    }
-
-    .damage-status.not-documented {
-      background-color: var(--color-warning-light);
-      color: #92400e;
-    }
-
-    .damage-status.legacy {
-      background-color: var(--color-primary-light);
-      color: var(--color-primary);
+      color: var(--color-text-secondary);
+      font-style: italic;
     }
 
     .damage-link {
