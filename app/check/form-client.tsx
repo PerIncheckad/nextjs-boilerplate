@@ -1473,6 +1473,10 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     };
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
     const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
+    
+    // Check if delivery odometer is less than check-in odometer (logical warning)
+    const showOdometerWarning = payload.bilen_star_nu?.matarstallning_avlamning && 
+      parseInt(payload.bilen_star_nu.matarstallning_avlamning, 10) < parseInt(payload.matarstallning, 10);
 
     return (<Fragment><div className="modal-overlay" onClick={onCancel} /><div 
         ref={containerRef}
@@ -1494,6 +1498,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 {payload.status?.insynsskyddSaknas && <p className="warning-highlight">Insynsskydd saknas</p>}
                 {showNotRefueled && <p className="warning-highlight">Bilen är ej upptankad</p>}
                 {showChargeWarning && <p className="warning-highlight">Låg laddnivå</p>}
+                {showOdometerWarning && <p className="warning-highlight">Mätarställning vid avlämning är lägre än vid incheckning</p>}
             </div>
         </div>
         <div className="confirm-details">
