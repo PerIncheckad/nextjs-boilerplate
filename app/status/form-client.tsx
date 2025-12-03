@@ -255,6 +255,16 @@ export default function StatusForm() {
           )}
         </Card>
 
+        {/* Print Header (hidden on screen, visible on print) */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          <div className="print-header">
+            <h1>MABI Fordonsstatus</h1>
+            <p className="print-regnr">Reg.nr: {vehicleStatus.vehicle.regnr}</p>
+            <p className="print-date">Utskrivet: {new Date().toISOString().split('T')[0]}</p>
+            <hr className="print-divider" />
+          </div>
+        )}
+
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
@@ -286,6 +296,13 @@ export default function StatusForm() {
                       : 'Bilkontroll'}
               </small>
             </div>
+            <button
+              type="button"
+              className="print-btn"
+              onClick={() => window.print()}
+            >
+              🖨️ Skriv ut
+            </button>
           </Card>
         )}
 
@@ -894,6 +911,30 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-size: 0.875rem;
     }
 
+    /* Print button styles */
+    .print-btn {
+      margin-top: 1rem;
+      padding: 0.75rem 1.5rem;
+      background-color: var(--color-primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: 100%;
+    }
+
+    .print-btn:hover {
+      background-color: #1d4ed8;
+    }
+
+    /* Print header (hidden on screen) */
+    .print-header {
+      display: none;
+    }
+
     @media (max-width: 480px) {
       .damage-item {
         flex-direction: column;
@@ -909,6 +950,145 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         flex: 1;
         min-width: 100px;
         text-align: center;
+      }
+    }
+
+    /* Print-specific styles */
+    @media print {
+      /* Hide elements not needed for print */
+      .main-header,
+      .copyright-footer,
+      .print-btn,
+      .damage-media-link,
+      body::before {
+        display: none !important;
+      }
+
+      /* Show print header */
+      .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #000;
+      }
+
+      .print-header h1 {
+        font-size: 1.5rem;
+        margin: 0 0 0.5rem 0;
+        color: #000;
+      }
+
+      .print-regnr {
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+        color: #000;
+      }
+
+      .print-date {
+        font-size: 0.875rem;
+        margin: 0.5rem 0;
+        color: #666;
+      }
+
+      .print-divider {
+        border: none;
+        border-top: 1px solid #ccc;
+        margin: 1rem 0 0 0;
+      }
+
+      /* Hide search section */
+      .card:first-of-type {
+        display: none;
+      }
+
+      /* Optimize for print */
+      body {
+        background: white !important;
+        color: black !important;
+      }
+
+      .status-form {
+        max-width: 100%;
+        padding: 0;
+      }
+
+      .card {
+        background-color: white !important;
+        box-shadow: none !important;
+        border: 1px solid #e5e7eb;
+        border-radius: 0;
+        page-break-inside: avoid;
+        margin-bottom: 1rem;
+      }
+
+      .section-header,
+      .section-header-expandable {
+        border-bottom-color: #000;
+      }
+
+      .section-header h2,
+      .section-header-expandable h2 {
+        color: #000;
+      }
+
+      /* Remove background colors and shadows */
+      .damage-item,
+      .history-item {
+        background-color: white !important;
+        box-shadow: none !important;
+        border: 1px solid #e5e7eb;
+      }
+
+      /* Ensure text is black */
+      .info-label,
+      .info-value,
+      .damage-type,
+      .damage-date,
+      .history-summary {
+        color: #000 !important;
+      }
+
+      /* Compact spacing */
+      .card {
+        padding: 1rem;
+      }
+
+      .damage-list,
+      .history-list {
+        gap: 0.5rem;
+      }
+
+      /* Hide expand icons and filters */
+      .expand-icon,
+      .history-filter,
+      .filter-btn {
+        display: none !important;
+      }
+
+      /* Force history to show all items by making content visible */
+      .history-list {
+        display: flex !important;
+        flex-direction: column;
+      }
+
+      /* Force expanded history section content to show */
+      .section-header-expandable + * {
+        display: block !important;
+      }
+
+      /* Convert media links to text */
+      .damage-media-link::after {
+        content: " (Media tillgänglig digitalt)";
+        color: #666;
+        font-style: italic;
+      }
+
+      /* Page break control */
+      .damage-item,
+      .history-item {
+        page-break-inside: avoid;
       }
     }
   `}</style>
