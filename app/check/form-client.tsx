@@ -701,12 +701,12 @@ export default function CheckInForm() {
     const avlamning = parseInt(matarstallningAvlamning, 10);
     const incheckning = parseInt(matarstallning, 10);
     
-    if (!isNaN(avlamning) && !isNaN(incheckning) && avlamning < incheckning) {
-      setMatarstallningAvlamningError('Mätarställning nu måste vara större än mätarställning vid incheckning.');
+    if (!isNaN(avlamning) && !isNaN(incheckning) && avlamning <= incheckning) {
+      setMatarstallningAvlamningError(`Detta måste vara högre än vid ${ort} / ${station}`);
     } else {
       setMatarstallningAvlamningError('');
     }
-  }, [locationDiffers, matarstallningAvlamning, matarstallning]);
+  }, [locationDiffers, matarstallningAvlamning, matarstallning, ort, station]);
 
   // Handlers
   const handleShowErrors = () => {
