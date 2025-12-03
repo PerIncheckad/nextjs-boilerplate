@@ -18,6 +18,7 @@ const defaultHuvudstationAddress = 'per@incheckad.se';
 const stationEmailMapping: { [ort: string]: string } = {
   Helsingborg: 'helsingborg@incheckad.se',
   Ängelholm: 'helsingborg@incheckad.se',
+  Varberg: 'varberg@mabi.se',
 };
 
 const getSiteUrl = (request: Request): string => {
@@ -605,9 +606,9 @@ export async function POST(request: Request) {
       huvudstationTo.push(stationSpecificEmail);
     }
 
-    // Bilkontroll recipients: Per always, Latif only for Helsingborg/Ängelholm
+    // Bilkontroll recipients: Per always, Latif only for Helsingborg/Ängelholm/Varberg
     const bilkontrollTo = ['per@incheckad.se'];
-    if (finalOrt === 'Helsingborg' || finalOrt === 'Ängelholm') {
+    if (finalOrt === 'Helsingborg' || finalOrt === 'Ängelholm' || finalOrt === 'Varberg') {
       bilkontrollTo.push('latif@incheckad.se');
     }
 
