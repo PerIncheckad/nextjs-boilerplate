@@ -233,6 +233,15 @@ export default function StatusForm() {
     return () => window.removeEventListener('beforeprint', handleBeforePrint);
   }, [includeHistoryInPrint]);
 
+  // Helper to build nybil photos title
+  const getNybilPhotosTitle = useCallback(() => {
+    if (!vehicleStatus?.nybilPhotos) return '';
+    const regnr = vehicleStatus.vehicle?.regnr || normalizedReg;
+    const datum = vehicleStatus.nybilPhotos.registreringsdatum;
+    const av = vehicleStatus.nybilPhotos.registreradAv;
+    return `${regnr} registrerad ${datum} av ${av}`;
+  }, [vehicleStatus, normalizedReg]);
+
   return (
     <Fragment>
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
@@ -292,7 +301,7 @@ export default function StatusForm() {
         {/* Nybil Reference Photos Section */}
         {vehicleStatus?.found && vehicleStatus.nybilPhotos?.photoUrls?.length > 0 && (
           <Card className="nybil-photos-card">
-            <SectionHeader title={`${vehicleStatus.vehicle?.regnr || normalizedReg} registrerad ${vehicleStatus.nybilPhotos.registreringsdatum} av ${vehicleStatus.nybilPhotos.registreradAv}`} />
+            <SectionHeader title={getNybilPhotosTitle()} />
             <div className="nybil-photos-grid">
               {vehicleStatus.nybilPhotos.photoUrls.map((url, index) => (
                 <a 
@@ -1203,6 +1212,18 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .nybil-photo-item:hover {
       transform: scale(1.05);
       opacity: 0.9;
+    }
+
+    /* Accessibility: Respect reduced motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+      .nybil-photo-item {
+        transition: none;
+      }
+      
+      .nybil-photo-item:hover {
+        transform: none;
+        opacity: 1;
+      }
     }
 
     .nybil-photo {
