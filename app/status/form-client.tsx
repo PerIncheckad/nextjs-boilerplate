@@ -260,7 +260,7 @@ export default function StatusForm() {
           <div className="print-header">
             <h1>MABI Fordonsstatus</h1>
             <p className="print-regnr">Reg.nr: {vehicleStatus.vehicle.regnr}</p>
-            <p className="print-date">Utskrivet: {new Date().toISOString().split('T')[0]}</p>
+            <p className="print-date">Utskrivet: {new Date().toLocaleDateString('sv-SE')}</p>
             <hr className="print-divider" />
           </div>
         )}
@@ -959,9 +959,23 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .main-header,
       .copyright-footer,
       .print-btn,
-      .damage-media-link,
       body::before {
         display: none !important;
+      }
+
+      /* Hide media links but keep them in DOM for text annotation */
+      .damage-media-link {
+        visibility: hidden;
+        position: relative;
+      }
+
+      .damage-media-link::before {
+        content: "(Media tillgänglig digitalt)";
+        visibility: visible;
+        position: absolute;
+        left: 0;
+        color: #666;
+        font-style: italic;
       }
 
       /* Show print header */
@@ -1076,13 +1090,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       /* Force expanded history section content to show */
       .section-header-expandable + * {
         display: block !important;
-      }
-
-      /* Convert media links to text */
-      .damage-media-link::after {
-        content: " (Media tillgänglig digitalt)";
-        color: #666;
-        font-style: italic;
       }
 
       /* Page break control */
