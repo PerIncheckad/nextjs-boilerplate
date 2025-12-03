@@ -287,7 +287,8 @@ export default function StatusForm() {
           <Card>
             <SectionHeader title="Fordonsinformation" />
             <div className="info-grid">
-              <InfoRow label="Reg.nr" value={vehicleStatus.vehicle.regnr} />
+              <span className="info-label hide-in-print">Reg.nr</span>
+              <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
               <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
               <InfoRow label="Bilen står nu" value={vehicleStatus.vehicle.bilenStarNu} />
               <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
@@ -1079,11 +1080,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         margin-bottom: 1rem;
       }
 
-      /* Hide Reg.nr row from vehicle info (it's in the header) */
-      .card .info-grid > span.info-label:first-child + span.info-value {
-        display: none !important;
-      }
-      .card .info-grid > span.info-label:first-child {
+      /* Hide elements marked for print hiding */
+      .hide-in-print {
         display: none !important;
       }
 
