@@ -115,6 +115,9 @@ export default function StatusForm() {
   // History section state
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'incheckning' | 'nybil' | 'manual'>('all');
+  
+  // Print options state
+  const [includeHistoryInPrint, setIncludeHistoryInPrint] = useState(false);
 
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -209,6 +212,20 @@ export default function StatusForm() {
     return vehicleStatus.history.filter(h => h.typ === historyFilter);
   }, [vehicleStatus?.history, historyFilter]);
 
+  // Handle print: add/remove class based on includeHistoryInPrint
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      if (includeHistoryInPrint) {
+        document.body.classList.add('include-history-print');
+      } else {
+        document.body.classList.remove('include-history-print');
+      }
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    return () => window.removeEventListener('beforeprint', handleBeforePrint);
+  }, [includeHistoryInPrint]);
+
   return (
     <Fragment>
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
@@ -258,7 +275,7 @@ export default function StatusForm() {
         {/* Print Header (hidden on screen, visible on print) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <div className="print-header">
-            <h1>MABI Fordonsstatus</h1>
+            <h1>MABI Syd Fordonsstatus</h1>
             <p className="print-regnr">Reg.nr: {vehicleStatus.vehicle.regnr}</p>
             <p className="print-date">Utskrivet: {new Date().toLocaleDateString('sv-SE')}</p>
             <hr className="print-divider" />
@@ -285,16 +302,15 @@ export default function StatusForm() {
               <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
               <InfoRow label="Klar för uthyrning" value={vehicleStatus.vehicle.klarForUthyrning} />
             </div>
-            <div className="source-info">
-              <small>
-                Datakälla: {vehicleStatus.source === 'both' 
-                  ? 'Nybilsregistrering + Bilkontroll' 
-                  : vehicleStatus.source === 'nybil_inventering' 
-                    ? 'Nybilsregistrering' 
-                    : vehicleStatus.source === 'checkins'
-                      ? 'Incheckning (saknas i Bilkontroll)'
-                      : 'Bilkontroll'}
-              </small>
+            <div className="print-options">
+              <label className="print-checkbox">
+                <input 
+                  type="checkbox" 
+                  checked={includeHistoryInPrint} 
+                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                />
+                <span>Inkludera all historik vid utskrift</span>
+              </label>
             </div>
             <button
               type="button"
@@ -911,6 +927,27 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-size: 0.875rem;
     }
 
+    /* Print options styles */
+    .print-options {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .print-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .print-checkbox input[type="checkbox"] {
+      cursor: pointer;
+      width: 1rem;
+      height: 1rem;
+    }
+
     /* Print button styles */
     .print-btn {
       margin-top: 1rem;
@@ -923,7 +960,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
-      width: 100%;
+      width: auto;
+      min-width: 200px;
     }
 
     .print-btn:hover {
@@ -959,7 +997,14 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .main-header,
       .copyright-footer,
       .print-btn,
+      .print-options,
       body::before {
+        display: none !important;
+      }
+
+      /* Hide search section (first card after print-header) */
+      .status-form > div:not(.print-header) > .card:first-of-type,
+      .status-form > .card:nth-of-type(1) {
         display: none !important;
       }
 
@@ -976,6 +1021,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         left: 0;
         color: #666;
         font-style: italic;
+        font-size: 0.75rem;
       }
 
       /* Show print header */
@@ -1012,11 +1058,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         margin: 1rem 0 0 0;
       }
 
-      /* Hide search section */
-      .card:first-of-type {
-        display: none;
-      }
-
       /* Optimize for print */
       body {
         background: white !important;
@@ -1026,6 +1067,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .status-form {
         max-width: 100%;
         padding: 0;
+        margin: 0;
       }
 
       .card {
@@ -1035,6 +1077,14 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border-radius: 0;
         page-break-inside: avoid;
         margin-bottom: 1rem;
+      }
+
+      /* Hide Reg.nr row from vehicle info (it's in the header) */
+      .card .info-grid > span.info-label:first-child + span.info-value {
+        display: none !important;
+      }
+      .card .info-grid > span.info-label:first-child {
+        display: none !important;
       }
 
       .section-header,
@@ -1072,6 +1122,16 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .damage-list,
       .history-list {
         gap: 0.5rem;
+      }
+
+      /* Force page break before damages section */
+      .card:has(> .section-header > h2:first-child) {
+        page-break-before: auto;
+      }
+
+      /* Force damages to start on new page */
+      .status-form > .card:nth-child(3) {
+        page-break-before: always;
       }
 
       /* Hide expand icons and filters */
