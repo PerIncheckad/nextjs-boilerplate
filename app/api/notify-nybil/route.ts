@@ -115,12 +115,11 @@ const createAdminBanner = (condition: boolean, text: string): string => {
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
-// Create admin banner with two centered lines for charge level
+// Create admin banner for charge level (same format as /check)
 const createChargeLevelBanner = (condition: boolean, laddnivaProcent: number | null | undefined): string => {
   if (!condition) return '';
-  const line1 = 'KOLLA BILENS LADDNIVÅ!';
-  const line2 = `${laddnivaProcent ?? 0}% vid ankomst.`;
-  const bannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${line1}<br>${line2}</div>`;
+  const text = `Kolla bilens laddnivå! (${laddnivaProcent ?? 0}%)`;
+  const bannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
 
