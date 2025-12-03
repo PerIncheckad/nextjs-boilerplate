@@ -53,6 +53,45 @@ export type VehicleStatusResult = {
   history: HistoryRecord[];
 };
 
+// Partial type for nybil_inventering fields we use
+type NybilInventeringData = {
+  id?: number;
+  created_at?: string;
+  bilmarke?: string;
+  modell?: string;
+  bilmodell?: string;
+  plats_aktuell_ort?: string;
+  plats_aktuell_station?: string;
+  plats_mottagning_ort?: string;
+  plats_mottagning_station?: string;
+  matarstallning_aktuell?: string;
+  matarstallning_inkop?: string;
+  hjultyp?: string;
+  bransletyp?: string;
+  serviceintervall?: string;
+  max_km_manad?: string;
+  avgift_over_km?: string;
+  saludatum?: string;
+  stold_gps?: boolean;
+  klar_for_uthyrning?: boolean;
+  planerad_station?: string;
+  antal_nycklar?: number;
+  antal_laddkablar?: number;
+  antal_insynsskydd?: number;
+  instruktionsbok?: boolean;
+  coc?: boolean;
+  lasbultar_med?: boolean;
+  dragkrok?: boolean;
+  gummimattor?: boolean;
+  dackkompressor?: boolean;
+  salu_station?: string;
+  kopare_foretag?: string;
+  returort?: string;
+  returadress?: string;
+  fullstandigt_namn?: string;
+  registrerad_av?: string;
+};
+
 // =================================================================
 // 2. HELPER FUNCTIONS
 // =================================================================
@@ -104,20 +143,20 @@ function getFullNameFromEmail(email: string): string {
 /**
  * Build equipment summary from nybil_inventering data
  */
-function buildEquipmentSummary(nybilData: any): string {
+function buildEquipmentSummary(nybilData: NybilInventeringData | null): string {
   if (!nybilData) return '---';
   
   const items: string[] = [];
   
-  if (nybilData.antal_nycklar) items.push(`${nybilData.antal_nycklar} nycklar`);
-  if (nybilData.antal_laddkablar) items.push(`${nybilData.antal_laddkablar} laddkablar`);
-  if (nybilData.antal_insynsskydd) items.push(`${nybilData.antal_insynsskydd} insynsskydd`);
-  if (nybilData.instruktionsbok) items.push('Instruktionsbok');
-  if (nybilData.coc) items.push('COC');
-  if (nybilData.lasbultar_med) items.push('Låsbultar');
-  if (nybilData.dragkrok) items.push('Dragkrok');
-  if (nybilData.gummimattor) items.push('Gummimattor');
-  if (nybilData.dackkompressor) items.push('Däckkompressor');
+  if (nybilData.antal_nycklar && nybilData.antal_nycklar > 0) items.push(`${nybilData.antal_nycklar} nycklar`);
+  if (nybilData.antal_laddkablar && nybilData.antal_laddkablar > 0) items.push(`${nybilData.antal_laddkablar} laddkablar`);
+  if (nybilData.antal_insynsskydd && nybilData.antal_insynsskydd > 0) items.push(`${nybilData.antal_insynsskydd} insynsskydd`);
+  if (nybilData.instruktionsbok === true) items.push('Instruktionsbok');
+  if (nybilData.coc === true) items.push('COC');
+  if (nybilData.lasbultar_med === true) items.push('Låsbultar');
+  if (nybilData.dragkrok === true) items.push('Dragkrok');
+  if (nybilData.gummimattor === true) items.push('Gummimattor');
+  if (nybilData.dackkompressor === true) items.push('Däckkompressor');
   
   return items.length > 0 ? items.join(', ') : '---';
 }
@@ -125,7 +164,7 @@ function buildEquipmentSummary(nybilData: any): string {
 /**
  * Build sale info summary from nybil_inventering data
  */
-function buildSaleInfo(nybilData: any): string {
+function buildSaleInfo(nybilData: NybilInventeringData | null): string {
   if (!nybilData) return '---';
   
   const items: string[] = [];
