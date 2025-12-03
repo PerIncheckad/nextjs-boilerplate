@@ -289,6 +289,35 @@ export default function StatusForm() {
           </div>
         )}
 
+        {/* Nybil Reference Photos Section */}
+        {vehicleStatus?.found && vehicleStatus.nybilPhotos && vehicleStatus.nybilPhotos.photoUrls.length > 0 && (
+          <Card>
+            <SectionHeader title="Nybilsfoton" />
+            <div className="nybil-photos-grid">
+              {vehicleStatus.nybilPhotos.photoUrls.map((url, index) => (
+                <div key={index} className="nybil-photo-item">
+                  <img 
+                    src={url} 
+                    alt={`Nybilsfoto ${index + 1}`} 
+                    className="nybil-photo"
+                  />
+                </div>
+              ))}
+            </div>
+            {vehicleStatus.nybilPhotos.mediaFolder && (
+              <div className="nybil-photos-link">
+                <a 
+                  href={`/public-media/${vehicleStatus.nybilPhotos.mediaFolder}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Visa alla foton 🔗
+                </a>
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
@@ -1150,6 +1179,63 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .damage-item,
       .history-item {
         page-break-inside: avoid;
+      }
+
+      /* Hide nybil photos in print */
+      .nybil-photos-grid {
+        display: none !important;
+      }
+    }
+
+    /* Nybil photos styling */
+    .nybil-photos-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .nybil-photo-item {
+      flex: 0 1 auto;
+      max-width: 100%;
+    }
+
+    .nybil-photo {
+      max-height: 200px;
+      width: auto;
+      max-width: 100%;
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      object-fit: contain;
+    }
+
+    .nybil-photos-link {
+      text-align: center;
+      padding-top: 0.5rem;
+    }
+
+    .nybil-photos-link a {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+
+    .nybil-photos-link a:hover {
+      text-decoration: underline;
+    }
+
+    /* Responsive layout for nybil photos */
+    @media (max-width: 600px) {
+      .nybil-photos-grid {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .nybil-photo {
+        max-height: 180px;
       }
     }
   `}</style>

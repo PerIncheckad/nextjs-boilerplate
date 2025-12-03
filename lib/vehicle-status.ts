@@ -53,6 +53,11 @@ export type VehicleStatusResult = {
   vehicle: VehicleStatusData | null;
   damages: DamageRecord[];
   history: HistoryRecord[];
+  // Nybil reference photos
+  nybilPhotos: {
+    photoUrls: string[];
+    mediaFolder: string | null;
+  } | null;
 };
 
 // Partial type for nybil_inventering fields we use
@@ -233,6 +238,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       vehicle: null,
       damages: [],
       history: [],
+      nybilPhotos: null,
     };
   }
 
@@ -293,6 +299,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       vehicle: null,
       damages: [],
       history: [],
+      nybilPhotos: null,
     };
   }
 
@@ -392,6 +399,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       vehicle,
       damages: damageRecords,
       history: historyRecords,
+      nybilPhotos: null, // No nybil photos when source is 'checkins' only
     };
   }
 
@@ -529,12 +537,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     return dateB.getTime() - dateA.getTime();
   });
 
+  // Extract nybil reference photos if available
+  const nybilPhotos = nybilData && Array.isArray(nybilData.photo_urls) && nybilData.photo_urls.length > 0
+    ? {
+        photoUrls: nybilData.photo_urls,
+        mediaFolder: nybilData.media_folder || null,
+      }
+    : null;
+
   return {
     found: true,
     source,
     vehicle,
     damages: damageRecords,
     history: historyRecords,
+    nybilPhotos,
   };
 }
 
