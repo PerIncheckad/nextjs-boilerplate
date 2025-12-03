@@ -1327,8 +1327,8 @@ export default function NybilForm() {
       laddkablarForvaring = `${laddkablarForvaringOrt}, ${laddkablarForvaringSpec}`;
     }
     
-    // Calculate charging/tank warnings
-    const showChargeWarning = isElectric && laddnivaProcent && parseInt(laddnivaProcent, 10) < 95;
+    // Calculate charging/tank warnings (same logic as /check)
+    const showChargeWarning = isElectric && laddnivaProcent !== null && laddnivaProcent !== '' && parseInt(laddnivaProcent, 10) < 95;
     const showNotRefueled = !isElectric && tankstatus === 'ej_upptankad';
     
     return {
@@ -2269,8 +2269,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
   <>
     <div className="modal-overlay" />
     <div className="modal-content confirmation-modal">
-      {summary.showChargeWarning && <div className="charge-warning-banner">Sätt bilen på laddning!</div>}
-      {summary.showNotRefueled && <div className="charge-warning-banner">Bilen är ej upptankad!</div>}
+      {summary.showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
+      {summary.showNotRefueled && <div className="charge-warning-banner">Bilen måste tankas!</div>}
       <h3>Bekräfta registrering</h3>
       <div className="summary-section">
         <h4>Fordon</h4>
