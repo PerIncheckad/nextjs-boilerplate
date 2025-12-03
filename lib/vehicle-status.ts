@@ -57,6 +57,8 @@ export type VehicleStatusResult = {
   nybilPhotos: {
     photoUrls: string[];
     mediaFolder: string | null;
+    registreringsdatum: string;
+    registreradAv: string;
   } | null;
 };
 
@@ -97,6 +99,7 @@ type NybilInventeringData = {
   returadress?: string;
   fullstandigt_namn?: string;
   registrerad_av?: string;
+  registreringsdatum?: string;
   photo_urls?: string[];
   media_folder?: string | null;
 };
@@ -544,6 +547,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     ? {
         photoUrls: nybilData.photo_urls,
         mediaFolder: nybilData.media_folder || null,
+        registreringsdatum: formatDate(nybilData.created_at || nybilData.registreringsdatum),
+        registreradAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
       }
     : null;
 

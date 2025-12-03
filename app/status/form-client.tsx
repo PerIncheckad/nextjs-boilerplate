@@ -292,29 +292,24 @@ export default function StatusForm() {
         {/* Nybil Reference Photos Section */}
         {vehicleStatus?.found && vehicleStatus.nybilPhotos?.photoUrls?.length > 0 && (
           <Card className="nybil-photos-card">
-            <SectionHeader title="Nybilsfoton" />
+            <SectionHeader title={`${vehicleStatus.vehicle?.regnr || normalizedReg} registrerad ${vehicleStatus.nybilPhotos.registreringsdatum} av ${vehicleStatus.nybilPhotos.registreradAv}`} />
             <div className="nybil-photos-grid">
               {vehicleStatus.nybilPhotos.photoUrls.map((url, index) => (
-                <div key={index} className="nybil-photo-item">
+                <a 
+                  key={index} 
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="nybil-photo-item"
+                >
                   <img 
                     src={url} 
                     alt={`Nybilsfoto ${index + 1}`} 
                     className="nybil-photo"
                   />
-                </div>
+                </a>
               ))}
             </div>
-            {vehicleStatus.nybilPhotos.mediaFolder && (
-              <div className="nybil-photos-link">
-                <a 
-                  href={`/public-media/${vehicleStatus.nybilPhotos.mediaFolder}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Visa alla foton 🔗
-                </a>
-              </div>
-            )}
           </Card>
         )}
 
@@ -1200,6 +1195,14 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .nybil-photo-item {
       flex: 0 1 auto;
       max-width: 100%;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+      display: block;
+    }
+
+    .nybil-photo-item:hover {
+      transform: scale(1.05);
+      opacity: 0.9;
     }
 
     .nybil-photo {
@@ -1209,22 +1212,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       border-radius: 8px;
       box-shadow: var(--shadow-sm);
       object-fit: contain;
+      display: block;
     }
 
-    .nybil-photos-link {
-      text-align: center;
-      padding-top: 0.5rem;
-    }
-
-    .nybil-photos-link a {
-      color: var(--color-primary);
-      text-decoration: none;
-      font-weight: 600;
-      font-size: 0.875rem;
-    }
-
-    .nybil-photos-link a:hover {
-      text-decoration: underline;
+    .nybil-photo-item:hover .nybil-photo {
+      box-shadow: var(--shadow-md);
     }
 
     /* Responsive layout for nybil photos */
