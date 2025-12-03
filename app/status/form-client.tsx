@@ -61,14 +61,15 @@ const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => 
 };
 
 /**
- * Build the public media URL for a damage based on regnr and damage date.
- * Returns the URL path or null if no valid date is available.
+ * Build the public media URL for a damage based on regnr, damage date, and folder.
+ * Returns the URL path or null if no valid date/folder is available.
  * 
  * @param regnr - Vehicle registration number (e.g., "ABC123")
  * @param datumStr - Damage date in YYYY-MM-DD format or "---" if unknown
+ * @param folder - Event folder name (e.g., "repa-hoger-dor")
  * @returns URL path to public media browser, or null if regnr is empty
  */
-const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined): string | null => {
+const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined, folder?: string): string | null => {
   if (!regnr) return null;
   
   const normalizedReg = regnr.toUpperCase().replace(/\s/g, '');
@@ -87,9 +88,15 @@ const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined)
     return `/public-media/${encodeURIComponent(normalizedReg)}`;
   }
   
-  // Build folder path: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}
-  // Each segment should be encoded separately to preserve the path structure
-  return `/public-media/${encodeURIComponent(normalizedReg)}/${encodeURIComponent(`${normalizedReg}-${datePart}`)}`;
+  // Build folder path: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}/{folder}
+  const basePath = `/public-media/${encodeURIComponent(normalizedReg)}/${encodeURIComponent(`${normalizedReg}-${datePart}`)}`;
+  
+  // If folder is provided, append it
+  if (folder) {
+    return `${basePath}/${encodeURIComponent(folder)}`;
+  }
+  
+  return basePath;
 };
 
 // =================================================================
@@ -115,6 +122,9 @@ export default function StatusForm() {
   // History section state
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'incheckning' | 'nybil' | 'manual'>('all');
+  
+  // Print options state
+  const [includeHistoryInPrint, setIncludeHistoryInPrint] = useState(false);
 
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -209,6 +219,20 @@ export default function StatusForm() {
     return vehicleStatus.history.filter(h => h.typ === historyFilter);
   }, [vehicleStatus?.history, historyFilter]);
 
+  // Handle print: add/remove class based on includeHistoryInPrint
+  useEffect(() => {
+    const handleBeforePrint = () => {
+      if (includeHistoryInPrint) {
+        document.body.classList.add('include-history-print');
+      } else {
+        document.body.classList.remove('include-history-print');
+      }
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    return () => window.removeEventListener('beforeprint', handleBeforePrint);
+  }, [includeHistoryInPrint]);
+
   return (
     <Fragment>
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
@@ -221,7 +245,7 @@ export default function StatusForm() {
         </div>
 
         {/* Search Section */}
-        <Card>
+        <Card className="search-form-card">
           <SectionHeader title="Sök fordon" />
           <div style={{ position: 'relative' }}>
             <Field label="Registreringsnummer">
@@ -255,43 +279,63 @@ export default function StatusForm() {
           )}
         </Card>
 
+        {/* Print Header (hidden on screen, visible on print) */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          <div className="print-header">
+            <h1>MABI Syd Fordonsstatus</h1>
+            <p className="print-regnr">Reg.nr: {vehicleStatus.vehicle.regnr}</p>
+            <p className="print-date">Utskrivet: {new Date().toLocaleDateString('sv-SE')}</p>
+            <hr className="print-divider" />
+          </div>
+        )}
+
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
             <SectionHeader title="Fordonsinformation" />
             <div className="info-grid">
-              <InfoRow label="Reg.nr" value={vehicleStatus.vehicle.regnr} />
+              <span className="info-label hide-in-print">Reg.nr</span>
+              <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
               <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
-              <InfoRow label="Bilen står nu" value={vehicleStatus.vehicle.bilenStarNu} />
+              <InfoRow label="Senast incheckad vid" value={vehicleStatus.vehicle.bilenStarNu} />
               <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
               <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulforvaring} />
+              <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
               <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
+              <InfoRow label="Utrustning" value={vehicleStatus.vehicle.utrustning} />
+              <InfoRow label="Saluinfo" value={vehicleStatus.vehicle.saluinfo} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
               <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
               <InfoRow label="Klar för uthyrning" value={vehicleStatus.vehicle.klarForUthyrning} />
             </div>
-            <div className="source-info">
-              <small>
-                Datakälla: {vehicleStatus.source === 'both' 
-                  ? 'Nybilsregistrering + Bilkontroll' 
-                  : vehicleStatus.source === 'nybil_inventering' 
-                    ? 'Nybilsregistrering' 
-                    : vehicleStatus.source === 'checkins'
-                      ? 'Incheckning (saknas i Bilkontroll)'
-                      : 'Bilkontroll'}
-              </small>
+            <div className="print-options">
+              <label className="print-checkbox">
+                <input 
+                  type="checkbox" 
+                  checked={includeHistoryInPrint} 
+                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                />
+                <span>Inkludera all historik vid utskrift</span>
+              </label>
             </div>
+            <button
+              type="button"
+              className="print-btn"
+              onClick={() => window.print()}
+            >
+              🖨️ Skriv ut
+            </button>
           </Card>
         )}
 
         {/* Damages Section */}
         {vehicleStatus?.found && (
-          <Card>
+          <Card className={`damages-card ${vehicleStatus.damages.length === 0 ? 'empty-damages' : ''}`}>
             <SectionHeader title={`Skador (${vehicleStatus.damages.length})`} />
             {vehicleStatus.damages.length === 0 ? (
               <p className="no-data-text">Inga registrerade skador</p>
@@ -307,7 +351,7 @@ export default function StatusForm() {
 
         {/* History Section */}
         {vehicleStatus?.found && (
-          <Card>
+          <Card className="history-card">
             <div 
               className="section-header-expandable"
               onClick={() => setHistoryExpanded(!historyExpanded)}
@@ -373,8 +417,8 @@ export default function StatusForm() {
 // 4. SUB-COMPONENTS
 // =================================================================
 
-const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) => (
-  <div className="card" {...props}>{children}</div>
+const Card: React.FC<React.PropsWithChildren<any>> = ({ children, className, ...props }) => (
+  <div className={`card ${className || ''}`} {...props}>{children}</div>
 );
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
@@ -416,25 +460,17 @@ const FilterButton: React.FC<React.PropsWithChildren<{ active: boolean; onClick:
   </button>
 );
 
-const getDamageStatusClass = (status: string): string => {
-  switch (status) {
-    case 'Dokumenterad': return 'documented';
-    case 'Befintlig': return 'legacy';
-    default: return 'not-documented';
-  }
-};
-
 const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage, regnr }) => {
-  const mediaUrl = buildDamageMediaUrl(regnr, damage.datum);
+  const mediaUrl = buildDamageMediaUrl(regnr, damage.datum, damage.folder);
   
   return (
     <div className="damage-item">
       <div className="damage-info">
         <span className="damage-type">{damage.skadetyp}</span>
         <span className="damage-date">{damage.datum}</span>
-        <span className={`damage-status ${getDamageStatusClass(damage.status)}`}>
-          {damage.status}
-        </span>
+        {damage.sourceInfo && (
+          <span className="damage-source">{damage.sourceInfo}</span>
+        )}
         {mediaUrl && (
           <a
             href={mediaUrl}
@@ -753,26 +789,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       color: var(--color-text-secondary);
     }
 
-    .damage-status {
+    .damage-source {
       font-size: 0.75rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      width: fit-content;
-    }
-
-    .damage-status.documented {
-      background-color: var(--color-success-light);
-      color: var(--color-success);
-    }
-
-    .damage-status.not-documented {
-      background-color: var(--color-warning-light);
-      color: #92400e;
-    }
-
-    .damage-status.legacy {
-      background-color: var(--color-primary-light);
-      color: var(--color-primary);
+      color: var(--color-text-secondary);
+      font-style: italic;
     }
 
     .damage-link {
@@ -887,11 +907,68 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     }
 
     .copyright-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
       text-align: center;
-      margin-top: 2rem;
-      padding: 1.5rem 0 3rem 0;
+      padding: 1rem 0;
+      background-color: rgba(255, 255, 255, 0.95);
+      border-top: 1px solid var(--color-border);
       color: var(--color-text-secondary);
       font-size: 0.875rem;
+      z-index: 100;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .status-form {
+      padding-bottom: 4rem; /* Add space for fixed footer */
+    }
+
+    /* Print options styles */
+    .print-options {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .print-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+    }
+
+    .print-checkbox input[type="checkbox"] {
+      cursor: pointer;
+      width: 1rem;
+      height: 1rem;
+    }
+
+    /* Print button styles */
+    .print-btn {
+      margin-top: 1rem;
+      padding: 0.75rem 1.5rem;
+      background-color: var(--color-primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      width: auto;
+      min-width: 200px;
+    }
+
+    .print-btn:hover {
+      background-color: #1d4ed8;
+    }
+
+    /* Print header (hidden on screen) */
+    .print-header {
+      display: none;
     }
 
     @media (max-width: 480px) {
@@ -909,6 +986,170 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         flex: 1;
         min-width: 100px;
         text-align: center;
+      }
+    }
+
+    /* Print-specific styles */
+    @media print {
+      /* Hide elements not needed for print */
+      .main-header,
+      .copyright-footer,
+      .print-btn,
+      .print-options,
+      body::before {
+        display: none !important;
+      }
+
+      /* Hide search form in print */
+      .search-form-card {
+        display: none !important;
+      }
+
+      /* Hide media links in print */
+      .damage-media-link {
+        display: none !important;
+      }
+
+      /* Show print header */
+      .print-header {
+        display: block;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #000;
+      }
+
+      .print-header h1 {
+        font-size: 1.5rem;
+        margin: 0 0 0.5rem 0;
+        color: #000;
+      }
+
+      .print-regnr {
+        font-size: 1.25rem;
+        font-weight: bold;
+        margin: 0.5rem 0;
+        color: #000;
+      }
+
+      .print-date {
+        font-size: 0.875rem;
+        margin: 0.5rem 0;
+        color: #666;
+      }
+
+      .print-divider {
+        border: none;
+        border-top: 1px solid #ccc;
+        margin: 1rem 0 0 0;
+      }
+
+      /* Optimize for print */
+      body {
+        background: white !important;
+        color: black !important;
+      }
+
+      .status-form {
+        max-width: 100%;
+        padding: 0;
+        margin: 0;
+      }
+
+      .card {
+        background-color: white !important;
+        box-shadow: none !important;
+        border: 1px solid #e5e7eb;
+        border-radius: 0;
+        page-break-inside: avoid;
+        margin-bottom: 1rem;
+      }
+
+      /* Hide elements marked for print hiding */
+      .hide-in-print {
+        display: none !important;
+      }
+
+      .section-header,
+      .section-header-expandable {
+        border-bottom-color: #000;
+      }
+
+      .section-header h2,
+      .section-header-expandable h2 {
+        color: #000;
+      }
+
+      /* Remove background colors and shadows */
+      .damage-item,
+      .history-item {
+        background-color: white !important;
+        box-shadow: none !important;
+        border: 1px solid #e5e7eb;
+      }
+
+      /* Ensure text is black */
+      .info-label,
+      .info-value,
+      .damage-type,
+      .damage-date,
+      .history-summary {
+        color: #000 !important;
+      }
+
+      /* Compact spacing */
+      .card {
+        padding: 1rem;
+      }
+
+      .damage-list,
+      .history-list {
+        gap: 0.5rem;
+      }
+
+      /* Force damages section to start on new page */
+      .damages-card {
+        page-break-before: always;
+      }
+
+      /* Hide empty damages section in print */
+      .damages-card.empty-damages {
+        display: none !important;
+      }
+
+      /* Hide expand icons and filters */
+      .expand-icon,
+      .history-filter,
+      .filter-btn {
+        display: none !important;
+      }
+
+      /* Hide history card by default in print */
+      .history-card {
+        display: none !important;
+      }
+
+      /* Show history card only if body has the class */
+      body.include-history-print .history-card {
+        display: block !important;
+        page-break-before: always;
+      }
+
+      /* Force history to show all items by making content visible */
+      body.include-history-print .history-list {
+        display: flex !important;
+        flex-direction: column;
+      }
+
+      /* Force expanded history section content to show */
+      body.include-history-print .section-header-expandable + * {
+        display: block !important;
+      }
+
+      /* Page break control */
+      .damage-item,
+      .history-item {
+        page-break-inside: avoid;
       }
     }
   `}</style>
