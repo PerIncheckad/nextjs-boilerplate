@@ -417,8 +417,8 @@ export default function StatusForm() {
 // 4. SUB-COMPONENTS
 // =================================================================
 
-const Card: React.FC<React.PropsWithChildren<any>> = ({ children, ...props }) => (
-  <div className="card" {...props}>{children}</div>
+const Card: React.FC<React.PropsWithChildren<any>> = ({ children, className, ...props }) => (
+  <div className={`card ${className || ''}`} {...props}>{children}</div>
 );
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
