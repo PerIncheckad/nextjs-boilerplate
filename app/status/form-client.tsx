@@ -340,7 +340,7 @@ export default function StatusForm() {
 
         {/* History Section */}
         {vehicleStatus?.found && (
-          <Card>
+          <Card className="history-card">
             <div 
               className="section-header-expandable"
               onClick={() => setHistoryExpanded(!historyExpanded)}
@@ -1124,13 +1124,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         gap: 0.5rem;
       }
 
-      /* Force page break before damages section */
-      .card:has(> .section-header > h2:first-child) {
-        page-break-before: auto;
-      }
-
-      /* Force damages to start on new page */
-      .status-form > .card:nth-child(3) {
+      /* Force damages section to start on new page */
+      .card:nth-of-type(3) {
         page-break-before: always;
       }
 
@@ -1141,14 +1136,25 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
+      /* Hide history card by default in print */
+      .history-card {
+        display: none !important;
+      }
+
+      /* Show history card only if body has the class */
+      body.include-history-print .history-card {
+        display: block !important;
+        page-break-before: always;
+      }
+
       /* Force history to show all items by making content visible */
-      .history-list {
+      body.include-history-print .history-list {
         display: flex !important;
         flex-direction: column;
       }
 
       /* Force expanded history section content to show */
-      .section-header-expandable + * {
+      body.include-history-print .section-header-expandable + * {
         display: block !important;
       }
 
