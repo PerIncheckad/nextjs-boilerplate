@@ -1475,8 +1475,12 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
     
     // Check if delivery odometer is less than check-in odometer (logical warning)
-    const showOdometerWarning = payload.bilen_star_nu?.matarstallning_avlamning && 
-      parseInt(payload.bilen_star_nu.matarstallning_avlamning, 10) < parseInt(payload.matarstallning, 10);
+    const showOdometerWarning = (() => {
+      if (!payload.bilen_star_nu?.matarstallning_avlamning || !payload.matarstallning) return false;
+      const avlamning = parseInt(payload.bilen_star_nu.matarstallning_avlamning, 10);
+      const incheckning = parseInt(payload.matarstallning, 10);
+      return !isNaN(avlamning) && !isNaN(incheckning) && avlamning < incheckning;
+    })();
 
     return (<Fragment><div className="modal-overlay" onClick={onCancel} /><div 
         ref={containerRef}
