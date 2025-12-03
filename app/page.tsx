@@ -26,13 +26,7 @@ export default function HomePage() {
             <a href="/nybil" className="btn registrera">Registrera ny bil</a>
           </div>
           
-          <div className="divider-wrap">
-            <hr className="divider" />
-          </div>
-          
-          <div className="report-section">
-            <a href="/rapport" className="btn report-btn">RAPPORT</a>
-          </div>
+
         </div>
         
         <footer className="homepage-footer">
