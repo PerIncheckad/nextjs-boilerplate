@@ -368,8 +368,8 @@ export default function StatusForm() {
         {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.utrustningForvaring !== '---' && (
           <Card>
             <SectionHeader title="Utrustningsförvaring" />
-            <div className="info-grid">
-              <InfoRow label="" value={vehicleStatus.vehicle.utrustningForvaring} />
+            <div style={{ padding: '0.5rem 0' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5' }}>{vehicleStatus.vehicle.utrustningForvaring}</p>
             </div>
           </Card>
         )}
@@ -378,8 +378,8 @@ export default function StatusForm() {
         {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.tankningInfo !== '---' && (
           <Card>
             <SectionHeader title="Tankning (MABI)" />
-            <div className="info-grid">
-              <InfoRow label="" value={vehicleStatus.vehicle.tankningInfo} />
+            <div style={{ padding: '0.5rem 0' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5' }}>{vehicleStatus.vehicle.tankningInfo}</p>
             </div>
           </Card>
         )}
