@@ -424,6 +424,7 @@ export default function CheckInForm() {
   const [bilenStarNuStation, setBilenStarNuStation] = useState('');
   const [bilenStarNuKommentar, setBilenStarNuKommentar] = useState('');
   const [matarstallningAvlamning, setMatarstallningAvlamning] = useState('');
+  const [matarstallningAvlamningError, setMatarstallningAvlamningError] = useState('');
 
 
   // Derived State & Memos
@@ -690,6 +691,22 @@ export default function CheckInForm() {
     return () => clearTimeout(timer);
   }, [regInput, fetchVehicleData, initialUrlLoadHandled]);
 
+  // Validate odometer readings when they change
+  useEffect(() => {
+    if (!locationDiffers || !matarstallningAvlamning || !matarstallning) {
+      setMatarstallningAvlamningError('');
+      return;
+    }
+    
+    const avlamning = parseInt(matarstallningAvlamning, 10);
+    const incheckning = parseInt(matarstallning, 10);
+    
+    if (!isNaN(avlamning) && !isNaN(incheckning) && avlamning < incheckning) {
+      setMatarstallningAvlamningError('Mätarställning nu måste vara större än mätarställning vid incheckning.');
+    } else {
+      setMatarstallningAvlamningError('');
+    }
+  }, [locationDiffers, matarstallningAvlamning, matarstallning]);
 
   // Handlers
   const handleShowErrors = () => {
@@ -1335,14 +1352,25 @@ export default function CheckInForm() {
             <Field label="Station *"><select value={bilenStarNuStation} onChange={e => setBilenStarNuStation(e.target.value)} disabled={!bilenStarNuOrt}><option value="">Välj station</option>{availableStationsBilenStarNu.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
           </div>
           {locationDiffers && (
-            <Field label="Mätarställning vid avlämning (km) *">
-              <input 
-                type="number" 
-                value={matarstallningAvlamning} 
-                onChange={e => setMatarstallningAvlamning(e.target.value)} 
-                placeholder="12345"
-              />
-            </Field>
+            <div id="matarstallning-avlamning-field">
+              <Field label="Mätarställning nu (km) *">
+                <input 
+                  type="number" 
+                  value={matarstallningAvlamning} 
+                  onChange={e => { 
+                    setMatarstallningAvlamning(e.target.value);
+                    setMatarstallningAvlamningError(''); // Clear error when user types
+                  }} 
+                  placeholder="12345"
+                  data-error={!!matarstallningAvlamningError}
+                />
+              </Field>
+              {matarstallningAvlamningError && (
+                <p className="error-text" style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  {matarstallningAvlamningError}
+                </p>
+              )}
+            </div>
           )}
           <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
         </Card>
@@ -1473,14 +1501,6 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
     };
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning.laddniva, 10) < 95;
     const showNotRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning.tankniva === 'ej_upptankad';
-    
-    // Check if delivery odometer is less than check-in odometer (logical warning)
-    const showOdometerWarning = (() => {
-      if (!payload.bilen_star_nu?.matarstallning_avlamning || !payload.matarstallning) return false;
-      const avlamning = parseInt(payload.bilen_star_nu.matarstallning_avlamning, 10);
-      const incheckning = parseInt(payload.matarstallning, 10);
-      return !isNaN(avlamning) && !isNaN(incheckning) && avlamning < incheckning;
-    })();
 
     return (<Fragment><div className="modal-overlay" onClick={onCancel} /><div 
         ref={containerRef}
@@ -1502,7 +1522,6 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
                 {payload.status?.insynsskyddSaknas && <p className="warning-highlight">Insynsskydd saknas</p>}
                 {showNotRefueled && <p className="warning-highlight">Bilen är ej upptankad</p>}
                 {showChargeWarning && <p className="warning-highlight">Låg laddnivå</p>}
-                {showOdometerWarning && <p className="warning-highlight">Mätarställning vid avlämning är lägre än vid incheckning</p>}
             </div>
         </div>
         <div className="confirm-details">
@@ -1514,7 +1533,7 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             {renderDamageList(payload.nya_skador, '💥 Nya skador', false)}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador', false)}{renderDamageList(payload.åtgärdade_skador, '✅ Går inte att dokumentera', true)}
             <div className="confirm-summary">
                 <p>🛣️ <strong>Mätarställning vid incheckning:</strong> {payload.matarstallning} km</p>
-                {payload.bilen_star_nu?.matarstallning_avlamning && <p>🛣️ <strong>Mätarställning vid avlämning:</strong> {payload.bilen_star_nu.matarstallning_avlamning} km</p>}
+                {payload.bilen_star_nu?.matarstallning_avlamning && <p>🛣️ <strong>Mätarställning nu:</strong> {payload.bilen_star_nu.matarstallning_avlamning} km</p>}
                 {getTankningText()}<p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
                 {payload.washed && <p><strong>✅ Tvättad</strong></p>}{payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
             </div>
