@@ -604,7 +604,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     }
 
     .card {
-      background-color: rgba(255, 255, 255, 0.95);
+      background-color: rgba(255, 255, 255, 0.92);
       padding: 1.5rem;
       border-radius: 12px;
       margin-bottom: 1.5rem;
