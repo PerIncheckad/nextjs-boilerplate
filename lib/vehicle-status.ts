@@ -366,7 +366,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDate(d.damage_date),
       status: 'Befintlig',
       source: 'legacy' as const,
-      sourceInfo: 'Källa: BUHS',
+      sourceInfo: 'Källa: BUHS (reg. nr har aldrig checkats in med incheckad.se/check)',
     }));
 
     // Build history records from checkins only
@@ -492,7 +492,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     datum: formatDate(d.damage_date),
     status: 'Befintlig',
     source: 'legacy' as const,
-    sourceInfo: 'Källa: BUHS',
+    sourceInfo: 'Källa: BUHS (reg. nr har aldrig checkats in med incheckad.se/check)',
   }));
 
   // Build history records

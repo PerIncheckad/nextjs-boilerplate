@@ -61,14 +61,15 @@ const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => 
 };
 
 /**
- * Build the public media URL for a damage based on regnr and damage date.
- * Returns the URL path or null if no valid date is available.
+ * Build the public media URL for a damage based on regnr, damage date, and folder.
+ * Returns the URL path or null if no valid date/folder is available.
  * 
  * @param regnr - Vehicle registration number (e.g., "ABC123")
  * @param datumStr - Damage date in YYYY-MM-DD format or "---" if unknown
+ * @param folder - Event folder name (e.g., "repa-hoger-dor")
  * @returns URL path to public media browser, or null if regnr is empty
  */
-const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined): string | null => {
+const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined, folder?: string): string | null => {
   if (!regnr) return null;
   
   const normalizedReg = regnr.toUpperCase().replace(/\s/g, '');
@@ -87,9 +88,15 @@ const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined)
     return `/public-media/${encodeURIComponent(normalizedReg)}`;
   }
   
-  // Build folder path: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}
-  // Each segment should be encoded separately to preserve the path structure
-  return `/public-media/${encodeURIComponent(normalizedReg)}/${encodeURIComponent(`${normalizedReg}-${datePart}`)}`;
+  // Build folder path: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}/{folder}
+  const basePath = `/public-media/${encodeURIComponent(normalizedReg)}/${encodeURIComponent(`${normalizedReg}-${datePart}`)}`;
+  
+  // If folder is provided, append it
+  if (folder) {
+    return `${basePath}/${encodeURIComponent(folder)}`;
+  }
+  
+  return basePath;
 };
 
 // =================================================================
@@ -328,7 +335,7 @@ export default function StatusForm() {
 
         {/* Damages Section */}
         {vehicleStatus?.found && (
-          <Card className="damages-card">
+          <Card className={`damages-card ${vehicleStatus.damages.length === 0 ? 'empty-damages' : ''}`}>
             <SectionHeader title={`Skador (${vehicleStatus.damages.length})`} />
             {vehicleStatus.damages.length === 0 ? (
               <p className="no-data-text">Inga registrerade skador</p>
@@ -454,7 +461,7 @@ const FilterButton: React.FC<React.PropsWithChildren<{ active: boolean; onClick:
 );
 
 const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage, regnr }) => {
-  const mediaUrl = buildDamageMediaUrl(regnr, damage.datum);
+  const mediaUrl = buildDamageMediaUrl(regnr, damage.datum, damage.folder);
   
   return (
     <div className="damage-item">
@@ -597,7 +604,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     }
 
     .card {
-      background-color: rgba(255, 255, 255, 0.98);
+      background-color: rgba(255, 255, 255, 0.95);
       padding: 1.5rem;
       border-radius: 12px;
       margin-bottom: 1.5rem;
@@ -987,20 +994,9 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
-      /* Hide media links but keep them in DOM for text annotation */
+      /* Hide media links in print */
       .damage-media-link {
-        visibility: hidden;
-        position: relative;
-      }
-
-      .damage-media-link::before {
-        content: "(Media tillgänglig digitalt)";
-        visibility: visible;
-        position: absolute;
-        left: 0;
-        color: #666;
-        font-style: italic;
-        font-size: 0.75rem;
+        display: none !important;
       }
 
       /* Show print header */
@@ -1103,6 +1099,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       /* Force damages section to start on new page */
       .damages-card {
         page-break-before: always;
+      }
+
+      /* Hide empty damages section in print */
+      .damages-card.empty-damages {
+        display: none !important;
       }
 
       /* Hide expand icons and filters */
