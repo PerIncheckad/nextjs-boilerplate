@@ -8,7 +8,7 @@ export type VehicleStatusData = {
   // Basic vehicle info
   regnr: string;
   bilmarkeModell: string;
-  bilenStarNu: string; // ort + station
+  bilenStarNu: string; // ort + station (with datetime if from checkin)
   matarstallning: string;
   hjultyp: string;
   hjulforvaring: string;
@@ -20,6 +20,10 @@ export type VehicleStatusData = {
   antalSkador: number;
   stoldGps: string;
   klarForUthyrning: string;
+  // Additional detailed fields from nybil_inventering
+  planeradStation: string;
+  utrustning: string;
+  saluinfo: string;
 };
 
 export type DamageRecord = {
@@ -95,6 +99,52 @@ function getFullNameFromEmail(email: string): string {
     return `${firstName} ${lastName}`;
   }
   return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+}
+
+/**
+ * Build equipment summary from nybil_inventering data
+ */
+function buildEquipmentSummary(nybilData: any): string {
+  if (!nybilData) return '---';
+  
+  const items: string[] = [];
+  
+  if (nybilData.antal_nycklar) items.push(`${nybilData.antal_nycklar} nycklar`);
+  if (nybilData.antal_laddkablar) items.push(`${nybilData.antal_laddkablar} laddkablar`);
+  if (nybilData.antal_insynsskydd) items.push(`${nybilData.antal_insynsskydd} insynsskydd`);
+  if (nybilData.instruktionsbok) items.push('Instruktionsbok');
+  if (nybilData.coc) items.push('COC');
+  if (nybilData.lasbultar_med) items.push('Låsbultar');
+  if (nybilData.dragkrok) items.push('Dragkrok');
+  if (nybilData.gummimattor) items.push('Gummimattor');
+  if (nybilData.dackkompressor) items.push('Däckkompressor');
+  
+  return items.length > 0 ? items.join(', ') : '---';
+}
+
+/**
+ * Build sale info summary from nybil_inventering data
+ */
+function buildSaleInfo(nybilData: any): string {
+  if (!nybilData) return '---';
+  
+  const items: string[] = [];
+  
+  if (nybilData.saludatum) {
+    items.push(`Saludatum: ${formatDate(nybilData.saludatum)}`);
+  }
+  if (nybilData.salu_station) {
+    items.push(`Station: ${nybilData.salu_station}`);
+  }
+  if (nybilData.kopare_foretag) {
+    items.push(`Köpare: ${nybilData.kopare_foretag}`);
+  }
+  if (nybilData.returort || nybilData.returadress) {
+    const returInfo = [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ');
+    items.push(`Retur: ${returInfo}`);
+  }
+  
+  return items.length > 0 ? items.join(' | ') : '---';
 }
 
 // Raw damage data from the legacy source (BUHS)
@@ -217,10 +267,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Bilmärke & Modell: from checkins.car_model if available
       bilmarkeModell: latestCheckin?.car_model || '---',
       
-      // Bilen står nu: from latest checkin
-      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station
-        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
-        : '---',
+      // Senast incheckad vid: from latest checkin with datetime
+      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
+        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)})`
+        : latestCheckin?.current_ort && latestCheckin?.current_station
+          ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
+          : '---',
       
       // Mätarställning: from latest checkin
       matarstallning: latestCheckin?.odometer_km
@@ -258,6 +310,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Klar för uthyrning: not available from checkins
       klarForUthyrning: '---',
+      
+      // Additional detailed fields: not available from checkins
+      planeradStation: '---',
+      utrustning: '---',
+      saluinfo: '---',
     };
 
     // Build damage records from legacy damages (BUHS)
@@ -309,12 +366,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           ? formatModel(vehicleData.brand, vehicleData.model)
           : '---',
     
-    // Bilen står nu: checkins.current_station (senaste) → nybil_inventering.plats_aktuell_station
-    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station
-      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
-      : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
-        ? `${nybilData.plats_aktuell_ort} / ${nybilData.plats_aktuell_station}`
-        : '---',
+    // Senast incheckad vid: checkins with datetime → nybil_inventering.plats_aktuell_station
+    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
+      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)})`
+      : latestCheckin?.current_ort && latestCheckin?.current_station
+        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
+        : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
+          ? `${nybilData.plats_aktuell_ort} / ${nybilData.plats_aktuell_station}`
+          : '---',
     
     // Mätarställning: checkins.odometer_km (senaste) → nybil_inventering.matarstallning_aktuell
     matarstallning: latestCheckin?.odometer_km
@@ -366,12 +425,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? 'Nej'
         : '---',
     
-    // Klar för uthyrning: nybil_inventering.klar_for_uthyrning
-    klarForUthyrning: nybilData?.klar_for_uthyrning === true
-      ? 'Ja'
-      : nybilData?.klar_for_uthyrning === false
-        ? 'Nej'
+    // Klar för uthyrning: Check both nybil and if explicitly marked as false
+    klarForUthyrning: nybilData?.klar_for_uthyrning === false
+      ? 'Nej'
+      : nybilData?.klar_for_uthyrning === true
+        ? 'Ja'
         : '---',
+    
+    // Planerad station: from nybil_inventering
+    planeradStation: nybilData?.planerad_station || '---',
+    
+    // Utrustning: summarized from nybil_inventering equipment fields
+    utrustning: buildEquipmentSummary(nybilData),
+    
+    // Saluinfo: summarized from nybil_inventering sale fields
+    saluinfo: buildSaleInfo(nybilData),
   };
 
   // Build damage records from legacy damages (BUHS) - same source as /check

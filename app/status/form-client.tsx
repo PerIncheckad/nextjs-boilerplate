@@ -290,15 +290,18 @@ export default function StatusForm() {
               <span className="info-label hide-in-print">Reg.nr</span>
               <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
               <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
-              <InfoRow label="Bilen står nu" value={vehicleStatus.vehicle.bilenStarNu} />
+              <InfoRow label="Senast incheckad vid" value={vehicleStatus.vehicle.bilenStarNu} />
               <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
               <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulforvaring} />
+              <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
               <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
+              <InfoRow label="Utrustning" value={vehicleStatus.vehicle.utrustning} />
+              <InfoRow label="Saluinfo" value={vehicleStatus.vehicle.saluinfo} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
               <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
               <InfoRow label="Klar för uthyrning" value={vehicleStatus.vehicle.klarForUthyrning} />
