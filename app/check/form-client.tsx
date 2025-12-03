@@ -423,12 +423,18 @@ export default function CheckInForm() {
   const [bilenStarNuOrt, setBilenStarNuOrt] = useState('');
   const [bilenStarNuStation, setBilenStarNuStation] = useState('');
   const [bilenStarNuKommentar, setBilenStarNuKommentar] = useState('');
+  const [matarstallningAvlamning, setMatarstallningAvlamning] = useState('');
+  const [matarstallningAvlamningError, setMatarstallningAvlamningError] = useState('');
 
 
   // Derived State & Memos
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
   const availableStationsBilenStarNu = useMemo(() => STATIONER[bilenStarNuOrt] || [], [bilenStarNuOrt]);
+  const locationDiffers = useMemo(() => 
+    bilenStarNuOrt && bilenStarNuStation && (bilenStarNuOrt !== ort || bilenStarNuStation !== station),
+    [bilenStarNuOrt, bilenStarNuStation, ort, station]
+  );
   
   const shouldHideAdBlue = useMemo(() => {
     // Hide AdBlue ONLY when:
@@ -454,6 +460,7 @@ export default function CheckInForm() {
 
   const formIsValidState = useMemo(() => {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !drivmedelstyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
+    if (locationDiffers && !matarstallningAvlamning) return false;
     if (drivmedelstyp === 'bensin_diesel' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)))) return false;
     if (drivmedelstyp === 'elbil' && (!laddniva || antalLaddkablar === null)) return false;
     
@@ -477,7 +484,7 @@ export default function CheckInForm() {
   }, [
     regInput, ort, station, matarstallning, hjultyp, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     skadekontroll, newDamages, existingDamages, isChecklistComplete, garInteAttHyraUt, garInteAttHyraUtKommentar, varningslampaLyser, varningslampaBeskrivning,
-    behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, unhandledLegacyDamages
+    behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, locationDiffers, matarstallningAvlamning, unhandledLegacyDamages
   ]);
 
   const finalPayloadForUI = useMemo(() => ({
@@ -524,7 +531,12 @@ export default function CheckInForm() {
       laddning: { laddniva, antal_laddkablar: antalLaddkablar },
       ort,
       station,
-      bilen_star_nu: { ort: bilenStarNuOrt, station: bilenStarNuStation, kommentar: bilenStarNuKommentar },
+      bilen_star_nu: { 
+        ort: bilenStarNuOrt, 
+        station: bilenStarNuStation, 
+        kommentar: bilenStarNuKommentar,
+        matarstallning_avlamning: locationDiffers ? matarstallningAvlamning : null
+      },
       nya_skador: newDamages,
       dokumenterade_skador: existingDamages.filter(d => d.status === 'documented'),
       åtgärdade_skador: existingDamages.filter(d => d.status === 'resolved'),
@@ -544,7 +556,7 @@ export default function CheckInForm() {
     varningslampaLyser, varningslampaBeskrivning,
     insynsskyddSaknas,
     drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
-    ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, 
+    ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, locationDiffers, matarstallningAvlamning,
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering,
     showUnknownRegHelper
   ]);
@@ -679,6 +691,22 @@ export default function CheckInForm() {
     return () => clearTimeout(timer);
   }, [regInput, fetchVehicleData, initialUrlLoadHandled]);
 
+  // Validate odometer readings when they change
+  useEffect(() => {
+    if (!locationDiffers || !matarstallningAvlamning || !matarstallning) {
+      setMatarstallningAvlamningError('');
+      return;
+    }
+    
+    const avlamning = parseInt(matarstallningAvlamning, 10);
+    const incheckning = parseInt(matarstallning, 10);
+    
+    if (!isNaN(avlamning) && !isNaN(incheckning) && avlamning <= incheckning) {
+      setMatarstallningAvlamningError(`Detta måste vara högre än vid ${ort} / ${station}`);
+    } else {
+      setMatarstallningAvlamningError('');
+    }
+  }, [locationDiffers, matarstallningAvlamning, matarstallning, ort, station]);
 
   // Handlers
   const handleShowErrors = () => {
@@ -714,7 +742,7 @@ export default function CheckInForm() {
     setSpolarvatskaOK(false); setAdblueOK(false); setVindrutaAvtorkadOK(false);
     setSkadekontroll(null);
     setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
-    setBilenStarNuOrt(''); setBilenStarNuStation(''); setBilenStarNuKommentar('');
+    setBilenStarNuOrt(''); setBilenStarNuStation(''); setBilenStarNuKommentar(''); setMatarstallningAvlamning('');
     window.history.pushState({}, '', window.location.pathname); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1185,7 +1213,7 @@ export default function CheckInForm() {
 
         <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && (!laddniva || antalLaddkablar === null)))}>
           <SectionHeader title="Fordonsstatus" />
-          <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
+          <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning vid incheckning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
           <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
           <SubSectionHeader title="Tankning/Laddning" /><Field label="Drivmedelstyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton><ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton></div></Field>
           {drivmedelstyp === 'bensin_diesel' && (<Fragment><Field label="Tankstatus *"><div className="grid-3-col">
@@ -1317,12 +1345,33 @@ export default function CheckInForm() {
           </div>
         </Card>
 
-        <Card data-error={showFieldErrors && (!bilenStarNuOrt || !bilenStarNuStation)}>
+        <Card data-error={showFieldErrors && (!bilenStarNuOrt || !bilenStarNuStation || (locationDiffers && !matarstallningAvlamning))}>
           <SectionHeader title="Var är bilen nu?" />
           <div className="grid-2-col">
             <Field label="Ort *"><select value={bilenStarNuOrt} onChange={e => { setBilenStarNuOrt(e.target.value); setBilenStarNuStation(''); }}><option value="">Välj ort</option>{ORTER.map(o => <option key={o} value={o}>{o}</option>)}</select></Field>
             <Field label="Station *"><select value={bilenStarNuStation} onChange={e => setBilenStarNuStation(e.target.value)} disabled={!bilenStarNuOrt}><option value="">Välj station</option>{availableStationsBilenStarNu.map(s => <option key={s} value={s}>{s}</option>)}</select></Field>
           </div>
+          {locationDiffers && (
+            <div id="matarstallning-avlamning-field">
+              <Field label="Mätarställning nu (km) *">
+                <input 
+                  type="number" 
+                  value={matarstallningAvlamning} 
+                  onChange={e => { 
+                    setMatarstallningAvlamning(e.target.value);
+                    setMatarstallningAvlamningError(''); // Clear error when user types
+                  }} 
+                  placeholder="12345"
+                  data-error={!!matarstallningAvlamningError}
+                />
+              </Field>
+              {matarstallningAvlamningError && (
+                <p className="error-text" style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  {matarstallningAvlamningError}
+                </p>
+              )}
+            </div>
+          )}
           <Field label="Parkeringsinfo (frivilligt)"><textarea value={bilenStarNuKommentar} onChange={e => setBilenStarNuKommentar(e.target.value)} placeholder="Ange parkering, nyckelnummer etc." rows={2}></textarea></Field>
         </Card>
 
@@ -1483,7 +1532,9 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             </div>
             {renderDamageList(payload.nya_skador, '💥 Nya skador', false)}{renderDamageList(payload.dokumenterade_skador, '📋 Dokumenterade skador', false)}{renderDamageList(payload.åtgärdade_skador, '✅ Går inte att dokumentera', true)}
             <div className="confirm-summary">
-                <p>🛣️ <strong>Mätarställning:</strong> {payload.matarstallning} km</p>{getTankningText()}<p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
+                <p>🛣️ <strong>Mätarställning vid incheckning:</strong> {payload.matarstallning} km</p>
+                {payload.bilen_star_nu?.matarstallning_avlamning && <p>🛣️ <strong>Mätarställning nu:</strong> {payload.bilen_star_nu.matarstallning_avlamning} km</p>}
+                {getTankningText()}<p>🛞 <strong>Hjul:</strong> {payload.hjultyp}</p>
                 {payload.washed && <p><strong>✅ Tvättad</strong></p>}{payload.otherChecklistItemsOK && <p><strong>✅ Övriga kontroller OK!</strong></p>}
             </div>
         </div>
