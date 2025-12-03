@@ -339,9 +339,7 @@ export default function StatusForm() {
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
-              <InfoRow label="Utrustning" value={vehicleStatus.vehicle.utrustning} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
-              <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
               <InfoRow label="Klar för uthyrning" value={vehicleStatus.vehicle.klarForUthyrning} />
             </div>
             <div className="print-options">
@@ -364,12 +362,41 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Equipment Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.utrustning !== '---' && (
+          <Card>
+            <SectionHeader title="Utrustning" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.antalNycklar !== '---' && <InfoRow label="Nycklar" value={vehicleStatus.vehicle.antalNycklar} />}
+              {vehicleStatus.vehicle.antalLaddkablar !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.antalLaddkablar} />}
+              {vehicleStatus.vehicle.antalInsynsskydd !== '---' && <InfoRow label="Insynsskydd" value={vehicleStatus.vehicle.antalInsynsskydd} />}
+              {vehicleStatus.vehicle.harInstruktionsbok !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.harInstruktionsbok} />}
+              {vehicleStatus.vehicle.harCoc !== '---' && <InfoRow label="COC" value={vehicleStatus.vehicle.harCoc} />}
+              {vehicleStatus.vehicle.harLasbultar !== '---' && <InfoRow label="Låsbultar" value={vehicleStatus.vehicle.harLasbultar} />}
+              {vehicleStatus.vehicle.harDragkrok !== '---' && <InfoRow label="Dragkrok" value={vehicleStatus.vehicle.harDragkrok} />}
+              {vehicleStatus.vehicle.harGummimattor !== '---' && <InfoRow label="Gummimattor" value={vehicleStatus.vehicle.harGummimattor} />}
+              {vehicleStatus.vehicle.harDackkompressor !== '---' && <InfoRow label="Däckkompressor" value={vehicleStatus.vehicle.harDackkompressor} />}
+              <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
+            </div>
+          </Card>
+        )}
+
         {/* Equipment Storage Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.utrustningForvaring !== '---' && (
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.reservnyckelInfo !== '---' ||
+          vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.cocForvaringInfo !== '---'
+        ) && (
           <Card>
             <SectionHeader title="Utrustningsförvaring" />
-            <div style={{ padding: '0.5rem 0' }}>
-              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5' }}>{vehicleStatus.vehicle.utrustningForvaring}</p>
+            <div className="info-grid">
+              {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
+              {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
+              {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
+              {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
+              {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
             </div>
           </Card>
         )}
@@ -1216,9 +1243,9 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         page-break-inside: avoid;
       }
 
-      /* Hide nybil photos section entirely in print */
-      .nybil-photos-card {
-        display: none !important;
+      /* Show nybil photos in print - make them smaller */
+      .nybil-photos-card .nybil-photo {
+        max-height: 150px;
       }
     }
 

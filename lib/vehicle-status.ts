@@ -24,8 +24,22 @@ export type VehicleStatusData = {
   planeradStation: string;
   utrustning: string;
   saluinfo: string;
-  // Detailed storage info
-  utrustningForvaring: string;
+  // Detailed storage info (individual fields)
+  hjulForvaringInfo: string;
+  reservnyckelInfo: string;
+  laddkablarForvaringInfo: string;
+  instruktionsbokForvaringInfo: string;
+  cocForvaringInfo: string;
+  // Equipment details (individual fields)
+  antalNycklar: string;
+  antalLaddkablar: string;
+  antalInsynsskydd: string;
+  harInstruktionsbok: string;
+  harCoc: string;
+  harLasbultar: string;
+  harDragkrok: string;
+  harGummimattor: string;
+  harDackkompressor: string;
   // Detailed sale info fields
   saluStation: string;
   saluKopare: string;
@@ -577,8 +591,33 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Saluinfo: summarized from nybil_inventering sale fields
     saluinfo: buildSaleInfo(nybilData),
     
-    // Equipment storage info
-    utrustningForvaring: buildEquipmentStorage(nybilData),
+    // Equipment storage info (individual fields for separate rows)
+    hjulForvaringInfo: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    reservnyckelInfo: (nybilData?.extranyckel_forvaring_ort || nybilData?.extranyckel_forvaring_spec)
+      ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    laddkablarForvaringInfo: (nybilData?.laddkablar_forvaring_ort || nybilData?.laddkablar_forvaring_spec)
+      ? [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    instruktionsbokForvaringInfo: (nybilData?.instruktionsbok_forvaring_ort || nybilData?.instruktionsbok_forvaring_spec)
+      ? [nybilData.instruktionsbok_forvaring_ort, nybilData.instruktionsbok_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    cocForvaringInfo: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
+      ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    
+    // Equipment details (individual fields for separate section)
+    antalNycklar: nybilData?.antal_nycklar ? `${nybilData.antal_nycklar} st` : '---',
+    antalLaddkablar: nybilData?.antal_laddkablar ? `${nybilData.antal_laddkablar} st` : '---',
+    antalInsynsskydd: nybilData?.antal_insynsskydd ? `${nybilData.antal_insynsskydd} st` : '---',
+    harInstruktionsbok: nybilData?.instruktionsbok === true ? 'Ja' : nybilData?.instruktionsbok === false ? 'Nej' : '---',
+    harCoc: nybilData?.coc === true ? 'Ja' : nybilData?.coc === false ? 'Nej' : '---',
+    harLasbultar: nybilData?.lasbultar_med === true ? 'Ja' : nybilData?.lasbultar_med === false ? 'Nej' : '---',
+    harDragkrok: nybilData?.dragkrok === true ? 'Ja' : nybilData?.dragkrok === false ? 'Nej' : '---',
+    harGummimattor: nybilData?.gummimattor === true ? 'Ja' : nybilData?.gummimattor === false ? 'Nej' : '---',
+    harDackkompressor: nybilData?.dackkompressor === true ? 'Ja' : nybilData?.dackkompressor === false ? 'Nej' : '---',
     
     // Detailed sale info fields
     saluStation: nybilData?.salu_station || '---',
