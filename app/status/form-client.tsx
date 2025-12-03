@@ -907,11 +907,22 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     }
 
     .copyright-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
       text-align: center;
-      margin-top: 2rem;
-      padding: 1.5rem 0 3rem 0;
+      padding: 1rem 0;
+      background-color: rgba(255, 255, 255, 0.95);
+      border-top: 1px solid var(--color-border);
       color: var(--color-text-secondary);
       font-size: 0.875rem;
+      z-index: 100;
+      box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .status-form {
+      padding-bottom: 4rem; /* Add space for fixed footer */
     }
 
     /* Print options styles */
