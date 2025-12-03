@@ -1328,6 +1328,7 @@ export default function NybilForm() {
     }
     
     // Calculate charging/tank warnings (same logic as /check)
+    // Note: Form validation ensures laddnivaProcent is a valid number before this point
     const showChargeWarning = isElectric && laddnivaProcent !== null && laddnivaProcent !== '' && parseInt(laddnivaProcent, 10) < 95;
     const showNotRefueled = !isElectric && tankstatus === 'ej_upptankad';
     

@@ -118,7 +118,9 @@ const createAdminBanner = (condition: boolean, text: string): string => {
 // Create admin banner for charge level (same format as /check)
 const createChargeLevelBanner = (condition: boolean, laddnivaProcent: number | null | undefined): string => {
   if (!condition) return '';
-  const text = `Kolla bilens laddnivå! (${laddnivaProcent ?? 0}%)`;
+  // Only show banner if we have a valid percentage value
+  if (laddnivaProcent === null || laddnivaProcent === undefined) return '';
+  const text = `Kolla bilens laddnivå! (${laddnivaProcent}%)`;
   const bannerContent = `<div style="background-color:${BANNER_COLOR_BLUE}!important;border:1px solid ${BANNER_COLOR_BLUE};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${text}</div>`;
   return `<tr><td style="padding:6px 0;">${bannerContent}</td></tr>`;
 };
