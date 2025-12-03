@@ -339,9 +339,7 @@ export default function StatusForm() {
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
-              <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
               <InfoRow label="Utrustning" value={vehicleStatus.vehicle.utrustning} />
-              <InfoRow label="Saluinfo" value={vehicleStatus.vehicle.saluinfo} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
               <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
               <InfoRow label="Klar för uthyrning" value={vehicleStatus.vehicle.klarForUthyrning} />
@@ -363,6 +361,39 @@ export default function StatusForm() {
             >
               🖨️ Skriv ut
             </button>
+          </Card>
+        )}
+
+        {/* Equipment Storage Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.utrustningForvaring !== '---' && (
+          <Card>
+            <SectionHeader title="Utrustningsförvaring" />
+            <div className="info-grid">
+              <InfoRow label="" value={vehicleStatus.vehicle.utrustningForvaring} />
+            </div>
+          </Card>
+        )}
+
+        {/* Fuel Filling Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.tankningInfo !== '---' && (
+          <Card>
+            <SectionHeader title="Tankning (MABI)" />
+            <div className="info-grid">
+              <InfoRow label="" value={vehicleStatus.vehicle.tankningInfo} />
+            </div>
+          </Card>
+        )}
+
+        {/* Sale Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.saludatum !== '---' && (
+          <Card>
+            <SectionHeader title="Salu" />
+            <div className="info-grid">
+              <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
+              <InfoRow label="Station" value={vehicleStatus.vehicle.saluStation} />
+              <InfoRow label="Köpare" value={vehicleStatus.vehicle.saluKopare} />
+              <InfoRow label="Retur" value={vehicleStatus.vehicle.saluRetur} />
+            </div>
           </Card>
         )}
 

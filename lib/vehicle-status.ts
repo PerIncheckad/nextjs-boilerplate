@@ -24,6 +24,14 @@ export type VehicleStatusData = {
   planeradStation: string;
   utrustning: string;
   saluinfo: string;
+  // Detailed storage info
+  utrustningForvaring: string;
+  // Detailed sale info fields
+  saluStation: string;
+  saluKopare: string;
+  saluRetur: string;
+  // Fuel filling info
+  tankningInfo: string;
 };
 
 export type DamageRecord = {
@@ -102,6 +110,21 @@ type NybilInventeringData = {
   registreringsdatum?: string;
   photo_urls?: string[];
   media_folder?: string | null;
+  // Storage fields
+  hjul_forvaring_ort?: string | null;
+  hjul_forvaring_spec?: string | null;
+  extranyckel_forvaring_ort?: string | null;
+  extranyckel_forvaring_spec?: string | null;
+  laddkablar_forvaring_ort?: string | null;
+  laddkablar_forvaring_spec?: string | null;
+  instruktionsbok_forvaring_ort?: string | null;
+  instruktionsbok_forvaring_spec?: string | null;
+  coc_forvaring_ort?: string | null;
+  coc_forvaring_spec?: string | null;
+  stold_gps_spec?: string | null;
+  // Fuel filling info
+  upptankning_liter?: number | null;
+  upptankning_literpris?: number | null;
 };
 
 // =================================================================
@@ -174,6 +197,47 @@ function buildEquipmentSummary(nybilData: NybilInventeringData | null): string {
 }
 
 /**
+ * Build equipment storage info from nybil_inventering data
+ */
+function buildEquipmentStorage(nybilData: NybilInventeringData | null): string {
+  if (!nybilData) return '---';
+  
+  const items: string[] = [];
+  
+  // Wheel storage
+  if (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec) {
+    const hjulInfo = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Hjulförvaring: ${hjulInfo}`);
+  }
+  
+  // Extra key storage
+  if (nybilData.extranyckel_forvaring_ort || nybilData.extranyckel_forvaring_spec) {
+    const nyckelInfo = [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Reservnyckel: ${nyckelInfo}`);
+  }
+  
+  // Charging cable storage
+  if (nybilData.laddkablar_forvaring_ort || nybilData.laddkablar_forvaring_spec) {
+    const laddkabelInfo = [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Laddkablar: ${laddkabelInfo}`);
+  }
+  
+  // Manual storage
+  if (nybilData.instruktionsbok_forvaring_ort || nybilData.instruktionsbok_forvaring_spec) {
+    const bokInfo = [nybilData.instruktionsbok_forvaring_ort, nybilData.instruktionsbok_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Instruktionsbok: ${bokInfo}`);
+  }
+  
+  // COC storage
+  if (nybilData.coc_forvaring_ort || nybilData.coc_forvaring_spec) {
+    const cocInfo = [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`COC-dokument: ${cocInfo}`);
+  }
+  
+  return items.length > 0 ? items.join(' | ') : '---';
+}
+
+/**
  * Build sale info summary from nybil_inventering data
  */
 function buildSaleInfo(nybilData: NybilInventeringData | null): string {
@@ -193,6 +257,23 @@ function buildSaleInfo(nybilData: NybilInventeringData | null): string {
   if (nybilData.returort || nybilData.returadress) {
     const returInfo = [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ');
     items.push(`Retur: ${returInfo}`);
+  }
+  
+  return items.length > 0 ? items.join(' | ') : '---';
+}
+
+/**
+ * Build fuel filling info from nybil_inventering data
+ */
+function buildFuelFillingInfo(nybilData: NybilInventeringData | null): string {
+  if (!nybilData) return '---';
+  
+  const items: string[] = [];
+  
+  if (nybilData.upptankning_liter && nybilData.upptankning_literpris) {
+    items.push(`${nybilData.upptankning_liter} liter à ${nybilData.upptankning_literpris} kr/liter`);
+  } else if (nybilData.upptankning_liter) {
+    items.push(`${nybilData.upptankning_liter} liter`);
   }
   
   return items.length > 0 ? items.join(' | ') : '---';
@@ -473,9 +554,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Antal registrerade skador: count legacy damages (BUHS) like /check does
     antalSkador: legacyDamages.length,
     
-    // Stöld-GPS monterad: nybil_inventering.stold_gps
+    // Stöld-GPS monterad: nybil_inventering.stold_gps with spec
     stoldGps: nybilData?.stold_gps === true
-      ? 'Ja'
+      ? (nybilData.stold_gps_spec ? `Ja (${nybilData.stold_gps_spec})` : 'Ja')
       : nybilData?.stold_gps === false
         ? 'Nej'
         : '---',
@@ -495,6 +576,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Saluinfo: summarized from nybil_inventering sale fields
     saluinfo: buildSaleInfo(nybilData),
+    
+    // Equipment storage info
+    utrustningForvaring: buildEquipmentStorage(nybilData),
+    
+    // Detailed sale info fields
+    saluStation: nybilData?.salu_station || '---',
+    saluKopare: nybilData?.kopare_foretag || '---',
+    saluRetur: (nybilData?.returort || nybilData?.returadress)
+      ? [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ')
+      : '---',
+    
+    // Fuel filling info
+    tankningInfo: buildFuelFillingInfo(nybilData),
   };
 
   // Build damage records from legacy damages (BUHS) - same source as /check

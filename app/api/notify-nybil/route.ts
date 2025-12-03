@@ -308,6 +308,32 @@ const buildConnectStatusSection = (payload: NybilPayload): string => {
 };
 
 /**
+ * Helper function to build fuel filling info section for email
+ */
+const buildFuelFillingSection = (payload: NybilPayload): string => {
+  if (!payload.upptankning_liter && !payload.upptankning_literpris) return '';
+  
+  let content = '';
+  if (payload.upptankning_liter && payload.upptankning_literpris) {
+    content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
+    content += `<tr><td style="padding:4px 0;"><strong>Literpris:</strong> ${payload.upptankning_literpris} kr/liter</td></tr>`;
+    const totalCost = payload.upptankning_liter * payload.upptankning_literpris;
+    content += `<tr><td style="padding:4px 0;"><strong>Total kostnad:</strong> ${totalCost.toFixed(2)} kr</td></tr>`;
+  } else if (payload.upptankning_liter) {
+    content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
+  }
+  
+  return `
+    <tr><td style="padding-top:20px;">
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Tankning (MABI)</h3>
+      <table width="100%" style="font-size:14px;">
+        <tbody>${content}</tbody>
+      </table>
+    </td></tr>
+  `;
+};
+
+/**
  * Helper function to build saluinfo section for email
  */
 const buildSaluinfoSection = (payload: NybilPayload): string => {
@@ -318,7 +344,7 @@ const buildSaluinfoSection = (payload: NybilPayload): string => {
     content += `<tr><td style="padding:4px 0;"><strong>Saludatum:</strong> ${escapeHtml(payload.saludatum)}</td></tr>`;
   }
   if (payload.salu_station) {
-    content += `<tr><td style="padding:4px 0;"><strong>Salustation:</strong> ${escapeHtml(payload.salu_station)}</td></tr>`;
+    content += `<tr><td style="padding:4px 0;"><strong>Station:</strong> ${escapeHtml(payload.salu_station)}</td></tr>`;
   }
   if (payload.kopare_foretag) {
     content += `<tr><td style="padding:4px 0;"><strong>Köpare:</strong> ${escapeHtml(payload.kopare_foretag)}</td></tr>`;
@@ -326,11 +352,9 @@ const buildSaluinfoSection = (payload: NybilPayload): string => {
   if (payload.attention) {
     content += `<tr><td style="padding:4px 0;"><strong>Attention:</strong> ${escapeHtml(payload.attention)}</td></tr>`;
   }
-  if (payload.returort) {
-    content += `<tr><td style="padding:4px 0;"><strong>Returort:</strong> ${escapeHtml(payload.returort)}</td></tr>`;
-  }
-  if (payload.returadress) {
-    content += `<tr><td style="padding:4px 0;"><strong>Returadress:</strong> ${escapeHtml(payload.returadress)}</td></tr>`;
+  const returInfo = [payload.returort, payload.returadress].filter(Boolean).join(', ');
+  if (returInfo) {
+    content += `<tr><td style="padding:4px 0;"><strong>Retur:</strong> ${escapeHtml(returInfo)}</td></tr>`;
   }
   if (payload.notering_forsaljning) {
     content += `<tr><td style="padding:4px 0;"><strong>Notering försäljning:</strong> ${escapeHtml(payload.notering_forsaljning)}</td></tr>`;
@@ -338,7 +362,7 @@ const buildSaluinfoSection = (payload: NybilPayload): string => {
   
   return `
     <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Saluinfo</h3>
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Salu</h3>
       <table width="100%" style="font-size:14px;">
         <tbody>${content}</tbody>
       </table>
@@ -350,16 +374,20 @@ const buildSaluinfoSection = (payload: NybilPayload): string => {
  * Helper function to build förvaring details section for email
  */
 const buildForvaringDetailsSection = (payload: NybilPayload): string => {
+  const hasHjulForvaring = payload.hjul_forvaring_ort || payload.hjul_forvaring_spec;
   const hasExtranyckelForvaring = payload.extranyckel_forvaring_ort || payload.extranyckel_forvaring_spec;
   const hasLaddkablarForvaring = payload.laddkablar_forvaring_ort || payload.laddkablar_forvaring_spec;
   const hasInstruktionsbokForvaring = payload.instruktionsbok_forvaring_ort || payload.instruktionsbok_forvaring_spec;
   const hasCocForvaring = payload.coc_forvaring_ort || payload.coc_forvaring_spec;
   
-  if (!hasExtranyckelForvaring && !hasLaddkablarForvaring && !hasInstruktionsbokForvaring && !hasCocForvaring) return '';
+  if (!hasHjulForvaring && !hasExtranyckelForvaring && !hasLaddkablarForvaring && !hasInstruktionsbokForvaring && !hasCocForvaring) return '';
   
   let content = '';
+  if (hasHjulForvaring) {
+    content += `<tr><td style="padding:4px 0;"><strong>Hjulförvaring:</strong> ${escapeHtml(payload.hjul_forvaring_ort || '')}${payload.hjul_forvaring_spec ? ` - ${escapeHtml(payload.hjul_forvaring_spec)}` : ''}</td></tr>`;
+  }
   if (hasExtranyckelForvaring) {
-    content += `<tr><td style="padding:4px 0;"><strong>Extranyckel förvaring:</strong> ${escapeHtml(payload.extranyckel_forvaring_ort || '')}${payload.extranyckel_forvaring_spec ? ` - ${escapeHtml(payload.extranyckel_forvaring_spec)}` : ''}</td></tr>`;
+    content += `<tr><td style="padding:4px 0;"><strong>Reservnyckel förvaring:</strong> ${escapeHtml(payload.extranyckel_forvaring_ort || '')}${payload.extranyckel_forvaring_spec ? ` - ${escapeHtml(payload.extranyckel_forvaring_spec)}` : ''}</td></tr>`;
   }
   if (hasLaddkablarForvaring) {
     content += `<tr><td style="padding:4px 0;"><strong>Laddkablar förvaring:</strong> ${escapeHtml(payload.laddkablar_forvaring_ort || '')}${payload.laddkablar_forvaring_spec ? ` - ${escapeHtml(payload.laddkablar_forvaring_spec)}` : ''}</td></tr>`;
@@ -373,7 +401,7 @@ const buildForvaringDetailsSection = (payload: NybilPayload): string => {
   
   return `
     <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Förvaringsdetaljer</h3>
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Utrustningsförvaring</h3>
       <table width="100%" style="font-size:14px;">
         <tbody>${content}</tbody>
       </table>
@@ -709,6 +737,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   // Additional sections using helper functions
   const hjulForvaringSection = buildHjulForvaringSection(payload);
   const connectStatusSection = buildConnectStatusSection(payload);
+  const fuelFillingSection = buildFuelFillingSection(payload);
   const saluinfoSection = buildSaluinfoSection(payload);
   const forvaringDetailsSection = buildForvaringDetailsSection(payload);
   
@@ -741,6 +770,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     ${contractSection}
     ${equipmentSection}
     ${forvaringDetailsSection}
+    ${fuelFillingSection}
     ${saluinfoSection}
     ${klarForUthyrningSection}
     ${ovrigtSection}
@@ -954,6 +984,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   // Additional sections using helper functions
   const hjulForvaringSection = buildHjulForvaringSection(payload);
   const connectStatusSection = buildConnectStatusSection(payload);
+  const fuelFillingSection = buildFuelFillingSection(payload);
   const saluinfoSection = buildSaluinfoSection(payload);
   const forvaringDetailsSection = buildForvaringDetailsSection(payload);
   
@@ -988,6 +1019,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     ${contractSection}
     ${equipmentSection}
     ${forvaringDetailsSection}
+    ${fuelFillingSection}
     ${saluinfoSection}
     ${klarForUthyrningSection}
     ${ovrigtSection}
