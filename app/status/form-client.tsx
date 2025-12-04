@@ -64,15 +64,25 @@ const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => 
  * Build the public media URL for a damage based on regnr, damage date, and folder.
  * Returns the URL path or null if no valid date/folder is available.
  * 
+ * Handles two folder structures:
+ * 1. From /check: {REGNR}/{REGNR}-{YYYYMMDD}/{folder}
+ * 2. From /nybil: {REGNR}/SKADOR/{YYYYMMDD}-{details}-NYBIL/
+ * 
  * @param regnr - Vehicle registration number (e.g., "ABC123")
  * @param datumStr - Damage date in YYYY-MM-DD format or "---" if unknown
- * @param folder - Event folder name (e.g., "repa-hoger-dor")
+ * @param folder - Event folder name or full path
  * @returns URL path to public media browser, or null if regnr is empty
  */
 const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined, folder?: string): string | null => {
   if (!regnr) return null;
   
   const normalizedReg = regnr.toUpperCase().replace(/\s/g, '');
+  
+  // If folder contains full path (starts with REGNR or contains SKADOR), use it directly
+  // This handles nybil damages: ABC123/SKADOR/20251204-repa-hoger-dorr-per-NYBIL
+  if (folder && (folder.includes('/SKADOR/') || folder.startsWith(normalizedReg + '/'))) {
+    return `/public-media/${folder.split('/').map(encodeURIComponent).join('/')}`;
+  }
   
   // If no valid date, link to the vehicle's root folder
   if (!datumStr || datumStr === '---') {
@@ -88,7 +98,7 @@ const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined,
     return `/public-media/${encodeURIComponent(normalizedReg)}`;
   }
   
-  // Build folder path: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}/{folder}
+  // Build folder path for /check damages: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}/{folder}
   const basePath = `/public-media/${encodeURIComponent(normalizedReg)}/${encodeURIComponent(`${normalizedReg}-${datePart}`)}`;
   
   // If folder is provided, append it
