@@ -291,10 +291,15 @@ export default function StatusForm() {
         {/* Print Header (hidden on screen, visible on print) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <div className="print-header">
-            <h1>MABI Syd Fordonsstatus</h1>
-            <p className="print-regnr">Reg.nr: {vehicleStatus.vehicle.regnr}</p>
-            <p className="print-date">Utskrivet: {new Date().toLocaleDateString('sv-SE')}</p>
-            <hr className="print-divider" />
+            <div className="print-logo">MABI Syd</div>
+            <h1 className="print-regnr">{vehicleStatus.vehicle.regnr}</h1>
+            {vehicleStatus.nybilPhotos && (
+              <p className="print-subtitle">
+                Registrerad {vehicleStatus.nybilPhotos.registreringsdatum} av {vehicleStatus.nybilPhotos.registreradAv}
+                {vehicleStatus.vehicle.bilenStarNu && vehicleStatus.vehicle.bilenStarNu !== '---' && 
+                  ` i ${vehicleStatus.vehicle.bilenStarNu.split(' / ')[0]}`}
+              </p>
+            )}
           </div>
         )}
 
@@ -330,7 +335,7 @@ export default function StatusForm() {
               <span className="info-label hide-in-print">Reg.nr</span>
               <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
               <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
-              <InfoRow label="Senast incheckad vid" value={vehicleStatus.vehicle.bilenStarNu} />
+              <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
               <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
               <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulforvaring} />
@@ -340,25 +345,7 @@ export default function StatusForm() {
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
-              <InfoRow label="Klar för uthyrning" value={vehicleStatus.vehicle.klarForUthyrning} />
             </div>
-            <div className="print-options">
-              <label className="print-checkbox">
-                <input 
-                  type="checkbox" 
-                  checked={includeHistoryInPrint} 
-                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
-                />
-                <span>Inkludera all historik vid utskrift</span>
-              </label>
-            </div>
-            <button
-              type="button"
-              className="print-btn"
-              onClick={() => window.print()}
-            >
-              🖨️ Skriv ut
-            </button>
           </Card>
         )}
 
@@ -401,7 +388,7 @@ export default function StatusForm() {
           vehicleStatus.vehicle.cocForvaringInfo !== '---'
         ) && (
           <Card>
-            <SectionHeader title="Utrustningsförvaring" />
+            <SectionHeader title="Förvaring" />
             <div className="info-grid">
               {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
               {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
@@ -433,6 +420,29 @@ export default function StatusForm() {
               <InfoRow label="Retur" value={vehicleStatus.vehicle.saluRetur} />
             </div>
           </Card>
+        )}
+
+        {/* Print Button and Options */}
+        {vehicleStatus?.found && (
+          <div className="print-controls">
+            <div className="print-options">
+              <label className="print-checkbox">
+                <input 
+                  type="checkbox" 
+                  checked={includeHistoryInPrint} 
+                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                />
+                <span>Inkludera all historik vid utskrift</span>
+              </label>
+            </div>
+            <button
+              type="button"
+              className="print-btn"
+              onClick={() => window.print()}
+            >
+              🖨️ Skriv ut
+            </button>
+          </div>
         )}
 
         {/* Damages Section */}
@@ -1027,11 +1037,18 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       padding-bottom: 4rem; /* Add space for fixed footer */
     }
 
+    /* Print controls container */
+    .print-controls {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background-color: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+
     /* Print options styles */
     .print-options {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--color-border);
+      margin-bottom: 1rem;
     }
 
     .print-checkbox {
@@ -1050,7 +1067,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
     /* Print button styles */
     .print-btn {
-      margin-top: 1rem;
       padding: 0.75rem 1.5rem;
       background-color: var(--color-primary);
       color: white;
@@ -1060,8 +1076,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
-      width: auto;
-      min-width: 200px;
+      width: 100%;
+      max-width: 300px;
     }
 
     .print-btn:hover {
@@ -1096,8 +1112,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       /* Hide elements not needed for print */
       .main-header,
       .copyright-footer,
-      .print-btn,
-      .print-options,
+      .print-controls,
       body::before {
         display: none !important;
       }
@@ -1112,44 +1127,40 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
-      /* Show print header */
+      /* Compact print header - max 5cm height */
       .print-header {
         display: block;
         text-align: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid #000;
+        margin-bottom: 0.5rem;
+        padding: 0.5rem 0;
+        max-height: 5cm;
       }
 
-      .print-header h1 {
+      .print-logo {
         font-size: 1.5rem;
-        margin: 0 0 0.5rem 0;
+        font-weight: bold;
+        margin: 0 0 0.3rem 0;
         color: #000;
       }
 
       .print-regnr {
-        font-size: 1.25rem;
+        font-size: 1.8rem;
         font-weight: bold;
-        margin: 0.5rem 0;
+        margin: 0.2rem 0;
         color: #000;
       }
 
-      .print-date {
-        font-size: 0.875rem;
-        margin: 0.5rem 0;
+      .print-subtitle {
+        font-size: 0.75rem;
+        margin: 0.2rem 0 0.5rem 0;
         color: #666;
       }
 
-      .print-divider {
-        border: none;
-        border-top: 1px solid #ccc;
-        margin: 1rem 0 0 0;
-      }
-
-      /* Optimize for print */
+      /* Optimize for print - compact layout with 11pt text */
       body {
         background: white !important;
         color: black !important;
+        font-size: 11pt !important;
       }
 
       .status-form {
@@ -1164,7 +1175,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border: 1px solid #e5e7eb;
         border-radius: 0;
         page-break-inside: avoid;
-        margin-bottom: 1rem;
+        margin-bottom: 0.5rem;
+        padding: 0.5rem !important;
       }
 
       /* Hide elements marked for print hiding */
@@ -1254,9 +1266,24 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         page-break-inside: avoid;
       }
 
-      /* Show nybil photos in print - make them smaller */
+      /* Show nybil photos in print - make them smaller and hide title */
+      .nybil-photos-card {
+        padding: 0.3rem !important;
+        margin-bottom: 0.3rem !important;
+        border: none !important;
+      }
+
+      .nybil-photos-card .section-header {
+        display: none !important;
+      }
+
+      .nybil-photos-grid {
+        gap: 0.3rem !important;
+        margin-bottom: 0 !important;
+      }
+
       .nybil-photos-card .nybil-photo {
-        max-height: 150px;
+        max-height: 120px;
       }
     }
 

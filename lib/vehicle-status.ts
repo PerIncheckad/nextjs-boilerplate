@@ -164,7 +164,7 @@ function formatDateTime(dateStr: string | null | undefined): string {
     const datePart = date.toISOString().split('T')[0];
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${datePart} ${hours}:${minutes}`;
+    return `${datePart} kl ${hours}:${minutes}`;
   } catch {
     return dateStr;
   }
@@ -516,9 +516,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           ? formatModel(vehicleData.brand, vehicleData.model)
           : '---',
     
-    // Senast incheckad vid: checkins with datetime → nybil_inventering.plats_aktuell_station
+    // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
     bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
-      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)})`
+      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)} av ${getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
       : latestCheckin?.current_ort && latestCheckin?.current_station
         ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
         : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
@@ -537,8 +537,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Däck som sitter på: checkins.hjultyp (senaste) → nybil_inventering.hjultyp
     hjultyp: latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
     
-    // Hjulförvaring: vehicles.wheel_storage_location
-    hjulforvaring: vehicleData?.wheel_storage_location || '---',
+    // Hjulförvaring: nybil_inventering.hjul_forvaring_ort/spec → vehicles.wheel_storage_location
+    hjulforvaring: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+      : vehicleData?.wheel_storage_location || '---',
     
     // Drivmedel: nybil_inventering.bransletyp
     drivmedel: nybilData?.bransletyp || '---',
