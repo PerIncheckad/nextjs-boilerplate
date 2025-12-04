@@ -233,6 +233,15 @@ export default function StatusForm() {
     return () => window.removeEventListener('beforeprint', handleBeforePrint);
   }, [includeHistoryInPrint]);
 
+  // Helper to build nybil photos title
+  const getNybilPhotosTitle = useCallback(() => {
+    if (!vehicleStatus?.nybilPhotos) return '';
+    const regnr = vehicleStatus.vehicle?.regnr || normalizedReg;
+    const datum = vehicleStatus.nybilPhotos.registreringsdatum;
+    const av = vehicleStatus.nybilPhotos.registreradAv;
+    return `${regnr} registrerad ${datum} av ${av}`;
+  }, [vehicleStatus, normalizedReg]);
+
   return (
     <Fragment>
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
@@ -282,11 +291,40 @@ export default function StatusForm() {
         {/* Print Header (hidden on screen, visible on print) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <div className="print-header">
-            <h1>MABI Syd Fordonsstatus</h1>
-            <p className="print-regnr">Reg.nr: {vehicleStatus.vehicle.regnr}</p>
-            <p className="print-date">Utskrivet: {new Date().toLocaleDateString('sv-SE')}</p>
-            <hr className="print-divider" />
+            <div className="print-logo">MABI Syd</div>
+            <h1 className="print-regnr">{vehicleStatus.vehicle.regnr}</h1>
+            {vehicleStatus.nybilPhotos && (
+              <p className="print-subtitle">
+                Registrerad {vehicleStatus.nybilPhotos.registreringsdatum} av {vehicleStatus.nybilPhotos.registreradAv}
+                {vehicleStatus.vehicle.bilenStarNu && vehicleStatus.vehicle.bilenStarNu !== '---' && 
+                  ` i ${vehicleStatus.vehicle.bilenStarNu.split(' / ')[0]}`}
+              </p>
+            )}
           </div>
+        )}
+
+        {/* Nybil Reference Photos Section */}
+        {vehicleStatus?.found && vehicleStatus.nybilPhotos?.photoUrls?.length > 0 && (
+          <Card className="nybil-photos-card">
+            <SectionHeader title={getNybilPhotosTitle()} />
+            <div className="nybil-photos-grid">
+              {vehicleStatus.nybilPhotos.photoUrls.map((url, index) => (
+                <a 
+                  key={index} 
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="nybil-photo-item"
+                >
+                  <img 
+                    src={url} 
+                    alt={`Nybilsfoto ${index + 1}`} 
+                    className="nybil-photo"
+                  />
+                </a>
+              ))}
+            </div>
+          </Card>
         )}
 
         {/* Vehicle Info Section (Executive Summary) */}
@@ -297,39 +335,92 @@ export default function StatusForm() {
               <span className="info-label hide-in-print">Reg.nr</span>
               <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
               <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
-              <InfoRow label="Senast incheckad vid" value={vehicleStatus.vehicle.bilenStarNu} />
+              <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
               <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
-              <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulforvaring} />
               <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
-              <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
-              <InfoRow label="Utrustning" value={vehicleStatus.vehicle.utrustning} />
-              <InfoRow label="Saluinfo" value={vehicleStatus.vehicle.saluinfo} />
+              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
-              <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />
-              <InfoRow label="Klar för uthyrning" value={vehicleStatus.vehicle.klarForUthyrning} />
             </div>
-            <div className="print-options">
-              <label className="print-checkbox">
-                <input 
-                  type="checkbox" 
-                  checked={includeHistoryInPrint} 
-                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
-                />
-                <span>Inkludera all historik vid utskrift</span>
-              </label>
+          </Card>
+        )}
+
+        {/* Equipment Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.antalNycklar !== '---' ||
+          vehicleStatus.vehicle.antalLaddkablar !== '---' ||
+          vehicleStatus.vehicle.antalInsynsskydd !== '---' ||
+          vehicleStatus.vehicle.harInstruktionsbok !== '---' ||
+          vehicleStatus.vehicle.harCoc !== '---' ||
+          vehicleStatus.vehicle.harLasbultar !== '---' ||
+          vehicleStatus.vehicle.harDragkrok !== '---' ||
+          vehicleStatus.vehicle.harGummimattor !== '---' ||
+          vehicleStatus.vehicle.harDackkompressor !== '---' ||
+          vehicleStatus.vehicle.stoldGps !== '---'
+        ) && (
+          <Card>
+            <SectionHeader title="Utrustning vid leverans" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.antalNycklar !== '---' && <InfoRow label="Nycklar" value={vehicleStatus.vehicle.antalNycklar} />}
+              {vehicleStatus.vehicle.antalLaddkablar !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.antalLaddkablar} />}
+              {vehicleStatus.vehicle.antalInsynsskydd !== '---' && <InfoRow label="Insynsskydd" value={vehicleStatus.vehicle.antalInsynsskydd} />}
+              {vehicleStatus.vehicle.harInstruktionsbok !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.harInstruktionsbok} />}
+              {vehicleStatus.vehicle.harCoc !== '---' && <InfoRow label="COC" value={vehicleStatus.vehicle.harCoc} />}
+              {vehicleStatus.vehicle.harLasbultar !== '---' && <InfoRow label="Låsbultar" value={vehicleStatus.vehicle.harLasbultar} />}
+              {vehicleStatus.vehicle.harDragkrok !== '---' && <InfoRow label="Dragkrok" value={vehicleStatus.vehicle.harDragkrok} />}
+              {vehicleStatus.vehicle.harGummimattor !== '---' && <InfoRow label="Gummimattor" value={vehicleStatus.vehicle.harGummimattor} />}
+              {vehicleStatus.vehicle.harDackkompressor !== '---' && <InfoRow label="Däckkompressor" value={vehicleStatus.vehicle.harDackkompressor} />}
+              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
             </div>
-            <button
-              type="button"
-              className="print-btn"
-              onClick={() => window.print()}
-            >
-              🖨️ Skriv ut
-            </button>
+          </Card>
+        )}
+
+        {/* Equipment Storage Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.reservnyckelInfo !== '---' ||
+          vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.cocForvaringInfo !== '---'
+        ) && (
+          <Card>
+            <SectionHeader title="Förvaring" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
+              {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
+              {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
+              {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
+              {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
+            </div>
+          </Card>
+        )}
+
+        {/* Fuel Filling Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.tankningInfo !== '---' && (
+          <Card>
+            <SectionHeader title="Tankning (MABI)" />
+            <div style={{ padding: '0.5rem 0' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5' }}>{vehicleStatus.vehicle.tankningInfo}</p>
+            </div>
+          </Card>
+        )}
+
+        {/* Sale Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.saludatum !== '---' && (
+          <Card>
+            <SectionHeader title="Salu" />
+            <div className="info-grid">
+              <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
+              <InfoRow label="Station" value={vehicleStatus.vehicle.saluStation} />
+              <InfoRow label="Köpare (företag)" value={vehicleStatus.vehicle.saluKopare} />
+              <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />
+              {vehicleStatus.vehicle.saluAttention !== '---' && <InfoRow label="Attention" value={vehicleStatus.vehicle.saluAttention} />}
+              {vehicleStatus.vehicle.saluNotering !== '---' && <InfoRow label="Notering försäljning" value={vehicleStatus.vehicle.saluNotering} />}
+            </div>
           </Card>
         )}
 
@@ -403,6 +494,29 @@ export default function StatusForm() {
               </>
             )}
           </Card>
+        )}
+
+        {/* Print Button and Options - Moved to bottom after HISTORIK */}
+        {vehicleStatus?.found && (
+          <div className="print-controls">
+            <div className="print-options">
+              <label className="print-checkbox">
+                <input 
+                  type="checkbox" 
+                  checked={includeHistoryInPrint} 
+                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                />
+                <span>Inkludera all historik vid utskrift</span>
+              </label>
+            </div>
+            <button
+              type="button"
+              className="print-btn"
+              onClick={() => window.print()}
+            >
+              🖨️ Skriv ut
+            </button>
+          </div>
         )}
 
         <footer className="copyright-footer">
@@ -925,11 +1039,18 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       padding-bottom: 4rem; /* Add space for fixed footer */
     }
 
+    /* Print controls container */
+    .print-controls {
+      margin: 2rem 0;
+      padding: 1.5rem;
+      background-color: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+    }
+
     /* Print options styles */
     .print-options {
-      margin-top: 1rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--color-border);
+      margin-bottom: 1rem;
     }
 
     .print-checkbox {
@@ -948,7 +1069,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
     /* Print button styles */
     .print-btn {
-      margin-top: 1rem;
       padding: 0.75rem 1.5rem;
       background-color: var(--color-primary);
       color: white;
@@ -958,8 +1078,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
-      width: auto;
-      min-width: 200px;
+      width: 100%;
+      max-width: 300px;
     }
 
     .print-btn:hover {
@@ -994,8 +1114,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       /* Hide elements not needed for print */
       .main-header,
       .copyright-footer,
-      .print-btn,
-      .print-options,
+      .print-controls,
       body::before {
         display: none !important;
       }
@@ -1010,44 +1129,40 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
-      /* Show print header */
+      /* Compact print header - max 5cm height */
       .print-header {
         display: block;
         text-align: center;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 2px solid #000;
+        margin-bottom: 8px !important;
+        padding-bottom: 8px !important;
+        max-height: 5cm;
       }
 
-      .print-header h1 {
-        font-size: 1.5rem;
-        margin: 0 0 0.5rem 0;
+      .print-logo {
+        font-size: 14pt !important;
+        font-weight: bold;
+        margin: 0 !important;
         color: #000;
       }
 
       .print-regnr {
-        font-size: 1.25rem;
+        font-size: 18pt !important;
         font-weight: bold;
-        margin: 0.5rem 0;
+        margin: 4px 0 !important;
         color: #000;
       }
 
-      .print-date {
-        font-size: 0.875rem;
-        margin: 0.5rem 0;
+      .print-subtitle {
+        font-size: 8pt !important;
+        margin: 0.2rem 0 0.5rem 0;
         color: #666;
       }
 
-      .print-divider {
-        border: none;
-        border-top: 1px solid #ccc;
-        margin: 1rem 0 0 0;
-      }
-
-      /* Optimize for print */
+      /* Optimize for print - very compact layout with 9pt text */
       body {
         background: white !important;
         color: black !important;
+        font-size: 9pt !important;
       }
 
       .status-form {
@@ -1062,7 +1177,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border: 1px solid #e5e7eb;
         border-radius: 0;
         page-break-inside: avoid;
-        margin-bottom: 1rem;
+        margin-bottom: 8px !important;
+        padding: 8px !important;
       }
 
       /* Hide elements marked for print hiding */
@@ -1078,6 +1194,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .section-header h2,
       .section-header-expandable h2 {
         color: #000;
+        font-size: 11pt !important;
       }
 
       /* Remove background colors and shadows */
@@ -1088,18 +1205,23 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border: 1px solid #e5e7eb;
       }
 
-      /* Ensure text is black */
+      /* Compact text sizes */
       .info-label,
-      .info-value,
+      .info-value {
+        font-size: 9pt !important;
+        color: #000 !important;
+      }
+
       .damage-type,
       .damage-date,
       .history-summary {
         color: #000 !important;
+        font-size: 9pt !important;
       }
 
-      /* Compact spacing */
-      .card {
-        padding: 1rem;
+      /* Minimal spacing */
+      .info-grid {
+        gap: 2px 8px !important;
       }
 
       .damage-list,
@@ -1150,6 +1272,87 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .damage-item,
       .history-item {
         page-break-inside: avoid;
+      }
+
+      /* Show nybil photos in print - make them smaller and hide title */
+      .nybil-photos-card {
+        padding: 0.3rem !important;
+        margin-bottom: 0.3rem !important;
+        border: none !important;
+      }
+
+      .nybil-photos-card .section-header {
+        display: none !important;
+      }
+
+      .nybil-photos-grid {
+        gap: 0.3rem !important;
+        margin-bottom: 0 !important;
+      }
+
+      .nybil-photos-card .nybil-photo {
+        max-height: 100px !important;
+      }
+    }
+
+    /* Nybil photos styling */
+    .nybil-photos-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: center;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+
+    .nybil-photo-item {
+      flex: 0 1 auto;
+      max-width: 100%;
+      cursor: pointer;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+      display: block;
+    }
+
+    .nybil-photo-item:hover {
+      transform: scale(1.05);
+      opacity: 0.9;
+    }
+
+    /* Accessibility: Respect reduced motion preferences */
+    @media (prefers-reduced-motion: reduce) {
+      .nybil-photo-item {
+        transition: none;
+      }
+      
+      .nybil-photo-item:hover {
+        transform: none;
+        opacity: 1;
+      }
+    }
+
+    .nybil-photo {
+      max-height: 200px;
+      width: auto;
+      max-width: 100%;
+      border-radius: 8px;
+      box-shadow: var(--shadow-sm);
+      object-fit: contain;
+      display: block;
+    }
+
+    .nybil-photo-item:hover .nybil-photo {
+      box-shadow: var(--shadow-md);
+    }
+
+    /* Responsive layout for nybil photos */
+    @media (max-width: 600px) {
+      .nybil-photos-grid {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .nybil-photo {
+        max-height: 180px;
       }
     }
   `}</style>

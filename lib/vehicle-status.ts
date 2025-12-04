@@ -24,6 +24,30 @@ export type VehicleStatusData = {
   planeradStation: string;
   utrustning: string;
   saluinfo: string;
+  // Detailed storage info (individual fields)
+  hjulForvaringInfo: string;
+  reservnyckelInfo: string;
+  laddkablarForvaringInfo: string;
+  instruktionsbokForvaringInfo: string;
+  cocForvaringInfo: string;
+  // Equipment details (individual fields)
+  antalNycklar: string;
+  antalLaddkablar: string;
+  antalInsynsskydd: string;
+  harInstruktionsbok: string;
+  harCoc: string;
+  harLasbultar: string;
+  harDragkrok: string;
+  harGummimattor: string;
+  harDackkompressor: string;
+  // Detailed sale info fields
+  saluStation: string;
+  saluKopare: string;
+  saluRetur: string;
+  saluAttention: string;
+  saluNotering: string;
+  // Fuel filling info
+  tankningInfo: string;
 };
 
 export type DamageRecord = {
@@ -53,6 +77,13 @@ export type VehicleStatusResult = {
   vehicle: VehicleStatusData | null;
   damages: DamageRecord[];
   history: HistoryRecord[];
+  // Nybil reference photos
+  nybilPhotos: {
+    photoUrls: string[];
+    mediaFolder: string | null;
+    registreringsdatum: string;
+    registreradAv: string;
+  } | null;
 };
 
 // Partial type for nybil_inventering fields we use
@@ -90,8 +121,28 @@ type NybilInventeringData = {
   kopare_foretag?: string;
   returort?: string;
   returadress?: string;
+  attention?: string | null;
+  notering_forsaljning?: string | null;
   fullstandigt_namn?: string;
   registrerad_av?: string;
+  registreringsdatum?: string;
+  photo_urls?: string[];
+  media_folder?: string | null;
+  // Storage fields
+  hjul_forvaring_ort?: string | null;
+  hjul_forvaring_spec?: string | null;
+  extranyckel_forvaring_ort?: string | null;
+  extranyckel_forvaring_spec?: string | null;
+  laddkablar_forvaring_ort?: string | null;
+  laddkablar_forvaring_spec?: string | null;
+  instruktionsbok_forvaring_ort?: string | null;
+  instruktionsbok_forvaring_spec?: string | null;
+  coc_forvaring_ort?: string | null;
+  coc_forvaring_spec?: string | null;
+  stold_gps_spec?: string | null;
+  // Fuel filling info
+  upptankning_liter?: number | null;
+  upptankning_literpris?: number | null;
 };
 
 // =================================================================
@@ -117,7 +168,7 @@ function formatDateTime(dateStr: string | null | undefined): string {
     const datePart = date.toISOString().split('T')[0];
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${datePart} ${hours}:${minutes}`;
+    return `${datePart} kl ${hours}:${minutes}`;
   } catch {
     return dateStr;
   }
@@ -164,6 +215,47 @@ function buildEquipmentSummary(nybilData: NybilInventeringData | null): string {
 }
 
 /**
+ * Build equipment storage info from nybil_inventering data
+ */
+function buildEquipmentStorage(nybilData: NybilInventeringData | null): string {
+  if (!nybilData) return '---';
+  
+  const items: string[] = [];
+  
+  // Wheel storage
+  if (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec) {
+    const hjulInfo = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Hjulförvaring: ${hjulInfo}`);
+  }
+  
+  // Extra key storage
+  if (nybilData.extranyckel_forvaring_ort || nybilData.extranyckel_forvaring_spec) {
+    const nyckelInfo = [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Reservnyckel: ${nyckelInfo}`);
+  }
+  
+  // Charging cable storage
+  if (nybilData.laddkablar_forvaring_ort || nybilData.laddkablar_forvaring_spec) {
+    const laddkabelInfo = [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Laddkablar: ${laddkabelInfo}`);
+  }
+  
+  // Manual storage
+  if (nybilData.instruktionsbok_forvaring_ort || nybilData.instruktionsbok_forvaring_spec) {
+    const bokInfo = [nybilData.instruktionsbok_forvaring_ort, nybilData.instruktionsbok_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`Instruktionsbok: ${bokInfo}`);
+  }
+  
+  // COC storage
+  if (nybilData.coc_forvaring_ort || nybilData.coc_forvaring_spec) {
+    const cocInfo = [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ');
+    items.push(`COC-dokument: ${cocInfo}`);
+  }
+  
+  return items.length > 0 ? items.join(' | ') : '---';
+}
+
+/**
  * Build sale info summary from nybil_inventering data
  */
 function buildSaleInfo(nybilData: NybilInventeringData | null): string {
@@ -183,6 +275,23 @@ function buildSaleInfo(nybilData: NybilInventeringData | null): string {
   if (nybilData.returort || nybilData.returadress) {
     const returInfo = [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ');
     items.push(`Retur: ${returInfo}`);
+  }
+  
+  return items.length > 0 ? items.join(' | ') : '---';
+}
+
+/**
+ * Build fuel filling info from nybil_inventering data
+ */
+function buildFuelFillingInfo(nybilData: NybilInventeringData | null): string {
+  if (!nybilData) return '---';
+  
+  const items: string[] = [];
+  
+  if (nybilData.upptankning_liter && nybilData.upptankning_literpris) {
+    items.push(`${nybilData.upptankning_liter} liter à ${nybilData.upptankning_literpris} kr/liter`);
+  } else if (nybilData.upptankning_liter) {
+    items.push(`${nybilData.upptankning_liter} liter`);
   }
   
   return items.length > 0 ? items.join(' | ') : '---';
@@ -233,6 +342,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       vehicle: null,
       damages: [],
       history: [],
+      nybilPhotos: null,
     };
   }
 
@@ -293,6 +403,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       vehicle: null,
       damages: [],
       history: [],
+      nybilPhotos: null,
     };
   }
 
@@ -356,6 +467,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       planeradStation: '---',
       utrustning: '---',
       saluinfo: '---',
+      hjulForvaringInfo: '---',
+      reservnyckelInfo: '---',
+      laddkablarForvaringInfo: '---',
+      instruktionsbokForvaringInfo: '---',
+      cocForvaringInfo: '---',
+      antalNycklar: '---',
+      antalLaddkablar: '---',
+      antalInsynsskydd: '---',
+      harInstruktionsbok: '---',
+      harCoc: '---',
+      harLasbultar: '---',
+      harDragkrok: '---',
+      harGummimattor: '---',
+      harDackkompressor: '---',
+      saluStation: '---',
+      saluKopare: '---',
+      saluRetur: '---',
+      saluAttention: '---',
+      saluNotering: '---',
+      tankningInfo: '---',
     };
 
     // Build damage records from legacy damages (BUHS)
@@ -392,6 +523,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       vehicle,
       damages: damageRecords,
       history: historyRecords,
+      nybilPhotos: null, // No nybil photos when source is 'checkins' only
     };
   }
 
@@ -408,9 +540,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           ? formatModel(vehicleData.brand, vehicleData.model)
           : '---',
     
-    // Senast incheckad vid: checkins with datetime → nybil_inventering.plats_aktuell_station
+    // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
     bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
-      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)})`
+      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)} av ${getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
       : latestCheckin?.current_ort && latestCheckin?.current_station
         ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
         : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
@@ -429,8 +561,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Däck som sitter på: checkins.hjultyp (senaste) → nybil_inventering.hjultyp
     hjultyp: latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
     
-    // Hjulförvaring: vehicles.wheel_storage_location
-    hjulforvaring: vehicleData?.wheel_storage_location || '---',
+    // Hjulförvaring: nybil_inventering.hjul_forvaring_ort/spec → vehicles.wheel_storage_location
+    hjulforvaring: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+      : vehicleData?.wheel_storage_location || '---',
     
     // Drivmedel: nybil_inventering.bransletyp
     drivmedel: nybilData?.bransletyp || '---',
@@ -460,9 +594,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Antal registrerade skador: count legacy damages (BUHS) like /check does
     antalSkador: legacyDamages.length,
     
-    // Stöld-GPS monterad: nybil_inventering.stold_gps
+    // Stöld-GPS monterad: nybil_inventering.stold_gps with spec
     stoldGps: nybilData?.stold_gps === true
-      ? 'Ja'
+      ? (nybilData.stold_gps_spec ? `Ja (${nybilData.stold_gps_spec})` : 'Ja')
       : nybilData?.stold_gps === false
         ? 'Nej'
         : '---',
@@ -482,6 +616,46 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Saluinfo: summarized from nybil_inventering sale fields
     saluinfo: buildSaleInfo(nybilData),
+    
+    // Equipment storage info (individual fields for separate rows)
+    hjulForvaringInfo: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    reservnyckelInfo: (nybilData?.extranyckel_forvaring_ort || nybilData?.extranyckel_forvaring_spec)
+      ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    laddkablarForvaringInfo: (nybilData?.laddkablar_forvaring_ort || nybilData?.laddkablar_forvaring_spec)
+      ? [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    instruktionsbokForvaringInfo: (nybilData?.instruktionsbok_forvaring_ort || nybilData?.instruktionsbok_forvaring_spec)
+      ? [nybilData.instruktionsbok_forvaring_ort, nybilData.instruktionsbok_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    cocForvaringInfo: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
+      ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    
+    // Equipment details (individual fields for separate section)
+    antalNycklar: nybilData?.antal_nycklar != null ? `${nybilData.antal_nycklar} st` : '---',
+    antalLaddkablar: nybilData?.antal_laddkablar != null ? `${nybilData.antal_laddkablar} st` : '---',
+    antalInsynsskydd: nybilData?.antal_insynsskydd != null ? `${nybilData.antal_insynsskydd} st` : '---',
+    harInstruktionsbok: nybilData?.instruktionsbok === true ? 'Ja' : nybilData?.instruktionsbok === false ? 'Nej' : '---',
+    harCoc: nybilData?.coc === true ? 'Ja' : nybilData?.coc === false ? 'Nej' : '---',
+    harLasbultar: nybilData?.lasbultar_med === true ? 'Ja' : nybilData?.lasbultar_med === false ? 'Nej' : '---',
+    harDragkrok: nybilData?.dragkrok === true ? 'Ja' : nybilData?.dragkrok === false ? 'Nej' : '---',
+    harGummimattor: nybilData?.gummimattor === true ? 'Ja' : nybilData?.gummimattor === false ? 'Nej' : '---',
+    harDackkompressor: nybilData?.dackkompressor === true ? 'Ja' : nybilData?.dackkompressor === false ? 'Nej' : '---',
+    
+    // Detailed sale info fields
+    saluStation: nybilData?.salu_station || '---',
+    saluKopare: nybilData?.kopare_foretag || '---',
+    saluRetur: (nybilData?.returort || nybilData?.returadress)
+      ? [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ')
+      : '---',
+    saluAttention: nybilData?.attention || '---',
+    saluNotering: nybilData?.notering_forsaljning || '---',
+    
+    // Fuel filling info
+    tankningInfo: buildFuelFillingInfo(nybilData),
   };
 
   // Build damage records from legacy damages (BUHS) - same source as /check
@@ -529,12 +703,23 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     return dateB.getTime() - dateA.getTime();
   });
 
+  // Extract nybil reference photos if available
+  const nybilPhotos = nybilData && Array.isArray(nybilData.photo_urls) && nybilData.photo_urls.length > 0
+    ? {
+        photoUrls: nybilData.photo_urls,
+        mediaFolder: nybilData.media_folder || null,
+        registreringsdatum: formatDate(nybilData.created_at || nybilData.registreringsdatum),
+        registreradAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
+      }
+    : null;
+
   return {
     found: true,
     source,
     vehicle,
     damages: damageRecords,
     history: historyRecords,
+    nybilPhotos,
   };
 }
 

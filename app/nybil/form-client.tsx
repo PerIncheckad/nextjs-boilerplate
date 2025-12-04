@@ -1327,6 +1327,11 @@ export default function NybilForm() {
       laddkablarForvaring = `${laddkablarForvaringOrt}, ${laddkablarForvaringSpec}`;
     }
     
+    // Calculate charging/tank warnings (same logic as /check)
+    // Note: Form validation ensures laddnivaProcent is a valid number before this point
+    const showChargeWarning = isElectric && laddnivaProcent !== null && laddnivaProcent !== '' && parseInt(laddnivaProcent, 10) < 95;
+    const showNotRefueled = !isElectric && tankstatus === 'ej_upptankad';
+    
     return {
       fordon: {
         regnr: normalizedReg,
@@ -1346,6 +1351,11 @@ export default function NybilForm() {
         bransletyp,
         vaxel: effectiveVaxel
       },
+      // Charging/tank status for warnings
+      laddnivaProcent: isElectric ? laddnivaProcent : null,
+      tankstatus: !isElectric ? tankstatus : null,
+      showChargeWarning,
+      showNotRefueled,
       avtalsvillkor: {
         serviceintervall: effectiveServiceintervall,
         maxKmManad: effectiveMaxKm,
@@ -2214,6 +2224,11 @@ type FormSummary = {
   mottagning: { ort: string; station: string };
   planeradStation: string;
   status: { matarstallning: string; matarstallningAktuell: string; hjultyp: string | null; hjulTillForvaring: string | null; bransletyp: string | null; vaxel: string | null };
+  // Charging/tank status
+  laddnivaProcent: string | null;
+  tankstatus: 'mottogs_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null;
+  showChargeWarning: boolean;
+  showNotRefueled: boolean;
   avtalsvillkor: { serviceintervall: string | null; maxKmManad: string | null; avgiftOverKm: string | null };
   stoldGps: boolean | null;
   stoldGpsSpec: string;
@@ -2255,6 +2270,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
   <>
     <div className="modal-overlay" />
     <div className="modal-content confirmation-modal">
+      {summary.showChargeWarning && <div className="charge-warning-banner">Säkerställ att bilen omedelbart sätts på laddning!</div>}
+      {summary.showNotRefueled && <div className="charge-warning-banner">Bilen måste tankas!</div>}
       <h3>Bekräfta registrering</h3>
       <div className="summary-section">
         <h4>Fordon</h4>
@@ -2659,6 +2676,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-photo-count { font-size:0.75rem; color:var(--color-text-secondary); }
     .summary-section-warning { background-color:var(--color-danger-light); padding:1rem; border-radius:8px; border:1px solid var(--color-danger); }
     .summary-section-warning h4 { color:var(--color-danger); margin:0 0 0.5rem 0; }
+    /* Charge warning banner */
+    .charge-warning-banner { background-color: var(--color-danger); color: white; font-weight: 700; font-size: 1.25rem; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center; }
     /* Duplicate warning modal styles */
     .duplicate-warning-modal h3 { color:var(--color-warning); }
     .duplicate-warning-modal .duplicate-info { background-color:var(--color-bg); padding:0.75rem; border-radius:6px; margin:1rem 0; }
