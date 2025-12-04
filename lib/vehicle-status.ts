@@ -13,6 +13,7 @@ export type VehicleStatusData = {
   hjultyp: string;
   hjulforvaring: string;
   drivmedel: string;
+  vaxel: string; // växellåda (automat/manuell)
   serviceintervall: string;
   maxKmManad: string;
   avgiftOverKm: string;
@@ -44,6 +45,7 @@ export type VehicleStatusData = {
   saluStation: string;
   saluKopare: string;
   saluRetur: string;
+  saluReturadress: string;
   saluAttention: string;
   saluNotering: string;
   // Fuel filling info
@@ -101,6 +103,7 @@ type NybilInventeringData = {
   matarstallning_inkop?: string;
   hjultyp?: string;
   bransletyp?: string;
+  vaxel?: string;
   serviceintervall?: string;
   max_km_manad?: string;
   avgift_over_km?: string;
@@ -440,6 +443,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Drivmedel: not available from checkins
       drivmedel: '---',
       
+      // Växellåda: not available from checkins
+      vaxel: '---',
+      
       // Serviceintervall: not available from checkins
       serviceintervall: '---',
       
@@ -484,6 +490,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       saluStation: '---',
       saluKopare: '---',
       saluRetur: '---',
+      saluReturadress: '---',
       saluAttention: '---',
       saluNotering: '---',
       tankningInfo: '---',
@@ -569,6 +576,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Drivmedel: nybil_inventering.bransletyp
     drivmedel: nybilData?.bransletyp || '---',
     
+    // Växellåda: nybil_inventering.vaxel
+    vaxel: nybilData?.vaxel || '---',
+    
     // Serviceintervall: nybil_inventering.serviceintervall
     serviceintervall: nybilData?.serviceintervall
       ? `${nybilData.serviceintervall} mil`
@@ -648,9 +658,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Detailed sale info fields
     saluStation: nybilData?.salu_station || '---',
     saluKopare: nybilData?.kopare_foretag || '---',
-    saluRetur: (nybilData?.returort || nybilData?.returadress)
-      ? [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ')
-      : '---',
+    saluRetur: nybilData?.returort || '---',
+    saluReturadress: nybilData?.returadress || '---',
     saluAttention: nybilData?.attention || '---',
     saluNotering: nybilData?.notering_forsaljning || '---',
     
