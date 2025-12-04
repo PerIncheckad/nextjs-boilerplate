@@ -1717,9 +1717,18 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .grid-3-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
     .fuel-type-buttons { display: flex; flex-wrap: wrap; gap: 1rem; }
     .fuel-type-buttons .choice-btn { flex-grow: 1; }
-    .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 1.5rem; }
+    .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 120px; }
     .copyright-footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 1rem 0; background-color: rgba(255, 255, 255, 0.95); border-top: 1px solid var(--color-border); color: var(--color-text-secondary); font-size: 0.875rem; z-index: 100; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05); }
     .check-form { padding-bottom: 4rem; }
+    @media (max-width: 480px) {
+      .copyright-footer {
+        padding: 8px 0;
+        font-size: 0.75rem;
+      }
+      .form-actions {
+        padding-bottom: 100px;
+      }
+    }
     .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
     .btn.primary { background-color: var(--color-primary); color: white; }
     .btn.secondary { background-color: var(--color-border); color: var(--color-text); }
