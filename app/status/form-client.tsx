@@ -324,6 +324,20 @@ export default function StatusForm() {
                 </a>
               ))}
             </div>
+            {vehicleStatus.vehicle?.saludatum && vehicleStatus.vehicle.saludatum !== '---' && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <p 
+                  style={{ 
+                    margin: 0, 
+                    fontSize: '0.875rem', 
+                    fontWeight: 500,
+                    color: isSaludatumAtRisk(vehicleStatus.vehicle.saludatum) ? 'var(--color-danger)' : 'inherit'
+                  }}
+                >
+                  Saludatum: {vehicleStatus.vehicle.saludatum}
+                </p>
+              </div>
+            )}
           </Card>
         )}
 
@@ -347,6 +361,22 @@ export default function StatusForm() {
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
             </div>
+          </Card>
+        )}
+
+        {/* Damages Section - Moved here under FORDONSINFORMATION */}
+        {vehicleStatus?.found && (
+          <Card className={`damages-card ${vehicleStatus.damages.length === 0 ? 'empty-damages' : ''}`}>
+            <SectionHeader title={`Skador (${vehicleStatus.damages.length})`} />
+            {vehicleStatus.damages.length === 0 ? (
+              <p className="no-data-text">Inga registrerade skador</p>
+            ) : (
+              <div className="damage-list">
+                {vehicleStatus.damages.map((damage) => (
+                  <DamageItem key={damage.id} damage={damage} regnr={vehicleStatus.vehicle?.regnr || normalizedReg} />
+                ))}
+              </div>
+            )}
           </Card>
         )}
 
@@ -378,6 +408,18 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Damages at Delivery Section - Moved here under UTRUSTNING */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.harSkadorVidLeverans && (
+          <Card>
+            <SectionHeader title="⚠️ Skador vid leverans" />
+            <div style={{ padding: '0.5rem 0' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5', color: 'var(--color-danger)', fontWeight: 600 }}>
+                Detta fordon registrerades med skador vid leverans. Se skaderegistreringen i sektionen "Skador" ovan.
+              </p>
+            </div>
+          </Card>
+        )}
+
         {/* Equipment Storage Section */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
@@ -401,7 +443,7 @@ export default function StatusForm() {
         {/* Fuel Filling Section */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (vehicleStatus.vehicle.tankstatusVidLeverans !== '---' || vehicleStatus.vehicle.tankningInfo !== '---') && (
           <Card>
-            <SectionHeader title="Tankningsbehov vid leverans" />
+            <SectionHeader title="Tankstatus vid leverans" />
             <div className="info-grid">
               {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />}
               {vehicleStatus.vehicle.tankningInfo !== '---' && <InfoRow label="Detaljer" value={vehicleStatus.vehicle.tankningInfo} />}
@@ -425,41 +467,13 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Damages at Delivery Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.harSkadorVidLeverans && (
-          <Card>
-            <SectionHeader title="⚠️ Skador vid leverans" />
-            <div style={{ padding: '0.5rem 0' }}>
-              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5', color: 'var(--color-danger)', fontWeight: 600 }}>
-                Detta fordon registrerades med skador vid leverans. Se skaderegistreringen i sektionen "Skador" nedan.
-              </p>
-            </div>
-          </Card>
-        )}
-
         {/* General Comment Section */}
         {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.anteckningar !== '---' && (
           <Card>
-            <SectionHeader title="Generell kommentar" />
+            <SectionHeader title="Övrig info vid leverans till MABI" />
             <div style={{ padding: '0.5rem 0' }}>
               <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{vehicleStatus.vehicle.anteckningar}</p>
             </div>
-          </Card>
-        )}
-
-        {/* Damages Section */}
-        {vehicleStatus?.found && (
-          <Card className={`damages-card ${vehicleStatus.damages.length === 0 ? 'empty-damages' : ''}`}>
-            <SectionHeader title={`Skador (${vehicleStatus.damages.length})`} />
-            {vehicleStatus.damages.length === 0 ? (
-              <p className="no-data-text">Inga registrerade skador</p>
-            ) : (
-              <div className="damage-list">
-                {vehicleStatus.damages.map((damage) => (
-                  <DamageItem key={damage.id} damage={damage} regnr={vehicleStatus.vehicle?.regnr || normalizedReg} />
-                ))}
-              </div>
-            )}
           </Card>
         )}
 

@@ -636,8 +636,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? formatDate(legacySaludatum)
         : '---',
     
-    // Antal registrerade skador: count legacy damages (BUHS) like /check does
-    antalSkador: legacyDamages.length,
+    // Antal registrerade skador: count legacy damages (BUHS) + nybil delivery damages
+    antalSkador: legacyDamages.length + damages.length,
     
     // Stöld-GPS monterad: nybil_inventering.stold_gps with spec
     stoldGps: nybilData?.stold_gps === true

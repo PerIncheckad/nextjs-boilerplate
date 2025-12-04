@@ -197,6 +197,8 @@ interface NybilPayload {
   // Fuel/charging status
   tankstatus?: 'mottogs_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null;
   laddniva_procent?: number | null;
+  upptankning_liter?: number | null;
+  upptankning_literpris?: number | null;
   // MB/VW Connect
   mbme_aktiverad?: boolean | null;
   vw_connect_aktiverad?: boolean | null;
@@ -311,21 +313,41 @@ const buildConnectStatusSection = (payload: NybilPayload): string => {
  * Helper function to build fuel filling info section for email
  */
 const buildFuelFillingSection = (payload: NybilPayload): string => {
-  if (!payload.upptankning_liter && !payload.upptankning_literpris) return '';
+  if (!payload.tankstatus) return '';
   
   let content = '';
-  if (payload.upptankning_liter && payload.upptankning_literpris) {
+  
+  // Display tankstatus
+  let tankstatusText = '';
+  switch (payload.tankstatus) {
+    case 'mottogs_fulltankad':
+      tankstatusText = 'Mottogs fulltankad';
+      break;
+    case 'tankad_nu':
+      tankstatusText = 'MABI tankade upp';
+      break;
+    case 'ej_upptankad':
+      tankstatusText = 'Levererades ej fulltankad';
+      break;
+  }
+  
+  if (tankstatusText) {
+    content += `<tr><td style="padding:4px 0;"><strong>Tankstatus:</strong> ${tankstatusText}</td></tr>`;
+  }
+  
+  // Add details for tankad_nu
+  if (payload.tankstatus === 'tankad_nu' && payload.upptankning_liter && payload.upptankning_literpris) {
     content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
     content += `<tr><td style="padding:4px 0;"><strong>Literpris:</strong> ${payload.upptankning_literpris} kr/liter</td></tr>`;
     const totalCost = payload.upptankning_liter * payload.upptankning_literpris;
     content += `<tr><td style="padding:4px 0;"><strong>Total kostnad:</strong> ${totalCost.toFixed(2)} kr</td></tr>`;
-  } else if (payload.upptankning_liter) {
+  } else if (payload.tankstatus === 'tankad_nu' && payload.upptankning_liter) {
     content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
   }
   
   return `
     <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Tankning (MABI)</h3>
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Tankning</h3>
       <table width="100%" style="font-size:14px;">
         <tbody>${content}</tbody>
       </table>
@@ -352,7 +374,7 @@ const buildSaluinfoSection = (payload: NybilPayload): string => {
   if (payload.attention) {
     content += `<tr><td style="padding:4px 0;"><strong>Attention:</strong> ${escapeHtml(payload.attention)}</td></tr>`;
   }
-  const returInfo = [payload.returort, payload.returadress].filter(Boolean).join(', ');
+  const returInfo = [payload.returadress, payload.returort].filter(Boolean).join(', ');
   if (returInfo) {
     content += `<tr><td style="padding:4px 0;"><strong>Retur:</strong> ${escapeHtml(returInfo)}</td></tr>`;
   }
