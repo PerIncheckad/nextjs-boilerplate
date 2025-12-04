@@ -720,6 +720,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     source: 'legacy' as const,
     sourceInfo: 'Källa: BUHS (reg. nr har aldrig checkats in med incheckad.se/check)',
   }));
+  
+  // Add damages from damages table (nybil delivery damages)
+  for (const damage of damages) {
+    damageRecords.push({
+      id: damage.id,
+      regnr: cleanedRegnr,
+      skadetyp: damage.skadetyp || 'Okänd',
+      datum: formatDate(damage.created_at || damage.datum),
+      status: damage.status || 'Befintlig',
+      folder: damage.folder,
+      source: 'damages' as const,
+      sourceInfo: damage.inchecker_name 
+        ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
+        : 'Registrerad vid nybilsleverans',
+    });
+  }
 
   // Build history records
   const historyRecords: HistoryRecord[] = [];

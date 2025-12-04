@@ -317,14 +317,20 @@ const buildFuelFillingSection = (payload: NybilPayload): string => {
   
   let content = '';
   
-  // Display tankstatus
+  // Display tankstatus with inline details for tankad_nu
   let tankstatusText = '';
   switch (payload.tankstatus) {
     case 'mottogs_fulltankad':
       tankstatusText = 'Mottogs fulltankad';
       break;
     case 'tankad_nu':
-      tankstatusText = 'MABI tankade upp';
+      if (payload.upptankning_liter && payload.upptankning_literpris) {
+        tankstatusText = `MABI tankade upp ${payload.upptankning_liter} liter (${payload.upptankning_literpris} kr/l)`;
+      } else if (payload.upptankning_liter) {
+        tankstatusText = `MABI tankade upp ${payload.upptankning_liter} liter`;
+      } else {
+        tankstatusText = 'MABI tankade upp';
+      }
       break;
     case 'ej_upptankad':
       tankstatusText = 'Levererades ej fulltankad';
@@ -333,16 +339,6 @@ const buildFuelFillingSection = (payload: NybilPayload): string => {
   
   if (tankstatusText) {
     content += `<tr><td style="padding:4px 0;"><strong>Tankstatus:</strong> ${tankstatusText}</td></tr>`;
-  }
-  
-  // Add details for tankad_nu
-  if (payload.tankstatus === 'tankad_nu' && payload.upptankning_liter && payload.upptankning_literpris) {
-    content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
-    content += `<tr><td style="padding:4px 0;"><strong>Literpris:</strong> ${payload.upptankning_literpris} kr/liter</td></tr>`;
-    const totalCost = payload.upptankning_liter * payload.upptankning_literpris;
-    content += `<tr><td style="padding:4px 0;"><strong>Total kostnad:</strong> ${totalCost.toFixed(2)} kr</td></tr>`;
-  } else if (payload.tankstatus === 'tankad_nu' && payload.upptankning_liter) {
-    content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
   }
   
   return `

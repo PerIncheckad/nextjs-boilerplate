@@ -291,7 +291,7 @@ export default function StatusForm() {
         {/* Print Header (hidden on screen, visible on print) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <div className="print-header">
-            <div className="print-logo">MABI Syd</div>
+            <img src={MABI_LOGO_URL} alt="MABI Syd" className="print-logo-img" />
             <h1 className="print-regnr">{vehicleStatus.vehicle.regnr}</h1>
             {vehicleStatus.nybilPhotos && (
               <p className="print-subtitle">
@@ -364,7 +364,27 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Damages Section - Moved here under FORDONSINFORMATION */}
+        {/* Equipment Storage Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.reservnyckelInfo !== '---' ||
+          vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' ||
+          vehicleStatus.vehicle.cocForvaringInfo !== '---'
+        ) && (
+          <Card>
+            <SectionHeader title="Förvaring" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
+              {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
+              {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
+              {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
+              {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
+            </div>
+          </Card>
+        )}
+
+        {/* Damages Section */}
         {vehicleStatus?.found && (
           <Card className={`damages-card ${vehicleStatus.damages.length === 0 ? 'empty-damages' : ''}`}>
             <SectionHeader title={`Skador (${vehicleStatus.damages.length})`} />
@@ -408,45 +428,23 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Damages at Delivery Section - Moved here under UTRUSTNING */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.harSkadorVidLeverans && (
-          <Card>
-            <SectionHeader title="⚠️ Skador vid leverans" />
-            <div style={{ padding: '0.5rem 0' }}>
-              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5', color: 'var(--color-danger)', fontWeight: 600 }}>
-                Detta fordon registrerades med skador vid leverans. Se skaderegistreringen i sektionen "Skador" ovan.
-              </p>
-            </div>
-          </Card>
-        )}
-
-        {/* Equipment Storage Section */}
+        {/* Övrig info vid leverans till MABI Section - Consolidated */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
-          vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
-          vehicleStatus.vehicle.reservnyckelInfo !== '---' ||
-          vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' ||
-          vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' ||
-          vehicleStatus.vehicle.cocForvaringInfo !== '---'
-        ) && (
           <Card>
-            <SectionHeader title="Förvaring" />
+            <SectionHeader title="Övrig info vid leverans till MABI" />
             <div className="info-grid">
-              {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
-              {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
-              {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
-              {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
-              {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
-            </div>
-          </Card>
-        )}
-
-        {/* Fuel Filling Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && (vehicleStatus.vehicle.tankstatusVidLeverans !== '---' || vehicleStatus.vehicle.tankningInfo !== '---') && (
-          <Card>
-            <SectionHeader title="Tankstatus vid leverans" />
-            <div className="info-grid">
-              {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />}
-              {vehicleStatus.vehicle.tankningInfo !== '---' && <InfoRow label="Detaljer" value={vehicleStatus.vehicle.tankningInfo} />}
+              {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && (
+                <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
+              )}
+              <Fragment>
+                <span className="info-label">Skador vid leverans</span>
+                <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans ? 'at-risk' : ''}`}>
+                  {vehicleStatus.vehicle.harSkadorVidLeverans 
+                    ? 'Skador vid leverans, se skaderegistreringen ovan' 
+                    : 'Inga'}
+                </span>
+              </Fragment>
+              <InfoRow label="Övrig info" value={vehicleStatus.vehicle.anteckningar} />
             </div>
           </Card>
         )}
@@ -463,16 +461,6 @@ export default function StatusForm() {
               {vehicleStatus.vehicle.saluRetur !== '---' && <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />}
               {vehicleStatus.vehicle.saluAttention !== '---' && <InfoRow label="Attention" value={vehicleStatus.vehicle.saluAttention} />}
               {vehicleStatus.vehicle.saluNotering !== '---' && <InfoRow label="Notering försäljning" value={vehicleStatus.vehicle.saluNotering} />}
-            </div>
-          </Card>
-        )}
-
-        {/* General Comment Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.anteckningar !== '---' && (
-          <Card>
-            <SectionHeader title="Övrig info vid leverans till MABI" />
-            <div style={{ padding: '0.5rem 0' }}>
-              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{vehicleStatus.vehicle.anteckningar}</p>
             </div>
           </Card>
         )}
@@ -1188,11 +1176,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         max-height: 5cm;
       }
 
-      .print-logo {
-        font-size: 14pt !important;
-        font-weight: bold;
-        margin: 0 !important;
-        color: #000;
+      .print-logo-img {
+        max-height: 2.5cm !important;
+        max-width: 8cm !important;
+        margin: 0 auto 8px auto !important;
+        display: block !important;
       }
 
       .print-regnr {
