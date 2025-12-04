@@ -343,6 +343,7 @@ export default function StatusForm() {
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
+              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
             </div>
           </Card>
@@ -415,33 +416,12 @@ export default function StatusForm() {
             <div className="info-grid">
               <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
               <InfoRow label="Station" value={vehicleStatus.vehicle.saluStation} />
-              <InfoRow label="Köpare" value={vehicleStatus.vehicle.saluKopare} />
-              <InfoRow label="Retur" value={vehicleStatus.vehicle.saluRetur} />
+              <InfoRow label="Köpare (företag)" value={vehicleStatus.vehicle.saluKopare} />
+              <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />
+              {vehicleStatus.vehicle.saluAttention !== '---' && <InfoRow label="Attention" value={vehicleStatus.vehicle.saluAttention} />}
+              {vehicleStatus.vehicle.saluNotering !== '---' && <InfoRow label="Notering försäljning" value={vehicleStatus.vehicle.saluNotering} />}
             </div>
           </Card>
-        )}
-
-        {/* Print Button and Options */}
-        {vehicleStatus?.found && (
-          <div className="print-controls">
-            <div className="print-options">
-              <label className="print-checkbox">
-                <input 
-                  type="checkbox" 
-                  checked={includeHistoryInPrint} 
-                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
-                />
-                <span>Inkludera all historik vid utskrift</span>
-              </label>
-            </div>
-            <button
-              type="button"
-              className="print-btn"
-              onClick={() => window.print()}
-            >
-              🖨️ Skriv ut
-            </button>
-          </div>
         )}
 
         {/* Damages Section */}
@@ -514,6 +494,29 @@ export default function StatusForm() {
               </>
             )}
           </Card>
+        )}
+
+        {/* Print Button and Options - Moved to bottom after HISTORIK */}
+        {vehicleStatus?.found && (
+          <div className="print-controls">
+            <div className="print-options">
+              <label className="print-checkbox">
+                <input 
+                  type="checkbox" 
+                  checked={includeHistoryInPrint} 
+                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                />
+                <span>Inkludera all historik vid utskrift</span>
+              </label>
+            </div>
+            <button
+              type="button"
+              className="print-btn"
+              onClick={() => window.print()}
+            >
+              🖨️ Skriv ut
+            </button>
+          </div>
         )}
 
         <footer className="copyright-footer">

@@ -44,6 +44,8 @@ export type VehicleStatusData = {
   saluStation: string;
   saluKopare: string;
   saluRetur: string;
+  saluAttention: string;
+  saluNotering: string;
   // Fuel filling info
   tankningInfo: string;
 };
@@ -119,6 +121,8 @@ type NybilInventeringData = {
   kopare_foretag?: string;
   returort?: string;
   returadress?: string;
+  attention?: string | null;
+  notering_forsaljning?: string | null;
   fullstandigt_namn?: string;
   registrerad_av?: string;
   registreringsdatum?: string;
@@ -463,6 +467,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       planeradStation: '---',
       utrustning: '---',
       saluinfo: '---',
+      hjulForvaringInfo: '---',
+      reservnyckelInfo: '---',
+      laddkablarForvaringInfo: '---',
+      instruktionsbokForvaringInfo: '---',
+      cocForvaringInfo: '---',
+      antalNycklar: '---',
+      antalLaddkablar: '---',
+      antalInsynsskydd: '---',
+      harInstruktionsbok: '---',
+      harCoc: '---',
+      harLasbultar: '---',
+      harDragkrok: '---',
+      harGummimattor: '---',
+      harDackkompressor: '---',
+      saluStation: '---',
+      saluKopare: '---',
+      saluRetur: '---',
+      saluAttention: '---',
+      saluNotering: '---',
+      tankningInfo: '---',
     };
 
     // Build damage records from legacy damages (BUHS)
@@ -627,6 +651,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     saluRetur: (nybilData?.returort || nybilData?.returadress)
       ? [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ')
       : '---',
+    saluAttention: nybilData?.attention || '---',
+    saluNotering: nybilData?.notering_forsaljning || '---',
     
     // Fuel filling info
     tankningInfo: buildFuelFillingInfo(nybilData),
