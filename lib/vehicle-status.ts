@@ -13,6 +13,7 @@ export type VehicleStatusData = {
   hjultyp: string;
   hjulforvaring: string;
   drivmedel: string;
+  vaxel: string; // växellåda (automat/manuell)
   serviceintervall: string;
   maxKmManad: string;
   avgiftOverKm: string;
@@ -44,10 +45,16 @@ export type VehicleStatusData = {
   saluStation: string;
   saluKopare: string;
   saluRetur: string;
+  saluReturadress: string;
   saluAttention: string;
   saluNotering: string;
   // Fuel filling info
   tankningInfo: string;
+  tankstatusVidLeverans: string;
+  // General comment
+  anteckningar: string;
+  // Damages at delivery
+  harSkadorVidLeverans: boolean;
 };
 
 export type DamageRecord = {
@@ -101,6 +108,7 @@ type NybilInventeringData = {
   matarstallning_inkop?: string;
   hjultyp?: string;
   bransletyp?: string;
+  vaxel?: string;
   serviceintervall?: string;
   max_km_manad?: string;
   avgift_over_km?: string;
@@ -131,6 +139,7 @@ type NybilInventeringData = {
   // Storage fields
   hjul_forvaring_ort?: string | null;
   hjul_forvaring_spec?: string | null;
+  hjul_forvaring?: string | null; // Legacy column name for spec
   extranyckel_forvaring_ort?: string | null;
   extranyckel_forvaring_spec?: string | null;
   laddkablar_forvaring_ort?: string | null;
@@ -143,6 +152,11 @@ type NybilInventeringData = {
   // Fuel filling info
   upptankning_liter?: number | null;
   upptankning_literpris?: number | null;
+  tankstatus?: string | null;
+  // General comment
+  anteckningar?: string | null;
+  // Damages at delivery
+  har_skador_vid_leverans?: boolean;
 };
 
 // =================================================================
@@ -223,8 +237,8 @@ function buildEquipmentStorage(nybilData: NybilInventeringData | null): string {
   const items: string[] = [];
   
   // Wheel storage
-  if (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec) {
-    const hjulInfo = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ');
+  if (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring) {
+    const hjulInfo = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ');
     items.push(`Hjulförvaring: ${hjulInfo}`);
   }
   
@@ -295,6 +309,27 @@ function buildFuelFillingInfo(nybilData: NybilInventeringData | null): string {
   }
   
   return items.length > 0 ? items.join(' | ') : '---';
+}
+
+/**
+ * Build tankstatus display from nybil_inventering data
+ */
+function buildTankstatusDisplay(nybilData: NybilInventeringData | null): string {
+  if (!nybilData || !nybilData.tankstatus) return '---';
+  
+  switch (nybilData.tankstatus) {
+    case 'mottogs_fulltankad':
+      return 'Mottogs fulltankad';
+    case 'tankad_nu':
+      if (nybilData.upptankning_liter && nybilData.upptankning_literpris) {
+        return `MABI tankade upp ${nybilData.upptankning_liter} liter (${nybilData.upptankning_literpris} kr/l)`;
+      }
+      return 'MABI tankade upp';
+    case 'ej_upptankad':
+      return 'Levererades ej fulltankad';
+    default:
+      return '---';
+  }
 }
 
 // Raw damage data from the legacy source (BUHS)
@@ -372,11 +407,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     
-    // checkins
+    // checkins - order by completed_at first, then created_at as fallback
     supabase
       .from('checkins')
       .select('*')
       .eq('regnr', cleanedRegnr)
+      .order('completed_at', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false }),
   ]);
 
@@ -419,9 +455,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Bilmärke & Modell: from checkins.car_model if available
       bilmarkeModell: latestCheckin?.car_model || '---',
       
-      // Senast incheckad vid: from latest checkin with datetime
-      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
-        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)})`
+      // Senast incheckad vid: from latest checkin with datetime and checker
+      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
+        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
         : latestCheckin?.current_ort && latestCheckin?.current_station
           ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
           : '---',
@@ -439,6 +475,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Drivmedel: not available from checkins
       drivmedel: '---',
+      
+      // Växellåda: not available from checkins
+      vaxel: '---',
       
       // Serviceintervall: not available from checkins
       serviceintervall: '---',
@@ -484,9 +523,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       saluStation: '---',
       saluKopare: '---',
       saluRetur: '---',
+      saluReturadress: '---',
       saluAttention: '---',
       saluNotering: '---',
       tankningInfo: '---',
+      tankstatusVidLeverans: '---',
+      anteckningar: '---',
+      harSkadorVidLeverans: false,
     };
 
     // Build damage records from legacy damages (BUHS)
@@ -541,8 +584,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           : '---',
     
     // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
-    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
-      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)} av ${getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
+    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
+      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
       : latestCheckin?.current_ort && latestCheckin?.current_station
         ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
         : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
@@ -562,12 +605,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     hjultyp: latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
     
     // Hjulförvaring: nybil_inventering.hjul_forvaring_ort/spec → vehicles.wheel_storage_location
-    hjulforvaring: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
-      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+    hjulforvaring: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec || nybilData?.hjul_forvaring)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
       : vehicleData?.wheel_storage_location || '---',
     
     // Drivmedel: nybil_inventering.bransletyp
     drivmedel: nybilData?.bransletyp || '---',
+    
+    // Växellåda: nybil_inventering.vaxel
+    vaxel: nybilData?.vaxel || '---',
     
     // Serviceintervall: nybil_inventering.serviceintervall
     serviceintervall: nybilData?.serviceintervall
@@ -591,8 +637,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? formatDate(legacySaludatum)
         : '---',
     
-    // Antal registrerade skador: count legacy damages (BUHS) like /check does
-    antalSkador: legacyDamages.length,
+    // Antal registrerade skador: count legacy damages (BUHS) + nybil delivery damages
+    antalSkador: legacyDamages.length + damages.length,
     
     // Stöld-GPS monterad: nybil_inventering.stold_gps with spec
     stoldGps: nybilData?.stold_gps === true
@@ -618,8 +664,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     saluinfo: buildSaleInfo(nybilData),
     
     // Equipment storage info (individual fields for separate rows)
-    hjulForvaringInfo: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
-      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+    hjulForvaringInfo: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec || nybilData?.hjul_forvaring)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
       : '---',
     reservnyckelInfo: (nybilData?.extranyckel_forvaring_ort || nybilData?.extranyckel_forvaring_spec)
       ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
@@ -648,14 +694,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Detailed sale info fields
     saluStation: nybilData?.salu_station || '---',
     saluKopare: nybilData?.kopare_foretag || '---',
-    saluRetur: (nybilData?.returort || nybilData?.returadress)
-      ? [nybilData.returort, nybilData.returadress].filter(Boolean).join(', ')
-      : '---',
+    saluRetur: nybilData?.returort || '---',
+    saluReturadress: nybilData?.returadress || '---',
     saluAttention: nybilData?.attention || '---',
     saluNotering: nybilData?.notering_forsaljning || '---',
     
     // Fuel filling info
     tankningInfo: buildFuelFillingInfo(nybilData),
+    tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
+    
+    // General comment
+    anteckningar: nybilData?.anteckningar || '---',
+    
+    // Damages at delivery
+    harSkadorVidLeverans: nybilData?.har_skador_vid_leverans === true,
   };
 
   // Build damage records from legacy damages (BUHS) - same source as /check
@@ -668,6 +720,39 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     source: 'legacy' as const,
     sourceInfo: 'Källa: BUHS (reg. nr har aldrig checkats in med incheckad.se/check)',
   }));
+  
+  // Add damages from damages table (nybil delivery damages)
+  for (const damage of damages) {
+    // Build damage description from type and positions
+    let skadetyp = damage.damage_type || damage.skadetyp || 'Okänd';
+    
+    // If user_positions exists, format it as "Skadetyp - Placering - Position"
+    if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
+      const positions = damage.user_positions.map((pos: any) => {
+        const parts: string[] = [];
+        if (pos.carPart) parts.push(pos.carPart);
+        if (pos.position) parts.push(pos.position);
+        return parts.join(' - ');
+      }).filter(Boolean);
+      
+      if (positions.length > 0) {
+        skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+      }
+    }
+    
+    damageRecords.push({
+      id: damage.id,
+      regnr: cleanedRegnr,
+      skadetyp: skadetyp,
+      datum: formatDate(damage.created_at || damage.damage_date || damage.datum),
+      status: damage.status || 'Befintlig',
+      folder: damage.uploads?.folder || damage.folder,
+      source: 'damages' as const,
+      sourceInfo: damage.inchecker_name 
+        ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
+        : 'Registrerad vid nybilsleverans',
+    });
+  }
 
   // Build history records
   const historyRecords: HistoryRecord[] = [];

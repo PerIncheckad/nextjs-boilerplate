@@ -197,6 +197,8 @@ interface NybilPayload {
   // Fuel/charging status
   tankstatus?: 'mottogs_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null;
   laddniva_procent?: number | null;
+  upptankning_liter?: number | null;
+  upptankning_literpris?: number | null;
   // MB/VW Connect
   mbme_aktiverad?: boolean | null;
   vw_connect_aktiverad?: boolean | null;
@@ -311,21 +313,37 @@ const buildConnectStatusSection = (payload: NybilPayload): string => {
  * Helper function to build fuel filling info section for email
  */
 const buildFuelFillingSection = (payload: NybilPayload): string => {
-  if (!payload.upptankning_liter && !payload.upptankning_literpris) return '';
+  if (!payload.tankstatus) return '';
   
   let content = '';
-  if (payload.upptankning_liter && payload.upptankning_literpris) {
-    content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
-    content += `<tr><td style="padding:4px 0;"><strong>Literpris:</strong> ${payload.upptankning_literpris} kr/liter</td></tr>`;
-    const totalCost = payload.upptankning_liter * payload.upptankning_literpris;
-    content += `<tr><td style="padding:4px 0;"><strong>Total kostnad:</strong> ${totalCost.toFixed(2)} kr</td></tr>`;
-  } else if (payload.upptankning_liter) {
-    content += `<tr><td style="padding:4px 0;"><strong>Antal liter:</strong> ${payload.upptankning_liter} liter</td></tr>`;
+  
+  // Display tankstatus with inline details for tankad_nu
+  let tankstatusText = '';
+  switch (payload.tankstatus) {
+    case 'mottogs_fulltankad':
+      tankstatusText = 'Mottogs fulltankad';
+      break;
+    case 'tankad_nu':
+      if (payload.upptankning_liter && payload.upptankning_literpris) {
+        tankstatusText = `MABI tankade upp ${payload.upptankning_liter} liter (${payload.upptankning_literpris} kr/l)`;
+      } else if (payload.upptankning_liter) {
+        tankstatusText = `MABI tankade upp ${payload.upptankning_liter} liter`;
+      } else {
+        tankstatusText = 'MABI tankade upp';
+      }
+      break;
+    case 'ej_upptankad':
+      tankstatusText = 'Levererades ej fulltankad';
+      break;
+  }
+  
+  if (tankstatusText) {
+    content += `<tr><td style="padding:4px 0;"><strong>Tankstatus:</strong> ${tankstatusText}</td></tr>`;
   }
   
   return `
     <tr><td style="padding-top:20px;">
-      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Tankning (MABI)</h3>
+      <h3 style="margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e5e7eb;padding-bottom:8px;">Tankning</h3>
       <table width="100%" style="font-size:14px;">
         <tbody>${content}</tbody>
       </table>
@@ -352,7 +370,7 @@ const buildSaluinfoSection = (payload: NybilPayload): string => {
   if (payload.attention) {
     content += `<tr><td style="padding:4px 0;"><strong>Attention:</strong> ${escapeHtml(payload.attention)}</td></tr>`;
   }
-  const returInfo = [payload.returort, payload.returadress].filter(Boolean).join(', ');
+  const returInfo = [payload.returadress, payload.returort].filter(Boolean).join(', ');
   if (returInfo) {
     content += `<tr><td style="padding:4px 0;"><strong>Retur:</strong> ${escapeHtml(returInfo)}</td></tr>`;
   }
@@ -421,7 +439,7 @@ const buildForvaringDetailsSection = (payload: NybilPayload): string => {
  * - Registrerad av...
  * - Photos
  * - Damage details (if any)
- * Includes blue banners for "Måste tankas!" and "Kolla bilens laddnivå"
+ * Includes blue banners for "Kolla om bilen är tankad!" and "Kolla bilens laddnivå"
  */
 const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: string, siteUrl: string): string => {
   const regNr = payload.regnr || '';
@@ -457,7 +475,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     ${createSuccessBanner(klarForUthyrning, 'KLAR FÖR UTHYRNING!')}
     ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
     ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
-    ${createAdminBanner(needsFueling, 'MÅSTE TANKAS!')}
+    ${createAdminBanner(needsFueling, 'KOLLA OM BILEN ÄR TANKAD!')}
     ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
   `;
   

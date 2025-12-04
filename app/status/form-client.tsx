@@ -64,15 +64,25 @@ const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => 
  * Build the public media URL for a damage based on regnr, damage date, and folder.
  * Returns the URL path or null if no valid date/folder is available.
  * 
+ * Handles two folder structures:
+ * 1. From /check: {REGNR}/{REGNR}-{YYYYMMDD}/{folder}
+ * 2. From /nybil: {REGNR}/SKADOR/{YYYYMMDD}-{details}-NYBIL/
+ * 
  * @param regnr - Vehicle registration number (e.g., "ABC123")
  * @param datumStr - Damage date in YYYY-MM-DD format or "---" if unknown
- * @param folder - Event folder name (e.g., "repa-hoger-dor")
+ * @param folder - Event folder name or full path
  * @returns URL path to public media browser, or null if regnr is empty
  */
 const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined, folder?: string): string | null => {
   if (!regnr) return null;
   
   const normalizedReg = regnr.toUpperCase().replace(/\s/g, '');
+  
+  // If folder contains full path (starts with REGNR or contains SKADOR), use it directly
+  // This handles nybil damages: ABC123/SKADOR/20251204-repa-hoger-dorr-per-NYBIL
+  if (folder && (folder.includes('/SKADOR/') || folder.startsWith(normalizedReg + '/'))) {
+    return `/public-media/${folder.split('/').map(encodeURIComponent).join('/')}`;
+  }
   
   // If no valid date, link to the vehicle's root folder
   if (!datumStr || datumStr === '---') {
@@ -88,7 +98,7 @@ const buildDamageMediaUrl = (regnr: string, datumStr: string | null | undefined,
     return `/public-media/${encodeURIComponent(normalizedReg)}`;
   }
   
-  // Build folder path: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}/{folder}
+  // Build folder path for /check damages: /public-media/{REGNR}/{REGNR}-{YYYYMMDD}/{folder}
   const basePath = `/public-media/${encodeURIComponent(normalizedReg)}/${encodeURIComponent(`${normalizedReg}-${datePart}`)}`;
   
   // If folder is provided, append it
@@ -291,7 +301,7 @@ export default function StatusForm() {
         {/* Print Header (hidden on screen, visible on print) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <div className="print-header">
-            <div className="print-logo">MABI Syd</div>
+            <img src={MABI_LOGO_URL} alt="MABI Syd" className="print-logo-img" />
             <h1 className="print-regnr">{vehicleStatus.vehicle.regnr}</h1>
             {vehicleStatus.nybilPhotos && (
               <p className="print-subtitle">
@@ -324,6 +334,20 @@ export default function StatusForm() {
                 </a>
               ))}
             </div>
+            {vehicleStatus.vehicle?.saludatum && vehicleStatus.vehicle.saludatum !== '---' && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <p 
+                  style={{ 
+                    margin: 0, 
+                    fontSize: '0.875rem', 
+                    fontWeight: 500,
+                    color: isSaludatumAtRisk(vehicleStatus.vehicle.saludatum) ? 'var(--color-danger)' : 'inherit'
+                  }}
+                >
+                  Saludatum: {vehicleStatus.vehicle.saludatum}
+                </p>
+              </div>
+            )}
           </Card>
         )}
 
@@ -340,41 +364,12 @@ export default function StatusForm() {
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
               <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
+              {vehicleStatus.vehicle.vaxel !== '---' && <InfoRow label="Växellåda" value={vehicleStatus.vehicle.vaxel} />}
+              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
-              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
-            </div>
-          </Card>
-        )}
-
-        {/* Equipment Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && (
-          vehicleStatus.vehicle.antalNycklar !== '---' ||
-          vehicleStatus.vehicle.antalLaddkablar !== '---' ||
-          vehicleStatus.vehicle.antalInsynsskydd !== '---' ||
-          vehicleStatus.vehicle.harInstruktionsbok !== '---' ||
-          vehicleStatus.vehicle.harCoc !== '---' ||
-          vehicleStatus.vehicle.harLasbultar !== '---' ||
-          vehicleStatus.vehicle.harDragkrok !== '---' ||
-          vehicleStatus.vehicle.harGummimattor !== '---' ||
-          vehicleStatus.vehicle.harDackkompressor !== '---' ||
-          vehicleStatus.vehicle.stoldGps !== '---'
-        ) && (
-          <Card>
-            <SectionHeader title="Utrustning vid leverans" />
-            <div className="info-grid">
-              {vehicleStatus.vehicle.antalNycklar !== '---' && <InfoRow label="Nycklar" value={vehicleStatus.vehicle.antalNycklar} />}
-              {vehicleStatus.vehicle.antalLaddkablar !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.antalLaddkablar} />}
-              {vehicleStatus.vehicle.antalInsynsskydd !== '---' && <InfoRow label="Insynsskydd" value={vehicleStatus.vehicle.antalInsynsskydd} />}
-              {vehicleStatus.vehicle.harInstruktionsbok !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.harInstruktionsbok} />}
-              {vehicleStatus.vehicle.harCoc !== '---' && <InfoRow label="COC" value={vehicleStatus.vehicle.harCoc} />}
-              {vehicleStatus.vehicle.harLasbultar !== '---' && <InfoRow label="Låsbultar" value={vehicleStatus.vehicle.harLasbultar} />}
-              {vehicleStatus.vehicle.harDragkrok !== '---' && <InfoRow label="Dragkrok" value={vehicleStatus.vehicle.harDragkrok} />}
-              {vehicleStatus.vehicle.harGummimattor !== '---' && <InfoRow label="Gummimattor" value={vehicleStatus.vehicle.harGummimattor} />}
-              {vehicleStatus.vehicle.harDackkompressor !== '---' && <InfoRow label="Däckkompressor" value={vehicleStatus.vehicle.harDackkompressor} />}
-              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
             </div>
           </Card>
         )}
@@ -399,31 +394,6 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Fuel Filling Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.tankningInfo !== '---' && (
-          <Card>
-            <SectionHeader title="Tankning (MABI)" />
-            <div style={{ padding: '0.5rem 0' }}>
-              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5' }}>{vehicleStatus.vehicle.tankningInfo}</p>
-            </div>
-          </Card>
-        )}
-
-        {/* Sale Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.saludatum !== '---' && (
-          <Card>
-            <SectionHeader title="Salu" />
-            <div className="info-grid">
-              <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
-              <InfoRow label="Station" value={vehicleStatus.vehicle.saluStation} />
-              <InfoRow label="Köpare (företag)" value={vehicleStatus.vehicle.saluKopare} />
-              <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />
-              {vehicleStatus.vehicle.saluAttention !== '---' && <InfoRow label="Attention" value={vehicleStatus.vehicle.saluAttention} />}
-              {vehicleStatus.vehicle.saluNotering !== '---' && <InfoRow label="Notering försäljning" value={vehicleStatus.vehicle.saluNotering} />}
-            </div>
-          </Card>
-        )}
-
         {/* Damages Section */}
         {vehicleStatus?.found && (
           <Card className={`damages-card ${vehicleStatus.damages.length === 0 ? 'empty-damages' : ''}`}>
@@ -437,6 +407,71 @@ export default function StatusForm() {
                 ))}
               </div>
             )}
+          </Card>
+        )}
+
+        {/* Equipment Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.antalNycklar !== '---' ||
+          vehicleStatus.vehicle.antalLaddkablar !== '---' ||
+          vehicleStatus.vehicle.antalInsynsskydd !== '---' ||
+          vehicleStatus.vehicle.harInstruktionsbok !== '---' ||
+          vehicleStatus.vehicle.harCoc !== '---' ||
+          vehicleStatus.vehicle.harLasbultar !== '---' ||
+          vehicleStatus.vehicle.harDragkrok !== '---' ||
+          vehicleStatus.vehicle.harGummimattor !== '---' ||
+          vehicleStatus.vehicle.harDackkompressor !== '---'
+        ) && (
+          <Card>
+            <SectionHeader title="Utrustning vid leverans" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.antalNycklar !== '---' && <InfoRow label="Nycklar" value={vehicleStatus.vehicle.antalNycklar} />}
+              {vehicleStatus.vehicle.antalLaddkablar !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.antalLaddkablar} />}
+              {vehicleStatus.vehicle.antalInsynsskydd !== '---' && <InfoRow label="Insynsskydd" value={vehicleStatus.vehicle.antalInsynsskydd} />}
+              {vehicleStatus.vehicle.harInstruktionsbok !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.harInstruktionsbok} />}
+              {vehicleStatus.vehicle.harCoc !== '---' && <InfoRow label="COC" value={vehicleStatus.vehicle.harCoc} />}
+              {vehicleStatus.vehicle.harLasbultar !== '---' && <InfoRow label="Låsbultar" value={vehicleStatus.vehicle.harLasbultar} />}
+              {vehicleStatus.vehicle.harDragkrok !== '---' && <InfoRow label="Dragkrok" value={vehicleStatus.vehicle.harDragkrok} />}
+              {vehicleStatus.vehicle.harGummimattor !== '---' && <InfoRow label="Gummimattor" value={vehicleStatus.vehicle.harGummimattor} />}
+              {vehicleStatus.vehicle.harDackkompressor !== '---' && <InfoRow label="Däckkompressor" value={vehicleStatus.vehicle.harDackkompressor} />}
+            </div>
+          </Card>
+        )}
+
+        {/* Övrig info vid leverans till MABI Section - Consolidated */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          <Card>
+            <SectionHeader title="Övrig info vid leverans till MABI" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && (
+                <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
+              )}
+              <Fragment>
+                <span className="info-label">Skador vid leverans</span>
+                <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans ? 'at-risk' : ''}`}>
+                  {vehicleStatus.vehicle.harSkadorVidLeverans 
+                    ? 'Skador vid leverans, se skaderegistreringen ovan' 
+                    : 'Inga'}
+                </span>
+              </Fragment>
+              <InfoRow label="Övrig info" value={vehicleStatus.vehicle.anteckningar} />
+            </div>
+          </Card>
+        )}
+
+        {/* Sale Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.saludatum !== '---' && (
+          <Card>
+            <SectionHeader title="Salu" />
+            <div className="info-grid">
+              <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
+              <InfoRow label="Station" value={vehicleStatus.vehicle.saluStation} />
+              {vehicleStatus.vehicle.saluKopare !== '---' && <InfoRow label="Köpare (företag)" value={vehicleStatus.vehicle.saluKopare} />}
+              {vehicleStatus.vehicle.saluReturadress !== '---' && <InfoRow label="Returadress" value={vehicleStatus.vehicle.saluReturadress} />}
+              {vehicleStatus.vehicle.saluRetur !== '---' && <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />}
+              {vehicleStatus.vehicle.saluAttention !== '---' && <InfoRow label="Attention" value={vehicleStatus.vehicle.saluAttention} />}
+              {vehicleStatus.vehicle.saluNotering !== '---' && <InfoRow label="Notering försäljning" value={vehicleStatus.vehicle.saluNotering} />}
+            </div>
           </Card>
         )}
 
@@ -496,27 +531,32 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Print Button and Options - Moved to bottom after HISTORIK */}
+        {/* Print Section - UTSKRIFT */}
         {vehicleStatus?.found && (
-          <div className="print-controls">
-            <div className="print-options">
-              <label className="print-checkbox">
-                <input 
-                  type="checkbox" 
-                  checked={includeHistoryInPrint} 
-                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
-                />
-                <span>Inkludera all historik vid utskrift</span>
-              </label>
+          <Card className="print-controls-card">
+            <SectionHeader title="Utskrift" />
+            <div className="print-controls-content">
+              <div className="print-options">
+                <label className="print-checkbox">
+                  <input 
+                    type="checkbox" 
+                    checked={includeHistoryInPrint} 
+                    onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                  />
+                  <span>Inkludera all historik vid utskrift</span>
+                </label>
+              </div>
+              <div className="print-button-container">
+                <button
+                  type="button"
+                  className="print-btn"
+                  onClick={() => window.print()}
+                >
+                  🖨️ Skriv ut
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              className="print-btn"
-              onClick={() => window.print()}
-            >
-              🖨️ Skriv ut
-            </button>
-          </div>
+          </Card>
         )}
 
         <footer className="copyright-footer">
@@ -1039,22 +1079,24 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       padding-bottom: 4rem; /* Add space for fixed footer */
     }
 
-    /* Print controls container */
-    .print-controls {
-      margin: 2rem 0;
-      padding: 1.5rem;
-      background-color: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
+    /* Print controls card */
+    .print-controls-card {
+      /* Inherits card styles */
+    }
+
+    .print-controls-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
 
     /* Print options styles */
     .print-options {
-      margin-bottom: 1rem;
+      text-align: left;
     }
 
     .print-checkbox {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 0.5rem;
       cursor: pointer;
@@ -1067,7 +1109,13 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       height: 1rem;
     }
 
-    /* Print button styles */
+    /* Print button container - centered */
+    .print-button-container {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Print button styles - max 200px */
     .print-btn {
       padding: 0.75rem 1.5rem;
       background-color: var(--color-primary);
@@ -1078,8 +1126,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
-      width: 100%;
-      max-width: 300px;
+      max-width: 200px;
     }
 
     .print-btn:hover {
@@ -1115,6 +1162,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .main-header,
       .copyright-footer,
       .print-controls,
+      .print-controls-card,
       body::before {
         display: none !important;
       }
@@ -1129,40 +1177,41 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
-      /* Compact print header - max 5cm height */
+      /* Compact print header */
       .print-header {
         display: block;
         text-align: center;
-        margin-bottom: 8px !important;
-        padding-bottom: 8px !important;
-        max-height: 5cm;
+        margin-bottom: 4px !important;
+        padding-bottom: 2px !important;
+        max-height: 2cm;
       }
 
-      .print-logo {
-        font-size: 14pt !important;
-        font-weight: bold;
-        margin: 0 !important;
-        color: #000;
+      .print-logo-img {
+        max-height: 1.5cm !important;
+        max-width: 6cm !important;
+        margin: 0 auto 2px auto !important;
+        display: block !important;
       }
 
       .print-regnr {
-        font-size: 18pt !important;
+        font-size: 14pt !important;
         font-weight: bold;
-        margin: 4px 0 !important;
+        margin: 2px 0 !important;
         color: #000;
       }
 
       .print-subtitle {
-        font-size: 8pt !important;
-        margin: 0.2rem 0 0.5rem 0;
+        font-size: 7pt !important;
+        margin: 0 !important;
         color: #666;
       }
 
-      /* Optimize for print - very compact layout with 9pt text */
+      /* Optimize for print - ultra compact layout with 8pt text */
       body {
         background: white !important;
         color: black !important;
-        font-size: 9pt !important;
+        font-size: 8pt !important;
+        line-height: 1.2 !important;
       }
 
       .status-form {
@@ -1177,8 +1226,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border: 1px solid #e5e7eb;
         border-radius: 0;
         page-break-inside: avoid;
-        margin-bottom: 8px !important;
-        padding: 8px !important;
+        margin-bottom: 4px !important;
+        padding: 4px !important;
       }
 
       /* Hide elements marked for print hiding */
@@ -1194,7 +1243,9 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .section-header h2,
       .section-header-expandable h2 {
         color: #000;
-        font-size: 11pt !important;
+        font-size: 10pt !important;
+        margin: 2px 0 !important;
+        padding: 0 !important;
       }
 
       /* Remove background colors and shadows */
@@ -1203,35 +1254,40 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         background-color: white !important;
         box-shadow: none !important;
         border: 1px solid #e5e7eb;
+        margin-bottom: 3px !important;
+        padding: 3px !important;
       }
 
       /* Compact text sizes */
       .info-label,
       .info-value {
-        font-size: 9pt !important;
+        font-size: 8pt !important;
         color: #000 !important;
+        line-height: 1.2 !important;
       }
 
       .damage-type,
       .damage-date,
       .history-summary {
         color: #000 !important;
-        font-size: 9pt !important;
+        font-size: 8pt !important;
+        line-height: 1.2 !important;
       }
 
       /* Minimal spacing */
       .info-grid {
-        gap: 2px 8px !important;
+        gap: 1px 6px !important;
+        margin: 0 !important;
       }
 
       .damage-list,
       .history-list {
-        gap: 0.5rem;
+        gap: 3px !important;
       }
 
-      /* Force damages section to start on new page */
+      /* Don't force page breaks - let content flow naturally */
       .damages-card {
-        page-break-before: always;
+        page-break-before: auto;
       }
 
       /* Hide empty damages section in print */
@@ -1274,10 +1330,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         page-break-inside: avoid;
       }
 
-      /* Show nybil photos in print - make them smaller and hide title */
+      /* Show nybil photos in print - make them much smaller */
       .nybil-photos-card {
-        padding: 0.3rem !important;
-        margin-bottom: 0.3rem !important;
+        padding: 2px !important;
+        margin-bottom: 2px !important;
         border: none !important;
       }
 
@@ -1286,12 +1342,13 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       }
 
       .nybil-photos-grid {
-        gap: 0.3rem !important;
+        gap: 2px !important;
         margin-bottom: 0 !important;
       }
 
       .nybil-photos-card .nybil-photo {
-        max-height: 100px !important;
+        max-height: 60px !important;
+        max-width: 80px !important;
       }
     }
 
