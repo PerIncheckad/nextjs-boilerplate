@@ -50,6 +50,11 @@ export type VehicleStatusData = {
   saluNotering: string;
   // Fuel filling info
   tankningInfo: string;
+  tankstatusVidLeverans: string;
+  // General comment
+  anteckningar: string;
+  // Damages at delivery
+  harSkadorVidLeverans: boolean;
 };
 
 export type DamageRecord = {
@@ -146,6 +151,11 @@ type NybilInventeringData = {
   // Fuel filling info
   upptankning_liter?: number | null;
   upptankning_literpris?: number | null;
+  tankstatus?: string | null;
+  // General comment
+  anteckningar?: string | null;
+  // Damages at delivery
+  har_skador_vid_leverans?: boolean;
 };
 
 // =================================================================
@@ -300,6 +310,27 @@ function buildFuelFillingInfo(nybilData: NybilInventeringData | null): string {
   return items.length > 0 ? items.join(' | ') : '---';
 }
 
+/**
+ * Build tankstatus display from nybil_inventering data
+ */
+function buildTankstatusDisplay(nybilData: NybilInventeringData | null): string {
+  if (!nybilData || !nybilData.tankstatus) return '---';
+  
+  switch (nybilData.tankstatus) {
+    case 'mottogs_fulltankad':
+      return 'Mottogs fulltankad';
+    case 'tankad_nu':
+      if (nybilData.upptankning_liter && nybilData.upptankning_literpris) {
+        return `MABI tankade upp ${nybilData.upptankning_liter} liter (${nybilData.upptankning_literpris} kr/l)`;
+      }
+      return 'MABI tankade upp';
+    case 'ej_upptankad':
+      return 'Levererades ej fulltankad';
+    default:
+      return '---';
+  }
+}
+
 // Raw damage data from the legacy source (BUHS)
 type LegacyDamage = {
   id: number;
@@ -375,11 +406,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     
-    // checkins
+    // checkins - order by completed_at first, then created_at as fallback
     supabase
       .from('checkins')
       .select('*')
       .eq('regnr', cleanedRegnr)
+      .order('completed_at', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false }),
   ]);
 
@@ -422,9 +454,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Bilmärke & Modell: from checkins.car_model if available
       bilmarkeModell: latestCheckin?.car_model || '---',
       
-      // Senast incheckad vid: from latest checkin with datetime
-      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
-        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)})`
+      // Senast incheckad vid: from latest checkin with datetime and checker
+      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
+        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
         : latestCheckin?.current_ort && latestCheckin?.current_station
           ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
           : '---',
@@ -494,6 +526,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       saluAttention: '---',
       saluNotering: '---',
       tankningInfo: '---',
+      tankstatusVidLeverans: '---',
+      anteckningar: '---',
+      harSkadorVidLeverans: false,
     };
 
     // Build damage records from legacy damages (BUHS)
@@ -548,8 +583,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           : '---',
     
     // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
-    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && latestCheckin?.created_at
-      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.created_at)} av ${getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
+    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
+      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
       : latestCheckin?.current_ort && latestCheckin?.current_station
         ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
         : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
@@ -665,6 +700,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Fuel filling info
     tankningInfo: buildFuelFillingInfo(nybilData),
+    tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
+    
+    // General comment
+    anteckningar: nybilData?.anteckningar || '---',
+    
+    // Damages at delivery
+    harSkadorVidLeverans: nybilData?.har_skador_vid_leverans === true,
   };
 
   // Build damage records from legacy damages (BUHS) - same source as /check

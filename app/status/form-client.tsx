@@ -341,10 +341,10 @@ export default function StatusForm() {
               <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               {vehicleStatus.vehicle.vaxel !== '---' && <InfoRow label="Växellåda" value={vehicleStatus.vehicle.vaxel} />}
+              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
-              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
             </div>
           </Card>
@@ -360,8 +360,7 @@ export default function StatusForm() {
           vehicleStatus.vehicle.harLasbultar !== '---' ||
           vehicleStatus.vehicle.harDragkrok !== '---' ||
           vehicleStatus.vehicle.harGummimattor !== '---' ||
-          vehicleStatus.vehicle.harDackkompressor !== '---' ||
-          vehicleStatus.vehicle.stoldGps !== '---'
+          vehicleStatus.vehicle.harDackkompressor !== '---'
         ) && (
           <Card>
             <SectionHeader title="Utrustning vid leverans" />
@@ -375,7 +374,6 @@ export default function StatusForm() {
               {vehicleStatus.vehicle.harDragkrok !== '---' && <InfoRow label="Dragkrok" value={vehicleStatus.vehicle.harDragkrok} />}
               {vehicleStatus.vehicle.harGummimattor !== '---' && <InfoRow label="Gummimattor" value={vehicleStatus.vehicle.harGummimattor} />}
               {vehicleStatus.vehicle.harDackkompressor !== '---' && <InfoRow label="Däckkompressor" value={vehicleStatus.vehicle.harDackkompressor} />}
-              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
             </div>
           </Card>
         )}
@@ -401,11 +399,12 @@ export default function StatusForm() {
         )}
 
         {/* Fuel Filling Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.tankningInfo !== '---' && (
+        {vehicleStatus?.found && vehicleStatus.vehicle && (vehicleStatus.vehicle.tankstatusVidLeverans !== '---' || vehicleStatus.vehicle.tankningInfo !== '---') && (
           <Card>
-            <SectionHeader title="Tankning (MABI)" />
-            <div style={{ padding: '0.5rem 0' }}>
-              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5' }}>{vehicleStatus.vehicle.tankningInfo}</p>
+            <SectionHeader title="Tankningsbehov vid leverans" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />}
+              {vehicleStatus.vehicle.tankningInfo !== '---' && <InfoRow label="Detaljer" value={vehicleStatus.vehicle.tankningInfo} />}
             </div>
           </Card>
         )}
@@ -418,10 +417,32 @@ export default function StatusForm() {
               <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
               <InfoRow label="Station" value={vehicleStatus.vehicle.saluStation} />
               {vehicleStatus.vehicle.saluKopare !== '---' && <InfoRow label="Köpare (företag)" value={vehicleStatus.vehicle.saluKopare} />}
-              {vehicleStatus.vehicle.saluRetur !== '---' && <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />}
               {vehicleStatus.vehicle.saluReturadress !== '---' && <InfoRow label="Returadress" value={vehicleStatus.vehicle.saluReturadress} />}
+              {vehicleStatus.vehicle.saluRetur !== '---' && <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />}
               {vehicleStatus.vehicle.saluAttention !== '---' && <InfoRow label="Attention" value={vehicleStatus.vehicle.saluAttention} />}
               {vehicleStatus.vehicle.saluNotering !== '---' && <InfoRow label="Notering försäljning" value={vehicleStatus.vehicle.saluNotering} />}
+            </div>
+          </Card>
+        )}
+
+        {/* Damages at Delivery Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.harSkadorVidLeverans && (
+          <Card>
+            <SectionHeader title="⚠️ Skador vid leverans" />
+            <div style={{ padding: '0.5rem 0' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5', color: 'var(--color-danger)', fontWeight: 600 }}>
+                Detta fordon registrerades med skador vid leverans. Se skaderegistreringen i sektionen "Skador" nedan.
+              </p>
+            </div>
+          </Card>
+        )}
+
+        {/* General Comment Section */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.anteckningar !== '---' && (
+          <Card>
+            <SectionHeader title="Generell kommentar" />
+            <div style={{ padding: '0.5rem 0' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{vehicleStatus.vehicle.anteckningar}</p>
             </div>
           </Card>
         )}
@@ -498,27 +519,32 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Print Button and Options - Moved to bottom after HISTORIK */}
+        {/* Print Section - UTSKRIFT */}
         {vehicleStatus?.found && (
-          <div className="print-controls">
-            <div className="print-options">
-              <label className="print-checkbox">
-                <input 
-                  type="checkbox" 
-                  checked={includeHistoryInPrint} 
-                  onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
-                />
-                <span>Inkludera all historik vid utskrift</span>
-              </label>
+          <Card className="print-controls-card">
+            <SectionHeader title="Utskrift" />
+            <div className="print-controls-content">
+              <div className="print-options">
+                <label className="print-checkbox">
+                  <input 
+                    type="checkbox" 
+                    checked={includeHistoryInPrint} 
+                    onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                  />
+                  <span>Inkludera all historik vid utskrift</span>
+                </label>
+              </div>
+              <div className="print-button-container">
+                <button
+                  type="button"
+                  className="print-btn"
+                  onClick={() => window.print()}
+                >
+                  🖨️ Skriv ut
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              className="print-btn"
-              onClick={() => window.print()}
-            >
-              🖨️ Skriv ut
-            </button>
-          </div>
+          </Card>
         )}
 
         <footer className="copyright-footer">
@@ -1041,22 +1067,24 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       padding-bottom: 4rem; /* Add space for fixed footer */
     }
 
-    /* Print controls container */
-    .print-controls {
-      margin: 2rem 0;
-      padding: 1.5rem;
-      background-color: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #e5e7eb;
+    /* Print controls card */
+    .print-controls-card {
+      /* Inherits card styles */
+    }
+
+    .print-controls-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
     }
 
     /* Print options styles */
     .print-options {
-      margin-bottom: 1rem;
+      text-align: left;
     }
 
     .print-checkbox {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 0.5rem;
       cursor: pointer;
@@ -1069,7 +1097,13 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       height: 1rem;
     }
 
-    /* Print button styles */
+    /* Print button container - centered */
+    .print-button-container {
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Print button styles - max 200px */
     .print-btn {
       padding: 0.75rem 1.5rem;
       background-color: var(--color-primary);
@@ -1080,8 +1114,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
-      width: 100%;
-      max-width: 300px;
+      max-width: 200px;
     }
 
     .print-btn:hover {
@@ -1117,6 +1150,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .main-header,
       .copyright-footer,
       .print-controls,
+      .print-controls-card,
       body::before {
         display: none !important;
       }
