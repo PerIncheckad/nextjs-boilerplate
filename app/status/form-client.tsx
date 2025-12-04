@@ -338,7 +338,6 @@ export default function StatusForm() {
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
               <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
-              <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulforvaring} />
               <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
@@ -363,7 +362,7 @@ export default function StatusForm() {
           vehicleStatus.vehicle.stoldGps !== '---'
         ) && (
           <Card>
-            <SectionHeader title="Utrustning" />
+            <SectionHeader title="Utrustning vid leverans" />
             <div className="info-grid">
               {vehicleStatus.vehicle.antalNycklar !== '---' && <InfoRow label="Nycklar" value={vehicleStatus.vehicle.antalNycklar} />}
               {vehicleStatus.vehicle.antalLaddkablar !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.antalLaddkablar} />}
@@ -1131,36 +1130,36 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .print-header {
         display: block;
         text-align: center;
-        margin-bottom: 0.5rem;
-        padding: 0.5rem 0;
+        margin-bottom: 8px !important;
+        padding-bottom: 8px !important;
         max-height: 5cm;
       }
 
       .print-logo {
-        font-size: 1.5rem;
+        font-size: 14pt !important;
         font-weight: bold;
-        margin: 0 0 0.3rem 0;
+        margin: 0 !important;
         color: #000;
       }
 
       .print-regnr {
-        font-size: 1.8rem;
+        font-size: 18pt !important;
         font-weight: bold;
-        margin: 0.2rem 0;
+        margin: 4px 0 !important;
         color: #000;
       }
 
       .print-subtitle {
-        font-size: 0.75rem;
+        font-size: 8pt !important;
         margin: 0.2rem 0 0.5rem 0;
         color: #666;
       }
 
-      /* Optimize for print - compact layout with 11pt text */
+      /* Optimize for print - very compact layout with 9pt text */
       body {
         background: white !important;
         color: black !important;
-        font-size: 11pt !important;
+        font-size: 9pt !important;
       }
 
       .status-form {
@@ -1175,8 +1174,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border: 1px solid #e5e7eb;
         border-radius: 0;
         page-break-inside: avoid;
-        margin-bottom: 0.5rem;
-        padding: 0.5rem !important;
+        margin-bottom: 8px !important;
+        padding: 8px !important;
       }
 
       /* Hide elements marked for print hiding */
@@ -1192,6 +1191,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .section-header h2,
       .section-header-expandable h2 {
         color: #000;
+        font-size: 11pt !important;
       }
 
       /* Remove background colors and shadows */
@@ -1202,18 +1202,23 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border: 1px solid #e5e7eb;
       }
 
-      /* Ensure text is black */
+      /* Compact text sizes */
       .info-label,
-      .info-value,
+      .info-value {
+        font-size: 9pt !important;
+        color: #000 !important;
+      }
+
       .damage-type,
       .damage-date,
       .history-summary {
         color: #000 !important;
+        font-size: 9pt !important;
       }
 
-      /* Compact spacing */
-      .card {
-        padding: 1rem;
+      /* Minimal spacing */
+      .info-grid {
+        gap: 2px 8px !important;
       }
 
       .damage-list,
@@ -1283,7 +1288,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       }
 
       .nybil-photos-card .nybil-photo {
-        max-height: 120px;
+        max-height: 100px !important;
       }
     }
 
