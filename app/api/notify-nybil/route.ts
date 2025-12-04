@@ -7,22 +7,17 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY || 'placeholder');
 
 // --- E-postmottagare ---
-// Under utveckling: skicka alltid till per@incheckad.se
-const DEV_EMAIL = 'per@incheckad.se';
-const BILKONTROLL_EMAIL = 'latif@incheckad.se';
+const PER_EMAIL = 'per@incheckad.se';
+const LATIF_EMAIL = 'latif@incheckad.se';
 
-// Station email mapping for production
-// TODO: Activate this mapping when switching from development mode to production
-// Currently all emails are sent to DEV_EMAIL (per@incheckad.se) during development
+// Station email mapping for production using @incheckad.se aliases
 const stationEmailMapping: Record<string, string> = {
-  'Malmö': 'malmo@mabi.se',
-  'Helsingborg': 'helsingborg@mabi.se',
-  'Ängelholm': 'angelholm@mabi.se',
-  'Halmstad': 'halmstad@mabi.se',
-  'Falkenberg': 'falkenberg@mabi.se',
-  'Trelleborg': 'trelleborg@mabi.se',
-  'Varberg': 'varberg@mabi.se',
-  'Lund': 'lund@mabi.se',
+  'Malmö': 'malmo@incheckad.se',
+  'Lund': 'malmo@incheckad.se',
+  'Trelleborg': 'malmo@incheckad.se',
+  'Helsingborg': 'helsingborg@incheckad.se',
+  'Ängelholm': 'helsingborg@incheckad.se',
+  'Varberg': 'varberg@incheckad.se',
 };
 
 const LOGO_URL =
@@ -1092,18 +1087,21 @@ export async function POST(request: Request) {
     const baseSubject = `NY BIL REGISTRERAD: ${regNr} - ${bilmarke} ${modell} - till ${planeradStation}${testMarker}`;
 
     // =================================================================
-    // E-posthantering - Under utveckling: alla mejl till per@incheckad.se
+    // E-posthantering - Production mode
     // =================================================================
     const emailPromises: Promise<unknown>[] = [];
 
+    // Bilkontroll recipients: latif@incheckad.se + per@incheckad.se (always for all /nybil registrations)
+    const bilkontrollRecipients = [LATIF_EMAIL, PER_EMAIL];
+    
     // E-post till Bilkontroll (alltid) - uses BILKONTROLL email builder (no blue banners)
     const bilkontrollHtml = buildNybilBilkontrollEmail(payload, date, time, siteUrl);
     const bilkontrollSubject = `${baseSubject} | BILKONTROLL`;
-    console.log(`Sending BILKONTROLL email to ${DEV_EMAIL} (actual: ${BILKONTROLL_EMAIL})`);
+    console.log(`Sending BILKONTROLL email to ${bilkontrollRecipients.join(', ')}`);
     emailPromises.push(
       resend.emails.send({
         from: 'nybil@incheckad.se',
-        to: [DEV_EMAIL], // Under utveckling: per@incheckad.se
+        to: bilkontrollRecipients,
         subject: bilkontrollSubject,
         html: bilkontrollHtml,
       })
@@ -1111,13 +1109,20 @@ export async function POST(request: Request) {
 
     // E-post till Huvudstation (endast om klar för uthyrning) - uses HUVUDSTATION email builder (with blue banners)
     if (payload.klar_for_uthyrning === true) {
+      // Determine recipients based on planerad_station
+      const huvudstationRecipients = [PER_EMAIL]; // per@incheckad.se always included
+      const stationEmail = stationEmailMapping[planeradStation];
+      if (stationEmail && !huvudstationRecipients.includes(stationEmail)) {
+        huvudstationRecipients.push(stationEmail);
+      }
+      
       const huvudstationHtml = buildNybilHuvudstationEmail(payload, date, time, siteUrl);
       const huvudstationSubject = `${baseSubject} | HUVUDSTATION`;
-      console.log(`Sending HUVUDSTATION email to ${DEV_EMAIL} (actual: station for ${planeradStation})`);
+      console.log(`Sending HUVUDSTATION email to ${huvudstationRecipients.join(', ')} for station ${planeradStation}`);
       emailPromises.push(
         resend.emails.send({
           from: 'nybil@incheckad.se',
-          to: [DEV_EMAIL], // Under utveckling: per@incheckad.se
+          to: huvudstationRecipients,
           subject: huvudstationSubject,
           html: huvudstationHtml,
         })
@@ -1128,11 +1133,11 @@ export async function POST(request: Request) {
     if (payload.is_duplicate === true) {
       const duplicateHtml = buildNybilDuplicateEmail(payload, date, time, siteUrl);
       const duplicateSubject = `DUBBLETT SKAPAD FÖR ${regNr} - ${bilmarke} ${modell} | BILKONTROLL`;
-      console.log(`Sending DUPLICATE email to ${DEV_EMAIL} (actual: ${BILKONTROLL_EMAIL})`);
+      console.log(`Sending DUPLICATE email to ${bilkontrollRecipients.join(', ')}`);
       emailPromises.push(
         resend.emails.send({
           from: 'nybil@incheckad.se',
-          to: [DEV_EMAIL], // Under utveckling: per@incheckad.se
+          to: bilkontrollRecipients,
           subject: duplicateSubject,
           html: duplicateHtml,
         })
