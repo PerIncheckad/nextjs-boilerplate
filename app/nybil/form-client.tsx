@@ -2682,6 +2682,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .duplicate-warning-modal h3 { color:var(--color-warning); }
     .duplicate-warning-modal .duplicate-info { background-color:var(--color-bg); padding:0.75rem; border-radius:6px; margin:1rem 0; }
     .duplicate-warning-modal .duplicate-info p { margin:0.25rem 0; font-size:0.9rem; }
-    @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } .photo-grid { grid-template-columns:1fr; } .damage-item-card { flex-direction:column; align-items:flex-start; gap:0.5rem; } .damage-actions { width:100%; } .damage-actions button { flex:1; } }
+    @media (max-width:480px) { .grid-2-col { grid-template-columns:1fr; } .grid-3-col { grid-template-columns:1fr; } .grid-4-col { grid-template-columns:repeat(2,1fr); } .grid-5-col { grid-template-columns:repeat(2,1fr); } .photo-grid { grid-template-columns:1fr; } .damage-item-card { flex-direction:column; align-items:flex-start; gap:0.5rem; } .damage-actions { width:100%; } .damage-actions button { flex:1; } .form-actions { margin-bottom: 80px; } }
   `}</style>
 );
