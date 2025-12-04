@@ -1167,40 +1167,41 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
-      /* Compact print header - max 5cm height */
+      /* Compact print header */
       .print-header {
         display: block;
         text-align: center;
-        margin-bottom: 8px !important;
-        padding-bottom: 8px !important;
-        max-height: 5cm;
+        margin-bottom: 4px !important;
+        padding-bottom: 2px !important;
+        max-height: 2cm;
       }
 
       .print-logo-img {
-        max-height: 2.5cm !important;
-        max-width: 8cm !important;
-        margin: 0 auto 8px auto !important;
+        max-height: 1.5cm !important;
+        max-width: 6cm !important;
+        margin: 0 auto 2px auto !important;
         display: block !important;
       }
 
       .print-regnr {
-        font-size: 18pt !important;
+        font-size: 14pt !important;
         font-weight: bold;
-        margin: 4px 0 !important;
+        margin: 2px 0 !important;
         color: #000;
       }
 
       .print-subtitle {
-        font-size: 8pt !important;
-        margin: 0.2rem 0 0.5rem 0;
+        font-size: 7pt !important;
+        margin: 0 !important;
         color: #666;
       }
 
-      /* Optimize for print - very compact layout with 9pt text */
+      /* Optimize for print - ultra compact layout with 8pt text */
       body {
         background: white !important;
         color: black !important;
-        font-size: 9pt !important;
+        font-size: 8pt !important;
+        line-height: 1.2 !important;
       }
 
       .status-form {
@@ -1215,8 +1216,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         border: 1px solid #e5e7eb;
         border-radius: 0;
         page-break-inside: avoid;
-        margin-bottom: 8px !important;
-        padding: 8px !important;
+        margin-bottom: 4px !important;
+        padding: 4px !important;
       }
 
       /* Hide elements marked for print hiding */
@@ -1232,7 +1233,9 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .section-header h2,
       .section-header-expandable h2 {
         color: #000;
-        font-size: 11pt !important;
+        font-size: 10pt !important;
+        margin: 2px 0 !important;
+        padding: 0 !important;
       }
 
       /* Remove background colors and shadows */
@@ -1241,35 +1244,40 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         background-color: white !important;
         box-shadow: none !important;
         border: 1px solid #e5e7eb;
+        margin-bottom: 3px !important;
+        padding: 3px !important;
       }
 
       /* Compact text sizes */
       .info-label,
       .info-value {
-        font-size: 9pt !important;
+        font-size: 8pt !important;
         color: #000 !important;
+        line-height: 1.2 !important;
       }
 
       .damage-type,
       .damage-date,
       .history-summary {
         color: #000 !important;
-        font-size: 9pt !important;
+        font-size: 8pt !important;
+        line-height: 1.2 !important;
       }
 
       /* Minimal spacing */
       .info-grid {
-        gap: 2px 8px !important;
+        gap: 1px 6px !important;
+        margin: 0 !important;
       }
 
       .damage-list,
       .history-list {
-        gap: 0.5rem;
+        gap: 3px !important;
       }
 
-      /* Force damages section to start on new page */
+      /* Don't force page breaks - let content flow naturally */
       .damages-card {
-        page-break-before: always;
+        page-break-before: auto;
       }
 
       /* Hide empty damages section in print */
@@ -1312,10 +1320,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         page-break-inside: avoid;
       }
 
-      /* Show nybil photos in print - make them smaller and hide title */
+      /* Show nybil photos in print - make them much smaller */
       .nybil-photos-card {
-        padding: 0.3rem !important;
-        margin-bottom: 0.3rem !important;
+        padding: 2px !important;
+        margin-bottom: 2px !important;
         border: none !important;
       }
 
@@ -1324,12 +1332,13 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       }
 
       .nybil-photos-grid {
-        gap: 0.3rem !important;
+        gap: 2px !important;
         margin-bottom: 0 !important;
       }
 
       .nybil-photos-card .nybil-photo {
-        max-height: 100px !important;
+        max-height: 60px !important;
+        max-width: 80px !important;
       }
     }
 

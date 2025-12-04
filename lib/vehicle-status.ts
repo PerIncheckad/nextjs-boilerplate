@@ -723,13 +723,30 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   // Add damages from damages table (nybil delivery damages)
   for (const damage of damages) {
+    // Build damage description from type and positions
+    let skadetyp = damage.damage_type || damage.skadetyp || 'Okänd';
+    
+    // If user_positions exists, format it as "Skadetyp - Placering - Position"
+    if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
+      const positions = damage.user_positions.map((pos: any) => {
+        const parts: string[] = [];
+        if (pos.carPart) parts.push(pos.carPart);
+        if (pos.position) parts.push(pos.position);
+        return parts.join(' - ');
+      }).filter(Boolean);
+      
+      if (positions.length > 0) {
+        skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+      }
+    }
+    
     damageRecords.push({
       id: damage.id,
       regnr: cleanedRegnr,
-      skadetyp: damage.skadetyp || 'Okänd',
-      datum: formatDate(damage.created_at || damage.datum),
+      skadetyp: skadetyp,
+      datum: formatDate(damage.created_at || damage.damage_date || damage.datum),
       status: damage.status || 'Befintlig',
-      folder: damage.folder,
+      folder: damage.uploads?.folder || damage.folder,
       source: 'damages' as const,
       sourceInfo: damage.inchecker_name 
         ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`

@@ -439,7 +439,7 @@ const buildForvaringDetailsSection = (payload: NybilPayload): string => {
  * - Registrerad av...
  * - Photos
  * - Damage details (if any)
- * Includes blue banners for "Måste tankas!" and "Kolla bilens laddnivå"
+ * Includes blue banners for "Kolla om bilen är tankad!" and "Kolla bilens laddnivå"
  */
 const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: string, siteUrl: string): string => {
   const regNr = payload.regnr || '';
@@ -475,7 +475,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
     ${createSuccessBanner(klarForUthyrning, 'KLAR FÖR UTHYRNING!')}
     ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
     ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
-    ${createAdminBanner(needsFueling, 'MÅSTE TANKAS!')}
+    ${createAdminBanner(needsFueling, 'KOLLA OM BILEN ÄR TANKAD!')}
     ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
   `;
   
