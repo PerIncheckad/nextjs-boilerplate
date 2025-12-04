@@ -139,6 +139,7 @@ type NybilInventeringData = {
   // Storage fields
   hjul_forvaring_ort?: string | null;
   hjul_forvaring_spec?: string | null;
+  hjul_forvaring?: string | null; // Legacy column name for spec
   extranyckel_forvaring_ort?: string | null;
   extranyckel_forvaring_spec?: string | null;
   laddkablar_forvaring_ort?: string | null;
@@ -236,8 +237,8 @@ function buildEquipmentStorage(nybilData: NybilInventeringData | null): string {
   const items: string[] = [];
   
   // Wheel storage
-  if (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec) {
-    const hjulInfo = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ');
+  if (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring) {
+    const hjulInfo = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ');
     items.push(`Hjulförvaring: ${hjulInfo}`);
   }
   
@@ -604,8 +605,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     hjultyp: latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
     
     // Hjulförvaring: nybil_inventering.hjul_forvaring_ort/spec → vehicles.wheel_storage_location
-    hjulforvaring: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
-      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+    hjulforvaring: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec || nybilData?.hjul_forvaring)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
       : vehicleData?.wheel_storage_location || '---',
     
     // Drivmedel: nybil_inventering.bransletyp
@@ -663,8 +664,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     saluinfo: buildSaleInfo(nybilData),
     
     // Equipment storage info (individual fields for separate rows)
-    hjulForvaringInfo: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec)
-      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec].filter(Boolean).join(' - ')
+    hjulForvaringInfo: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec || nybilData?.hjul_forvaring)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
       : '---',
     reservnyckelInfo: (nybilData?.extranyckel_forvaring_ort || nybilData?.extranyckel_forvaring_spec)
       ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
