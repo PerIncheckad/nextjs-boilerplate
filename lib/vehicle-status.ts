@@ -569,6 +569,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       return dateB.getTime() - dateA.getTime();
     });
 
+    // Update the vehicle's damage count to reflect the actual list
+    vehicle.antalSkador = damageRecords.length;
+
     return {
       found: true,
       source,
@@ -838,6 +841,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const dateB = new Date(b.rawTimestamp);
     return dateB.getTime() - dateA.getTime();
   });
+
+  // Update the vehicle's damage count to reflect the filtered list
+  vehicle.antalSkador = damageRecords.length;
 
   // Extract nybil reference photos if available
   const nybilPhotos = nybilData && Array.isArray(nybilData.photo_urls) && nybilData.photo_urls.length > 0
