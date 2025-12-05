@@ -230,11 +230,9 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
             onTouchMove={draw}
             onTouchEnd={endDrawing}
           />
-        </div>
-
-        <div className="annotator-controls">
-          <div className="color-selector">
-            <label className="color-label">Färg:</label>
+          
+          {/* Floating toolbar on image */}
+          <div className="floating-toolbar">
             <div className="color-buttons">
               {NEON_COLORS.map(color => (
                 <button
@@ -252,34 +250,35 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 </button>
               ))}
             </div>
-          </div>
-
-          <div className="line-width-selector">
-            <label className="line-width-label">Tjocklek:</label>
+            
             <div className="line-width-buttons">
               <button
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THIN ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THIN)}
-                title="Tunn linje (3.5px)"
+                title="Pennspets - tunn linje (3.5px)"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M3 21L12 12M12 12L21 3M12 12L9 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="9" cy="15" r="1" fill="currentColor"/>
                 </svg>
               </button>
               <button
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THICK ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THICK)}
-                title="Tjock linje (9px)"
+                title="Penselspets - tjock linje (9px)"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+                  <path d="M4 20L12 12M12 12L20 4M12 12L8 16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="8" cy="16" r="2" fill="currentColor"/>
                 </svg>
               </button>
             </div>
           </div>
+        </div>
 
+        <div className="annotator-controls">
           <div className="action-buttons">
             <button
               type="button"
@@ -373,6 +372,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           padding: 1rem;
           background-color: #f9fafb;
           touch-action: none;
+          position: relative;
         }
 
         .annotator-canvas {
@@ -385,36 +385,31 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           background-color: white;
         }
 
-        .annotator-controls {
-          padding: 1rem 1.5rem;
-          border-top: 1px solid #e5e7eb;
-          border-bottom: 1px solid #e5e7eb;
-          background-color: white;
-        }
-
-        .color-selector {
+        .floating-toolbar {
+          position: absolute;
+          bottom: 1rem;
+          left: 50%;
+          transform: translateX(-50%);
           display: flex;
           align-items: center;
           gap: 1rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-        }
-
-        .color-label {
-          font-weight: 600;
-          font-size: 0.875rem;
-          color: #374151;
+          padding: 0.75rem 1rem;
+          background: rgba(255, 255, 255, 0.95);
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          backdrop-filter: blur(8px);
+          z-index: 10;
         }
 
         .color-buttons {
           display: flex;
           gap: 0.5rem;
-          flex-wrap: wrap;
+          align-items: center;
         }
 
         .color-btn {
-          width: 48px;
-          height: 48px;
+          width: 44px;
+          height: 44px;
           border-radius: 50%;
           cursor: pointer;
           transition: all 0.2s;
@@ -434,50 +429,44 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
-        .line-width-selector {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          margin-bottom: 1rem;
-          flex-wrap: wrap;
-        }
-
-        .line-width-label {
-          font-weight: 600;
-          font-size: 0.875rem;
-          color: #374151;
-        }
-
         .line-width-buttons {
           display: flex;
           gap: 0.5rem;
+          padding: 0.25rem 0.5rem;
+          background: #4b5563;
+          border-radius: 8px;
         }
 
         .line-width-btn {
-          width: 48px;
-          height: 48px;
-          border-radius: 8px;
+          width: 40px;
+          height: 40px;
+          border-radius: 6px;
           cursor: pointer;
           transition: all 0.2s;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 0;
-          background-color: white;
-          border: 2px solid #d1d5db;
-          color: #374151;
+          background-color: transparent;
+          border: none;
+          color: #d1d5db;
         }
 
         .line-width-btn:hover {
-          background-color: #f9fafb;
-          border-color: #9ca3af;
+          background-color: rgba(255, 255, 255, 0.1);
+          color: white;
         }
 
         .line-width-btn.active {
-          background-color: #eff6ff;
-          border-color: #2563eb;
-          color: #2563eb;
-          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+          background-color: rgba(255, 255, 255, 0.2);
+          color: white;
+        }
+
+        .annotator-controls {
+          padding: 1rem 1.5rem;
+          border-top: 1px solid #e5e7eb;
+          border-bottom: 1px solid #e5e7eb;
+          background-color: white;
         }
 
         .action-buttons {
@@ -548,14 +537,22 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
             padding: 0.5rem;
           }
 
-          .color-selector {
-            flex-direction: column;
-            align-items: flex-start;
+          .floating-toolbar {
+            bottom: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
           }
 
-          .line-width-selector {
-            flex-direction: column;
-            align-items: flex-start;
+          .color-btn {
+            width: 40px;
+            height: 40px;
+          }
+
+          .line-width-btn {
+            width: 36px;
+            height: 36px;
           }
 
           .action-buttons {
