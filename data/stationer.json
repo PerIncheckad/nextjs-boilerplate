@@ -46,9 +46,10 @@
   { "namn": "KIA Halmstad", "station_id": "2743", "huvudstation_id": "274", "region": "Norr", "type": "station" },
   { "namn": "FORD Halmstad", "station_id": "2744", "huvudstation_id": "274", "region": "Norr", "type": "station" },
 
+  { "namn": "MB Varberg", "station_id": "290", "huvudstation_id": "290", "region": "Syd", "type": "station" },
   { "namn": "FORD Varberg", "station_id": "2901", "huvudstation_id": "290", "region": "Syd", "type": "station" },
-  { "namn": "Hedin Automotive Varberg", "station_id": "2902", "huvudstation_id": "290", "region": "Syd", "type": "station" },
-  { "namn": "Sällstorp lack plåt", "station_id": "2903", "huvudstation_id": "290", "region": "Syd", "type": "station" },
+  { "namn": "Varberg multi (Hedin)", "station_id": "2902", "huvudstation_id": "290", "region": "Syd", "type": "station" },
+  { "namn": "Autoklinik (Sällstorp)", "station_id": "2903", "huvudstation_id": "290", "region": "Syd", "type": "station" },
   { "namn": "Finnveden plåt", "station_id": "2904", "huvudstation_id": "290", "region": "Syd", "type": "station" },
 
   { "namn": "FORD Lund", "station_id": "4061", "huvudstation_id": "406", "region": "Syd", "type": "station" },

@@ -51,11 +51,11 @@ export const STATIONS: StationTree = {
   ],
   'Trelleborg': [{ id: 'trelleborg', name: 'Trelleborg' }],
   'Varberg': [
-    { id: 'varberg-finnvedens-skadecenter', name: 'Finnvedens Bil Skadecenter' },
-    { id: 'varberg-hedin-ford', name: 'Hedin Automotive Ford' },
-    { id: 'varberg-hedin-holmgarde', name: 'Hedin Automotive Holmgärde' },
-    { id: 'varberg-hedin', name: 'Hedin Automotive' },
-    { id: 'varberg-sallstorps-plat-lack', name: 'Sällstorps Plåt & Lack' },
+    { id: 'varberg-mb', name: 'MB Varberg' },
+    { id: 'varberg-ford', name: 'FORD Varberg' },
+    { id: 'varberg-multi-hedin', name: 'Varberg multi (Hedin)' },
+    { id: 'varberg-autoklinik-sallstorp', name: 'Autoklinik (Sällstorp)' },
+    { id: 'varberg-finnveden-plat', name: 'Finnveden plåt' },
   ],
   'X (Old)': [{ id: 'x-old-helsingborg-holmgrens', name: 'HELSINGBORG (Holmgrens Bil)' }],
 };
