@@ -213,9 +213,6 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
       <div className="annotator-modal">
         <div className="annotator-header">
           <h3>Rita på bilden</h3>
-          <p className="annotator-instructions">
-            Rita med fingret/musen för att markera skador
-          </p>
         </div>
 
         <div className="annotator-canvas-container">
@@ -259,7 +256,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 title="Tunn linje (3.5px)"
               >
                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 </svg>
               </button>
               <button
@@ -269,7 +266,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 title="Tjock linje (9px)"
               >
                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/>
+                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="8" strokeLinecap="round"/>
                 </svg>
               </button>
             </div>
@@ -391,11 +388,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0.875rem 1.25rem;
-          background: rgba(255, 255, 255, 0.96);
-          border-radius: 16px;
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
-          backdrop-filter: blur(12px);
+          padding: 0 0.5rem;
           z-index: 10;
           max-width: 600px;
           margin: 0 auto;
