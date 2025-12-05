@@ -255,3 +255,25 @@ LIMIT 500;
 
 Tips:
 - Om "app‑standardiserade" texter ("Skadetyp - Placering - Position") dyker upp i BUHS‑kolumnerna så är de redan app‑dokumenterade; dessa triggar inte ny dokumentation och filtreras även i UI.
+
+# UPPDATERING 2025-12-05
+
+# CSV-import till Supabase
+
+## Skadefilen (BUHS)
+
+1. Exportera från BUHS
+2. Ladda upp till staging-tabell `mabi_damage_data_raw_new`
+3.  Kör UPSERT till `damages` via SQL
+
+## Bilkontroll-filen
+
+1.  Exportera från Bilkontroll
+2. Ladda upp till `vehicles`-tabellen
+3.  Använd RPC `get_vehicle_by_trimmed_regnr` för sökning
+
+## Viktigt
+
+- `legacy_damage_source_text` = NULL → tolkas som nybilsskada
+- `legacy_damage_source_text` = text → tolkas som BUHS-skada
+- Undvik dubletter genom att matcha på `regnr` + `damage_date`
