@@ -33,7 +33,7 @@ const STATIONER: Record<string, string[]> = {
   'Falkenberg': ['Falkenberg'],
   'Halmstad': ['Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
   'Trelleborg': ['Trelleborg'],
-  'Varberg': ['FORD Varberg', 'Hedin Automotive Varberg', 'Sällstorp lack plåt', 'Finnveden plåt']
+  'Varberg': ['MB Varberg', 'FORD Varberg', 'Varberg multi (Hedin)', 'Autoklinik (Sällstorp)', 'Finnveden plåt']
 };
 
 const capitalizeFirstLetter = (str: string): string => {
