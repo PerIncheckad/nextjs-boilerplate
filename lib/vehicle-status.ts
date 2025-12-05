@@ -722,28 +722,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Determine if vehicle has ever been checked in
   const hasBeenCheckedIn = checkins.length > 0;
   
-  // Build set of legacy damages that have been inventoried in damages table
-  // to avoid showing duplicates
-  const inventoriedLegacyDamages = new Set<string>();
-  for (const damage of damages) {
-    if (damage.legacy_damage_source_text) {
-      // This is a BUHS damage that was inventoried
-      const key = `${cleanedRegnr}-${formatDate(damage.damage_date)}-${damage.legacy_damage_source_text}`;
-      inventoriedLegacyDamages.add(key);
-    }
+  // Build set of legacy damage keys (regnr + damage_date) from RPC
+  // to filter out duplicates in damages table
+  const legacyDamageKeys = new Set<string>();
+  for (const d of legacyDamages) {
+    const key = `${cleanedRegnr}-${formatDate(d.damage_date)}`;
+    legacyDamageKeys.add(key);
   }
   
-  // Build damage records from legacy damages (BUHS) - filter out duplicates
+  // Build damage records from legacy damages (BUHS)
   const damageRecords: DamageRecord[] = [];
   
   for (const d of legacyDamages) {
     const legacyText = getLegacyDamageText(d);
-    const key = `${cleanedRegnr}-${formatDate(d.damage_date)}-${legacyText}`;
-    
-    // Skip if this damage has already been inventoried in damages table
-    if (inventoriedLegacyDamages.has(key)) {
-      continue;
-    }
     
     // Build sourceInfo based on whether vehicle has been checked in
     let sourceInfo = 'Källa: BUHS';
@@ -763,8 +754,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     });
   }
   
-  // Add damages from damages table (nybil delivery damages or inventoried BUHS damages)
+  // Add damages from damages table (nybil delivery damages only)
+  // Skip damages that match legacy damages by regnr + damage_date
   for (const damage of damages) {
+    // Check if this damage matches a legacy damage (same regnr + damage_date)
+    const damageKey = `${cleanedRegnr}-${formatDate(damage.damage_date || damage.created_at || damage.datum)}`;
+    if (legacyDamageKeys.has(damageKey)) {
+      // This damage already exists in legacy damages, skip it
+      continue;
+    }
     // Build damage description from type and positions
     // Use damage_type_raw if available, otherwise format damage_type
     let skadetyp: string;
@@ -790,20 +788,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     }
     
-    // Determine source info based on whether this is a legacy damage or nybil damage
-    let sourceInfo: string;
-    if (damage.legacy_damage_source_text) {
-      // This was a BUHS damage that was inventoried
-      sourceInfo = 'Källa: BUHS (inventerad)';
-      if (damage.inchecker_name) {
-        sourceInfo += ` av ${damage.inchecker_name}`;
-      }
-    } else {
-      // This is a new damage registered during nybil delivery
-      sourceInfo = damage.inchecker_name 
-        ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
-        : 'Registrerad vid nybilsleverans';
-    }
+    // This is a new damage registered during nybil delivery (not a legacy duplicate)
+    const sourceInfo = damage.inchecker_name 
+      ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
+      : 'Registrerad vid nybilsleverans';
     
     damageRecords.push({
       id: damage.id,
