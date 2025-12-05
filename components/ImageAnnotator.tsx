@@ -261,7 +261,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THIN ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THIN)}
-                title="Tunn linje (3-4px)"
+                title="Tunn linje (3.5px)"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -271,7 +271,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THICK ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THICK)}
-                title="Tjock linje (8-10px)"
+                title="Tjock linje (9px)"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
