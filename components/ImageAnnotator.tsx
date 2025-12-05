@@ -10,12 +10,17 @@ const NEON_COLORS = [
   { name: 'Neongul', value: '#FFFF00', label: '🟡' }
 ] as const;
 
-const LINE_WIDTH = 5; // Thickness of drawing lines
+// Available line widths
+const LINE_WIDTHS = {
+  THIN: 3.5,
+  THICK: 9
+} as const;
 
 type DrawingPoint = {
   x: number;
   y: number;
   color: string;
+  lineWidth: number;
 };
 
 type DrawingStroke = DrawingPoint[];
@@ -29,6 +34,7 @@ interface ImageAnnotatorProps {
 export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnnotatorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [selectedColor, setSelectedColor] = useState(NEON_COLORS[0].value);
+  const [selectedLineWidth, setSelectedLineWidth] = useState(LINE_WIDTHS.THIN);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<DrawingStroke>([]);
@@ -82,7 +88,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
       
       ctx.beginPath();
       ctx.strokeStyle = stroke[0].color;
-      ctx.lineWidth = LINE_WIDTH;
+      ctx.lineWidth = stroke[0].lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
@@ -97,7 +103,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
     if (currentStroke.length > 1) {
       ctx.beginPath();
       ctx.strokeStyle = currentStroke[0].color;
-      ctx.lineWidth = LINE_WIDTH;
+      ctx.lineWidth = currentStroke[0].lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
@@ -144,7 +150,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
     e.preventDefault();
     setIsDrawing(true);
     const coords = getCoordinates(e);
-    setCurrentStroke([{ ...coords, color: selectedColor }]);
+    setCurrentStroke([{ ...coords, color: selectedColor, lineWidth: selectedLineWidth }]);
   };
 
   // Continue drawing
@@ -153,7 +159,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
     e.preventDefault();
     
     const coords = getCoordinates(e);
-    setCurrentStroke(prev => [...prev, { ...coords, color: selectedColor }]);
+    setCurrentStroke(prev => [...prev, { ...coords, color: selectedColor, lineWidth: selectedLineWidth }]);
   };
 
   // End drawing
@@ -245,6 +251,32 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                   {color.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="line-width-selector">
+            <label className="line-width-label">Tjocklek:</label>
+            <div className="line-width-buttons">
+              <button
+                type="button"
+                className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THIN ? 'active' : ''}`}
+                onClick={() => setSelectedLineWidth(LINE_WIDTHS.THIN)}
+                title="Tunn linje (3-4px)"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THICK ? 'active' : ''}`}
+                onClick={() => setSelectedLineWidth(LINE_WIDTHS.THICK)}
+                title="Tjock linje (8-10px)"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="5" strokeLinecap="round" />
+                </svg>
+              </button>
             </div>
           </div>
 
@@ -402,6 +434,52 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
+        .line-width-selector {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          margin-bottom: 1rem;
+          flex-wrap: wrap;
+        }
+
+        .line-width-label {
+          font-weight: 600;
+          font-size: 0.875rem;
+          color: #374151;
+        }
+
+        .line-width-buttons {
+          display: flex;
+          gap: 0.5rem;
+        }
+
+        .line-width-btn {
+          width: 48px;
+          height: 48px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          background-color: white;
+          border: 2px solid #d1d5db;
+          color: #374151;
+        }
+
+        .line-width-btn:hover {
+          background-color: #f9fafb;
+          border-color: #9ca3af;
+        }
+
+        .line-width-btn.active {
+          background-color: #eff6ff;
+          border-color: #2563eb;
+          color: #2563eb;
+          box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+        }
+
         .action-buttons {
           display: flex;
           gap: 0.75rem;
@@ -471,6 +549,11 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           }
 
           .color-selector {
+            flex-direction: column;
+            align-items: flex-start;
+          }
+
+          .line-width-selector {
             flex-direction: column;
             align-items: flex-start;
           }
