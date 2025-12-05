@@ -156,6 +156,7 @@ export default function StatusForm() {
         vehicle: null,
         damages: [],
         history: [],
+        nybilPhotos: null,
       });
     } finally {
       setLoading(false);
@@ -615,7 +616,7 @@ const FilterButton: React.FC<React.PropsWithChildren<{ active: boolean; onClick:
 );
 
 const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage, regnr }) => {
-  const mediaUrl = buildDamageMediaUrl(regnr, damage.datum, damage.folder);
+  const mediaUrl = damage.folder ? buildDamageMediaUrl(regnr, damage.datum, damage.folder) : null;
   
   return (
     <div className="damage-item">
@@ -623,7 +624,9 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
         <span className="damage-type">{damage.skadetyp}</span>
         <span className="damage-date">{damage.datum}</span>
         {damage.sourceInfo && (
-          <span className="damage-source">{damage.sourceInfo}</span>
+          <span className="damage-source" style={{ whiteSpace: 'pre-line' }}>
+            {damage.sourceInfo}
+          </span>
         )}
         {mediaUrl && (
           <a
