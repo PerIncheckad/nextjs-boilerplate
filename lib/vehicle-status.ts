@@ -342,6 +342,14 @@ type LegacyDamage = {
   damage_date: string | null;
 };
 
+// Helper to format damage type from UPPERCASE_WITH_UNDERSCORES to Title Case
+function formatDamageType(damageType: string): string {
+  return damageType
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 // Helper to combine the raw text fields from a legacy damage object (same as /check)
 function getLegacyDamageText(damage: LegacyDamage): string {
   const parts = [
@@ -533,6 +541,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     };
 
     // Build damage records from legacy damages (BUHS)
+    // Note: Since source is 'checkins', the vehicle has never been checked in
     const damageRecords: DamageRecord[] = legacyDamages.map((d: LegacyDamage) => ({
       id: d.id,
       regnr: cleanedRegnr,
@@ -540,7 +549,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDate(d.damage_date),
       status: 'Befintlig',
       source: 'legacy' as const,
-      sourceInfo: 'Källa: BUHS (reg. nr har aldrig checkats in med incheckad.se/check)',
+      sourceInfo: 'Källa: BUHS\nReg. nr har aldrig checkats in med incheckad.se/check',
     }));
 
     // Build history records from checkins only
@@ -710,21 +719,62 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     harSkadorVidLeverans: nybilData?.har_skador_vid_leverans === true,
   };
 
-  // Build damage records from legacy damages (BUHS) - same source as /check
-  const damageRecords: DamageRecord[] = legacyDamages.map((d: LegacyDamage) => ({
-    id: d.id,
-    regnr: cleanedRegnr,
-    skadetyp: getLegacyDamageText(d) || 'Okänd',
-    datum: formatDate(d.damage_date),
-    status: 'Befintlig',
-    source: 'legacy' as const,
-    sourceInfo: 'Källa: BUHS (reg. nr har aldrig checkats in med incheckad.se/check)',
-  }));
+  // Determine if vehicle has ever been checked in
+  const hasBeenCheckedIn = checkins.length > 0;
   
-  // Add damages from damages table (nybil delivery damages)
+  // Build set of legacy damages that have been inventoried in damages table
+  // to avoid showing duplicates
+  const inventoriedLegacyDamages = new Set<string>();
+  for (const damage of damages) {
+    if (damage.legacy_damage_source_text) {
+      // This is a BUHS damage that was inventoried
+      const key = `${cleanedRegnr}-${formatDate(damage.damage_date)}-${damage.legacy_damage_source_text}`;
+      inventoriedLegacyDamages.add(key);
+    }
+  }
+  
+  // Build damage records from legacy damages (BUHS) - filter out duplicates
+  const damageRecords: DamageRecord[] = [];
+  
+  for (const d of legacyDamages) {
+    const legacyText = getLegacyDamageText(d);
+    const key = `${cleanedRegnr}-${formatDate(d.damage_date)}-${legacyText}`;
+    
+    // Skip if this damage has already been inventoried in damages table
+    if (inventoriedLegacyDamages.has(key)) {
+      continue;
+    }
+    
+    // Build sourceInfo based on whether vehicle has been checked in
+    let sourceInfo = 'Källa: BUHS';
+    if (!hasBeenCheckedIn) {
+      sourceInfo += '\nReg. nr har aldrig checkats in med incheckad.se/check';
+    }
+    
+    damageRecords.push({
+      id: d.id,
+      regnr: cleanedRegnr,
+      skadetyp: legacyText || 'Okänd',
+      datum: formatDate(d.damage_date),
+      status: 'Befintlig',
+      source: 'legacy' as const,
+      sourceInfo,
+      // No folder for legacy damages - they don't have media
+    });
+  }
+  
+  // Add damages from damages table (nybil delivery damages or inventoried BUHS damages)
   for (const damage of damages) {
     // Build damage description from type and positions
-    let skadetyp = damage.damage_type || damage.skadetyp || 'Okänd';
+    // Use damage_type_raw if available, otherwise format damage_type
+    let skadetyp: string;
+    if (damage.damage_type_raw) {
+      skadetyp = damage.damage_type_raw;
+    } else if (damage.damage_type) {
+      skadetyp = formatDamageType(damage.damage_type);
+    } else {
+      skadetyp = damage.skadetyp || 'Okänd';
+    }
     
     // If user_positions exists, format it as "Skadetyp - Placering - Position"
     if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
@@ -740,6 +790,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     }
     
+    // Determine source info based on whether this is a legacy damage or nybil damage
+    let sourceInfo: string;
+    if (damage.legacy_damage_source_text) {
+      // This was a BUHS damage that was inventoried
+      sourceInfo = 'Källa: BUHS (inventerad)';
+      if (damage.inchecker_name) {
+        sourceInfo += ` av ${damage.inchecker_name}`;
+      }
+    } else {
+      // This is a new damage registered during nybil delivery
+      sourceInfo = damage.inchecker_name 
+        ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
+        : 'Registrerad vid nybilsleverans';
+    }
+    
     damageRecords.push({
       id: damage.id,
       regnr: cleanedRegnr,
@@ -748,9 +813,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       status: damage.status || 'Befintlig',
       folder: damage.uploads?.folder || damage.folder,
       source: 'damages' as const,
-      sourceInfo: damage.inchecker_name 
-        ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
-        : 'Registrerad vid nybilsleverans',
+      sourceInfo,
     });
   }
 
