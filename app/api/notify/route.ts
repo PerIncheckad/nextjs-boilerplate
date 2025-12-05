@@ -18,7 +18,10 @@ const defaultHuvudstationAddress = 'per@incheckad.se';
 const stationEmailMapping: { [ort: string]: string } = {
   Helsingborg: 'helsingborg@incheckad.se',
   Ängelholm: 'helsingborg@incheckad.se',
-  Varberg: 'varberg@mabi.se',
+  Varberg: 'varberg@incheckad.se',
+  Malmö: 'malmo@incheckad.se',
+  Trelleborg: 'trelleborg@incheckad.se',
+  Lund: 'lund@incheckad.se',
 };
 
 const getSiteUrl = (request: Request): string => {
