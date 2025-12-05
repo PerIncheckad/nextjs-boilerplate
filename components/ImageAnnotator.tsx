@@ -256,22 +256,20 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THIN ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THIN)}
-                title="Pennspets - tunn linje (3.5px)"
+                title="Tunn linje (3.5px)"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3 21L12 12M12 12L21 3M12 12L9 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="9" cy="15" r="1" fill="currentColor"/>
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                 </svg>
               </button>
               <button
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THICK ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THICK)}
-                title="Penselspets - tjock linje (9px)"
+                title="Tjock linje (9px)"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M4 20L12 12M12 12L20 4M12 12L8 16" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="8" cy="16" r="2" fill="currentColor"/>
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="6" strokeLinecap="round"/>
                 </svg>
               </button>
             </div>
@@ -387,32 +385,34 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
 
         .floating-toolbar {
           position: absolute;
-          bottom: 1rem;
-          left: 50%;
-          transform: translateX(-50%);
+          bottom: 1.5rem;
+          left: 1rem;
+          right: 1rem;
           display: flex;
           align-items: center;
-          gap: 1rem;
-          padding: 0.75rem 1rem;
-          background: rgba(255, 255, 255, 0.95);
-          border-radius: 12px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-          backdrop-filter: blur(8px);
+          justify-content: space-between;
+          padding: 0.875rem 1.25rem;
+          background: rgba(255, 255, 255, 0.96);
+          border-radius: 16px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+          backdrop-filter: blur(12px);
           z-index: 10;
+          max-width: 600px;
+          margin: 0 auto;
         }
 
         .color-buttons {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.625rem;
           align-items: center;
         }
 
         .color-btn {
-          width: 44px;
-          height: 44px;
+          width: 48px;
+          height: 48px;
           border-radius: 50%;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.2s ease;
           font-size: 1.5rem;
           display: flex;
           align-items: center;
@@ -421,45 +421,47 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
         }
 
         .color-btn:hover {
-          transform: scale(1.1);
+          transform: scale(1.08);
         }
 
         .color-btn.active {
-          transform: scale(1.15);
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          transform: scale(1.12);
+          box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15);
         }
 
         .line-width-buttons {
           display: flex;
           gap: 0.5rem;
-          padding: 0.25rem 0.5rem;
-          background: #4b5563;
-          border-radius: 8px;
+          padding: 0.375rem 0.625rem;
+          background: linear-gradient(135deg, #374151 0%, #4b5563 100%);
+          border-radius: 10px;
+          box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .line-width-btn {
-          width: 40px;
-          height: 40px;
-          border-radius: 6px;
+          width: 44px;
+          height: 44px;
+          border-radius: 8px;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.2s ease;
           display: flex;
           align-items: center;
           justify-content: center;
           padding: 0;
           background-color: transparent;
           border: none;
-          color: #d1d5db;
+          color: #9ca3af;
         }
 
         .line-width-btn:hover {
-          background-color: rgba(255, 255, 255, 0.1);
-          color: white;
+          background-color: rgba(255, 255, 255, 0.15);
+          color: #e5e7eb;
         }
 
         .line-width-btn.active {
-          background-color: rgba(255, 255, 255, 0.2);
+          background-color: rgba(255, 255, 255, 0.25);
           color: white;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
         }
 
         .annotator-controls {
@@ -538,21 +540,29 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           }
 
           .floating-toolbar {
-            bottom: 0.5rem;
-            padding: 0.5rem 0.75rem;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            justify-content: center;
+            bottom: 0.75rem;
+            left: 0.75rem;
+            right: 0.75rem;
+            padding: 0.75rem 1rem;
+          }
+
+          .color-buttons {
+            gap: 0.5rem;
           }
 
           .color-btn {
-            width: 40px;
-            height: 40px;
+            width: 42px;
+            height: 42px;
+            font-size: 1.25rem;
+          }
+
+          .line-width-buttons {
+            padding: 0.25rem 0.5rem;
           }
 
           .line-width-btn {
-            width: 36px;
-            height: 36px;
+            width: 38px;
+            height: 38px;
           }
 
           .action-buttons {
