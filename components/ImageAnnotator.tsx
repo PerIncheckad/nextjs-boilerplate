@@ -185,7 +185,9 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
 
     canvas.toBlob((blob) => {
       if (!blob) {
-        alert('Fel vid sparande av bild');
+        console.error('Failed to create blob from canvas');
+        // Just cancel instead of showing an error - user can try again
+        onCancel();
         return;
       }
 

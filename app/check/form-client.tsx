@@ -1166,25 +1166,26 @@ export default function CheckInForm() {
   const handleAnnotatorSave = async (annotatedFile: File) => {
     if (!annotatorContext) return;
 
-    const processed = await processFiles(new DataTransfer().files as FileList);
-    // Create a DataTransfer to hold the annotated file
-    const dt = new DataTransfer();
-    dt.items.add(annotatedFile);
-    const annotatedProcessed = await processFiles(dt.files);
+    // Create MediaFile directly from the annotated file
+    const annotatedMediaFile: MediaFile = {
+      file: annotatedFile,
+      type: 'image',
+      preview: URL.createObjectURL(annotatedFile)
+    };
 
     if (annotatorContext.type === 'damage' && annotatorContext.damageId) {
       const updater = annotatorContext.isExisting ? setExistingDamages : setNewDamages;
       updater(damages => damages.map(d => 
         d.id === annotatorContext.damageId 
-          ? { ...d, media: [...(d.media || []), ...annotatedProcessed] } 
+          ? { ...d, media: [...(d.media || []), annotatedMediaFile] } 
           : d
       ));
     } else if (annotatorContext.type === 'rekond') {
-      setRekondMedia(prev => [...prev, ...annotatedProcessed]);
+      setRekondMedia(prev => [...prev, annotatedMediaFile]);
     } else if (annotatorContext.type === 'husdjur') {
-      setHusdjurMedia(prev => [...prev, ...annotatedProcessed]);
+      setHusdjurMedia(prev => [...prev, annotatedMediaFile]);
     } else if (annotatorContext.type === 'rokning') {
-      setRokningMedia(prev => [...prev, ...annotatedProcessed]);
+      setRokningMedia(prev => [...prev, annotatedMediaFile]);
     }
 
     // Close annotator
