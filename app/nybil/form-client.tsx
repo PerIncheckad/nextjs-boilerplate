@@ -211,6 +211,7 @@ export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
   const [regInput, setRegInput] = useState('');
+  const [regInputConfirm, setRegInputConfirm] = useState('');
   const [bilmarke, setBilmarke] = useState('');
   const [bilmarkeAnnat, setBilmarkeAnnat] = useState('');
   const [modell, setModell] = useState('');
@@ -300,6 +301,7 @@ export default function NybilForm() {
   const [showRegWarningModal, setShowRegWarningModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [matarstallningError, setMatarstallningError] = useState('');
+  const [regMismatchError, setRegMismatchError] = useState(false);
   
   // Duplicate detection state
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
@@ -327,6 +329,8 @@ export default function NybilForm() {
   const [annotatorDamageId, setAnnotatorDamageId] = useState<string | null>(null);
   
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
+  const normalizedRegConfirm = useMemo(() => regInputConfirm.toUpperCase().replace(/\s/g, ''), [regInputConfirm]);
+  const regNrMatches = useMemo(() => normalizedReg === normalizedRegConfirm, [normalizedReg, normalizedRegConfirm]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
   const availableStationsAktuell = useMemo(() => STATIONER[platsAktuellOrt] || [], [platsAktuellOrt]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -517,6 +521,8 @@ export default function NybilForm() {
     // Required basic fields - FORDON
     if (!regInput || !bilmarke || !modell) return false;
     if (bilmarke === 'Annat' && !bilmarkeAnnat.trim()) return false;
+    // REGISTRATION NUMBER CONFIRMATION
+    if (!regInputConfirm || !regNrMatches) return false;
     // PLATS FÖR MOTTAGNING
     if (!ort || !station) return false;
     // PLANERAD STATION - now optional, no validation needed
@@ -538,7 +544,7 @@ export default function NybilForm() {
     // KLAR FÖR UTHYRNING
     if (klarForUthyrningMissing) return false;
     return true;
-  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, damagesMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
+  }, [regInput, regInputConfirm, regNrMatches, bilmarke, bilmarkeAnnat, modell, ort, station, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, damagesMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -600,6 +606,7 @@ export default function NybilForm() {
   
   const resetForm = () => {
     setRegInput('');
+    setRegInputConfirm('');
     setBilmarke('');
     setBilmarkeAnnat('');
     setModell('');
@@ -673,6 +680,7 @@ export default function NybilForm() {
     setShowFieldErrors(false);
     setShowRegWarningModal(false);
     setShowConfirmModal(false);
+    setRegMismatchError(false);
     // Reset duplicate state
     setShowDuplicateModal(false);
     setDuplicateInfo(null);
@@ -913,6 +921,10 @@ export default function NybilForm() {
     
     if (!formIsValid) {
       console.log('Form is not valid, showing errors');
+      // Show registration mismatch error if applicable
+      if (regInputConfirm && !regNrMatches) {
+        setRegMismatchError(true);
+      }
       handleShowErrors();
       return;
     }
@@ -1528,10 +1540,36 @@ export default function NybilForm() {
       </div>
       
       {/* FORDON Section */}
-      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell || (bilmarke === 'Annat' && !bilmarkeAnnat.trim()))}>
+      <Card data-error={showFieldErrors && (!regInput || !regInputConfirm || !regNrMatches || !bilmarke || !modell || (bilmarke === 'Annat' && !bilmarkeAnnat.trim()))}>
         <SectionHeader title="Fordon" />
         <Field label="Registreringsnummer *">
-          <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} placeholder="ABC 123" className="reg-input" />
+          <input 
+            type="text" 
+            value={regInput} 
+            onChange={(e) => {
+              setRegInput(e.target.value);
+              setRegMismatchError(false);
+            }} 
+            placeholder="ABC 123" 
+            className="reg-input" 
+          />
+        </Field>
+        <Field label="Bekräfta registreringsnummer *">
+          <input 
+            type="text" 
+            value={regInputConfirm} 
+            onChange={(e) => {
+              setRegInputConfirm(e.target.value);
+              setRegMismatchError(false);
+            }} 
+            placeholder="ABC 123" 
+            className="reg-input" 
+          />
+          {regMismatchError && regInputConfirm && !regNrMatches && (
+            <p className="error-text" style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              Registreringsnumren matchar inte. Kontrollera stavningen.
+            </p>
+          )}
         </Field>
         <div className="grid-2-col">
           <Field label="Bilmärke *">
