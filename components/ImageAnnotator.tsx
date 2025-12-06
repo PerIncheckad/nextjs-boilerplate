@@ -238,9 +238,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                   }}
                   onClick={() => setSelectedColor(color.value)}
                   title={color.name}
-                >
-                  {color.label}
-                </button>
+                />
               ))}
             </div>
             
@@ -252,8 +250,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 title="Pennspets - tunn linje (3.5px)"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20 4L4 20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  <circle cx="18.5" cy="5.5" r="1.5" fill="currentColor"/>
+                  <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
                 </svg>
               </button>
               <button
@@ -263,8 +260,7 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 title="Penselspets - tjock linje (9px)"
               >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M19 5L5 19" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
-                  <ellipse cx="17" cy="7" rx="2.5" ry="3.5" transform="rotate(-45 17 7)" fill="currentColor"/>
+                  <ellipse cx="12" cy="12" rx="5" ry="3.5" fill="currentColor"/>
                 </svg>
               </button>
             </div>
