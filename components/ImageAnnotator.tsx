@@ -12,8 +12,8 @@ const NEON_COLORS = [
 
 // Available line widths
 const LINE_WIDTHS = {
-  THIN: 3.5,
-  THICK: 9
+  THIN: 10,
+  THICK: 20
 } as const;
 
 type DrawingPoint = {
@@ -247,20 +247,20 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THIN ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THIN)}
-                title="Pennspets - tunn linje (3.5px)"
+                title="Tunn linje (10px)"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="2.5" fill="currentColor"/>
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                  <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
                 </svg>
               </button>
               <button
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THICK ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THICK)}
-                title="Penselspets - tjock linje (9px)"
+                title="Tjock linje (20px)"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <ellipse cx="12" cy="12" rx="5" ry="3.5" fill="currentColor"/>
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                  <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="8" strokeLinecap="round"/>
                 </svg>
               </button>
             </div>
