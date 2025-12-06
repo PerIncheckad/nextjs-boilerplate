@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
+import ImageAnnotator from '@/components/ImageAnnotator';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
@@ -319,6 +320,11 @@ export default function NybilForm() {
   const [damages, setDamages] = useState<DamageEntry[]>([]);
   const [showDamageModal, setShowDamageModal] = useState(false);
   const [currentDamageId, setCurrentDamageId] = useState<string | null>(null);
+
+  // Image Annotator State
+  const [showAnnotator, setShowAnnotator] = useState(false);
+  const [annotatorImage, setAnnotatorImage] = useState<File | null>(null);
+  const [annotatorDamageId, setAnnotatorDamageId] = useState<string | null>(null);
   
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
@@ -747,6 +753,16 @@ export default function NybilForm() {
   const handleDamagePhotoChange = (damageId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
+      const firstFile = files[0];
+      // Show annotator for first image
+      if (firstFile && firstFile.type.startsWith('image')) {
+        setAnnotatorImage(firstFile);
+        setAnnotatorDamageId(damageId);
+        setShowAnnotator(true);
+        e.target.value = '';
+        return;
+      }
+      // Process remaining files
       const newPhotos: PhotoFile[] = Array.from(files).map(file => ({
         file,
         preview: URL.createObjectURL(file)
@@ -759,6 +775,33 @@ export default function NybilForm() {
     e.target.value = '';
   };
   
+  // Handle annotator save
+  const handleAnnotatorSave = (annotatedFile: File) => {
+    if (!annotatorDamageId) return;
+
+    const newPhoto: PhotoFile = {
+      file: annotatedFile,
+      preview: URL.createObjectURL(annotatedFile)
+    };
+
+    setDamages(prev => prev.map(d => {
+      if (d.id !== annotatorDamageId) return d;
+      return { ...d, photos: [...d.photos, newPhoto] };
+    }));
+
+    // Close annotator
+    setShowAnnotator(false);
+    setAnnotatorImage(null);
+    setAnnotatorDamageId(null);
+  };
+
+  // Handle annotator cancel
+  const handleAnnotatorCancel = () => {
+    setShowAnnotator(false);
+    setAnnotatorImage(null);
+    setAnnotatorDamageId(null);
+  };
+
   const removeDamagePhoto = (damageId: string, photoIndex: number) => {
     setDamages(prev => prev.map(d => {
       if (d.id !== damageId) return d;
@@ -1407,6 +1450,13 @@ export default function NybilForm() {
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
       {isSaving && <SpinnerOverlay />}
       {showSuccessModal && <SuccessModal firstName={firstName} />}
+      {showAnnotator && annotatorImage && (
+        <ImageAnnotator
+          imageFile={annotatorImage}
+          onSave={handleAnnotatorSave}
+          onCancel={handleAnnotatorCancel}
+        />
+      )}
       {showDamageModal && currentDamageId && (
         <DamageModal
           damage={getCurrentDamage()!}

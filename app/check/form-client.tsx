@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 import { DAMAGE_OPTIONS } from '@/data/damage-options';
+import ImageAnnotator from '@/components/ImageAnnotator';
 
 // =================================================================
 // 1. DATA, TYPES & HELPERS
@@ -425,6 +426,15 @@ export default function CheckInForm() {
   const [bilenStarNuKommentar, setBilenStarNuKommentar] = useState('');
   const [matarstallningAvlamning, setMatarstallningAvlamning] = useState('');
   const [matarstallningAvlamningError, setMatarstallningAvlamningError] = useState('');
+
+  // Image Annotator State
+  const [showAnnotator, setShowAnnotator] = useState(false);
+  const [annotatorImage, setAnnotatorImage] = useState<File | null>(null);
+  const [annotatorContext, setAnnotatorContext] = useState<{
+    type: 'damage' | 'rekond' | 'husdjur' | 'rokning';
+    damageId?: string;
+    isExisting?: boolean;
+  } | null>(null);
 
 
   // Derived State & Memos
@@ -1082,22 +1092,52 @@ export default function CheckInForm() {
   };
 
   const handleMediaUpdate = async (id: string, files: FileList, isExisting: boolean) => {
+    // For image files, show annotator for first image
+    const firstFile = files[0];
+    if (firstFile && firstFile.type.startsWith('image')) {
+      setAnnotatorImage(firstFile);
+      setAnnotatorContext({ type: 'damage', damageId: id, isExisting });
+      setShowAnnotator(true);
+      return;
+    }
+    // For videos, process directly
     const processed = await processFiles(files);
     const updater = isExisting ? setExistingDamages : setNewDamages;
     updater(damages => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
   };
   
   const handleRekondMediaUpdate = async (files: FileList) => {
+    const firstFile = files[0];
+    if (firstFile && firstFile.type.startsWith('image')) {
+      setAnnotatorImage(firstFile);
+      setAnnotatorContext({ type: 'rekond' });
+      setShowAnnotator(true);
+      return;
+    }
     const processed = await processFiles(files);
     setRekondMedia(prev => [...prev, ...processed]);
   };
   
   const handleHusdjurMediaUpdate = async (files: FileList) => {
+    const firstFile = files[0];
+    if (firstFile && firstFile.type.startsWith('image')) {
+      setAnnotatorImage(firstFile);
+      setAnnotatorContext({ type: 'husdjur' });
+      setShowAnnotator(true);
+      return;
+    }
     const processed = await processFiles(files);
     setHusdjurMedia(prev => [...prev, ...processed]);
   };
   
   const handleRokningMediaUpdate = async (files: FileList) => {
+    const firstFile = files[0];
+    if (firstFile && firstFile.type.startsWith('image')) {
+      setAnnotatorImage(firstFile);
+      setAnnotatorContext({ type: 'rokning' });
+      setShowAnnotator(true);
+      return;
+    }
     const processed = await processFiles(files);
     setRokningMedia(prev => [...prev, ...processed]);
   };
@@ -1120,6 +1160,45 @@ export default function CheckInForm() {
   };
   const handleRokningMediaRemove = (index: number) => {
     setRokningMedia(prev => { const newMedia = [...prev]; newMedia.splice(index, 1); return newMedia; });
+  };
+
+  // Handle annotator save
+  const handleAnnotatorSave = async (annotatedFile: File) => {
+    if (!annotatorContext) return;
+
+    // Create MediaFile directly from the annotated file
+    const annotatedMediaFile: MediaFile = {
+      file: annotatedFile,
+      type: 'image',
+      preview: URL.createObjectURL(annotatedFile)
+    };
+
+    if (annotatorContext.type === 'damage' && annotatorContext.damageId) {
+      const updater = annotatorContext.isExisting ? setExistingDamages : setNewDamages;
+      updater(damages => damages.map(d => 
+        d.id === annotatorContext.damageId 
+          ? { ...d, media: [...(d.media || []), annotatedMediaFile] } 
+          : d
+      ));
+    } else if (annotatorContext.type === 'rekond') {
+      setRekondMedia(prev => [...prev, annotatedMediaFile]);
+    } else if (annotatorContext.type === 'husdjur') {
+      setHusdjurMedia(prev => [...prev, annotatedMediaFile]);
+    } else if (annotatorContext.type === 'rokning') {
+      setRokningMedia(prev => [...prev, annotatedMediaFile]);
+    }
+
+    // Close annotator
+    setShowAnnotator(false);
+    setAnnotatorImage(null);
+    setAnnotatorContext(null);
+  };
+
+  // Handle annotator cancel
+  const handleAnnotatorCancel = () => {
+    setShowAnnotator(false);
+    setAnnotatorImage(null);
+    setAnnotatorContext(null);
   };
 
   const addDamage = () => {
@@ -1167,6 +1246,13 @@ export default function CheckInForm() {
       {showSuccessModal && <SuccessModal firstName={firstName} />}
       {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
       <ActionConfirmDialog state={confirmDialog} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
+      {showAnnotator && annotatorImage && (
+        <ImageAnnotator
+          imageFile={annotatorImage}
+          onSave={handleAnnotatorSave}
+          onCancel={handleAnnotatorCancel}
+        />
+      )}
       
       <div className="checkin-form">
         <div className="main-header">
