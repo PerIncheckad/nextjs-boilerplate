@@ -211,10 +211,6 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
     <>
       <div className="annotator-overlay" onClick={onCancel} />
       <div className="annotator-modal">
-        <div className="annotator-header">
-          <h3>Rita på bilden</h3>
-        </div>
-
         <div className="annotator-canvas-container">
           <canvas
             ref={canvasRef}
@@ -253,20 +249,22 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THIN ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THIN)}
-                title="Tunn linje (3.5px)"
+                title="Pennspets - tunn linje (3.5px)"
               >
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M20 4L4 20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  <circle cx="18.5" cy="5.5" r="1.5" fill="currentColor"/>
                 </svg>
               </button>
               <button
                 type="button"
                 className={`line-width-btn ${selectedLineWidth === LINE_WIDTHS.THICK ? 'active' : ''}`}
                 onClick={() => setSelectedLineWidth(LINE_WIDTHS.THICK)}
-                title="Tjock linje (9px)"
+                title="Penselspets - tjock linje (9px)"
               >
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <line x1="6" y1="14" x2="22" y2="14" stroke="currentColor" strokeWidth="8" strokeLinecap="round"/>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M19 5L5 19" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                  <ellipse cx="17" cy="7" rx="2.5" ry="3.5" transform="rotate(-45 17 7)" fill="currentColor"/>
                 </svg>
               </button>
             </div>
@@ -339,25 +337,6 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
           box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
         }
 
-        .annotator-header {
-          padding: 1.5rem;
-          border-bottom: 1px solid #e5e7eb;
-          text-align: center;
-        }
-
-        .annotator-header h3 {
-          margin: 0 0 0.5rem 0;
-          font-size: 1.25rem;
-          font-weight: 700;
-          color: #1f2937;
-        }
-
-        .annotator-instructions {
-          margin: 0;
-          font-size: 0.875rem;
-          color: #6b7280;
-        }
-
         .annotator-canvas-container {
           flex: 1;
           overflow: auto;
@@ -419,7 +398,6 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
 
         .color-btn.active {
           transform: scale(1.12);
-          box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.15);
         }
 
         .line-width-buttons {
@@ -522,10 +500,6 @@ export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnn
             width: 100%;
             height: 100%;
             border-radius: 0;
-          }
-
-          .annotator-header {
-            padding: 1rem;
           }
 
           .annotator-canvas-container {
