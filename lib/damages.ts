@@ -91,7 +91,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .not('legacy_damage_source_text', 'is', null),
     supabase
       .from('nybil_inventering')
-      .select('regnr, bilmarke, modell')
+      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -149,11 +149,17 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
 
   // Check if vehicle exists in nybil_inventering (registered via /nybil)
   if (nybilData) {
+    const wheelStorage = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring]
+      .filter(Boolean)
+      .join(' - ') || 'Ingen information';
+    
+    const nybilSaludatum = nybilData.saludatum ? formatSaludatum(nybilData.saludatum) : finalSaludatum;
+    
     return {
       regnr: cleanedRegnr,
       model: formatModel(nybilData.bilmarke, nybilData.modell),
-      wheel_storage_location: 'Ingen information',
-      saludatum: finalSaludatum,
+      wheel_storage_location: wheelStorage,
+      saludatum: nybilSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
     };
