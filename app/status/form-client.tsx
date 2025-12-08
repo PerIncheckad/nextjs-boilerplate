@@ -297,6 +297,20 @@ export default function StatusForm() {
           {vehicleStatus && !vehicleStatus.found && !loading && regInput.length >= 5 && (
             <p className="not-found-text">Fordonet hittades inte</p>
           )}
+          {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.saludatum !== '---' && (
+            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+              <p 
+                style={{ 
+                  margin: 0, 
+                  fontSize: '0.875rem', 
+                  fontWeight: 500,
+                  color: isSaludatumAtRisk(vehicleStatus.vehicle.saludatum) ? 'var(--color-danger)' : 'inherit'
+                }}
+              >
+                Saludatum: {vehicleStatus.vehicle.saludatum}
+              </p>
+            </div>
+          )}
         </Card>
 
         {/* Print Header (hidden on screen, visible on print) */}
