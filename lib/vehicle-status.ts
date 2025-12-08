@@ -729,12 +729,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : null,
     
     // Sale status: nybil_inventering.is_sold → vehicles.is_sold
-    // Only use actual boolean values (true/false), not null/undefined
-    isSold: typeof nybilData?.is_sold === 'boolean'
-      ? nybilData.is_sold 
-      : typeof vehicleData?.is_sold === 'boolean'
-        ? vehicleData.is_sold 
-        : null,
+    // Use nullish coalescing to preserve null values (not convert to false)
+    isSold: nybilData?.is_sold ?? vehicleData?.is_sold ?? null,
   };
 
   // Determine if vehicle has ever been checked in
