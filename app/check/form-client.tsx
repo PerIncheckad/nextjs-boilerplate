@@ -586,7 +586,7 @@ export default function CheckInForm() {
       if (info.status === 'NO_MATCH' || info.status === 'PARTIAL_MATCH_DAMAGE_ONLY') {
         setConfirmDialog({
           isOpen: true,
-          title: '⚠️ Reg.nr saknas i Bilkontroll',
+          title: '⚠️ Reg.nr saknas!',
           text: 'Okänt reg.nr. Vänligen dubbelkolla innan du fortsätter.',
           confirmButtonVariant: 'danger',
           theme: 'warning',

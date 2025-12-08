@@ -79,7 +79,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
   // Step 1: Fetch all data concurrently
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse] = await Promise.all([
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, nybilResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -88,11 +88,19 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .from('damages')
       .select('legacy_damage_source_text, user_type, user_positions')
       .eq('regnr', cleanedRegnr)
-      .not('legacy_damage_source_text', 'is', null)
+      .not('legacy_damage_source_text', 'is', null),
+    supabase
+      .from('nybil_inventering')
+      .select('regnr, bilmarke, modell')
+      .ilike('regnr', cleanedRegnr)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
 
   // Step 2: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
+  const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   
   // Create a lookup map of inventoried damages for efficient access
@@ -133,6 +141,18 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       regnr: cleanedRegnr,
       model: formatModel(vehicleData.brand, vehicleData.model),
       wheel_storage_location: vehicleData.wheel_storage_location || 'Ingen information',
+      saludatum: finalSaludatum,
+      existing_damages: consolidatedDamages,
+      status: 'FULL_MATCH',
+    };
+  }
+
+  // Check if vehicle exists in nybil_inventering (registered via /nybil)
+  if (nybilData) {
+    return {
+      regnr: cleanedRegnr,
+      model: formatModel(nybilData.bilmarke, nybilData.modell),
+      wheel_storage_location: 'Ingen information',
       saludatum: finalSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
