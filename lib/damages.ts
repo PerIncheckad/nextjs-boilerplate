@@ -92,7 +92,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     supabase
       .from('nybil_inventering')
       .select('regnr, bilmarke, modell')
-      .ilike('regnr', cleanedRegnr)
+      .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
