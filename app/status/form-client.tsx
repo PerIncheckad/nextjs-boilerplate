@@ -474,10 +474,12 @@ export default function StatusForm() {
               )}
               <Fragment>
                 <span className="info-label">Skador vid leverans</span>
-                <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans ? 'at-risk' : ''}`}>
-                  {vehicleStatus.vehicle.harSkadorVidLeverans 
+                <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans === true ? 'at-risk' : ''}`}>
+                  {vehicleStatus.vehicle.harSkadorVidLeverans === true
                     ? 'Skador vid leverans, se skaderegistreringen ovan' 
-                    : 'Inga'}
+                    : vehicleStatus.vehicle.harSkadorVidLeverans === false
+                      ? 'Inga'
+                      : '---'}
                 </span>
               </Fragment>
               <InfoRow label="Övrig info" value={vehicleStatus.vehicle.anteckningar} />

@@ -54,7 +54,7 @@ export type VehicleStatusData = {
   // General comment
   anteckningar: string;
   // Damages at delivery
-  harSkadorVidLeverans: boolean;
+  harSkadorVidLeverans: boolean | null;
   // Sale status
   isSold: boolean | null;
 };
@@ -541,7 +541,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
       anteckningar: '---',
-      harSkadorVidLeverans: false,
+      harSkadorVidLeverans: null,
       isSold: null,
     };
 
@@ -724,7 +724,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     anteckningar: nybilData?.anteckningar || '---',
     
     // Damages at delivery
-    harSkadorVidLeverans: nybilData?.har_skador_vid_leverans === true,
+    harSkadorVidLeverans: typeof nybilData?.har_skador_vid_leverans === 'boolean'
+      ? nybilData.har_skador_vid_leverans
+      : null,
     
     // Sale status: nybil_inventering.is_sold → vehicles.is_sold
     // Only use actual boolean values (true/false), not null/undefined
