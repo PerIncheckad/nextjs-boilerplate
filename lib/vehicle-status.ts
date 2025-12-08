@@ -634,7 +634,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Serviceintervall: nybil_inventering.serviceintervall
     serviceintervall: nybilData?.serviceintervall
-      ? `${nybilData.serviceintervall} mil`
+      ? `${nybilData.serviceintervall} km`
       : '---',
     
     // Max km/månad: nybil_inventering.max_km_manad
@@ -727,9 +727,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     harSkadorVidLeverans: nybilData?.har_skador_vid_leverans === true,
     
     // Sale status: nybil_inventering.is_sold → vehicles.is_sold
-    isSold: nybilData?.is_sold !== undefined 
+    isSold: nybilData?.is_sold !== undefined && nybilData?.is_sold !== null
       ? nybilData.is_sold 
-      : vehicleData?.is_sold !== undefined 
+      : vehicleData?.is_sold !== undefined && vehicleData?.is_sold !== null
         ? vehicleData.is_sold 
         : null,
   };
