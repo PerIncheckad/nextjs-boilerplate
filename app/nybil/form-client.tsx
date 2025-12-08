@@ -211,6 +211,7 @@ export default function NybilForm() {
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
   const [regInput, setRegInput] = useState('');
+  const [regInputConfirm, setRegInputConfirm] = useState('');
   const [bilmarke, setBilmarke] = useState('');
   const [bilmarkeAnnat, setBilmarkeAnnat] = useState('');
   const [modell, setModell] = useState('');
@@ -300,6 +301,7 @@ export default function NybilForm() {
   const [showRegWarningModal, setShowRegWarningModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [matarstallningError, setMatarstallningError] = useState('');
+  const [regMismatchError, setRegMismatchError] = useState(false);
   
   // Duplicate detection state
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
@@ -307,6 +309,7 @@ export default function NybilForm() {
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
     previousRegistration: { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string } | null;
+    vehicleInfo: { bilmarke?: string; modell?: string } | null;
   } | null>(null);
   const [isDuplicate, setIsDuplicate] = useState(false);
   
@@ -327,6 +330,8 @@ export default function NybilForm() {
   const [annotatorDamageId, setAnnotatorDamageId] = useState<string | null>(null);
   
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
+  const normalizedRegConfirm = useMemo(() => regInputConfirm.toUpperCase().replace(/\s/g, ''), [regInputConfirm]);
+  const regNrMatches = useMemo(() => normalizedReg === normalizedRegConfirm, [normalizedReg, normalizedRegConfirm]);
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
   const availableStationsAktuell = useMemo(() => STATIONER[platsAktuellOrt] || [], [platsAktuellOrt]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -517,6 +522,8 @@ export default function NybilForm() {
     // Required basic fields - FORDON
     if (!regInput || !bilmarke || !modell) return false;
     if (bilmarke === 'Annat' && !bilmarkeAnnat.trim()) return false;
+    // REGISTRATION NUMBER CONFIRMATION
+    if (!regInputConfirm || !regNrMatches) return false;
     // PLATS FÖR MOTTAGNING
     if (!ort || !station) return false;
     // PLANERAD STATION - now optional, no validation needed
@@ -538,7 +545,7 @@ export default function NybilForm() {
     // KLAR FÖR UTHYRNING
     if (klarForUthyrningMissing) return false;
     return true;
-  }, [regInput, bilmarke, bilmarkeAnnat, modell, ort, station, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, damagesMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
+  }, [regInput, regInputConfirm, regNrMatches, bilmarke, bilmarkeAnnat, modell, ort, station, hasFordonStatusErrors, avtalsvillkorMissing, equipmentMissing, showUppkopplingSection, uppkopplingMissing, photosMissing, damagesMissing, platsAktuellOrt, platsAktuellStation, locationDiffers, matarstallningAktuell, klarForUthyrningMissing]);
   
   useEffect(() => {
     const getUser = async () => {
@@ -600,6 +607,7 @@ export default function NybilForm() {
   
   const resetForm = () => {
     setRegInput('');
+    setRegInputConfirm('');
     setBilmarke('');
     setBilmarkeAnnat('');
     setModell('');
@@ -673,6 +681,7 @@ export default function NybilForm() {
     setShowFieldErrors(false);
     setShowRegWarningModal(false);
     setShowConfirmModal(false);
+    setRegMismatchError(false);
     // Reset duplicate state
     setShowDuplicateModal(false);
     setDuplicateInfo(null);
@@ -854,6 +863,7 @@ export default function NybilForm() {
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
     previousRegistration: { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
+    vehicleInfo: { bilmarke?: string; modell?: string } | null;
   }> => {
     const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
     console.log('Checking duplicate for:', normalizedRegnr);
@@ -861,7 +871,7 @@ export default function NybilForm() {
     // Check vehicles table (Bilkontroll-filen) - use ilike for case-insensitive matching
     const { data: vehicleMatch, error: vehicleError } = await supabase
       .from('vehicles')
-      .select('regnr')
+      .select('regnr, brand, model')
       .ilike('regnr', normalizedRegnr)
       .maybeSingle();
     
@@ -896,7 +906,8 @@ export default function NybilForm() {
     const result = {
       existsInBilkontroll: !!vehicleMatch,
       existsInNybil: !!nybilMatch,
-      previousRegistration: previousRegistration as { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null
+      previousRegistration: previousRegistration as { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null,
+      vehicleInfo: vehicleMatch ? { bilmarke: vehicleMatch.brand, modell: vehicleMatch.model } : null
     };
     console.log('Duplicate result:', result);
     console.log('previousRegistration.id:', previousRegistration?.id, 'type:', typeof previousRegistration?.id);
@@ -913,6 +924,10 @@ export default function NybilForm() {
     
     if (!formIsValid) {
       console.log('Form is not valid, showing errors');
+      // Show registration mismatch error if applicable
+      if (regInputConfirm && !regNrMatches) {
+        setRegMismatchError(true);
+      }
       handleShowErrors();
       return;
     }
@@ -1507,6 +1522,7 @@ export default function NybilForm() {
           existsInBilkontroll={duplicateInfo.existsInBilkontroll}
           existsInNybil={duplicateInfo.existsInNybil}
           previousRegistration={duplicateInfo.previousRegistration}
+          vehicleInfo={duplicateInfo.vehicleInfo}
           onCancel={() => {
             setShowDuplicateModal(false);
             setDuplicateInfo(null);
@@ -1528,10 +1544,36 @@ export default function NybilForm() {
       </div>
       
       {/* FORDON Section */}
-      <Card data-error={showFieldErrors && (!regInput || !bilmarke || !modell || (bilmarke === 'Annat' && !bilmarkeAnnat.trim()))}>
+      <Card data-error={showFieldErrors && (!regInput || !regInputConfirm || !regNrMatches || !bilmarke || !modell || (bilmarke === 'Annat' && !bilmarkeAnnat.trim()))}>
         <SectionHeader title="Fordon" />
         <Field label="Registreringsnummer *">
-          <input type="text" value={regInput} onChange={(e) => setRegInput(e.target.value)} placeholder="ABC 123" className="reg-input" />
+          <input 
+            type="text" 
+            value={regInput} 
+            onChange={(e) => {
+              setRegInput(e.target.value);
+              setRegMismatchError(false);
+            }} 
+            placeholder="ABC 123" 
+            className="reg-input" 
+          />
+        </Field>
+        <Field label="Bekräfta registreringsnummer *">
+          <input 
+            type="text" 
+            value={regInputConfirm} 
+            onChange={(e) => {
+              setRegInputConfirm(e.target.value);
+              setRegMismatchError(false);
+            }} 
+            placeholder="ABC 123" 
+            className="reg-input" 
+          />
+          {regMismatchError && regInputConfirm && !regNrMatches && (
+            <p className="error-text" style={{ color: 'var(--color-danger)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              Registreringsnumren matchar inte. Kontrollera stavningen.
+            </p>
+          )}
         </Field>
         <div className="grid-2-col">
           <Field label="Bilmärke *">
@@ -2209,6 +2251,7 @@ type DuplicateWarningModalProps = {
   existsInBilkontroll: boolean;
   existsInNybil: boolean;
   previousRegistration: { regnr: string; registreringsdatum: string; bilmarke: string; modell: string; created_at?: string; fullstandigt_namn?: string } | null;
+  vehicleInfo: { bilmarke?: string; modell?: string } | null;
   onCancel: () => void;
   onConfirm: () => void;
 };
@@ -2217,7 +2260,8 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
   regnr, 
   existsInBilkontroll, 
   existsInNybil, 
-  previousRegistration, 
+  previousRegistration,
+  vehicleInfo,
   onCancel, 
   onConfirm 
 }) => {
@@ -2234,24 +2278,46 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
     return previousRegistration.registreringsdatum;
   };
 
+  const renderBilkontrollInfo = () => {
+    if (!vehicleInfo) return <p style={{ marginTop: '16px', color: '#6b7280', fontStyle: 'italic' }}>Finns i Bilkontroll-filen.</p>;
+    
+    const { bilmarke, modell } = vehicleInfo;
+    if (bilmarke && modell) {
+      return (
+        <div className="duplicate-info" style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
+          <p style={{ margin: '0 0 4px 0' }}><strong>Tidigare registrering:</strong> {bilmarke} {modell}</p>
+          <p style={{ margin: 0, color: '#6b7280', fontStyle: 'italic' }}>(från Bilkontroll-filen)</p>
+        </div>
+      );
+    } else if (bilmarke) {
+      return (
+        <div style={{ marginTop: '16px' }}>
+          <p style={{ margin: '0 0 4px 0' }}><strong>Tidigare registrering:</strong> {bilmarke}</p>
+          <p style={{ margin: 0, color: '#6b7280', fontStyle: 'italic' }}>(från Bilkontroll-filen)</p>
+        </div>
+      );
+    } else {
+      return <p style={{ marginTop: '16px', color: '#6b7280', fontStyle: 'italic' }}>Finns i Bilkontroll-filen.</p>;
+    }
+  };
+
   return (
     <>
       <div className="modal-overlay" />
       <div className="modal-content warning-modal duplicate-warning-modal">
         <h3>Reg.nr {regnr} är redan registrerat</h3>
-        {previousRegistration && (
+        
+        {previousRegistration ? (
           <div className="duplicate-info" style={{ marginTop: '16px', padding: '12px', backgroundColor: '#f9fafb', borderRadius: '6px' }}>
             <p style={{ margin: '0 0 4px 0' }}><strong>Tidigare registrering:</strong> {previousRegistration.bilmarke} {previousRegistration.modell}</p>
             <p style={{ margin: 0, color: '#6b7280' }}>
               Registrerad av {previousRegistration.fullstandigt_namn || 'okänd'} {formatPreviousTimeDate()}
             </p>
           </div>
-        )}
-        {existsInBilkontroll && !existsInNybil && (
-          <p style={{ marginTop: '16px', color: '#6b7280', fontStyle: 'italic' }}>
-            Finns i Bilkontroll-listan.
-          </p>
-        )}
+        ) : existsInBilkontroll && !existsInNybil ? (
+          renderBilkontrollInfo()
+        ) : null}
+        
         <div className="modal-actions">
           <button onClick={onCancel} className="btn secondary">Avbryt</button>
           <button onClick={onConfirm} className="btn primary">Skapa dubblett</button>
