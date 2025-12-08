@@ -18,14 +18,14 @@ const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v
 const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
 
 const STATIONER: Record<string, string[]> = {
-  'Malmö': ['FORD Malmö', 'MB Malmö', 'Mechanum', 'Malmö Automera', 'Werksta St Bernstorp', 'Werksta Malmö Hamn', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Sturup'],
-  'Helsingborg': ['MB Helsingborg', 'HBSC Helsingborg', 'FORD Helsingborg', 'Transport Helsingborg', 'S. Jönsson', 'BMW Helsingborg', 'KIA Helsingborg', 'Euromaster Helsingborg', 'B/S Klippan', 'B/S Munka-Ljungby', 'B/S Helsingborg', 'Werksta Helsingborg', 'Båstad'],
-  'Lund': ['FORD Lund', 'Hedin Lund', 'B/S Lund', 'P7 Revinge'],
-  'Ängelholm': ['FORD Ängelholm', 'Mekonomen Ängelholm', 'Flyget Ängelholm'],
   'Falkenberg': ['Falkenberg'],
-  'Halmstad': ['Flyget Halmstad', 'KIA Halmstad', 'FORD Halmstad'],
+  'Halmstad': ['Flyget Halmstad', 'FORD Halmstad', 'KIA Halmstad'],
+  'Helsingborg': ['B/S Klippan', 'BMW Helsingborg', 'Euromaster Helsingborg', 'FORD Helsingborg', 'HBSC Helsingborg', 'KIA Helsingborg', 'MB Helsingborg', 'S. Jönsson', 'Transport Helsingborg'],
+  'Lund': ['B/S Lund', 'FORD Lund', 'Hedin Lund', 'P7 Revinge'],
+  'Malmö': ['FORD Malmö', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Malmö Automera', 'MB Malmö', 'Mechanum', 'Sturup', 'Werksta Malmö Hamn', 'Werksta St Bernstorp'],
   'Trelleborg': ['Trelleborg'],
-  'Varberg': ['MB Varberg', 'FORD Varberg', 'Varberg multi (Hedin)', 'Autoklinik (Sällstorp)', 'Finnveden plåt']
+  'Varberg': ['Autoklinik (Sällstorp)', 'Finnveden plåt', 'FORD Varberg', 'MB Varberg', 'Varberg multi (Hedin)'],
+  'Ängelholm': ['Flyget Ängelholm', 'FORD Ängelholm', 'Mekonomen Ängelholm']
 };
 
 const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort((a, b) => a.localeCompare(b, 'sv'));
