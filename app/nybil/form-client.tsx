@@ -871,7 +871,7 @@ export default function NybilForm() {
     // Check vehicles table (Bilkontroll-filen) - use ilike for case-insensitive matching
     const { data: vehicleMatch, error: vehicleError } = await supabase
       .from('vehicles')
-      .select('regnr, bilmarke, modell')
+      .select('regnr, brand, model')
       .ilike('regnr', normalizedRegnr)
       .maybeSingle();
     
@@ -907,7 +907,7 @@ export default function NybilForm() {
       existsInBilkontroll: !!vehicleMatch,
       existsInNybil: !!nybilMatch,
       previousRegistration: previousRegistration as { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null,
-      vehicleInfo: vehicleMatch ? { bilmarke: vehicleMatch.bilmarke, modell: vehicleMatch.modell } : null
+      vehicleInfo: vehicleMatch ? { bilmarke: vehicleMatch.brand, modell: vehicleMatch.model } : null
     };
     console.log('Duplicate result:', result);
     console.log('previousRegistration.id:', previousRegistration?.id, 'type:', typeof previousRegistration?.id);
