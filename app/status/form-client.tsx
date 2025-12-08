@@ -371,6 +371,17 @@ export default function StatusForm() {
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
+              <InfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum || '---'} />
+              <InfoRow 
+                label="Såld" 
+                value={
+                  vehicleStatus.vehicle.isSold === true 
+                    ? 'Ja' 
+                    : vehicleStatus.vehicle.isSold === false 
+                      ? 'Nej' 
+                      : '---'
+                } 
+              />
             </div>
           </Card>
         )}

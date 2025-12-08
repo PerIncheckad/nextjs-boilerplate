@@ -55,6 +55,8 @@ export type VehicleStatusData = {
   anteckningar: string;
   // Damages at delivery
   harSkadorVidLeverans: boolean;
+  // Sale status
+  isSold: boolean | null;
 };
 
 export type DamageRecord = {
@@ -157,6 +159,8 @@ type NybilInventeringData = {
   anteckningar?: string | null;
   // Damages at delivery
   har_skador_vid_leverans?: boolean;
+  // Sale status
+  is_sold?: boolean | null;
 };
 
 // =================================================================
@@ -538,6 +542,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       tankstatusVidLeverans: '---',
       anteckningar: '---',
       harSkadorVidLeverans: false,
+      isSold: null,
     };
 
     // Build damage records from legacy damages (BUHS)
@@ -720,6 +725,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Damages at delivery
     harSkadorVidLeverans: nybilData?.har_skador_vid_leverans === true,
+    
+    // Sale status: nybil_inventering.is_sold → vehicles.is_sold
+    isSold: nybilData?.is_sold !== undefined 
+      ? nybilData.is_sold 
+      : vehicleData?.is_sold !== undefined 
+        ? vehicleData.is_sold 
+        : null,
   };
 
   // Determine if vehicle has ever been checked in
