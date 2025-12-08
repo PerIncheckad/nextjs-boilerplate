@@ -297,6 +297,20 @@ export default function StatusForm() {
           {vehicleStatus && !vehicleStatus.found && !loading && regInput.length >= 5 && (
             <p className="not-found-text">Fordonet hittades inte</p>
           )}
+          {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.saludatum !== '---' && (
+            <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+              <p 
+                style={{ 
+                  margin: 0, 
+                  fontSize: '0.875rem', 
+                  fontWeight: 500,
+                  color: isSaludatumAtRisk(vehicleStatus.vehicle.saludatum) ? 'var(--color-danger)' : 'inherit'
+                }}
+              >
+                Saludatum: {vehicleStatus.vehicle.saludatum}
+              </p>
+            </div>
+          )}
         </Card>
 
         {/* Print Header (hidden on screen, visible on print) */}
@@ -371,6 +385,17 @@ export default function StatusForm() {
               <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
               <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
+              <InfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum || '---'} />
+              <InfoRow 
+                label="Såld" 
+                value={
+                  vehicleStatus.vehicle.isSold === true 
+                    ? 'Ja' 
+                    : vehicleStatus.vehicle.isSold === false 
+                      ? 'Nej' 
+                      : '---'
+                } 
+              />
             </div>
           </Card>
         )}
@@ -449,10 +474,12 @@ export default function StatusForm() {
               )}
               <Fragment>
                 <span className="info-label">Skador vid leverans</span>
-                <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans ? 'at-risk' : ''}`}>
-                  {vehicleStatus.vehicle.harSkadorVidLeverans 
+                <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans === true ? 'at-risk' : ''}`}>
+                  {vehicleStatus.vehicle.harSkadorVidLeverans === true
                     ? 'Skador vid leverans, se skaderegistreringen ovan' 
-                    : 'Inga'}
+                    : vehicleStatus.vehicle.harSkadorVidLeverans === false
+                      ? 'Inga'
+                      : '---'}
                 </span>
               </Fragment>
               <InfoRow label="Övrig info" value={vehicleStatus.vehicle.anteckningar} />

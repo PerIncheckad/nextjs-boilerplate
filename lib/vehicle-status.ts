@@ -54,7 +54,9 @@ export type VehicleStatusData = {
   // General comment
   anteckningar: string;
   // Damages at delivery
-  harSkadorVidLeverans: boolean;
+  harSkadorVidLeverans: boolean | null;
+  // Sale status
+  isSold: boolean | null;
 };
 
 export type DamageRecord = {
@@ -157,6 +159,8 @@ type NybilInventeringData = {
   anteckningar?: string | null;
   // Damages at delivery
   har_skador_vid_leverans?: boolean;
+  // Sale status
+  is_sold?: boolean | null;
 };
 
 // =================================================================
@@ -537,7 +541,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
       anteckningar: '---',
-      harSkadorVidLeverans: false,
+      harSkadorVidLeverans: null,
+      isSold: null,
     };
 
     // Build damage records from legacy damages (BUHS)
@@ -629,7 +634,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Serviceintervall: nybil_inventering.serviceintervall
     serviceintervall: nybilData?.serviceintervall
-      ? `${nybilData.serviceintervall} mil`
+      ? `${nybilData.serviceintervall} km`
       : '---',
     
     // Max km/månad: nybil_inventering.max_km_manad
@@ -719,7 +724,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     anteckningar: nybilData?.anteckningar || '---',
     
     // Damages at delivery
-    harSkadorVidLeverans: nybilData?.har_skador_vid_leverans === true,
+    harSkadorVidLeverans: typeof nybilData?.har_skador_vid_leverans === 'boolean'
+      ? nybilData.har_skador_vid_leverans
+      : null,
+    
+    // Sale status: nybil_inventering.is_sold → vehicles.is_sold
+    // Only use actual boolean values (true/false), not null/undefined
+    isSold: typeof nybilData?.is_sold === 'boolean'
+      ? nybilData.is_sold 
+      : typeof vehicleData?.is_sold === 'boolean'
+        ? vehicleData.is_sold 
+        : null,
   };
 
   // Determine if vehicle has ever been checked in
