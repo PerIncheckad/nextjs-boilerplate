@@ -82,7 +82,8 @@ export type HistoryRecord = {
   
   // Avvikelser för incheckning (från checkins.checklist)
   avvikelser?: {
-    nyaSkador?: number; // antal nya skador
+    nyaSkador?: number; // antal nya skador (0 om has_new_damages men inga i tabell)
+    hasNewDamages?: boolean; // flagga från checkin.has_new_damages
     garInteAttHyraUt?: string | null; // kommentar eller null
     varningslampaPa?: string | null; // kommentar eller null
     rekondBehov?: {
@@ -361,11 +362,10 @@ async function buildCheckinAvvikelser(checkin: any) {
   const checklist = checkin.checklist || {};
   
   // Count new damages for this checkin
-  // If has_new_damages is true but we can't count exact damages, default to 1
+  // If has_new_damages is true, try to count from checkin_damages table
   let nyaSkadorCount = 0;
   if (checkin.has_new_damages) {
-    const count = await countCheckinDamages(checkin.id);
-    nyaSkadorCount = count > 0 ? count : 1;
+    nyaSkadorCount = await countCheckinDamages(checkin.id);
   }
   
   // Parse rekond behov if present
@@ -385,6 +385,7 @@ async function buildCheckinAvvikelser(checkin: any) {
   
   return {
     nyaSkador: nyaSkadorCount,
+    hasNewDamages: checkin.has_new_damages || false,
     garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || null) : null,
     varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || null) : null,
     rekondBehov,
@@ -646,7 +647,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         datum: formatDateTime(checkin.created_at),
         rawTimestamp: checkin.created_at || '',
         typ: 'incheckning' as const,
-        sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+        sammanfattning: `Incheckad vid ${checkin.current_city || checkin.city || '?'} / ${checkin.current_station || checkin.station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
         utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
         plats: checkin.current_city && checkin.current_station 
           ? `${checkin.current_city} / ${checkin.current_station}`
@@ -925,7 +926,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDateTime(checkin.created_at),
       rawTimestamp: checkin.created_at || '',
       typ: 'incheckning',
-      sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+      sammanfattning: `Incheckad vid ${checkin.current_city || checkin.city || '?'} / ${checkin.current_station || checkin.station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
       utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
       plats: checkin.current_city && checkin.current_station 
         ? `${checkin.current_city} / ${checkin.current_station}`

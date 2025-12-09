@@ -331,8 +331,10 @@ export default function StatusForm() {
                 </div>
                 
                 {/* Avvikelser for incheckning */}
-                {event.avvikelser?.nyaSkador && event.avvikelser.nyaSkador > 0 && (
-                  <div className="warning-banner">⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})</div>
+                {event.avvikelser?.hasNewDamages && (
+                  <div className="warning-banner">
+                    ⚠️ NYA SKADOR{event.avvikelser.nyaSkador > 0 ? ` (${event.avvikelser.nyaSkador})` : ''}
+                  </div>
                 )}
                 {event.avvikelser?.garInteAttHyraUt !== null && event.avvikelser?.garInteAttHyraUt !== undefined && (
                   <div className="warning-banner">
@@ -740,6 +742,8 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
 };
 
 const HistoryItem: React.FC<{ record: HistoryRecord }> = ({ record }) => {
+  const [expanded, setExpanded] = useState(false);
+  
   const getTypeLabel = (typ: string) => {
     switch (typ) {
       case 'incheckning': return 'Incheckning';
@@ -760,14 +764,86 @@ const HistoryItem: React.FC<{ record: HistoryRecord }> = ({ record }) => {
 
   return (
     <div className="history-item">
-      <div className="history-header">
-        <span className={`history-type ${getTypeClass(record.typ)}`}>
-          {getTypeLabel(record.typ)}
-        </span>
+      <div 
+        className="history-header clickable"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="history-header-left">
+          <span className={`history-type ${getTypeClass(record.typ)}`}>
+            {getTypeLabel(record.typ)}
+          </span>
+          <span className="expand-icon">{expanded ? '▼' : '▶'}</span>
+        </div>
         <span className="history-date">{record.datum}</span>
       </div>
       <p className="history-summary">{record.sammanfattning}</p>
       <span className="history-user">Utförd av: {record.utfordAv}</span>
+      
+      {expanded && (
+        <div className="history-details">
+          {record.plats && (
+            <div className="detail-row">
+              <strong>Plats:</strong> {record.plats}
+            </div>
+          )}
+          
+          {/* Avvikelser för incheckning */}
+          {record.avvikelser && (
+            <div className="detail-section">
+              <strong>Avvikelser:</strong>
+              {record.avvikelser.hasNewDamages && (
+                <div className="detail-warning">
+                  ⚠️ NYA SKADOR{record.avvikelser.nyaSkador > 0 ? ` (${record.avvikelser.nyaSkador})` : ''}
+                </div>
+              )}
+              {record.avvikelser.garInteAttHyraUt !== null && record.avvikelser.garInteAttHyraUt !== undefined && (
+                <div className="detail-warning">
+                  ⚠️ GÅR INTE ATT HYRA UT{record.avvikelser.garInteAttHyraUt ? `: ${record.avvikelser.garInteAttHyraUt}` : ''}
+                </div>
+              )}
+              {record.avvikelser.varningslampaPa !== null && record.avvikelser.varningslampaPa !== undefined && (
+                <div className="detail-warning">
+                  ⚠️ VARNINGSLAMPA EJ SLÄCKT{record.avvikelser.varningslampaPa ? `: ${record.avvikelser.varningslampaPa}` : ''}
+                </div>
+              )}
+              {record.avvikelser.rekondBehov && (
+                <div className="detail-warning">
+                  ⚠️ REKOND ({[
+                    record.avvikelser.rekondBehov.invandig ? 'invändig' : '',
+                    record.avvikelser.rekondBehov.utvandig ? 'utvändig' : ''
+                  ].filter(Boolean).join(' + ')}){record.avvikelser.rekondBehov.kommentar ? `: ${record.avvikelser.rekondBehov.kommentar}` : ''}
+                </div>
+              )}
+              {record.avvikelser.husdjurSanering !== null && record.avvikelser.husdjurSanering !== undefined && (
+                <div className="detail-warning">
+                  ⚠️ HUSDJUR (SANERING){record.avvikelser.husdjurSanering ? `: ${record.avvikelser.husdjurSanering}` : ''}
+                </div>
+              )}
+              {record.avvikelser.rokningSanering !== null && record.avvikelser.rokningSanering !== undefined && (
+                <div className="detail-warning">
+                  ⚠️ RÖKNING (SANERING){record.avvikelser.rokningSanering ? `: ${record.avvikelser.rokningSanering}` : ''}
+                </div>
+              )}
+              {record.avvikelser.insynsskyddSaknas && (
+                <div className="detail-warning">⚠️ INSYNSSKYDD SAKNAS</div>
+              )}
+            </div>
+          )}
+          
+          {/* Nybil-avvikelser */}
+          {record.nybilAvvikelser && (
+            <div className="detail-section">
+              <strong>Avvikelser:</strong>
+              {record.nybilAvvikelser.harSkadorVidLeverans && (
+                <div className="detail-warning">⚠️ SKADOR VID LEVERANS</div>
+              )}
+              {record.nybilAvvikelser.ejRedoAttHyrasUt && (
+                <div className="detail-warning">⚠️ EJ REDO ATT HYRAS UT</div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1157,6 +1233,52 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .history-user {
       font-size: 0.75rem;
       color: var(--color-text-secondary);
+    }
+
+    .history-header.clickable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .history-header.clickable:hover {
+      opacity: 0.8;
+    }
+
+    .history-header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .history-details {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .detail-section {
+      margin-bottom: 1rem;
+    }
+
+    .detail-section strong {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+
+    .detail-row {
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .detail-warning {
+      background-color: var(--color-danger-light);
+      color: var(--color-danger);
+      padding: 0.5rem;
+      margin-bottom: 0.25rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 500;
     }
 
     .copyright-footer {
