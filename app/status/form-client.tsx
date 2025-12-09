@@ -353,7 +353,10 @@ export default function StatusForm() {
                 className="history-link"
                 onClick={(e) => {
                   e.preventDefault();
-                  document.querySelector('.history-card')?.scrollIntoView({ behavior: 'smooth' });
+                  const historySection = document.getElementById('history-section');
+                  if (historySection) {
+                    historySection.scrollIntoView({ behavior: 'smooth' });
+                  }
                 }}
               >
                 💬 För fler händelser, se HISTORIK nedan
@@ -781,8 +784,12 @@ const RecentEventItem: React.FC<{
   // "Incheckad vid Malmö / MB Malmö. Mätarställning: 12345 km"
   const extractLocation = (summary: string, typ: string) => {
     if (typ === 'incheckning') {
-      const match = summary.match(/Incheckad vid (.+?)\. Mätarställning/);
-      if (match) return match[1];
+      try {
+        const match = summary.match(/Incheckad vid (.+?)\. Mätarställning/);
+        if (match) return match[1];
+      } catch (error) {
+        console.error('Error extracting location from summary:', error);
+      }
     }
     return null;
   };
@@ -791,7 +798,23 @@ const RecentEventItem: React.FC<{
 
   // Match damages to this event by date
   // Extract date from record.datum (e.g., "2025-12-09 kl 14:32" -> "2025-12-09")
-  const eventDate = record.datum.split(' ')[0];
+  // The date format comes from formatDateTime in lib/vehicle-status.ts
+  const extractEventDate = (dateString: string): string => {
+    try {
+      // Expected format: "YYYY-MM-DD kl HH:MM" or similar
+      const parts = dateString.split(' ');
+      if (parts.length > 0 && /^\d{4}-\d{2}-\d{2}$/.test(parts[0])) {
+        return parts[0];
+      }
+      // Fallback: return the full string if format doesn't match
+      return dateString;
+    } catch (error) {
+      console.error('Error parsing event date:', error);
+      return dateString;
+    }
+  };
+
+  const eventDate = extractEventDate(record.datum);
   const eventDamages = damages.filter(damage => {
     // Match by exact date
     return damage.datum === eventDate;
