@@ -459,19 +459,18 @@ export default function StatusForm() {
                 ))}
                 {vehicleStatus.history.length > 2 && (
                   <div style={{ textAlign: 'center', marginTop: '1rem' }}>
-                    <a 
-                      href="#history-section" 
+                    <button 
+                      type="button"
                       className="view-all-history-link"
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
                         setHistoryExpanded(true);
                         setTimeout(() => {
                           document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                         }, 100);
                       }}
                     >
-                      Visa all historik ({vehicleStatus.history.length} händelser) →
-                    </a>
+                      Visa alla händelser ({vehicleStatus.history.length}) →
+                    </button>
                   </div>
                 )}
               </div>
@@ -1174,6 +1173,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
     .view-all-history-link {
       color: var(--color-primary);
+      background-color: white;
       text-decoration: none;
       font-size: 0.875rem;
       font-weight: 500;
@@ -1182,6 +1182,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       border: 1px solid var(--color-primary);
       border-radius: 6px;
       transition: all 0.2s;
+      cursor: pointer;
+      font-family: inherit;
     }
 
     .view-all-history-link:hover {
