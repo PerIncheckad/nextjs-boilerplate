@@ -66,7 +66,7 @@ export type DamageRecord = {
   datum: string;
   status: string;
   folder?: string;
-  source: 'legacy' | 'damages';
+  source: 'legacy' | 'damages' | 'checkin';
   // Source info for display
   sourceInfo?: string; // e.g., "Källa: BUHS" or "Incheckad av Per Andersson 2025-12-03 14:30"
 };
@@ -860,7 +860,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDate(checkinDate),
       status: 'Ny',
       folder: cd.media_folder || undefined,
-      source: 'damages' as const,
+      source: 'checkin' as const,
       sourceInfo: `Registrerad vid incheckning av ${checkerName}`,
     });
   }
