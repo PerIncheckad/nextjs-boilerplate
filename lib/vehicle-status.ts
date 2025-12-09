@@ -361,9 +361,11 @@ async function buildCheckinAvvikelser(checkin: any) {
   const checklist = checkin.checklist || {};
   
   // Count new damages for this checkin
+  // If has_new_damages is true but we can't count exact damages, default to 1
   let nyaSkadorCount = 0;
   if (checkin.has_new_damages) {
-    nyaSkadorCount = await countCheckinDamages(checkin.id);
+    const count = await countCheckinDamages(checkin.id);
+    nyaSkadorCount = count > 0 ? count : 1;
   }
   
   // Parse rekond behov if present
@@ -645,10 +647,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         rawTimestamp: checkin.created_at || '',
         typ: 'incheckning' as const,
         sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-        utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
-        plats: checkin.current_ort && checkin.current_station 
-          ? `${checkin.current_ort} / ${checkin.current_station}`
-          : undefined,
+        utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
+        plats: checkin.current_city && checkin.current_station 
+          ? `${checkin.current_city} / ${checkin.current_station}`
+          : checkin.city && checkin.station
+            ? `${checkin.city} / ${checkin.station}`
+            : undefined,
         avvikelser,
       });
     }
@@ -922,10 +926,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       rawTimestamp: checkin.created_at || '',
       typ: 'incheckning',
       sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-      utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
-      plats: checkin.current_ort && checkin.current_station 
-        ? `${checkin.current_ort} / ${checkin.current_station}`
-        : undefined,
+      utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
+      plats: checkin.current_city && checkin.current_station 
+        ? `${checkin.current_city} / ${checkin.current_station}`
+        : checkin.city && checkin.station
+          ? `${checkin.city} / ${checkin.station}`
+          : undefined,
       avvikelser,
     });
   }
