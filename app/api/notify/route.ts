@@ -656,7 +656,71 @@ export async function POST(request: Request) {
           checker_email: payload.user_email || payload.email || null,
           completed_at: now.toISOString(),
           status: 'COMPLETED',
-          // has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0, // (valfritt)
+          
+          // Mätarställning (odometer reading)
+          // Prioritize "bilen står nu" matarstallning_avlamning if available, otherwise use regular matarstallning
+          odometer_km: (() => {
+            const value = payload.bilen_star_nu?.matarstallning_avlamning || payload.matarstallning;
+            if (!value) return null;
+            const parsed = parseInt(value, 10);
+            return isNaN(parsed) ? null : parsed;
+          })(),
+          
+          // Hjultyp (wheel type)
+          hjultyp: payload.hjultyp || null,
+          
+          // Drivmedel/bränsle (fuel type)
+          fuel_type: payload.drivmedel === 'elbil' ? 'El' 
+            : payload.drivmedel === 'bensin_diesel' 
+              ? (payload.tankning?.bransletyp || 'Bensin/Diesel') 
+              : null,
+          
+          // Tankning (refueling) - for bensin/diesel
+          fuel_liters: (() => {
+            if (!payload.tankning?.liters) return null;
+            const parsed = parseFloat(payload.tankning.liters);
+            return isNaN(parsed) ? null : parsed;
+          })(),
+          fuel_price_per_liter: (() => {
+            if (!payload.tankning?.literpris) return null;
+            const parsed = parseFloat(payload.tankning.literpris);
+            return isNaN(parsed) ? null : parsed;
+          })(),
+          
+          // Laddning (charging) - for electric vehicles
+          charge_level_percent: (() => {
+            if (!payload.laddning?.laddniva) return null;
+            const parsed = parseInt(payload.laddning.laddniva, 10);
+            return isNaN(parsed) ? null : parsed;
+          })(),
+          
+          // Flaggor (flags)
+          has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0,
+          has_documented_buhs: Array.isArray(payload.dokumenterade_skador) && payload.dokumenterade_skador.length > 0,
+          rekond_behov: payload.rekond?.behoverRekond === true,
+          
+          // Övrig kommentar/notering (notes)
+          notes: payload.notering || null,
+          
+          // Insynsskydd (privacy cover)
+          privacy_cover_ok: payload.status?.insynsskyddSaknas === true ? false : null,
+          
+          // Checklist för Status & Sanering (Status & Sanitation checklist)
+          checklist: {
+            rental_unavailable: payload.rental?.unavailable === true,
+            rental_unavailable_comment: payload.rental?.comment || null,
+            warning_light_on: payload.varningslampa?.lyser === true,
+            warning_light_comment: payload.varningslampa?.beskrivning || null,
+            pet_sanitation_needed: payload.husdjur?.sanerad === true,
+            pet_sanitation_comment: payload.husdjur?.text || null,
+            pet_sanitation_folder: payload.husdjur?.folder || null,
+            smoking_sanitation_needed: payload.rokning?.sanerad === true,
+            smoking_sanitation_comment: payload.rokning?.text || null,
+            smoking_sanitation_folder: payload.rokning?.folder || null,
+            privacy_cover_missing: payload.status?.insynsskyddSaknas === true,
+            rekond_comment: payload.rekond?.text || null,
+            rekond_folder: payload.rekond?.folder || null,
+          },
         };
 
         const { data: checkinRecord, error: checkinError } = await supabaseAdmin
