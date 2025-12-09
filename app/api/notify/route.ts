@@ -656,7 +656,38 @@ export async function POST(request: Request) {
           checker_email: payload.user_email || payload.email || null,
           completed_at: now.toISOString(),
           status: 'COMPLETED',
-          // has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0, // (valfritt)
+          
+          // Mätarställning (odometer reading)
+          // Prioritize "bilen står nu" matarstallning_avlamning if available, otherwise use regular matarstallning
+          odometer_km: payload.bilen_star_nu?.matarstallning_avlamning 
+            ? parseInt(payload.bilen_star_nu.matarstallning_avlamning, 10) 
+            : payload.matarstallning 
+              ? parseInt(payload.matarstallning, 10) 
+              : null,
+          
+          // Hjultyp (wheel type)
+          hjultyp: payload.hjultyp || null,
+          
+          // Drivmedel/bränsle (fuel type)
+          fuel_type: payload.drivmedel === 'elbil' ? 'El' 
+            : payload.drivmedel === 'bensin_diesel' 
+              ? (payload.tankning?.bransletyp || 'Bensin/Diesel') 
+              : null,
+          
+          // Tankning (refueling) - for bensin/diesel
+          fuel_liters: payload.tankning?.liters ? parseFloat(payload.tankning.liters) : null,
+          fuel_price_per_liter: payload.tankning?.literpris ? parseFloat(payload.tankning.literpris) : null,
+          
+          // Laddning (charging) - for electric vehicles
+          charge_level_percent: payload.laddning?.laddniva ? parseInt(payload.laddning.laddniva, 10) : null,
+          
+          // Flaggor (flags)
+          has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0,
+          has_documented_buhs: Array.isArray(payload.dokumenterade_skador) && payload.dokumenterade_skador.length > 0,
+          rekond_behov: payload.rekond?.behoverRekond === true,
+          
+          // Övrig kommentar/notering (notes)
+          notes: payload.notering || null,
         };
 
         const { data: checkinRecord, error: checkinError } = await supabaseAdmin
