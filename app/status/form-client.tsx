@@ -313,6 +313,75 @@ export default function StatusForm() {
           )}
         </Card>
 
+        {/* Recent Events Section */}
+        {vehicleStatus?.history && vehicleStatus.history.length > 0 && (
+          <Card className="recent-events-card">
+            <SectionHeader title="SENASTE HÄNDELSER" />
+            
+            {vehicleStatus.history.slice(0, 2).map((event) => (
+              <div key={event.id} className="event-card">
+                <div className="event-header">
+                  📅 {event.datum}
+                </div>
+                <div className="event-summary">
+                  {event.typ === 'incheckning' 
+                    ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
+                    : `Nybilsregistrering av ${event.utfordAv}`
+                  }
+                </div>
+                
+                {/* Avvikelser for incheckning */}
+                {event.avvikelser?.nyaSkador && event.avvikelser.nyaSkador > 0 && (
+                  <div className="warning-banner">⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})</div>
+                )}
+                {event.avvikelser?.garInteAttHyraUt !== null && (
+                  <div className="warning-banner">
+                    ⚠️ GÅR INTE ATT HYRA UT{typeof event.avvikelser.garInteAttHyraUt === 'string' && event.avvikelser.garInteAttHyraUt ? `: ${event.avvikelser.garInteAttHyraUt}` : ''}
+                  </div>
+                )}
+                {event.avvikelser?.varningslampaPa !== null && (
+                  <div className="warning-banner">
+                    ⚠️ VARNINGSLAMPA EJ SLÄCKT{typeof event.avvikelser.varningslampaPa === 'string' && event.avvikelser.varningslampaPa ? `: ${event.avvikelser.varningslampaPa}` : ''}
+                  </div>
+                )}
+                {event.avvikelser?.rekondBehov && (
+                  <div className="warning-banner">
+                    ⚠️ REKOND ({[
+                      event.avvikelser.rekondBehov.invandig ? 'invändig' : '',
+                      event.avvikelser.rekondBehov.utvandig ? 'utvändig' : ''
+                    ].filter(Boolean).join(' + ')}){event.avvikelser.rekondBehov.kommentar ? `: ${event.avvikelser.rekondBehov.kommentar}` : ''}
+                  </div>
+                )}
+                {event.avvikelser?.husdjurSanering !== null && (
+                  <div className="warning-banner">
+                    ⚠️ HUSDJUR (SANERING){typeof event.avvikelser.husdjurSanering === 'string' && event.avvikelser.husdjurSanering ? `: ${event.avvikelser.husdjurSanering}` : ''}
+                  </div>
+                )}
+                {event.avvikelser?.rokningSanering !== null && (
+                  <div className="warning-banner">
+                    ⚠️ RÖKNING (SANERING){typeof event.avvikelser.rokningSanering === 'string' && event.avvikelser.rokningSanering ? `: ${event.avvikelser.rokningSanering}` : ''}
+                  </div>
+                )}
+                {event.avvikelser?.insynsskyddSaknas && (
+                  <div className="warning-banner">⚠️ INSYNSSKYDD SAKNAS</div>
+                )}
+                
+                {/* Nybil-avvikelser */}
+                {event.nybilAvvikelser?.harSkadorVidLeverans && (
+                  <div className="warning-banner">⚠️ SKADOR VID LEVERANS</div>
+                )}
+                {event.nybilAvvikelser?.ejRedoAttHyrasUt && (
+                  <div className="warning-banner">⚠️ EJ REDO ATT HYRAS UT</div>
+                )}
+              </div>
+            ))}
+            
+            <p className="history-link">
+              Detaljer och fler poster i sektionen <a href="#history-section">Historik</a> nedan
+            </p>
+          </Card>
+        )}
+
         {/* Print Header (hidden on screen, visible on print) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <div className="print-header">
@@ -505,7 +574,7 @@ export default function StatusForm() {
 
         {/* History Section */}
         {vehicleStatus?.found && (
-          <Card className="history-card">
+          <Card className="history-card" id="history-section">
             <div 
               className="section-header-expandable"
               onClick={() => setHistoryExpanded(!historyExpanded)}
@@ -1440,6 +1509,67 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
       .nybil-photo {
         max-height: 180px;
+      }
+    }
+
+    /* Recent Events Section Styles */
+    .recent-events-card {
+      /* Inherits card styles */
+    }
+
+    .event-card {
+      background-color: var(--color-bg);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .event-header {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .event-summary {
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 0.75rem;
+      color: var(--color-text);
+    }
+
+    .warning-banner {
+      background-color: #B30E0E;
+      color: white;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .history-link {
+      text-align: center;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-top: 1rem;
+      margin-bottom: 0;
+    }
+
+    .history-link a {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .history-link a:hover {
+      text-decoration: underline;
+    }
+
+    /* Hide recent events in print */
+    @media print {
+      .recent-events-card {
+        display: none !important;
       }
     }
   `}</style>
