@@ -464,9 +464,11 @@ export default function StatusForm() {
                       className="view-all-history-link"
                       onClick={() => {
                         setHistoryExpanded(true);
-                        setTimeout(() => {
-                          document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        }, 100);
+                        requestAnimationFrame(() => {
+                          requestAnimationFrame(() => {
+                            document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          });
+                        });
                       }}
                     >
                       Visa alla händelser ({vehicleStatus.history.length}) →
