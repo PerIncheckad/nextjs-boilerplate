@@ -331,20 +331,20 @@ export default function StatusForm() {
                 </div>
                 
                 {/* Avvikelser for incheckning */}
-                {event.avvikelser?.nyaSkador && event.avvikelser.nyaSkador > 0 && (
+                {event.avvikelser && event.avvikelser.nyaSkador && event.avvikelser.nyaSkador > 0 && (
                   <div className="warning-banner">⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})</div>
                 )}
-                {event.avvikelser?.garInteAttHyraUt !== null && (
+                {event.avvikelser && event.avvikelser.garInteAttHyraUt !== null && (
                   <div className="warning-banner">
                     ⚠️ GÅR INTE ATT HYRA UT{typeof event.avvikelser.garInteAttHyraUt === 'string' && event.avvikelser.garInteAttHyraUt ? `: ${event.avvikelser.garInteAttHyraUt}` : ''}
                   </div>
                 )}
-                {event.avvikelser?.varningslampaPa !== null && (
+                {event.avvikelser && event.avvikelser.varningslampaPa !== null && (
                   <div className="warning-banner">
                     ⚠️ VARNINGSLAMPA EJ SLÄCKT{typeof event.avvikelser.varningslampaPa === 'string' && event.avvikelser.varningslampaPa ? `: ${event.avvikelser.varningslampaPa}` : ''}
                   </div>
                 )}
-                {event.avvikelser?.rekondBehov && (
+                {event.avvikelser && event.avvikelser.rekondBehov && (
                   <div className="warning-banner">
                     ⚠️ REKOND ({[
                       event.avvikelser.rekondBehov.invandig ? 'invändig' : '',
@@ -352,17 +352,17 @@ export default function StatusForm() {
                     ].filter(Boolean).join(' + ')}){event.avvikelser.rekondBehov.kommentar ? `: ${event.avvikelser.rekondBehov.kommentar}` : ''}
                   </div>
                 )}
-                {event.avvikelser?.husdjurSanering !== null && (
+                {event.avvikelser && event.avvikelser.husdjurSanering !== null && (
                   <div className="warning-banner">
                     ⚠️ HUSDJUR (SANERING){typeof event.avvikelser.husdjurSanering === 'string' && event.avvikelser.husdjurSanering ? `: ${event.avvikelser.husdjurSanering}` : ''}
                   </div>
                 )}
-                {event.avvikelser?.rokningSanering !== null && (
+                {event.avvikelser && event.avvikelser.rokningSanering !== null && (
                   <div className="warning-banner">
                     ⚠️ RÖKNING (SANERING){typeof event.avvikelser.rokningSanering === 'string' && event.avvikelser.rokningSanering ? `: ${event.avvikelser.rokningSanering}` : ''}
                   </div>
                 )}
-                {event.avvikelser?.insynsskyddSaknas && (
+                {event.avvikelser && event.avvikelser.insynsskyddSaknas && (
                   <div className="warning-banner">⚠️ INSYNSSKYDD SAKNAS</div>
                 )}
                 
