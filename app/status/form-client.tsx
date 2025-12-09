@@ -761,7 +761,7 @@ const RecentEventItem: React.FC<{
 }> = ({ record, damages, isLatest, isExpanded, onToggle }) => {
   const getTypeLabel = (typ: string) => {
     switch (typ) {
-      case 'incheckning': return 'Incheckning';
+      case 'incheckning': return 'Incheckad';
       case 'nybil': return 'Nybilsregistrering';
       case 'manual': return 'Manuell ändring';
       default: return typ;
@@ -777,50 +777,36 @@ const RecentEventItem: React.FC<{
     }
   };
 
+  // Extract location from summary for incheckning
+  // "Incheckad vid Malmö / MB Malmö. Mätarställning: 12345 km"
+  const extractLocation = (summary: string, typ: string) => {
+    if (typ === 'incheckning') {
+      const match = summary.match(/Incheckad vid (.+?)\. Mätarställning/);
+      if (match) return match[1];
+    }
+    return null;
+  };
+
+  const location = extractLocation(record.sammanfattning, record.typ);
+
   // Match damages to this event by date
   // Extract date from record.datum (e.g., "2025-12-09 kl 14:32" -> "2025-12-09")
   const eventDate = record.datum.split(' ')[0];
-  const eventDamages = damages.filter(damage => damage.datum === eventDate);
+  const eventDamages = damages.filter(damage => {
+    // Match by exact date
+    return damage.datum === eventDate;
+  });
 
-  // Parse the summary to extract deviations
-  const parseDeviations = (summary: string) => {
-    const deviations: string[] = [];
-    
-    // Check for various deviation patterns in the summary
-    if (summary.includes('Ny skada:') || summary.includes('Nya skador:')) {
-      const newDamages = eventDamages.filter(d => 
-        summary.toLowerCase().includes(d.skadetyp.toLowerCase())
-      );
-      newDamages.forEach(d => {
-        const mediaIcon = d.folder ? ' [📷]' : '';
-        deviations.push(`⚠️ Ny skada: ${d.skadetyp}${mediaIcon}`);
-      });
-    }
-    
-    if (summary.includes('Befintlig') || summary.includes('befintlig')) {
-      deviations.push('⚠️ Befintlig skada dokumenterad [📷]');
-    }
-    
-    if (summary.toLowerCase().includes('rekond')) {
-      deviations.push('⚠️ Rekond krävs');
-    }
-    
-    if (summary.toLowerCase().includes('husdjur')) {
-      deviations.push('⚠️ Husdjur noterat');
-    }
-    
-    if (summary.toLowerCase().includes('rökning') || summary.toLowerCase().includes('rokt')) {
-      deviations.push('⚠️ Rökning noterat');
-    }
-    
-    if (summary.toLowerCase().includes('insynsskydd saknas')) {
-      deviations.push('⚠️ Insynsskydd saknas');
-    }
-    
-    return deviations;
-  };
-
-  const deviations = parseDeviations(record.sammanfattning);
+  // Build display items for this event
+  const displayItems: string[] = [];
+  
+  // Show damages registered on this date
+  if (eventDamages.length > 0) {
+    eventDamages.forEach(damage => {
+      const mediaIcon = damage.folder ? ' 📷' : '';
+      displayItems.push(`⚠️ Ny skada: ${damage.skadetyp}${mediaIcon}`);
+    });
+  }
 
   if (!isLatest && !isExpanded) {
     // Collapsed view for previous event
@@ -851,22 +837,29 @@ const RecentEventItem: React.FC<{
         <span className="recent-event-date">📅 {record.datum}</span>
       </div>
       
-      <div className="recent-event-summary">
-        <span className={`recent-event-type ${getTypeClass(record.typ)}`}>
-          {getTypeLabel(record.typ)}
-        </span>
-        <span className="recent-event-user"> av {record.utfordAv}</span>
-      </div>
-      
-      {deviations.length > 0 && (
-        <div className="recent-event-deviations">
-          {deviations.map((deviation, index) => (
-            <div key={index} className="recent-event-deviation">
-              {deviation}
-            </div>
-          ))}
+      <div className="recent-event-content">
+        <div className="recent-event-main-info">
+          {record.typ === 'incheckning' && location ? (
+            <p className="recent-event-text">
+              <strong>{getTypeLabel(record.typ)}</strong> av <strong>{record.utfordAv}</strong> på <strong>{location}</strong>
+            </p>
+          ) : (
+            <p className="recent-event-text">
+              <strong>{getTypeLabel(record.typ)}</strong> av <strong>{record.utfordAv}</strong>
+            </p>
+          )}
         </div>
-      )}
+        
+        {displayItems.length > 0 && (
+          <div className="recent-event-deviations">
+            {displayItems.map((item, index) => (
+              <div key={index} className="recent-event-deviation">
+                {item}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1286,40 +1279,19 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-weight: 500;
     }
 
-    .recent-event-summary {
+    .recent-event-content {
+      margin-top: 0.5rem;
+    }
+
+    .recent-event-main-info {
       margin-bottom: 0.75rem;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.25rem;
     }
 
-    .recent-event-type {
-      font-size: 0.875rem;
-      font-weight: 600;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
-      text-transform: uppercase;
-    }
-
-    .recent-event-type.type-incheckning {
-      background-color: var(--color-success-light);
-      color: var(--color-success);
-    }
-
-    .recent-event-type.type-nybil {
-      background-color: var(--color-primary-light);
-      color: var(--color-primary);
-    }
-
-    .recent-event-type.type-manual {
-      background-color: var(--color-warning-light);
-      color: #92400e;
-    }
-
-    .recent-event-user {
-      font-size: 0.875rem;
+    .recent-event-text {
+      font-size: 0.9375rem;
       color: var(--color-text);
+      margin: 0;
+      line-height: 1.5;
     }
 
     .recent-event-deviations {
