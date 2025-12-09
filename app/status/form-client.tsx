@@ -378,7 +378,7 @@ export default function StatusForm() {
         )}
 
         {/* Nybil Reference Photos Section */}
-        {vehicleStatus?.found && vehicleStatus.nybilPhotos?.photoUrls?.length > 0 && (
+        {vehicleStatus?.found && vehicleStatus.nybilPhotos?.photoUrls && vehicleStatus.nybilPhotos.photoUrls.length > 0 && (
           <Card className="nybil-photos-card">
             <SectionHeader title={getNybilPhotosTitle()} />
             <div className="nybil-photos-grid">
