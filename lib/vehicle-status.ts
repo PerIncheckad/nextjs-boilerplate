@@ -353,6 +353,9 @@ async function countCheckinDamages(checkinId: number): Promise<number> {
 
 /**
  * Build avvikelser object from checkin data
+ * 
+ * Note: rekondBehov detection uses substring matching as per requirements.
+ * The UI checks for 'invändig' and 'utvändig' in the rekond_comment field.
  */
 async function buildCheckinAvvikelser(checkin: any) {
   const checklist = checkin.checklist || {};
@@ -363,15 +366,26 @@ async function buildCheckinAvvikelser(checkin: any) {
     nyaSkadorCount = await countCheckinDamages(checkin.id);
   }
   
+  // Parse rekond behov if present
+  let rekondBehov = null;
+  if (checkin.rekond_behov) {
+    const comment = checklist.rekond_comment?.toLowerCase() || '';
+    const invandig = comment.includes('invändig');
+    const utvandig = comment.includes('utvändig');
+    
+    // If rekond_behov is true but no specific type found, default to both
+    rekondBehov = {
+      invandig: invandig || (!invandig && !utvandig),
+      utvandig: utvandig || (!invandig && !utvandig),
+      kommentar: checklist.rekond_comment || null,
+    };
+  }
+  
   return {
     nyaSkador: nyaSkadorCount,
     garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || null) : null,
     varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || null) : null,
-    rekondBehov: checkin.rekond_behov ? {
-      invandig: checklist.rekond_comment?.toLowerCase().includes('invändig') || false,
-      utvandig: checklist.rekond_comment?.toLowerCase().includes('utvändig') || false,
-      kommentar: checklist.rekond_comment || null,
-    } : null,
+    rekondBehov,
     husdjurSanering: checklist.pet_sanitation_needed ? (checklist.pet_sanitation_comment || null) : null,
     rokningSanering: checklist.smoking_sanitation_needed ? (checklist.smoking_sanitation_comment || null) : null,
     insynsskyddSaknas: checklist.privacy_cover_missing || false,
