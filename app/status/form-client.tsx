@@ -129,6 +129,9 @@ export default function StatusForm() {
   const [vehicleStatus, setVehicleStatus] = useState<VehicleStatusResult | null>(null);
   const [initialUrlLoadHandled, setInitialUrlLoadHandled] = useState(false);
   
+  // Recent events section state
+  const [recentEventsExpanded, setRecentEventsExpanded] = useState(true);
+  
   // History section state
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'incheckning' | 'nybil' | 'manual'>('all');
@@ -436,6 +439,46 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Recent Events Section - Latest 2 events with expand/collapse */}
+        {vehicleStatus?.found && vehicleStatus.history.length > 0 && (
+          <Card className="recent-events-card">
+            <div 
+              className="section-header-expandable"
+              onClick={() => setRecentEventsExpanded(!recentEventsExpanded)}
+            >
+              <h2>
+                Senaste händelser (2)
+                <span className="expand-icon">{recentEventsExpanded ? '▼' : '▶'}</span>
+              </h2>
+            </div>
+            
+            {recentEventsExpanded && (
+              <div className="recent-events-list">
+                {vehicleStatus.history.slice(0, 2).map((record) => (
+                  <HistoryItem key={record.id} record={record} />
+                ))}
+                {vehicleStatus.history.length > 2 && (
+                  <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                    <a 
+                      href="#history-section" 
+                      className="view-all-history-link"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setHistoryExpanded(true);
+                        setTimeout(() => {
+                          document.getElementById('history-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 100);
+                      }}
+                    >
+                      Visa all historik ({vehicleStatus.history.length} händelser) →
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        )}
+
         {/* Equipment Section */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           vehicleStatus.vehicle.antalNycklar !== '---' ||
@@ -505,7 +548,7 @@ export default function StatusForm() {
 
         {/* History Section */}
         {vehicleStatus?.found && (
-          <Card className="history-card">
+          <Card className="history-card" id="history-section">
             <div 
               className="section-header-expandable"
               onClick={() => setHistoryExpanded(!historyExpanded)}
@@ -698,6 +741,17 @@ const HistoryItem: React.FC<{ record: HistoryRecord }> = ({ record }) => {
         <span className="history-date">{record.datum}</span>
       </div>
       <p className="history-summary">{record.sammanfattning}</p>
+      {/* Show additional checkin details if available */}
+      {record.typ === 'incheckning' && (record.matarstallning || record.hjultyp) && (
+        <div className="history-details">
+          {record.matarstallning && (
+            <span className="history-detail-item">Mätarställning: {record.matarstallning}</span>
+          )}
+          {record.hjultyp && (
+            <span className="history-detail-item">Hjultyp: {record.hjultyp}</span>
+          )}
+        </div>
+      )}
       <span className="history-user">Utförd av: {record.utfordAv}</span>
     </div>
   );
@@ -1088,6 +1142,51 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .history-user {
       font-size: 0.75rem;
       color: var(--color-text-secondary);
+    }
+
+    .history-details {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 0.5rem 0;
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+    }
+
+    .history-detail-item {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      background-color: var(--color-bg);
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    /* Recent events section */
+    .recent-events-card {
+      /* Inherits card styles */
+    }
+
+    .recent-events-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .view-all-history-link {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--color-primary);
+      border-radius: 6px;
+      transition: all 0.2s;
+    }
+
+    .view-all-history-link:hover {
+      background-color: var(--color-primary);
+      color: white;
     }
 
     .copyright-footer {
