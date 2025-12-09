@@ -1135,8 +1135,10 @@ export default function NybilForm() {
         media_folder: mediaFolder,
         // Duplicate handling fields
         is_duplicate: isDuplicate,
-        duplicate_group_id: duplicateGroupId
+        duplicate_group_id: duplicateGroupId,
         // Note: original_registration_id is NOT set - use duplicate_group_id instead for tracking duplicates
+        // Sale status: explicitly set to null for new cars (unknown status)
+        is_sold: null
       };
       console.log('Attempting to insert inventoryData:', inventoryData);
       const { data, error } = await supabase
