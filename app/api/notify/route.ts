@@ -701,6 +701,26 @@ export async function POST(request: Request) {
           
           // Övrig kommentar/notering (notes)
           notes: payload.notering || null,
+          
+          // Insynsskydd (privacy cover)
+          privacy_cover_ok: payload.status?.insynsskyddSaknas === true ? false : null,
+          
+          // Checklist för Status & Sanering (Status & Sanitation checklist)
+          checklist: {
+            rental_unavailable: payload.rental?.unavailable === true,
+            rental_unavailable_comment: payload.rental?.comment || null,
+            warning_light_on: payload.varningslampa?.lyser === true,
+            warning_light_comment: payload.varningslampa?.beskrivning || null,
+            pet_sanitation_needed: payload.husdjur?.sanerad === true,
+            pet_sanitation_comment: payload.husdjur?.text || null,
+            pet_sanitation_folder: payload.husdjur?.folder || null,
+            smoking_sanitation_needed: payload.rokning?.sanerad === true,
+            smoking_sanitation_comment: payload.rokning?.text || null,
+            smoking_sanitation_folder: payload.rokning?.folder || null,
+            privacy_cover_missing: payload.status?.insynsskyddSaknas === true,
+            rekond_comment: payload.rekond?.text || null,
+            rekond_folder: payload.rekond?.folder || null,
+          },
         };
 
         const { data: checkinRecord, error: checkinError } = await supabaseAdmin
