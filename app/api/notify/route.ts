@@ -659,11 +659,12 @@ export async function POST(request: Request) {
           
           // Mätarställning (odometer reading)
           // Prioritize "bilen står nu" matarstallning_avlamning if available, otherwise use regular matarstallning
-          odometer_km: payload.bilen_star_nu?.matarstallning_avlamning 
-            ? parseInt(payload.bilen_star_nu.matarstallning_avlamning, 10) 
-            : payload.matarstallning 
-              ? parseInt(payload.matarstallning, 10) 
-              : null,
+          odometer_km: (() => {
+            const value = payload.bilen_star_nu?.matarstallning_avlamning || payload.matarstallning;
+            if (!value) return null;
+            const parsed = parseInt(value, 10);
+            return isNaN(parsed) ? null : parsed;
+          })(),
           
           // Hjultyp (wheel type)
           hjultyp: payload.hjultyp || null,
@@ -675,11 +676,23 @@ export async function POST(request: Request) {
               : null,
           
           // Tankning (refueling) - for bensin/diesel
-          fuel_liters: payload.tankning?.liters ? parseFloat(payload.tankning.liters) : null,
-          fuel_price_per_liter: payload.tankning?.literpris ? parseFloat(payload.tankning.literpris) : null,
+          fuel_liters: (() => {
+            if (!payload.tankning?.liters) return null;
+            const parsed = parseFloat(payload.tankning.liters);
+            return isNaN(parsed) ? null : parsed;
+          })(),
+          fuel_price_per_liter: (() => {
+            if (!payload.tankning?.literpris) return null;
+            const parsed = parseFloat(payload.tankning.literpris);
+            return isNaN(parsed) ? null : parsed;
+          })(),
           
           // Laddning (charging) - for electric vehicles
-          charge_level_percent: payload.laddning?.laddniva ? parseInt(payload.laddning.laddniva, 10) : null,
+          charge_level_percent: (() => {
+            if (!payload.laddning?.laddniva) return null;
+            const parsed = parseInt(payload.laddning.laddniva, 10);
+            return isNaN(parsed) ? null : parsed;
+          })(),
           
           // Flaggor (flags)
           has_new_damages: Array.isArray(payload.nya_skador) && payload.nya_skador.length > 0,
