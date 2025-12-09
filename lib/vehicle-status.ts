@@ -78,6 +78,11 @@ export type HistoryRecord = {
   typ: 'incheckning' | 'nybil' | 'manual';
   sammanfattning: string;
   utfordAv: string;
+  // Additional checkin details (only for incheckning type)
+  ort?: string;
+  station?: string;
+  matarstallning?: string;
+  hjultyp?: string;
 };
 
 export type VehicleStatusResult = {
@@ -209,6 +214,25 @@ function getFullNameFromEmail(email: string): string {
     return `${firstName} ${lastName}`;
   }
   return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+}
+
+/**
+ * Build a history record from a checkin object
+ */
+function buildCheckinHistoryRecord(checkin: any): HistoryRecord {
+  return {
+    id: `checkin-${checkin.id}`,
+    datum: formatDateTime(checkin.completed_at || checkin.created_at),
+    rawTimestamp: checkin.completed_at || checkin.created_at || '',
+    typ: 'incheckning' as const,
+    sammanfattning: `Incheckad vid ${checkin.current_city || checkin.current_ort || '?'} / ${checkin.current_station || '?'}`,
+    utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || checkin.user_email || checkin.incheckare || ''),
+    // Additional checkin details
+    ort: checkin.current_city || checkin.current_ort,
+    station: checkin.current_station,
+    matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
+    hjultyp: checkin.hjultyp,
+  };
 }
 
 /**
@@ -558,14 +582,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }));
 
     // Build history records from checkins only
-    const historyRecords: HistoryRecord[] = checkins.map(checkin => ({
-      id: `checkin-${checkin.id}`,
-      datum: formatDateTime(checkin.created_at),
-      rawTimestamp: checkin.created_at || '',
-      typ: 'incheckning' as const,
-      sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-      utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
-    }));
+    const historyRecords: HistoryRecord[] = checkins.map(checkin => buildCheckinHistoryRecord(checkin));
 
     // Sort history by rawTimestamp (newest first)
     historyRecords.sort((a, b) => {
@@ -828,14 +845,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Add checkins to history
   for (const checkin of checkins) {
-    historyRecords.push({
-      id: `checkin-${checkin.id}`,
-      datum: formatDateTime(checkin.created_at),
-      rawTimestamp: checkin.created_at || '',
-      typ: 'incheckning',
-      sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-      utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
-    });
+    historyRecords.push(buildCheckinHistoryRecord(checkin));
   }
 
   // Add nybil registration to history
