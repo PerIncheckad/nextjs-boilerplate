@@ -331,20 +331,20 @@ export default function StatusForm() {
                 </div>
                 
                 {/* Avvikelser for incheckning */}
-                {event.avvikelser && event.avvikelser.nyaSkador && event.avvikelser.nyaSkador > 0 && (
+                {event.avvikelser?.nyaSkador && event.avvikelser.nyaSkador > 0 && (
                   <div className="warning-banner">⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})</div>
                 )}
-                {event.avvikelser && event.avvikelser.garInteAttHyraUt !== null && (
+                {event.avvikelser?.garInteAttHyraUt !== null && event.avvikelser?.garInteAttHyraUt !== undefined && (
                   <div className="warning-banner">
-                    ⚠️ GÅR INTE ATT HYRA UT{typeof event.avvikelser.garInteAttHyraUt === 'string' && event.avvikelser.garInteAttHyraUt ? `: ${event.avvikelser.garInteAttHyraUt}` : ''}
+                    ⚠️ GÅR INTE ATT HYRA UT{event.avvikelser.garInteAttHyraUt ? `: ${event.avvikelser.garInteAttHyraUt}` : ''}
                   </div>
                 )}
-                {event.avvikelser && event.avvikelser.varningslampaPa !== null && (
+                {event.avvikelser?.varningslampaPa !== null && event.avvikelser?.varningslampaPa !== undefined && (
                   <div className="warning-banner">
-                    ⚠️ VARNINGSLAMPA EJ SLÄCKT{typeof event.avvikelser.varningslampaPa === 'string' && event.avvikelser.varningslampaPa ? `: ${event.avvikelser.varningslampaPa}` : ''}
+                    ⚠️ VARNINGSLAMPA EJ SLÄCKT{event.avvikelser.varningslampaPa ? `: ${event.avvikelser.varningslampaPa}` : ''}
                   </div>
                 )}
-                {event.avvikelser && event.avvikelser.rekondBehov && (
+                {event.avvikelser?.rekondBehov && (
                   <div className="warning-banner">
                     ⚠️ REKOND ({[
                       event.avvikelser.rekondBehov.invandig ? 'invändig' : '',
@@ -352,17 +352,17 @@ export default function StatusForm() {
                     ].filter(Boolean).join(' + ')}){event.avvikelser.rekondBehov.kommentar ? `: ${event.avvikelser.rekondBehov.kommentar}` : ''}
                   </div>
                 )}
-                {event.avvikelser && event.avvikelser.husdjurSanering !== null && (
+                {event.avvikelser?.husdjurSanering !== null && event.avvikelser?.husdjurSanering !== undefined && (
                   <div className="warning-banner">
-                    ⚠️ HUSDJUR (SANERING){typeof event.avvikelser.husdjurSanering === 'string' && event.avvikelser.husdjurSanering ? `: ${event.avvikelser.husdjurSanering}` : ''}
+                    ⚠️ HUSDJUR (SANERING){event.avvikelser.husdjurSanering ? `: ${event.avvikelser.husdjurSanering}` : ''}
                   </div>
                 )}
-                {event.avvikelser && event.avvikelser.rokningSanering !== null && (
+                {event.avvikelser?.rokningSanering !== null && event.avvikelser?.rokningSanering !== undefined && (
                   <div className="warning-banner">
-                    ⚠️ RÖKNING (SANERING){typeof event.avvikelser.rokningSanering === 'string' && event.avvikelser.rokningSanering ? `: ${event.avvikelser.rokningSanering}` : ''}
+                    ⚠️ RÖKNING (SANERING){event.avvikelser.rokningSanering ? `: ${event.avvikelser.rokningSanering}` : ''}
                   </div>
                 )}
-                {event.avvikelser && event.avvikelser.insynsskyddSaknas && (
+                {event.avvikelser?.insynsskyddSaknas && (
                   <div className="warning-banner">⚠️ INSYNSSKYDD SAKNAS</div>
                 )}
                 

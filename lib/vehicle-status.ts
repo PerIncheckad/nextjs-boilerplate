@@ -338,6 +338,47 @@ function buildFuelFillingInfo(nybilData: NybilInventeringData | null): string {
 }
 
 /**
+ * Count new damages for a checkin from checkin_damages table
+ */
+async function countCheckinDamages(checkinId: number): Promise<number> {
+  if (!checkinId) return 0;
+  
+  const { data: checkinDamages } = await supabase
+    .from('checkin_damages')
+    .select('damage_id', { count: 'exact' })
+    .eq('checkin_id', checkinId);
+  
+  return checkinDamages?.length || 0;
+}
+
+/**
+ * Build avvikelser object from checkin data
+ */
+async function buildCheckinAvvikelser(checkin: any) {
+  const checklist = checkin.checklist || {};
+  
+  // Count new damages for this checkin
+  let nyaSkadorCount = 0;
+  if (checkin.has_new_damages) {
+    nyaSkadorCount = await countCheckinDamages(checkin.id);
+  }
+  
+  return {
+    nyaSkador: nyaSkadorCount,
+    garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || null) : null,
+    varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || null) : null,
+    rekondBehov: checkin.rekond_behov ? {
+      invandig: checklist.rekond_comment?.toLowerCase().includes('invändig') || false,
+      utvandig: checklist.rekond_comment?.toLowerCase().includes('utvändig') || false,
+      kommentar: checklist.rekond_comment || null,
+    } : null,
+    husdjurSanering: checklist.pet_sanitation_needed ? (checklist.pet_sanitation_comment || null) : null,
+    rokningSanering: checklist.smoking_sanitation_needed ? (checklist.smoking_sanitation_comment || null) : null,
+    insynsskyddSaknas: checklist.privacy_cover_missing || false,
+  };
+}
+
+/**
  * Build tankstatus display from nybil_inventering data
  */
 function buildTankstatusDisplay(nybilData: NybilInventeringData | null): string {
@@ -582,32 +623,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Build history records from checkins only
     const historyRecords: HistoryRecord[] = [];
     for (const checkin of checkins) {
-      const checklist = checkin.checklist || {};
-      
-      // Count new damages for this checkin from checkin_damages table
-      let nyaSkadorCount = 0;
-      if (checkin.has_new_damages) {
-        const { data: checkinDamages } = await supabase
-          .from('checkin_damages')
-          .select('damage_id', { count: 'exact' })
-          .eq('checkin_id', checkin.id);
-        nyaSkadorCount = checkinDamages?.length || 0;
-      }
-      
-      // Build avvikelser from checklist
-      const avvikelser = {
-        nyaSkador: nyaSkadorCount,
-        garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || null) : null,
-        varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || null) : null,
-        rekondBehov: checkin.rekond_behov ? {
-          invandig: checklist.rekond_comment?.toLowerCase().includes('invändig') || false,
-          utvandig: checklist.rekond_comment?.toLowerCase().includes('utvändig') || false,
-          kommentar: checklist.rekond_comment || null,
-        } : null,
-        husdjurSanering: checklist.pet_sanitation_needed ? (checklist.pet_sanitation_comment || null) : null,
-        rokningSanering: checklist.smoking_sanitation_needed ? (checklist.smoking_sanitation_comment || null) : null,
-        insynsskyddSaknas: checklist.privacy_cover_missing || false,
-      };
+      const avvikelser = await buildCheckinAvvikelser(checkin);
       
       historyRecords.push({
         id: `checkin-${checkin.id}`,
@@ -884,33 +900,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Add checkins to history
   for (const checkin of checkins) {
-    const checklist = checkin.checklist || {};
-    
-    // Count new damages for this checkin from checkin_damages table
-    let nyaSkadorCount = 0;
-    if (checkin.has_new_damages) {
-      // Query checkin_damages to count
-      const { data: checkinDamages } = await supabase
-        .from('checkin_damages')
-        .select('damage_id', { count: 'exact' })
-        .eq('checkin_id', checkin.id);
-      nyaSkadorCount = checkinDamages?.length || 0;
-    }
-    
-    // Build avvikelser from checklist
-    const avvikelser = {
-      nyaSkador: nyaSkadorCount,
-      garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || null) : null,
-      varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || null) : null,
-      rekondBehov: checkin.rekond_behov ? {
-        invandig: checklist.rekond_comment?.toLowerCase().includes('invändig') || false,
-        utvandig: checklist.rekond_comment?.toLowerCase().includes('utvändig') || false,
-        kommentar: checklist.rekond_comment || null,
-      } : null,
-      husdjurSanering: checklist.pet_sanitation_needed ? (checklist.pet_sanitation_comment || null) : null,
-      rokningSanering: checklist.smoking_sanitation_needed ? (checklist.smoking_sanitation_comment || null) : null,
-      insynsskyddSaknas: checklist.privacy_cover_missing || false,
-    };
+    const avvikelser = await buildCheckinAvvikelser(checkin);
     
     historyRecords.push({
       id: `checkin-${checkin.id}`,
