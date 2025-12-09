@@ -135,6 +135,9 @@ export default function StatusForm() {
   
   // Print options state
   const [includeHistoryInPrint, setIncludeHistoryInPrint] = useState(false);
+  
+  // Recent events state
+  const [previousEventExpanded, setPreviousEventExpanded] = useState(false);
 
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -312,6 +315,52 @@ export default function StatusForm() {
             </div>
           )}
         </Card>
+
+        {/* Recent Events Section */}
+        {vehicleStatus?.found && vehicleStatus.history.length > 0 && (
+          <Card className="recent-events-card">
+            <SectionHeader title="Senaste händelser" />
+            
+            {/* Latest Event - Always Expanded */}
+            {vehicleStatus.history[0] && (
+              <RecentEventItem 
+                record={vehicleStatus.history[0]} 
+                damages={vehicleStatus.damages}
+                isLatest={true}
+                isExpanded={true}
+                onToggle={() => {}}
+              />
+            )}
+            
+            {/* Previous Event - Collapsible */}
+            {vehicleStatus.history[1] && (
+              <>
+                <div className="event-separator" />
+                <RecentEventItem 
+                  record={vehicleStatus.history[1]} 
+                  damages={vehicleStatus.damages}
+                  isLatest={false}
+                  isExpanded={previousEventExpanded}
+                  onToggle={() => setPreviousEventExpanded(!previousEventExpanded)}
+                />
+              </>
+            )}
+            
+            {/* Link to History Section */}
+            <div className="history-link-container">
+              <a 
+                href="#history-section" 
+                className="history-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.querySelector('.history-card')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
+                💬 För fler händelser, se HISTORIK nedan
+              </a>
+            </div>
+          </Card>
+        )}
 
         {/* Print Header (hidden on screen, visible on print) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
@@ -505,7 +554,7 @@ export default function StatusForm() {
 
         {/* History Section */}
         {vehicleStatus?.found && (
-          <Card className="history-card">
+          <Card className="history-card" id="history-section">
             <div 
               className="section-header-expandable"
               onClick={() => setHistoryExpanded(!historyExpanded)}
@@ -699,6 +748,125 @@ const HistoryItem: React.FC<{ record: HistoryRecord }> = ({ record }) => {
       </div>
       <p className="history-summary">{record.sammanfattning}</p>
       <span className="history-user">Utförd av: {record.utfordAv}</span>
+    </div>
+  );
+};
+
+const RecentEventItem: React.FC<{ 
+  record: HistoryRecord; 
+  damages: DamageRecord[];
+  isLatest: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
+}> = ({ record, damages, isLatest, isExpanded, onToggle }) => {
+  const getTypeLabel = (typ: string) => {
+    switch (typ) {
+      case 'incheckning': return 'Incheckning';
+      case 'nybil': return 'Nybilsregistrering';
+      case 'manual': return 'Manuell ändring';
+      default: return typ;
+    }
+  };
+
+  const getTypeClass = (typ: string) => {
+    switch (typ) {
+      case 'incheckning': return 'type-incheckning';
+      case 'nybil': return 'type-nybil';
+      case 'manual': return 'type-manual';
+      default: return '';
+    }
+  };
+
+  // Match damages to this event by date
+  // Extract date from record.datum (e.g., "2025-12-09 kl 14:32" -> "2025-12-09")
+  const eventDate = record.datum.split(' ')[0];
+  const eventDamages = damages.filter(damage => damage.datum === eventDate);
+
+  // Parse the summary to extract deviations
+  const parseDeviations = (summary: string) => {
+    const deviations: string[] = [];
+    
+    // Check for various deviation patterns in the summary
+    if (summary.includes('Ny skada:') || summary.includes('Nya skador:')) {
+      const newDamages = eventDamages.filter(d => 
+        summary.toLowerCase().includes(d.skadetyp.toLowerCase())
+      );
+      newDamages.forEach(d => {
+        const mediaIcon = d.folder ? ' [📷]' : '';
+        deviations.push(`⚠️ Ny skada: ${d.skadetyp}${mediaIcon}`);
+      });
+    }
+    
+    if (summary.includes('Befintlig') || summary.includes('befintlig')) {
+      deviations.push('⚠️ Befintlig skada dokumenterad [📷]');
+    }
+    
+    if (summary.toLowerCase().includes('rekond')) {
+      deviations.push('⚠️ Rekond krävs');
+    }
+    
+    if (summary.toLowerCase().includes('husdjur')) {
+      deviations.push('⚠️ Husdjur noterat');
+    }
+    
+    if (summary.toLowerCase().includes('rökning') || summary.toLowerCase().includes('rokt')) {
+      deviations.push('⚠️ Rökning noterat');
+    }
+    
+    if (summary.toLowerCase().includes('insynsskydd saknas')) {
+      deviations.push('⚠️ Insynsskydd saknas');
+    }
+    
+    return deviations;
+  };
+
+  const deviations = parseDeviations(record.sammanfattning);
+
+  if (!isLatest && !isExpanded) {
+    // Collapsed view for previous event
+    return (
+      <div className="recent-event-collapsed" onClick={onToggle}>
+        <div className="recent-event-collapsed-header">
+          <span className="expand-chevron">▼</span>
+          <span className="recent-event-collapsed-text">Visa föregående händelse</span>
+        </div>
+        <div className="recent-event-collapsed-preview">
+          <span className="recent-event-date">📅 {record.datum}</span>
+          <span className="recent-event-type-preview">{getTypeLabel(record.typ)}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="recent-event-item">
+      {!isLatest && (
+        <div className="recent-event-collapse-btn" onClick={onToggle}>
+          <span className="expand-chevron">▲</span>
+          <span>Dölj händelse</span>
+        </div>
+      )}
+      
+      <div className="recent-event-date-row">
+        <span className="recent-event-date">📅 {record.datum}</span>
+      </div>
+      
+      <div className="recent-event-summary">
+        <span className={`recent-event-type ${getTypeClass(record.typ)}`}>
+          {getTypeLabel(record.typ)}
+        </span>
+        <span className="recent-event-user"> av {record.utfordAv}</span>
+      </div>
+      
+      {deviations.length > 0 && (
+        <div className="recent-event-deviations">
+          {deviations.map((deviation, index) => (
+            <div key={index} className="recent-event-deviation">
+              {deviation}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
@@ -1090,6 +1258,166 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       color: var(--color-text-secondary);
     }
 
+    /* Recent Events Section Styles */
+    .recent-events-card {
+      /* Inherits card styles */
+    }
+
+    .event-separator {
+      height: 1px;
+      background-color: var(--color-border);
+      margin: 1.5rem 0;
+    }
+
+    .recent-event-item {
+      padding: 1rem;
+      background-color: var(--color-bg);
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+    }
+
+    .recent-event-date-row {
+      margin-bottom: 0.5rem;
+    }
+
+    .recent-event-date {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      font-weight: 500;
+    }
+
+    .recent-event-summary {
+      margin-bottom: 0.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .recent-event-type {
+      font-size: 0.875rem;
+      font-weight: 600;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .recent-event-type.type-incheckning {
+      background-color: var(--color-success-light);
+      color: var(--color-success);
+    }
+
+    .recent-event-type.type-nybil {
+      background-color: var(--color-primary-light);
+      color: var(--color-primary);
+    }
+
+    .recent-event-type.type-manual {
+      background-color: var(--color-warning-light);
+      color: #92400e;
+    }
+
+    .recent-event-user {
+      font-size: 0.875rem;
+      color: var(--color-text);
+    }
+
+    .recent-event-deviations {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .recent-event-deviation {
+      font-size: 0.875rem;
+      color: var(--color-danger);
+      font-weight: 500;
+      padding: 0.5rem;
+      background-color: var(--color-danger-light);
+      border-radius: 4px;
+      border-left: 3px solid var(--color-danger);
+    }
+
+    .recent-event-collapsed {
+      padding: 1rem;
+      background-color: var(--color-bg);
+      border-radius: 8px;
+      border: 1px solid var(--color-border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .recent-event-collapsed:hover {
+      background-color: var(--color-primary-light);
+      border-color: var(--color-primary);
+    }
+
+    .recent-event-collapsed-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .expand-chevron {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+    }
+
+    .recent-event-collapsed-text {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--color-text);
+    }
+
+    .recent-event-collapsed-preview {
+      display: flex;
+      gap: 1rem;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      padding-left: 1.25rem;
+    }
+
+    .recent-event-type-preview {
+      font-weight: 500;
+    }
+
+    .recent-event-collapse-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      margin-bottom: 0.75rem;
+      padding: 0.25rem;
+    }
+
+    .recent-event-collapse-btn:hover {
+      color: var(--color-primary);
+    }
+
+    .history-link-container {
+      text-align: center;
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--color-border);
+    }
+
+    .history-link {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .history-link:hover {
+      text-decoration: underline;
+      color: #1d4ed8;
+    }
+
     .copyright-footer {
       position: fixed;
       bottom: 0;
@@ -1199,6 +1527,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
       /* Hide search form in print */
       .search-form-card {
+        display: none !important;
+      }
+
+      /* Hide recent events section in print */
+      .recent-events-card {
         display: none !important;
       }
 
