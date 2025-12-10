@@ -80,6 +80,27 @@ export type HistoryRecord = {
   utfordAv: string;
   plats?: string; // t.ex. "Halmstad / FORD Halmstad"
   
+  // Detaljerad info för incheckning
+  checkinDetaljer?: {
+    platsForIncheckning?: string;  // "Falkenberg / Falkenberg"
+    bilenStarNu?: string;          // "Halmstad / FORD Halmstad"
+    parkeringsinfo?: string;
+    matarstallning?: string;
+    hjultyp?: string;
+    tankningInfo?: string;         // "Tankad nu av MABI (11L Bensin @ 19 kr/L)" eller "Fulltankad"
+    laddningInfo?: string;         // "85% (2 laddkablar)"
+  };
+  
+  // Detaljerad info för nybil
+  nybilDetaljer?: {
+    bilmarkeModell?: string;
+    mottagenVid?: string;
+    matarstallningVidLeverans?: string;
+    hjultyp?: string;
+    drivmedel?: string;
+    planeradStation?: string;
+  };
+  
   // Avvikelser för incheckning (från checkins.checklist jsonb)
   avvikelser?: {
     nyaSkador?: number;
@@ -407,6 +428,43 @@ function detectRekondTypes(folder: string | null): { invandig: boolean; utvandig
   };
 }
 
+/**
+ * Build tankning info string from checkin data
+ * Format: "Tankad nu av MABI (11L Bensin @ 19 kr/L)" eller "Fulltankad"
+ */
+function buildTankningInfo(checkin: any): string | undefined {
+  if (!checkin.fuel_type) return undefined;
+  
+  // If we have liters and price, build full string
+  if (checkin.fuel_liters && checkin.fuel_price_per_liter) {
+    return `Tankad nu av MABI (${checkin.fuel_liters}L ${checkin.fuel_type} @ ${checkin.fuel_price_per_liter} kr/L)`;
+  }
+  
+  // If we have liters but no price
+  if (checkin.fuel_liters) {
+    return `Tankad nu av MABI (${checkin.fuel_liters}L ${checkin.fuel_type})`;
+  }
+  
+  // Otherwise just indicate fuel type
+  return `Fulltankad (${checkin.fuel_type})`;
+}
+
+/**
+ * Build laddning info string from checkin data
+ * Format: "85% (2 laddkablar)"
+ */
+function buildLaddningInfo(checkin: any): string | undefined {
+  if (checkin.charge_level_percent == null) return undefined;
+  
+  const parts: string[] = [`${checkin.charge_level_percent}%`];
+  
+  if (checkin.charge_cables_count) {
+    parts.push(`(${checkin.charge_cables_count} laddkablar)`);
+  }
+  
+  return parts.join(' ');
+}
+
 // =================================================================
 // 3. MAIN DATA FETCHING FUNCTION
 // =================================================================
@@ -667,6 +725,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? `${checkin.current_city} / ${checkin.current_station}`
         : undefined;
       
+      // Build plats för incheckning
+      const platsForIncheckning = checkin.city && checkin.station
+        ? `${checkin.city} / ${checkin.station}`
+        : undefined;
+      
+      // Build bilen står nu
+      const bilenStarNu = checkin.current_city && checkin.current_station
+        ? `${checkin.current_city} / ${checkin.current_station}`
+        : undefined;
+      
       historyRecords.push({
         id: `checkin-${checkin.id}`,
         datum: formatDateTime(checkin.completed_at || checkin.created_at),
@@ -675,6 +743,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sammanfattning: `Incheckad vid ${checkin.current_city || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
         utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || ''),
         plats,
+        checkinDetaljer: {
+          platsForIncheckning,
+          bilenStarNu,
+          parkeringsinfo: checkin.current_location_note || undefined,
+          matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
+          hjultyp: checkin.hjultyp || undefined,
+          tankningInfo: buildTankningInfo(checkin),
+          laddningInfo: buildLaddningInfo(checkin),
+        },
         avvikelser: {
           nyaSkador: damageCount,
           garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || 'Ja') : null,
@@ -982,6 +1059,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? `${checkin.current_city || checkin.current_ort} / ${checkin.current_station}`
       : undefined;
     
+    // Build plats för incheckning
+    const platsForIncheckning = checkin.city && checkin.station
+      ? `${checkin.city} / ${checkin.station}`
+      : undefined;
+    
+    // Build bilen står nu
+    const bilenStarNu = (checkin.current_city || checkin.current_ort) && checkin.current_station
+      ? `${checkin.current_city || checkin.current_ort} / ${checkin.current_station}`
+      : undefined;
+    
     historyRecords.push({
       id: `checkin-${checkin.id}`,
       datum: formatDateTime(checkin.completed_at || checkin.created_at),
@@ -990,6 +1077,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       sammanfattning: `Incheckad vid ${checkin.current_city || checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
       utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || checkin.user_email || checkin.incheckare || ''),
       plats,
+      checkinDetaljer: {
+        platsForIncheckning,
+        bilenStarNu,
+        parkeringsinfo: checkin.current_location_note || undefined,
+        matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
+        hjultyp: checkin.hjultyp || undefined,
+        tankningInfo: buildTankningInfo(checkin),
+        laddningInfo: buildLaddningInfo(checkin),
+      },
       avvikelser: {
         nyaSkador: damageCount,
         garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || 'Ja') : null,
@@ -1008,6 +1104,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Add nybil registration to history (with nybilAvvikelser)
   if (nybilData) {
+    const mottagenVid = nybilData.plats_mottagning_ort && nybilData.plats_mottagning_station
+      ? `${nybilData.plats_mottagning_ort} / ${nybilData.plats_mottagning_station}`
+      : undefined;
+    
     historyRecords.push({
       id: `nybil-${nybilData.id}`,
       datum: formatDateTime(nybilData.created_at),
@@ -1015,6 +1115,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       typ: 'nybil',
       sammanfattning: `Nybilsregistrering: ${nybilData.bilmarke || ''} ${nybilData.modell || ''}. Mottagen vid ${nybilData.plats_mottagning_ort || '?'} / ${nybilData.plats_mottagning_station || '?'}`,
       utfordAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
+      nybilDetaljer: {
+        bilmarkeModell: formatModel(nybilData.bilmarke ?? null, nybilData.modell ?? null),
+        mottagenVid,
+        matarstallningVidLeverans: nybilData.matarstallning_inkop ? `${nybilData.matarstallning_inkop} km` : undefined,
+        hjultyp: nybilData.hjultyp || undefined,
+        drivmedel: nybilData.bransletyp || undefined,
+        planeradStation: nybilData.planerad_station || undefined,
+      },
       nybilAvvikelser: {
         harSkadorVidLeverans: nybilData.har_skador_vid_leverans === true,
         ejRedoAttHyrasUt: nybilData.klar_for_uthyrning === false,
