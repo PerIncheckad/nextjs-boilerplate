@@ -468,10 +468,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       bilmarkeModell: latestCheckin?.car_model || '---',
       
       // Senast incheckad vid: from latest checkin with datetime and checker
-      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
-        : latestCheckin?.current_ort && latestCheckin?.current_station
-          ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
+      bilenStarNu: latestCheckin?.current_city && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
+        ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
+        : latestCheckin?.current_city && latestCheckin?.current_station
+          ? `${latestCheckin.current_city} / ${latestCheckin.current_station}`
           : '---',
       
       // Mätarställning: from latest checkin
@@ -608,8 +608,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDateTime(checkin.created_at),
       rawTimestamp: checkin.created_at || '',
       typ: 'incheckning' as const,
-      sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-      utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
+      sammanfattning: `Incheckad vid ${checkin.current_city || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+      utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || ''),
     }));
 
     // Sort history by rawTimestamp (newest first)
