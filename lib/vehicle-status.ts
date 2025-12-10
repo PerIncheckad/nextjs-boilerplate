@@ -397,17 +397,6 @@ function formatModel(brand: string | null, model: string | null): string {
   return '---';
 }
 
-// Count damages for a specific checkin
-async function countDamagesForCheckin(checkinId: string): Promise<number> {
-  const { count } = await supabase
-    .from('checkin_damages')
-    .select('*', { count: 'exact', head: true })
-    .eq('checkin_id', checkinId)
-    .eq('type', 'new');
-  
-  return count || 0;
-}
-
 // Detect if rekond is invandig/utvandig from folder name
 function detectRekondTypes(folder: string | null): { invandig: boolean; utvandig: boolean } {
   if (!folder) return { invandig: false, utvandig: false };
@@ -646,12 +635,32 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
+    
+    // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
+    const checkinIds = checkins.map(c => c.id).filter(Boolean);
+    const damageCounts = new Map<string, number>();
+    
+    if (checkinIds.length > 0) {
+      const { data: damageData } = await supabase
+        .from('checkin_damages')
+        .select('checkin_id')
+        .in('checkin_id', checkinIds)
+        .eq('type', 'new');
+      
+      if (damageData) {
+        for (const damage of damageData) {
+          const count = damageCounts.get(damage.checkin_id) || 0;
+          damageCounts.set(damage.checkin_id, count + 1);
+        }
+      }
+    }
+    
     for (const checkin of checkins) {
       const checklist = checkin.checklist || {};
       const rekondTypes = detectRekondTypes(checklist.rekond_folder);
       
-      // Count new damages for this checkin
-      const damageCount = checkin.has_new_damages ? await countDamagesForCheckin(checkin.id) : 0;
+      // Get damage count from pre-fetched map
+      const damageCount = checkin.has_new_damages ? (damageCounts.get(checkin.id) || 0) : 0;
       
       // Build plats string
       const plats = checkin.current_city && checkin.current_station
@@ -941,13 +950,32 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Build history records
   const historyRecords: HistoryRecord[] = [];
 
+  // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
+  const checkinIds = checkins.map(c => c.id).filter(Boolean);
+  const damageCounts = new Map<string, number>();
+  
+  if (checkinIds.length > 0) {
+    const { data: damageData } = await supabase
+      .from('checkin_damages')
+      .select('checkin_id')
+      .in('checkin_id', checkinIds)
+      .eq('type', 'new');
+    
+    if (damageData) {
+      for (const damage of damageData) {
+        const count = damageCounts.get(damage.checkin_id) || 0;
+        damageCounts.set(damage.checkin_id, count + 1);
+      }
+    }
+  }
+
   // Add checkins to history (with avvikelser)
   for (const checkin of checkins) {
     const checklist = checkin.checklist || {};
     const rekondTypes = detectRekondTypes(checklist.rekond_folder);
     
-    // Count new damages for this checkin
-    const damageCount = checkin.has_new_damages ? await countDamagesForCheckin(checkin.id) : 0;
+    // Get damage count from pre-fetched map
+    const damageCount = checkin.has_new_damages ? (damageCounts.get(checkin.id) || 0) : 0;
     
     // Build plats string
     const plats = (checkin.current_city || checkin.current_ort) && checkin.current_station

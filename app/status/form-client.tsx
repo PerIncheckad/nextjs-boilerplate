@@ -11,6 +11,15 @@ import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } fr
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MB%20300%20SL%20Roadster%201962/MB%20300-SL-Roadster_1962.jpg";
 
+// Warning banner styles for avvikelser
+const WARNING_BANNER_STYLE: React.CSSProperties = {
+  backgroundColor: '#B30E0E',
+  color: 'white',
+  padding: '0.5rem 1rem',
+  borderRadius: '4px',
+  marginBottom: '0.25rem',
+};
+
 // =================================================================
 // 2. HELPER FUNCTIONS
 // =================================================================
@@ -387,22 +396,22 @@ export default function StatusForm() {
                 {event.avvikelser && (
                   <>
                     {event.avvikelser.nyaSkador !== undefined && event.avvikelser.nyaSkador > 0 && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})
                       </div>
                     )}
                     {event.avvikelser.garInteAttHyraUt && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ GÅR INTE ATT HYRA UT: {event.avvikelser.garInteAttHyraUt}
                       </div>
                     )}
                     {event.avvikelser.varningslampaPa && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ VARNINGSLAMPA EJ SLÄCKT: {event.avvikelser.varningslampaPa}
                       </div>
                     )}
                     {event.avvikelser.rekondBehov && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ REKOND ({[
                           event.avvikelser.rekondBehov.invandig && 'invändig',
                           event.avvikelser.rekondBehov.utvandig && 'utvändig'
@@ -410,17 +419,17 @@ export default function StatusForm() {
                       </div>
                     )}
                     {event.avvikelser.husdjurSanering && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ HUSDJUR (SANERING): {event.avvikelser.husdjurSanering}
                       </div>
                     )}
                     {event.avvikelser.rokningSanering && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ RÖKNING (SANERING): {event.avvikelser.rokningSanering}
                       </div>
                     )}
                     {event.avvikelser.insynsskyddSaknas && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ INSYNSSKYDD SAKNAS
                       </div>
                     )}
@@ -431,12 +440,12 @@ export default function StatusForm() {
                 {event.nybilAvvikelser && (
                   <>
                     {event.nybilAvvikelser.harSkadorVidLeverans && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ SKADOR VID LEVERANS
                       </div>
                     )}
                     {event.nybilAvvikelser.ejRedoAttHyrasUt && (
-                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                      <div style={WARNING_BANNER_STYLE}>
                         ⚠️ EJ REDO ATT HYRAS UT
                       </div>
                     )}
