@@ -1034,82 +1034,6 @@ const HistoryItem: React.FC<{
               <div className="history-detail-row">
                 <strong>Utförd av:</strong> {record.utfordAv}
               </div>
-              
-              {/* Media links */}
-              {record.checkinDetaljer.mediaLankar && (
-                record.checkinDetaljer.mediaLankar.rekond || 
-                record.checkinDetaljer.mediaLankar.husdjur || 
-                record.checkinDetaljer.mediaLankar.rokning
-              ) && (
-                <div style={{ marginTop: '1rem' }}>
-                  <strong>Bilagor:</strong>
-                  <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                    {record.checkinDetaljer.mediaLankar.rekond && (
-                      <li>
-                        <a 
-                          href={record.checkinDetaljer.mediaLankar.rekond} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#1a73e8' }}
-                        >
-                          Rekond 📎
-                        </a>
-                      </li>
-                    )}
-                    {record.checkinDetaljer.mediaLankar.husdjur && (
-                      <li>
-                        <a 
-                          href={record.checkinDetaljer.mediaLankar.husdjur} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#1a73e8' }}
-                        >
-                          Husdjur 📎
-                        </a>
-                      </li>
-                    )}
-                    {record.checkinDetaljer.mediaLankar.rokning && (
-                      <li>
-                        <a 
-                          href={record.checkinDetaljer.mediaLankar.rokning} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#1a73e8' }}
-                        >
-                          Rökning 📎
-                        </a>
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
-              
-              {/* Damages registered at this checkin */}
-              {record.checkinDetaljer.skador && record.checkinDetaljer.skador.length > 0 && (
-                <div style={{ marginTop: '1rem' }}>
-                  <strong>Skador registrerade vid denna incheckning:</strong>
-                  <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                    {record.checkinDetaljer.skador.map((skada, idx) => (
-                      <li key={idx}>
-                        {skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}
-                        {skada.mediaUrl && (
-                          <span>
-                            {' '}
-                            <a 
-                              href={skada.mediaUrl} 
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
-                            >
-                              Visa media 📎
-                            </a>
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </>
           )}
 
@@ -1194,6 +1118,82 @@ const HistoryItem: React.FC<{
                 </div>
               )}
             </>
+          )}
+          
+          {/* Media links - shown after avvikelser for incheckning */}
+          {record.typ === 'incheckning' && record.checkinDetaljer?.mediaLankar && (
+            record.checkinDetaljer.mediaLankar.rekond || 
+            record.checkinDetaljer.mediaLankar.husdjur || 
+            record.checkinDetaljer.mediaLankar.rokning
+          ) && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>Bilagor:</strong>
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                {record.checkinDetaljer.mediaLankar.rekond && (
+                  <li>
+                    <a 
+                      href={record.checkinDetaljer.mediaLankar.rekond} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Rekond 📎
+                    </a>
+                  </li>
+                )}
+                {record.checkinDetaljer.mediaLankar.husdjur && (
+                  <li>
+                    <a 
+                      href={record.checkinDetaljer.mediaLankar.husdjur} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Husdjur 📎
+                    </a>
+                  </li>
+                )}
+                {record.checkinDetaljer.mediaLankar.rokning && (
+                  <li>
+                    <a 
+                      href={record.checkinDetaljer.mediaLankar.rokning} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Rökning 📎
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          
+          {/* Damages registered at this checkin - shown after avvikelser */}
+          {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>Skador registrerade vid denna incheckning:</strong>
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                {record.checkinDetaljer.skador.map((skada, idx) => (
+                  <li key={idx}>
+                    {skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}
+                    {skada.mediaUrl && (
+                      <span>
+                        {' '}
+                        <a 
+                          href={skada.mediaUrl} 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
+                        >
+                          Visa media 📎
+                        </a>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {/* Nybil-avvikelser */}
