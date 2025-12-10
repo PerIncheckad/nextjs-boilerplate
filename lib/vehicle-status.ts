@@ -468,10 +468,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       bilmarkeModell: latestCheckin?.car_model || '---',
       
       // Senast incheckad vid: from latest checkin with datetime and checker
-      bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
-        : latestCheckin?.current_ort && latestCheckin?.current_station
-          ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
+      bilenStarNu: latestCheckin?.current_city && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
+        ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
+        : latestCheckin?.current_city && latestCheckin?.current_station
+          ? `${latestCheckin.current_city} / ${latestCheckin.current_station}`
           : '---',
       
       // Mätarställning: from latest checkin
@@ -505,8 +505,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? formatDate(legacySaludatum)
         : '---',
       
-      // Antal registrerade skador: count legacy damages (BUHS)
-      antalSkador: legacyDamages.length,
+      // Antal registrerade skador: will be updated after building damageRecords
+      antalSkador: 0,
       
       // Stöld-GPS monterad: not available from checkins
       stoldGps: '---',
@@ -557,14 +557,59 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       sourceInfo: 'Källa: BUHS\nReg. nr har aldrig checkats in med incheckad.se/check',
     }));
 
+    // Add damages from damages table (new damages from checkins)
+    for (const damage of damages) {
+      let skadetyp: string;
+      if (damage.damage_type_raw) {
+        skadetyp = damage.damage_type_raw;
+      } else if (damage.damage_type) {
+        skadetyp = formatDamageType(damage.damage_type);
+      } else {
+        skadetyp = 'Okänd';
+      }
+      
+      // Add position info if user_positions exists
+      if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
+        const positions = damage.user_positions.map((pos: any) => {
+          const parts: string[] = [];
+          if (pos.carPart) parts.push(pos.carPart);
+          if (pos.position) parts.push(pos.position);
+          return parts.join(' - ');
+        }).filter(Boolean);
+        if (positions.length > 0) {
+          skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+        }
+      }
+      
+      // Add description if available
+      if (damage.description) {
+        skadetyp = `${skadetyp}: ${damage.description}`;
+      }
+      
+      const sourceInfo = damage.inchecker_name 
+        ? `Registrerad vid incheckning av ${damage.inchecker_name}`
+        : 'Registrerad vid incheckning';
+      
+      damageRecords.push({
+        id: damage.id,
+        regnr: cleanedRegnr,
+        skadetyp: skadetyp,
+        datum: formatDate(damage.damage_date || damage.created_at),
+        status: damage.status || 'Ny',
+        folder: damage.uploads?.folder || undefined,
+        source: 'damages' as const,
+        sourceInfo: sourceInfo,
+      });
+    }
+
     // Build history records from checkins only
     const historyRecords: HistoryRecord[] = checkins.map(checkin => ({
       id: `checkin-${checkin.id}`,
       datum: formatDateTime(checkin.created_at),
       rawTimestamp: checkin.created_at || '',
       typ: 'incheckning' as const,
-      sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-      utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
+      sammanfattning: `Incheckad vid ${checkin.current_city || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+      utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || ''),
     }));
 
     // Sort history by rawTimestamp (newest first)
