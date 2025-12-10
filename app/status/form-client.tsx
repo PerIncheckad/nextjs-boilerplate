@@ -159,9 +159,11 @@ export default function StatusForm() {
   // History section state
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [historyFilter, setHistoryFilter] = useState<'all' | 'incheckning' | 'nybil' | 'manual'>('all');
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   
   // Print options state
   const [includeHistoryInPrint, setIncludeHistoryInPrint] = useState(false);
+  const [includeDetailedHistory, setIncludeDetailedHistory] = useState(false);
 
   const normalizedReg = useMemo(() => regInput.toUpperCase().replace(/\s/g, ''), [regInput]);
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -257,19 +259,48 @@ export default function StatusForm() {
     return vehicleStatus.history.filter(h => h.typ === historyFilter);
   }, [vehicleStatus?.history, historyFilter]);
 
-  // Handle print: add/remove class based on includeHistoryInPrint
+  // Toggle functions for expandable history
+  const toggleEvent = useCallback((eventId: string) => {
+    setExpandedEvents(prev => {
+      const next = new Set(prev);
+      if (next.has(eventId)) {
+        next.delete(eventId);
+      } else {
+        next.add(eventId);
+      }
+      return next;
+    });
+  }, []);
+
+  const expandAll = useCallback(() => {
+    if (vehicleStatus?.history) {
+      setExpandedEvents(new Set(vehicleStatus.history.map(e => e.id)));
+    }
+  }, [vehicleStatus?.history]);
+
+  const collapseAll = useCallback(() => {
+    setExpandedEvents(new Set());
+  }, []);
+
+  // Handle print: add/remove class based on includeHistoryInPrint and includeDetailedHistory
   useEffect(() => {
     const handleBeforePrint = () => {
       if (includeHistoryInPrint) {
         document.body.classList.add('include-history-print');
+        if (includeDetailedHistory) {
+          document.body.classList.add('include-detailed-history-print');
+        } else {
+          document.body.classList.remove('include-detailed-history-print');
+        }
       } else {
         document.body.classList.remove('include-history-print');
+        document.body.classList.remove('include-detailed-history-print');
       }
     };
 
     window.addEventListener('beforeprint', handleBeforePrint);
     return () => window.removeEventListener('beforeprint', handleBeforePrint);
-  }, [includeHistoryInPrint]);
+  }, [includeHistoryInPrint, includeDetailedHistory]);
 
   // Helper to build nybil photos title
   const getNybilPhotosTitle = useCallback(() => {
@@ -398,82 +429,37 @@ export default function StatusForm() {
           <Card className="recent-events-card">
             <SectionHeader title="Senaste händelser" />
             
-            {vehicleStatus.history.slice(0, 2).map((event) => (
-              <div key={event.id} className="event-card" style={EVENT_CARD_STYLE}>
-                <div style={EVENT_DATE_STYLE}>
-                  📅 {event.datum}
+            {vehicleStatus.history.slice(0, 2).map((event) => {
+              // Kolla om det finns avvikelser
+              const hasAvvikelser = 
+                (event.avvikelser?.nyaSkador && event.avvikelser.nyaSkador > 0) ||
+                event.avvikelser?.garInteAttHyraUt ||
+                event.avvikelser?.varningslampaPa ||
+                event.avvikelser?.rekondBehov ||
+                event.avvikelser?.husdjurSanering ||
+                event.avvikelser?.rokningSanering ||
+                event.avvikelser?.insynsskyddSaknas ||
+                event.nybilAvvikelser?.harSkadorVidLeverans ||
+                event.nybilAvvikelser?.ejRedoAttHyrasUt;
+              
+              return (
+                <div key={event.id} style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '8px' }}>
+                  <div style={{ color: '#666', marginBottom: '0.5rem' }}>
+                    📅 {event.datum}
+                  </div>
+                  <div style={{ fontWeight: 'bold' }}>
+                    {event.typ === 'incheckning' 
+                      ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
+                      : `Nybilsregistrering av ${event.utfordAv}`
+                    }
+                    {hasAvvikelser && ' ⚠️'}
+                  </div>
                 </div>
-                <div style={EVENT_TITLE_STYLE}>
-                  {event.typ === 'incheckning' 
-                    ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
-                    : `Nybilsregistrering av ${event.utfordAv}`
-                  }
-                </div>
-                
-                {/* Avvikelser för incheckning */}
-                {event.avvikelser && (
-                  <>
-                    {event.avvikelser.nyaSkador !== undefined && event.avvikelser.nyaSkador > 0 && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})
-                      </div>
-                    )}
-                    {event.avvikelser.garInteAttHyraUt && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ GÅR INTE ATT HYRA UT: {event.avvikelser.garInteAttHyraUt}
-                      </div>
-                    )}
-                    {event.avvikelser.varningslampaPa && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ VARNINGSLAMPA EJ SLÄCKT: {event.avvikelser.varningslampaPa}
-                      </div>
-                    )}
-                    {event.avvikelser.rekondBehov && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ REKOND ({[
-                          event.avvikelser.rekondBehov.invandig && 'invändig',
-                          event.avvikelser.rekondBehov.utvandig && 'utvändig'
-                        ].filter(Boolean).join(' + ') || 'behövs'}){event.avvikelser.rekondBehov.kommentar ? `: ${event.avvikelser.rekondBehov.kommentar}` : ''}
-                      </div>
-                    )}
-                    {event.avvikelser.husdjurSanering && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ HUSDJUR (SANERING): {event.avvikelser.husdjurSanering}
-                      </div>
-                    )}
-                    {event.avvikelser.rokningSanering && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ RÖKNING (SANERING): {event.avvikelser.rokningSanering}
-                      </div>
-                    )}
-                    {event.avvikelser.insynsskyddSaknas && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ INSYNSSKYDD SAKNAS
-                      </div>
-                    )}
-                  </>
-                )}
-                
-                {/* Nybil-avvikelser */}
-                {event.nybilAvvikelser && (
-                  <>
-                    {event.nybilAvvikelser.harSkadorVidLeverans && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ SKADOR VID LEVERANS
-                      </div>
-                    )}
-                    {event.nybilAvvikelser.ejRedoAttHyrasUt && (
-                      <div style={WARNING_BANNER_STYLE}>
-                        ⚠️ EJ REDO ATT HYRAS UT
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            ))}
+              );
+            })}
             
-            <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', marginTop: '1rem' }}>
-              Detaljer och fler poster i sektionen <a href="#history-section" style={{ color: '#1a73e8', textDecoration: 'underline' }}>Historik</a> nedan
+            <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem' }}>
+              Detaljer och fler poster i sektionen <a href="#history-section" style={{ color: '#1a73e8' }}>Historik</a> nedan
             </p>
           </Card>
         )}
@@ -630,31 +616,50 @@ export default function StatusForm() {
             
             {historyExpanded && (
               <>
-                <div className="history-filter">
-                  <FilterButton
-                    active={historyFilter === 'all'}
-                    onClick={() => setHistoryFilter('all')}
-                  >
-                    Alla
-                  </FilterButton>
-                  <FilterButton
-                    active={historyFilter === 'incheckning'}
-                    onClick={() => setHistoryFilter('incheckning')}
-                  >
-                    Incheckningar
-                  </FilterButton>
-                  <FilterButton
-                    active={historyFilter === 'nybil'}
-                    onClick={() => setHistoryFilter('nybil')}
-                  >
-                    Nybil
-                  </FilterButton>
-                  <FilterButton
-                    active={historyFilter === 'manual'}
-                    onClick={() => setHistoryFilter('manual')}
-                  >
-                    Manuella ändringar
-                  </FilterButton>
+                <div className="history-controls">
+                  <div className="history-expand-buttons">
+                    <button 
+                      type="button" 
+                      className="expand-all-btn"
+                      onClick={expandAll}
+                    >
+                      Expandera alla
+                    </button>
+                    <button 
+                      type="button" 
+                      className="collapse-all-btn"
+                      onClick={collapseAll}
+                    >
+                      Fäll ihop alla
+                    </button>
+                  </div>
+                  
+                  <div className="history-filter">
+                    <FilterButton
+                      active={historyFilter === 'all'}
+                      onClick={() => setHistoryFilter('all')}
+                    >
+                      Alla
+                    </FilterButton>
+                    <FilterButton
+                      active={historyFilter === 'incheckning'}
+                      onClick={() => setHistoryFilter('incheckning')}
+                    >
+                      Incheckningar
+                    </FilterButton>
+                    <FilterButton
+                      active={historyFilter === 'nybil'}
+                      onClick={() => setHistoryFilter('nybil')}
+                    >
+                      Nybil
+                    </FilterButton>
+                    <FilterButton
+                      active={historyFilter === 'manual'}
+                      onClick={() => setHistoryFilter('manual')}
+                    >
+                      Manuella ändringar
+                    </FilterButton>
+                  </div>
                 </div>
 
                 {filteredHistory.length === 0 ? (
@@ -662,7 +667,12 @@ export default function StatusForm() {
                 ) : (
                   <div className="history-list">
                     {filteredHistory.map((record) => (
-                      <HistoryItem key={record.id} record={record} />
+                      <HistoryItem 
+                        key={record.id} 
+                        record={record}
+                        isExpanded={expandedEvents.has(record.id)}
+                        onToggle={() => toggleEvent(record.id)}
+                      />
                     ))}
                   </div>
                 )}
@@ -681,10 +691,26 @@ export default function StatusForm() {
                   <input 
                     type="checkbox" 
                     checked={includeHistoryInPrint} 
-                    onChange={(e) => setIncludeHistoryInPrint(e.target.checked)} 
+                    onChange={(e) => {
+                      setIncludeHistoryInPrint(e.target.checked);
+                      if (!e.target.checked) {
+                        setIncludeDetailedHistory(false);
+                      }
+                    }} 
                   />
-                  <span>Inkludera all historik vid utskrift</span>
+                  <span>Inkludera historik vid utskrift</span>
                 </label>
+                
+                {includeHistoryInPrint && (
+                  <label className="print-checkbox print-checkbox-nested">
+                    <input 
+                      type="checkbox" 
+                      checked={includeDetailedHistory}
+                      onChange={(e) => setIncludeDetailedHistory(e.target.checked)}
+                    />
+                    <span>Inkludera detaljerad historik</span>
+                  </label>
+                )}
               </div>
               <div className="print-button-container">
                 <button
@@ -782,35 +808,179 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
   );
 };
 
-const HistoryItem: React.FC<{ record: HistoryRecord }> = ({ record }) => {
+const HistoryItem: React.FC<{ 
+  record: HistoryRecord; 
+  isExpanded: boolean; 
+  onToggle: () => void;
+}> = ({ record, isExpanded, onToggle }) => {
   const getTypeLabel = (typ: string) => {
     switch (typ) {
-      case 'incheckning': return 'Incheckning';
-      case 'nybil': return 'Nybilsregistrering';
-      case 'manual': return 'Manuell ändring';
-      default: return typ;
-    }
-  };
-
-  const getTypeClass = (typ: string) => {
-    switch (typ) {
-      case 'incheckning': return 'type-incheckning';
-      case 'nybil': return 'type-nybil';
-      case 'manual': return 'type-manual';
-      default: return '';
+      case 'incheckning': return 'INCHECKNING';
+      case 'nybil': return 'NYBILSREGISTRERING';
+      case 'manual': return 'MANUELL ÄNDRING';
+      default: return typ.toUpperCase();
     }
   };
 
   return (
-    <div className="history-item">
-      <div className="history-header">
-        <span className={`history-type ${getTypeClass(record.typ)}`}>
-          {getTypeLabel(record.typ)}
-        </span>
-        <span className="history-date">{record.datum}</span>
+    <div className="history-item-expandable">
+      {/* Collapsed view - always visible */}
+      <div className="history-item-collapsed" onClick={onToggle}>
+        <div className="history-collapsed-content">
+          <span className="history-type-label">{getTypeLabel(record.typ)}</span>
+          {record.plats && <span className="history-plats-label">{record.plats}</span>}
+          <span className="history-date-label">{record.datum}</span>
+        </div>
+        <span className="history-toggle-icon">{isExpanded ? '▲' : '▼'}</span>
       </div>
-      <p className="history-summary">{record.sammanfattning}</p>
-      <span className="history-user">Utförd av: {record.utfordAv}</span>
+
+      {/* Expanded view - only when isExpanded */}
+      {isExpanded && (
+        <div className="history-item-expanded">
+          {/* For incheckning */}
+          {record.typ === 'incheckning' && record.checkinDetaljer && (
+            <>
+              {record.checkinDetaljer.platsForIncheckning && (
+                <div className="history-detail-row">
+                  <strong>Plats för incheckning:</strong> {record.checkinDetaljer.platsForIncheckning}
+                </div>
+              )}
+              {record.checkinDetaljer.bilenStarNu && (
+                <div className="history-detail-row">
+                  <strong>Bilen står nu:</strong> {record.checkinDetaljer.bilenStarNu}
+                </div>
+              )}
+              {record.checkinDetaljer.parkeringsinfo && (
+                <div className="history-detail-row">
+                  <strong>Parkeringsinfo:</strong> {record.checkinDetaljer.parkeringsinfo}
+                </div>
+              )}
+              {record.checkinDetaljer.matarstallning && (
+                <div className="history-detail-row">
+                  <strong>Mätarställning:</strong> {record.checkinDetaljer.matarstallning}
+                </div>
+              )}
+              {record.checkinDetaljer.hjultyp && (
+                <div className="history-detail-row">
+                  <strong>Hjultyp:</strong> {record.checkinDetaljer.hjultyp}
+                </div>
+              )}
+              {record.checkinDetaljer.tankningInfo && (
+                <div className="history-detail-row">
+                  <strong>Tankning:</strong> {record.checkinDetaljer.tankningInfo}
+                </div>
+              )}
+              {record.checkinDetaljer.laddningInfo && (
+                <div className="history-detail-row">
+                  <strong>Laddning:</strong> {record.checkinDetaljer.laddningInfo}
+                </div>
+              )}
+              <div className="history-detail-row">
+                <strong>Utförd av:</strong> {record.utfordAv}
+              </div>
+            </>
+          )}
+
+          {/* For nybil */}
+          {record.typ === 'nybil' && record.nybilDetaljer && (
+            <>
+              {record.nybilDetaljer.bilmarkeModell && (
+                <div className="history-detail-row">
+                  <strong>Bilmärke & Modell:</strong> {record.nybilDetaljer.bilmarkeModell}
+                </div>
+              )}
+              {record.nybilDetaljer.mottagenVid && (
+                <div className="history-detail-row">
+                  <strong>Mottagen vid:</strong> {record.nybilDetaljer.mottagenVid}
+                </div>
+              )}
+              {record.nybilDetaljer.matarstallningVidLeverans && (
+                <div className="history-detail-row">
+                  <strong>Mätarställning vid leverans:</strong> {record.nybilDetaljer.matarstallningVidLeverans}
+                </div>
+              )}
+              {record.nybilDetaljer.hjultyp && (
+                <div className="history-detail-row">
+                  <strong>Hjultyp:</strong> {record.nybilDetaljer.hjultyp}
+                </div>
+              )}
+              {record.nybilDetaljer.drivmedel && (
+                <div className="history-detail-row">
+                  <strong>Drivmedel:</strong> {record.nybilDetaljer.drivmedel}
+                </div>
+              )}
+              {record.nybilDetaljer.planeradStation && (
+                <div className="history-detail-row">
+                  <strong>Planerad station:</strong> {record.nybilDetaljer.planeradStation}
+                </div>
+              )}
+              <div className="history-detail-row">
+                <strong>Utförd av:</strong> {record.utfordAv}
+              </div>
+            </>
+          )}
+
+          {/* Avvikelser för incheckning */}
+          {record.avvikelser && (
+            <>
+              {record.avvikelser.nyaSkador !== undefined && record.avvikelser.nyaSkador > 0 && (
+                <div className="history-avvikelse">
+                  ⚠️ NYA SKADOR ({record.avvikelser.nyaSkador})
+                </div>
+              )}
+              {record.avvikelser.garInteAttHyraUt && (
+                <div className="history-avvikelse">
+                  ⚠️ GÅR INTE ATT HYRA UT: {record.avvikelser.garInteAttHyraUt}
+                </div>
+              )}
+              {record.avvikelser.varningslampaPa && (
+                <div className="history-avvikelse">
+                  ⚠️ VARNINGSLAMPA EJ SLÄCKT: {record.avvikelser.varningslampaPa}
+                </div>
+              )}
+              {record.avvikelser.rekondBehov && (
+                <div className="history-avvikelse">
+                  ⚠️ REKOND ({[
+                    record.avvikelser.rekondBehov.invandig && 'invändig',
+                    record.avvikelser.rekondBehov.utvandig && 'utvändig'
+                  ].filter(Boolean).join(' + ') || 'behövs'}){record.avvikelser.rekondBehov.kommentar ? `: ${record.avvikelser.rekondBehov.kommentar}` : ''}
+                </div>
+              )}
+              {record.avvikelser.husdjurSanering && (
+                <div className="history-avvikelse">
+                  ⚠️ HUSDJUR (SANERING): {record.avvikelser.husdjurSanering}
+                </div>
+              )}
+              {record.avvikelser.rokningSanering && (
+                <div className="history-avvikelse">
+                  ⚠️ RÖKNING (SANERING): {record.avvikelser.rokningSanering}
+                </div>
+              )}
+              {record.avvikelser.insynsskyddSaknas && (
+                <div className="history-avvikelse">
+                  ⚠️ INSYNSSKYDD SAKNAS
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Nybil-avvikelser */}
+          {record.nybilAvvikelser && (
+            <>
+              {record.nybilAvvikelser.harSkadorVidLeverans && (
+                <div className="history-avvikelse">
+                  ⚠️ SKADOR VID LEVERANS
+                </div>
+              )}
+              {record.nybilAvvikelser.ejRedoAttHyrasUt && (
+                <div className="history-avvikelse">
+                  ⚠️ EJ REDO ATT HYRAS UT
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1113,12 +1283,39 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       text-decoration: underline;
     }
 
+    /* History controls - buttons and filter */
+    .history-controls {
+      margin-bottom: 1rem;
+    }
+
+    .history-expand-buttons {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .expand-all-btn,
+    .collapse-all-btn {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      background-color: white;
+      color: var(--color-text);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .expand-all-btn:hover,
+    .collapse-all-btn:hover {
+      background-color: var(--color-bg);
+    }
+
     /* History filter styles */
     .history-filter {
       display: flex;
       flex-wrap: wrap;
       gap: 0.5rem;
-      margin-bottom: 1rem;
     }
 
     .filter-btn {
@@ -1149,57 +1346,85 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       gap: 0.75rem;
     }
 
-    .history-item {
-      padding: 0.75rem;
+    /* Expandable history item styles */
+    .history-item-expandable {
       background-color: var(--color-bg);
       border-radius: 8px;
       border: 1px solid var(--color-border);
+      overflow: hidden;
     }
 
-    .history-header {
+    .history-item-collapsed {
+      padding: 0.75rem;
+      cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 0.5rem;
+      user-select: none;
+      transition: background-color 0.2s;
     }
 
-    .history-type {
-      font-size: 0.75rem;
-      font-weight: 600;
-      padding: 0.25rem 0.5rem;
-      border-radius: 4px;
+    .history-item-collapsed:hover {
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    .history-collapsed-content {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .history-type-label {
+      font-weight: 700;
+      font-size: 0.875rem;
       text-transform: uppercase;
+      color: var(--color-text);
     }
 
-    .history-type.type-incheckning {
-      background-color: var(--color-success-light);
-      color: var(--color-success);
+    .history-plats-label {
+      font-size: 0.875rem;
+      color: var(--color-text);
     }
 
-    .history-type.type-nybil {
-      background-color: var(--color-primary-light);
-      color: var(--color-primary);
-    }
-
-    .history-type.type-manual {
-      background-color: var(--color-warning-light);
-      color: #92400e;
-    }
-
-    .history-date {
+    .history-date-label {
       font-size: 0.875rem;
       color: var(--color-text-secondary);
+      margin-left: auto;
     }
 
-    .history-summary {
-      margin: 0 0 0.5rem 0;
+    .history-toggle-icon {
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      margin-left: 0.5rem;
+    }
+
+    .history-item-expanded {
+      padding: 0.75rem;
+      padding-top: 0;
+      border-top: 1px solid var(--color-border);
+      background-color: white;
+    }
+
+    .history-detail-row {
+      padding: 0.5rem 0;
       font-size: 0.875rem;
       line-height: 1.4;
     }
 
-    .history-user {
-      font-size: 0.75rem;
-      color: var(--color-text-secondary);
+    .history-detail-row strong {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+
+    .history-avvikelse {
+      background-color: #B30E0E;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
     }
 
     .copyright-footer {
@@ -1249,6 +1474,12 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       cursor: pointer;
       width: 1rem;
       height: 1rem;
+    }
+
+    .print-checkbox-nested {
+      margin-left: 1.5rem;
+      display: block;
+      margin-top: 0.5rem;
     }
 
     /* Print button container - centered */
@@ -1437,10 +1668,12 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
-      /* Hide expand icons and filters */
+      /* Hide expand icons, filters, and expand buttons */
       .expand-icon,
       .history-filter,
-      .filter-btn {
+      .filter-btn,
+      .history-expand-buttons,
+      .history-controls {
         display: none !important;
       }
 
@@ -1466,9 +1699,52 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: block !important;
       }
 
+      /* Expandable history items in print */
+      body.include-history-print .history-item-expandable {
+        background-color: white !important;
+        box-shadow: none !important;
+        border: 1px solid #e5e7eb;
+        margin-bottom: 3px !important;
+        padding: 3px !important;
+      }
+
+      body.include-history-print .history-item-collapsed {
+        padding: 3px !important;
+        cursor: default;
+      }
+
+      body.include-history-print .history-toggle-icon {
+        display: none !important;
+      }
+
+      /* Hide expanded details by default in print */
+      body.include-history-print .history-item-expanded {
+        display: none !important;
+      }
+
+      /* Show expanded details only when detailed history is enabled */
+      body.include-history-print.include-detailed-history-print .history-item-expanded {
+        display: block !important;
+        padding: 3px !important;
+        border-top: 1px solid #e5e7eb;
+        background-color: white;
+      }
+
+      body.include-history-print.include-detailed-history-print .history-detail-row {
+        padding: 2px 0;
+        font-size: 8pt !important;
+        line-height: 1.2 !important;
+      }
+
+      body.include-history-print.include-detailed-history-print .history-avvikelse {
+        padding: 3px 6px;
+        margin-top: 2px;
+        font-size: 7pt !important;
+      }
+
       /* Page break control */
       .damage-item,
-      .history-item {
+      .history-item-expandable {
         page-break-inside: avoid;
       }
 
