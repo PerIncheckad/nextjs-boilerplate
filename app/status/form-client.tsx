@@ -853,7 +853,7 @@ export default function StatusForm() {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
                       printWindow.document.write('<html><head><title>Nybilsregistrering</title>');
-                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 2rem; } h2, h3 { margin-top: 1.5rem; } p { margin: 0.25rem 0; }</style>');
+                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 2rem; font-size: 12px; } h2 { font-size: 16px; margin-top: 0; margin-bottom: 1rem; } h3 { font-size: 14px; margin-top: 1.5rem; margin-bottom: 0.5rem; } p { margin: 0.25rem 0; font-size: 12px; } strong { font-weight: 600; }</style>');
                       printWindow.document.write('</head><body>');
                       printWindow.document.write(content.innerHTML);
                       printWindow.document.write('</body></html>');
@@ -1037,6 +1037,10 @@ const HistoryItem: React.FC<{
               
               {/* Media links */}
               {record.checkinDetaljer.mediaLankar && (
+                record.checkinDetaljer.mediaLankar.rekond || 
+                record.checkinDetaljer.mediaLankar.husdjur || 
+                record.checkinDetaljer.mediaLankar.rokning
+              ) && (
                 <div style={{ marginTop: '1rem' }}>
                   <strong>Bilagor:</strong>
                   <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>

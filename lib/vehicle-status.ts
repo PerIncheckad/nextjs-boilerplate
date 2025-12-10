@@ -1245,6 +1245,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       typ: 'nybil',
       sammanfattning: `Nybilsregistrering: ${nybilData.bilmarke || ''} ${nybilData.modell || ''}. Mottagen vid ${nybilData.plats_mottagning_ort || '?'} / ${nybilData.plats_mottagning_station || '?'}`,
       utfordAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
+      plats: mottagenVid, // Add plats field for display in history
       nybilDetaljer: {
         bilmarkeModell: formatModel(nybilData.bilmarke ?? null, nybilData.modell ?? null),
         mottagenVid,
