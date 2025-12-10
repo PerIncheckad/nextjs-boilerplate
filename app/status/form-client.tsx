@@ -865,7 +865,7 @@ export default function StatusForm() {
                   if (content) {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
-                      // Escape values to prevent XSS
+                      // Escape title text to prevent XSS
                       const safeRegnr = escapeHtml(vehicleStatus.vehicle?.regnr);
                       
                       printWindow.document.write(`
@@ -894,12 +894,14 @@ export default function StatusForm() {
 `);
                       
                       // Add nybil photos if available
+                      // URLs come from Supabase storage and are trusted (stored in photo_urls column from nybil_inventering)
                       if (vehicleStatus.nybilPhotos?.photoUrls && vehicleStatus.nybilPhotos.photoUrls.length > 0) {
                         printWindow.document.write('<div class="photos">');
                         vehicleStatus.nybilPhotos.photoUrls.forEach((url) => {
-                          // Escape URL to prevent XSS
-                          const safeUrl = escapeHtml(url);
-                          printWindow.document.write(`<img src="${safeUrl}" alt="Nybilsfoto" />`);
+                          // Validate URL starts with expected Supabase storage domain
+                          if (url.startsWith('https://ufioaijcmaujlvmveyra.supabase.co/')) {
+                            printWindow.document.write(`<img src="${url}" alt="Nybilsfoto" />`);
+                          }
                         });
                         printWindow.document.write('</div>');
                       }
