@@ -853,7 +853,7 @@ export default function StatusForm() {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
                       printWindow.document.write('<html><head><title>Nybilsregistrering</title>');
-                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 2rem; font-size: 10pt; } h2 { font-size: 14pt; margin-top: 0; margin-bottom: 1rem; } h3 { font-size: 12pt; margin-top: 1.5rem; margin-bottom: 0.5rem; } p { margin: 0.25rem 0; font-size: 10pt; } strong { font-weight: 600; }</style>');
+                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 1.5rem; font-size: 9pt; line-height: 1.3; } h2 { font-size: 11pt; margin-top: 0; margin-bottom: 0.75rem; font-weight: bold; } h3 { font-size: 10pt; margin-top: 1rem; margin-bottom: 0.5rem; font-weight: bold; } p { margin: 0.2rem 0; font-size: 9pt; } strong { font-weight: 600; font-size: 9pt; }</style>');
                       printWindow.document.write('</head><body>');
                       printWindow.document.write(content.innerHTML);
                       printWindow.document.write('</body></html>');
