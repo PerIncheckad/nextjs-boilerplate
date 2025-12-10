@@ -366,6 +366,91 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Recent Events Section - Senaste händelser */}
+        {vehicleStatus?.found && vehicleStatus.history && vehicleStatus.history.length > 0 && (
+          <Card className="recent-events-card">
+            <SectionHeader title="Senaste händelser" />
+            
+            {vehicleStatus.history.slice(0, 2).map((event) => (
+              <div key={event.id} className="event-card" style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '8px' }}>
+                <div style={{ color: '#666', marginBottom: '0.5rem' }}>
+                  📅 {event.datum}
+                </div>
+                <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                  {event.typ === 'incheckning' 
+                    ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
+                    : `Nybilsregistrering av ${event.utfordAv}`
+                  }
+                </div>
+                
+                {/* Avvikelser för incheckning */}
+                {event.avvikelser && (
+                  <>
+                    {event.avvikelser.nyaSkador !== undefined && event.avvikelser.nyaSkador > 0 && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})
+                      </div>
+                    )}
+                    {event.avvikelser.garInteAttHyraUt && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ GÅR INTE ATT HYRA UT: {event.avvikelser.garInteAttHyraUt}
+                      </div>
+                    )}
+                    {event.avvikelser.varningslampaPa && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ VARNINGSLAMPA EJ SLÄCKT: {event.avvikelser.varningslampaPa}
+                      </div>
+                    )}
+                    {event.avvikelser.rekondBehov && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ REKOND ({[
+                          event.avvikelser.rekondBehov.invandig && 'invändig',
+                          event.avvikelser.rekondBehov.utvandig && 'utvändig'
+                        ].filter(Boolean).join(' + ') || 'behövs'}){event.avvikelser.rekondBehov.kommentar ? `: ${event.avvikelser.rekondBehov.kommentar}` : ''}
+                      </div>
+                    )}
+                    {event.avvikelser.husdjurSanering && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ HUSDJUR (SANERING): {event.avvikelser.husdjurSanering}
+                      </div>
+                    )}
+                    {event.avvikelser.rokningSanering && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ RÖKNING (SANERING): {event.avvikelser.rokningSanering}
+                      </div>
+                    )}
+                    {event.avvikelser.insynsskyddSaknas && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ INSYNSSKYDD SAKNAS
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {/* Nybil-avvikelser */}
+                {event.nybilAvvikelser && (
+                  <>
+                    {event.nybilAvvikelser.harSkadorVidLeverans && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ SKADOR VID LEVERANS
+                      </div>
+                    )}
+                    {event.nybilAvvikelser.ejRedoAttHyrasUt && (
+                      <div style={{ backgroundColor: '#B30E0E', color: 'white', padding: '0.5rem 1rem', borderRadius: '4px', marginBottom: '0.25rem' }}>
+                        ⚠️ EJ REDO ATT HYRAS UT
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+            
+            <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', marginTop: '1rem' }}>
+              Detaljer och fler poster i sektionen <a href="#history-section" style={{ color: '#1a73e8', textDecoration: 'underline' }}>Historik</a> nedan
+            </p>
+          </Card>
+        )}
+
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
@@ -505,7 +590,7 @@ export default function StatusForm() {
 
         {/* History Section */}
         {vehicleStatus?.found && (
-          <Card className="history-card">
+          <Card className="history-card" id="history-section">
             <div 
               className="section-header-expandable"
               onClick={() => setHistoryExpanded(!historyExpanded)}

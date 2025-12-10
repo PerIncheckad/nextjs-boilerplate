@@ -462,12 +462,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     
-    // checkins - order by completed_at first, then created_at as fallback
+    // checkins - order by created_at
     supabase
       .from('checkins')
       .select('*')
       .eq('regnr', cleanedRegnr)
-      .order('completed_at', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false }),
   ]);
 
