@@ -161,6 +161,9 @@ export default function StatusForm() {
   const [historyFilter, setHistoryFilter] = useState<'all' | 'incheckning' | 'nybil' | 'manual'>('all');
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   
+  // Nybil modal state
+  const [showNybilModal, setShowNybilModal] = useState(false);
+  
   // Print options state
   const [includeHistoryInPrint, setIncludeHistoryInPrint] = useState(false);
   const [includeDetailedHistory, setIncludeDetailedHistory] = useState(false);
@@ -421,6 +424,26 @@ export default function StatusForm() {
                 </p>
               </div>
             )}
+            
+            {/* Button to show complete nybil registration */}
+            {vehicleStatus.nybilFullData && (
+              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+                <button 
+                  onClick={() => setShowNybilModal(true)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#1a73e8',
+                    cursor: 'pointer',
+                    fontSize: '1rem',
+                    textDecoration: 'underline',
+                    padding: 0
+                  }}
+                >
+                  📋 Visa komplett nybilsregistrering
+                </button>
+              </div>
+            )}
           </Card>
         )}
 
@@ -610,7 +633,7 @@ export default function StatusForm() {
             >
               <h2>
                 Historik ({vehicleStatus.history.length})
-                <span className="expand-icon">{historyExpanded ? '▼' : '▶'}</span>
+                <span className="expand-icon">{historyExpanded ? '▲' : '▼'}</span>
               </h2>
             </div>
             
@@ -729,6 +752,133 @@ export default function StatusForm() {
           &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
         </footer>
       </div>
+      
+      {/* Nybil Modal */}
+      {showNybilModal && vehicleStatus?.nybilFullData && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setShowNybilModal(false)}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '2rem',
+              maxWidth: '600px',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              margin: '1rem'
+            }}
+            onClick={(e) => e.stopPropagation()}
+            id="nybil-print-content"
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KOMPLETT NYBILSREGISTRERING</h2>
+              <button 
+                onClick={() => setShowNybilModal(false)} 
+                style={{ 
+                  fontSize: '1.5rem', 
+                  background: 'none', 
+                  border: 'none', 
+                  cursor: 'pointer',
+                  padding: '0 0.5rem'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '1.5rem' }}>
+              <p style={{ margin: '0.25rem 0' }}><strong>Registrerad:</strong> {vehicleStatus.nybilFullData.registreringsdatum}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Registrerad av:</strong> {vehicleStatus.nybilFullData.registreradAv}</p>
+            </div>
+            
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h3>
+            <p style={{ margin: '0.25rem 0' }}><strong>Registreringsnummer:</strong> {vehicleStatus.nybilFullData.regnr}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Bilmärke & Modell:</strong> {vehicleStatus.nybilFullData.bilmarkeModell}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Mottagen vid:</strong> {vehicleStatus.nybilFullData.mottagenVid}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Planerad station:</strong> {vehicleStatus.nybilFullData.planeradStation}</p>
+            
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h3>
+            <p style={{ margin: '0.25rem 0' }}><strong>Mätarställning vid leverans:</strong> {vehicleStatus.nybilFullData.matarstallningVidLeverans}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Hjultyp (monterat):</strong> {vehicleStatus.nybilFullData.hjultypMonterat}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Hjul till förvaring:</strong> {vehicleStatus.nybilFullData.hjulTillForvaring}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Drivmedel:</strong> {vehicleStatus.nybilFullData.drivmedel}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Växellåda:</strong> {vehicleStatus.nybilFullData.vaxellada}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Tankstatus vid leverans:</strong> {vehicleStatus.nybilFullData.tankstatusVidLeverans}</p>
+            
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h3>
+            <p style={{ margin: '0.25rem 0' }}><strong>Serviceintervall:</strong> {vehicleStatus.nybilFullData.serviceintervall}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Max km/månad:</strong> {vehicleStatus.nybilFullData.maxKmManad}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Avgift över-km:</strong> {vehicleStatus.nybilFullData.avgiftOverKm}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Saludatum:</strong> {vehicleStatus.nybilFullData.saludatum}</p>
+            
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h3>
+            <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.harInstruktionsbok}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>COC:</strong> {vehicleStatus.nybilFullData.harCoc}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Låsbultar:</strong> {vehicleStatus.nybilFullData.harLasbultar}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Dragkrok:</strong> {vehicleStatus.nybilFullData.harDragkrok}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Gummimattor:</strong> {vehicleStatus.nybilFullData.harGummimattor}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Däckkompressor:</strong> {vehicleStatus.nybilFullData.harDackkompressor}</p>
+            
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h3>
+            <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
+            
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h3>
+            <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
+            <p style={{ margin: '0.25rem 0' }}><strong>Anteckningar:</strong> {vehicleStatus.nybilFullData.anteckningar}</p>
+            
+            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+              <button 
+                onClick={() => {
+                  const content = document.getElementById('nybil-print-content');
+                  if (content) {
+                    const printWindow = window.open('', '_blank');
+                    if (printWindow) {
+                      printWindow.document.write('<html><head><title>Nybilsregistrering</title>');
+                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 1.5rem; font-size: 9pt; line-height: 1.3; } h2 { font-size: 11pt; margin-top: 0; margin-bottom: 0.75rem; font-weight: bold; } h3 { font-size: 10pt; margin-top: 1rem; margin-bottom: 0.5rem; font-weight: bold; } p { margin: 0.2rem 0; font-size: 9pt; } strong { font-weight: 600; font-size: 9pt; }</style>');
+                      printWindow.document.write('</head><body>');
+                      printWindow.document.write(content.innerHTML);
+                      printWindow.document.write('</body></html>');
+                      printWindow.document.close();
+                      printWindow.print();
+                    }
+                  }
+                }}
+                style={{
+                  backgroundColor: '#1a73e8',
+                  color: 'white',
+                  padding: '0.75rem 1.5rem',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: 500
+                }}
+              >
+                🖨️ Skriv ut nybilsregistrering
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Fragment>
   );
 }
@@ -822,16 +972,22 @@ const HistoryItem: React.FC<{
     }
   };
 
+  const isNybil = record.typ === 'nybil';
+
   return (
     <div className="history-item-expandable">
       {/* Collapsed view - always visible */}
-      <div className="history-item-collapsed" onClick={onToggle}>
+      <div 
+        className="history-item-collapsed" 
+        onClick={isNybil ? undefined : onToggle}
+        style={{ cursor: isNybil ? 'default' : 'pointer' }}
+      >
         <div className="history-collapsed-content">
           <span className="history-type-label">{getTypeLabel(record.typ)}</span>
           {record.plats && <span className="history-plats-label">{record.plats}</span>}
           <span className="history-date-label">{record.datum}</span>
         </div>
-        <span className="history-toggle-icon">{isExpanded ? '▲' : '▼'}</span>
+        {!isNybil && <span className="history-toggle-icon">{isExpanded ? '▲' : '▼'}</span>}
       </div>
 
       {/* Expanded view - only when isExpanded */}
@@ -962,6 +1118,82 @@ const HistoryItem: React.FC<{
                 </div>
               )}
             </>
+          )}
+          
+          {/* Media links - shown after avvikelser for incheckning */}
+          {record.typ === 'incheckning' && record.checkinDetaljer?.mediaLankar && (
+            record.checkinDetaljer.mediaLankar.rekond || 
+            record.checkinDetaljer.mediaLankar.husdjur || 
+            record.checkinDetaljer.mediaLankar.rokning
+          ) && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>Bilagor:</strong>
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                {record.checkinDetaljer.mediaLankar.rekond && (
+                  <li>
+                    <a 
+                      href={record.checkinDetaljer.mediaLankar.rekond} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Rekond 📎
+                    </a>
+                  </li>
+                )}
+                {record.checkinDetaljer.mediaLankar.husdjur && (
+                  <li>
+                    <a 
+                      href={record.checkinDetaljer.mediaLankar.husdjur} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Husdjur 📎
+                    </a>
+                  </li>
+                )}
+                {record.checkinDetaljer.mediaLankar.rokning && (
+                  <li>
+                    <a 
+                      href={record.checkinDetaljer.mediaLankar.rokning} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Rökning 📎
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          
+          {/* Damages registered at this checkin - shown after avvikelser */}
+          {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>Skador registrerade vid denna incheckning:</strong>
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                {record.checkinDetaljer.skador.map((skada, idx) => (
+                  <li key={idx}>
+                    {skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}
+                    {skada.mediaUrl && (
+                      <span>
+                        {' '}
+                        <a 
+                          href={skada.mediaUrl} 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
+                        >
+                          Visa media 📎
+                        </a>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {/* Nybil-avvikelser */}

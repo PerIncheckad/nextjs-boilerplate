@@ -89,6 +89,20 @@ export type HistoryRecord = {
     hjultyp?: string;
     tankningInfo?: string;         // "Tankad nu av MABI (11L Bensin @ 19 kr/L)" eller "Fulltankad"
     laddningInfo?: string;         // "85% (2 laddkablar)"
+    
+    // Media links
+    mediaLankar?: {
+      rekond?: string;
+      husdjur?: string;
+      rokning?: string;
+    };
+    
+    // Damages registered at this checkin
+    skador?: Array<{
+      typ: string;
+      beskrivning: string;
+      mediaUrl?: string;
+    }>;
   };
   
   // Detaljerad info för nybil
@@ -136,6 +150,46 @@ export type VehicleStatusResult = {
     registreringsdatum: string;
     registreradAv: string;
   } | null;
+  // Complete nybil data for modal display
+  nybilFullData?: {
+    registreringsdatum: string;
+    registreradAv: string;
+    // Fordon
+    regnr: string;
+    bilmarkeModell: string;
+    mottagenVid: string;
+    planeradStation: string;
+    // Fordonsstatus
+    matarstallningVidLeverans: string;
+    hjultypMonterat: string;
+    hjulTillForvaring: string;
+    drivmedel: string;
+    vaxellada: string;
+    tankstatusVidLeverans: string;
+    // Avtalsvillkor
+    serviceintervall: string;
+    maxKmManad: string;
+    avgiftOverKm: string;
+    saludatum: string;
+    // Utrustning
+    antalNycklar: string;
+    antalLaddkablar: string;
+    antalInsynsskydd: string;
+    harInstruktionsbok: string;
+    harCoc: string;
+    harLasbultar: string;
+    harDragkrok: string;
+    harGummimattor: string;
+    harDackkompressor: string;
+    // Förvaring
+    hjulforvaring: string;
+    reservnyckelForvaring: string;
+    laddkablarForvaring: string;
+    // Leveransstatus
+    skadorVidLeverans: string;
+    klarForUthyrning: string;
+    anteckningar: string;
+  };
 };
 
 // Partial type for nybil_inventering fields we use
@@ -232,6 +286,17 @@ function formatDateTime(dateStr: string | null | undefined): string {
     return `${datePart} kl ${hours}:${minutes}`;
   } catch {
     return dateStr;
+  }
+}
+
+function formatDateForFolder(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    return date.toISOString().split('T')[0].replace(/-/g, '');
+  } catch {
+    return '';
   }
 }
 
@@ -1041,14 +1106,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Build history records
   const historyRecords: HistoryRecord[] = [];
 
-  // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
+  // Fetch all damage counts and details for checkins in a single query (optimize N+1 pattern)
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
   const damageCounts = new Map<string, number>();
+  const checkinDamagesMap = new Map<string, any[]>();
   
   if (checkinIds.length > 0) {
     const { data: damageData } = await supabase
       .from('checkin_damages')
-      .select('checkin_id')
+      .select('*')
       .in('checkin_id', checkinIds)
       .eq('type', 'new');
     
@@ -1056,6 +1122,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       for (const damage of damageData) {
         const count = damageCounts.get(damage.checkin_id) || 0;
         damageCounts.set(damage.checkin_id, count + 1);
+        
+        // Build damages list per checkin
+        const damagesList = checkinDamagesMap.get(damage.checkin_id) || [];
+        damagesList.push(damage);
+        checkinDamagesMap.set(damage.checkin_id, damagesList);
       }
     }
   }
@@ -1083,6 +1154,47 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? `${checkin.current_city || checkin.current_ort} / ${checkin.current_station}`
       : undefined;
     
+    // Build media folder for this checkin
+    const checkinDate = formatDateForFolder(checkin.completed_at || checkin.created_at);
+    const mediaFolder = checkinDate ? `${cleanedRegnr}/${cleanedRegnr}-${checkinDate}` : null;
+    
+    // Build media links based on checklist folders
+    const mediaLankar: any = {};
+    if (checklist.rekond_folder) {
+      mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+    }
+    if (checklist.pet_sanitation_folder) {
+      mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+    }
+    if (checklist.smoking_sanitation_folder) {
+      mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+    }
+    
+    // Build damages list for this checkin
+    const checkinDamages = checkinDamagesMap.get(checkin.id) || [];
+    const skador = checkinDamages.map(d => {
+      let typ = d.damage_type_raw || 'Okänd';
+      
+      // Add positions if available
+      if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
+        const positions = d.user_positions.map((pos: any) => {
+          const parts: string[] = [];
+          if (pos.carPart) parts.push(pos.carPart);
+          if (pos.position) parts.push(pos.position);
+          return parts.join(' - ');
+        }).filter(Boolean);
+        if (positions.length > 0) {
+          typ = `${typ} - ${positions.join(', ')}`;
+        }
+      }
+      
+      return {
+        typ,
+        beskrivning: d.description || '',
+        mediaUrl: d.uploads?.folder ? `/media/${d.uploads.folder}` : undefined,
+      };
+    });
+    
     historyRecords.push({
       id: `checkin-${checkin.id}`,
       datum: formatDateTime(checkin.completed_at || checkin.created_at),
@@ -1099,6 +1211,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         hjultyp: checkin.hjultyp || undefined,
         tankningInfo: buildTankningInfo(checkin),
         laddningInfo: buildLaddningInfo(checkin),
+        mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
+        skador: skador.length > 0 ? skador : undefined,
       },
       avvikelser: {
         nyaSkador: damageCount,
@@ -1129,6 +1243,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       typ: 'nybil',
       sammanfattning: `Nybilsregistrering: ${nybilData.bilmarke || ''} ${nybilData.modell || ''}. Mottagen vid ${nybilData.plats_mottagning_ort || '?'} / ${nybilData.plats_mottagning_station || '?'}`,
       utfordAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
+      plats: mottagenVid, // Add plats field for display in history
       nybilDetaljer: {
         bilmarkeModell: formatModel(nybilData.bilmarke ?? null, nybilData.modell ?? null),
         mottagenVid,
@@ -1164,6 +1279,57 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     : null;
 
+  // Build complete nybil data for modal display
+  const nybilFullData = nybilData ? {
+    registreringsdatum: formatDateTime(nybilData.created_at || nybilData.registreringsdatum),
+    registreradAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
+    // Fordon
+    regnr: cleanedRegnr,
+    bilmarkeModell: formatModel(nybilData.bilmarke ?? null, nybilData.modell ?? null),
+    mottagenVid: (nybilData.plats_mottagning_ort && nybilData.plats_mottagning_station)
+      ? `${nybilData.plats_mottagning_ort} / ${nybilData.plats_mottagning_station}`
+      : '---',
+    planeradStation: nybilData.planerad_station || '---',
+    // Fordonsstatus
+    matarstallningVidLeverans: nybilData.matarstallning_inkop ? `${nybilData.matarstallning_inkop} km` : '---',
+    hjultypMonterat: nybilData.hjultyp || '---',
+    hjulTillForvaring: (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
+      : '---',
+    drivmedel: nybilData.bransletyp || '---',
+    vaxellada: nybilData.vaxel || '---',
+    tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
+    // Avtalsvillkor
+    serviceintervall: nybilData.serviceintervall ? `${nybilData.serviceintervall} km` : '---',
+    maxKmManad: nybilData.max_km_manad ? `${nybilData.max_km_manad} km` : '---',
+    avgiftOverKm: nybilData.avgift_over_km ? `${nybilData.avgift_over_km} kr` : '---',
+    saludatum: formatDate(nybilData.saludatum),
+    // Utrustning
+    antalNycklar: nybilData.antal_nycklar != null ? `${nybilData.antal_nycklar} st` : '---',
+    antalLaddkablar: nybilData.antal_laddkablar != null ? `${nybilData.antal_laddkablar} st` : '---',
+    antalInsynsskydd: nybilData.antal_insynsskydd != null ? `${nybilData.antal_insynsskydd} st` : '---',
+    harInstruktionsbok: nybilData.instruktionsbok === true ? 'Ja' : nybilData.instruktionsbok === false ? 'Nej' : '---',
+    harCoc: nybilData.coc === true ? 'Ja' : nybilData.coc === false ? 'Nej' : '---',
+    harLasbultar: nybilData.lasbultar_med === true ? 'Ja' : nybilData.lasbultar_med === false ? 'Nej' : '---',
+    harDragkrok: nybilData.dragkrok === true ? 'Ja' : nybilData.dragkrok === false ? 'Nej' : '---',
+    harGummimattor: nybilData.gummimattor === true ? 'Ja' : nybilData.gummimattor === false ? 'Nej' : '---',
+    harDackkompressor: nybilData.dackkompressor === true ? 'Ja' : nybilData.dackkompressor === false ? 'Nej' : '---',
+    // Förvaring
+    hjulforvaring: (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring)
+      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
+      : '---',
+    reservnyckelForvaring: (nybilData.extranyckel_forvaring_ort || nybilData.extranyckel_forvaring_spec)
+      ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    laddkablarForvaring: (nybilData.laddkablar_forvaring_ort || nybilData.laddkablar_forvaring_spec)
+      ? [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    // Leveransstatus
+    skadorVidLeverans: nybilData.har_skador_vid_leverans === true ? 'Ja' : nybilData.har_skador_vid_leverans === false ? 'Inga' : '---',
+    klarForUthyrning: nybilData.klar_for_uthyrning === true ? 'Ja' : nybilData.klar_for_uthyrning === false ? 'Nej' : '---',
+    anteckningar: nybilData.anteckningar || '---',
+  } : undefined;
+
   return {
     found: true,
     source,
@@ -1171,6 +1337,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     damages: damageRecords,
     history: historyRecords,
     nybilPhotos,
+    nybilFullData,
   };
 }
 
