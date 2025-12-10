@@ -78,6 +78,28 @@ export type HistoryRecord = {
   typ: 'incheckning' | 'nybil' | 'manual';
   sammanfattning: string;
   utfordAv: string;
+  plats?: string; // t.ex. "Halmstad / FORD Halmstad"
+  
+  // Avvikelser för incheckning (från checkins.checklist jsonb)
+  avvikelser?: {
+    nyaSkador?: number;
+    garInteAttHyraUt?: string | null;
+    varningslampaPa?: string | null;
+    rekondBehov?: {
+      invandig: boolean;
+      utvandig: boolean;
+      kommentar?: string | null;
+    } | null;
+    husdjurSanering?: string | null;
+    rokningSanering?: string | null;
+    insynsskyddSaknas?: boolean;
+  };
+  
+  // Avvikelser för nybil (från nybil_inventering)
+  nybilAvvikelser?: {
+    harSkadorVidLeverans?: boolean;
+    ejRedoAttHyrasUt?: boolean;
+  };
 };
 
 export type VehicleStatusResult = {
@@ -375,6 +397,16 @@ function formatModel(brand: string | null, model: string | null): string {
   return '---';
 }
 
+// Detect if rekond is invandig/utvandig from folder name
+function detectRekondTypes(folder: string | null): { invandig: boolean; utvandig: boolean } {
+  if (!folder) return { invandig: false, utvandig: false };
+  const folderUpper = folder.toUpperCase();
+  return {
+    invandig: folderUpper.includes('INVANDIG') || folderUpper.includes('INVÄNDIG'),
+    utvandig: folderUpper.includes('UTVANDIG') || folderUpper.includes('UTVÄNDIG'),
+  };
+}
+
 // =================================================================
 // 3. MAIN DATA FETCHING FUNCTION
 // =================================================================
@@ -419,12 +451,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     
-    // checkins - order by completed_at first, then created_at as fallback
+    // checkins - order by created_at
     supabase
       .from('checkins')
       .select('*')
       .eq('regnr', cleanedRegnr)
-      .order('completed_at', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false }),
   ]);
 
@@ -602,15 +633,63 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
     }
 
-    // Build history records from checkins only
-    const historyRecords: HistoryRecord[] = checkins.map(checkin => ({
-      id: `checkin-${checkin.id}`,
-      datum: formatDateTime(checkin.created_at),
-      rawTimestamp: checkin.created_at || '',
-      typ: 'incheckning' as const,
-      sammanfattning: `Incheckad vid ${checkin.current_city || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-      utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || ''),
-    }));
+    // Build history records from checkins only (with avvikelser)
+    const historyRecords: HistoryRecord[] = [];
+    
+    // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
+    const checkinIds = checkins.map(c => c.id).filter(Boolean);
+    const damageCounts = new Map<string, number>();
+    
+    if (checkinIds.length > 0) {
+      const { data: damageData } = await supabase
+        .from('checkin_damages')
+        .select('checkin_id')
+        .in('checkin_id', checkinIds)
+        .eq('type', 'new');
+      
+      if (damageData) {
+        for (const damage of damageData) {
+          const count = damageCounts.get(damage.checkin_id) || 0;
+          damageCounts.set(damage.checkin_id, count + 1);
+        }
+      }
+    }
+    
+    for (const checkin of checkins) {
+      const checklist = checkin.checklist || {};
+      const rekondTypes = detectRekondTypes(checklist.rekond_folder);
+      
+      // Get damage count from pre-fetched map
+      const damageCount = checkin.has_new_damages ? (damageCounts.get(checkin.id) || 0) : 0;
+      
+      // Build plats string
+      const plats = checkin.current_city && checkin.current_station
+        ? `${checkin.current_city} / ${checkin.current_station}`
+        : undefined;
+      
+      historyRecords.push({
+        id: `checkin-${checkin.id}`,
+        datum: formatDateTime(checkin.completed_at || checkin.created_at),
+        rawTimestamp: checkin.completed_at || checkin.created_at || '',
+        typ: 'incheckning' as const,
+        sammanfattning: `Incheckad vid ${checkin.current_city || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+        utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || ''),
+        plats,
+        avvikelser: {
+          nyaSkador: damageCount,
+          garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || 'Ja') : null,
+          varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || 'Ja') : null,
+          rekondBehov: checkin.rekond_behov ? {
+            invandig: rekondTypes.invandig,
+            utvandig: rekondTypes.utvandig,
+            kommentar: checklist.rekond_comment || null,
+          } : null,
+          husdjurSanering: checklist.pet_sanitation_needed ? (checklist.pet_sanitation_comment || 'Ja') : null,
+          rokningSanering: checklist.smoking_sanitation_needed ? (checklist.smoking_sanitation_comment || 'Ja') : null,
+          insynsskyddSaknas: checklist.privacy_cover_missing || false,
+        },
+      });
+    }
 
     // Sort history by rawTimestamp (newest first)
     historyRecords.sort((a, b) => {
@@ -871,19 +950,63 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Build history records
   const historyRecords: HistoryRecord[] = [];
 
-  // Add checkins to history
+  // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
+  const checkinIds = checkins.map(c => c.id).filter(Boolean);
+  const damageCounts = new Map<string, number>();
+  
+  if (checkinIds.length > 0) {
+    const { data: damageData } = await supabase
+      .from('checkin_damages')
+      .select('checkin_id')
+      .in('checkin_id', checkinIds)
+      .eq('type', 'new');
+    
+    if (damageData) {
+      for (const damage of damageData) {
+        const count = damageCounts.get(damage.checkin_id) || 0;
+        damageCounts.set(damage.checkin_id, count + 1);
+      }
+    }
+  }
+
+  // Add checkins to history (with avvikelser)
   for (const checkin of checkins) {
+    const checklist = checkin.checklist || {};
+    const rekondTypes = detectRekondTypes(checklist.rekond_folder);
+    
+    // Get damage count from pre-fetched map
+    const damageCount = checkin.has_new_damages ? (damageCounts.get(checkin.id) || 0) : 0;
+    
+    // Build plats string
+    const plats = (checkin.current_city || checkin.current_ort) && checkin.current_station
+      ? `${checkin.current_city || checkin.current_ort} / ${checkin.current_station}`
+      : undefined;
+    
     historyRecords.push({
       id: `checkin-${checkin.id}`,
-      datum: formatDateTime(checkin.created_at),
-      rawTimestamp: checkin.created_at || '',
+      datum: formatDateTime(checkin.completed_at || checkin.created_at),
+      rawTimestamp: checkin.completed_at || checkin.created_at || '',
       typ: 'incheckning',
-      sammanfattning: `Incheckad vid ${checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
-      utfordAv: getFullNameFromEmail(checkin.user_email || checkin.incheckare || ''),
+      sammanfattning: `Incheckad vid ${checkin.current_city || checkin.current_ort || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+      utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || checkin.user_email || checkin.incheckare || ''),
+      plats,
+      avvikelser: {
+        nyaSkador: damageCount,
+        garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || 'Ja') : null,
+        varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || 'Ja') : null,
+        rekondBehov: checkin.rekond_behov ? {
+          invandig: rekondTypes.invandig,
+          utvandig: rekondTypes.utvandig,
+          kommentar: checklist.rekond_comment || null,
+        } : null,
+        husdjurSanering: checklist.pet_sanitation_needed ? (checklist.pet_sanitation_comment || 'Ja') : null,
+        rokningSanering: checklist.smoking_sanitation_needed ? (checklist.smoking_sanitation_comment || 'Ja') : null,
+        insynsskyddSaknas: checklist.privacy_cover_missing || false,
+      },
     });
   }
 
-  // Add nybil registration to history
+  // Add nybil registration to history (with nybilAvvikelser)
   if (nybilData) {
     historyRecords.push({
       id: `nybil-${nybilData.id}`,
@@ -892,6 +1015,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       typ: 'nybil',
       sammanfattning: `Nybilsregistrering: ${nybilData.bilmarke || ''} ${nybilData.modell || ''}. Mottagen vid ${nybilData.plats_mottagning_ort || '?'} / ${nybilData.plats_mottagning_station || '?'}`,
       utfordAv: nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || ''),
+      nybilAvvikelser: {
+        harSkadorVidLeverans: nybilData.har_skador_vid_leverans === true,
+        ejRedoAttHyrasUt: nybilData.klar_for_uthyrning === false,
+      },
     });
   }
 

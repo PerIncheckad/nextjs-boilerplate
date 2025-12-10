@@ -11,6 +11,33 @@ import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } fr
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MB%20300%20SL%20Roadster%201962/MB%20300-SL-Roadster_1962.jpg";
 
+// Warning banner styles for avvikelser
+const WARNING_BANNER_STYLE: React.CSSProperties = {
+  backgroundColor: '#B30E0E',
+  color: 'white',
+  padding: '0.5rem 1rem',
+  borderRadius: '4px',
+  marginBottom: '0.25rem',
+};
+
+// Event card styles for recent events
+const EVENT_CARD_STYLE: React.CSSProperties = {
+  marginBottom: '1rem',
+  padding: '1rem',
+  backgroundColor: 'rgba(255,255,255,0.9)',
+  borderRadius: '8px',
+};
+
+const EVENT_DATE_STYLE: React.CSSProperties = {
+  color: '#666',
+  marginBottom: '0.5rem',
+};
+
+const EVENT_TITLE_STYLE: React.CSSProperties = {
+  fontWeight: 'bold',
+  marginBottom: '0.5rem',
+};
+
 // =================================================================
 // 2. HELPER FUNCTIONS
 // =================================================================
@@ -366,6 +393,91 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Recent Events Section - Senaste händelser */}
+        {vehicleStatus?.found && vehicleStatus.history && vehicleStatus.history.length > 0 && (
+          <Card className="recent-events-card">
+            <SectionHeader title="Senaste händelser" />
+            
+            {vehicleStatus.history.slice(0, 2).map((event) => (
+              <div key={event.id} className="event-card" style={EVENT_CARD_STYLE}>
+                <div style={EVENT_DATE_STYLE}>
+                  📅 {event.datum}
+                </div>
+                <div style={EVENT_TITLE_STYLE}>
+                  {event.typ === 'incheckning' 
+                    ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
+                    : `Nybilsregistrering av ${event.utfordAv}`
+                  }
+                </div>
+                
+                {/* Avvikelser för incheckning */}
+                {event.avvikelser && (
+                  <>
+                    {event.avvikelser.nyaSkador !== undefined && event.avvikelser.nyaSkador > 0 && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ NYA SKADOR ({event.avvikelser.nyaSkador})
+                      </div>
+                    )}
+                    {event.avvikelser.garInteAttHyraUt && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ GÅR INTE ATT HYRA UT: {event.avvikelser.garInteAttHyraUt}
+                      </div>
+                    )}
+                    {event.avvikelser.varningslampaPa && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ VARNINGSLAMPA EJ SLÄCKT: {event.avvikelser.varningslampaPa}
+                      </div>
+                    )}
+                    {event.avvikelser.rekondBehov && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ REKOND ({[
+                          event.avvikelser.rekondBehov.invandig && 'invändig',
+                          event.avvikelser.rekondBehov.utvandig && 'utvändig'
+                        ].filter(Boolean).join(' + ') || 'behövs'}){event.avvikelser.rekondBehov.kommentar ? `: ${event.avvikelser.rekondBehov.kommentar}` : ''}
+                      </div>
+                    )}
+                    {event.avvikelser.husdjurSanering && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ HUSDJUR (SANERING): {event.avvikelser.husdjurSanering}
+                      </div>
+                    )}
+                    {event.avvikelser.rokningSanering && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ RÖKNING (SANERING): {event.avvikelser.rokningSanering}
+                      </div>
+                    )}
+                    {event.avvikelser.insynsskyddSaknas && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ INSYNSSKYDD SAKNAS
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {/* Nybil-avvikelser */}
+                {event.nybilAvvikelser && (
+                  <>
+                    {event.nybilAvvikelser.harSkadorVidLeverans && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ SKADOR VID LEVERANS
+                      </div>
+                    )}
+                    {event.nybilAvvikelser.ejRedoAttHyrasUt && (
+                      <div style={WARNING_BANNER_STYLE}>
+                        ⚠️ EJ REDO ATT HYRAS UT
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+            
+            <p style={{ textAlign: 'center', color: '#666', fontSize: '0.9rem', marginTop: '1rem' }}>
+              Detaljer och fler poster i sektionen <a href="#history-section" style={{ color: '#1a73e8', textDecoration: 'underline' }}>Historik</a> nedan
+            </p>
+          </Card>
+        )}
+
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
@@ -505,7 +617,7 @@ export default function StatusForm() {
 
         {/* History Section */}
         {vehicleStatus?.found && (
-          <Card className="history-card">
+          <Card className="history-card" id="history-section">
             <div 
               className="section-header-expandable"
               onClick={() => setHistoryExpanded(!historyExpanded)}
