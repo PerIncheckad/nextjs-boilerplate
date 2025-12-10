@@ -433,20 +433,33 @@ function detectRekondTypes(folder: string | null): { invandig: boolean; utvandig
  * Format: "Tankad nu av MABI (11L Bensin @ 19 kr/L)" eller "Fulltankad"
  */
 function buildTankningInfo(checkin: any): string | undefined {
-  if (!checkin.fuel_type) return undefined;
+  if (!checkin.fuel_type && !checkin.fuel_level) return undefined;
   
-  // If we have liters and price, build full string
-  if (checkin.fuel_liters && checkin.fuel_price_per_liter) {
+  // Check fuel_level first
+  if (checkin.fuel_level === 'återlämnades_fulltankad') {
+    return 'Fulltankad';
+  }
+  
+  if (checkin.fuel_level === 'ej_upptankad') {
+    return 'Ej upptankad';
+  }
+  
+  // If tankad_nu or we have liters and price, build full string
+  if (checkin.fuel_liters && checkin.fuel_price_per_liter && checkin.fuel_type) {
     return `Tankad nu av MABI (${checkin.fuel_liters}L ${checkin.fuel_type} @ ${checkin.fuel_price_per_liter} kr/L)`;
   }
   
   // If we have liters but no price
-  if (checkin.fuel_liters) {
+  if (checkin.fuel_liters && checkin.fuel_type) {
     return `Tankad nu av MABI (${checkin.fuel_liters}L ${checkin.fuel_type})`;
   }
   
-  // Otherwise just indicate fuel type
-  return `Fulltankad (${checkin.fuel_type})`;
+  // Otherwise just indicate fuel type if available
+  if (checkin.fuel_type) {
+    return `${checkin.fuel_type}`;
+  }
+  
+  return undefined;
 }
 
 /**
