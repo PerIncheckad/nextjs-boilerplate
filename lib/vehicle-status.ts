@@ -66,7 +66,7 @@ export type DamageRecord = {
   datum: string;
   status: string;
   folder?: string;
-  source: 'legacy' | 'damages' | 'checkin';
+  source: 'legacy' | 'damages';
   // Source info for display
   sourceInfo?: string; // e.g., "Källa: BUHS" or "Incheckad av Per Andersson 2025-12-03 14:30"
 };
@@ -394,7 +394,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
 
   // Fetch data from all sources concurrently
-  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse, checkinDamagesResponse] = await Promise.all([
+  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse] = await Promise.all([
     // nybil_inventering - newest first
     supabase
       .from('nybil_inventering')
@@ -426,14 +426,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       .eq('regnr', cleanedRegnr)
       .order('completed_at', { ascending: false, nullsLast: true })
       .order('created_at', { ascending: false }),
-    
-    // checkin_damages - new damages from checkins
-    supabase
-      .from('checkin_damages')
-      .select('*, checkins!inner(regnr, checker_name, completed_at, created_at)')
-      .eq('checkins.regnr', cleanedRegnr)
-      .eq('type', 'new')
-      .order('created_at', { ascending: false }),
   ]);
 
   const nybilData = nybilResponse.data;
@@ -441,7 +433,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const damages = damagesResponse.data || [];
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
-  const checkinDamages = checkinDamagesResponse.data || [];
   
   // Get saludatum from legacy damages if available
   const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
@@ -514,8 +505,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? formatDate(legacySaludatum)
         : '---',
       
-      // Antal registrerade skador: count legacy damages (BUHS)
-      antalSkador: legacyDamages.length,
+      // Antal registrerade skador: will be updated after building damageRecords
+      antalSkador: 0,
       
       // Stöld-GPS monterad: not available from checkins
       stoldGps: '---',
@@ -565,6 +556,51 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       source: 'legacy' as const,
       sourceInfo: 'Källa: BUHS\nReg. nr har aldrig checkats in med incheckad.se/check',
     }));
+
+    // Add damages from damages table (new damages from checkins)
+    for (const damage of damages) {
+      let skadetyp: string;
+      if (damage.damage_type_raw) {
+        skadetyp = damage.damage_type_raw;
+      } else if (damage.damage_type) {
+        skadetyp = formatDamageType(damage.damage_type);
+      } else {
+        skadetyp = 'Okänd';
+      }
+      
+      // Add position info if user_positions exists
+      if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
+        const positions = damage.user_positions.map((pos: any) => {
+          const parts: string[] = [];
+          if (pos.carPart) parts.push(pos.carPart);
+          if (pos.position) parts.push(pos.position);
+          return parts.join(' - ');
+        }).filter(Boolean);
+        if (positions.length > 0) {
+          skadetyp = skadetyp + ' - ' + positions.join(', ');
+        }
+      }
+      
+      // Add description if available
+      if (damage.description) {
+        skadetyp = skadetyp + ': ' + damage.description;
+      }
+      
+      const sourceInfo = damage.inchecker_name 
+        ? 'Registrerad vid incheckning av ' + damage.inchecker_name
+        : 'Registrerad vid incheckning';
+      
+      damageRecords.push({
+        id: damage.id,
+        regnr: cleanedRegnr,
+        skadetyp: skadetyp,
+        datum: formatDate(damage.damage_date || damage.created_at),
+        status: damage.status || 'Ny',
+        folder: damage.uploads?.folder || undefined,
+        source: 'damages' as const,
+        sourceInfo: sourceInfo,
+      });
+    }
 
     // Build history records from checkins only
     const historyRecords: HistoryRecord[] = checkins.map(checkin => ({
@@ -829,39 +865,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       folder: damage.uploads?.folder || damage.folder,
       source: 'damages' as const,
       sourceInfo,
-    });
-  }
-
-  // Add new damages from checkin_damages
-  for (const cd of checkinDamages) {
-    // Build damage description
-    let skadetyp = cd.damage_type ? formatDamageType(cd.damage_type) : 'Okänd';
-    
-    // Add position info if available
-    if (cd.car_part || cd.position) {
-      const positionParts = [cd.car_part, cd.position].filter(Boolean);
-      if (positionParts.length > 0) {
-        skadetyp = `${skadetyp} - ${positionParts.join(' - ')}`;
-      }
-    }
-    
-    // Add description if available
-    if (cd.description) {
-      skadetyp = `${skadetyp}: ${cd.description}`;
-    }
-    
-    const checkinDate = cd.checkins?.completed_at || cd.checkins?.created_at || cd.created_at;
-    const checkerName = cd.checkins?.checker_name || 'Okänd';
-    
-    damageRecords.push({
-      id: cd.id,
-      regnr: cleanedRegnr,
-      skadetyp: skadetyp,
-      datum: formatDate(checkinDate),
-      status: 'Ny',
-      folder: cd.media_folder || undefined,
-      source: 'checkin' as const,
-      sourceInfo: `Registrerad vid incheckning av ${checkerName}`,
     });
   }
 
