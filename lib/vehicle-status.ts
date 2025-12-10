@@ -577,17 +577,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           return parts.join(' - ');
         }).filter(Boolean);
         if (positions.length > 0) {
-          skadetyp = skadetyp + ' - ' + positions.join(', ');
+          skadetyp = `${skadetyp} - ${positions.join(', ')}`;
         }
       }
       
       // Add description if available
       if (damage.description) {
-        skadetyp = skadetyp + ': ' + damage.description;
+        skadetyp = `${skadetyp}: ${damage.description}`;
       }
       
       const sourceInfo = damage.inchecker_name 
-        ? 'Registrerad vid incheckning av ' + damage.inchecker_name
+        ? `Registrerad vid incheckning av ${damage.inchecker_name}`
         : 'Registrerad vid incheckning';
       
       damageRecords.push({
