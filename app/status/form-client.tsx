@@ -66,6 +66,19 @@ const getFullNameFromEmail = (email: string): string => {
 };
 
 /**
+ * Escape HTML special characters to prevent XSS
+ */
+const escapeHtml = (str: string | null | undefined): string => {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+/**
  * Check if a Saludatum is at risk (past or within 10 days from today)
  */
 const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => {
@@ -852,10 +865,13 @@ export default function StatusForm() {
                   if (content) {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
+                      // Escape values to prevent XSS
+                      const safeRegnr = escapeHtml(vehicleStatus.vehicle?.regnr);
+                      
                       printWindow.document.write(`
   <html>
     <head>
-      <title>Nybilsregistrering - ${vehicleStatus.vehicle?.regnr}</title>
+      <title>Nybilsregistrering - ${safeRegnr}</title>
       <style>
         body { 
           font-family: Arial, sans-serif; 
@@ -881,7 +897,9 @@ export default function StatusForm() {
                       if (vehicleStatus.nybilPhotos?.photoUrls && vehicleStatus.nybilPhotos.photoUrls.length > 0) {
                         printWindow.document.write('<div class="photos">');
                         vehicleStatus.nybilPhotos.photoUrls.forEach((url) => {
-                          printWindow.document.write(`<img src="${url}" alt="Nybilsfoto" />`);
+                          // Escape URL to prevent XSS
+                          const safeUrl = escapeHtml(url);
+                          printWindow.document.write(`<img src="${safeUrl}" alt="Nybilsfoto" />`);
                         });
                         printWindow.document.write('</div>');
                       }
