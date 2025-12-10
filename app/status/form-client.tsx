@@ -633,7 +633,7 @@ export default function StatusForm() {
             >
               <h2>
                 Historik ({vehicleStatus.history.length})
-                <span className="expand-icon">{historyExpanded ? '▼' : '▶'}</span>
+                <span className="expand-icon">{historyExpanded ? '▲' : '▼'}</span>
               </h2>
             </div>
             
@@ -853,7 +853,7 @@ export default function StatusForm() {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
                       printWindow.document.write('<html><head><title>Nybilsregistrering</title>');
-                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 2rem; font-size: 12px; } h2 { font-size: 16px; margin-top: 0; margin-bottom: 1rem; } h3 { font-size: 14px; margin-top: 1.5rem; margin-bottom: 0.5rem; } p { margin: 0.25rem 0; font-size: 12px; } strong { font-weight: 600; }</style>');
+                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 2rem; font-size: 10pt; } h2 { font-size: 14pt; margin-top: 0; margin-bottom: 1rem; } h3 { font-size: 12pt; margin-top: 1.5rem; margin-bottom: 0.5rem; } p { margin: 0.25rem 0; font-size: 10pt; } strong { font-weight: 600; }</style>');
                       printWindow.document.write('</head><body>');
                       printWindow.document.write(content.innerHTML);
                       printWindow.document.write('</body></html>');

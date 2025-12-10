@@ -1158,18 +1158,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkinDate = formatDateForFolder(checkin.completed_at || checkin.created_at);
     const mediaFolder = checkinDate ? `${cleanedRegnr}/${cleanedRegnr}-${checkinDate}` : null;
     
-    // Build media links
+    // Build media links based on checklist folders
     const mediaLankar: any = {};
-    if (mediaFolder) {
-      if (checkin.rekond_behov && checklist.rekond_folder) {
-        mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
-      }
-      if (checklist.pet_sanitation_needed && checklist.pet_sanitation_folder) {
-        mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
-      }
-      if (checklist.smoking_sanitation_needed && checklist.smoking_sanitation_folder) {
-        mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
-      }
+    if (checklist.rekond_folder) {
+      mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+    }
+    if (checklist.pet_sanitation_folder) {
+      mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+    }
+    if (checklist.smoking_sanitation_folder) {
+      mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
     }
     
     // Build damages list for this checkin
