@@ -20,6 +20,24 @@ const WARNING_BANNER_STYLE: React.CSSProperties = {
   marginBottom: '0.25rem',
 };
 
+// Event card styles for recent events
+const EVENT_CARD_STYLE: React.CSSProperties = {
+  marginBottom: '1rem',
+  padding: '1rem',
+  backgroundColor: 'rgba(255,255,255,0.9)',
+  borderRadius: '8px',
+};
+
+const EVENT_DATE_STYLE: React.CSSProperties = {
+  color: '#666',
+  marginBottom: '0.5rem',
+};
+
+const EVENT_TITLE_STYLE: React.CSSProperties = {
+  fontWeight: 'bold',
+  marginBottom: '0.5rem',
+};
+
 // =================================================================
 // 2. HELPER FUNCTIONS
 // =================================================================
@@ -381,11 +399,11 @@ export default function StatusForm() {
             <SectionHeader title="Senaste händelser" />
             
             {vehicleStatus.history.slice(0, 2).map((event) => (
-              <div key={event.id} className="event-card" style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: '8px' }}>
-                <div style={{ color: '#666', marginBottom: '0.5rem' }}>
+              <div key={event.id} className="event-card" style={EVENT_CARD_STYLE}>
+                <div style={EVENT_DATE_STYLE}>
                   📅 {event.datum}
                 </div>
-                <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                <div style={EVENT_TITLE_STYLE}>
                   {event.typ === 'incheckning' 
                     ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
                     : `Nybilsregistrering av ${event.utfordAv}`
