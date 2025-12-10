@@ -692,12 +692,13 @@ export async function POST(request: Request) {
           charge_level_percent: (() => {
             if (!payload.laddning?.laddniva) return null;
             const parsed = parseInt(payload.laddning.laddniva, 10);
-            return isNaN(parsed) ? null : parsed;
+            return isNaN(parsed) || parsed < 0 ? null : parsed;
           })(),
           charge_cables_count: (() => {
             if (!payload.laddning?.antal_laddkablar) return null;
             const parsed = parseInt(payload.laddning.antal_laddkablar, 10);
-            return isNaN(parsed) ? null : parsed;
+            // Only accept positive integers (0 or negative doesn't make sense)
+            return isNaN(parsed) || parsed < 1 ? null : parsed;
           })(),
           
           // Flaggor (flags)

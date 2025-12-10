@@ -702,7 +702,7 @@ export default function StatusForm() {
                 </label>
                 
                 {includeHistoryInPrint && (
-                  <label className="print-checkbox" style={{ marginLeft: '1.5rem', display: 'block', marginTop: '0.5rem' }}>
+                  <label className="print-checkbox print-checkbox-nested">
                     <input 
                       type="checkbox" 
                       checked={includeDetailedHistory}
@@ -1474,6 +1474,12 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       cursor: pointer;
       width: 1rem;
       height: 1rem;
+    }
+
+    .print-checkbox-nested {
+      margin-left: 1.5rem;
+      display: block;
+      margin-top: 0.5rem;
     }
 
     /* Print button container - centered */

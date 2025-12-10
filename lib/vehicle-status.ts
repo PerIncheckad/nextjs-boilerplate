@@ -471,7 +471,8 @@ function buildLaddningInfo(checkin: any): string | undefined {
   
   const parts: string[] = [`${checkin.charge_level_percent}%`];
   
-  if (checkin.charge_cables_count) {
+  // Only include cable count if it's a positive number
+  if (checkin.charge_cables_count && checkin.charge_cables_count > 0) {
     parts.push(`(${checkin.charge_cables_count} laddkablar)`);
   }
   
