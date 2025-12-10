@@ -784,7 +784,7 @@ export default function StatusForm() {
             id="nybil-print-content"
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KOMPLETT NYBILSREGISTRERING</h2>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KOMPLETT NYBILSREGISTRERING</h1>
               <button 
                 onClick={() => setShowNybilModal(false)} 
                 style={{ 
@@ -804,13 +804,13 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad av:</strong> {vehicleStatus.nybilFullData.registreradAv}</p>
             </div>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h3>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Registreringsnummer:</strong> {vehicleStatus.nybilFullData.regnr}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Bilmärke & Modell:</strong> {vehicleStatus.nybilFullData.bilmarkeModell}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Mottagen vid:</strong> {vehicleStatus.nybilFullData.mottagenVid}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Planerad station:</strong> {vehicleStatus.nybilFullData.planeradStation}</p>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h3>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Mätarställning vid leverans:</strong> {vehicleStatus.nybilFullData.matarstallningVidLeverans}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Hjultyp (monterat):</strong> {vehicleStatus.nybilFullData.hjultypMonterat}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Hjul till förvaring:</strong> {vehicleStatus.nybilFullData.hjulTillForvaring}</p>
@@ -818,13 +818,13 @@ export default function StatusForm() {
             <p style={{ margin: '0.25rem 0' }}><strong>Växellåda:</strong> {vehicleStatus.nybilFullData.vaxellada}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Tankstatus vid leverans:</strong> {vehicleStatus.nybilFullData.tankstatusVidLeverans}</p>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h3>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Serviceintervall:</strong> {vehicleStatus.nybilFullData.serviceintervall}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Max km/månad:</strong> {vehicleStatus.nybilFullData.maxKmManad}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Avgift över-km:</strong> {vehicleStatus.nybilFullData.avgiftOverKm}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Saludatum:</strong> {vehicleStatus.nybilFullData.saludatum}</p>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h3>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
@@ -835,12 +835,12 @@ export default function StatusForm() {
             <p style={{ margin: '0.25rem 0' }}><strong>Gummimattor:</strong> {vehicleStatus.nybilFullData.harGummimattor}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Däckkompressor:</strong> {vehicleStatus.nybilFullData.harDackkompressor}</p>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h3>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h3>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Anteckningar:</strong> {vehicleStatus.nybilFullData.anteckningar}</p>
@@ -852,9 +852,40 @@ export default function StatusForm() {
                   if (content) {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
-                      printWindow.document.write('<html><head><title>Nybilsregistrering</title>');
-                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 1.5rem; font-size: 9pt; line-height: 1.3; } h2 { font-size: 11pt; margin-top: 0; margin-bottom: 0.75rem; font-weight: bold; } h3 { font-size: 10pt; margin-top: 1rem; margin-bottom: 0.5rem; font-weight: bold; } p { margin: 0.2rem 0; font-size: 9pt; } strong { font-weight: 600; font-size: 9pt; }</style>');
-                      printWindow.document.write('</head><body>');
+                      printWindow.document.write(`
+  <html>
+    <head>
+      <title>Nybilsregistrering - ${vehicleStatus.vehicle?.regnr}</title>
+      <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          font-size: 9pt; 
+          line-height: 1.4;
+          padding: 20px;
+        }
+        h1 { font-size: 14pt; margin-bottom: 10px; }
+        h2 { font-size: 12pt; margin: 15px 0 8px 0; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+        h3 { font-size: 10pt; margin: 10px 0 5px 0; }
+        p { margin: 3px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 5px 0; }
+        td { padding: 2px 5px; vertical-align: top; }
+        td:first-child { font-weight: bold; width: 40%; }
+        .photos { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+        .photos img { max-width: 150px; max-height: 100px; object-fit: cover; }
+      </style>
+    </head>
+    <body>
+`);
+                      
+                      // Add nybil photos if available
+                      if (vehicleStatus.nybilPhotos?.photoUrls && vehicleStatus.nybilPhotos.photoUrls.length > 0) {
+                        printWindow.document.write('<div class="photos">');
+                        vehicleStatus.nybilPhotos.photoUrls.forEach((url) => {
+                          printWindow.document.write(`<img src="${url}" alt="Nybilsfoto" />`);
+                        });
+                        printWindow.document.write('</div>');
+                      }
+                      
                       printWindow.document.write(content.innerHTML);
                       printWindow.document.write('</body></html>');
                       printWindow.document.close();
