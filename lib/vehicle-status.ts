@@ -773,6 +773,125 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
     
+    // Fetch all damage counts and details for checkins in a single query
+    const checkinIds = checkins.map(c => c.id).filter(Boolean);
+    const damageCounts = new Map<string, number>();
+    const checkinDamagesMap = new Map<string, any[]>();
+    
+    if (checkinIds.length > 0) {
+      const { data: damageData } = await supabase
+        .from('checkin_damages')
+        .select('*')
+        .in('checkin_id', checkinIds)
+        .eq('type', 'new');
+      
+      if (damageData) {
+        for (const damage of damageData) {
+          const count = damageCounts.get(damage.checkin_id) || 0;
+          damageCounts.set(damage.checkin_id, count + 1);
+          
+          // Build damages list per checkin
+          const damagesList = checkinDamagesMap.get(damage.checkin_id) || [];
+          damagesList.push(damage);
+          checkinDamagesMap.set(damage.checkin_id, damagesList);
+        }
+      }
+    }
+    
+    for (const checkin of checkins) {
+      const checklist = checkin.checklist || {};
+      const rekondTypes = detectRekondTypes(checklist.rekond_folder);
+      
+      // Get damage count from pre-fetched map
+      const damageCount = checkin.has_new_damages ? (damageCounts.get(checkin.id) || 0) : 0;
+      
+      // Build plats string
+      const plats = checkin.current_city && checkin.current_station
+        ? `${checkin.current_city} / ${checkin.current_station}`
+        : undefined;
+      
+      // Build plats för incheckning
+      const platsForIncheckning = checkin.city && checkin.station
+        ? `${checkin.city} / ${checkin.station}`
+        : undefined;
+      
+      // Build bilen står nu
+      const bilenStarNu = checkin.current_city && checkin.current_station
+        ? `${checkin.current_city} / ${checkin.current_station}`
+        : undefined;
+      
+      // Build media links based on checklist folders
+      const mediaLankar: any = {};
+      if (checklist.rekond_folder) {
+        mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+      }
+      if (checklist.pet_sanitation_folder) {
+        mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+      }
+      if (checklist.smoking_sanitation_folder) {
+        mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+      }
+      
+      // Build damages list for this checkin
+      const checkinDamages = checkinDamagesMap.get(checkin.id) || [];
+      const skador = checkinDamages.map(d => {
+        let typ = d.damage_type_raw || 'Okänd';
+        
+        // Add positions if available
+        if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
+          const positions = d.user_positions.map((pos: any) => {
+            const parts: string[] = [];
+            if (pos.carPart) parts.push(pos.carPart);
+            if (pos.position) parts.push(pos.position);
+            return parts.join(' - ');
+          }).filter(Boolean);
+          if (positions.length > 0) {
+            typ = `${typ} - ${positions.join(', ')}`;
+          }
+        }
+        
+        return {
+          typ,
+          beskrivning: d.description || '',
+          mediaUrl: d.uploads?.folder ? `/media/${d.uploads.folder}` : undefined,
+        };
+      });
+      
+      historyRecords.push({
+        id: `checkin-${checkin.id}`,
+        datum: formatDateTime(checkin.completed_at || checkin.created_at),
+        rawTimestamp: checkin.completed_at || checkin.created_at || '',
+        typ: 'incheckning' as const,
+        sammanfattning: `Incheckad vid ${checkin.current_city || '?'} / ${checkin.current_station || '?'}. Mätarställning: ${checkin.odometer_km || '?'} km`,
+        utfordAv: checkin.checker_name || getFullNameFromEmail(checkin.checker_email || ''),
+        plats,
+        checkinDetaljer: {
+          platsForIncheckning,
+          bilenStarNu,
+          parkeringsinfo: checkin.current_location_note || undefined,
+          matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
+          hjultyp: checkin.hjultyp || undefined,
+          tankningInfo: buildTankningInfo(checkin),
+          laddningInfo: buildLaddningInfo(checkin),
+          mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
+          skador: skador.length > 0 ? skador : undefined,
+        },
+        avvikelser: {
+          nyaSkador: damageCount,
+          garInteAttHyraUt: checklist.rental_unavailable ? (checklist.rental_unavailable_comment || 'Ja') : null,
+          varningslampaPa: checklist.warning_light_on ? (checklist.warning_light_comment || 'Ja') : null,
+          rekondBehov: checkin.rekond_behov ? {
+            invandig: rekondTypes.invandig,
+            utvandig: rekondTypes.utvandig,
+            kommentar: checklist.rekond_comment || null,
+          } : null,
+          husdjurSanering: checklist.pet_sanitation_needed ? (checklist.pet_sanitation_comment || 'Ja') : null,
+          rokningSanering: checklist.smoking_sanitation_needed ? (checklist.smoking_sanitation_comment || 'Ja') : null,
+          insynsskyddSaknas: checklist.privacy_cover_missing || false,
+        },
+      });
+    }
+    
     // Sort history by rawTimestamp (newest first)
     historyRecords.sort((a, b) => {
       const dateA = new Date(a.rawTimestamp);
