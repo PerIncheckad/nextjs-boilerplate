@@ -448,7 +448,7 @@ export default function StatusForm() {
                     border: 'none',
                     color: '#1a73e8',
                     cursor: 'pointer',
-                    fontSize: '1rem',
+                    fontSize: '0.9rem',
                     textDecoration: 'underline',
                     padding: 0
                   }}
@@ -483,7 +483,7 @@ export default function StatusForm() {
                   <div style={{ color: '#666', marginBottom: '0.5rem' }}>
                     📅 {event.datum}
                   </div>
-                  <div style={{ fontWeight: 'normal' }}>
+                  <div style={{ fontWeight: 'normal', fontSize: '1rem' }}>
                     {event.typ === 'incheckning' 
                       ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
                       : `Nybilsregistrering av ${event.utfordAv}`
@@ -817,7 +817,7 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad av:</strong> {vehicleStatus.nybilFullData.registreradAv}</p>
             </div>
             
-            <div className="section">
+            <div className="print-section">
               <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h2>
               <p style={{ margin: '0.25rem 0' }}><strong>Registreringsnummer:</strong> {vehicleStatus.nybilFullData.regnr}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Bilmärke & Modell:</strong> {vehicleStatus.nybilFullData.bilmarkeModell}</p>
@@ -825,7 +825,7 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Planerad station:</strong> {vehicleStatus.nybilFullData.planeradStation}</p>
             </div>
             
-            <div className="section">
+            <div className="print-section">
               <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h2>
               <p style={{ margin: '0.25rem 0' }}><strong>Mätarställning vid leverans:</strong> {vehicleStatus.nybilFullData.matarstallningVidLeverans}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Hjultyp (monterat):</strong> {vehicleStatus.nybilFullData.hjultypMonterat}</p>
@@ -835,7 +835,7 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Tankstatus vid leverans:</strong> {vehicleStatus.nybilFullData.tankstatusVidLeverans}</p>
             </div>
             
-            <div className="section">
+            <div className="print-section">
               <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h2>
               <p style={{ margin: '0.25rem 0' }}><strong>Serviceintervall:</strong> {vehicleStatus.nybilFullData.serviceintervall}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Max km/månad:</strong> {vehicleStatus.nybilFullData.maxKmManad}</p>
@@ -843,7 +843,7 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Saludatum:</strong> {vehicleStatus.nybilFullData.saludatum}</p>
             </div>
             
-            <div className="section">
+            <div className="print-section">
               <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h2>
               <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
               {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
@@ -858,7 +858,7 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Däckkompressor:</strong> {vehicleStatus.nybilFullData.harDackkompressor}</p>
             </div>
             
-            <div className="section">
+            <div className="print-section">
               <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h2>
               <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
@@ -867,7 +867,7 @@ export default function StatusForm() {
               )}
             </div>
             
-            <div className="section">
+            <div className="print-section">
               <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h2>
               <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
@@ -904,11 +904,11 @@ export default function StatusForm() {
         table { width: 100%; border-collapse: collapse; margin: 5px 0; }
         td { padding: 2px 5px; vertical-align: top; }
         td:first-child { font-weight: bold; width: 40%; }
-        .photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); justify-items: center; gap: 10px; margin: 15px 0; }
+        .photos { display: grid; grid-template-columns: repeat(3, 1fr); justify-items: center; gap: 10px; margin: 15px 0; }
         .photos img { height: 150px; width: auto; object-fit: cover; }
         .info-text { text-align: center; font-size: 9pt; margin: 10px 0; color: #666; }
         .print-button { display: none; }
-        .section { page-break-inside: avoid; }
+        .print-section { page-break-inside: avoid; }
       </style>
     </head>
     <body>
@@ -1197,6 +1197,24 @@ const HistoryItem: React.FC<{
                 </div>
               )}
             </>
+          )}
+          
+          {/* DEBUG: Hard-coded test output */}
+          {record.typ === 'incheckning' && (
+            <div style={{ 
+              marginTop: '1rem', 
+              padding: '1rem', 
+              backgroundColor: '#fff3cd', 
+              border: '2px solid #ffc107',
+              borderRadius: '4px'
+            }}>
+              <strong>DEBUG - Expanderad vy körs:</strong>
+              <pre style={{ fontSize: '0.8rem', marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>
+                mediaLankar: {JSON.stringify(record.checkinDetaljer?.mediaLankar, null, 2) || 'undefined'}
+                {'\n'}
+                skador: {JSON.stringify(record.checkinDetaljer?.skador, null, 2) || 'undefined'}
+              </pre>
+            </div>
           )}
           
           {/* Media links - shown after avvikelser for incheckning */}
