@@ -483,7 +483,7 @@ export default function StatusForm() {
                   <div style={{ color: '#666', marginBottom: '0.5rem' }}>
                     📅 {event.datum}
                   </div>
-                  <div style={{ fontWeight: 'bold' }}>
+                  <div style={{ fontWeight: 'normal' }}>
                     {event.typ === 'incheckning' 
                       ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
                       : `Nybilsregistrering av ${event.utfordAv}`
@@ -839,7 +839,9 @@ export default function StatusForm() {
             
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
+            {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
+              <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
+            )}
             <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.harInstruktionsbok}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>COC:</strong> {vehicleStatus.nybilFullData.harCoc}</p>
@@ -851,7 +853,9 @@ export default function StatusForm() {
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
+            {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
+              <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
+            )}
             
             <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h2>
             <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
@@ -875,23 +879,27 @@ export default function StatusForm() {
       <style>
         body { 
           font-family: Arial, sans-serif; 
-          font-size: 9pt; 
+          font-size: 8pt; 
           line-height: 1.4;
           padding: 20px;
         }
-        h1 { font-size: 14pt; margin-bottom: 10px; }
-        h2 { font-size: 12pt; margin: 15px 0 8px 0; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+        h1 { font-size: 16pt; text-align: center; margin-bottom: 10px; }
+        h2 { font-size: 10pt; margin: 15px 0 8px 0; border-bottom: 1px solid #ccc; padding-bottom: 4px; page-break-after: avoid; }
+        h2 + * { page-break-before: avoid; }
         h3 { font-size: 10pt; margin: 10px 0 5px 0; }
         p { margin: 3px 0; }
         table { width: 100%; border-collapse: collapse; margin: 5px 0; }
         td { padding: 2px 5px; vertical-align: top; }
         td:first-child { font-weight: bold; width: 40%; }
-        .photos { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+        .photos { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0; }
         .photos img { max-width: 150px; max-height: 100px; object-fit: cover; }
       </style>
     </head>
     <body>
 `);
+                      
+                      // Add regnr as main heading
+                      printWindow.document.write(`<h1>${safeRegnr}</h1>`);
                       
                       // Add nybil photos if available
                       // URLs come from Supabase storage and are trusted (stored in photo_urls column from nybil_inventering)
@@ -1172,11 +1180,14 @@ const HistoryItem: React.FC<{
           )}
           
           {/* Media links - shown after avvikelser for incheckning */}
-          {record.typ === 'incheckning' && record.checkinDetaljer?.mediaLankar && (
-            record.checkinDetaljer.mediaLankar.rekond || 
-            record.checkinDetaljer.mediaLankar.husdjur || 
-            record.checkinDetaljer.mediaLankar.rokning
-          ) && (
+          {record.typ === 'incheckning' && (() => {
+            console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
+            return record.checkinDetaljer?.mediaLankar && (
+              record.checkinDetaljer.mediaLankar.rekond || 
+              record.checkinDetaljer.mediaLankar.husdjur || 
+              record.checkinDetaljer.mediaLankar.rokning
+            );
+          })() && (
             <div style={{ marginTop: '1rem' }}>
               <strong>Bilagor:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
