@@ -1199,24 +1199,6 @@ const HistoryItem: React.FC<{
             </>
           )}
           
-          {/* DEBUG: Hard-coded test output */}
-          {record.typ === 'incheckning' && (
-            <div style={{ 
-              marginTop: '1rem', 
-              padding: '1rem', 
-              backgroundColor: '#fff3cd', 
-              border: '2px solid #ffc107',
-              borderRadius: '4px'
-            }}>
-              <strong>DEBUG - Expanderad vy körs:</strong>
-              <pre style={{ fontSize: '0.8rem', marginTop: '0.5rem', whiteSpace: 'pre-wrap' }}>
-                mediaLankar: {JSON.stringify(record.checkinDetaljer?.mediaLankar, null, 2) || 'undefined'}
-                {'\n'}
-                skador: {JSON.stringify(record.checkinDetaljer?.skador, null, 2) || 'undefined'}
-              </pre>
-            </div>
-          )}
-          
           {/* Media links - shown after avvikelser for incheckning */}
           {record.typ === 'incheckning' && (() => {
             console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
