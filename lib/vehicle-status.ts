@@ -821,7 +821,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         : undefined;
       
       // Build media links based on checklist folders
-      const mediaLankar: any = {};
+      const mediaLankar: { rekond?: string; husdjur?: string; rokning?: string } = {};
       if (checklist.rekond_folder) {
         mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
       }
@@ -1204,7 +1204,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const mediaFolder = checkinDate ? `${cleanedRegnr}/${cleanedRegnr}-${checkinDate}` : null;
     
     // Build media links based on checklist folders
-    const mediaLankar: any = {};
+    const mediaLankar: { rekond?: string; husdjur?: string; rokning?: string } = {};
     if (checklist.rekond_folder) {
       mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
     }
