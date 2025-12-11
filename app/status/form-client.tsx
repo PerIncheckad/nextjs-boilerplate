@@ -796,11 +796,10 @@ export default function StatusForm() {
             onClick={(e) => e.stopPropagation()}
             id="nybil-print-content"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div className="print-button" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KOMPLETT NYBILSREGISTRERING</h1>
               <button 
                 onClick={() => setShowNybilModal(false)} 
-                className="print-button"
                 style={{ 
                   fontSize: '1.5rem', 
                   background: 'none', 
@@ -818,50 +817,62 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad av:</strong> {vehicleStatus.nybilFullData.registreradAv}</p>
             </div>
             
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h2>
-            <p style={{ margin: '0.25rem 0' }}><strong>Registreringsnummer:</strong> {vehicleStatus.nybilFullData.regnr}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Bilmärke & Modell:</strong> {vehicleStatus.nybilFullData.bilmarkeModell}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Mottagen vid:</strong> {vehicleStatus.nybilFullData.mottagenVid}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Planerad station:</strong> {vehicleStatus.nybilFullData.planeradStation}</p>
+            <div className="section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Registreringsnummer:</strong> {vehicleStatus.nybilFullData.regnr}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Bilmärke & Modell:</strong> {vehicleStatus.nybilFullData.bilmarkeModell}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Mottagen vid:</strong> {vehicleStatus.nybilFullData.mottagenVid}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Planerad station:</strong> {vehicleStatus.nybilFullData.planeradStation}</p>
+            </div>
             
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h2>
-            <p style={{ margin: '0.25rem 0' }}><strong>Mätarställning vid leverans:</strong> {vehicleStatus.nybilFullData.matarstallningVidLeverans}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Hjultyp (monterat):</strong> {vehicleStatus.nybilFullData.hjultypMonterat}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Hjul till förvaring:</strong> {vehicleStatus.nybilFullData.hjulTillForvaring}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Drivmedel:</strong> {vehicleStatus.nybilFullData.drivmedel}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Växellåda:</strong> {vehicleStatus.nybilFullData.vaxellada}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Tankstatus vid leverans:</strong> {vehicleStatus.nybilFullData.tankstatusVidLeverans}</p>
+            <div className="section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Mätarställning vid leverans:</strong> {vehicleStatus.nybilFullData.matarstallningVidLeverans}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Hjultyp (monterat):</strong> {vehicleStatus.nybilFullData.hjultypMonterat}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Hjul till förvaring:</strong> {vehicleStatus.nybilFullData.hjulTillForvaring}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Drivmedel:</strong> {vehicleStatus.nybilFullData.drivmedel}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Växellåda:</strong> {vehicleStatus.nybilFullData.vaxellada}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Tankstatus vid leverans:</strong> {vehicleStatus.nybilFullData.tankstatusVidLeverans}</p>
+            </div>
             
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h2>
-            <p style={{ margin: '0.25rem 0' }}><strong>Serviceintervall:</strong> {vehicleStatus.nybilFullData.serviceintervall}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Max km/månad:</strong> {vehicleStatus.nybilFullData.maxKmManad}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Avgift över-km:</strong> {vehicleStatus.nybilFullData.avgiftOverKm}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Saludatum:</strong> {vehicleStatus.nybilFullData.saludatum}</p>
+            <div className="section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Serviceintervall:</strong> {vehicleStatus.nybilFullData.serviceintervall}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Max km/månad:</strong> {vehicleStatus.nybilFullData.maxKmManad}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Avgift över-km:</strong> {vehicleStatus.nybilFullData.avgiftOverKm}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Saludatum:</strong> {vehicleStatus.nybilFullData.saludatum}</p>
+            </div>
             
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h2>
-            <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
-            {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
-              <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
-            )}
-            <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.harInstruktionsbok}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>COC:</strong> {vehicleStatus.nybilFullData.harCoc}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Låsbultar:</strong> {vehicleStatus.nybilFullData.harLasbultar}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Dragkrok:</strong> {vehicleStatus.nybilFullData.harDragkrok}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Gummimattor:</strong> {vehicleStatus.nybilFullData.harGummimattor}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Däckkompressor:</strong> {vehicleStatus.nybilFullData.harDackkompressor}</p>
+            <div className="section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
+              {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
+                <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
+              )}
+              <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.harInstruktionsbok}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>COC:</strong> {vehicleStatus.nybilFullData.harCoc}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Låsbultar:</strong> {vehicleStatus.nybilFullData.harLasbultar}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Dragkrok:</strong> {vehicleStatus.nybilFullData.harDragkrok}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Gummimattor:</strong> {vehicleStatus.nybilFullData.harGummimattor}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Däckkompressor:</strong> {vehicleStatus.nybilFullData.harDackkompressor}</p>
+            </div>
             
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h2>
-            <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
-            {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
-              <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
-            )}
+            <div className="section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
+              {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
+                <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
+              )}
+            </div>
             
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h2>
-            <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Anteckningar:</strong> {vehicleStatus.nybilFullData.anteckningar}</p>
+            <div className="section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Anteckningar:</strong> {vehicleStatus.nybilFullData.anteckningar}</p>
+            </div>
             
             <div className="print-button" style={{ textAlign: 'center', marginTop: '2rem' }}>
               <button 
@@ -893,10 +904,11 @@ export default function StatusForm() {
         table { width: 100%; border-collapse: collapse; margin: 5px 0; }
         td { padding: 2px 5px; vertical-align: top; }
         td:first-child { font-weight: bold; width: 40%; }
-        .photos { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 15px 0; }
+        .photos { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); justify-items: center; gap: 10px; margin: 15px 0; }
         .photos img { height: 150px; width: auto; object-fit: cover; }
         .info-text { text-align: center; font-size: 9pt; margin: 10px 0; color: #666; }
         .print-button { display: none; }
+        .section { page-break-inside: avoid; }
       </style>
     </head>
     <body>
