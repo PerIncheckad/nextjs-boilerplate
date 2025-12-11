@@ -1700,12 +1700,12 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     }
 
     .history-plats-label {
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       color: var(--color-text);
     }
 
     .history-date-label {
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       color: var(--color-text-secondary);
       margin-left: auto;
     }
