@@ -440,7 +440,7 @@ export default function StatusForm() {
             
             {/* Button to show complete nybil registration */}
             {vehicleStatus.nybilFullData && (
-              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <div className="nybil-link-button" style={{ textAlign: 'center', marginTop: '1rem' }}>
                 <button 
                   onClick={() => setShowNybilModal(true)}
                   style={{
@@ -800,6 +800,7 @@ export default function StatusForm() {
               <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KOMPLETT NYBILSREGISTRERING</h1>
               <button 
                 onClick={() => setShowNybilModal(false)} 
+                className="print-button"
                 style={{ 
                   fontSize: '1.5rem', 
                   background: 'none', 
@@ -812,7 +813,7 @@ export default function StatusForm() {
               </button>
             </div>
             
-            <div style={{ marginBottom: '1.5rem' }}>
+            <div className="print-button" style={{ marginBottom: '1.5rem' }}>
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad:</strong> {vehicleStatus.nybilFullData.registreringsdatum}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad av:</strong> {vehicleStatus.nybilFullData.registreradAv}</p>
             </div>
@@ -862,8 +863,9 @@ export default function StatusForm() {
             <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
             <p style={{ margin: '0.25rem 0' }}><strong>Anteckningar:</strong> {vehicleStatus.nybilFullData.anteckningar}</p>
             
-            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+            <div className="print-button" style={{ textAlign: 'center', marginTop: '2rem' }}>
               <button 
+                className="print-button"
                 onClick={() => {
                   const content = document.getElementById('nybil-print-content');
                   if (content) {
@@ -891,8 +893,10 @@ export default function StatusForm() {
         table { width: 100%; border-collapse: collapse; margin: 5px 0; }
         td { padding: 2px 5px; vertical-align: top; }
         td:first-child { font-weight: bold; width: 40%; }
-        .photos { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0; }
-        .photos img { max-width: 150px; max-height: 100px; object-fit: cover; }
+        .photos { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 15px 0; }
+        .photos img { min-height: 150px; max-height: 150px; width: auto; object-fit: cover; }
+        .info-text { text-align: center; font-size: 9pt; margin: 10px 0; color: #666; }
+        .print-button { display: none; }
       </style>
     </head>
     <body>
@@ -901,7 +905,11 @@ export default function StatusForm() {
                       // Add regnr as main heading
                       printWindow.document.write(`<h1>${safeRegnr}</h1>`);
                       
-                      // Add nybil photos if available
+                      // Add info text with date
+                      const registreringsdatum = vehicleStatus.nybilFullData?.registreringsdatum || '';
+                      printWindow.document.write(`<p class="info-text">All info från nybilsregistrering ${registreringsdatum}</p>`);
+                      
+                      // Add nybil photos if available (larger size)
                       // URLs come from Supabase storage and are trusted (stored in photo_urls column from nybil_inventering)
                       if (vehicleStatus.nybilPhotos?.photoUrls && vehicleStatus.nybilPhotos.photoUrls.length > 0) {
                         printWindow.document.write('<div class="photos">');
@@ -913,6 +921,12 @@ export default function StatusForm() {
                         });
                         printWindow.document.write('</div>');
                       }
+                      
+                      // Add registration details at top
+                      const safeRegistreringsdatum = escapeHtml(vehicleStatus.nybilFullData?.registreringsdatum);
+                      const safeRegistreradAv = escapeHtml(vehicleStatus.nybilFullData?.registreradAv);
+                      printWindow.document.write(`<p style="margin: 10px 0 5px 0;"><strong>Registrerad:</strong> ${safeRegistreringsdatum}</p>`);
+                      printWindow.document.write(`<p style="margin: 5px 0 15px 0;"><strong>Registrerad av:</strong> ${safeRegistreradAv}</p>`);
                       
                       printWindow.document.write(content.innerHTML);
                       printWindow.document.write('</body></html>');
@@ -1836,6 +1850,16 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
       /* Hide search form in print */
       .search-form-card {
+        display: none !important;
+      }
+
+      /* Hide Recent Events section in print */
+      .recent-events-card {
+        display: none !important;
+      }
+
+      /* Hide nybil link button in print */
+      .nybil-link-button {
         display: none !important;
       }
 
