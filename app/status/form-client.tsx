@@ -483,7 +483,7 @@ export default function StatusForm() {
                   <div style={{ color: '#666', marginBottom: '0.5rem' }}>
                     📅 {event.datum}
                   </div>
-                  <div style={{ fontWeight: 'normal', fontSize: '1rem' }}>
+                  <div style={{ fontWeight: 'normal', fontSize: '0.95rem' }}>
                     {event.typ === 'incheckning' 
                       ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
                       : `Nybilsregistrering av ${event.utfordAv}`
@@ -1210,7 +1210,7 @@ const HistoryItem: React.FC<{
             record.checkinDetaljer.mediaLankar.husdjur || 
             record.checkinDetaljer.mediaLankar.rokning
           ) && (
-            <div style={{ marginTop: '1rem' }}>
+            <div className="history-media-links" style={{ marginTop: '1rem' }}>
               <strong>Bilagor:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
                 {record.checkinDetaljer.mediaLankar.rekond && (
@@ -1694,7 +1694,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
     .history-type-label {
       font-weight: 700;
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       text-transform: uppercase;
       color: var(--color-text);
     }
@@ -1873,6 +1873,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
       /* Hide media links in print */
       .damage-media-link {
+        display: none !important;
+      }
+
+      /* Hide Bilagor section in print */
+      .history-media-links {
         display: none !important;
       }
 
