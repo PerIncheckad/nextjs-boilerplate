@@ -1205,14 +1205,11 @@ const HistoryItem: React.FC<{
           )}
           
           {/* Media links - shown after avvikelser for incheckning */}
-          {record.typ === 'incheckning' && (() => {
-            console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
-            return record.checkinDetaljer?.mediaLankar && (
-              record.checkinDetaljer.mediaLankar.rekond || 
-              record.checkinDetaljer.mediaLankar.husdjur || 
-              record.checkinDetaljer.mediaLankar.rokning
-            );
-          })() && (
+          {record.typ === 'incheckning' && record.checkinDetaljer?.mediaLankar && (
+            record.checkinDetaljer.mediaLankar.rekond || 
+            record.checkinDetaljer.mediaLankar.husdjur || 
+            record.checkinDetaljer.mediaLankar.rokning
+          ) && (
             <div style={{ marginTop: '1rem' }}>
               <strong>Bilagor:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
