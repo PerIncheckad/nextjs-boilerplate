@@ -2044,6 +2044,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         cursor: default;
       }
 
+      body.include-history-print .history-type-label {
+        font-size: 8pt !important;
+      }
+
       body.include-history-print .history-toggle-icon {
         display: none !important;
       }

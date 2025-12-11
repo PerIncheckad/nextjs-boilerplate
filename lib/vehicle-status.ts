@@ -879,11 +879,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
         
         // Try to find matching damage in damages table to get uploads.folder
+        // Match by damage_type first, then optionally by description if there are multiple matches
         let mediaUrl: string | undefined;
-        const matchingDamage = correspondingDamages.find((dmg: any) => 
+        
+        // First try: match by damage_type and description
+        let matchingDamage = correspondingDamages.find((dmg: any) => 
           dmg.damage_type === d.damage_type && 
           dmg.description === d.description
         );
+        
+        // Second try: if no match, try just damage_type (description might be slightly different)
+        if (!matchingDamage) {
+          matchingDamage = correspondingDamages.find((dmg: any) => 
+            dmg.damage_type === d.damage_type
+          );
+        }
         
         if (matchingDamage?.uploads?.folder) {
           mediaUrl = `/media/${matchingDamage.uploads.folder}`;
@@ -1292,11 +1302,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       // Try to find matching damage in damages table to get uploads.folder
+      // Match by damage_type first, then optionally by description if there are multiple matches
       let mediaUrl: string | undefined;
-      const matchingDamage = correspondingDamages.find((dmg: any) => 
+      
+      // First try: match by damage_type and description
+      let matchingDamage = correspondingDamages.find((dmg: any) => 
         dmg.damage_type === d.damage_type && 
         dmg.description === d.description
       );
+      
+      // Second try: if no match, try just damage_type (description might be slightly different)
+      if (!matchingDamage) {
+        matchingDamage = correspondingDamages.find((dmg: any) => 
+          dmg.damage_type === d.damage_type
+        );
+      }
       
       if (matchingDamage?.uploads?.folder) {
         mediaUrl = `/media/${matchingDamage.uploads.folder}`;
