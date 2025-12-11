@@ -66,6 +66,19 @@ const getFullNameFromEmail = (email: string): string => {
 };
 
 /**
+ * Escape HTML special characters to prevent XSS
+ */
+const escapeHtml = (str: string | null | undefined): string => {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+/**
  * Check if a Saludatum is at risk (past or within 10 days from today)
  */
 const isSaludatumAtRisk = (saludatumStr: string | null | undefined): boolean => {
@@ -427,7 +440,7 @@ export default function StatusForm() {
             
             {/* Button to show complete nybil registration */}
             {vehicleStatus.nybilFullData && (
-              <div style={{ textAlign: 'center', marginTop: '1rem' }}>
+              <div className="nybil-link-button" style={{ textAlign: 'center', marginTop: '1rem' }}>
                 <button 
                   onClick={() => setShowNybilModal(true)}
                   style={{
@@ -435,7 +448,7 @@ export default function StatusForm() {
                     border: 'none',
                     color: '#1a73e8',
                     cursor: 'pointer',
-                    fontSize: '1rem',
+                    fontSize: '0.9rem',
                     textDecoration: 'underline',
                     padding: 0
                   }}
@@ -470,7 +483,7 @@ export default function StatusForm() {
                   <div style={{ color: '#666', marginBottom: '0.5rem' }}>
                     📅 {event.datum}
                   </div>
-                  <div style={{ fontWeight: 'bold' }}>
+                  <div style={{ fontWeight: 'normal', fontSize: '1rem' }}>
                     {event.typ === 'incheckning' 
                       ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
                       : `Nybilsregistrering av ${event.utfordAv}`
@@ -783,8 +796,8 @@ export default function StatusForm() {
             onClick={(e) => e.stopPropagation()}
             id="nybil-print-content"
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KOMPLETT NYBILSREGISTRERING</h2>
+            <div className="print-button" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>KOMPLETT NYBILSREGISTRERING</h1>
               <button 
                 onClick={() => setShowNybilModal(false)} 
                 style={{ 
@@ -804,58 +817,129 @@ export default function StatusForm() {
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad av:</strong> {vehicleStatus.nybilFullData.registreradAv}</p>
             </div>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h3>
-            <p style={{ margin: '0.25rem 0' }}><strong>Registreringsnummer:</strong> {vehicleStatus.nybilFullData.regnr}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Bilmärke & Modell:</strong> {vehicleStatus.nybilFullData.bilmarkeModell}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Mottagen vid:</strong> {vehicleStatus.nybilFullData.mottagenVid}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Planerad station:</strong> {vehicleStatus.nybilFullData.planeradStation}</p>
+            <div className="print-section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDON</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Registreringsnummer:</strong> {vehicleStatus.nybilFullData.regnr}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Bilmärke & Modell:</strong> {vehicleStatus.nybilFullData.bilmarkeModell}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Mottagen vid:</strong> {vehicleStatus.nybilFullData.mottagenVid}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Planerad station:</strong> {vehicleStatus.nybilFullData.planeradStation}</p>
+            </div>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h3>
-            <p style={{ margin: '0.25rem 0' }}><strong>Mätarställning vid leverans:</strong> {vehicleStatus.nybilFullData.matarstallningVidLeverans}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Hjultyp (monterat):</strong> {vehicleStatus.nybilFullData.hjultypMonterat}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Hjul till förvaring:</strong> {vehicleStatus.nybilFullData.hjulTillForvaring}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Drivmedel:</strong> {vehicleStatus.nybilFullData.drivmedel}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Växellåda:</strong> {vehicleStatus.nybilFullData.vaxellada}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Tankstatus vid leverans:</strong> {vehicleStatus.nybilFullData.tankstatusVidLeverans}</p>
+            <div className="print-section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FORDONSSTATUS</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Mätarställning vid leverans:</strong> {vehicleStatus.nybilFullData.matarstallningVidLeverans}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Hjultyp (monterat):</strong> {vehicleStatus.nybilFullData.hjultypMonterat}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Hjul till förvaring:</strong> {vehicleStatus.nybilFullData.hjulTillForvaring}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Drivmedel:</strong> {vehicleStatus.nybilFullData.drivmedel}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Växellåda:</strong> {vehicleStatus.nybilFullData.vaxellada}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Tankstatus vid leverans:</strong> {vehicleStatus.nybilFullData.tankstatusVidLeverans}</p>
+            </div>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h3>
-            <p style={{ margin: '0.25rem 0' }}><strong>Serviceintervall:</strong> {vehicleStatus.nybilFullData.serviceintervall}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Max km/månad:</strong> {vehicleStatus.nybilFullData.maxKmManad}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Avgift över-km:</strong> {vehicleStatus.nybilFullData.avgiftOverKm}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Saludatum:</strong> {vehicleStatus.nybilFullData.saludatum}</p>
+            <div className="print-section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>AVTALSVILLKOR</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Serviceintervall:</strong> {vehicleStatus.nybilFullData.serviceintervall}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Max km/månad:</strong> {vehicleStatus.nybilFullData.maxKmManad}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Avgift över-km:</strong> {vehicleStatus.nybilFullData.avgiftOverKm}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Saludatum:</strong> {vehicleStatus.nybilFullData.saludatum}</p>
+            </div>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h3>
-            <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.harInstruktionsbok}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>COC:</strong> {vehicleStatus.nybilFullData.harCoc}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Låsbultar:</strong> {vehicleStatus.nybilFullData.harLasbultar}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Dragkrok:</strong> {vehicleStatus.nybilFullData.harDragkrok}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Gummimattor:</strong> {vehicleStatus.nybilFullData.harGummimattor}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Däckkompressor:</strong> {vehicleStatus.nybilFullData.harDackkompressor}</p>
+            <div className="print-section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UTRUSTNING VID LEVERANS</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Nycklar:</strong> {vehicleStatus.nybilFullData.antalNycklar}</p>
+              {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
+                <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.antalLaddkablar}</p>
+              )}
+              <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.harInstruktionsbok}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>COC:</strong> {vehicleStatus.nybilFullData.harCoc}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Låsbultar:</strong> {vehicleStatus.nybilFullData.harLasbultar}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Dragkrok:</strong> {vehicleStatus.nybilFullData.harDragkrok}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Gummimattor:</strong> {vehicleStatus.nybilFullData.harGummimattor}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Däckkompressor:</strong> {vehicleStatus.nybilFullData.harDackkompressor}</p>
+            </div>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h3>
-            <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
+            <div className="print-section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>FÖRVARING</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Hjulförvaring:</strong> {vehicleStatus.nybilFullData.hjulforvaring}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Reservnyckel:</strong> {vehicleStatus.nybilFullData.reservnyckelForvaring}</p>
+              {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
+                <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
+              )}
+            </div>
             
-            <h3 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h3>
-            <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
-            <p style={{ margin: '0.25rem 0' }}><strong>Anteckningar:</strong> {vehicleStatus.nybilFullData.anteckningar}</p>
+            <div className="print-section">
+              <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h2>
+              <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Klar för uthyrning:</strong> {vehicleStatus.nybilFullData.klarForUthyrning}</p>
+              <p style={{ margin: '0.25rem 0' }}><strong>Anteckningar:</strong> {vehicleStatus.nybilFullData.anteckningar}</p>
+            </div>
             
-            <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+            <div className="print-button" style={{ textAlign: 'center', marginTop: '2rem' }}>
               <button 
+                className="print-button"
                 onClick={() => {
                   const content = document.getElementById('nybil-print-content');
                   if (content) {
                     const printWindow = window.open('', '_blank');
                     if (printWindow) {
-                      printWindow.document.write('<html><head><title>Nybilsregistrering</title>');
-                      printWindow.document.write('<style>body { font-family: Arial, sans-serif; padding: 1.5rem; font-size: 9pt; line-height: 1.3; } h2 { font-size: 11pt; margin-top: 0; margin-bottom: 0.75rem; font-weight: bold; } h3 { font-size: 10pt; margin-top: 1rem; margin-bottom: 0.5rem; font-weight: bold; } p { margin: 0.2rem 0; font-size: 9pt; } strong { font-weight: 600; font-size: 9pt; }</style>');
-                      printWindow.document.write('</head><body>');
-                      printWindow.document.write(content.innerHTML);
+                      // Escape title text to prevent XSS
+                      const safeRegnr = escapeHtml(vehicleStatus.vehicle?.regnr);
+                      
+                      printWindow.document.write(`
+  <html>
+    <head>
+      <title>Nybilsregistrering - ${safeRegnr}</title>
+      <style>
+        body { 
+          font-family: Arial, sans-serif; 
+          font-size: 8pt; 
+          line-height: 1.4;
+          padding: 20px;
+        }
+        h1 { font-size: 16pt; text-align: center; margin-bottom: 10px; }
+        h2 { font-size: 10pt; margin: 15px 0 8px 0; border-bottom: 1px solid #ccc; padding-bottom: 4px; page-break-after: avoid; }
+        h2 + * { page-break-before: avoid; }
+        h3 { font-size: 10pt; margin: 10px 0 5px 0; }
+        p { margin: 3px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 5px 0; }
+        td { padding: 2px 5px; vertical-align: top; }
+        td:first-child { font-weight: bold; width: 40%; }
+        .photos { display: grid; grid-template-columns: repeat(3, 1fr); justify-items: center; gap: 10px; margin: 15px 0; }
+        .photos img { height: 150px; width: auto; object-fit: cover; }
+        .info-text { text-align: center; font-size: 9pt; margin: 10px 0; color: #666; }
+        .print-button { display: none; }
+        .print-section { page-break-inside: avoid; }
+      </style>
+    </head>
+    <body>
+`);
+                      
+                      // Add regnr as main heading
+                      printWindow.document.write(`<h1>${safeRegnr}</h1>`);
+                      
+                      // Add info text with date
+                      const registreringsdatum = vehicleStatus.nybilFullData?.registreringsdatum || '';
+                      printWindow.document.write(`<p class="info-text">All info från nybilsregistrering ${registreringsdatum}</p>`);
+                      
+                      // Add nybil photos if available (larger size)
+                      // URLs come from Supabase storage and are trusted (stored in photo_urls column from nybil_inventering)
+                      if (vehicleStatus.nybilPhotos?.photoUrls && vehicleStatus.nybilPhotos.photoUrls.length > 0) {
+                        printWindow.document.write('<div class="photos">');
+                        vehicleStatus.nybilPhotos.photoUrls.forEach((url) => {
+                          // Validate URL starts with expected Supabase storage domain
+                          if (url.startsWith('https://ufioaijcmaujlvmveyra.supabase.co/')) {
+                            printWindow.document.write(`<img src="${url}" alt="Nybilsfoto" />`);
+                          }
+                        });
+                        printWindow.document.write('</div>');
+                      }
+                      
+                      // Clone and filter content to exclude print-button elements
+                      const contentClone = content.cloneNode(true) as HTMLElement;
+                      const printButtons = contentClone.querySelectorAll('.print-button');
+                      printButtons.forEach(el => el.remove());
+                      
+                      printWindow.document.write(contentClone.innerHTML);
                       printWindow.document.write('</body></html>');
                       printWindow.document.close();
                       printWindow.print();
@@ -1121,11 +1205,14 @@ const HistoryItem: React.FC<{
           )}
           
           {/* Media links - shown after avvikelser for incheckning */}
-          {record.typ === 'incheckning' && record.checkinDetaljer?.mediaLankar && (
-            record.checkinDetaljer.mediaLankar.rekond || 
-            record.checkinDetaljer.mediaLankar.husdjur || 
-            record.checkinDetaljer.mediaLankar.rokning
-          ) && (
+          {record.typ === 'incheckning' && (() => {
+            console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
+            return record.checkinDetaljer?.mediaLankar && (
+              record.checkinDetaljer.mediaLankar.rekond || 
+              record.checkinDetaljer.mediaLankar.husdjur || 
+              record.checkinDetaljer.mediaLankar.rokning
+            );
+          })() && (
             <div style={{ marginTop: '1rem' }}>
               <strong>Bilagor:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
@@ -1774,6 +1861,16 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
       /* Hide search form in print */
       .search-form-card {
+        display: none !important;
+      }
+
+      /* Hide Recent Events section in print */
+      .recent-events-card {
+        display: none !important;
+      }
+
+      /* Hide nybil link button in print */
+      .nybil-link-button {
         display: none !important;
       }
 
