@@ -773,14 +773,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
     
-    // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
+    // Fetch all damage counts and details for checkins in a single query (optimize N+1 pattern)
     const checkinIds = checkins.map(c => c.id).filter(Boolean);
     const damageCounts = new Map<string, number>();
+    const checkinDamagesMap = new Map<string, any[]>();
     
     if (checkinIds.length > 0) {
       const { data: damageData } = await supabase
         .from('checkin_damages')
-        .select('checkin_id')
+        .select('*')
         .in('checkin_id', checkinIds)
         .eq('type', 'new');
       
@@ -788,6 +789,33 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         for (const damage of damageData) {
           const count = damageCounts.get(damage.checkin_id) || 0;
           damageCounts.set(damage.checkin_id, count + 1);
+          
+          // Build damages list per checkin
+          const damagesList = checkinDamagesMap.get(damage.checkin_id) || [];
+          damagesList.push(damage);
+          checkinDamagesMap.set(damage.checkin_id, damagesList);
+        }
+      }
+    }
+    
+    // Also fetch damages from damages table for this regnr to get uploads.folder
+    // Match damages to checkins by timestamp proximity
+    const { data: allDamages } = await supabase
+      .from('damages')
+      .select('*')
+      .eq('regnr', cleanedRegnr)
+      .not('inchecker_name', 'is', null)
+      .order('created_at', { ascending: false });
+    
+    // Build a map of damages by approximate timestamp for quick lookup
+    const damagesByTime = new Map<string, any[]>();
+    if (allDamages) {
+      for (const damage of allDamages) {
+        const damageDate = damage.created_at ? new Date(damage.created_at).toISOString().split('T')[0] : null;
+        if (damageDate) {
+          const existingDamages = damagesByTime.get(damageDate) || [];
+          existingDamages.push(damage);
+          damagesByTime.set(damageDate, existingDamages);
         }
       }
     }
@@ -814,6 +842,70 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? `${checkin.current_city} / ${checkin.current_station}`
         : undefined;
       
+      // Build media links based on checklist folders
+      const mediaLankar: { rekond?: string; husdjur?: string; rokning?: string } = {};
+      if (checklist.rekond_folder) {
+        mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+      }
+      if (checklist.pet_sanitation_folder) {
+        mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+      }
+      if (checklist.smoking_sanitation_folder) {
+        mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+      }
+      
+      // Build damages list for this checkin
+      const checkinDamages = checkinDamagesMap.get(checkin.id) || [];
+      
+      // Get corresponding damages from damages table to get uploads.folder
+      const checkinDate = checkin.completed_at || checkin.created_at;
+      const checkinDateStr = checkinDate ? new Date(checkinDate).toISOString().split('T')[0] : null;
+      const correspondingDamages = checkinDateStr ? (damagesByTime.get(checkinDateStr) || []) : [];
+      
+      const skador = checkinDamages.map(d => {
+        let typ = d.damage_type_raw || d.damage_type || 'Okänd';
+        
+        // Add positions if available
+        if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
+          const positions = d.user_positions.map((pos: any) => {
+            const parts: string[] = [];
+            if (pos.carPart) parts.push(pos.carPart);
+            if (pos.position) parts.push(pos.position);
+            return parts.join(' - ');
+          }).filter(Boolean);
+          if (positions.length > 0) {
+            typ = `${typ} - ${positions.join(', ')}`;
+          }
+        }
+        
+        // Try to find matching damage in damages table to get uploads.folder
+        // Match by damage_type first, then optionally by description if there are multiple matches
+        let mediaUrl: string | undefined;
+        
+        // First try: match by damage_type and description
+        let matchingDamage = correspondingDamages.find((dmg: any) => 
+          dmg.damage_type === d.damage_type && 
+          dmg.description === d.description
+        );
+        
+        // Second try: if no match, try just damage_type (description might be slightly different)
+        if (!matchingDamage) {
+          matchingDamage = correspondingDamages.find((dmg: any) => 
+            dmg.damage_type === d.damage_type
+          );
+        }
+        
+        if (matchingDamage?.uploads?.folder) {
+          mediaUrl = `/media/${matchingDamage.uploads.folder}`;
+        }
+        
+        return {
+          typ,
+          beskrivning: d.description || '',
+          mediaUrl,
+        };
+      });
+      
       historyRecords.push({
         id: `checkin-${checkin.id}`,
         datum: formatDateTime(checkin.completed_at || checkin.created_at),
@@ -830,6 +922,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           hjultyp: checkin.hjultyp || undefined,
           tankningInfo: buildTankningInfo(checkin),
           laddningInfo: buildLaddningInfo(checkin),
+          mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
+          skador: skador.length > 0 ? skador : undefined,
         },
         avvikelser: {
           nyaSkador: damageCount,
@@ -1130,6 +1224,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     }
   }
+  
+  // Build a map of damages by date for quick lookup of uploads.folder
+  const damagesByTime = new Map<string, any[]>();
+  if (damages && damages.length > 0) {
+    for (const damage of damages) {
+      const damageDate = damage.created_at ? new Date(damage.created_at).toISOString().split('T')[0] : null;
+      if (damageDate) {
+        const existingDamages = damagesByTime.get(damageDate) || [];
+        existingDamages.push(damage);
+        damagesByTime.set(damageDate, existingDamages);
+      }
+    }
+  }
 
   // Add checkins to history (with avvikelser)
   for (const checkin of checkins) {
@@ -1159,7 +1266,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const mediaFolder = checkinDate ? `${cleanedRegnr}/${cleanedRegnr}-${checkinDate}` : null;
     
     // Build media links based on checklist folders
-    const mediaLankar: any = {};
+    const mediaLankar: { rekond?: string; husdjur?: string; rokning?: string } = {};
     if (checklist.rekond_folder) {
       mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
     }
@@ -1172,8 +1279,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Build damages list for this checkin
     const checkinDamages = checkinDamagesMap.get(checkin.id) || [];
+    
+    // Get corresponding damages from damages table to get uploads.folder
+    const checkinTimestamp = checkin.completed_at || checkin.created_at;
+    const checkinDateStr = checkinTimestamp ? new Date(checkinTimestamp).toISOString().split('T')[0] : null;
+    const correspondingDamages = checkinDateStr ? (damagesByTime.get(checkinDateStr) || []) : [];
+    
     const skador = checkinDamages.map(d => {
-      let typ = d.damage_type_raw || 'Okänd';
+      let typ = d.damage_type_raw || d.damage_type || 'Okänd';
       
       // Add positions if available
       if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
@@ -1188,10 +1301,31 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
+      // Try to find matching damage in damages table to get uploads.folder
+      // Match by damage_type first, then optionally by description if there are multiple matches
+      let mediaUrl: string | undefined;
+      
+      // First try: match by damage_type and description
+      let matchingDamage = correspondingDamages.find((dmg: any) => 
+        dmg.damage_type === d.damage_type && 
+        dmg.description === d.description
+      );
+      
+      // Second try: if no match, try just damage_type (description might be slightly different)
+      if (!matchingDamage) {
+        matchingDamage = correspondingDamages.find((dmg: any) => 
+          dmg.damage_type === d.damage_type
+        );
+      }
+      
+      if (matchingDamage?.uploads?.folder) {
+        mediaUrl = `/media/${matchingDamage.uploads.folder}`;
+      }
+      
       return {
         typ,
         beskrivning: d.description || '',
-        mediaUrl: d.uploads?.folder ? `/media/${d.uploads.folder}` : undefined,
+        mediaUrl,
       };
     });
     

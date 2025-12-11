@@ -483,7 +483,7 @@ export default function StatusForm() {
                   <div style={{ color: '#666', marginBottom: '0.5rem' }}>
                     📅 {event.datum}
                   </div>
-                  <div style={{ fontWeight: 'normal', fontSize: '1rem' }}>
+                  <div style={{ fontWeight: 'normal', fontSize: '0.95rem' }}>
                     {event.typ === 'incheckning' 
                       ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
                       : `Nybilsregistrering av ${event.utfordAv}`
@@ -1205,15 +1205,12 @@ const HistoryItem: React.FC<{
           )}
           
           {/* Media links - shown after avvikelser for incheckning */}
-          {record.typ === 'incheckning' && (() => {
-            console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
-            return record.checkinDetaljer?.mediaLankar && (
-              record.checkinDetaljer.mediaLankar.rekond || 
-              record.checkinDetaljer.mediaLankar.husdjur || 
-              record.checkinDetaljer.mediaLankar.rokning
-            );
-          })() && (
-            <div style={{ marginTop: '1rem' }}>
+          {record.typ === 'incheckning' && record.checkinDetaljer?.mediaLankar && (
+            record.checkinDetaljer.mediaLankar.rekond || 
+            record.checkinDetaljer.mediaLankar.husdjur || 
+            record.checkinDetaljer.mediaLankar.rokning
+          ) && (
+            <div className="history-media-links" style={{ marginTop: '1rem' }}>
               <strong>Bilagor:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
                 {record.checkinDetaljer.mediaLankar.rekond && (
@@ -1697,18 +1694,18 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
     .history-type-label {
       font-weight: 700;
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       text-transform: uppercase;
       color: var(--color-text);
     }
 
     .history-plats-label {
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       color: var(--color-text);
     }
 
     .history-date-label {
-      font-size: 0.875rem;
+      font-size: 0.95rem;
       color: var(--color-text-secondary);
       margin-left: auto;
     }
@@ -1879,6 +1876,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
         display: none !important;
       }
 
+      /* Hide Bilagor section in print */
+      .history-media-links {
+        display: none !important;
+      }
+
       /* Compact print header */
       .print-header {
         display: block;
@@ -2040,6 +2042,10 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       body.include-history-print .history-item-collapsed {
         padding: 3px !important;
         cursor: default;
+      }
+
+      body.include-history-print .history-type-label {
+        font-size: 8pt !important;
       }
 
       body.include-history-print .history-toggle-icon {
