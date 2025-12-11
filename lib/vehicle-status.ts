@@ -773,15 +773,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
     
-    // Fetch all damage counts and details for checkins in a single query
+    // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
     const checkinIds = checkins.map(c => c.id).filter(Boolean);
     const damageCounts = new Map<string, number>();
-    const checkinDamagesMap = new Map<string, any[]>();
     
     if (checkinIds.length > 0) {
       const { data: damageData } = await supabase
         .from('checkin_damages')
-        .select('*')
+        .select('checkin_id')
         .in('checkin_id', checkinIds)
         .eq('type', 'new');
       
@@ -789,11 +788,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         for (const damage of damageData) {
           const count = damageCounts.get(damage.checkin_id) || 0;
           damageCounts.set(damage.checkin_id, count + 1);
-          
-          // Build damages list per checkin
-          const damagesList = checkinDamagesMap.get(damage.checkin_id) || [];
-          damagesList.push(damage);
-          checkinDamagesMap.set(damage.checkin_id, damagesList);
         }
       }
     }
@@ -820,43 +814,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? `${checkin.current_city} / ${checkin.current_station}`
         : undefined;
       
-      // Build media links based on checklist folders
-      const mediaLankar: any = {};
-      if (checklist.rekond_folder) {
-        mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
-      }
-      if (checklist.pet_sanitation_folder) {
-        mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
-      }
-      if (checklist.smoking_sanitation_folder) {
-        mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
-      }
-      
-      // Build damages list for this checkin
-      const checkinDamages = checkinDamagesMap.get(checkin.id) || [];
-      const skador = checkinDamages.map(d => {
-        let typ = d.damage_type_raw || 'Okänd';
-        
-        // Add positions if available
-        if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
-          const positions = d.user_positions.map((pos: any) => {
-            const parts: string[] = [];
-            if (pos.carPart) parts.push(pos.carPart);
-            if (pos.position) parts.push(pos.position);
-            return parts.join(' - ');
-          }).filter(Boolean);
-          if (positions.length > 0) {
-            typ = `${typ} - ${positions.join(', ')}`;
-          }
-        }
-        
-        return {
-          typ,
-          beskrivning: d.description || '',
-          mediaUrl: d.uploads?.folder ? `/media/${d.uploads.folder}` : undefined,
-        };
-      });
-      
       historyRecords.push({
         id: `checkin-${checkin.id}`,
         datum: formatDateTime(checkin.completed_at || checkin.created_at),
@@ -873,8 +830,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           hjultyp: checkin.hjultyp || undefined,
           tankningInfo: buildTankningInfo(checkin),
           laddningInfo: buildLaddningInfo(checkin),
-          mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
-          skador: skador.length > 0 ? skador : undefined,
         },
         avvikelser: {
           nyaSkador: damageCount,
@@ -891,7 +846,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         },
       });
     }
-    
+
     // Sort history by rawTimestamp (newest first)
     historyRecords.sort((a, b) => {
       const dateA = new Date(a.rawTimestamp);
