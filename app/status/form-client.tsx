@@ -813,7 +813,7 @@ export default function StatusForm() {
               </button>
             </div>
             
-            <div className="print-button" style={{ marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '1.5rem' }}>
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad:</strong> {vehicleStatus.nybilFullData.registreringsdatum}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Registrerad av:</strong> {vehicleStatus.nybilFullData.registreradAv}</p>
             </div>
@@ -894,7 +894,7 @@ export default function StatusForm() {
         td { padding: 2px 5px; vertical-align: top; }
         td:first-child { font-weight: bold; width: 40%; }
         .photos { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 15px 0; }
-        .photos img { min-height: 150px; max-height: 150px; width: auto; object-fit: cover; }
+        .photos img { height: 150px; width: auto; object-fit: cover; }
         .info-text { text-align: center; font-size: 9pt; margin: 10px 0; color: #666; }
         .print-button { display: none; }
       </style>
@@ -921,12 +921,6 @@ export default function StatusForm() {
                         });
                         printWindow.document.write('</div>');
                       }
-                      
-                      // Add registration details at top
-                      const safeRegistreringsdatum = escapeHtml(vehicleStatus.nybilFullData?.registreringsdatum);
-                      const safeRegistreradAv = escapeHtml(vehicleStatus.nybilFullData?.registreradAv);
-                      printWindow.document.write(`<p style="margin: 10px 0 5px 0;"><strong>Registrerad:</strong> ${safeRegistreringsdatum}</p>`);
-                      printWindow.document.write(`<p style="margin: 5px 0 15px 0;"><strong>Registrerad av:</strong> ${safeRegistreradAv}</p>`);
                       
                       printWindow.document.write(content.innerHTML);
                       printWindow.document.write('</body></html>');
