@@ -934,7 +934,24 @@ export default function StatusForm() {
                         printWindow.document.write('</div>');
                       }
                       
-                      printWindow.document.write(content.innerHTML);
+                      // Add registration details
+                      printWindow.document.write('<div style="margin-bottom: 1.5rem;">');
+                      printWindow.document.write(`<p style="margin: 0.25rem 0;"><strong>Registrerad:</strong> ${vehicleStatus.nybilFullData?.registreringsdatum || ''}</p>`);
+                      printWindow.document.write(`<p style="margin: 0.25rem 0;"><strong>Registrerad av:</strong> ${vehicleStatus.nybilFullData?.registreradAv || ''}</p>`);
+                      printWindow.document.write('</div>');
+                      
+                      // Clone and filter content to exclude print-button elements
+                      const contentClone = content.cloneNode(true) as HTMLElement;
+                      const printButtons = contentClone.querySelectorAll('.print-button');
+                      printButtons.forEach(el => el.remove());
+                      
+                      // Also remove the registration details div since we already added it above
+                      const registrationDiv = contentClone.children[1]; // Second child after header
+                      if (registrationDiv) {
+                        registrationDiv.remove();
+                      }
+                      
+                      printWindow.document.write(contentClone.innerHTML);
                       printWindow.document.write('</body></html>');
                       printWindow.document.close();
                       printWindow.print();
