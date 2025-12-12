@@ -812,6 +812,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
+    const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
     
     // Fetch damage counts for checkins (for avvikelser count)
     const checkinIds = checkins.map(c => c.id).filter(Boolean);
@@ -877,6 +878,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         return damageDateStr === checkinDateStr;
       });
       
+      // Track which damages are shown in this checkin
+      matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+      
       // Build skador array from matched damageRecords
       const skador = matchedDamages.map(damage => {
         // Add damage media to mediaLankar if not already there
@@ -889,7 +893,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         return {
           typ: damage.skadetyp,
-          beskrivning: '', // DamageRecord doesn't have separate description
+          beskrivning: '', // Kept for compatibility with display logic
           mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null,
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
@@ -933,23 +937,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Add BUHS damage history events
     // Create a separate history event for each BUHS damage (source='legacy')
-    // These are damages that were NOT matched/shown in any checkin
-    const damagesShownInCheckins = new Set<number>();
-    
-    // Build set of damage IDs that are already shown in checkins
-    for (const record of historyRecords) {
-      if (record.typ === 'incheckning' && record.checkinDetaljer?.skador) {
-        for (const skada of record.checkinDetaljer.skador) {
-          // Find the damage ID from damageRecords by matching skadetyp
-          const matchedDamage = damageRecords.find(d => d.skadetyp === skada.typ);
-          if (matchedDamage) {
-            damagesShownInCheckins.add(matchedDamage.id);
-          }
-        }
-      }
-    }
-    
-    // Create history events for BUHS damages (source='legacy') that aren't shown in any checkin
+    // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
     for (const damage of damageRecords) {
       if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
         historyRecords.push({
@@ -1219,6 +1207,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Build history records
   const historyRecords: HistoryRecord[] = [];
+  const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
 
   // Fetch damage counts for checkins (for avvikelser count)
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
@@ -1285,6 +1274,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       return damageDateStr === checkinDateStr;
     });
     
+    // Track which damages are shown in this checkin
+    matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+    
     // Build skador array from matched damageRecords
     const skador = matchedDamages.map(damage => {
       // Add damage media to mediaLankar if not already there
@@ -1298,7 +1290,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       return {
         typ: damage.skadetyp,
-        beskrivning: '', // DamageRecord doesn't have separate description
+        beskrivning: '', // Kept for compatibility with display logic
         mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null,
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
@@ -1410,23 +1402,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Add BUHS damage history events
   // Create a separate history event for each BUHS damage (source='legacy')
-  // These are damages that were NOT matched/shown in any checkin
-  const damagesShownInCheckins = new Set<number>();
-  
-  // Build set of damage IDs that are already shown in checkins
-  for (const record of historyRecords) {
-    if (record.typ === 'incheckning' && record.checkinDetaljer?.skador) {
-      for (const skada of record.checkinDetaljer.skador) {
-        // Find the damage ID from damageRecords by matching skadetyp
-        const matchedDamage = damageRecords.find(d => d.skadetyp === skada.typ);
-        if (matchedDamage) {
-          damagesShownInCheckins.add(matchedDamage.id);
-        }
-      }
-    }
-  }
-  
-  // Create history events for BUHS damages (source='legacy') that aren't shown in any checkin
+  // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
   for (const damage of damageRecords) {
     if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
       historyRecords.push({
