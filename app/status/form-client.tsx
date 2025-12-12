@@ -486,7 +486,9 @@ export default function StatusForm() {
                   <div style={{ fontWeight: 'normal', fontSize: '1rem' }}>
                     {event.typ === 'incheckning' 
                       ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
-                      : `Nybilsregistrering av ${event.utfordAv}`
+                      : event.typ === 'buhs_skada' && event.buhsSkadaDetaljer
+                        ? event.buhsSkadaDetaljer.skadetyp
+                        : `Nybilsregistrering av ${event.utfordAv}`
                     }
                     {hasAvvikelser && ' ⚠️'}
                   </div>
