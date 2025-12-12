@@ -1227,18 +1227,18 @@ const HistoryItem: React.FC<{
           {record.typ === 'incheckning' && (() => {
             console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
             return record.checkinDetaljer?.mediaLankar && (
-              record.checkinDetaljer.mediaLankar.rekond || 
-              record.checkinDetaljer.mediaLankar.husdjur || 
-              record.checkinDetaljer.mediaLankar.rokning
+              record.checkinDetaljer?.mediaLankar?.rekond || 
+              record.checkinDetaljer?.mediaLankar?.husdjur || 
+              record.checkinDetaljer?.mediaLankar?.rokning
             );
           })() && (
             <div style={{ marginTop: '1rem' }}>
               <strong>Bilagor:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                {record.checkinDetaljer.mediaLankar.rekond && (
+                {record.checkinDetaljer?.mediaLankar?.rekond && (
                   <li>
                     <a 
-                      href={record.checkinDetaljer.mediaLankar.rekond} 
+                      href={record.checkinDetaljer?.mediaLankar?.rekond} 
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: '#1a73e8' }}
@@ -1247,10 +1247,10 @@ const HistoryItem: React.FC<{
                     </a>
                   </li>
                 )}
-                {record.checkinDetaljer.mediaLankar.husdjur && (
+                {record.checkinDetaljer?.mediaLankar?.husdjur && (
                   <li>
                     <a 
-                      href={record.checkinDetaljer.mediaLankar.husdjur} 
+                      href={record.checkinDetaljer?.mediaLankar?.husdjur} 
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: '#1a73e8' }}
@@ -1259,10 +1259,10 @@ const HistoryItem: React.FC<{
                     </a>
                   </li>
                 )}
-                {record.checkinDetaljer.mediaLankar.rokning && (
+                {record.checkinDetaljer?.mediaLankar?.rokning && (
                   <li>
                     <a 
-                      href={record.checkinDetaljer.mediaLankar.rokning} 
+                      href={record.checkinDetaljer?.mediaLankar?.rokning} 
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: '#1a73e8' }}
