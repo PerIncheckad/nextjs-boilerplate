@@ -66,16 +66,19 @@ export type DamageRecord = {
   datum: string;
   status: string;
   folder?: string;
-  source: 'legacy' | 'damages';
+  source: 'legacy' | 'damages' | 'checkin';
   // Source info for display
   sourceInfo?: string; // e.g., "Källa: BUHS" or "Incheckad av Per Andersson 2025-12-03 14:30"
+  // For BUHS damages (legacy)
+  legacy_damage_source_text?: string | null;
+  original_damage_date?: string | null;
 };
 
 export type HistoryRecord = {
   id: string;
   datum: string;
   rawTimestamp: string; // ISO string for sorting
-  typ: 'incheckning' | 'nybil' | 'manual';
+  typ: 'incheckning' | 'nybil' | 'manual' | 'buhs_skada';
   sammanfattning: string;
   utfordAv: string;
   plats?: string; // t.ex. "Halmstad / FORD Halmstad"
@@ -102,6 +105,8 @@ export type HistoryRecord = {
       typ: string;
       beskrivning: string;
       mediaUrl?: string;
+      isDocumentedOlder?: boolean; // True if this is a documented older BUHS damage
+      originalDamageDate?: string; // Original damage date for documented older damages
     }>;
   };
   
@@ -113,6 +118,18 @@ export type HistoryRecord = {
     hjultyp?: string;
     drivmedel?: string;
     planeradStation?: string;
+    // Media links for nybil attachments
+    mediaLankar?: {
+      rekond?: string;
+      husdjur?: string;
+      rokning?: string;
+    };
+    // Damages from nybil delivery
+    skador?: Array<{
+      typ: string;
+      beskrivning: string;
+      mediaUrl?: string;
+    }>;
   };
   
   // Avvikelser för incheckning (från checkins.checklist jsonb)
@@ -134,6 +151,12 @@ export type HistoryRecord = {
   nybilAvvikelser?: {
     harSkadorVidLeverans?: boolean;
     ejRedoAttHyrasUt?: boolean;
+  };
+  
+  // BUHS skada detaljer (för typ='buhs_skada')
+  buhsSkadaDetaljer?: {
+    skadetyp: string;
+    legacy_damage_source_text?: string;
   };
 };
 
@@ -298,6 +321,28 @@ function formatDateForFolder(dateStr: string | null | undefined): string {
   } catch {
     return '';
   }
+}
+
+// Helper to build media URL for a damage based on its folder
+function buildDamageMediaUrl(folder: string | undefined): string | undefined {
+  if (!folder) return undefined;
+  return `/media/${folder}`;
+}
+
+// Helper to create a damage key for matching BUHS damages
+function createBuhsDamageKey(regnr: string, legacySourceText: string | null | undefined): string {
+  return `${regnr}-${legacySourceText || ''}`;
+}
+
+// Helper to format damage positions from user_positions array
+function formatDamagePositions(userPositions: any[]): string {
+  const positions = userPositions.map((pos: any) => {
+    const parts: string[] = [];
+    if (pos.carPart) parts.push(pos.carPart);
+    if (pos.position) parts.push(pos.position);
+    return parts.join(' - ');
+  }).filter(Boolean);
+  return positions.join(', ');
 }
 
 function getFirstNameFromEmail(email: string): string {
@@ -738,14 +783,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Add position info if user_positions exists
       if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
-        const positions = damage.user_positions.map((pos: any) => {
-          const parts: string[] = [];
-          if (pos.carPart) parts.push(pos.carPart);
-          if (pos.position) parts.push(pos.position);
-          return parts.join(' - ');
-        }).filter(Boolean);
-        if (positions.length > 0) {
-          skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+        const positionsStr = formatDamagePositions(damage.user_positions);
+        if (positionsStr) {
+          skadetyp = `${skadetyp} - ${positionsStr}`;
         }
       }
       
@@ -772,8 +812,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
+    const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
     
-    // Fetch all damage counts for checkins in a single query (optimize N+1 pattern)
+    // Fetch damage counts for checkins (for avvikelser count)
     const checkinIds = checkins.map(c => c.id).filter(Boolean);
     const damageCounts = new Map<string, number>();
     
@@ -814,6 +855,51 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? `${checkin.current_city} / ${checkin.current_station}`
         : undefined;
       
+      // Build media links based on checklist folders
+      const mediaLankar: any = {};
+      if (checklist.rekond_folder) {
+        mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+      }
+      if (checklist.pet_sanitation_folder) {
+        mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+      }
+      if (checklist.smoking_sanitation_folder) {
+        mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+      }
+      
+      // Match damages from damageRecords to this checkin by date
+      // Use the same damageRecords that powers the "Skador" section
+      const checkinDateStr = checkin.completed_at || checkin.created_at;
+      const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
+        // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
+        const checkinDate = new Date(checkinDateStr);
+        if (isNaN(checkinDate.getTime())) return false;
+        const checkinYMD = checkinDate.toISOString().split('T')[0];
+        return damage.datum === checkinYMD;
+      }) : [];
+      
+      // Track which damages are shown in this checkin
+      matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+      
+      // Build skador array from matched damageRecords
+      const skador = matchedDamages.map(damage => {
+        // Add damage media to mediaLankar if not already there
+        if (damage.folder) {
+          const damageMediaKey = `skada-${damage.id}`;
+          if (!mediaLankar[damageMediaKey]) {
+            mediaLankar[damageMediaKey] = `/media/${damage.folder}`;
+          }
+        }
+        
+        return {
+          typ: damage.skadetyp,
+          beskrivning: '', // Kept for compatibility with display logic
+          mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
+          isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null,
+          originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
+        };
+      });
+      
       historyRecords.push({
         id: `checkin-${checkin.id}`,
         datum: formatDateTime(checkin.completed_at || checkin.created_at),
@@ -830,6 +916,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           hjultyp: checkin.hjultyp || undefined,
           tankningInfo: buildTankningInfo(checkin),
           laddningInfo: buildLaddningInfo(checkin),
+          mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
+          skador: skador.length > 0 ? skador : undefined,
         },
         avvikelser: {
           nyaSkador: damageCount,
@@ -847,6 +935,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
     }
 
+    // Add BUHS damage history events
+    // Create a separate history event for each BUHS damage (source='legacy')
+    // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
+    for (const damage of damageRecords) {
+      if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
+        historyRecords.push({
+          id: `buhs-${damage.id}`,
+          datum: damage.datum,
+          rawTimestamp: damage.datum || '',
+          typ: 'buhs_skada',
+          sammanfattning: 'Ej dokumenterad i Incheckad',
+          utfordAv: 'System (BUHS)',
+          buhsSkadaDetaljer: {
+            skadetyp: damage.skadetyp,
+            legacy_damage_source_text: damage.legacy_damage_source_text,
+          },
+        });
+      }
+    }
+    
     // Sort history by rawTimestamp (newest first)
     historyRecords.sort((a, b) => {
       const dateA = new Date(a.rawTimestamp);
@@ -1074,15 +1182,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // If user_positions exists, format it as "Skadetyp - Placering - Position"
     if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
-      const positions = damage.user_positions.map((pos: any) => {
-        const parts: string[] = [];
-        if (pos.carPart) parts.push(pos.carPart);
-        if (pos.position) parts.push(pos.position);
-        return parts.join(' - ');
-      }).filter(Boolean);
-      
-      if (positions.length > 0) {
-        skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+      const positionsStr = formatDamagePositions(damage.user_positions);
+      if (positionsStr) {
+        skadetyp = `${skadetyp} - ${positionsStr}`;
       }
     }
     
@@ -1105,16 +1207,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Build history records
   const historyRecords: HistoryRecord[] = [];
+  const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
 
-  // Fetch all damage counts and details for checkins in a single query (optimize N+1 pattern)
+  // Fetch damage counts for checkins (for avvikelser count)
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
   const damageCounts = new Map<string, number>();
-  const checkinDamagesMap = new Map<string, any[]>();
   
   if (checkinIds.length > 0) {
     const { data: damageData } = await supabase
       .from('checkin_damages')
-      .select('*')
+      .select('checkin_id')
       .in('checkin_id', checkinIds)
       .eq('type', 'new');
     
@@ -1122,16 +1224,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       for (const damage of damageData) {
         const count = damageCounts.get(damage.checkin_id) || 0;
         damageCounts.set(damage.checkin_id, count + 1);
-        
-        // Build damages list per checkin
-        const damagesList = checkinDamagesMap.get(damage.checkin_id) || [];
-        damagesList.push(damage);
-        checkinDamagesMap.set(damage.checkin_id, damagesList);
       }
     }
   }
 
-  // Add checkins to history (with avvikelser)
+  // Add checkins to history (with avvikelser and damages from damageRecords)
   for (const checkin of checkins) {
     const checklist = checkin.checklist || {};
     const rekondTypes = detectRekondTypes(checklist.rekond_folder);
@@ -1154,10 +1251,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? `${checkin.current_city || checkin.current_ort} / ${checkin.current_station}`
       : undefined;
     
-    // Build media folder for this checkin
-    const checkinDate = formatDateForFolder(checkin.completed_at || checkin.created_at);
-    const mediaFolder = checkinDate ? `${cleanedRegnr}/${cleanedRegnr}-${checkinDate}` : null;
-    
     // Build media links based on checklist folders
     const mediaLankar: any = {};
     if (checklist.rekond_folder) {
@@ -1170,28 +1263,37 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
     }
     
-    // Build damages list for this checkin
-    const checkinDamages = checkinDamagesMap.get(checkin.id) || [];
-    const skador = checkinDamages.map(d => {
-      let typ = d.damage_type_raw || 'Okänd';
-      
-      // Add positions if available
-      if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
-        const positions = d.user_positions.map((pos: any) => {
-          const parts: string[] = [];
-          if (pos.carPart) parts.push(pos.carPart);
-          if (pos.position) parts.push(pos.position);
-          return parts.join(' - ');
-        }).filter(Boolean);
-        if (positions.length > 0) {
-          typ = `${typ} - ${positions.join(', ')}`;
+    // Match damages from damageRecords to this checkin by date
+    // Use the same damageRecords that powers the "Skador" section
+    const checkinDateStr = checkin.completed_at || checkin.created_at;
+    const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
+      // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
+      const checkinDate = new Date(checkinDateStr);
+      if (isNaN(checkinDate.getTime())) return false;
+      const checkinYMD = checkinDate.toISOString().split('T')[0];
+      return damage.datum === checkinYMD;
+    }) : [];
+    
+    // Track which damages are shown in this checkin
+    matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+    
+    // Build skador array from matched damageRecords
+    const skador = matchedDamages.map(damage => {
+      // Add damage media to mediaLankar if not already there
+      if (damage.folder) {
+        // Use damage folder for media link
+        const damageMediaKey = `skada-${damage.id}`;
+        if (!mediaLankar[damageMediaKey]) {
+          mediaLankar[damageMediaKey] = `/media/${damage.folder}`;
         }
       }
       
       return {
-        typ,
-        beskrivning: d.description || '',
-        mediaUrl: d.uploads?.folder ? `/media/${d.uploads.folder}` : undefined,
+        typ: damage.skadetyp,
+        beskrivning: '', // Kept for compatibility with display logic
+        mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
+        isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null,
+        originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
       };
     });
     
@@ -1236,6 +1338,44 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? `${nybilData.plats_mottagning_ort} / ${nybilData.plats_mottagning_station}`
       : undefined;
     
+    // Find nybil damages (non-BUHS damages registered around nybil creation time)
+    // These are damages from the damages table without legacy_damage_source_text
+    // and with created_at/damage_date close to nybil created_at
+    const nybilCreatedDate = nybilData.created_at ? new Date(nybilData.created_at) : null;
+    const nybilDamages = damages.filter(d => {
+      // Skip BUHS damages
+      if (d.legacy_damage_source_text != null) return false;
+      
+      // Check if damage date is close to nybil creation date (same day or within 7 days)
+      const damageDate = d.damage_date || d.created_at;
+      if (!damageDate || !nybilCreatedDate) return false;
+      
+      const damageDateObj = new Date(damageDate);
+      const diffMs = Math.abs(damageDateObj.getTime() - nybilCreatedDate.getTime());
+      const diffDays = diffMs / (1000 * 60 * 60 * 24);
+      
+      return diffDays <= 7;
+    });
+    
+    // Build skador array for nybil
+    const nybilSkador = nybilDamages.map(d => {
+      let typ = d.damage_type_raw || d.damage_type ? formatDamageType(d.damage_type) : 'Okänd';
+      
+      // Add positions if available
+      if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
+        const positionsStr = formatDamagePositions(d.user_positions);
+        if (positionsStr) {
+          typ = `${typ} - ${positionsStr}`;
+        }
+      }
+      
+      return {
+        typ,
+        beskrivning: d.description || '',
+        mediaUrl: buildDamageMediaUrl(d.uploads?.folder || d.folder),
+      };
+    });
+    
     historyRecords.push({
       id: `nybil-${nybilData.id}`,
       datum: formatDateTime(nybilData.created_at),
@@ -1251,12 +1391,33 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         hjultyp: nybilData.hjultyp || undefined,
         drivmedel: nybilData.bransletyp || undefined,
         planeradStation: nybilData.planerad_station || undefined,
+        skador: nybilSkador.length > 0 ? nybilSkador : undefined,
       },
       nybilAvvikelser: {
         harSkadorVidLeverans: nybilData.har_skador_vid_leverans === true,
         ejRedoAttHyrasUt: nybilData.klar_for_uthyrning === false,
       },
     });
+  }
+
+  // Add BUHS damage history events
+  // Create a separate history event for each BUHS damage (source='legacy')
+  // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
+  for (const damage of damageRecords) {
+    if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
+      historyRecords.push({
+        id: `buhs-${damage.id}`,
+        datum: damage.datum,
+        rawTimestamp: damage.datum || '',
+        typ: 'buhs_skada',
+        sammanfattning: 'Ej dokumenterad i Incheckad',
+        utfordAv: 'System (BUHS)',
+        buhsSkadaDetaljer: {
+          skadetyp: damage.skadetyp,
+          legacy_damage_source_text: damage.legacy_damage_source_text,
+        },
+      });
+    }
   }
 
   // Sort history by rawTimestamp (newest first)

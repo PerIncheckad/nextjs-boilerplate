@@ -1052,26 +1052,45 @@ const HistoryItem: React.FC<{
       case 'incheckning': return 'INCHECKNING';
       case 'nybil': return 'NYBILSREGISTRERING';
       case 'manual': return 'MANUELL ÄNDRING';
+      case 'buhs_skada': return 'SKADA';
       default: return typ.toUpperCase();
     }
   };
 
   const isNybil = record.typ === 'nybil';
+  const isBuhsSkada = record.typ === 'buhs_skada';
+  // Make nybil expandable if it has skador or attachments
+  const nybilHasExpandableContent = isNybil && (
+    (record.nybilDetaljer?.skador && record.nybilDetaljer.skador.length > 0) ||
+    (record.nybilDetaljer?.mediaLankar && (
+      record.nybilDetaljer.mediaLankar.rekond ||
+      record.nybilDetaljer.mediaLankar.husdjur ||
+      record.nybilDetaljer.mediaLankar.rokning
+    ))
+  );
+  const isNonExpandable = isBuhsSkada || (isNybil && !nybilHasExpandableContent);
 
   return (
     <div className="history-item-expandable">
       {/* Collapsed view - always visible */}
       <div 
         className="history-item-collapsed" 
-        onClick={isNybil ? undefined : onToggle}
-        style={{ cursor: isNybil ? 'default' : 'pointer' }}
+        onClick={isNonExpandable ? undefined : onToggle}
+        style={{ cursor: isNonExpandable ? 'default' : 'pointer' }}
       >
         <div className="history-collapsed-content">
-          <span className="history-type-label">{getTypeLabel(record.typ)}</span>
+          <span className="history-type-label" style={isBuhsSkada ? { color: '#B30E0E' } : undefined}>{getTypeLabel(record.typ)}</span>
           {record.plats && <span className="history-plats-label">{record.plats}</span>}
+          {/* For BUHS damages, show the damage type and summary */}
+          {isBuhsSkada && record.buhsSkadaDetaljer && (
+            <span className="history-buhs-label">{record.buhsSkadaDetaljer.skadetyp}</span>
+          )}
+          {isBuhsSkada && (
+            <span className="history-buhs-summary">{record.sammanfattning}</span>
+          )}
           <span className="history-date-label">{record.datum}</span>
         </div>
-        {!isNybil && <span className="history-toggle-icon">{isExpanded ? '▲' : '▼'}</span>}
+        {!isNonExpandable && <span className="history-toggle-icon">{isExpanded ? '▲' : '▼'}</span>}
       </div>
 
       {/* Expanded view - only when isExpanded */}
@@ -1206,20 +1225,19 @@ const HistoryItem: React.FC<{
           
           {/* Media links - shown after avvikelser for incheckning */}
           {record.typ === 'incheckning' && (() => {
-            console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
             return record.checkinDetaljer?.mediaLankar && (
-              record.checkinDetaljer.mediaLankar.rekond || 
-              record.checkinDetaljer.mediaLankar.husdjur || 
-              record.checkinDetaljer.mediaLankar.rokning
+              record.checkinDetaljer?.mediaLankar?.rekond || 
+              record.checkinDetaljer?.mediaLankar?.husdjur || 
+              record.checkinDetaljer?.mediaLankar?.rokning
             );
           })() && (
             <div style={{ marginTop: '1rem' }}>
               <strong>Bilagor:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                {record.checkinDetaljer.mediaLankar.rekond && (
+                {record.checkinDetaljer?.mediaLankar?.rekond && (
                   <li>
                     <a 
-                      href={record.checkinDetaljer.mediaLankar.rekond} 
+                      href={record.checkinDetaljer?.mediaLankar?.rekond} 
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: '#1a73e8' }}
@@ -1228,10 +1246,10 @@ const HistoryItem: React.FC<{
                     </a>
                   </li>
                 )}
-                {record.checkinDetaljer.mediaLankar.husdjur && (
+                {record.checkinDetaljer?.mediaLankar?.husdjur && (
                   <li>
                     <a 
-                      href={record.checkinDetaljer.mediaLankar.husdjur} 
+                      href={record.checkinDetaljer?.mediaLankar?.husdjur} 
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: '#1a73e8' }}
@@ -1240,10 +1258,10 @@ const HistoryItem: React.FC<{
                     </a>
                   </li>
                 )}
-                {record.checkinDetaljer.mediaLankar.rokning && (
+                {record.checkinDetaljer?.mediaLankar?.rokning && (
                   <li>
                     <a 
-                      href={record.checkinDetaljer.mediaLankar.rokning} 
+                      href={record.checkinDetaljer?.mediaLankar?.rokning} 
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{ color: '#1a73e8' }}
@@ -1259,11 +1277,15 @@ const HistoryItem: React.FC<{
           {/* Damages registered at this checkin - shown after avvikelser */}
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              <strong>Skador registrerade vid denna incheckning:</strong>
+              <strong style={{ color: '#B30E0E' }}>Skador registrerade vid denna incheckning:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
                 {record.checkinDetaljer.skador.map((skada, idx) => (
                   <li key={idx}>
-                    {skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}
+                    {skada.isDocumentedOlder && skada.originalDamageDate ? (
+                      <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
+                    ) : (
+                      <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
+                    )}
                     {skada.mediaUrl && (
                       <span>
                         {' '}
@@ -1297,6 +1319,82 @@ const HistoryItem: React.FC<{
                 </div>
               )}
             </>
+          )}
+          
+          {/* Nybil attachments */}
+          {record.typ === 'nybil' && record.nybilDetaljer?.mediaLankar && (
+            record.nybilDetaljer.mediaLankar.rekond ||
+            record.nybilDetaljer.mediaLankar.husdjur ||
+            record.nybilDetaljer.mediaLankar.rokning
+          ) && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>Bilagor:</strong>
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                {record.nybilDetaljer.mediaLankar.rekond && (
+                  <li>
+                    <a 
+                      href={record.nybilDetaljer.mediaLankar.rekond} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Rekond 📎
+                    </a>
+                  </li>
+                )}
+                {record.nybilDetaljer.mediaLankar.husdjur && (
+                  <li>
+                    <a 
+                      href={record.nybilDetaljer.mediaLankar.husdjur} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Husdjur 📎
+                    </a>
+                  </li>
+                )}
+                {record.nybilDetaljer.mediaLankar.rokning && (
+                  <li>
+                    <a 
+                      href={record.nybilDetaljer.mediaLankar.rokning} 
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#1a73e8' }}
+                    >
+                      Rökning 📎
+                    </a>
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+          
+          {/* Nybil damages */}
+          {record.typ === 'nybil' && record.nybilDetaljer?.skador && record.nybilDetaljer.skador.length > 0 && (
+            <div style={{ marginTop: '1rem' }}>
+              <strong>Skador vid leverans:</strong>
+              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                {record.nybilDetaljer.skador.map((skada, idx) => (
+                  <li key={idx}>
+                    {skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}
+                    {skada.mediaUrl && (
+                      <span>
+                        {' '}
+                        <a 
+                          href={skada.mediaUrl} 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
+                        >
+                          Visa media 📎
+                        </a>
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}
@@ -1876,6 +1974,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
 
       /* Hide media links in print */
       .damage-media-link {
+        display: none !important;
+      }
+      
+      /* Hide attachment links in history expanded view in print */
+      .history-item-expanded a {
         display: none !important;
       }
 
