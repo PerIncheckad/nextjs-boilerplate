@@ -869,14 +869,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Match damages from damageRecords to this checkin by date
       // Use the same damageRecords that powers the "Skador" section
-      const checkinDateObj = new Date(checkin.completed_at || checkin.created_at || '');
-      const checkinDateStr = checkinDateObj.toISOString().split('T')[0]; // YYYY-MM-DD
-      
-      const matchedDamages = damageRecords.filter(damage => {
+      const checkinDateStr = checkin.completed_at || checkin.created_at;
+      const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
         // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
-        const damageDateStr = damage.datum; // Already formatted as YYYY-MM-DD
-        return damageDateStr === checkinDateStr;
-      });
+        const checkinDate = new Date(checkinDateStr);
+        if (isNaN(checkinDate.getTime())) return false;
+        const checkinYMD = checkinDate.toISOString().split('T')[0];
+        return damage.datum === checkinYMD;
+      }) : [];
       
       // Track which damages are shown in this checkin
       matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -1265,14 +1265,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Match damages from damageRecords to this checkin by date
     // Use the same damageRecords that powers the "Skador" section
-    const checkinDateObj = new Date(checkin.completed_at || checkin.created_at || '');
-    const checkinDateStr = checkinDateObj.toISOString().split('T')[0]; // YYYY-MM-DD
-    
-    const matchedDamages = damageRecords.filter(damage => {
+    const checkinDateStr = checkin.completed_at || checkin.created_at;
+    const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
       // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
-      const damageDateStr = damage.datum; // Already formatted as YYYY-MM-DD
-      return damageDateStr === checkinDateStr;
-    });
+      const checkinDate = new Date(checkinDateStr);
+      if (isNaN(checkinDate.getTime())) return false;
+      const checkinYMD = checkinDate.toISOString().split('T')[0];
+      return damage.datum === checkinYMD;
+    }) : [];
     
     // Track which damages are shown in this checkin
     matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
