@@ -329,6 +329,11 @@ function buildDamageMediaUrl(folder: string | undefined): string | undefined {
   return `/media/${folder}`;
 }
 
+// Helper to create a damage key for matching BUHS damages
+function createBuhsDamageKey(regnr: string, legacySourceText: string | null | undefined): string {
+  return `${regnr}-${legacySourceText || ''}`;
+}
+
 function getFirstNameFromEmail(email: string): string {
   if (!email) return 'Okänd';
   const namePart = email.split('@')[0];
@@ -1222,9 +1227,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Check if this is a documented older damage (type='documented')
       const isDocumentedOlder = d.type === 'documented';
-      const originalDamageDate = isDocumentedOlder && d.original_damage_date 
-        ? formatDate(d.original_damage_date) 
-        : undefined;
+      const originalDamageDate = d.type === 'documented' ? formatDate(d.original_damage_date) : undefined;
       
       return {
         typ,
@@ -1354,7 +1357,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     for (const damage of checkinDamagesArray) {
       if (damage.type === 'documented' && damage.legacy_damage_source_text) {
         // Create a key to identify this documented damage
-        const key = `${cleanedRegnr}-${damage.legacy_damage_source_text}`;
+        const key = createBuhsDamageKey(cleanedRegnr, damage.legacy_damage_source_text);
         documentedBuhsDamageKeys.add(key);
       }
     }
@@ -1362,7 +1365,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   // Create history events for BUHS damages that haven't been documented
   for (const damage of buhsDamages) {
-    const damageKey = `${cleanedRegnr}-${damage.legacy_damage_source_text}`;
+    const damageKey = createBuhsDamageKey(cleanedRegnr, damage.legacy_damage_source_text);
     
     // Skip if this BUHS damage has been documented
     if (documentedBuhsDamageKeys.has(damageKey)) {

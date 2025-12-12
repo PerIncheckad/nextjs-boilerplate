@@ -1225,7 +1225,6 @@ const HistoryItem: React.FC<{
           
           {/* Media links - shown after avvikelser for incheckning */}
           {record.typ === 'incheckning' && (() => {
-            console.log('mediaLankar:', record.checkinDetaljer?.mediaLankar, 'skador:', record.checkinDetaljer?.skador);
             return record.checkinDetaljer?.mediaLankar && (
               record.checkinDetaljer?.mediaLankar?.rekond || 
               record.checkinDetaljer?.mediaLankar?.husdjur || 
