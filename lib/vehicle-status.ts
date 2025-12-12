@@ -334,6 +334,17 @@ function createBuhsDamageKey(regnr: string, legacySourceText: string | null | un
   return `${regnr}-${legacySourceText || ''}`;
 }
 
+// Helper to format damage positions from user_positions array
+function formatDamagePositions(userPositions: any[]): string {
+  const positions = userPositions.map((pos: any) => {
+    const parts: string[] = [];
+    if (pos.carPart) parts.push(pos.carPart);
+    if (pos.position) parts.push(pos.position);
+    return parts.join(' - ');
+  }).filter(Boolean);
+  return positions.join(', ');
+}
+
 function getFirstNameFromEmail(email: string): string {
   if (!email) return 'Okänd';
   const namePart = email.split('@')[0];
@@ -772,14 +783,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Add position info if user_positions exists
       if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
-        const positions = damage.user_positions.map((pos: any) => {
-          const parts: string[] = [];
-          if (pos.carPart) parts.push(pos.carPart);
-          if (pos.position) parts.push(pos.position);
-          return parts.join(' - ');
-        }).filter(Boolean);
-        if (positions.length > 0) {
-          skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+        const positionsStr = formatDamagePositions(damage.user_positions);
+        if (positionsStr) {
+          skadetyp = `${skadetyp} - ${positionsStr}`;
         }
       }
       
@@ -876,14 +882,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         // Add positions if available
         if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
-          const positions = d.user_positions.map((pos: any) => {
-            const parts: string[] = [];
-            if (pos.carPart) parts.push(pos.carPart);
-            if (pos.position) parts.push(pos.position);
-            return parts.join(' - ');
-          }).filter(Boolean);
-          if (positions.length > 0) {
-            typ = `${typ} - ${positions.join(', ')}`;
+          const positionsStr = formatDamagePositions(d.user_positions);
+          if (positionsStr) {
+            typ = `${typ} - ${positionsStr}`;
           }
         }
         
@@ -972,14 +973,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Add positions if available
       if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
-        const positions = damage.user_positions.map((pos: any) => {
-          const parts: string[] = [];
-          if (pos.carPart) parts.push(pos.carPart);
-          if (pos.position) parts.push(pos.position);
-          return parts.join(' - ');
-        }).filter(Boolean);
-        if (positions.length > 0) {
-          skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+        const positionsStr = formatDamagePositions(damage.user_positions);
+        if (positionsStr) {
+          skadetyp = `${skadetyp} - ${positionsStr}`;
         }
       }
       
@@ -1232,15 +1228,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // If user_positions exists, format it as "Skadetyp - Placering - Position"
     if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
-      const positions = damage.user_positions.map((pos: any) => {
-        const parts: string[] = [];
-        if (pos.carPart) parts.push(pos.carPart);
-        if (pos.position) parts.push(pos.position);
-        return parts.join(' - ');
-      }).filter(Boolean);
-      
-      if (positions.length > 0) {
-        skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+      const positionsStr = formatDamagePositions(damage.user_positions);
+      if (positionsStr) {
+        skadetyp = `${skadetyp} - ${positionsStr}`;
       }
     }
     
@@ -1338,14 +1328,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Add positions if available
       if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
-        const positions = d.user_positions.map((pos: any) => {
-          const parts: string[] = [];
-          if (pos.carPart) parts.push(pos.carPart);
-          if (pos.position) parts.push(pos.position);
-          return parts.join(' - ');
-        }).filter(Boolean);
-        if (positions.length > 0) {
-          typ = `${typ} - ${positions.join(', ')}`;
+        const positionsStr = formatDamagePositions(d.user_positions);
+        if (positionsStr) {
+          typ = `${typ} - ${positionsStr}`;
         }
       }
       
@@ -1428,14 +1413,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Add positions if available
       if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
-        const positions = d.user_positions.map((pos: any) => {
-          const parts: string[] = [];
-          if (pos.carPart) parts.push(pos.carPart);
-          if (pos.position) parts.push(pos.position);
-          return parts.join(' - ');
-        }).filter(Boolean);
-        if (positions.length > 0) {
-          typ = `${typ} - ${positions.join(', ')}`;
+        const positionsStr = formatDamagePositions(d.user_positions);
+        if (positionsStr) {
+          typ = `${typ} - ${positionsStr}`;
         }
       }
       
@@ -1508,14 +1488,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Add positions if available
     if (damage.user_positions && Array.isArray(damage.user_positions) && damage.user_positions.length > 0) {
-      const positions = damage.user_positions.map((pos: any) => {
-        const parts: string[] = [];
-        if (pos.carPart) parts.push(pos.carPart);
-        if (pos.position) parts.push(pos.position);
-        return parts.join(' - ');
-      }).filter(Boolean);
-      if (positions.length > 0) {
-        skadetyp = `${skadetyp} - ${positions.join(', ')}`;
+      const positionsStr = formatDamagePositions(damage.user_positions);
+      if (positionsStr) {
+        skadetyp = `${skadetyp} - ${positionsStr}`;
       }
     }
     
