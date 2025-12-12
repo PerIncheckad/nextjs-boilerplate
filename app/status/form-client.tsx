@@ -448,7 +448,7 @@ export default function StatusForm() {
                     border: 'none',
                     color: '#1a73e8',
                     cursor: 'pointer',
-                    fontSize: '0.9rem',
+                    fontSize: '0.8rem',
                     textDecoration: 'underline',
                     padding: 0
                   }}
@@ -904,10 +904,10 @@ export default function StatusForm() {
         table { width: 100%; border-collapse: collapse; margin: 5px 0; }
         td { padding: 2px 5px; vertical-align: top; }
         td:first-child { font-weight: bold; width: 40%; }
-        .photos { display: grid; grid-template-columns: repeat(3, 1fr); justify-items: center; gap: 10px; margin: 15px 0; }
-        .photos img { height: 150px; width: auto; object-fit: cover; }
+        .photos { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 15px 0; }
+        .photos img { height: 150px; width: 30%; object-fit: cover; }
         .info-text { text-align: center; font-size: 9pt; margin: 10px 0; color: #666; }
-        .print-button { display: none; }
+        .print-button { display: none !important; }
         .print-section { page-break-inside: avoid; }
       </style>
     </head>
