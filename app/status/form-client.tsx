@@ -1079,7 +1079,7 @@ const HistoryItem: React.FC<{
         style={{ cursor: isNonExpandable ? 'default' : 'pointer' }}
       >
         <div className="history-collapsed-content">
-          <span className="history-type-label">{getTypeLabel(record.typ)}</span>
+          <span className="history-type-label" style={isBuhsSkada ? { color: '#B30E0E' } : undefined}>{getTypeLabel(record.typ)}</span>
           {record.plats && <span className="history-plats-label">{record.plats}</span>}
           {/* For BUHS damages, show the damage type and summary */}
           {isBuhsSkada && record.buhsSkadaDetaljer && (
@@ -1277,7 +1277,7 @@ const HistoryItem: React.FC<{
           {/* Damages registered at this checkin - shown after avvikelser */}
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              <strong>Skador registrerade vid denna incheckning:</strong>
+              <strong style={{ color: '#B30E0E' }}>Skador registrerade vid denna incheckning:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
                 {record.checkinDetaljer.skador.map((skada, idx) => (
                   <li key={idx}>
