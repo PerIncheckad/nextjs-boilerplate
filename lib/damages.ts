@@ -108,11 +108,25 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
       if (inv.legacy_damage_source_text) {
-        const positions = (inv.user_positions as any[] || [])
-          .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
-          .filter(Boolean)
-          .join(', ');
-        const newText = `${inv.user_type || 'Skada'}: ${positions}`;
+        let newText: string;
+        
+        if (inv.user_type) {
+          // We have structured data from the check-in
+          const positions = (inv.user_positions as any[] || [])
+            .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
+            .filter(Boolean)
+            .join(', ');
+          newText = positions ? `${inv.user_type}: ${positions}` : inv.user_type;
+        } else {
+          // Fallback: use legacy_damage_source_text as display text
+          // Remove any "(Går ej:...)" suffixes for cleaner display
+          newText = inv.legacy_damage_source_text.split(' (Går ej:')[0].trim();
+          // If still empty, use a generic text
+          if (!newText) {
+            newText = 'Dokumenterad skada';
+          }
+        }
+        
         inventoriedMap.set(inv.legacy_damage_source_text, newText);
       }
     }
