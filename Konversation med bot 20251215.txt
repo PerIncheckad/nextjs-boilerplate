@@ -1,0 +1,951 @@
+Copilot Chat
+ToDo-lista och prioriteringar för incheck
+PerIncheckad/nextjs-boilerplate
+Konversation med bot 20251212.txt
+Konversation med bot (fail) 20251211-20251212.txt
+Konversation med bot (fail) 20251211.txt
+Konversation med bot 20251209-20251211_2.txt
+Konversation med bot 20251209-20251211_1.txt
+Konversation med bot 20251208-20251209_1.txt
+Konversation med bot 20251208-20251209_2.txt
+Architecture.md
+Check-in-flow.md
+Contributing.md
+CSV-import.md
+Database.md
+Home.md
+Media-and-email.md
+Operations.md
+You said: Hej! Jag vill med dig arbeta vidare
+Hej! Jag vill med dig arbeta vidare med incheckad.se. Jag har kommit en bra bit och behöver nu sammanfatta min ToDo- och priolista för nästa steg. Vänligen läs igenom de datummärkta bifogade txt-filerna.
+
+Vi ska inte arbeta med antaganden eller gissningar; alla steg vi tar ska baseras på 100% koll. Ställ frågor tills du vet allt om relevant kod, flöden, Supabase, Vercel etc.
+
+Copilot said: Jag kan sammanfatta en ToDo/prio-lista, men jag
+Jag kan sammanfatta en ToDo/prio-lista, men jag behöver först säkerställa att jag läser rätt källor och har rätt nuläge. Hjälp mig med detta så att vi undviker gissningar:
+
+Ge mig länkar/åtkomst till de datummärkta txt-filerna (och/eller md-filer) som du vill att jag läser nu.
+Bekräfta aktuell main-status: vilken commit/branch ska jag utgå från (t.ex. main efter PR #198 eller senare)? Finns några öppna PR:er som ska beaktas?
+Har det skett några nya Supabase-schemaändringar (tabeller/kolumner/RPC) efter den senaste mergade PR:n? Om ja, vilka?
+Vilka konkreta områden vill du att jag prioriterar i ToDo:n? (ex: media-länkar/skador i historik, font/print, nybilsutskrift, “Senaste händelser”, /check-UX m.m.)
+Är det någon specifik Vercel-preview eller prod-url jag ska använda för referens när jag verifierar beteende?
+När jag fått detta:
+
+Jag läser de angivna filerna.
+Jag återkommer med en tabell: Status (klart/pågående/att göra), prio (hög/medel/låg), och kort next-step per punkt.
+You said: 1. De viktigaste txt-filerna bifogades i min
+1. De viktigaste txt-filerna bifogades i min första replik. Det är konversationer med dina företrädare. I /docs finner du en mängd sådana konversationer samt en del md-filer. Där finner du även /docs/wiki.
+2. Detta klarnar när du läst de seanste konversationerna med dina företrädare (de bifogade txt-filerna i min förra replik).
+3. Jag är osäker. Ge mig SQL-frågor så kan jag köra dem i Supabase.
+4. Låt oss först se hela toDo-listan, så prioriterar vi därefter. En del småfixar är akuta. 
+5. Osäker på din fråga. Varje PR skapar ju egan previews? Alla öppna PRs är obsoleta; det är alltså ingen av dem som ska färdigställas. Jag tänker stänga dem i en storstädning längre fram.
+
+JAg har även en del nya saker jag vill lägga till ToDo-listan (några kan vara upprepningar):
+- Skicka alla incheckningar till Bilkontroll, även från Malmö, Varberg, Halmstad. Idag endast Helsingborg/Ängelholm.
+- Bilder som läggs in i vår app ska ofta laddas upp i BUHS, och där får bildstorleken vara högst 1oMB. Finns det något sätt att automatiskt hålla våra bild-filer under 10 MB?
+- Säkerställ att alla röda flaggor - Rekond, Rökning, Husdjur m.m. även kommer med i mejlet till Bilkontroll.
+- När man i /nybil eller /check uppger "Upptankad nu av MABI" skulle jag vilja ge möjligheten att ladda upp en bild på kvittot, t.ex. med en knapp som heter "Ladda upp foto på kvitto". Länk till den bilden ska sedan finnas i mejlet till Huvudstation.
+- Lägg till info om "Däck som sitter på" i mejlet från /check till Bilkontroll.
+- På /status, lägg till en ändra-knapp enligt tidigare konversationer + eventuellt en snabbknapp för (t.ex.) "Markera som tankad". Det finns ett längre resonemang om detta i minst en tidigare konversation från senaste veckan.
+-Bättre filnamn i nybil-photos (redan fixad?)
+- I /check, lägg till varningsmodaler om hjultyp avviker från /status, eller om mätarställning är lägre än i /status.
+- Lägg till smart bränsletyp i /check.
+- Texterna “📅 … Incheckad av … ⚠️” och “📅 … Nybilsregistrering av …” är för stora. Att t.ex. sätta ca font-size 0.95rem, font-weight normal kommer inte att fungera, det har vi testat 100 gånger.
+- “INCHECKNING” i expanderad vy är större än “HISTORIK (1)”. Sänk rubriken under överordnad nivå. 
+Utskrift – Nybilsregister. Bilagelänkar ska bort från utskriften. Rubriker och brödtext ska ned ett par punkter (t.ex. body 8–9pt, h2/h3 nedjusterat). |
+- Uppdatera Halmstad-stationerna. Det ska vara 5 stationer: Flyget Halmstad 2741 8finns), KIA Halmstad 2743 (finns), FORD Halmstad 2744 (finns), Huvudstation Halmstad 274 döps om till MB Halmstad, BVH (Hedin multi) 2742 läggs till.
+Copilot said: Jag tar fram en ToDo/prio-lista, men först
+Jag tar fram en ToDo/prio-lista, men först behöver jag läsa de datummärkta konversationerna och wiki-filerna i /docs och /docs/wiki. Jag kommer inte anta något. För att snabba upp:
+
+1) Data att läsa
+Du nämner “de viktigaste txt-filerna” i din första replik samt fler i /docs och /docs/wiki. Jag går igenom dem i sin helhet och bygger en ToDo/prio-tabell utifrån det.
+2) Supabase—jag behöver färska värden
+Kör gärna dessa SQL:er så jag ser aktuellt schema och kan bekräfta kolumnnamn/typer (kopiera rakt in i Supabase SQL Editor):
+
+Schema-koll (centrala tabeller)
+
+SQL
+-- damages
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='damages'
+ORDER BY ordinal_position;
+
+-- checkins
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='checkins'
+ORDER BY ordinal_position;
+
+-- checkin_damages
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='checkin_damages'
+ORDER BY ordinal_position;
+
+-- vehicles
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='vehicles'
+ORDER BY ordinal_position;
+
+-- nybil_inventering
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_schema='public' AND table_name='nybil_inventering'
+ORDER BY ordinal_position;
+Flaggor & mediafält i checkins (sanity på JSONB)
+
+SQL
+SELECT regnr, checklist
+FROM checkins
+ORDER BY created_at DESC
+LIMIT 5;
+Damages med uploads (sanity)
+
+SQL
+SELECT regnr, damage_type, description, damage_date, source, uploads
+FROM damages
+ORDER BY created_at DESC
+LIMIT 10;
+3) Vercel/preview
+Du skrev att alla öppna PR:er är obsoleta och ska stängas senare. Bekräfta att vi utgår från main (efter merge av PR #198) som bas.
+
+4) Bekräfta testreg.nr
+Vill du att jag fortfarande använder 333333 (incheckning), DEB35E (nybil) och XJA61K (BUHS) som huvudtest när jag formulerar ToDo/prio? Om du har fler aktuella, ge dem.
+
+5) Nya önskemål (jag loggar dem för ToDo-listan)
+Skicka alla incheckningar till Bilkontroll, även Malmö/Varberg/Halmstad (idag bara Helsingborg/Ängelholm).
+Bildstorlek <10 MB automatiskt (för BUHS-uppladdning).
+Säkerställ att alla röda flaggor (Rekond, Rökning, Husdjur m.m.) också går till Bilkontroll-mejlet.
+/nybil och /check: möjlighet att ladda upp kvittobild vid “Upptankad nu av MABI”; länk ska till Huvudstation-mejlet.
+/check: lägg “Däck som sitter på” i mejlet till Bilkontroll.
+/status: ändra-knapp + ev. snabbknapp (“Markera som tankad”) enligt tidigare konversationer.
+Bättre filnamn i nybil-photos (om inte redan fixat).
+/check: varningsmodal om hjultyp avviker från /status, eller om mätarställning < /status.
+Lägg till “smart bränsletyp” i /check.
+Fontfrågor (senaste händelser, historikrubriker): nuvarande försök (0.95rem) gav ej önskat resultat – vi måste mäta mot annan brödtext, inte bara sätta fasta tal.
+“INCHECKNING” ska vara mindre än “HISTORIK (1)” (proportioner).
+Utskrift nybilsregister: bilagelänkar bort, rubriker/brödtext ned några punkter (body ca 8–9 pt).
+Stationsuppdatering Halmstad (5 stationer; MB Halmstad osv. enligt din lista).
+Nästa steg
+Du kör SQL ovan → klistra resultaten här.
+Bekräfta att main efter PR #198 är bas, samt vilka reg.nr jag ska använda som primära test.
+Jag läser de datummärkta txt-filerna + /docs/wiki och återkommer med en ToDo/prio-tabell (klart/pågående/att göra, prio hög/medel/låg, samt nästa steg per punkt).
+Supabase Snippet Vehicle Check-in System Setup (32).csv
+Supabase Snippet Vehicle Check-in System Setup (34).csv
+Supabase Snippet Vehicle Check-in System Setup (33).csv
+You said: Tack. 1 och 2. Bifogar svar på
+Tack. 
+
+1 och 2. Bifogar svar på dina SQL i csv-filer.
+
+3. PR #198 är mergead för länge sedan. Läs senaste konversationerna noga så ser du vilken PR som är den senast mergeade.
+
+4. De reg.nr du nämner är bra reg.nr att testa med.
+
+
+
+Copilot said: Här är ett första utkast till en
+Här är ett första utkast till en samlad ToDo-/prio-lista baserat på våra senaste konversationer och de nya punkterna du gav. Jag flaggar var jag behöver bekräftelse/extra data (t.ex. exakt senaste mergade PR).
+
+Vad jag vet (från våra dialoger)
+Flera PR har mergats; senast nämndes #197 som mergead med grön deploy (men jag vill att du bekräftar att #197 är den senaste mergade).
+Öppna PR är obsoleta och ska stängas senare.
+Testreg.nr: 333333 (incheckning), DEB35E (nybil), XJA61K (BUHS). Du godkände att dessa används.
+Supabase utdrag (från dina CSV-svar):
+damages har uploads.folder/photo_urls/video_urls, source "CHECK" m.m.
+checkins.checklist har rekond_folder, pet_sanitation_folder, smoking_sanitation_folder etc. (men i de nya utdragen för 2025-12-10-exemplen är de flesta null).
+nybil_inventering-liknande schema (du gav ett stort schemautdrag: bl.a. monterade_dack, hjultyp, planerad_station, media_folder, photo_urls, video_urls etc.).
+Fortsatta problem som återkommit: media-länkar och skador i historik saknas; fontstorlekar i “Senaste händelser” och vissa rubriker; print-justeringar (nybil/huvudutskrift) inkl. rubriker, bilder, sektioner; “Komplett nybilsregistrering” ska bort i utskrift; dubbletter i registrerad/registrerad av i print.
+ToDo/Prio (förslag)
+Jag delar upp i Hög / Medel / Låg. Vi kan justera efter dina kommentarer.
+
+Hög prio
+Media-länkar och skador i Historik (expanderad)
+
+Säkerställ att checkinDetaljer.mediaLankar/mediaFolders och checkinDetaljer.skador faktiskt skickas och renderas.
+Utred varför de fortfarande är undefined i frontend (möjligen fel path/typ-stripping/dubbla push-block).
+Test: 333333 och XJA61K.
+Fontstorlekar i “Senaste händelser” och Historik-rader
+
+“📅 … Incheckad av … ⚠️” och “📅 … Nybilsregistrering av …” ska ned till samma storlek som brödtext (ej bara hårdkoda 0.95rem, mät mot faktisk body-stil).
+“INCHECKNING …” ska vara mindre än “HISTORIK (1)” (proportioner).
+Print nybil och huvudutskrift
+
+Ta bort “Komplett nybilsregistrering” och stäng-kryss från utskrift.
+Undvik dubbletter av “Registrerad/Registrerad av”.
+Ordning överst: Reg.nr → “All info från nybilsregistrering [datum]” → Fordonsbilder → “Registrerad:”/“Registrerad av:” → övrigt.
+Bildlayout: minst ~150 px höjd (~4 cm), 3+3 vid 6 bilder, udda antal → en extra på övre raden, centrerat.
+Håll ihop sektioner (page-break-inside: avoid), bryt inte listor (“Utrustning vid leverans” etc.).
+I huvudutskriften (knappen längst ned): ta bort “Visa komplett nybilsregistrering” och hela “Senaste händelser”-sektionen.
+Stationsuppdatering Halmstad
+
+5 stationer: Flyget Halmstad 2741, KIA Halmstad 2743, FORD Halmstad 2744, Huvudstation Halmstad 2740 döps om till MB Halmstad, BVH (Hedin multi) 2742 läggs till.
+Medel prio
+Skicka alla incheckningar till Bilkontroll (även Malmö, Varberg, Halmstad)
+
+Utöka nuvarande begränsning (idag bara Helsingborg/Ängelholm).
+Röda flaggor i Bilkontroll-mejl
+
+Säkerställ att Rekond, Rökning, Husdjur m.fl. alltid följer med i Bilkontroll-mejlet.
+/nybil & /check: kvittobild vid “Upptankad nu av MABI”
+
+Lägg till upload-knapp för kvitto; länk ska gå till Huvudstation-mejlet.
+/check: “Däck som sitter på” till Bilkontroll-mejlet
+
+Lägg in fältet i mejlbygget.
+/status: ändra-knapp + ev. snabbknapp (“Markera som tankad”)
+
+Baserat på tidigare resonemang i konversationer (behövs fil/radreferenser senare).
+/check: varningsmodaler
+
+Om hjultyp avviker från /status eller om mätarställning < /status.
+Smart bränsletyp i /check
+
+Visa “Senast incheckad [datum, tid] av [incheckare]” under reg.nr (Fordon-sektionen) när reg.nr är känt.
+Bättre filnamn i nybil-photos
+
+Verifiera om redan fixat; annars standardisera.
+Utskrift – Nybilsregister (detaljerad)
+
+Bilagelänkar ska bort; rubriker/brödtext ned några punkter (body 8–9 pt, h2/h3 nedjusterat).
+Låg prio / framtida
+Bildstorlek <10 MB automatiskt
+
+Utreda server-/client-side komprimering före upload (t.ex. bädda in komprimering i upload-flödet).
+/status: snabbknapp “Markera som tankad” (om inte inkluderat ovan)
+
+Tydliggöra om det ska vara samma som punkt 9.
+Övriga UX-polish / rubriker / hierarki
+
+Säkerställa konsekvent hierarki på rubriker och brödtext över hela /status och print.
+Klargöranden jag behöver
+Senast mergad PR: Jag tror #197 var senast mergead (“Fixa media-länkar, print-storlek och nybilsbilder i utskrift”), men bekräfta vilken PR/commit som faktiskt är senaste i main.
+Frontendläget för media/skador: Vill du att jag försöker lokalisera den exakta kodvägen som droppar mediaLankar/skador (troligen dubbla push-block i lib/vehicle-status.ts), eller ska vi öppna ny PR direkt? (Jag kan förbereda exakt patch-punkter om du bekräftar filerna/branch.)
+Print CSS scope: Ska vi justera print CSS både för nybil-modalen och huvudutskriften (inkl. att dölja “Senaste händelser” och nybilslänken) i samma PR?
+Bilkontroll-utökning: För utskick av alla incheckningar (Malmö/Varberg/Halmstad) – bekräfta vilka mailadresser/routing-regler som gäller, eller ska jag läsa från befintlig mapping i koden/SQL?
+10 MB bildgräns: Är det OK att vi föreslår client-side resize/komprimering (t.ex. canvas/ffmpeg-lite) innan upload, eller föredrar du server-side?
+Nästa steg
+Om du bekräftar punkterna ovan (särskilt senaste mergade PR och ev. mailrouting för Bilkontroll) kan jag ge en mer exakt plan och bryta ut i 1–2 PR-förslag (t.ex. Hög prio i en PR, Medel i nästa).
+Vill du att jag börjar med Hög prio (1–4) i en samlad PR, och sedan tar Medel i en senare?
+You said: Senast mergeade PR är #202. Det kan
+Senast mergeade PR är #202. Det kan du läsa om i den allra senaste konversationen "Konversation med bot 20251212.txt". Du behöver läsa de senaste konversationerna (som jag bifogade tidigare) mer noggrant. I de senaste konversationerna kan du bl.a. läsa om att vi fixat problemet med att media-länkar och skador i historik saknades. Dubbelkolla gärna (vi kan testa).
+
+Problemet med fontstorlekarna är kosmetiskt och har lägre prio. Samma sak gäller utskrifterna. Print CSS scope har lägre prio.
+
+Hög prio, i prioordning:
+- Bildstorlek <10 MB automatiskt.
+- Stationsuppdatering Halmstad.
+- Skicka alla incheckningar till Bilkontroll.
+- Ladda upp bilfakta för att komplettera det som syns i /status (ny, denna tror jag inte att jag nämnt tidigare).
+- Läs från befintlig mapping i koden för utskicket till alla stationer. Jag behöver på mitt håll skapa adresser/alias för halmstad@incheckad.se och falkenberg@incheckad.se (Falkenberg ska också aktiveras - inga stationer ska vara passiva nu) i one.com så som jag tidigare gjort för de adresser som redan är igång.
+- /check: “Däck som sitter på” till Bilkontroll-mejlet.
+- /status: ändra-knapp + ev. snabbknapp (“Markera som tankad”).
+
+Du måste veta den exakta kodvägen. Hur fastställer vi den?
+
+Gällande 10MB bildgräns; jag behöver för/emot för serverside vs clientside.
+
+Fortsätt fråga! SOm sagt, inga gissningar eller antaganden!
+Copilot said: Jag tar fasta på din prioordning. Eftersom
+Jag tar fasta på din prioordning. Eftersom vi inte ska gissa behöver jag snabbt få fram exakta underlag för kodvägar och mapping. Jag har inte tillgång till filer förrän du pekar ut dem eller låter mig läsa, så jag ställer riktade frågor:
+
+Klargöranden (för att undvika gissningar)
+Kodvägar för station/mapping och Bilkontroll-utskick
+
+Ge permalänkar (main/#202-basen) till de filer som bygger mejl/routing för Bilkontroll (t.ex. lib/notify.ts, app/api/notify/route.ts eller var mappingen bor).
+Finns det en station/adress-mapping i kod eller konfig? Om ja, var (fil/konstant)? Jag behöver se den för att lägga till Halmstad/Falkenberg och säkerställa att alla stationer är aktiva.
+Kodväg för “Däck som sitter på” i /check → Bilkontroll-mejl
+
+Ge permalänk till check-form payload och mejlbyggare (t.ex. app/check/form-client.tsx och motsvarande server/notify-fil) så jag ser vilken data som redan skickas och var den tappas.
+Kodväg för /status ändra-knapp + “Markera som tankad”
+
+Var finns UI/handlers för /status? (t.ex. app/status/form-client.tsx eller andra komponenter).
+Finns det redan API-endpoints för uppdatering (PUT/PATCH) av status, eller behöver de skapas? Länka ev. backend-fil.
+“Ladda upp bilfakta för att komplettera /status”
+
+Vilken källa ska användas: CSV import, manuell upload via UI, eller en ny UI-yta? Finns det en befintlig endpoint/tabell (ex. vehicles/nybil_inventering) att fylla på? Vill du att jag tar fram en liten plan, eller har du en filstruktur (t.ex. “Bilfakta-CSV” med bestämda kolumner)?
+Testreg.nr (bekräftelse)
+
+Fortsätter vi med 333333 (incheckning), DEB35E (nybil), XJA61K (BUHS)? Något ytterligare reg.nr för Halmstad/Falkenberg du vill att jag validerar mot när mappingen uppdateras?
+Bildstorlek <10 MB – för/emot (server vs client)
+Client-side komprimering
+
+Avlastar server/bandbredd; bilder trimmas innan upload.
+Direkt feedback till användare (visa uppskattad storlek före upload).
+– Kräver JS-komprimering (canvas/ffmpeg-lite); risk för kvalitetstapp om fel inställt.
+– Äldre mobiler kan bli långsamma; behöver fallback.
+Server-side komprimering
+
+Enkelt för klienten; användaren skickar original.
+Kan standardisera pipeline på servern (samma preset alltid).
+– Högre ingress-bandbredd/kostnad (uppladdning av stora filer).
+– Kräver compute (FFmpeg/Sharp) på server/vercel edge eller job queue.
+– Risk för timeout i API-route om inte offloadat till bakgrundsjobb.
+Praktiskt för er (Vercel/Supabase)
+
+Jag lutar initialt mot client-side resize till t.ex. max dimension + kvalitet, och hårt stopp på >10 MB efter komprimering.
+Lägg till server-side guard: avvisa filer >10 MB (post-komprimering) för säkerhet.
+Vill du att jag tar fram ett konkret förslag (lib + hook) för client-side komprimering + server-guard?
+
+Nästa steg
+Skicka permalänkar till ovan nämnda filer (notify/mejl-mapping, /check-form och serverdel, /status UI/API).
+Bekräfta testreg.nr-listan.
+Säg om du vill att jag tar fram ett konkret komprimeringsförslag (kodskiss) i nästa svar.
+När jag fått länkarna läser jag kodvägarna och återkommer med en mer detaljerad ToDo-plan (Hög prio-punkterna först: 10 MB, stationer/mapping/Bilkontroll, däckfält i mejl, ändra-knapp/snabbknapp, bilfakta-inmatning).
+PerIncheckad/nextjs-boilerplate
+You said: Du har tillgång till hela repot nu.
+Du har tillgång till hela repot nu. Kan du då se vad du behöver? Obs att jag inte kan någonting om kodning, så ju fler svar du själv kan hitta i koden/Supabase desto mer korrekta svar får du. Om du vill ha URL till specifika filer för att vara 100% på att arbeta utifrån det senaste fixar jag gärna det.
+
+Ja, vi fortsätter med med 333333 (incheckning), DEB35E (nybil), XJA61K (BUHS).
+
+JAg behvöer veta mer om client-side-lösningen. Behöver programvara installeras? Användarna ska kunna köra direkt på hemsidan incheckad.se utan att peta med annat.
+Copilot said: Jag kan läsa koden direkt, men mitt
+Jag kan läsa koden direkt, men mitt försök att hämta filer just nu misslyckades. För att undvika nya försök som kanske fallerar: kan du ge mig permalänkar (main/#202-basen) till de centrala filerna så jag säkert granskar rätt version?
+
+Mejlrouting/Bilkontroll: t.ex. app/api/notify/route.ts och ev. hjälpfiler (notify/builder/mapping).
+/check payload och mejlbyggare: app/check/form-client.tsx + serverdelen som tar emot check-payload.
+/status UI/APIs: app/status/... (form-client/komponenter) och ev. backend-endpoints som stödjer ändra-knapp/”markera som tankad”.
+Mapping för stationer (Halmstad/Falkenberg); om den finns i kod eller config, ge länken.
+Testreg.nr: 333333, DEB35E, XJA61K bekräftade.
+
+Bildstorlek <10 MB – client-side lösning (ingen extra installation för användare)
+Körs i browsern på incheckad.se, ingen manuell installation för användare.
+Strategy: när användaren väljer bild → komprimera/resize i JS (t.ex. canvas/Web APIs) → ladda upp komprimerad version. Lägg till server-guard som avvisar >10 MB om något ändå slinker igenom.
+Valfria parametrar vi kan välja: max dimension (t.ex. 2048 px längsta sida), kvalitet (t.ex. 0.7–0.8), samt hårt stopp >10 MB efter komprimering.
+Jag kan ta fram konkreta kodförslag när jag sett nuvarande upload-flöde (var filerna ligger).
+Hög prio (enligt din lista)
+Bildstorlek <10 MB (client-side komprimering + server-guard).
+Stationsuppdatering Halmstad (5 stationer, aktivera Falkenberg).
+Skicka alla incheckningar till Bilkontroll (routing/mapping i koden).
+Ladda upp bilfakta för att komplettera /status (behöver se hur/var det ska matas in – UI eller import?).
+/check: “Däck som sitter på” in i Bilkontroll-mejlet.
+/status: ändra-knapp + ev. snabbknapp “Markera som tankad”.
+När du skickar permalänkarna kan jag direkt läsa koden, se den exakta kodvägen och ge en exakt arbetsplan utan gissningar.
+
+Uploaded image: image.png
+Uploaded image: image.png
+Uploaded image: image.png
+Uploaded image: image.png
+route.ts
+route.ts
+form-client.tsx
+form-client.tsx
+form-client.tsx
+LoginGate.tsx
+damage-options.ts
+damages.ts
+notify.ts
+stations.ts
+supabase.ts
+vehicle-status.ts
+You said: Titta i skärmdumparna vilka filer som finns.
+Titta i skärmdumparna vilka filer som finns. Låt mig veta ifall du vill ha fler URL:er än nedan:
+
+@PerIncheckad/nextjs-boilerplate/files/app/api/notify-nybil/route.ts
+@PerIncheckad/nextjs-boilerplate/files/app/api/notify/route.ts
+@PerIncheckad/nextjs-boilerplate/files/app/check/form-client.tsx
+@PerIncheckad/nextjs-boilerplate/files/app/nybil/form-client.tsx
+@PerIncheckad/nextjs-boilerplate/files/app/status/form-client.tsx
+@PerIncheckad/nextjs-boilerplate/files/components/LoginGate.tsx
+@PerIncheckad/nextjs-boilerplate/files/data/damage-options.ts
+@PerIncheckad/nextjs-boilerplate/files/lib/damages.ts
+@PerIncheckad/nextjs-boilerplate/files/lib/notify.ts
+@PerIncheckad/nextjs-boilerplate/files/lib/stations.ts
+@PerIncheckad/nextjs-boilerplate/files/lib/supabase.ts
+@PerIncheckad/nextjs-boilerplate/files/lib/vehicle-status.ts
+Copilot said: Jag har nu koden och kan arbeta
+Jag har nu koden och kan arbeta utan fler antaganden. Här är en konkret plan för hög-prio-punkterna du listade, med var i koden vi ska göra ändringarna och vad som behöver utredas.
+
+Hög prio – plan och kodvägar
+Bildstorlek <10 MB (client-side + server-guard)
+
+Upload-flöde /check: app/check/form-client.tsx (processFiles, uploadOne, MediaUpload mm).
+Upload-flöde /nybil: app/nybil/form-client.tsx (uploadNybilPhoto/uploadDamagePhoto).
+Server-guard: /api/notify och /api/notify-nybil tar emot payload; vi kan lägga till validering på uploads-storlek, men effektivast är att stoppa innan upload.
+Förslag (client-side): använd canvas-baserad resize/komprimering på bilder >10 MB eller med max-dimension (t.ex. 2048 px) + kvalitetsfaktor. Ingen extra installation för slutanvändaren; allt sker i browsern. Vi kan antingen:
+a) Implementera lättvikts egen utils (File → Image → canvas → toBlob) i processFiles (/check) och motsv. i /nybil.
+b) Alternativt lägga till ett litet beroende (t.ex. browser-image-compression) om du godkänner.
+Vill du att jag kör “egen util” (ingen ny dependency) eller är ett litet npm-paket OK?
+Stationsuppdatering Halmstad (5 stationer) och aktivera Falkenberg
+
+Mapping finns i lib/stations.ts och i data/stationer.json.
+Uppdatera Halmstad-listan till: Flyget Halmstad (2741), KIA Halmstad (2743), FORD Halmstad (2744), MB Halmstad (rename från Huvudstation Halmstad 2740), BVH (Hedin multi) 2742.
+Aktivera Falkenberg (redan finns i stations.ts; verifiera i stationer.json och ev. mejl-routing).
+Skicka alla incheckningar till Bilkontroll (även Malmö/Varberg/Halmstad)
+
+Mejlrouting finns i app/api/notify/route.ts (buildBilkontrollEmail) och ev. lib/notify.ts (notifyCheckin), samt env-vars i Vercel (MAIL_REGION_*).
+Plan: Utöka routing-logiken så Bilkontroll alltid får kopia oavsett ort/station. Jag läser befintliga regionregler; därefter föreslår jag exakt mapping.
+Ladda upp bilfakta för att komplettera /status (ny punkt)
+
+/status hämtar från lib/vehicle-status.ts, som läser Supabase (vehicles, nybil_inventering, damages, checkins).
+Fråga: Ska detta vara en ny UI-yta (t.ex. upload CSV/”Bilfakta”) eller en knapp/sektion i /status? Om du vill komplettera med CSV är det närmast att lägga en enkel importvy eller ett API som skriver till vehicles/nybil_inventering. Ge önskat format/kolumner så specificerar jag.
+/check: “Däck som sitter på” till Bilkontroll-mejlet
+
+Lägg fältet (monterade_dack/hjultyp) i payload → app/api/notify/route.ts → buildBilkontrollEmail.
+Jag kartlägger exakt fält i /check-form (hjultyp, ev. däckposition) och inkluderar i Bilkontroll-mail.
+/status: ändra-knapp + snabbknapp “Markera som tankad”
+
+UI: app/status/form-client.tsx (History/vehicle card).
+Backend: det finns ingen uppenbar update-endpoint; vi kan behöva skapa en ny API-route (t.ex. /api/status/update) som uppdaterar checkins/vehicles. Jag föreslår minsta möjliga: en knapp som sätter “tankstatus”/“klar_for_uthyrning” eller notering på senaste checkin/vehicle. Bekräfta vilka fält som ska uppdateras och i vilken tabell (checkins vs vehicles vs nybil_inventering).
+Läs från befintlig mapping i koden för utskicket till alla stationer
+
+Jag inventerar app/api/notify/route.ts och ev. mappingfiler (kanske i kod, inte bara env). Bekräftar routing för alla orter, och utökar till Malmö/Varberg/Halmstad + Falkenberg. Jag tar hänsyn till befintliga env-variabler (MAIL_REGION_*).
+Frågor (för att undvika antaganden)
+Bilfakta-upload: Ska det vara UI i /status (manuell upload/knapp) eller en CSV-import som en admin-sida/API? Finns önskat kolumnschema? (Se nybil_inventering/vehicles-schema i dina CSV:ar.)
+Client-side komprimering: OK att lägga till litet npm-bibliotek, eller föredrar du en egen utils-lösning?
+/status ändra-knapp: Vilka fält ska ändras? (Tankstatus, klar_for_uthyrning, noteringar?) Ska “Markera som tankad” uppdatera senaste checkin eller vehicles-tabellen?
+Bilkontroll-routing: Ska Bilkontroll alltid få kopia oavsett ort/station, eller bara vissa regioner? (Du nämnde “alla incheckningar”.)
+Nästa steg
+När du svarat på frågorna ovan (framför allt bilfakta-scope, komprimeringsstrategi, ändra-knapp-fält, och Bilkontroll-routingsregeln) tar jag fram exakta ändringspunkter i filerna ovan och ett PR-upplägg för hög-prio-paketet.
+You said: Tack. - Du frågar: "Vill du att jag
+Tack.
+
+- Du frågar: "Vill du att jag kör “egen util” (ingen ny dependency) eller är ett litet npm-paket OK?" - Jag förstår inte alls frågan. Kan du förklara vad det betyder och berätta vad du rekommenderar, tack. Med det sagt verkar client-side vara rätt väg.
+
+- Jag brukar ladda upp fräscha versioner av Skadefilen (med BUHS-skador och saludatum) och Bilkontroll-filen direkt med csv-import i Supabase, dvs helt manuellt. Jag fortsätter gärna på samma sätt med vår kompletterande bilfakta. Inga nya kolumner behövs för faktan som ska importeras, däremot kanske en ny source ("Bilfakta-filen")?
+
+- Obs att “Däck som sitter på” redan finns i mejlet till Huvudstation. Det är exakt samma info jag vill ha även i mejlet till Bilkontroll.
+
+- Superviktigt att du har 100% koll på allt i Supabase, vilka tabeller och kolumner som finns, vilka som används och hur flödet ser ut inkl legacy, upsert osv.
+
+- När man går till /status ska man se senaste fakta om bilen. En del kommer att vara från /check, annat från /nybil, en del från att man gjort en manuell ändring i /status (efter att vi skapat den möjligheten), en del är från Skadefilen, en del är från Bilkontroll-filen (märke, modell, hjulförvaring) och en del kommer att komma från den engångsuppladdning av bilfakta som jag vill göra nu. Bilfaktan kommer från samma stora excel-fil ur vilken jag skapar csv-filen med märke, modell och hjulförvaring, men det kanske är bra att ge den ett eget namn, t.ex. "Bilfakta-filen".
+
+- Bilkontroll ska alltid få kopia oavsett ort/station.
+
+Fortsätt fråga!
+
+Copilot said: Jag hör dig. Jag håller mig till
+Jag hör dig. Jag håller mig till client-side-komprimering (ingen extra installation för användaren) och förklarar valet.
+
+Client-side komprimering – “egen util” vs npm-paket (vad det betyder och rekommendation):
+
+“Egen util”: Vi skriver några rader JS själva i befintlig kod (t.ex. i processFiles i /check och motsv. i /nybil) som:
+läser bilden med Image(),
+ritar till ett canvas med max-dimension (t.ex. 2048 px längsta sida),
+exporterar med canvas.toBlob(..., 'image/jpeg', quality≈0.7–0.8),
+avvisar om resultatet >10 MB,
+fall back till original om komprimering misslyckas.
+Fördel: ingen ny dependency, inget extra för användaren.
+Nackdel: lite mer handkod, men helt ok.
+“Npm-paket”: Litet tredjepartsbibliotek som gör samma sak. Fördel: färre kodrader; nackdel: extra dependency att underhålla.
+Rekommendation: Egen util (ingen ny dependency), med server-guard som extra skydd.
+Bilfakta-import (CSV, manuellt via Supabase):
+
+Du vill fortsätta manuellt via Supabase CSV-import (ingen ny UI).
+Inga nya kolumner behövs; ev. markera source = “Bilfakta-filen”.
+Fråga: Vilken tabell ska Bilfakta-filen in i? (troligast vehicles – du sa samma Excel som märke/modell/hjulförvaring). Bekräfta:
+Vilka kolumner ska fyllas från Bilfakta-filen? (t.ex. bilmarke, bilmodell, hjul_forvaring_ort/spec, planerad_station, ev. tankstatus?).
+Ska vi använda en unik constraint (regnr) och upsert (INSERT ... ON CONFLICT regnr DO UPDATE) med source=“Bilfakta-filen”?
+Vill du ha en liten SQL-snutt du kan köra i Supabase SQL Editor för upsert, inkl. sätta source?
+Däck som sitter på till Bilkontroll-mejlet:
+
+Finns redan i Huvudstations-mejlet. Jag lägger in samma fält i buildBilkontrollEmail i app/api/notify/route.ts.
+Bilkontroll alltid kopia:
+
+Jag justerar routing i app/api/notify/route.ts så Bilkontroll alltid får en kopia, oavsett ort/station.
+Jag läser befintlig mapping/region-logik och ser till att Halmstad/Falkenberg ingår.
+Stationsuppdatering Halmstad (och Falkenberg aktiverad):
+
+Uppdaterar lib/stations.ts och data/stationer.json till:
+Halmstad: Flyget Halmstad (2741), KIA Halmstad (2743), FORD Halmstad (2744), MB Halmstad (rename från Huvudstation Halmstad 2740), BVH (Hedin multi) 2742.
+Falkenberg aktiverad (finns redan men bekräftas i json + mejl-routing).
+/status: ändra-knapp + “Markera som tankad”:
+
+Behöver veta vilka fält/tabell vi ska uppdatera:
+Ska “Markera som tankad” sätta fält i checkins (senaste incheckning) eller i vehicles (beständigt statusfält)? Finns ett tankningsfält i checkins som ska togglas?
+Ska ändra-knappen kunna uppdatera fler fält (t.ex. klar_for_uthyrning, noteringar)?
+Finns redan en backend-endpoint för uppdatering, eller skapar vi en ny (t.ex. /api/status/update)? Jag föreslår minsta möjliga PATCH med auth-check (LoginGate/whitelist).
+/status: samla fakta från flera källor:
+
+Jag ser att lib/vehicle-status.ts idag läser vehicles, nybil_inventering, damages, checkins, checkin_damages, BUHS RPC.
+När Bilfakta-filen importeras: vi upsertar i vehicles. Då ska /status visa senaste fakta därifrån (märke/modell/hjulförvaring etc.). Bekräfta om fler fält ska in (t.ex. tankstatus, klar_for_uthyrning).
+Öppna frågor att besvara:
+
+Bilfakta-CSV: Bekräfta mål-tabell (vehicles?) och exakta kolumner vi ska fylla. Vill du att jag föreslår en SQL-upsert (med source=“Bilfakta-filen”)?
+Markera som tankad/ändra-knapp: Vilka fält och vilken tabell ska uppdateras? (senaste checkin vs vehicles).
+Client-side komprimering: Jag kör “egen util” i /check och /nybil; ok? (ingen ny dependency).
+Routing Bilkontroll: Ska Bilkontroll alltid få CC (dvs. alltid ett mail till Bilkontroll-adress + ordinarie mottagare)? Jag tolkar ditt svar som “ja, alltid kopia”.
+Finns specifika mailalias/adresser för Halmstad/Falkenberg som redan är beslutade, eller ska jag bara utgå från nuvarande mapping och lägga till nya env/konstanter? (Du nämnde att du skapar alias i one.com.)
+När du bekräftar ovan kan jag föreslå ett första PR-paket för hög-prio:
+
+Client-side komprimering + server-guard (10 MB) i /check & /nybil.
+Bilkontroll alltid kopia; “Däck som sitter på” in i Bilkontroll-mejl.
+Stationer Halmstad/Falkenberg uppdaterade.
+Bilfakta-upsert-SQL (om du vill att jag skriver script/snutt).
+Grund för “Markera som tankad” (om du anger tabell/fält).
+You said: - Jag är inte säker på vilken
+- Jag är inte säker på vilken tabell Bilfakta-filen ska in i. Faktan ska visas på /status och i den ska vara tällgånglig för /check när vi snart inför smarta varningar (t.ex. incheckad mätarställning lägre än den som redan finns någonstans i vårt system, eller incheckade hjul är sommardäck när senaste infon vi har är att det är vinterdäck --> varningsmodal). Det finns redan en del fakta på varje reg.nr i Supabase, men i många fall saknas den. Vi ska bara lägga till info där det saknas, och det kan i princip vara i alla kolumner (utom reg.nr och bilmärke). Låt oss återkomma till dina frågor om constraint och upsert; jag vet inte vad det betyder.
+- Huvudstation Halmstad har station_id 274 (inte 2740). Det ska inte ändras när vi nu ändrar namnet till MB Halmstad.
+- Även Halmstad med "under-stationer" ska aktiveras - alla stationer ska vara aktiverade.
+- Jag tror det är klokt att låta checkins endast "ta emot" input från /check.
+- Kolla hur checkins ser ut och fungerar så du har 100% koll. Inga gissningar.
+- Jag tror inte att en backend-endpoint för uppdatering finns.
+- Tankstatus och klar för uthyrning ska inte synas i /status, MEN om "Går inte att hyra ut" har angivits i /check eller om "Klar för uthyrning" angivits till NEJ i /nybil, då ska det stå i anslutning till saludatumet på /status.
+- Alias för Hamstad och Falkenberg är skapade.
+
+Fortsätt fråga!
+Copilot said: Jag fortsätter utan gissningar. Jag behöver några
+Jag fortsätter utan gissningar. Jag behöver några beslut/klargöranden innan jag kan skriva exakt plan för nästa PR(s):
+
+Bilfakta-fil: mål-tabell och strategi
+
+Du vill fylla på saknad fakta som ska synas i /status och kunna användas för varningar i /check.
+Kandidat: tabell vehicles (har redan många av de fält som listas i din nybil_inventering-schema-dump).
+Fråga: Är det ok att vi använder vehicles och gör en “fyll i saknade fält”-upsert per regnr (INSERT ... ON CONFLICT regnr DO UPDATE ONLY missing/NULL fields), utan att skriva över befintliga värden?
+Om ok: jag föreslår en SQL-snutt du kan köra i Supabase SQL Editor som:
+Läser in CSV till staging (t.ex. vehicles_facts_staging)
+Upsertar till vehicles per regnr, sätter ev. source = 'Bilfakta-filen' (om vi lägger till en source-kolumn eller använder en befintlig textkolumn som markör).
+Bekräfta: ska vi lägga till en source-kolumn i vehicles eller återanvända en befintlig textkolumn (t.ex. attention eller notering_forsaljning), eller hoppa över source-markering?
+Halmstad-stationer (alla aktiva) + namnbyte
+
+Bekräfta att Huvudstation Halmstad har id 274 (inte 2740) och ska heta “MB Halmstad”, men id förblir 274.
+Jag uppdaterar lib/stations.ts och data/stationer.json med:
+Flyget Halmstad (2741), KIA Halmstad (2743), FORD Halmstad (2744), MB Halmstad (274), BVH (Hedin multi) 2742.
+Falkenberg aktiverad (alias redan finns). Alla stationer aktiva.
+Bilkontroll alltid kopia
+
+Jag justerar mejlrouting i app/api/notify/route.ts så Bilkontroll alltid får kopia, oavsett ort/station. Alias Halmstad/Falkenberg finns; jag läser befintlig mapping.
+“Däck som sitter på” ska redan till Huvudstation; jag lägger samma info i Bilkontroll-mejlet.
+/status ändra-knapp + “Markera som tankad”
+
+Du vill att checkins endast skrivs av /check.
+Finns inget backend-API för uppdatering, så vi behöver skapa ett (t.ex. /api/status/update).
+Vilken tabell/fält ska “Markera som tankad” uppdatera? Ska det sätta en notering i vehicles (t.ex. tankstatus text) eller bara loggas som “klar för uthyrning”/notering?
+Du nämner att “Går inte att hyra ut” från /check eller “Klar för uthyrning” = NEJ i /nybil ska visas nära saludatum i /status. Dessa fält finns i checkins/nybil_inventering. Bekräfta om vi bara ska läsa och visa (ingen redigering), eller om ändra-knappen också ska kunna toggla “klar för uthyrning” i vehicles?
+Client-side komprimering
+
+Jag kör “egen util” (canvas) i /check (processFiles) och /nybil (uploadNybilPhoto/damage photo) för att hålla bilder <10 MB efter komprimering. Lägg även server-guard (avvisa payload med för stora filer om något slinker igenom). Ok?
+/status-data-flöde
+
+Du vill att /status visar senaste fakta från: /check (checkins), /nybil (nybil_inventering), manuella ändringar (kommande API), Skadefilen (damages/BUHS), Bilkontroll-filen (vehicles), Bilfakta-filen (ny).
+Jag föreslår att vi samlar “statiska” fordonsfält i vehicles (märke, modell, hjulförvaring, ev. planerad station, ev. tankstatus), och att checkins/nybil ger senaste dynamiska händelser; /status läser båda. Ok?
+Checkins-koll
+
+Jag läser checkins-schema och befintliga fält (tankning/laddning etc.). Om du vill kan jag lista de exakta kolumnerna jag behöver för “Markera som tankad” och för visning vid saludatum. Bekräfta om jag ska göra det nu.
+När du bekräftar punkt 1 (mål-tabell + source-kolumn för Bilfakta-upsert) och punkt 4 (vilka fält ska ändras med “Markera som tankad”/ändra-knappen), kan jag skriva en detaljerad ändringsplan (och SQL-snutt för Bilfakta-import) för nästa PR.
+
+SPEC-nybil-och-status-20251126.md
+Konversation med bot (fail) 20251209.txt
+Konversation med bot 20251205-20251208.txt
+HANDOVER-NOTES 20251205.md
+Konversation med bot 20251201-20251205.txt
+Konversation med bot 20251127-20251201.txt
+docs_BRIEF-overlamning-2025-12-01.md
+You said: - Jag bekräftar det du skriver i
+- Jag bekräftar det du skriver i 1. och jag tycker det verkar som en god idé att lägga till en source-kolumn i vehicles.
+- JAg bekräftar att Huvudstation Halmstad har id 274 (inte 2740) och ska heta “MB Halmstad”, men id förblir 274.
+- Ett reg.nr kan markeras som "Ej upptankad" både i /check och i /nybil. Denna status måste vi kunna "släcka" när bilen väl blivit tankad av MABIs personal "utanför" incheckningar - förstår du hur jag menar? Dina förslag kring detta?
+- Obs att vi inte vill skriva ut station_id i frontend, bara stationernas namn.
+- "klar för uthyrning" måste kunna togglas.
+- Angående "avvisa payload med för stora filer om något slinker igenom" - vad innebär det? Tänk på att det för användaren sannolikt saknas möjlighet att göra bilden mindre på egen hand. 
+
+Läs igenom bifogade dokument. De föregår de konversationer du redan läst, men jag tror att där finns mycket matnyttig info för dig. Läs igenom dem alla, och läs igenom dem *noga*.
+
+Du fick svar på en del nu, men säkert inte allt. Fortsätt fråga!
+Copilot said: Jag har noterat dina bekräftelser och begränsningar.
+Jag har noterat dina bekräftelser och begränsningar. Jag läser igenom de bifogade dokumenten noggrant (äldre specs/konversationer) för att inte missa något. Under tiden behöver jag några precisa klarlägganden:
+
+Bilfakta-fil → vehicles med source-kolumn
+
+OK att lägga till source i vehicles. Ska default vara NULL för befintliga rader och sättas till t.ex. "Bilfakta-filen" vid import?
+Vid “fyll i saknade fält”-upsert: vi uppdaterar endast NULL/ tomma fält per regnr, inte skriver över befintliga värden. Bekräfta.
+Halmstad stationer
+
+ID 274 behålls, namn ändras till “MB Halmstad”. Understationer aktiveras. Falkenberg aktiv. Vi visar endast namn i UI (inte ID). OK.
+“Ej upptankad” / “klar för uthyrning” – togglas manuellt (utanför /check)
+Jag tolkar: ibland tankar MABI bilen utan att göra en /check, så vi måste kunna “släcka” flaggan i /status/editeringsläge.
+
+Vilket fält/tabell ska lagra “ej upptankad” manuellt? (Ex. vehicles.tankstatus eller ett nytt fält?)
+“Klar för uthyrning” ska kunna togglas: vilket fält/tabell ska uppdateras (finns i nybil_inventering + ev. vehicles)? Önskar vi en sammanlagd vy som tar “senaste kända” från /check, /nybil, manuell toggle?
+Vill du att toggling loggas i vehicle_status_log (event_type: MANUAL_EDIT) med vem/när?
+Avvisa payload om >10 MB
+
+Server-guard betyder: API-route (/api/notify, /api/notify-nybil) kontrollerar inkommande mediafält (URL:er/buffertar) och avvisar (400) om storlek >10 MB.
+På klienten komprimerar vi så användaren normalt inte fastnar; om något ändå blir för stort får de ett tydligt felmeddelande och kan försöka igen. OK?
+Bilkontroll alltid kopia
+
+Jag kommer läsa app/api/notify/route.ts för nuvarande routing och se till att Bilkontroll får allt (alla orter, inkl. Halmstad/Falkenberg). Bekräfta att det räcker med befintlig env-mapping (alias redan skapade), ingen extra list behövs?
+“Däck som sitter på” till Bilkontroll-mejl
+
+Jag lägger in samma info som redan går till Huvudstation. OK?
+/status: manuell ändring & snabbknapp “Markera som tankad”
+
+Vi skapar en liten update-API för /status. Vilka fält ska kunna ändras där, minsta krav: tankstatus (släcka “Ej upptankad”), “klar för uthyrning” toggle, ev. anteckning?
+Bekräfta vilka exakta fält i DB vi ska skriva till (ex. vehicles.tankstatus / vehicles.klar_for_uthyrning eller annan tabell).
+Bilfakta-import (CSV)
+
+Vilka kolumner vill du inkludera i importen för “fyll i saknat”? (t.ex. bilmarke, bilmodell, hjul_forvaring_ort/spec, planerad_station, saludatum, tankstatus?). Ju tydligare lista desto bättre när jag skriver upsert-SQL.
+Äldre dokument
+
+Jag läser igenom bifogade dokument nu (SPEC-nybil-och-status-20251126 m.fl.) och återkommer om något där ändrar ovanstående.
+Kan du svara på 1,3,5,7,8 så kan jag spika plan/PR-ordning för hög-prio-punkterna (10 MB, stationer/mapping/Bilkontroll, däckinfo i mejl, manuell tank/uthyrnings-toggle + logg, bilfakta-upsert)?
+
+Uploaded image: image.png
+You said: 1. Bekräftar båda. 2. Bekräftar. 3. Jag har inga
+1. Bekräftar båda.
+2. Bekräftar.
+3. Jag har inga preferesner avseende dina två första punkter. Tredje punkten; ja, det låter som en god idé. Alla manuella redigeringar ska registreras (inkl namn på redigeraren) som "händelse", och även visas i sktionen "Historik" på /status.
+4. När får användaren felmeddelandet? Är det vid "Spara och checka in" på respektive formulär (/nybil och /check)? Om det är så vill jag nog hellre ha följande lösning: om filen är för stor visas ingen varning, i stället hoppas vi på att det fungerar för mottagaren (Huvudstation) att ladda upp, alternativt får mottagaren på egen hand komprimera filen. Om det blir återkommande bekymmer får vi göra ett omtag. Ok?
+5. Förtydligar: Bilkontroll ska alltså ha de mejl som har "BILKONTROLL" i mejlets subject, inte de mejl som har "HUVUDSTATION" i mejlets subject. Mejladresser som ska användas: falkenberg@incheckad.se, halmstad@incheckad.se. Täcker vi därmed alla (huvud)stationer? Ängelholm fortsätter sortera under Helsingorg tills vidare.
+6. Ok.
+7. Vi vill i princip kunna ändra i samtliga fält utom reg.nr. Se tidigare konversationer där det resoneras kring detta.
+8. I skärmdumpen ser du den "bilfakta" som kommer att hämtas. Som du ser är det inte att bara importera, det måste tvättas och separeras en del först. Kan du klura ut hur det behöver separeras? Några förslag för hur vi gör det?
+
+Vad lärde du dig av att läsa dokumenten du nyss fick?
+Copilot said: Här är vad jag tar med mig
+Här är vad jag tar med mig och vad jag behöver bekräfta/foreslå:
+
+Lärt från dokumenten (kort)
+Specen (SPEC-nybil-och-status-20251126) sätter /nybil → DB → /status → /check-flödet. /check läser aldrig direkt från /nybil, utan via DB. Historik/vehicle_status_log ska logga alla händelser (checkins, nybil, manuella edits, importer).
+Stationer/orter/huvudstationer och ID används bl.a. för planerad station och mailrouting (Huvudstation-id 274 = MB Halmstad, etc).
+Skadeflödet: BUHS via RPC + damages, nya skador via /check, nybil-skador via /nybil (source), dokumentation en gång, media via damage-photos/public-media.
+/status ska vara läs + redigera (append-only logg i vehicle_status_log), historik kronologisk.
+Dina nya svar (tolkning)
+vehicles får kolumn source; fill-missing-only upsert per regnr.
+MB Halmstad (id 274) namnbyte ok; understationer aktiva, Falkenberg aktiv. ID visas aldrig i UI.
+“Ej upptankad” kan behöva manuellt släckas; “klar för uthyrning” ska togglas; alla manuella edits loggas i vehicle_status_log och visas i Historik.
+Fil >10 MB: du vill undvika att blockera vid “Spara/Checka in”; hellre låta det gå igenom och eventuellt komprimera manuellt i mottagande ände.
+Bilkontroll ska få de mail med subject “BILKONTROLL”, inte “HUVUDSTATION”. Adresser: falkenberg@incheckad.se, halmstad@incheckad.se. Ängelholm under Helsingborg tills vidare.
+Däckinfo till Bilkontroll = samma som Huvudstation.
+Redigera: i princip alla fält utom regnr, loggas med redigerare i vehicle_status_log.
+Bilfakta-excel kräver tvätt/separering (se nedan).
+Öppna punkter/konfirmationer
+A) Bilfakta-import → vehicles
+
+Jag föreslår staging-tabell (t.ex. vehicles_facts_staging) och en upsert som bara fyller NULL/tomma fält i vehicles, sätter source = 'Bilfakta-filen'. OK?
+Kolumner att mappa (från din skärmdump):
+Laddkabel (antal/”1ST I BIL”/”?") → normalisera till antal + plats (i bil/förvaring)
+Vinterdäck/Sommarhjul → däcktyp på / hjul till förvaring
+COC, Instruktionsbok, Nycklar (antal), Kompressor, Insynsskydd, Gummimattor → boolean/antal + ev. plats
+HJUL PÅ (Sommar/Vinter) → däcktyp som sitter på
+“Kom” (datum) → tolka som registrerings-/uppdateringsdatum
+Är det OK att jag föreslår ett normaliseringssteg (skript/SQL) som: trimma, mappa JA/NEJ/? till boolean/NULL, extrahera antal och “I BIL”/“SONAX”/“HOS KUND” till separata fält?
+B) Manual toggle “Ej upptankad” / “klar för uthyrning”
+
+För “Ej upptankad”: ska vi skriva till vehicles.tankstatus (t.ex. “Ej upptankad”/“Upptankad”) eller lägga till ett eget fält?
+För “klar för uthyrning”: finns i nybil_inventering; ska vi också spegla i vehicles för visning i /status, och logga ändringen i vehicle_status_log?
+Ska /status-redigering uppdatera både vehicles och nybil_inventering om posten finns i båda, eller bara vehicles som “sanning” framåt?
+C) 10 MB-hantering
+
+Du vill inte stoppa användaren vid “Spara”. Förslag:
+Client: vi komprimerar ner enligt max-dimension/quality (ingen extra dependency).
+Server: ingen hård 10MB-block; bara logga om någon filrapport överstiger 10 MB. OK?
+Alternativ: mjukt varningsmeddelande (“Stort foto, kan ta längre tid”) men ingen block.
+D) Bilkontroll-mail
+
+Jag sätter routing så att alla incheckningar får Bilkontroll-mail (BILKONTROLL-subject) med alias falkenberg@… och halmstad@…; Ängelholm via Helsingborg (befintlig mapping). OK?
+E) Manuell redigering i /status
+
+Jag lägger upp en liten update-API (PATCH) som kräver inlogg (LoginGate) och loggar till vehicle_status_log (event_type: MANUAL_EDIT) med changed_by (email/namn) + diff.
+Vilka fält ska första versionen hantera? Förslag: tankstatus, klar_for_uthyrning, däcktyp på, hjul-förvaring, insynsskydd, laddkabel-status, nyckelantal, instruktionsbok/COC, gummimattor/kompressor, ev. notering. OK?
+F) Varberg/Halmstad stationer
+
+Jag uppdaterar /check + /nybil STATIONER, lib/stations.ts, data/stationer.json, och routing för Halmstad/Falkenberg mail. Inga station_id i UI. OK?
+G) Dubbel reg.nr
+
+Jag implementerar dubbel inmatning i /nybil (och bara där). Behåller dubblettvarning mot vehicles + nybil_inventering. OK?
+Nästa steg (första PR-paket, i din föreslagna ordning 1,2,4,3,5)
+Stationer (Varberg/Halmstad/Falkenberg) + Bilkontroll-routing justering.
+Rit-verktyg på bilder (/check + /nybil), inbakat i bilden.
+Dubbel reg.nr-inmatning (/nybil).
+Manuell redigering + logg i /status (minsta fältsett enligt E).
+10MB: client-komprimering, ingen hård block; ev. mjuk varning/logg.
+Bekräfta A–G (särskilt A/B/C/E) så tar jag fram exakta mappar/SQL för bilfakta-importen och startar med PR för stationer/rit-verktyg/dubbel reg.nr.
+
+You said: TAck. A. - “Kom” (datum) → tolka som registreringsdatum. -
+TAck.
+
+A.
+- “Kom” (datum) → tolka som registreringsdatum.
+- Föreslå gärna normaliseringssteg (skript/SQL).
+
+B.
+- "Ej upptankad" kan anges i /check eller i /nybil. Bilen kan inte hyras ut om den inte är upptankad. Bilen är upptankad om den angivits "Lämnades tillbaka fulltankad" (i /check) eller "Levererades fulltankad" (i /nybil), eller om den angivits som "Upptankad nu av MABI" i /check eller /nybil, där även antal liter och literpris rapporterats in. Förslag: Om man i /status ska ändra "Ej upptankad" till "Icke- ej upptankad" (om du förstår hur jag menar), då kan man ha en knapp som säger t.ex. "Ändra till upptankad", med frivilliga fält för antal liter och literpris. Eller finns det en smartare lösning? Finns det någon besläktad praxis att luta sig mot?
+- Även "klar för uthyrning" är "binär" i en mening; antingen är bilen uthyrningsbar eller så är den inte det. Om den har status "icke-klar för uthyrning" så vill man kunna "släcka" den statusen, så att bilen inte längre har statusen att den inte är klar för uthyrning. Då behöver vi en knapp (eller liknande) och en obligatorisk fritextruta, vars innehåll också måste sparas (så att det kommer med i sektionen Historik).
+- nybil_inventering skrivs bara till vid ett enda tillfälle, eller rättare sägt så fylls fälten bara i en gång. Fält som inte fylls i vid nybilsinventeringen (t.ex. Planerad station) ska kunna kompletteras i efterhand, men om det redan finns något ska det inte kunna ändras i nybil_inventering; det ska registreras som en *ändring*. Förstår du hur jag menar? Makes sense?
+
+C. 
+Bra.
+
+D. 
+- Förtydligar: falkenberg@..., varberg@... är adresserna till olika huvudstationer; det finns bara en adress till bilkontroll: latif@incheckad.se
+
+E. 
+- Du skriver "Jag lägger upp en liten update-API (PATCH) som kräver inlogg..." Vad innebär det?
+- "Första versionen", du menar den vi testari PR innan vi går live?
+
+F. 
+OK.
+
+G. 
+- Oklart varför du tar upp dubbel reg.nr; denna funktionalitet är redan på plats.
+
+Rit-verktyg är redan på plats. Du måste verkligen läsa tidigare konversationer, åtminstone de som har datum 202512...
+Copilot said: Förstår. Jag justerar planen utifrån dina klargöranden: -
+Förstår. Jag justerar planen utifrån dina klargöranden:
+
+Rit-verktyg: redan på plats (ingen åtgärd).
+Dubbel reg.nr: redan på plats (ingen åtgärd).
+Bilkontroll-adress: endast latif@incheckad.se. falkenberg@…, halmstad@…, varberg@… är huvudstationsadresser (HUVUDSTATION-subject), inte Bilkontroll.
+Nya/uppdaterade punkter att lösa:
+
+Bilfakta-import → vehicles med source
+
+Upsert som fyller bara tomma/NULL-fält och sätter source = 'Bilfakta-filen'.
+“Kom” = registreringsdatum.
+Jag föreslår ett staging + normaliseringssteg (se nedan) och en upsert-SQL.
+Normalisering (utifrån Excel-snittet)
+
+Laddkabel: tolka antal + placering (“I BIL” / förvaring / saknas); “?” → NULL.
+Vinterdäck/Sommarhjul/HJUL PÅ: däcktyp på bilen, plus ev. “hjul till förvaring”.
+COC, Instruktionsbok, Kompressor, Gummimattor, Insynsskydd: JA/NEJ/? → boolean/NULL. Platsinfo (t.ex. “JA SONAX”, “HOS KUND”) kan separeras i textfält (freeform).
+Nycklar: extrahera antal (2ST, 1ST) + ev. “HOS KUND/SONAX/I BIL” → antal + platsfält.
+Datumkolumn (“Kom”) → datum (YYYYMMDD) eller NULL om “?”.
+Jag kan skriva ett script/SQL som: a) Laddar staging (vehicles_facts_staging), b) Normaliserar till rena fält (antal, boolean, plats, datum), c) Upsertar in i vehicles endast där fält saknas.
+OK att jag föreslår exakta kolumnnamn i staging + upsert-SQL?
+Tankstatus / “Ej upptankad” släckas manuellt
+
+Förslag: i /status visa “Upptankad”/“Ej upptankad” baserat på senaste kända händelse (/check “lämnades tillbaka fulltankad” eller “Upptankad nu av MABI”; /nybil “levererades fulltankad”/“upptankad nu av MABI”).
+Manuell släckning: knapp “Ändra till upptankad” + frivilliga fält “liter”/“literpris”. Vid spar:
+Skriv till vehicles (t.ex. tankstatus = “Upptankad” + liter/literpris om angivet).
+Logga i vehicle_status_log (event_type MANUAL_EDIT, changed_by, data: {tankstatus: …, liter, literpris}).
+Är det ok att sanningstabellen för manuella justeringar är vehicles (inte nybil_inventering)? nybil_inventering förblir write-once; ändringar loggas separat.
+Klar för uthyrning – släcka “inte uthyrningsbar”
+
+Knapp “Markera uthyrningsbar” + obligatorisk kommentar vid ändring.
+Skriv till vehicles (klar_for_uthyrning = true, reason cleared), och logga i vehicle_status_log med changed_by + kommentar.
+OK att vi använder vehicles som sanning för manuella toggles och loggar diffen?
+Patch-API för /status-redigering
+
+Innebörd: ny endpoint (t.ex. /api/status/update) som bara tillåter inloggade (LoginGate) och uppdaterar tillåtna fält i vehicles, samt alltid skriver en post i vehicle_status_log med changed_by (user.email eller namn).
+“Första versionen” = den vi testar i PR innan prod. OK?
+Mailrouting (Bilkontroll)
+
+Justerar notify så att Bilkontroll-mail (subject “BILKONTROLL”) går till latif@incheckad.se för alla orter. Huvudstation-mail (HUVUDSTATION) använder respektive alias (falkenberg@…, halmstad@…, varberg@… osv). Ängelholm via Helsingborg kvarstår. OK?
+Stationsuppdatering Halmstad/Varberg/Falkenberg
+
+ID 274 = MB Halmstad (endast namnbyte, ID oförändrat), understationer aktiva, Falkenberg aktiv. Ingen station_id visas i UI. Uppdaterar stationslistor i /check, /nybil, lib/stations.ts, stationer.json.
+Om fil >10 MB
+
+Du vill inte blockera vid “Spara”. Då gör vi:
+Client: försök komprimera (max-dim/quality) så det oftast blir <10 MB.
+Server: ingen hård block, ev. logga storlek men inte avvisa. Ingen varning till användare. OK?
+Två små frågor kvar för att skriva exakt staging/SQL:
+
+Är det ok att jag definierar en staging-tabell vehicles_facts_staging med kolumner som motsvarar Excel (Regnr, Laddkabel_raw, Vinterdäck_raw, Sommarhjul_raw, COC_raw, Instruktionsbok_raw, Nycklar_raw, Kompressor_raw, Insynsskydd_raw, Gummimattor_raw, HjulPa_raw, Kom_datum_raw, Kommentar_raw)?
+Vill du att “Kommentar” (kolumn L i Excel) också sparas, och i så fall till vilket fält i vehicles (t.ex. notering/attention)?
+Bekräfta dessa punkter så tar jag fram:
+
+Normaliseringsförslag (staging-schema + upsert-SQL).
+Plan för tank/uthyrnings-toggle och loggning.
+Routing-justering för Bilkontroll/Huvudstation.
+Stationsuppdatering (Halmstad/Varberg/Falkenberg).
+You said: 1. OK 2. OK 3. OK 4. OK 5. Utan inloggning
+1. OK
+2. OK
+3. OK
+4. OK
+5. Utan inloggning kommer man inte åt någonting alls på incheckad.se. Behöver vi ytterligare ett lager av inloggning?
+6. OK
+7. OK
+8. OK
+
+Dina två frågor på slutet:
+- Kolumn L i Excel är "Kom" (registreringsdatum), inte "Kommentar".
+
+
+Copilot said: Toppen. Jag sammanfattar och beskriver nästa steg/plan
+Toppen. Jag sammanfattar och beskriver nästa steg/plan utan gissningar.
+
+Klargjort
+Bilfakta → vehicles med source = 'Bilfakta-filen', fill-only-missing fält via staging + upsert.
+MB Halmstad (id 274) namnbyte, understationer aktiva, Falkenberg aktiv; station_id visas inte i UI.
+“Ej upptankad”/“klar för uthyrning” kan togglas manuellt i /status, skrivs till vehicles, loggas i vehicle_status_log (changed_by + data).
+Bilkontroll-mail = latif@incheckad.se (subject “BILKONTROLL”). Huvudstation-mail använder respektive alias (falkenberg@…, halmstad@…, varberg@…), Ängelholm via Helsingborg.
+Rit-verktyg och dubbel reg.nr redan på plats; inga ändringar behövs där.
+Ingen hård 10MB-block; vi komprimerar på klient, men stoppar inte spar.
+Staging/normalisering (Bilfakta-filen)
+Jag föreslår staging-tabell vehicles_facts_staging med kolumner motsvarande Excel (råvärden):
+
+regnr, laddkabel_raw, vinterdack_raw, sommarhjul_raw, coc_raw, instruktionsbok_raw, nycklar_raw, kompressor_raw, insynsskydd_raw, gummimattor_raw, hjul_pa_raw, kom_datum_raw
+ev. fri text/”plats”-fält kan extraheras ur råsträngar (t.ex. “JA SONAX”, “HOS KUND”, “I BIL”).
+Normalisering (script/SQL):
+
+JA/NEJ/? → boolean/NULL.
+Antal: “2ST”, “1 ST” → integer, plats i separat textfält (“I BIL”/“HOS KUND”/“SONAX” etc).
+Däck: hjul_pa_raw → “Sommar”/“Vinter” i fält “däck som sitter på”; vinterdäck/sommarhjul_raw → “hjul till förvaring” + plats.
+Datum: kom_datum_raw (YYYYMMDD) → date eller NULL.
+Upsert: INSERT ... ON CONFLICT (regnr) DO UPDATE där endast NULL/tomma fält fylls; sätt source = 'Bilfakta-filen' om tom.
+/status manuella toggles
+API (PATCH) bakom befintlig LoginGate (ingen extra auth behövs): uppdaterar vehicles för utvalda fält (tankstatus, klar_for_uthyrning, däcktyp, hjulförvaring, insynsskydd, laddkabel, nycklar, instruktionsbok/COC, gummimattor/kompressor, m.m.), loggar alltid i vehicle_status_log (event_type MANUAL_EDIT, changed_by, data diff).
+“Ändra till upptankad”: knapp + frivilliga fält liter/literpris → skriver till vehicles + logg.
+“Markera uthyrningsbar”: knapp + obligatorisk kommentar → klar_for_uthyrning = true, reason cleared, logg.
+Mailrouting
+/api/notify: Bilkontroll (BILKONTROLL-subject) → latif@incheckad.se alltid.
+Huvudstation (HUVUDSTATION-subject) → alias per ort (inkl. halmstad@, falkenberg@, varberg@; Ängelholm via Helsingborg).
+Stationsuppdatering
+Uppdatera stationnamn/ID i:
+app/check/form-client.tsx (STATIONER)
+app/nybil/form-client.tsx (STATIONER)
+lib/stations.ts (id + namn)
+data/stationer.json (namn)
+MB Halmstad id=274 namnbyte; understationer aktiva; Falkenberg aktiv.
+Ingen extra login
+Allt redan skyddat via LoginGate; PATCH-API för /status kräver befintlig session.
+Nästa steg
+Jag tar fram:
+PR: Stationnamn/ID + mailrouting-justering.
+PR: Patch-API + /status UI-togglar + loggning.
+SQL/script-förslag för Bilfakta-staging + normalisering + upsert (fill-missing, source-tag).
+Bekräfta att staging-kolumner enligt listan ovan är ok, så skriver jag konkret SQL + kolumnmappar i nästa svar.
+You said: Tack. Jag vill be dig skriva ner
+Tack. Jag vill be dig skriva ner allt detta i en mycket utförlig och detaljerad md-fil, som jag kan visa för en bot-kollega för en second opinion. 
+Copilot said: ````markdown name=Plan-High-Priority-Tasks.md # Plan: Högprioriterade åtgärder för incheckad.se ##
+Plan-High-Priority-Tasks.md
+# Plan: Högprioriterade åtgärder för incheckad.se
+
+## Översikt
+Detta dokument sammanfattar beslut och planerade åtgärder för högprioriterade uppgifter efter senaste konversationerna. Fokus är på:
+- Bilfakta-import (staging + normalisering + fill-missing-upsert till `vehicles`)
+- Manuella togglar i /status för tankning och uthyrningsbarhet, med loggning i `vehicle_status_log`
+- Mailrouting (Bilkontroll vs Huvudstation)
+- Stationsuppdateringar (Halmstad/Varberg/Falkenberg) i kod
+- Klargöranden om redan befintliga funktioner (rit-verktyg, dubbelt reg.nr)
+
+---
+
+## 1) Bilfakta-import → `vehicles` med `source = 'Bilfakta-filen'`
+
+### Mål
+- Fylla på saknad fakta för befintliga reg.nr i `vehicles` utan att skriva över befintliga värden.
+- Märka rader som kompletteras via denna import med `source = 'Bilfakta-filen'`.
+
+### Stagingförslag
+Skapa staging-tabell (förslag) `vehicles_facts_staging` med kolumner motsvarande Excel-råvärden:
+- `regnr` (text)
+- `laddkabel_raw` (text)
+- `vinterdack_raw` (text)
+- `sommarhjul_raw` (text)
+- `coc_raw` (text)
+- `instruktionsbok_raw` (text)
+- `nycklar_raw` (text)
+- `kompressor_raw` (text)
+- `insynsskydd_raw` (text)
+- `gummimattor_raw` (text)
+- `hjul_pa_raw` (text)  — däcktyp som sitter på (Sommar/Vinter)
+- `kom_datum_raw` (text) — registreringsdatum (YYYYMMDD), kolumn “Kom”
+- (valfritt) `plats_raw` / `kommentar_raw` om vi behöver spara plats/notes som extraheras ur råsträngar
+
+### Normalisering (logik i script/SQL)
+- JA/NEJ/? → boolean/NULL.
+- Antal: strängar som “2ST”, “1 ST” → integer; eventuell platsinformation (“I BIL”, “HOS KUND”, “SONAX”) separeras till ett plats-/textfält.
+- Däck:
+  - `hjul_pa_raw` → fält “däck som sitter på” (Sommar/Vinter).
+  - `vinterdack_raw`/`sommarhjul_raw` → “hjul till förvaring” + ev. plats/text.
+- Övriga utrustningsfält (COC, instruktionsbok, kompressor, insynsskydd, gummimattor) → boolean/NULL + ev. plats-text.
+- Datum: `kom_datum_raw` (YYYYMMDD) → date eller NULL om “?”.
+- Extrahera platskomponent ur strängar som “JA SONAX”, “JA I BIL”, “2ST HOS KUND” till separata textfält (fri text).
+
+### Upsert-strategi
+- `INSERT ... ON CONFLICT (regnr) DO UPDATE` i `vehicles`, men endast där fält är NULL/tomma (fill-missing-only).
+- Sätt `source = 'Bilfakta-filen'` om tom/null.
+- Skriv *inte* över befintliga värden.
+
+---
+
+## 2) /status: Manuella togglar (tankning, uthyrningsbarhet) + loggning
+
+### Principer
+- All redigering kräver inloggning via befintlig LoginGate (inga extra lager).
+- Vi uppdaterar `vehicles` som “sanningen” för manuella justeringar (nybil_inventering är write-once).
+- Varje manuell ändring loggas i `vehicle_status_log` med:
+  - `event_type = 'MANUAL_EDIT'`
+  - `changed_by = user.email` (eller namn)
+  - `data =` diff/nytt värde
+  - tidsstämpel (finns i tabellen)
+
+### “Ej upptankad” → “Upptankad”
+- Bilen är upptankad om senaste händelse (från /check: “lämnades tillbaka fulltankad” eller “Upptankad nu av MABI” med liter/literpris, eller från /nybil: “levererades fulltankad” eller “upptankad nu av MABI”) indikerar det.
+- Manuell släckning i /status: knapp “Ändra till upptankad” + frivilliga fält för liter/literpris (om angivet, skrivs till `vehicles`).
+- Logga i `vehicle_status_log` (MANUAL_EDIT) med changed_by + data (tankstatus och ev. liter/literpris).
+
+### “Inte klar för uthyrning” → “Klar för uthyrning”
+- Binär status: uthyrningsbar / ej uthyrningsbar.
+- Släckning: knapp “Markera uthyrningsbar” + obligatorisk kommentar (sparas).
+- Skriv till `vehicles` (klar_for_uthyrning = true, reason cleared).
+- Logga i `vehicle_status_log` med changed_by + kommentar.
+
+### Övriga fält
+- I princip allt utom reg.nr ska kunna ändras manuellt i /status, med loggning (append-only). Exempel: däcktyp, hjulförvaring, insynsskydd, laddkabelstatus, nyckelantal, instruktionsbok/COC, gummimattor/kompressor, notering.
+
+### API
+- Skapa PATCH-endpoint (t.ex. `/api/status/update`) som:
+  - Kräver befintlig session (LoginGate)
+  - Uppdaterar tillåtna fält i `vehicles`
+  - Loggar alltid i `vehicle_status_log`
+
+---
+
+## 3) Mailrouting
+
+- Bilkontroll-mail (subject “BILKONTROLL”) → **latif@incheckad.se** alltid.
+- Huvudstations-mail (subject “HUVUDSTATION”) → alias per ort:
+  - falkenberg@incheckad.se, halmstad@incheckad.se, varberg@incheckad.se, etc.
+  - Ängelholm sorterar under Helsingborg tills vidare.
+- “Däck som sitter på” ska ingå i Bilkontroll-mail (samma som Huvudstation).
+
+---
+
+## 4) Stationsuppdateringar (Halmstad/Varberg/Falkenberg)
+
+- ID 274 = MB Halmstad (namnbyte, ID oförändrat), understationer aktiva, Falkenberg aktiv.
+- Uppdatera i:
+  - `app/check/form-client.tsx` (STATIONER)
+  - `app/nybil/form-client.tsx` (STATIONER)
+  - `lib/stations.ts` (id + namn)
+  - `data/stationer.json` (namn)
+- Station_id ska inte visas i UI.
+
+---
+
+## 5) Rit-verktyg och dubbelt reg.nr
+
+- **Rit-verktyg**: Redan på plats (båda /check och /nybil), inga åtgärder.
+- **Dubbel reg.nr-inmatning**: Redan på plats; behålls.
+
+---
+
+## 6) Filstorlek > 10 MB
+
+- Klient: försök komprimera (max-dimension/quality) men **ingen blockering** vid “Spara”. Ingen varning till användaren om >10 MB.
+- Server: ingen hård avvisning; eventuellt logga men inte stoppa.
+
+---
+
+## Nästa steg / PR-uppdelning (förslag)
+
+1) **Stations + routing**  
+   - Uppdatera stationlistor (Halmstad/Varberg/Falkenberg) i /check, /nybil, lib/stations.ts, stationer.json.  
+   - Justera notify-routing för Bilkontroll/Huvudstation enligt ovan.
+
+2) **/status manuella togglar + logg**  
+   - PATCH-API för manuella uppdateringar till `vehicles`.  
+   - UI-knappar: “Ändra till upptankad” (liter/literpris frivilligt), “Markera uthyrningsbar” (obligatorisk kommentar).  
+   - Loggning i `vehicle_status_log` (MANUAL_EDIT) med changed_by + data.
+
+3) **Bilfakta-import (SQL/script)**  
+   - Stagingtabell + normaliseringssteg (JA/NEJ/? → bool/NULL; antal + plats; däck; datum).  
+   - Fill-missing-only upsert till `vehicles`, set `source = 'Bilfakta-filen'`.  
+   - “Kom” = registreringsdatum.
+
+(4) **Eventuell UI-justering /status** för att visa/ändra övriga fält (däcktyp, insynsskydd, laddkabelstatus, nycklar etc.) med loggning – beroende på scope i nästa iteration.
+
+---
+
+## Övriga påminnelser
+- /check läser inte direkt från /nybil; /status ska samla senaste fakta från /check, /nybil, manuella ändringar, bilfakta-import, Bilkontroll/Skadefil.  
+- Historik i /status ska vara kronologisk logg (vehicle_status_log + händelser), append-only.  
+- Skador och media i Historik/Skador-sektion är redan fixade (PR #201/#202).  
+- Inga station_id i UI; endast namn.
