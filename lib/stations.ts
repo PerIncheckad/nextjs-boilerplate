@@ -10,11 +10,11 @@ export const STATIONS: StationTree = {
   ],
   'Falkenberg': [{ id: 'falkenberg', name: 'Falkenberg' }],
   'Halmstad': [
-    { id: 'halmstad-mb', name: 'MB Halmstad' },
-    { id: 'halmstad-flyget', name: 'Flyget Halmstad' },
     { id: 'halmstad-bvh', name: 'BVH (Hedin multi)' },
-    { id: 'halmstad-kia', name: 'KIA Halmstad' },
+    { id: 'halmstad-flyget', name: 'Flyget Halmstad' },
     { id: 'halmstad-ford', name: 'FORD Halmstad' },
+    { id: 'halmstad-kia', name: 'KIA Halmstad' },
+    { id: 'halmstad-mb', name: 'MB Halmstad' },
   ],
   'Helsingborg': [
     { id: 'helsingborg-mb', name: 'MB Helsingborg' },
