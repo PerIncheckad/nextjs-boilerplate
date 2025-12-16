@@ -120,7 +120,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         } else {
           // Fallback: use legacy_damage_source_text as display text
           // Remove any "(Går ej:...)" suffixes for cleaner display
-          newText = inv.legacy_damage_source_text.split(' (Går ej:')[0].trim();
+          newText = (inv.legacy_damage_source_text || '').split(' (Går ej:')[0].trim();
           // If still empty, use a generic text
           if (!newText) {
             newText = 'Dokumenterad skada';
