@@ -42,7 +42,9 @@
   { "namn": "Mekonomen Ängelholm", "station_id": "1712", "huvudstation_id": "171", "region": "Syd", "type": "station" },
   { "namn": "Flyget Ängelholm", "station_id": "154", "huvudstation_id": "171", "region": "Syd", "type": "station" },
 
+  { "namn": "MB Halmstad", "station_id": "274", "huvudstation_id": "274", "region": "Norr", "type": "station" },
   { "namn": "Flyget Halmstad", "station_id": "2741", "huvudstation_id": "274", "region": "Norr", "type": "station" },
+  { "namn": "BVH (Hedin multi)", "station_id": "2742", "huvudstation_id": "274", "region": "Norr", "type": "station" },
   { "namn": "KIA Halmstad", "station_id": "2743", "huvudstation_id": "274", "region": "Norr", "type": "station" },
   { "namn": "FORD Halmstad", "station_id": "2744", "huvudstation_id": "274", "region": "Norr", "type": "station" },
 

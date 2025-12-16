@@ -22,6 +22,8 @@ const stationEmailMapping: { [ort: string]: string } = {
   Malmö: 'malmo@incheckad.se',
   Trelleborg: 'trelleborg@incheckad.se',
   Lund: 'lund@incheckad.se',
+  Halmstad: 'halmstad@incheckad.se',
+  Falkenberg: 'falkenberg@incheckad.se',
 };
 
 const getSiteUrl = (request: Request): string => {
@@ -609,11 +611,8 @@ export async function POST(request: Request) {
       huvudstationTo.push(stationSpecificEmail);
     }
 
-    // Bilkontroll recipients: Per always, Latif only for Helsingborg/Ängelholm/Varberg
-    const bilkontrollTo = ['per@incheckad.se'];
-    if (finalOrt === 'Helsingborg' || finalOrt === 'Ängelholm' || finalOrt === 'Varberg') {
-      bilkontrollTo.push('latif@incheckad.se');
-    }
+    // Bilkontroll recipients: Per always, Latif always (alla orter)
+    const bilkontrollTo = ['per@incheckad.se', 'latif@incheckad.se'];
 
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
     const cleanStation = stationForSubject?.includes(' / ')
