@@ -75,10 +75,10 @@ function normalizeForMatching(text: string): string {
   if (!text) return '';
   return text
     .toLowerCase()
-    .replace(/(\s*-\s*)+/g, ' - ')   // Multiple dashes with whitespace → single " - "
-    .replace(/\s*-\s*$/g, '')         // Remove trailing " -" or " - "
-    .replace(/^\s*-\s*/g, '')         // Remove leading " -" or "- "
-    .replace(/\s+/g, ' ')             // Normalize whitespace
+    .replace(/\s*-\s*-\s*/g, ' - ')   // " - - " blir " - "
+    .replace(/(\s*-\s*)+$/g, '')       // Ta bort ALLA trailing " - " eller " -" eller "-"
+    .replace(/^(\s*-\s*)+/g, '')       // Ta bort ALLA leading " - " eller "- "
+    .replace(/\s+/g, ' ')              // Normalisera mellanslag
     .trim();
 }
 
