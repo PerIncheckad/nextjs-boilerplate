@@ -75,7 +75,7 @@ function normalizeForMatching(text: string): string {
   if (!text) return '';
   return text
     .toLowerCase()
-    .replace(/\s*-\s*-\s*/g, ' - ')  // " - - " → " - "
+    .replace(/(\s*-\s*)+/g, ' - ')   // Multiple dashes with whitespace → single " - "
     .replace(/\s*-\s*$/g, '')         // Remove trailing " -" or " - "
     .replace(/^\s*-\s*/g, '')         // Remove leading " -" or "- "
     .replace(/\s+/g, ' ')             // Normalize whitespace
@@ -116,6 +116,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   
   // Create a lookup map of inventoried damages for efficient access
+  // Use normalized keys for O(1) lookup performance
   const inventoriedMap = new Map<string, string>();
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
@@ -139,7 +140,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
           }
         }
         
-        inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        // Store with normalized key for efficient matching
+        const normalizedKey = normalizeForMatching(inv.legacy_damage_source_text);
+        inventoriedMap.set(normalizedKey, newText);
       }
     }
   }
@@ -149,17 +152,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     const originalText = getLegacyDamageText(leg);
     const normalizedOriginal = normalizeForMatching(originalText);
     
-    // Flexible matching: check if any key in inventoriedMap matches after normalization
-    let isInventoried = false;
-    let displayText = originalText;
-    
-    for (const [key, value] of inventoriedMap.entries()) {
-      if (normalizeForMatching(key) === normalizedOriginal) {
-        isInventoried = true;
-        displayText = value;
-        break;
-      }
-    }
+    // O(1) lookup using normalized key
+    const isInventoried = inventoriedMap.has(normalizedOriginal);
+    const displayText = isInventoried ? inventoriedMap.get(normalizedOriginal)! : originalText;
 
     return {
       id: leg.id,
