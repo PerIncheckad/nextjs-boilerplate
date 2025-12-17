@@ -1945,7 +1945,6 @@ export default function NybilForm() {
                   <input 
                     type="file" 
                     accept="image/*" 
-                    capture="environment" 
                     onChange={handlePhotoFrontChange}
                     style={{ display: 'none' }}
                   />
@@ -1968,7 +1967,6 @@ export default function NybilForm() {
                   <input 
                     type="file" 
                     accept="image/*" 
-                    capture="environment" 
                     onChange={handlePhotoBackChange}
                     style={{ display: 'none' }}
                   />
@@ -1985,7 +1983,6 @@ export default function NybilForm() {
             <input 
               type="file" 
               accept="image/*" 
-              capture="environment" 
               multiple
               onChange={handleAdditionalPhotosChange}
               style={{ display: 'none' }}
@@ -2607,7 +2604,6 @@ const DamageModal: React.FC<DamageModalProps> = ({
             <input 
               type="file" 
               accept="image/*" 
-              capture="environment"
               multiple
               onChange={onPhotoChange}
               style={{ display: 'none' }}

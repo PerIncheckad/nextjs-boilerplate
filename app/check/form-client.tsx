@@ -1702,7 +1702,7 @@ const MediaUpload: React.FC<{ id: string, onUpload: (files: FileList) => void, h
     const buttonText = hasFile ? `Lägg till ${fileType === 'image' ? 'fler foton' : 'fler videor'}` : label;
     return (<div className="media-upload">
         <label htmlFor={id} className={className}>{buttonText}</label>
-        <input id={id} type="file" accept={`${fileType}/*`} capture="environment" onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
+        <input id={id} type="file" accept={`${fileType}/*`} onChange={e => e.target.files && onUpload(e.target.files)} style={{ display: 'none' }} multiple />
     </div>);
 };
 
