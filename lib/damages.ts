@@ -76,9 +76,9 @@ function normalizeForMatching(text: string): string {
   return text
     .toLowerCase()
     .replace(/\s*-\s*-\s*/g, ' - ')    // " - - " blir " - "
-    .replace(/(\s*-\s*)+$/g, '')        // Ta bort ALLA trailing " - " eller " -" eller "-"
-    .replace(/^(\s*-\s*)+/g, '')        // Ta bort ALLA leading " - " eller "- "
-    .replace(/\s+/g, ' ')               // Normalisera mellanslag
+    .replace(/\s+/g, ' ')               // Normalisera mellanslag först
+    .replace(/( - )+$/g, '')            // Ta bort trailing " - " (efter whitespace normalisering)
+    .replace(/^( - )+/g, '')            // Ta bort leading " - " (efter whitespace normalisering)
     .trim();
 }
 
