@@ -26,6 +26,7 @@ export type ConsolidatedDamage = {
   text: string;
   damage_date: string | null;
   is_inventoried: boolean;
+  folder?: string | null;
 };
 
 export type VehicleInfo = {
@@ -86,12 +87,12 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .from('damages')
-      .select('legacy_damage_source_text, user_type, user_positions')
+      .select('legacy_damage_source_text, user_type, user_positions, uploads')
       .eq('regnr', cleanedRegnr)
       .not('legacy_damage_source_text', 'is', null),
     supabase
       .from('damages')
-      .select('id, regnr, source, user_type, user_positions, damage_date, created_at, legacy_damage_source_text')
+      .select('id, regnr, source, user_type, user_positions, damage_date, created_at, legacy_damage_source_text, uploads')
       .eq('regnr', cleanedRegnr)
       .in('source', ['CHECK', 'NYBIL'])
       .order('created_at', { ascending: false }),
@@ -111,7 +112,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const dbDamages = dbDamagesResponse.data || [];
   
   // Create a lookup map of inventoried damages for efficient access
-  const inventoriedMap = new Map<string, string>();
+  const inventoriedMap = new Map<string, { text: string; folder: string | null }>();
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
       if (inv.legacy_damage_source_text) {
@@ -134,7 +135,10 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
           }
         }
         
-        inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        // Extract folder from uploads object
+        const folder = inv.uploads?.folder || null;
+        
+        inventoriedMap.set(inv.legacy_damage_source_text, { text: newText, folder });
       }
     }
   }
@@ -146,7 +150,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   for (const leg of legacyDamages) {
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
-    const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
+    const inventoriedData = inventoriedMap.get(originalText);
+    const displayText = isInventoried && inventoriedData ? inventoriedData.text : originalText;
+    const folder = isInventoried && inventoriedData ? inventoriedData.folder : null;
 
     if (displayText) {
       consolidatedDamages.push({
@@ -154,6 +160,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         text: displayText,
         damage_date: leg.damage_date,
         is_inventoried: isInventoried,
+        folder,
       });
     }
   }
@@ -185,6 +192,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       text: displayText,
       damage_date: dbDamage.damage_date || dbDamage.created_at,
       is_inventoried: true, // These are already inventoried (registered via CHECK/NYBIL)
+      folder: dbDamage.uploads?.folder || null,
     });
   }
 

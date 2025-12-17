@@ -603,7 +603,7 @@ export default function CheckInForm() {
                 status: 'not_selected',
                 userPositions: [],
                 media: [],
-                uploads: { photo_urls: [], video_urls: [], folder: '' }
+                uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
               })));
             }
           },
@@ -627,7 +627,7 @@ export default function CheckInForm() {
               status: 'not_selected',
               userPositions: [],
               media: [],
-              uploads: { photo_urls: [], video_urls: [], folder: '' }
+              uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
           })));
       }
   
@@ -1281,7 +1281,24 @@ export default function CheckInForm() {
               {existingDamages.length > 0 && (
                 <div className="damage-list-info">
                   <span className="info-label">Befintliga skador ({existingDamages.length})</span>
-                  {existingDamages.map((d, i) => <div key={d.id} className="damage-list-item">{i + 1}. {d.fullText}</div>)}
+                  {existingDamages.map((d, i) => (
+                    <div key={d.id} className="damage-list-item">
+                      {i + 1}. {d.fullText}
+                      {d.uploads.folder && (
+                        <span>
+                          {' '}
+                          <a 
+                            href={`/media/${d.uploads.folder}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
+                          >
+                            📁 Visa media
+                          </a>
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
               {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
