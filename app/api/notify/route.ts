@@ -860,6 +860,28 @@ export async function POST(request: Request) {
             }
           });
 
+          // Resolved damages (åtgärdade_skador) - "Går ej att dokumentera"
+          // These are BUHS damages that couldn't be documented (e.g., already repaired or not found)
+          (payload.åtgärdade_skador || []).forEach((skada: any) => {
+            // Extract damage type from fullText or use a fallback
+            const rawType = skada.fullText?.split(':')[0]?.trim() || 'Okänd skada';
+            const normalized = normalizeDamageType(rawType);
+
+            // Add to checkin_damages with type 'not_found'
+            checkinDamageInserts.push({
+              checkin_id: checkinId,
+              type: 'not_found',
+              damage_type: normalized.typeCode,
+              car_part: null,
+              position: null,
+              description: skada.resolvedComment || '',
+              photo_urls: [],
+              video_urls: [],
+              positions: [],
+              created_at: now.toISOString(),
+            });
+          });
+
           console.debug(`Inserting ${damageInserts.length} damage records and ${checkinDamageInserts.length} checkin_damage records`);
 
           if (damageInserts.length > 0) {

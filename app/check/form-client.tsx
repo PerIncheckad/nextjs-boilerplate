@@ -1301,6 +1301,14 @@ export default function CheckInForm() {
                 </div>
               )}
               {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
+              {vehicleData.last_checkin && (
+                <div className="damage-list-info">
+                  <span className="info-label">Senast incheckad</span>
+                  <div>
+                    på {vehicleData.last_checkin.station} av {vehicleData.last_checkin.checker_name.split(' ')[0]}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Card>
