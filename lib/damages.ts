@@ -75,10 +75,11 @@ function normalizeForMatching(text: string): string {
   if (!text) return '';
   return text
     .toLowerCase()
-    .replace(/\s*-\s*-\s*/g, ' - ')    // " - - " blir " - "
     .replace(/\s+/g, ' ')               // Normalisera mellanslag först
-    .replace(/( - )+$/g, '')            // Ta bort trailing " - " (efter whitespace normalisering)
-    .replace(/^( - )+/g, '')            // Ta bort leading " - " (efter whitespace normalisering)
+    .replace(/\s*-\s*/g, ' - ')         // Normalisera alla streck med mellanslag
+    .replace(/( - )+/g, ' - ')          // Kollapsa upprepade " - " till en
+    .replace(/^( - )+/g, '')            // Ta bort leading " - "
+    .replace(/( - )+$/g, '')            // Ta bort trailing " - "
     .trim();
 }
 
