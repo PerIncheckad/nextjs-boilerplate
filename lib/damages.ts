@@ -79,7 +79,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
   // Step 1: Fetch all data concurrently
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, nybilResponse] = await Promise.all([
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -89,6 +89,12 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .select('legacy_damage_source_text, user_type, user_positions')
       .eq('regnr', cleanedRegnr)
       .not('legacy_damage_source_text', 'is', null),
+    supabase
+      .from('damages')
+      .select('id, regnr, source, user_type, user_positions, damage_date, created_at, legacy_damage_source_text')
+      .eq('regnr', cleanedRegnr)
+      .in('source', ['CHECK', 'NYBIL'])
+      .order('created_at', { ascending: false }),
     supabase
       .from('nybil_inventering')
       .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum')
@@ -102,6 +108,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
+  const dbDamages = dbDamagesResponse.data || [];
   
   // Create a lookup map of inventoried damages for efficient access
   const inventoriedMap = new Map<string, string>();
@@ -133,18 +140,53 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   }
 
   // Step 3: Consolidate the damage lists
-  const consolidatedDamages: ConsolidatedDamage[] = legacyDamages.map(leg => {
+  const consolidatedDamages: ConsolidatedDamage[] = [];
+  
+  // Add BUHS damages (from legacy source)
+  for (const leg of legacyDamages) {
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
 
-    return {
-      id: leg.id,
+    if (displayText) {
+      consolidatedDamages.push({
+        id: leg.id,
+        text: displayText,
+        damage_date: leg.damage_date,
+        is_inventoried: isInventoried,
+      });
+    }
+  }
+  
+  // Add damages from damages table (CHECK and NYBIL sources)
+  // These are damages registered via /check or /nybil that are NOT duplicates of BUHS damages
+  for (const dbDamage of dbDamages) {
+    // Skip if this damage is already in the legacy damages list (avoid duplicates)
+    // A damage is a duplicate if it has legacy_damage_source_text that matches a BUHS damage
+    if (dbDamage.legacy_damage_source_text) {
+      // This is a documented BUHS damage, already included above
+      continue;
+    }
+    
+    // Build display text from user_type and user_positions
+    let displayText: string;
+    if (dbDamage.user_type) {
+      const positions = (dbDamage.user_positions as any[] || [])
+        .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
+        .filter(Boolean)
+        .join(', ');
+      displayText = positions ? `${dbDamage.user_type}: ${positions}` : dbDamage.user_type;
+    } else {
+      displayText = 'Skada';
+    }
+    
+    consolidatedDamages.push({
+      id: dbDamage.id,
       text: displayText,
-      damage_date: leg.damage_date, // <<< CORRECTED: Use the actual damage_date
-      is_inventoried: isInventoried,
-    };
-  }).filter(d => d.text); // Ensure we don't have empty damage entries
+      damage_date: dbDamage.damage_date || dbDamage.created_at,
+      is_inventoried: true, // These are already inventoried (registered via CHECK/NYBIL)
+    });
+  }
 
   const latestSaludatum = legacyDamages.length > 0 ? legacyDamages[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
