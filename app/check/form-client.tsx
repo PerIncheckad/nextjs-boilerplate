@@ -1301,14 +1301,19 @@ export default function CheckInForm() {
                 </div>
               )}
               {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
-              {vehicleData.last_checkin && (
-                <div className="damage-list-info">
-                  <span className="info-label">Senast incheckad</span>
-                  <div>
-                    på {vehicleData.last_checkin.station} av {vehicleData.last_checkin.checker_name?.split(' ')[0] || 'Okänd'}
+              {vehicleData.last_checkin && (() => {
+                // Format the completed_at timestamp to Swedish format
+                const completedAt = new Date(vehicleData.last_checkin.completed_at);
+                const dateStr = completedAt.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+                const timeStr = completedAt.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); // HH:mm
+                const firstName = vehicleData.last_checkin.checker_name?.split(' ')[0] || 'Okänd';
+                
+                return (
+                  <div className="damage-list-info" style={{ fontStyle: 'italic', fontSize: '0.875rem', marginTop: '0.75rem' }}>
+                    Senast incheckad på {vehicleData.last_checkin.station} av {firstName} ({dateStr} kl {timeStr})
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </Card>
