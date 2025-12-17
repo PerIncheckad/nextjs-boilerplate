@@ -866,11 +866,7 @@ export async function POST(request: Request) {
             // Extract damage type from fullText
             // fullText format from BUHS is typically "DamageType - note - note" or just "DamageType"
             // We want the first part before any " - " separator
-            let rawType = 'Okänd skada';
-            if (skada.fullText) {
-              // Split on ' - ' and take the first part to get just the damage type
-              rawType = skada.fullText.split(' - ')[0].trim() || 'Okänd skada';
-            }
+            const rawType = skada.fullText?.split(' - ')[0]?.trim() || 'Okänd skada';
             const normalized = normalizeDamageType(rawType);
 
             // Add to checkin_damages with type 'not_found'

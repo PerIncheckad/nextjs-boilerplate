@@ -277,11 +277,20 @@ const getFullNameFromEmail = (email: string): string => {
 };
 
 const formatLastCheckinText = (lastCheckin: { station: string; checker_name: string; completed_at: string }): string => {
-    const completedAt = new Date(lastCheckin.completed_at);
-    const dateStr = completedAt.toLocaleDateString('sv-SE'); // YYYY-MM-DD
-    const timeStr = completedAt.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); // HH:mm
-    const firstName = lastCheckin.checker_name?.split(' ')[0] || 'Okänd';
-    return `Senast incheckad på ${lastCheckin.station} av ${firstName} (${dateStr} kl ${timeStr})`;
+    try {
+        const completedAt = new Date(lastCheckin.completed_at);
+        // Check if date is valid
+        if (isNaN(completedAt.getTime())) {
+            return `Senast incheckad på ${lastCheckin.station}`;
+        }
+        const dateStr = completedAt.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+        const timeStr = completedAt.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); // HH:mm
+        const firstName = lastCheckin.checker_name?.split(' ')[0] || 'Okänd';
+        return `Senast incheckad på ${lastCheckin.station} av ${firstName} (${dateStr} kl ${timeStr})`;
+    } catch {
+        // Fallback if date parsing fails
+        return `Senast incheckad på ${lastCheckin.station}`;
+    }
 };
 
 // =================================================================
