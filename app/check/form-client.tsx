@@ -1305,7 +1305,7 @@ export default function CheckInForm() {
                 <div className="damage-list-info">
                   <span className="info-label">Senast incheckad</span>
                   <div>
-                    på {vehicleData.last_checkin.station} av {vehicleData.last_checkin.checker_name.split(' ')[0]}
+                    på {vehicleData.last_checkin.station} av {vehicleData.last_checkin.checker_name?.split(' ')[0] || 'Okänd'}
                   </div>
                 </div>
               )}

@@ -1,30 +1,5 @@
 import { supabase } from './supabase';
-
-// Import normalization function to match damage types with checkin_damages
-function normalizeDamageType(damageType: string | null | undefined): string {
-  if (!damageType || typeof damageType !== 'string') {
-    return 'UNKNOWN';
-  }
-
-  const trimmed = damageType.trim();
-
-  // For all types, sanitize to uppercase with underscores
-  // Replace Swedish characters: Å→A, Ä→A, Ö→O, å→a, ä→a, ö→o
-  const sanitized = trimmed
-    .replace(/Å/g, 'A')
-    .replace(/Ä/g, 'A')
-    .replace(/Ö/g, 'O')
-    .replace(/å/g, 'a')
-    .replace(/ä/g, 'a')
-    .replace(/ö/g, 'o')
-    .toUpperCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^A-Z0-9_]/g, '_') // Replace any remaining special chars with underscore
-    .replace(/_+/g, '_') // Collapse multiple underscores
-    .replace(/^_|_$/g, ''); // Trim underscores from start/end
-
-  return sanitized || 'UNKNOWN';
-}
+import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
 
 // =================================================================
 // 1. TYPE DEFINITIONS
@@ -224,8 +199,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       
       // Filter out damages that have already been handled
       // Normalize the damage type to match with checkin_damages
-      const normalizedType = normalizeDamageType(damageType);
-      if (handledDamageTypes.has(normalizedType)) {
+      const normalized = normalizeDamageType(damageType);
+      if (handledDamageTypes.has(normalized.typeCode)) {
         // This damage has been handled (documented or marked as not found) in a previous check-in
         continue;
       }
