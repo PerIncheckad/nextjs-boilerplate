@@ -152,6 +152,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     const originalText = getLegacyDamageText(leg);
     const normalizedOriginal = normalizeForMatching(originalText);
     
+    // Debug logging to understand matching
+    console.log('=== Damage Matching Debug ===');
+    console.log('BUHS originalText:', originalText);
+    console.log('BUHS normalized:', normalizedOriginal);
+    console.log('inventoriedMap keys:', [...inventoriedMap.keys()]);
+    console.log('Match found:', inventoriedMap.has(normalizedOriginal));
+    
     // O(1) lookup using normalized key
     const isInventoried = inventoriedMap.has(normalizedOriginal);
     const displayText = isInventoried ? inventoriedMap.get(normalizedOriginal)! : originalText;
