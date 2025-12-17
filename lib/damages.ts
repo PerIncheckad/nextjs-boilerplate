@@ -119,6 +119,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Use normalized keys for O(1) lookup performance
   const inventoriedMap = new Map<string, string>();
   if (inventoriedDamagesResponse.data) {
+    console.log('=== Building inventoriedMap ===');
+    console.log(`Found ${inventoriedDamagesResponse.data.length} inventoried damages in database`);
+    
     for (const inv of inventoriedDamagesResponse.data) {
       if (inv.legacy_damage_source_text) {
         let newText: string;
@@ -142,9 +145,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         
         // Store with normalized key for efficient matching
         const normalizedKey = normalizeForMatching(inv.legacy_damage_source_text);
+        console.log(`  DB original: "${inv.legacy_damage_source_text}"`);
+        console.log(`  DB normalized: "${normalizedKey}"`);
+        console.log(`  Display text: "${newText}"`);
         inventoriedMap.set(normalizedKey, newText);
       }
     }
+    console.log('=== End inventoriedMap ===\n');
   }
 
   // Step 3: Consolidate the damage lists
