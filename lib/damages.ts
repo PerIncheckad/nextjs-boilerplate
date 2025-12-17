@@ -70,6 +70,17 @@ function getLegacyDamageText(damage: LegacyDamage): string {
     return uniqueParts.join(' - ');
 }
 
+// Normalize text for flexible matching - handles trailing dashes, whitespace, etc.
+function normalizeForMatching(text: string): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/\s*-\s*-\s*/g, ' - ')    // " - - " blir " - "
+    .replace(/(\s*-\s*)+$/g, '')        // Ta bort ALLA trailing " - " eller " -" eller "-"
+    .replace(/^(\s*-\s*)+/g, '')        // Ta bort ALLA leading " - " eller "- "
+    .replace(/\s+/g, ' ')               // Normalisera mellanslag
+    .trim();
+}
 
 // =================================================================
 // 3. CORE DATA FETCHING FUNCTION
@@ -127,7 +138,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
           }
         }
         
-        inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        // Use normalized key for flexible matching
+        const normalizedKey = normalizeForMatching(inv.legacy_damage_source_text);
+        inventoriedMap.set(normalizedKey, newText);
       }
     }
   }
@@ -135,8 +148,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Step 3: Consolidate the damage lists
   const consolidatedDamages: ConsolidatedDamage[] = legacyDamages.map(leg => {
     const originalText = getLegacyDamageText(leg);
-    const isInventoried = inventoriedMap.has(originalText);
-    const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
+    const normalizedOriginal = normalizeForMatching(originalText);
+    const isInventoried = inventoriedMap.has(normalizedOriginal);
+    const displayText = isInventoried ? inventoriedMap.get(normalizedOriginal)! : originalText;
 
     return {
       id: leg.id,
