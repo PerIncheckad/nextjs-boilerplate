@@ -603,7 +603,7 @@ export default function CheckInForm() {
                 status: 'not_selected',
                 userPositions: [],
                 media: [],
-                uploads: { photo_urls: [], video_urls: [], folder: '' }
+                uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
               })));
             }
           },
@@ -627,7 +627,7 @@ export default function CheckInForm() {
               status: 'not_selected',
               userPositions: [],
               media: [],
-              uploads: { photo_urls: [], video_urls: [], folder: '' }
+              uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
           })));
       }
   
@@ -1281,7 +1281,23 @@ export default function CheckInForm() {
               {existingDamages.length > 0 && (
                 <div className="damage-list-info">
                   <span className="info-label">Befintliga skador ({existingDamages.length})</span>
-                  {existingDamages.map((d, i) => <div key={d.id} className="damage-list-item">{i + 1}. {d.fullText}</div>)}
+                  {existingDamages.map((d, i) => (
+                    <div key={d.id} className="damage-list-item">
+                      {i + 1}. {d.fullText}
+                      {d.uploads.folder && (
+                        <a 
+                          href={`/media/${d.uploads.folder}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="damage-media-link"
+                          aria-label="Visa media för denna skada"
+                          title="Öppna mediefiler för denna skada"
+                        >
+                          📁 Visa media
+                        </a>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
               {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
@@ -1799,6 +1815,8 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
     .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
     .damage-list-item { padding-left: 0.5rem; line-height: 1.4; font-size: 0.875rem;}
+    .damage-media-link { color: #2563eb; text-decoration: none; margin-left: 0.5rem; font-size: 0.875rem; }
+    .damage-media-link:hover { text-decoration: underline; }
     .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
     .grid-3-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
     .fuel-type-buttons { display: flex; flex-wrap: wrap; gap: 1rem; }
