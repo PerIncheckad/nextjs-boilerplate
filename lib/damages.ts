@@ -26,7 +26,7 @@ export type ConsolidatedDamage = {
   text: string;
   damage_date: string | null;
   is_inventoried: boolean;
-  folder?: string | null;  // For media link
+  folder?: string | null;  // Folder path for associated media files (photos/videos)
 };
 
 export type VehicleInfo = {

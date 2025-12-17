@@ -1290,6 +1290,8 @@ export default function CheckInForm() {
                           target="_blank" 
                           rel="noopener noreferrer"
                           className="damage-media-link"
+                          aria-label="Visa media för denna skada"
+                          title="Öppna mediefiler för denna skada"
                         >
                           📁 Visa media
                         </a>
