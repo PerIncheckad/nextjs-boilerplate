@@ -1188,10 +1188,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     }
     
-    // This is a new damage registered during nybil delivery (not a legacy duplicate)
-    const sourceInfo = damage.inchecker_name 
-      ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
-      : 'Registrerad vid nybilsleverans';
+    // Build sourceInfo based on damage.source
+    let sourceInfo: string;
+    if (damage.source === 'CHECK') {
+      sourceInfo = damage.inchecker_name 
+        ? `Registrerad vid incheckning av ${damage.inchecker_name}`
+        : 'Registrerad vid incheckning';
+    } else {
+      sourceInfo = damage.inchecker_name 
+        ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
+        : 'Registrerad vid nybilsleverans';
+    }
     
     damageRecords.push({
       id: damage.id,
