@@ -276,6 +276,14 @@ const getFullNameFromEmail = (email: string): string => {
     return capitalizeFirstLetter(parts[0]);
 };
 
+const formatLastCheckinText = (lastCheckin: { station: string; checker_name: string; completed_at: string }): string => {
+    const completedAt = new Date(lastCheckin.completed_at);
+    const dateStr = completedAt.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+    const timeStr = completedAt.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); // HH:mm
+    const firstName = lastCheckin.checker_name?.split(' ')[0] || 'Okänd';
+    return `Senast incheckad på ${lastCheckin.station} av ${firstName} (${dateStr} kl ${timeStr})`;
+};
+
 // =================================================================
 // 1B. MODAL HELPER HOOKS
 // =================================================================
@@ -1301,19 +1309,11 @@ export default function CheckInForm() {
                 </div>
               )}
               {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
-              {vehicleData.last_checkin && (() => {
-                // Format the completed_at timestamp to Swedish format
-                const completedAt = new Date(vehicleData.last_checkin.completed_at);
-                const dateStr = completedAt.toLocaleDateString('sv-SE'); // YYYY-MM-DD
-                const timeStr = completedAt.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); // HH:mm
-                const firstName = vehicleData.last_checkin.checker_name?.split(' ')[0] || 'Okänd';
-                
-                return (
-                  <div className="damage-list-info" style={{ fontStyle: 'italic', fontSize: '0.875rem', marginTop: '0.75rem' }}>
-                    Senast incheckad på {vehicleData.last_checkin.station} av {firstName} ({dateStr} kl {timeStr})
-                  </div>
-                );
-              })()}
+              {vehicleData.last_checkin && (
+                <div className="last-checkin-info">
+                  {formatLastCheckinText(vehicleData.last_checkin)}
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -1828,6 +1828,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
     .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
     .damage-list-item { padding-left: 0.5rem; line-height: 1.4; font-size: 0.875rem;}
+    .last-checkin-info { margin-top: 0.75rem; font-style: italic; font-size: 0.875rem; color: var(--color-text-secondary); }
     .damage-media-link { color: #2563eb; text-decoration: none; margin-left: 0.5rem; font-size: 0.875rem; }
     .damage-media-link:hover { text-decoration: underline; }
     .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
