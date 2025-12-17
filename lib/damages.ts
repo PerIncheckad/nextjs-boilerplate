@@ -26,6 +26,7 @@ export type ConsolidatedDamage = {
   text: string;
   damage_date: string | null;
   is_inventoried: boolean;
+  folder?: string | null;  // For media link
 };
 
 export type VehicleInfo = {
@@ -91,7 +92,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .not('legacy_damage_source_text', 'is', null),
     supabase
       .from('damages')
-      .select('id, regnr, source, user_type, user_positions, damage_date, created_at, legacy_damage_source_text')
+      .select('id, regnr, source, user_type, damage_type_raw, user_positions, damage_date, created_at, legacy_damage_source_text, uploads')
       .eq('regnr', cleanedRegnr)
       .in('source', ['CHECK', 'NYBIL'])
       .order('created_at', { ascending: false }),
@@ -170,12 +171,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     
     // Build display text from user_type and user_positions
     let displayText: string;
-    if (dbDamage.user_type) {
+    const damageType = dbDamage.user_type || dbDamage.damage_type_raw;
+    if (damageType) {
       const positions = (dbDamage.user_positions as any[] || [])
         .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
         .filter(Boolean)
         .join(', ');
-      displayText = positions ? `${dbDamage.user_type}: ${positions}` : dbDamage.user_type;
+      displayText = positions ? `${damageType}: ${positions}` : damageType;
     } else {
       displayText = 'Skada';
     }
@@ -185,6 +187,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       text: displayText,
       damage_date: dbDamage.damage_date || dbDamage.created_at,
       is_inventoried: true, // These are already inventoried (registered via CHECK/NYBIL)
+      folder: (dbDamage.uploads as any)?.folder || null,
     });
   }
 
