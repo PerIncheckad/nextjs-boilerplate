@@ -237,28 +237,19 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       let isHandled = false;
       let handledInfo: HandledDamageInfo | null = null;
       
-      if (lastCheckinDate && leg.damage_date) {
-        const damageDate = new Date(leg.damage_date);
-        if (lastCheckinDate > damageDate) {
-          isHandled = true;
-          // Match by index: use the corresponding checkin_damage entry in order
-          // Increment index for ALL damages (not just handled ones) to maintain proper mapping
-          if (handledDamageIndex < handledDamagesList.length) {
-            handledInfo = handledDamagesList[handledDamageIndex];
+      // Try to match this BUHS damage with a checkin_damage entry
+      // Match by index (order-based matching)
+      if (handledDamageIndex < handledDamagesList.length) {
+        handledInfo = handledDamagesList[handledDamageIndex];
+        handledDamageIndex++;
+        
+        // Check if this damage should be marked as handled (filtered from "Befintliga skador att hantera")
+        if (lastCheckinDate && leg.damage_date) {
+          const damageDate = new Date(leg.damage_date);
+          if (lastCheckinDate > damageDate) {
+            isHandled = true;
           }
         }
-      }
-      
-      // Even if not handled (damage is from after last check-in), still try to find matching checkin_damage
-      // This handles cases where damage was documented but there's no "last check-in" or date comparison fails
-      if (!handledInfo && handledDamageIndex < handledDamagesList.length) {
-        handledInfo = handledDamagesList[handledDamageIndex];
-      }
-      
-      // Always increment index to maintain proper order matching
-      // This ensures 1st BUHS damage maps to 1st checkin_damage, 2nd to 2nd, etc.
-      if (handledInfo) {
-        handledDamageIndex++;
       }
       
       // Track this damage to avoid duplicates from damages table
