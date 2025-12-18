@@ -145,8 +145,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // If last check-in exists and is newer than a damage's date, that damage is considered handled
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
   
-  // Create a map of handled damages with their complete details for display formatting
-  // Key: damage_type, Value: full damage info from checkin_damages
+  // Build a list of handled damages in chronological order for order-based matching
+  // We can't match by damage_type because BUHS "Skrapad och buckla" != checkin_damages "Krockskada"
+  // Instead, we match by order: 1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
   type HandledDamageInfo = {
     type: 'existing' | 'not_found';
     damage_type: string;
@@ -157,15 +158,15 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     photo_urls: string[];
     video_urls: string[];
   };
-  const handledDamageMap = new Map<string, HandledDamageInfo>();
+  const handledDamagesList: HandledDamageInfo[] = [];
   
   for (const handled of handledDamages) {
-    if (handled.damage_type && (handled.type === 'existing' || handled.type === 'not_found')) {
+    if (handled.type === 'existing' || handled.type === 'not_found') {
       // Get the checker name from the checkin (using type assertion for nested join data)
       const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
-      handledDamageMap.set(handled.damage_type, {
+      handledDamagesList.push({
         type: handled.type,
-        damage_type: handled.damage_type,
+        damage_type: handled.damage_type || 'Okänd',
         car_part: handled.car_part || null,
         position: handled.position || null,
         description: handled.description || '',
@@ -213,30 +214,33 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   // Add BUHS damages (from legacy source)
   // Each BUHS damage is unique - do NOT deduplicate within BUHS
+  // Match with checkin_damages by INDEX, not by damage_type
+  let handledDamageIndex = 0;
+  
   for (const leg of legacyDamages) {
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
 
     if (displayText) {
-      // Extract damage type for checking if it's been handled
+      // Extract damage type for deduplication tracking
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
       
-      // Check if this damage has been handled in a previous check-in
-      const handledInfo = handledDamageMap.get(normalized.typeCode);
-      
       // Determine if this damage should be filtered from "Befintliga skador att hantera"
-      // A damage is handled if:
-      // 1. It has an entry in checkin_damages (type='existing' or 'not_found'), OR
-      // 2. The last check-in is newer than the damage date
+      // A damage is handled if the last check-in is newer than the damage date
       let isHandled = false;
-      if (handledInfo) {
-        isHandled = true;
-      } else if (lastCheckinDate && leg.damage_date) {
+      let handledInfo: HandledDamageInfo | null = null;
+      
+      if (lastCheckinDate && leg.damage_date) {
         const damageDate = new Date(leg.damage_date);
         if (lastCheckinDate > damageDate) {
           isHandled = true;
+          // Match by index: use the corresponding checkin_damage entry
+          if (handledDamageIndex < handledDamagesList.length) {
+            handledInfo = handledDamagesList[handledDamageIndex];
+            handledDamageIndex++;
+          }
         }
       }
       
