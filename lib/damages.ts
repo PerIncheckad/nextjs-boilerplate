@@ -29,8 +29,13 @@ export type ConsolidatedDamage = {
   is_inventoried: boolean;
   folder?: string | null;  // Folder path for associated media files (photos/videos)
   handled_type?: 'existing' | 'not_found' | null;  // How the damage was handled in a previous check-in
+  handled_damage_type?: string | null;  // Structured damage type from checkin_damages
+  handled_car_part?: string | null;  // Car part from checkin_damages
+  handled_position?: string | null;  // Position from checkin_damages
   handled_comment?: string | null;  // Comment from when it was handled
   handled_by?: string | null;  // Who handled the damage
+  handled_photo_urls?: string[];  // Photo URLs from checkin_damages
+  handled_video_urls?: string[];  // Video URLs from checkin_damages
 };
 
 export type VehicleInfo = {
@@ -114,7 +119,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .maybeSingle(),
     supabase
       .from('checkin_damages')
-      .select('type, damage_type, car_part, position, description, created_at, checkin_id, checkins!inner(regnr, checker_name)')
+      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins!inner(regnr, checker_name)')
       .eq('checkins.regnr', cleanedRegnr)
       .in('type', ['not_found', 'existing', 'documented'])
       .order('created_at', { ascending: false }),
@@ -140,17 +145,33 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // If last check-in exists and is newer than a damage's date, that damage is considered handled
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
   
-  // Create a map of handled damages with their details for display formatting
-  // Key: damage_type, Value: { type, comment, checker_name }
-  const handledDamageMap = new Map<string, { type: 'existing' | 'not_found', comment: string, checker: string }>();
+  // Create a map of handled damages with their complete details for display formatting
+  // Key: damage_type, Value: full damage info from checkin_damages
+  type HandledDamageInfo = {
+    type: 'existing' | 'not_found';
+    damage_type: string;
+    car_part: string | null;
+    position: string | null;
+    description: string;
+    checker: string;
+    photo_urls: string[];
+    video_urls: string[];
+  };
+  const handledDamageMap = new Map<string, HandledDamageInfo>();
+  
   for (const handled of handledDamages) {
     if (handled.damage_type && (handled.type === 'existing' || handled.type === 'not_found')) {
       // Get the checker name from the checkin (using type assertion for nested join data)
       const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
       handledDamageMap.set(handled.damage_type, {
         type: handled.type,
-        comment: handled.description || '',
-        checker: checkerName
+        damage_type: handled.damage_type,
+        car_part: handled.car_part || null,
+        position: handled.position || null,
+        description: handled.description || '',
+        checker: checkerName,
+        photo_urls: (handled.photo_urls as string[]) || [],
+        video_urls: (handled.video_urls as string[]) || [],
       });
     }
   }
@@ -231,8 +252,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         // This prevents the damage from showing in "Befintliga skador att hantera"
         is_inventoried: isInventoried || isHandled,
         handled_type: handledInfo?.type || null,
-        handled_comment: handledInfo?.comment || null,
+        handled_damage_type: handledInfo?.damage_type || null,
+        handled_car_part: handledInfo?.car_part || null,
+        handled_position: handledInfo?.position || null,
+        handled_comment: handledInfo?.description || null,
         handled_by: handledInfo?.checker || null,
+        handled_photo_urls: handledInfo?.photo_urls || [],
+        handled_video_urls: handledInfo?.video_urls || [],
       });
     }
   }
@@ -278,8 +304,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       is_inventoried: true, // These are already inventoried (registered via CHECK/NYBIL)
       folder: (dbDamage.uploads as any)?.folder || null,
       handled_type: null,
+      handled_damage_type: null,
+      handled_car_part: null,
+      handled_position: null,
       handled_comment: null,
       handled_by: null,
+      handled_photo_urls: [],
+      handled_video_urls: [],
     });
   }
 
