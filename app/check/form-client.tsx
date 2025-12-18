@@ -1331,18 +1331,13 @@ export default function CheckInForm() {
                     if (d.handledType === 'existing' || d.handledType === 'documented') {
                       // Dokumenterade skador (type='existing' or type='documented')
                       // Use structured data from checkin_damages
-                      // Format: {damage_type}: {car_part} ({position}) - matching email format
-                      displayText = d.handledDamageType || 'Dokumenterad skada';
+                      // Format: {damage_type} - {car_part} - {position}
+                      const parts: string[] = [];
+                      if (d.handledDamageType) parts.push(d.handledDamageType);
+                      if (d.handledCarPart) parts.push(d.handledCarPart);
+                      if (d.handledPosition) parts.push(d.handledPosition);
                       
-                      // Build position string: "CarPart (Position)" or just "CarPart"
-                      if (d.handledCarPart) {
-                        let positionStr = d.handledCarPart;
-                        if (d.handledPosition) {
-                          positionStr += ` (${d.handledPosition})`;
-                        }
-                        displayText += `: ${positionStr}`;
-                      }
-                      
+                      displayText = parts.length > 0 ? parts.join(' - ') : (d.fullText || 'Dokumenterad skada');
                       if (d.handledComment) {
                         displayText += ` (${d.handledComment})`;
                       }
