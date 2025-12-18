@@ -28,7 +28,7 @@ export type ConsolidatedDamage = {
   damage_date: string | null;
   is_inventoried: boolean;
   folder?: string | null;  // Folder path for associated media files (photos/videos)
-  handled_type?: 'existing' | 'not_found' | null;  // How the damage was handled in a previous check-in
+  handled_type?: 'existing' | 'not_found' | 'documented' | null;  // How the damage was handled in a previous check-in
   handled_damage_type?: string | null;  // Structured damage type from checkin_damages
   handled_car_part?: string | null;  // Car part from checkin_damages
   handled_position?: string | null;  // Position from checkin_damages
@@ -149,7 +149,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // We can't match by damage_type because BUHS "Skrapad och buckla" != checkin_damages "Krockskada"
   // Instead, we match by order: 1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
   type HandledDamageInfo = {
-    type: 'existing' | 'not_found';
+    type: 'existing' | 'not_found' | 'documented';
     damage_type: string;
     car_part: string | null;
     position: string | null;
@@ -161,7 +161,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const handledDamagesList: HandledDamageInfo[] = [];
   
   for (const handled of handledDamages) {
-    if (handled.type === 'existing' || handled.type === 'not_found') {
+    if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
       // Get the checker name from the checkin (using type assertion for nested join data)
       const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
       handledDamagesList.push({
