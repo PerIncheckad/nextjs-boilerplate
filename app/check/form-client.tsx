@@ -59,7 +59,7 @@ type ExistingDamage = {
   resolvedComment?: string;
   media: MediaFile[];
   uploads: Uploads;
-  handledType?: 'existing' | 'not_found' | null;
+  handledType?: 'existing' | 'not_found' | 'documented' | null;
   handledDamageType?: string | null;
   handledCarPart?: string | null;
   handledPosition?: string | null;
@@ -1328,8 +1328,8 @@ export default function CheckInForm() {
                     let hasMedia = false;
                     let mediaUrls: string[] = [];
                     
-                    if (d.handledType === 'existing') {
-                      // Dokumenterade skador (type='existing')
+                    if (d.handledType === 'existing' || d.handledType === 'documented') {
+                      // Dokumenterade skador (type='existing' or 'documented')
                       // Use structured data from checkin_damages
                       // Format: {damage_type} - {car_part} - {position} ({description if exists})
                       const parts: string[] = [];
