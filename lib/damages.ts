@@ -9,16 +9,16 @@ import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
 type LegacyDamage = {
   id: number;
   damage_type_raw: string | null;
-  note_customer: string | null;
+  note_customer:  string | null;
   note_internal: string | null;
   saludatum: string | null;
-  damage_date: string | null; // <<< CORRECTED: Ensure this field is fetched
+  damage_date: string | null;
 };
 
 // Represents an already inventoried damage from our main 'damages' table
 type InventoriedDamage = {
-  legacy_damage_source_text: string; // The original text, used as a key
-  new_text: string; // The new, structured text (e.g., "Repa: Dörr (Höger fram)")
+  legacy_damage_source_text: string;
+  new_text: string;
 };
 
 // The final, consolidated damage object sent to the form client
@@ -27,15 +27,15 @@ export type ConsolidatedDamage = {
   text: string;
   damage_date: string | null;
   is_inventoried: boolean;
-  folder?: string | null;  // Folder path for associated media files (photos/videos)
-  handled_type?: 'existing' | 'not_found' | null;  // How the damage was handled in a previous check-in
-  handled_damage_type?: string | null;  // Structured damage type from checkin_damages
-  handled_car_part?: string | null;  // Car part from checkin_damages
-  handled_position?: string | null;  // Position from checkin_damages
-  handled_comment?: string | null;  // Comment from when it was handled
-  handled_by?: string | null;  // Who handled the damage
-  handled_photo_urls?: string[];  // Photo URLs from checkin_damages
-  handled_video_urls?: string[];  // Video URLs from checkin_damages
+  folder?:  string | null;
+  handled_type?:  'existing' | 'not_found' | null;
+  handled_damage_type?: string | null;
+  handled_car_part?: string | null;
+  handled_position?: string | null;
+  handled_comment?: string | null;
+  handled_by?: string | null;
+  handled_photo_urls?: string[];
+  handled_video_urls?: string[];
 };
 
 export type VehicleInfo = {
@@ -45,7 +45,7 @@ export type VehicleInfo = {
   saludatum: string;
   existing_damages: ConsolidatedDamage[];
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
-  last_checkin?: {
+  last_checkin?:  {
     station: string;
     checker_name: string;
     completed_at: string;
@@ -74,12 +74,11 @@ function formatSaludatum(dateStr: string | null | undefined): string {
     return dateStr;
 }
 
-// Helper to combine the raw text fields from a legacy damage object
 function getLegacyDamageText(damage: LegacyDamage): string {
     const parts = [
       damage.damage_type_raw,
       damage.note_customer,
-      damage.note_internal,
+      damage. note_internal,
     ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
     const uniqueParts = [...new Set(parts)];
     return uniqueParts.join(' - ');
@@ -91,12 +90,12 @@ function getLegacyDamageText(damage: LegacyDamage): string {
 // =================================================================
 
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
-  const cleanedRegnr = regnr.toUpperCase().trim();
+  const cleanedRegnr = regnr. toUpperCase().trim();
 
-  // Step 1: Fetch all data concurrently, including handled damages from checkin_damages and last check-in
+  // Step 1: Fetch all data concurrently
   const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, handledDamagesResponse, lastCheckinResponse] = await Promise.all([
     supabase
-      .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
+      . rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -117,12 +116,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // IMPORTANT: Sort ASCENDING to match BUHS order (oldest first)
     supabase
       .from('checkin_damages')
-      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins!inner(regnr, checker_name)')
+      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins! inner(regnr, checker_name)')
       .eq('checkins.regnr', cleanedRegnr)
       .in('type', ['not_found', 'existing', 'documented'])
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: true }),
     supabase
       .from('checkins')
       .select('current_station, checker_name, completed_at')
@@ -134,42 +134,38 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   ]);
 
   // Step 2: Process the fetched data
-  const vehicleData = vehicleResponse.data?.[0] || null;
+  const vehicleData = vehicleResponse.data? .[0] || null;
   const nybilData = nybilResponse.data || null;
-  const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
+  const legacyDamages:  LegacyDamage[] = legacyDamagesResponse. data || [];
   const dbDamages = dbDamagesResponse.data || [];
   const handledDamages = handledDamagesResponse.data || [];
-  const lastCheckinData = lastCheckinResponse.data || null;
+  const lastCheckinData = lastCheckinResponse. data || null;
   
-  // Get the date of the last check-in to filter damages older than that
-  // If last check-in exists and is newer than a damage's date, that damage is considered handled
-  const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
+  const lastCheckinDate = lastCheckinData?.completed_at ?  new Date(lastCheckinData.completed_at) : null;
   
-  // Build a list of handled damages in chronological order for order-based matching
-  // We can't match by damage_type because BUHS "Skrapad och buckla" != checkin_damages "Krockskada"
-  // Instead, we match by order: 1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
+  // Build a LIST (not map) of handled damages for INDEX-based matching
+  // We match by position:  1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
+  // This is necessary because BUHS "Skrapad och buckla" can become "Krockskada" in checkin_damages
   type HandledDamageInfo = {
     type: 'existing' | 'not_found';
-    damage_type: string;
+    damage_type:  string;
     car_part: string | null;
     position: string | null;
     description: string;
-    checker: string;
+    checker:  string;
     photo_urls: string[];
     video_urls: string[];
   };
+  
   const handledDamagesList: HandledDamageInfo[] = [];
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found') {
-      // Get the checker name from the checkin (using type assertion for nested join data)
       const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
       handledDamagesList.push({
         type: handled.type,
-        // damage_type can be null/undefined in rare cases (data integrity issues)
-        // Use fallback 'Okänd' to ensure display always has a value
         damage_type: handled.damage_type || 'Okänd',
-        car_part: handled.car_part || null,
+        car_part:  handled.car_part || null,
         position: handled.position || null,
         description: handled.description || '',
         checker: checkerName,
@@ -179,61 +175,65 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     }
   }
   
-  // Create a lookup map of inventoried damages for efficient access
+  // Create inventoried map for legacy damages that were previously documented
   const inventoriedMap = new Map<string, string>();
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
       if (inv.legacy_damage_source_text) {
-        let newText: string;
+        let newText:  string;
         
-        if (inv.user_type) {
-          // We have structured data from the check-in
+        if (inv. user_type) {
           const positions = (inv.user_positions as any[] || [])
             .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
             .filter(Boolean)
             .join(', ');
-          newText = positions ? `${inv.user_type}: ${positions}` : inv.user_type;
+          newText = positions ? `${inv.user_type}:  ${positions}` : inv.user_type;
         } else {
-          // Fallback: use legacy_damage_source_text as display text
-          // Remove any "(Går ej:...)" suffixes for cleaner display
-          newText = (inv.legacy_damage_source_text || '').split(' (Går ej:')[0].trim();
-          // If still empty, use a generic text
-          if (!newText) {
+          newText = (inv.legacy_damage_source_text || '').split(' (Går ej: ')[0]. trim();
+          if (! newText) {
             newText = 'Dokumenterad skada';
           }
         }
         
-        inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        inventoriedMap.set(inv. legacy_damage_source_text, newText);
       }
     }
   }
 
   // Step 3: Consolidate the damage lists
-  const consolidatedDamages: ConsolidatedDamage[] = [];
-  
-  // Track damages from damages table to avoid duplicates between BUHS and damages table
+  const consolidatedDamages:  ConsolidatedDamage[] = [];
   const dbDamageKeys = new Set<string>();
   
-  // Add BUHS damages (from legacy source)
-  // Each BUHS damage is unique - do NOT deduplicate within BUHS
-  // Match with checkin_damages by INDEX for damages from the same date, not by damage_type
-  // This is because users can select different damage types when documenting
-  // (e.g., BUHS "Skrapad och buckla" → user documents as "Krockskada")
+  // Count how many BUHS damages are older than the last check-in
+  // This tells us how many checkin_damages entries we should have
+  let handledBuhsCount = 0;
+  if (lastCheckinDate) {
+    for (const leg of legacyDamages) {
+      if (leg. damage_date) {
+        const damageDate = new Date(leg.damage_date);
+        if (lastCheckinDate > damageDate) {
+          handledBuhsCount++;
+        }
+      }
+    }
+  }
+  
+  // Only use index-based matching if the counts match
+  // This ensures we don't mismatch when data is incomplete
+  const useIndexMatching = handledBuhsCount > 0 && handledBuhsCount === handledDamagesList.length;
+  
   let handledDamageIndex = 0;
   
-  for (let i = 0; i < legacyDamages.length; i++) {
-    const leg = legacyDamages[i];
+  for (const leg of legacyDamages) {
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
 
     if (displayText) {
-      // Extract damage type for deduplication tracking
-      const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
+      const damageType = leg.damage_type_raw || displayText. split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
       
-      // Determine if this damage should be filtered from "Befintliga skador att hantera"
-      // A damage is handled if the last check-in is newer than the damage date
+      // Check if this damage is handled (last check-in is newer than damage date)
       let isHandled = false;
       let handledInfo: HandledDamageInfo | null = null;
       
@@ -241,31 +241,23 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         const damageDate = new Date(leg.damage_date);
         if (lastCheckinDate > damageDate) {
           isHandled = true;
-          // Match by index: use the corresponding checkin_damage entry in order
-          // Increment index for ALL damages (not just handled ones) to maintain proper mapping
-          if (handledDamageIndex < handledDamagesList.length) {
+          
+          // Use index-based matching if counts match
+          if (useIndexMatching && handledDamageIndex < handledDamagesList.length) {
             handledInfo = handledDamagesList[handledDamageIndex];
+            handledDamageIndex++;
           }
         }
       }
       
-      // Always increment index to maintain proper order matching
-      // This ensures 1st BUHS damage maps to 1st checkin_damage, 2nd to 2nd, etc.
-      if (isHandled) {
-        handledDamageIndex++;
-      }
-      
-      // Track this damage to avoid duplicates from damages table
-      const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;
-      dbDamageKeys.add(dedupeKey);
+      const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized. typeCode}`;
+      dbDamageKeys. add(dedupeKey);
       
       consolidatedDamages.push({
-        id: leg.id,
+        id: leg. id,
         text: displayText,
         damage_date: leg.damage_date,
-        // Mark as inventoried if already documented OR if handled in previous check-in
-        // This prevents the damage from showing in "Befintliga skador att hantera"
-        is_inventoried: isInventoried || isHandled,
+        is_inventoried:  isInventoried || isHandled,
         handled_type: handledInfo?.type || null,
         handled_damage_type: handledInfo?.damage_type || null,
         handled_car_part: handledInfo?.car_part || null,
@@ -279,17 +271,12 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   }
   
   // Add damages from damages table (CHECK and NYBIL sources)
-  // These are damages registered via /check or /nybil that are NOT duplicates of BUHS damages
   for (const dbDamage of dbDamages) {
-    // Skip if this damage is already in the legacy damages list (avoid duplicates)
-    // A damage is a duplicate if it has legacy_damage_source_text that matches a BUHS damage
     if (dbDamage.legacy_damage_source_text) {
-      // This is a documented BUHS damage, already included above
       continue;
     }
     
-    // Build display text from user_type and user_positions
-    let displayText: string;
+    let displayText:  string;
     const damageType = dbDamage.user_type || dbDamage.damage_type_raw;
     if (damageType) {
       const positions = (dbDamage.user_positions as any[] || [])
@@ -301,39 +288,36 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       displayText = 'Skada';
     }
     
-    // Create a unique key for deduplication between BUHS and damages table
     const damageDate = dbDamage.damage_date || dbDamage.created_at;
     const normalized = normalizeDamageType(damageType);
     const dedupeKey = `${cleanedRegnr}|${damageDate}|${normalized.typeCode}`;
     
-    // Skip if this damage was already added from BUHS
     if (dbDamageKeys.has(dedupeKey)) {
       continue;
     }
-    dbDamageKeys.add(dedupeKey);
+    dbDamageKeys. add(dedupeKey);
     
     consolidatedDamages.push({
       id: dbDamage.id,
       text: displayText,
       damage_date: damageDate,
-      is_inventoried: true, // These are already inventoried (registered via CHECK/NYBIL)
-      folder: (dbDamage.uploads as any)?.folder || null,
+      is_inventoried:  true,
+      folder: (dbDamage. uploads as any)?.folder || null,
       handled_type: null,
       handled_damage_type: null,
       handled_car_part: null,
       handled_position: null,
       handled_comment: null,
-      handled_by: null,
-      handled_photo_urls: [],
+      handled_by:  null,
+      handled_photo_urls:  [],
       handled_video_urls: [],
     });
   }
 
-  const latestSaludatum = legacyDamages.length > 0 ? legacyDamages[0].saludatum : null;
+  const latestSaludatum = legacyDamages. length > 0 ? legacyDamages[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
-  // Process last check-in information
-  const lastCheckin = lastCheckinData ? {
+  const lastCheckin = lastCheckinData ?  {
     station: lastCheckinData.current_station || 'Okänd station',
     checker_name: lastCheckinData.checker_name || 'Okänd',
     completed_at: lastCheckinData.completed_at || '',
@@ -343,8 +327,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   if (vehicleData) {
     return {
       regnr: cleanedRegnr,
-      model: formatModel(vehicleData.brand, vehicleData.model),
-      wheel_storage_location: vehicleData.wheel_storage_location || 'Ingen information',
+      model: formatModel(vehicleData.brand, vehicleData. model),
+      wheel_storage_location:  vehicleData.wheel_storage_location || 'Ingen information',
       saludatum: finalSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
@@ -352,18 +336,17 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     };
   }
 
-  // Check if vehicle exists in nybil_inventering (registered via /nybil)
   if (nybilData) {
     const wheelStorage = [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring]
       .filter(Boolean)
       .join(' - ') || 'Ingen information';
     
-    const nybilSaludatum = nybilData.saludatum ? formatSaludatum(nybilData.saludatum) : finalSaludatum;
+    const nybilSaludatum = nybilData.saludatum ?  formatSaludatum(nybilData.saludatum) : finalSaludatum;
     
     return {
       regnr: cleanedRegnr,
-      model: formatModel(nybilData.bilmarke, nybilData.modell),
-      wheel_storage_location: wheelStorage,
+      model: formatModel(nybilData. bilmarke, nybilData.modell),
+      wheel_storage_location:  wheelStorage,
       saludatum: nybilSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
@@ -371,7 +354,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     };
   }
 
-  if (consolidatedDamages.length > 0) {
+  if (consolidatedDamages. length > 0) {
     return {
       regnr: cleanedRegnr,
       model: 'Modell saknas',
@@ -387,7 +370,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     regnr: cleanedRegnr,
     model: 'Modell saknas',
     wheel_storage_location: 'Ingen information',
-    saludatum: 'Ingen information',
+    saludatum:  'Ingen information',
     existing_damages: [],
     status: 'NO_MATCH',
     last_checkin: lastCheckin,
