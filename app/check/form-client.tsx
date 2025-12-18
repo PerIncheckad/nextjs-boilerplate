@@ -59,6 +59,9 @@ type ExistingDamage = {
   resolvedComment?: string;
   media: MediaFile[];
   uploads: Uploads;
+  handledType?: 'existing' | 'not_found' | null;
+  handledComment?: string | null;
+  handledBy?: string | null;
 };
 
 type NewDamage = {
@@ -620,7 +623,10 @@ export default function CheckInForm() {
                 status: 'not_selected',
                 userPositions: [],
                 media: [],
-                uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
+                uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' },
+                handledType: d.handled_type || null,
+                handledComment: d.handled_comment || null,
+                handledBy: d.handled_by || null
               })));
             }
           },
@@ -644,7 +650,10 @@ export default function CheckInForm() {
               status: 'not_selected',
               userPositions: [],
               media: [],
-              uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
+              uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' },
+              handledType: d.handled_type || null,
+              handledComment: d.handled_comment || null,
+              handledBy: d.handled_by || null
           })));
       }
   
@@ -1298,23 +1307,47 @@ export default function CheckInForm() {
               {existingDamages.length > 0 && (
                 <div className="damage-list-info">
                   <span className="info-label">Befintliga skador ({existingDamages.length})</span>
-                  {existingDamages.map((d, i) => (
-                    <div key={d.id} className="damage-list-item">
-                      {i + 1}. {d.fullText}
-                      {d.uploads.folder && (
-                        <a 
-                          href={`/media/${d.uploads.folder}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="damage-media-link"
-                          aria-label="Visa media för denna skada"
-                          title="Öppna mediefiler för denna skada"
-                        >
-                          📁 Visa media
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                  {existingDamages.map((d, i) => {
+                    // Format damage display based on handled type
+                    let displayText = d.fullText;
+                    if (d.handledType === 'existing') {
+                      // Dokumenterade skador (type='existing')
+                      // Format: {Skadetyp} - {Placering} - {Position} ({eventuell kommentar})
+                      displayText = d.fullText;
+                      if (d.handledComment) {
+                        displayText += ` (${d.handledComment})`;
+                      }
+                    } else if (d.handledType === 'not_found') {
+                      // Ej dokumenterade skador (type='not_found')
+                      // Format: {Skadetyp}. Ej dokumenterad. "{kommentar}" ({incheckare})
+                      const skadetyp = d.fullText.split(' - ')[0];
+                      displayText = `${skadetyp}. Ej dokumenterad.`;
+                      if (d.handledComment) {
+                        displayText += ` "${d.handledComment}"`;
+                      }
+                      if (d.handledBy) {
+                        displayText += ` (${d.handledBy.split(' ')[0]})`;
+                      }
+                    }
+                    
+                    return (
+                      <div key={d.id} className="damage-list-item">
+                        {i + 1}. {displayText}
+                        {d.uploads.folder && (
+                          <a 
+                            href={`/media/${d.uploads.folder}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="damage-media-link"
+                            aria-label="Visa media för denna skada"
+                            title="Öppna mediefiler för denna skada"
+                          >
+                            📁 Visa media
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}

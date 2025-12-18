@@ -28,6 +28,9 @@ export type ConsolidatedDamage = {
   damage_date: string | null;
   is_inventoried: boolean;
   folder?: string | null;  // Folder path for associated media files (photos/videos)
+  handled_type?: 'existing' | 'not_found' | null;  // How the damage was handled in a previous check-in
+  handled_comment?: string | null;  // Comment from when it was handled
+  handled_by?: string | null;  // Who handled the damage
 };
 
 export type VehicleInfo = {
@@ -111,7 +114,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .maybeSingle(),
     supabase
       .from('checkin_damages')
-      .select('type, damage_type, car_part, position, created_at, checkin_id, checkins!inner(regnr)')
+      .select('type, damage_type, car_part, position, description, created_at, checkin_id, checkins!inner(regnr, checker_name)')
       .eq('checkins.regnr', cleanedRegnr)
       .in('type', ['not_found', 'existing', 'documented'])
       .order('created_at', { ascending: false }),
@@ -133,14 +136,22 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const handledDamages = handledDamagesResponse.data || [];
   const lastCheckinData = lastCheckinResponse.data || null;
   
-  // Create a Set of handled damage keys to filter them out
-  // A damage is considered handled if it has been documented, marked as not_found, or existing
-  // We match based on damage_type since that's the most reliable identifier
-  const handledDamageTypes = new Set<string>();
+  // Get the date of the last check-in to filter damages older than that
+  // If last check-in exists and is newer than a damage's date, that damage is considered handled
+  const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
+  
+  // Create a map of handled damages with their details for display formatting
+  // Key: damage_type, Value: { type, comment, checker_name }
+  const handledDamageMap = new Map<string, { type: 'existing' | 'not_found', comment: string, checker: string }>();
   for (const handled of handledDamages) {
-    // Store damage type as handled
-    if (handled.damage_type) {
-      handledDamageTypes.add(handled.damage_type);
+    if (handled.damage_type && (handled.type === 'existing' || handled.type === 'not_found')) {
+      // Get the checker name from the checkin
+      const checkerName = (handled as any).checkins?.checker_name || 'Okänd';
+      handledDamageMap.set(handled.damage_type, {
+        type: handled.type,
+        comment: handled.description || '',
+        checker: checkerName
+      });
     }
   }
   
@@ -173,43 +184,53 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     }
   }
 
-  // Step 3: Consolidate the damage lists with deduplication
+  // Step 3: Consolidate the damage lists
   const consolidatedDamages: ConsolidatedDamage[] = [];
   
-  // Use a Set to track unique damages by regnr + damage_date + damage_type
-  // This prevents the same damage from appearing multiple times
-  const seenDamages = new Set<string>();
+  // Track damages from damages table to avoid duplicates between BUHS and damages table
+  const dbDamageKeys = new Set<string>();
   
   // Add BUHS damages (from legacy source)
+  // Each BUHS damage is unique - do NOT deduplicate within BUHS
   for (const leg of legacyDamages) {
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
 
     if (displayText) {
-      // Create a unique key based on damage_date and damage_type (extracted from text)
-      const damageType = leg.damage_type_raw || displayText.split(':')[0].trim();
-      const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${damageType}`;
-      
-      // Skip if we've already seen this damage
-      if (seenDamages.has(dedupeKey)) {
-        continue;
-      }
-      seenDamages.add(dedupeKey);
-      
-      // Filter out damages that have already been handled
-      // Normalize the damage type to match with checkin_damages
+      // Extract damage type for checking if it's been handled
+      const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
-      if (handledDamageTypes.has(normalized.typeCode)) {
-        // This damage has been handled (documented or marked as not found) in a previous check-in
-        continue;
+      
+      // Check if this damage has been handled in a previous check-in
+      const handledInfo = handledDamageMap.get(normalized.typeCode);
+      
+      // Determine if this damage should be filtered from "Befintliga skador att hantera"
+      // A damage is handled if:
+      // 1. It has an entry in checkin_damages (type='existing' or 'not_found'), OR
+      // 2. The last check-in is newer than the damage date
+      let isHandled = false;
+      if (handledInfo) {
+        isHandled = true;
+      } else if (lastCheckinDate && leg.damage_date) {
+        const damageDate = new Date(leg.damage_date);
+        if (lastCheckinDate > damageDate) {
+          isHandled = true;
+        }
       }
+      
+      // Track this damage to avoid duplicates from damages table
+      const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;
+      dbDamageKeys.add(dedupeKey);
       
       consolidatedDamages.push({
         id: leg.id,
         text: displayText,
         damage_date: leg.damage_date,
-        is_inventoried: isInventoried,
+        is_inventoried: isInventoried || isHandled,  // Mark as inventoried if handled
+        handled_type: handledInfo?.type || null,
+        handled_comment: handledInfo?.comment || null,
+        handled_by: handledInfo?.checker || null,
       });
     }
   }
@@ -237,15 +258,16 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       displayText = 'Skada';
     }
     
-    // Create a unique key for deduplication
+    // Create a unique key for deduplication between BUHS and damages table
     const damageDate = dbDamage.damage_date || dbDamage.created_at;
-    const dedupeKey = `${cleanedRegnr}|${damageDate}|${damageType}`;
+    const normalized = normalizeDamageType(damageType);
+    const dedupeKey = `${cleanedRegnr}|${damageDate}|${normalized.typeCode}`;
     
-    // Skip if we've already seen this damage
-    if (seenDamages.has(dedupeKey)) {
+    // Skip if this damage was already added from BUHS
+    if (dbDamageKeys.has(dedupeKey)) {
       continue;
     }
-    seenDamages.add(dedupeKey);
+    dbDamageKeys.add(dedupeKey);
     
     consolidatedDamages.push({
       id: dbDamage.id,
@@ -253,6 +275,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       damage_date: damageDate,
       is_inventoried: true, // These are already inventoried (registered via CHECK/NYBIL)
       folder: (dbDamage.uploads as any)?.folder || null,
+      handled_type: null,
+      handled_comment: null,
+      handled_by: null,
     });
   }
 
