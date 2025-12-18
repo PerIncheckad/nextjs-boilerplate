@@ -166,6 +166,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
       handledDamagesList.push({
         type: handled.type,
+        // damage_type can be null/undefined in rare cases (data integrity issues)
+        // Use fallback 'Okänd' to ensure display always has a value
         damage_type: handled.damage_type || 'Okänd',
         car_part: handled.car_part || null,
         position: handled.position || null,
@@ -214,10 +216,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   // Add BUHS damages (from legacy source)
   // Each BUHS damage is unique - do NOT deduplicate within BUHS
-  // Match with checkin_damages by INDEX, not by damage_type
+  // Match with checkin_damages by INDEX for damages from the same date, not by damage_type
+  // This is because users can select different damage types when documenting
+  // (e.g., BUHS "Skrapad och buckla" → user documents as "Krockskada")
   let handledDamageIndex = 0;
   
-  for (const leg of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const leg = legacyDamages[i];
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
@@ -236,12 +241,18 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         const damageDate = new Date(leg.damage_date);
         if (lastCheckinDate > damageDate) {
           isHandled = true;
-          // Match by index: use the corresponding checkin_damage entry
+          // Match by index: use the corresponding checkin_damage entry in order
+          // Increment index for ALL damages (not just handled ones) to maintain proper mapping
           if (handledDamageIndex < handledDamagesList.length) {
             handledInfo = handledDamagesList[handledDamageIndex];
-            handledDamageIndex++;
           }
         }
+      }
+      
+      // Always increment index to maintain proper order matching
+      // This ensures 1st BUHS damage maps to 1st checkin_damage, 2nd to 2nd, etc.
+      if (isHandled) {
+        handledDamageIndex++;
       }
       
       // Track this damage to avoid duplicates from damages table
