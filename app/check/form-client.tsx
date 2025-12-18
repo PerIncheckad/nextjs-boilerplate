@@ -1342,10 +1342,14 @@ export default function CheckInForm() {
                         displayText += ` (${d.handledComment})`;
                       }
                       
-                      // Check for media from checkin_damages
+                      // Check for media from checkin_damages first
                       if (d.handledPhotoUrls && d.handledPhotoUrls.length > 0) {
                         hasMedia = true;
                         mediaUrls = d.handledPhotoUrls;
+                      }
+                      // Also check for media from damages.uploads as fallback
+                      if (!hasMedia && d.uploads.folder) {
+                        hasMedia = true;
                       }
                     } else if (d.handledType === 'not_found') {
                       // Ej dokumenterade skador (type='not_found')
