@@ -125,7 +125,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false }),
     supabase
       .from('checkins')
-      .select('current_station, checker_name, completed_at')
+      .select('id, current_station, checker_name, completed_at')
       .eq('regnr', cleanedRegnr)
       .eq('status', 'COMPLETED')
       .order('completed_at', { ascending: false })
@@ -144,6 +144,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Get the date of the last check-in to filter damages older than that
   // If last check-in exists and is newer than a damage's date, that damage is considered handled
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
+  const lastCheckinId = lastCheckinData?.id || null;
   
   // Build a list of handled damages in chronological order for order-based matching
   // We can't match by damage_type because BUHS "Skrapad och buckla" != checkin_damages "Krockskada"
@@ -161,26 +162,6 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     created_at: string;
   };
   const handledDamagesList: HandledDamageInfo[] = [];
-  
-  // Get the checkin_id of the last check-in to filter damages from only that check-in
-  let lastCheckinId: number | null = null;
-  if (handledDamages.length > 0 && lastCheckinData) {
-    // Find checkin_id from the most recent checkin_damage entry
-    // Since handledDamages is ordered by created_at DESC, we can find the first one
-    // that matches our last check-in timeframe
-    for (const handled of handledDamages) {
-      const handledDate = new Date(handled.created_at);
-      const checkinDate = new Date(lastCheckinData.completed_at);
-      // Check if this damage was created around the same time as the last check-in
-      // (within a reasonable timeframe, e.g., same day or close)
-      const timeDiff = Math.abs(checkinDate.getTime() - handledDate.getTime());
-      const oneDayMs = 24 * 60 * 60 * 1000;
-      if (timeDiff < oneDayMs) {
-        lastCheckinId = handled.checkin_id;
-        break;
-      }
-    }
-  }
   
   for (const handled of handledDamages) {
     // Only include damages from the last check-in
@@ -207,6 +188,10 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       });
     }
   }
+  
+  // Reverse the list since it was fetched in DESC order (newest first)
+  // but we need to match in ASC order (oldest first) to align with legacyDamages order
+  handledDamagesList.reverse();
   
   console.log('[damages.ts] lastCheckinId:', lastCheckinId);
   console.log('[damages.ts] handledDamagesList length:', handledDamagesList.length);
