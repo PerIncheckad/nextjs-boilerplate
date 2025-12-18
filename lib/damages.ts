@@ -207,8 +207,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         inventoriedMap.set(inv.legacy_damage_source_text, newText);
         
         // Store folder path if uploads exist
-        if ((inv.uploads as any)?.folder) {
-          inventoriedFolderMap.set(inv.legacy_damage_source_text, (inv.uploads as any).folder);
+        const uploads = inv.uploads as { folder?: string } | null | undefined;
+        if (uploads?.folder) {
+          inventoriedFolderMap.set(inv.legacy_damage_source_text, uploads.folder);
         }
       }
     }
