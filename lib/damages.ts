@@ -122,7 +122,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins!inner(regnr, checker_name)')
       .eq('checkins.regnr', cleanedRegnr)
       .in('type', ['not_found', 'existing', 'documented'])
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: true }),
     supabase
       .from('checkins')
       .select('current_station, checker_name, completed_at')
@@ -242,17 +242,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         if (lastCheckinDate > damageDate) {
           isHandled = true;
           // Match by index: use the corresponding checkin_damage entry in order
-          // Increment index for ALL damages (not just handled ones) to maintain proper mapping
           if (handledDamageIndex < handledDamagesList.length) {
             handledInfo = handledDamagesList[handledDamageIndex];
+            // Increment index for each handled damage to maintain proper order matching
+            // This ensures 1st handled BUHS damage maps to 1st checkin_damage, 2nd to 2nd, etc.
+            handledDamageIndex++;
           }
         }
-      }
-      
-      // Always increment index to maintain proper order matching
-      // This ensures 1st BUHS damage maps to 1st checkin_damage, 2nd to 2nd, etc.
-      if (isHandled) {
-        handledDamageIndex++;
       }
       
       // Track this damage to avoid duplicates from damages table
