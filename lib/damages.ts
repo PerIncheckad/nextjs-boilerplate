@@ -249,9 +249,15 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         }
       }
       
+      // Even if not handled (damage is from after last check-in), still try to find matching checkin_damage
+      // This handles cases where damage was documented but there's no "last check-in" or date comparison fails
+      if (!handledInfo && handledDamageIndex < handledDamagesList.length) {
+        handledInfo = handledDamagesList[handledDamageIndex];
+      }
+      
       // Always increment index to maintain proper order matching
       // This ensures 1st BUHS damage maps to 1st checkin_damage, 2nd to 2nd, etc.
-      if (isHandled) {
+      if (handledInfo) {
         handledDamageIndex++;
       }
       
