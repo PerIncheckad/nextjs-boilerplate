@@ -5,9 +5,13 @@ import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
 // 1. TYPE DEFINITIONS
 // =================================================================
 
-// Raw damage data from the legacy source (BUHS)
-// Note: The RPC get_damages_by_trimmed_regnr returns data from damages_external view
-// which does NOT have an id column, so we generate synthetic IDs
+/**
+ * Raw damage data from the legacy source (BUHS)
+ * 
+ * Note: The RPC get_damages_by_trimmed_regnr returns data from damages_external view
+ * which does NOT have an id column. Synthetic IDs will be generated programmatically
+ * using negative index-based values (e.g., -1, -2, -3) to avoid conflicts with real database IDs.
+ */
 type LegacyDamage = {
   damage_type_raw: string | null;
   note_customer: string | null;
@@ -144,6 +148,11 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         .in('type', ['not_found', 'existing', 'documented'])
         .order('created_at', { ascending: false })
     : { data: [], error: null };
+  
+  // Check for errors in the handled damages query
+  if (handledDamagesResponse.error) {
+    console.error('Error fetching checkin_damages:', handledDamagesResponse.error);
+  }
 
   // Step 2: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
