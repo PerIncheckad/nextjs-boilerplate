@@ -59,6 +59,14 @@ type ExistingDamage = {
   resolvedComment?: string;
   media: MediaFile[];
   uploads: Uploads;
+  handledType?: 'existing' | 'not_found' | null;
+  handledDamageType?: string | null;
+  handledCarPart?: string | null;
+  handledPosition?: string | null;
+  handledComment?: string | null;
+  handledBy?: string | null;
+  handledPhotoUrls?: string[];
+  handledVideoUrls?: string[];
 };
 
 type NewDamage = {
@@ -274,6 +282,23 @@ const getFullNameFromEmail = (email: string): string => {
         return `${firstName} ${lastName}`;
     }
     return capitalizeFirstLetter(parts[0]);
+};
+
+const formatLastCheckinText = (lastCheckin: { station: string; checker_name: string; completed_at: string }): string => {
+    try {
+        const completedAt = new Date(lastCheckin.completed_at);
+        // Check if date is valid
+        if (isNaN(completedAt.getTime())) {
+            return `Senast incheckad på ${lastCheckin.station}`;
+        }
+        const dateStr = completedAt.toLocaleDateString('sv-SE'); // YYYY-MM-DD
+        const timeStr = completedAt.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }); // HH:mm
+        const firstName = lastCheckin.checker_name?.split(' ')[0] || 'Okänd';
+        return `Senast incheckad på ${lastCheckin.station} av ${firstName} (${dateStr} kl ${timeStr})`;
+    } catch {
+        // Fallback if date parsing fails
+        return `Senast incheckad på ${lastCheckin.station}`;
+    }
 };
 
 // =================================================================
@@ -603,7 +628,15 @@ export default function CheckInForm() {
                 status: 'not_selected',
                 userPositions: [],
                 media: [],
-                uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
+                uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' },
+                handledType: d.handled_type || null,
+                handledDamageType: d.handled_damage_type || null,
+                handledCarPart: d.handled_car_part || null,
+                handledPosition: d.handled_position || null,
+                handledComment: d.handled_comment || null,
+                handledBy: d.handled_by || null,
+                handledPhotoUrls: d.handled_photo_urls || [],
+                handledVideoUrls: d.handled_video_urls || []
               })));
             }
           },
@@ -627,7 +660,15 @@ export default function CheckInForm() {
               status: 'not_selected',
               userPositions: [],
               media: [],
-              uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' }
+              uploads: { photo_urls: [], video_urls: [], folder: d.folder || '' },
+              handledType: d.handled_type || null,
+              handledDamageType: d.handled_damage_type || null,
+              handledCarPart: d.handled_car_part || null,
+              handledPosition: d.handled_position || null,
+              handledComment: d.handled_comment || null,
+              handledBy: d.handled_by || null,
+              handledPhotoUrls: d.handled_photo_urls || [],
+              handledVideoUrls: d.handled_video_urls || []
           })));
       }
   
@@ -1281,26 +1322,95 @@ export default function CheckInForm() {
               {existingDamages.length > 0 && (
                 <div className="damage-list-info">
                   <span className="info-label">Befintliga skador ({existingDamages.length})</span>
-                  {existingDamages.map((d, i) => (
-                    <div key={d.id} className="damage-list-item">
-                      {i + 1}. {d.fullText}
-                      {d.uploads.folder && (
-                        <a 
-                          href={`/media/${d.uploads.folder}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="damage-media-link"
-                          aria-label="Visa media för denna skada"
-                          title="Öppna mediefiler för denna skada"
-                        >
-                          📁 Visa media
-                        </a>
-                      )}
-                    </div>
-                  ))}
+                  {existingDamages.map((d, i) => {
+                    // Format damage display based on handled type
+                    let displayText = '';
+                    let hasMedia = false;
+                    let mediaUrls: string[] = [];
+                    
+                    if (d.handledType === 'existing') {
+                      // Dokumenterade skador (type='existing')
+                      // Use structured data from checkin_damages
+                      // Format: {damage_type} - {car_part} - {position} ({description if exists})
+                      const parts: string[] = [];
+                      if (d.handledDamageType) parts.push(d.handledDamageType);
+                      if (d.handledCarPart) parts.push(d.handledCarPart);
+                      if (d.handledPosition) parts.push(d.handledPosition);
+                      
+                      displayText = parts.length > 0 ? parts.join(' - ') : (d.fullText || 'Dokumenterad skada');
+                      if (d.handledComment) {
+                        displayText += ` (${d.handledComment})`;
+                      }
+                      
+                      // Check for media from checkin_damages
+                      if (d.handledPhotoUrls && d.handledPhotoUrls.length > 0) {
+                        hasMedia = true;
+                        mediaUrls = d.handledPhotoUrls;
+                      }
+                    } else if (d.handledType === 'not_found') {
+                      // Ej dokumenterade skador (type='not_found')
+                      // Format: {damage_type}. Ej dokumenterad. "{description}" ({checker_name})
+                      let damageTypeName = d.handledDamageType;
+                      if (!damageTypeName && d.fullText) {
+                        const parts = d.fullText.split(' - ');
+                        damageTypeName = parts.length > 0 ? parts[0] : d.fullText;
+                      }
+                      displayText = (damageTypeName || 'Skada') + '. Ej dokumenterad.';
+                      if (d.handledComment) {
+                        displayText += ` "${d.handledComment}"`;
+                      }
+                      if (d.handledBy) {
+                        const firstName = d.handledBy.split(' ')[0] || d.handledBy;
+                        displayText += ` (${firstName})`;
+                      }
+                    } else {
+                      // Unhandled damages - show BUHS text as is
+                      displayText = d.fullText;
+                      
+                      // Check for media from uploads folder
+                      if (d.uploads.folder) {
+                        hasMedia = true;
+                      }
+                    }
+                    
+                    return (
+                      <div key={d.id} className="damage-list-item">
+                        {i + 1}. {displayText}
+                        {hasMedia && mediaUrls.length > 0 && (
+                          <a 
+                            href={mediaUrls[0]}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="damage-media-link"
+                            aria-label="Visa media för denna skada"
+                            title="Öppna mediefiler för denna skada"
+                          >
+                            📁 Visa media
+                          </a>
+                        )}
+                        {hasMedia && !mediaUrls.length && d.uploads.folder && (
+                          <a 
+                            href={`/media/${d.uploads.folder}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="damage-media-link"
+                            aria-label="Visa media för denna skada"
+                            title="Öppna mediefiler för denna skada"
+                          >
+                            📁 Visa media
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
               {existingDamages.length === 0 && !loading && <div className="damage-list-info"><span className="info-label">Befintliga skador</span><div>- Inga kända skador</div></div>}
+              {vehicleData.last_checkin && (
+                <div className="last-checkin-info">
+                  {formatLastCheckinText(vehicleData.last_checkin)}
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -1815,6 +1925,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-list-info { margin-top: 1rem; grid-column: 1 / -1; border-top: 1px solid #dbeafe; padding-top: 0.75rem; }
     .damage-list-info .info-label { display: block; margin-bottom: 0.25rem; }
     .damage-list-item { padding-left: 0.5rem; line-height: 1.4; font-size: 0.875rem;}
+    .last-checkin-info { margin-top: 0.75rem; font-style: italic; font-size: 0.875rem; color: var(--color-text-secondary); }
     .damage-media-link { color: #2563eb; text-decoration: none; margin-left: 0.5rem; font-size: 0.875rem; }
     .damage-media-link:hover { text-decoration: underline; }
     .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
