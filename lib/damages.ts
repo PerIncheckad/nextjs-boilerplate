@@ -5,20 +5,16 @@ import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
 // 1. TYPE DEFINITIONS
 // =================================================================
 
-// Raw damage data from the legacy source (BUHS)
+// Raw damage data from the legacy source (BUHS/damages_external)
+// NOTE: damages_external does NOT have an 'id' column
 type LegacyDamage = {
-  id: number;
-  damage_type_raw: string | null;
-  note_customer:  string | null;
-  note_internal: string | null;
+  regnr:  string;
   saludatum: string | null;
   damage_date: string | null;
-};
-
-// Represents an already inventoried damage from our main 'damages' table
-type InventoriedDamage = {
-  legacy_damage_source_text: string;
-  new_text: string;
+  damage_type_raw:  string | null;
+  note_customer: string | null;
+  note_internal: string | null;
+  vehiclenote: string | null;
 };
 
 // The final, consolidated damage object sent to the form client
@@ -78,7 +74,7 @@ function getLegacyDamageText(damage: LegacyDamage): string {
     const parts = [
       damage.damage_type_raw,
       damage.note_customer,
-      damage. note_internal,
+      damage.note_internal,
     ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
     const uniqueParts = [...new Set(parts)];
     return uniqueParts.join(' - ');
@@ -90,12 +86,12 @@ function getLegacyDamageText(damage: LegacyDamage): string {
 // =================================================================
 
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
-  const cleanedRegnr = regnr. toUpperCase().trim();
+  const cleanedRegnr = regnr.toUpperCase().trim();
 
   // Step 1: Fetch all data concurrently
   const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, handledDamagesResponse, lastCheckinResponse] = await Promise.all([
     supabase
-      . rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
+      .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -136,20 +132,18 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Step 2: Process the fetched data
   const vehicleData = vehicleResponse.data? .[0] || null;
   const nybilData = nybilResponse.data || null;
-  const legacyDamages:  LegacyDamage[] = legacyDamagesResponse. data || [];
-  const dbDamages = dbDamagesResponse.data || [];
+  const legacyDamages:  LegacyDamage[] = legacyDamagesResponse.data || [];
+  const dbDamages = dbDamagesResponse. data || [];
   const handledDamages = handledDamagesResponse.data || [];
   const lastCheckinData = lastCheckinResponse. data || null;
   
-  const lastCheckinDate = lastCheckinData?.completed_at ?  new Date(lastCheckinData.completed_at) : null;
+  const lastCheckinDate = lastCheckinData?. completed_at ?  new Date(lastCheckinData.completed_at) : null;
   
-  // Build a LIST (not map) of handled damages for INDEX-based matching
-  // We match by position:  1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
-  // This is necessary because BUHS "Skrapad och buckla" can become "Krockskada" in checkin_damages
+  // Build a LIST of handled damages for INDEX-based matching
   type HandledDamageInfo = {
     type: 'existing' | 'not_found';
     damage_type:  string;
-    car_part: string | null;
+    car_part:  string | null;
     position: string | null;
     description: string;
     checker:  string;
@@ -161,15 +155,15 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found') {
-      const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
+      const checkerName = (handled. checkins as any)?.checker_name || 'Okänd';
       handledDamagesList.push({
-        type: handled.type,
-        damage_type: handled.damage_type || 'Okänd',
-        car_part:  handled.car_part || null,
+        type:  handled.type,
+        damage_type:  handled.damage_type || 'Okänd',
+        car_part: handled. car_part || null,
         position: handled.position || null,
         description: handled.description || '',
-        checker: checkerName,
-        photo_urls: (handled.photo_urls as string[]) || [],
+        checker:  checkerName,
+        photo_urls:  (handled.photo_urls as string[]) || [],
         video_urls: (handled.video_urls as string[]) || [],
       });
     }
@@ -205,7 +199,6 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const dbDamageKeys = new Set<string>();
   
   // Count how many BUHS damages are older than the last check-in
-  // This tells us how many checkin_damages entries we should have
   let handledBuhsCount = 0;
   if (lastCheckinDate) {
     for (const leg of legacyDamages) {
@@ -218,19 +211,19 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     }
   }
   
-  // Only use index-based matching if the counts match
-  // This ensures we don't mismatch when data is incomplete
+  // Use index-based matching if counts match
   const useIndexMatching = handledBuhsCount > 0 && handledBuhsCount === handledDamagesList.length;
   
   let handledDamageIndex = 0;
   
-  for (const leg of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const leg = legacyDamages[i];
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
 
     if (displayText) {
-      const damageType = leg.damage_type_raw || displayText. split(' - ')[0].trim();
+      const damageType = leg.damage_type_raw || displayText. split(' - ')[0]. trim();
       const normalized = normalizeDamageType(damageType);
       
       // Check if this damage is handled (last check-in is newer than damage date)
@@ -253,8 +246,11 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized. typeCode}`;
       dbDamageKeys. add(dedupeKey);
       
+      // Generate a unique ID based on index since damages_external has no id column
+      const generatedId = i + 1;
+      
       consolidatedDamages.push({
-        id: leg. id,
+        id: generatedId,
         text: displayText,
         damage_date: leg.damage_date,
         is_inventoried:  isInventoried || isHandled,
@@ -263,7 +259,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         handled_car_part: handledInfo?.car_part || null,
         handled_position: handledInfo?.position || null,
         handled_comment: handledInfo?.description || null,
-        handled_by: handledInfo?.checker || null,
+        handled_by: handledInfo?. checker || null,
         handled_photo_urls: handledInfo?.photo_urls || [],
         handled_video_urls: handledInfo?.video_urls || [],
       });
@@ -307,14 +303,14 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       handled_damage_type: null,
       handled_car_part: null,
       handled_position: null,
-      handled_comment: null,
-      handled_by:  null,
-      handled_photo_urls:  [],
+      handled_comment:  null,
+      handled_by: null,
+      handled_photo_urls: [],
       handled_video_urls: [],
     });
   }
 
-  const latestSaludatum = legacyDamages. length > 0 ? legacyDamages[0].saludatum : null;
+  const latestSaludatum = legacyDamages. length > 0 ? legacyDamages[0].saludatum :  null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
   const lastCheckin = lastCheckinData ?  {
