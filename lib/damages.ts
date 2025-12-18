@@ -8,10 +8,10 @@ import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
 // Raw damage data from the legacy source (BUHS/damages_external)
 // NOTE: damages_external does NOT have an 'id' column
 type LegacyDamage = {
-  regnr:  string;
+  regnr: string;
   saludatum: string | null;
   damage_date: string | null;
-  damage_type_raw:  string | null;
+  damage_type_raw: string | null;
   note_customer: string | null;
   note_internal: string | null;
   vehiclenote: string | null;
@@ -75,7 +75,7 @@ function getLegacyDamageText(damage: LegacyDamage): string {
       damage.damage_type_raw,
       damage.note_customer,
       damage.note_internal,
-    ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
+    ].filter(p => p && p.trim() !== '' && p. trim() !== '-');
     const uniqueParts = [...new Set(parts)];
     return uniqueParts.join(' - ');
 }
@@ -85,11 +85,11 @@ function getLegacyDamageText(damage: LegacyDamage): string {
 // 3. CORE DATA FETCHING FUNCTION
 // =================================================================
 
-export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
-  const cleanedRegnr = regnr.toUpperCase().trim();
+export async function getVehicleInfo(regnr:  string): Promise<VehicleInfo> {
+  const cleanedRegnr = regnr. toUpperCase().trim();
 
-  // Step 1: Fetch all data concurrently
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, handledDamagesResponse, lastCheckinResponse] = await Promise.all([
+  // Step 1: Fetch base data concurrently
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, checkinsForRegnrResponse, lastCheckinResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -100,7 +100,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .eq('regnr', cleanedRegnr)
       .not('legacy_damage_source_text', 'is', null),
     supabase
-      .from('damages')
+      . from('damages')
       .select('id, regnr, source, user_type, damage_type_raw, user_positions, damage_date, created_at, legacy_damage_source_text, uploads')
       .eq('regnr', cleanedRegnr)
       .in('source', ['CHECK', 'NYBIL'])
@@ -112,15 +112,14 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    // IMPORTANT: Sort ASCENDING to match BUHS order (oldest first)
-    supabase
-      .from('checkin_damages')
-      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins! inner(regnr, checker_name)')
-      .eq('checkins.regnr', cleanedRegnr)
-      .in('type', ['not_found', 'existing', 'documented'])
-      .order('created_at', { ascending: true }),
+    // Get all checkin IDs for this regnr first
     supabase
       .from('checkins')
+      .select('id, checker_name')
+      .eq('regnr', cleanedRegnr)
+      .eq('status', 'COMPLETED'),
+    supabase
+      . from('checkins')
       .select('current_station, checker_name, completed_at')
       .eq('regnr', cleanedRegnr)
       .eq('status', 'COMPLETED')
@@ -130,19 +129,38 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   ]);
 
   // Step 2: Process the fetched data
-  const vehicleData = vehicleResponse.data? .[0] || null;
+  const vehicleData = vehicleResponse. data? .[0] || null;
   const nybilData = nybilResponse.data || null;
-  const legacyDamages:  LegacyDamage[] = legacyDamagesResponse.data || [];
+  const legacyDamages:  LegacyDamage[] = legacyDamagesResponse. data || [];
   const dbDamages = dbDamagesResponse. data || [];
-  const handledDamages = handledDamagesResponse.data || [];
+  const checkinsForRegnr = checkinsForRegnrResponse.data || [];
   const lastCheckinData = lastCheckinResponse. data || null;
   
-  const lastCheckinDate = lastCheckinData?. completed_at ?  new Date(lastCheckinData.completed_at) : null;
+  const lastCheckinDate = lastCheckinData?.completed_at ?  new Date(lastCheckinData.completed_at) : null;
+  
+  // Step 2b: Fetch checkin_damages using the checkin IDs we found
+  // This avoids the problematic join filter syntax
+  const checkinIds = checkinsForRegnr.map(c => c.id);
+  const checkerNameMap = new Map<string, string>();
+  for (const c of checkinsForRegnr) {
+    checkerNameMap.set(c. id, c.checker_name || 'Okänd');
+  }
+  
+  let handledDamages: any[] = [];
+  if (checkinIds.length > 0) {
+    const { data } = await supabase
+      .from('checkin_damages')
+      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
+      .in('checkin_id', checkinIds)
+      .in('type', ['not_found', 'existing', 'documented'])
+      .order('created_at', { ascending: true });
+    handledDamages = data || [];
+  }
   
   // Build a LIST of handled damages for INDEX-based matching
   type HandledDamageInfo = {
     type: 'existing' | 'not_found';
-    damage_type:  string;
+    damage_type: string;
     car_part:  string | null;
     position: string | null;
     description: string;
@@ -155,11 +173,11 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found') {
-      const checkerName = (handled. checkins as any)?.checker_name || 'Okänd';
+      const checkerName = checkerNameMap.get(handled.checkin_id) || 'Okänd';
       handledDamagesList.push({
-        type:  handled.type,
-        damage_type:  handled.damage_type || 'Okänd',
-        car_part: handled. car_part || null,
+        type: handled.type,
+        damage_type: handled.damage_type || 'Okänd',
+        car_part:  handled.car_part || null,
         position: handled.position || null,
         description: handled.description || '',
         checker:  checkerName,
@@ -172,7 +190,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Create inventoried map for legacy damages that were previously documented
   const inventoriedMap = new Map<string, string>();
   if (inventoriedDamagesResponse.data) {
-    for (const inv of inventoriedDamagesResponse.data) {
+    for (const inv of inventoriedDamagesResponse. data) {
       if (inv.legacy_damage_source_text) {
         let newText:  string;
         
@@ -223,7 +241,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
 
     if (displayText) {
-      const damageType = leg.damage_type_raw || displayText. split(' - ')[0]. trim();
+      const damageType = leg.damage_type_raw || displayText. split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
       
       // Check if this damage is handled (last check-in is newer than damage date)
@@ -236,7 +254,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
           isHandled = true;
           
           // Use index-based matching if counts match
-          if (useIndexMatching && handledDamageIndex < handledDamagesList.length) {
+          if (useIndexMatching && handledDamageIndex < handledDamagesList. length) {
             handledInfo = handledDamagesList[handledDamageIndex];
             handledDamageIndex++;
           }
@@ -310,7 +328,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     });
   }
 
-  const latestSaludatum = legacyDamages. length > 0 ? legacyDamages[0].saludatum :  null;
+  const latestSaludatum = legacyDamages. length > 0 ? legacyDamages[0]. saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
   const lastCheckin = lastCheckinData ?  {
@@ -342,7 +360,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     return {
       regnr: cleanedRegnr,
       model: formatModel(nybilData. bilmarke, nybilData.modell),
-      wheel_storage_location:  wheelStorage,
+      wheel_storage_location: wheelStorage,
       saludatum: nybilSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
