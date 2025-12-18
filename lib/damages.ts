@@ -157,10 +157,37 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     checker: string;
     photo_urls: string[];
     video_urls: string[];
+    checkin_id: number;
+    created_at: string;
   };
   const handledDamagesList: HandledDamageInfo[] = [];
   
+  // Get the checkin_id of the last check-in to filter damages from only that check-in
+  let lastCheckinId: number | null = null;
+  if (handledDamages.length > 0 && lastCheckinData) {
+    // Find checkin_id from the most recent checkin_damage entry
+    // Since handledDamages is ordered by created_at DESC, we can find the first one
+    // that matches our last check-in timeframe
+    for (const handled of handledDamages) {
+      const handledDate = new Date(handled.created_at);
+      const checkinDate = new Date(lastCheckinData.completed_at);
+      // Check if this damage was created around the same time as the last check-in
+      // (within a reasonable timeframe, e.g., same day or close)
+      const timeDiff = Math.abs(checkinDate.getTime() - handledDate.getTime());
+      const oneDayMs = 24 * 60 * 60 * 1000;
+      if (timeDiff < oneDayMs) {
+        lastCheckinId = handled.checkin_id;
+        break;
+      }
+    }
+  }
+  
   for (const handled of handledDamages) {
+    // Only include damages from the last check-in
+    if (lastCheckinId && handled.checkin_id !== lastCheckinId) {
+      continue;
+    }
+    
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
       // Get the checker name from the checkin (using type assertion for nested join data)
       const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
@@ -175,9 +202,15 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         checker: checkerName,
         photo_urls: (handled.photo_urls as string[]) || [],
         video_urls: (handled.video_urls as string[]) || [],
+        checkin_id: handled.checkin_id,
+        created_at: handled.created_at,
       });
     }
   }
+  
+  console.log('[damages.ts] lastCheckinId:', lastCheckinId);
+  console.log('[damages.ts] handledDamagesList length:', handledDamagesList.length);
+  console.log('[damages.ts] handledDamagesList:', JSON.stringify(handledDamagesList, null, 2));
   
   // Create a lookup map of inventoried damages for efficient access
   const inventoriedMap = new Map<string, string>();
@@ -237,14 +270,27 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       let isHandled = false;
       let handledInfo: HandledDamageInfo | null = null;
       
+      console.log(`[damages.ts] Processing legacy damage ${i}:`, {
+        id: leg.id,
+        damage_date: leg.damage_date,
+        originalText,
+        lastCheckinDate: lastCheckinDate?.toISOString(),
+        handledDamageIndex
+      });
+      
       if (lastCheckinDate && leg.damage_date) {
         const damageDate = new Date(leg.damage_date);
+        console.log(`[damages.ts] Comparing dates: lastCheckinDate (${lastCheckinDate.toISOString()}) > damageDate (${damageDate.toISOString()})? ${lastCheckinDate > damageDate}`);
+        
         if (lastCheckinDate > damageDate) {
           isHandled = true;
           // Match by index: use the corresponding checkin_damage entry in order
           // Increment index for ALL damages (not just handled ones) to maintain proper mapping
           if (handledDamageIndex < handledDamagesList.length) {
             handledInfo = handledDamagesList[handledDamageIndex];
+            console.log(`[damages.ts] Matched with handledInfo at index ${handledDamageIndex}:`, handledInfo);
+          } else {
+            console.log(`[damages.ts] No handledInfo available at index ${handledDamageIndex} (list length: ${handledDamagesList.length})`);
           }
         }
       }
@@ -259,7 +305,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;
       dbDamageKeys.add(dedupeKey);
       
-      consolidatedDamages.push({
+      const consolidated = {
         id: leg.id,
         text: displayText,
         damage_date: leg.damage_date,
@@ -274,7 +320,10 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         handled_by: handledInfo?.checker || null,
         handled_photo_urls: handledInfo?.photo_urls || [],
         handled_video_urls: handledInfo?.video_urls || [],
-      });
+      };
+      
+      console.log(`[damages.ts] Pushing consolidated damage:`, consolidated);
+      consolidatedDamages.push(consolidated);
     }
   }
   
