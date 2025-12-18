@@ -6,8 +6,9 @@ import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
 // =================================================================
 
 // Raw damage data from the legacy source (BUHS)
+// Note: The RPC get_damages_by_trimmed_regnr returns data from damages_external view
+// which does NOT have an id column, so we generate synthetic IDs
 type LegacyDamage = {
-  id: number;
   damage_type_raw: string | null;
   note_customer: string | null;
   note_internal: string | null;
@@ -93,8 +94,8 @@ function getLegacyDamageText(damage: LegacyDamage): string {
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
-  // Step 1: Fetch all data concurrently, including handled damages from checkin_damages and last check-in
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, handledDamagesResponse, lastCheckinResponse] = await Promise.all([
+  // Step 1: Fetch all data concurrently, including last check-in and checkins for damage lookup
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, checkinsResponse, lastCheckinResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -118,11 +119,11 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .limit(1)
       .maybeSingle(),
     supabase
-      .from('checkin_damages')
-      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins!inner(regnr, checker_name)')
-      .eq('checkins.regnr', cleanedRegnr)
-      .in('type', ['not_found', 'existing', 'documented'])
-      .order('created_at', { ascending: false }),
+      .from('checkins')
+      .select('id, checker_name')
+      .eq('regnr', cleanedRegnr)
+      .eq('status', 'COMPLETED')
+      .order('completed_at', { ascending: false }),
     supabase
       .from('checkins')
       .select('current_station, checker_name, completed_at')
@@ -133,13 +134,31 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .maybeSingle()
   ]);
 
+  // Step 1.5: Fetch checkin_damages using the checkin IDs from step 1
+  const checkinIds = (checkinsResponse.data || []).map(c => c.id);
+  const handledDamagesResponse = checkinIds.length > 0
+    ? await supabase
+        .from('checkin_damages')
+        .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
+        .in('checkin_id', checkinIds)
+        .in('type', ['not_found', 'existing', 'documented'])
+        .order('created_at', { ascending: false })
+    : { data: [], error: null };
+
   // Step 2: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
   const handledDamages = handledDamagesResponse.data || [];
+  const checkins = checkinsResponse.data || [];
   const lastCheckinData = lastCheckinResponse.data || null;
+  
+  // Create a lookup map for checker names by checkin_id
+  const checkinLookup = new Map<number, string>();
+  for (const checkin of checkins) {
+    checkinLookup.set(checkin.id, checkin.checker_name || 'Okänd');
+  }
   
   // Get the date of the last check-in to filter damages older than that
   // If last check-in exists and is newer than a damage's date, that damage is considered handled
@@ -162,8 +181,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found') {
-      // Get the checker name from the checkin (using type assertion for nested join data)
-      const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
+      // Get the checker name from the checkin lookup map
+      const checkerName = checkinLookup.get(handled.checkin_id) || 'Okänd';
       handledDamagesList.push({
         type: handled.type,
         // damage_type can be null/undefined in rare cases (data integrity issues)
@@ -259,8 +278,12 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;
       dbDamageKeys.add(dedupeKey);
       
+      // Generate a synthetic ID for legacy damages since the RPC doesn't return one
+      // Use a negative index-based ID to avoid conflicts with real database IDs
+      const syntheticId = -(i + 1);
+      
       consolidatedDamages.push({
-        id: leg.id,
+        id: syntheticId,
         text: displayText,
         damage_date: leg.damage_date,
         // Mark as inventoried if already documented OR if handled in previous check-in
