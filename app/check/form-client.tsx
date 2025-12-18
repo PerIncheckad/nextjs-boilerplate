@@ -1337,7 +1337,7 @@ export default function CheckInForm() {
                       if (d.handledCarPart) parts.push(d.handledCarPart);
                       if (d.handledPosition) parts.push(d.handledPosition);
                       
-                      displayText = parts.join(' - ');
+                      displayText = parts.length > 0 ? parts.join(' - ') : (d.fullText || 'Dokumenterad skada');
                       if (d.handledComment) {
                         displayText += ` (${d.handledComment})`;
                       }
@@ -1350,8 +1350,12 @@ export default function CheckInForm() {
                     } else if (d.handledType === 'not_found') {
                       // Ej dokumenterade skador (type='not_found')
                       // Format: {damage_type}. Ej dokumenterad. "{description}" ({checker_name})
-                      displayText = d.handledDamageType || d.fullText.split(' - ')[0];
-                      displayText += '. Ej dokumenterad.';
+                      let damageTypeName = d.handledDamageType;
+                      if (!damageTypeName && d.fullText) {
+                        const parts = d.fullText.split(' - ');
+                        damageTypeName = parts.length > 0 ? parts[0] : d.fullText;
+                      }
+                      displayText = (damageTypeName || 'Skada') + '. Ej dokumenterad.';
                       if (d.handledComment) {
                         displayText += ` "${d.handledComment}"`;
                       }
