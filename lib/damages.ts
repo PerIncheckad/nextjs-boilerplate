@@ -101,7 +101,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .from('damages')
-      .select('legacy_damage_source_text, user_type, user_positions')
+      .select('legacy_damage_source_text, user_type, user_positions, uploads')
       .eq('regnr', cleanedRegnr)
       .not('legacy_damage_source_text', 'is', null),
     supabase
@@ -181,6 +181,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   // Create a lookup map of inventoried damages for efficient access
   const inventoriedMap = new Map<string, string>();
+  const inventoriedFolderMap = new Map<string, string>();
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
       if (inv.legacy_damage_source_text) {
@@ -204,6 +205,11 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         }
         
         inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        
+        // Store folder path if uploads exist
+        if ((inv.uploads as any)?.folder) {
+          inventoriedFolderMap.set(inv.legacy_damage_source_text, (inv.uploads as any).folder);
+        }
       }
     }
   }
@@ -259,6 +265,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;
       dbDamageKeys.add(dedupeKey);
       
+      // Get folder path for documented damages from the damages table
+      const folderPath = inventoriedFolderMap.get(originalText) || null;
+      
       consolidatedDamages.push({
         id: leg.id,
         text: displayText,
@@ -266,6 +275,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         // Mark as inventoried if already documented OR if handled in previous check-in
         // This prevents the damage from showing in "Befintliga skador att hantera"
         is_inventoried: isInventoried || isHandled,
+        folder: folderPath,
         handled_type: handledInfo?.type || null,
         handled_damage_type: handledInfo?.damage_type || null,
         handled_car_part: handledInfo?.car_part || null,
