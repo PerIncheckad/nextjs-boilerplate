@@ -145,8 +145,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const handledDamageMap = new Map<string, { type: 'existing' | 'not_found', comment: string, checker: string }>();
   for (const handled of handledDamages) {
     if (handled.damage_type && (handled.type === 'existing' || handled.type === 'not_found')) {
-      // Get the checker name from the checkin
-      const checkerName = (handled as any).checkins?.checker_name || 'Okänd';
+      // Get the checker name from the checkin (using type assertion for nested join data)
+      const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
       handledDamageMap.set(handled.damage_type, {
         type: handled.type,
         comment: handled.description || '',
@@ -227,7 +227,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         id: leg.id,
         text: displayText,
         damage_date: leg.damage_date,
-        is_inventoried: isInventoried || isHandled,  // Mark as inventoried if handled
+        // Mark as inventoried if already documented OR if handled in previous check-in
+        // This prevents the damage from showing in "Befintliga skador att hantera"
+        is_inventoried: isInventoried || isHandled,
         handled_type: handledInfo?.type || null,
         handled_comment: handledInfo?.comment || null,
         handled_by: handledInfo?.checker || null,

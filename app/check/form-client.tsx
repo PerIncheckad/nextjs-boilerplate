@@ -1326,7 +1326,8 @@ export default function CheckInForm() {
                         displayText += ` "${d.handledComment}"`;
                       }
                       if (d.handledBy) {
-                        displayText += ` (${d.handledBy.split(' ')[0]})`;
+                        const firstName = d.handledBy.split(' ')[0] || d.handledBy;
+                        displayText += ` (${firstName})`;
                       }
                     }
                     
