@@ -116,6 +116,11 @@ function normalizeDamageType(damageType: string): { typeCode: string } {
 async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
+  // Debug logging at start for JBD26N
+  if (cleanedRegnr === 'JBD26N') {
+    console.log('JBD26N_DEBUG_START', { regnr: cleanedRegnr, commitHint: '0f0f2eb' });
+  }
+
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
   const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
     supabaseAdmin
@@ -335,17 +340,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
 
     // Debug logging for JBD26N specifically with searchable tag
     if (cleanedRegnr === 'JBD26N') {
-      console.log('JBD26N_DEBUG: Processing legacy damage', {
-        damageIndex: i,
+      console.log('JBD26N_DEBUG_KEYS', {
         originalText,
         normalizedOriginalKey: normalizedKey,
         inventoriedMapSize: inventoriedMap.size,
-        inventoriedMapHasKey: inventoriedMap.has(normalizedKey),
-        inventoriedMapKeys: Array.from(inventoriedMap.keys()).slice(0, 10).map(k => ({
-          raw: k,
-          normalized: normalizeKey(k),
-        })),
-        isInventoried,
+        hasKey: inventoriedMap.has(normalizedKey),
+        inventoriedMapKeys: Array.from(inventoriedMap.keys()).slice(0, 10),
         displayText,
         willUseRawBUHS: !isInventoried,
       });
