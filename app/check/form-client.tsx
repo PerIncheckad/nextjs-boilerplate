@@ -59,7 +59,7 @@ type ExistingDamage = {
   resolvedComment?: string;
   media: MediaFile[];
   uploads: Uploads;
-  handledType?: 'existing' | 'not_found' | null;
+  handledType?: 'existing' | 'not_found' | 'documented' | null;
   handledDamageType?: string | null;
   handledCarPart?: string | null;
   handledPosition?: string | null;
@@ -1328,8 +1328,8 @@ export default function CheckInForm() {
                     let hasMedia = false;
                     let mediaUrls: string[] = [];
                     
-                    if (d.handledType === 'existing') {
-                      // Dokumenterade skador (type='existing')
+                    if (d.handledType === 'existing' || d.handledType === 'documented') {
+                      // Dokumenterade skador (type='existing' or 'documented')
                       // Use structured data from checkin_damages
                       // Format: {damage_type} - {car_part} - {position} ({description if exists})
                       const parts: string[] = [];
@@ -1342,10 +1342,14 @@ export default function CheckInForm() {
                         displayText += ` (${d.handledComment})`;
                       }
                       
-                      // Check for media from checkin_damages
+                      // Check for media from checkin_damages first
                       if (d.handledPhotoUrls && d.handledPhotoUrls.length > 0) {
                         hasMedia = true;
                         mediaUrls = d.handledPhotoUrls;
+                      }
+                      // Also check for media from damages.uploads as fallback
+                      if (!hasMedia && d.uploads.folder) {
+                        hasMedia = true;
                       }
                     } else if (d.handledType === 'not_found') {
                       // Ej dokumenterade skador (type='not_found')
