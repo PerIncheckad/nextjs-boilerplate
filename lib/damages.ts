@@ -15,6 +15,23 @@ type LegacyDamage = {
   damage_date: string | null; // <<< CORRECTED: Ensure this field is fetched
 };
 
+// Type for checkin_damages data with nested checkins join
+type CheckinDamageWithCheckin = {
+  type: 'existing' | 'not_found' | 'documented';
+  damage_type: string | null;
+  car_part: string | null;
+  position: string | null;
+  description: string | null;
+  photo_urls: unknown;
+  video_urls: unknown;
+  created_at: string;
+  checkin_id: string;
+  checkins: {
+    regnr: string;
+    checker_name: string;
+  } | null;
+};
+
 // Represents an already inventoried damage from our main 'damages' table
 type InventoriedDamage = {
   legacy_damage_source_text: string; // The original text, used as a key
@@ -145,7 +162,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
-  const handledDamages = handledDamagesResponse.data || [];
+  const handledDamages = (handledDamagesResponse.data || []) as CheckinDamageWithCheckin[];
   
   // Get the date of the last check-in for display purposes
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
@@ -167,8 +184,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
-      // Get the checker name from the checkin (using type assertion for nested join data)
-      const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
+      // Get the checker name from the nested checkin join
+      const checkerName = handled.checkins?.checker_name || 'Okänd';
       handledDamagesList.push({
         type: handled.type,
         // damage_type can be null/undefined in rare cases (data integrity issues)
@@ -242,7 +259,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       // This is deterministic and doesn't rely on fragile date comparisons
       let handledInfo: HandledDamageInfo | null = null;
       
-      if (lastCheckinDate && handledDamageIndex < handledDamagesList.length) {
+      if (handledDamageIndex < handledDamagesList.length) {
         handledInfo = handledDamagesList[handledDamageIndex];
         handledDamageIndex++;
       }
