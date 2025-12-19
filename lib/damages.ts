@@ -28,7 +28,7 @@ export type ConsolidatedDamage = {
   damage_date: string | null;
   is_inventoried: boolean;
   folder?: string | null;  // Folder path for associated media files (photos/videos)
-  handled_type?: 'existing' | 'not_found' | null;  // How the damage was handled in a previous check-in
+  handled_type?: 'existing' | 'not_found' | 'documented' | null;  // How the damage was handled in a previous check-in
   handled_damage_type?: string | null;  // Structured damage type from checkin_damages
   handled_car_part?: string | null;  // Car part from checkin_damages
   handled_position?: string | null;  // Position from checkin_damages
@@ -149,7 +149,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // We can't match by damage_type because BUHS "Skrapad och buckla" != checkin_damages "Krockskada"
   // Instead, we match by order: 1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
   type HandledDamageInfo = {
-    type: 'existing' | 'not_found';
+    type: 'existing' | 'not_found' | 'documented';
     damage_type: string;
     car_part: string | null;
     position: string | null;
@@ -161,7 +161,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const handledDamagesList: HandledDamageInfo[] = [];
   
   for (const handled of handledDamages) {
-    if (handled.type === 'existing' || handled.type === 'not_found') {
+    if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
       // Get the checker name from the checkin (using type assertion for nested join data)
       const checkerName = (handled.checkins as any)?.checker_name || 'Okänd';
       handledDamagesList.push({
@@ -232,26 +232,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
       
-      // Determine if this damage should be filtered from "Befintliga skador att hantera"
-      // A damage is handled if the last check-in is newer than the damage date
-      let isHandled = false;
+      // Determine if this damage has been handled in the last check-in
+      // Match by index: 1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
+      // This is deterministic and doesn't rely on fragile date comparisons
       let handledInfo: HandledDamageInfo | null = null;
       
-      if (lastCheckinDate && leg.damage_date) {
-        const damageDate = new Date(leg.damage_date);
-        if (lastCheckinDate > damageDate) {
-          isHandled = true;
-          // Match by index: use the corresponding checkin_damage entry in order
-          // Increment index for ALL damages (not just handled ones) to maintain proper mapping
-          if (handledDamageIndex < handledDamagesList.length) {
-            handledInfo = handledDamagesList[handledDamageIndex];
-          }
-        }
-      }
-      
-      // Always increment index to maintain proper order matching
-      // This ensures 1st BUHS damage maps to 1st checkin_damage, 2nd to 2nd, etc.
-      if (isHandled) {
+      if (lastCheckinDate && handledDamageIndex < handledDamagesList.length) {
+        handledInfo = handledDamagesList[handledDamageIndex];
         handledDamageIndex++;
       }
       
@@ -263,9 +250,9 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         id: leg.id,
         text: displayText,
         damage_date: leg.damage_date,
-        // Mark as inventoried if already documented OR if handled in previous check-in
+        // Mark as inventoried if already documented OR if handled in last check-in
         // This prevents the damage from showing in "Befintliga skador att hantera"
-        is_inventoried: isInventoried || isHandled,
+        is_inventoried: isInventoried || (handledInfo !== null),
         handled_type: handledInfo?.type || null,
         handled_damage_type: handledInfo?.damage_type || null,
         handled_car_part: handledInfo?.car_part || null,
