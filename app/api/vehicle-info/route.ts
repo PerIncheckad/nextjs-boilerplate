@@ -333,14 +333,21 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     const isInventoried = inventoriedMap.has(normalizedKey);
     const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : originalText;
 
-    // Debug logging for JBD26N specifically
+    // Debug logging for JBD26N specifically with searchable tag
     if (cleanedRegnr === 'JBD26N') {
-      console.log(`[${cleanedRegnr}] Processing legacy damage #${i}:`, {
+      console.log('JBD26N_DEBUG: Processing legacy damage', {
+        damageIndex: i,
         originalText,
-        normalizedKey,
-        inventoriedMapKeys: Array.from(inventoriedMap.keys()),
+        normalizedOriginalKey: normalizedKey,
+        inventoriedMapSize: inventoriedMap.size,
+        inventoriedMapHasKey: inventoriedMap.has(normalizedKey),
+        inventoriedMapKeys: Array.from(inventoriedMap.keys()).slice(0, 10).map(k => ({
+          raw: k,
+          normalized: normalizeKey(k),
+        })),
         isInventoried,
         displayText,
+        willUseRawBUHS: !isInventoried,
       });
     }
 
