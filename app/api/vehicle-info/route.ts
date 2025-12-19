@@ -116,9 +116,9 @@ function normalizeDamageType(damageType: string): { typeCode: string } {
 async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
-  // Debug logging at start for JBD26N
-  if (cleanedRegnr === 'JBD26N') {
-    console.log('JBD26N_DEBUG_START', { regnr: cleanedRegnr, commitHint: '0f0f2eb' });
+  // Debug logging at start for JBD26N - using exact format requested
+  if (regnr === "JBD26N") {
+    console.log("JBD26N_DEBUG_START", { regnr, now: new Date().toISOString() });
   }
 
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
