@@ -303,6 +303,15 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       }
     }
   }
+  
+  // Create folder lookup map from dbDamages
+  // Maps legacy_damage_source_text -> uploads.folder
+  const folderMap = new Map<string, string>();
+  for (const dbDamage of dbDamages) {
+    if (dbDamage.legacy_damage_source_text && (dbDamage.uploads as any)?.folder) {
+      folderMap.set(dbDamage.legacy_damage_source_text, (dbDamage.uploads as any).folder);
+    }
+  }
 
   // Consolidate damages
   const consolidatedDamages: ConsolidatedDamage[] = [];
@@ -335,6 +344,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         text: displayText,
         damage_date: leg.damage_date,
         is_inventoried: isInventoried || (handledInfo !== null),
+        folder: folderMap.get(originalText) || null,
         handled_type: handledInfo?.type || null,
         handled_damage_type: handledInfo?.damage_type || null,
         handled_car_part: handledInfo?.car_part || null,
