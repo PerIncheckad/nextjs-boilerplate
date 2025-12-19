@@ -153,6 +153,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   let N = 10;
   let checkins: any[] = [];
   let allCheckinDamages: CheckinDamageData[] = [];
+  let allCheckinDamagesError: any = null;
   let winningCheckinId: string | null = null;
   let winningCheckinData: any = null;
   let handledDamages: CheckinDamageData[] = [];
@@ -183,6 +184,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       : { data: [], error: null };
     
     allCheckinDamages = (allCheckinDamagesResponse.data || []) as CheckinDamageData[];
+    allCheckinDamagesError = allCheckinDamagesResponse.error;
     
     // Step 4: Find "winning checkin" - most recent checkin where handledCount >= L
     for (const checkin of checkins) {
@@ -234,7 +236,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     winningCheckinId,
     winningCheckinCompleted: winningCheckinData?.completed_at,
     handledCount: handledDamages.length,
-    handledErr: allCheckinDamagesResponse.error,
+    handledErr: allCheckinDamagesError,
     firstHandled: handledDamages.length > 0 ? handledDamages[0] : null,
   });
   
