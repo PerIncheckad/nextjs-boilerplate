@@ -130,6 +130,32 @@ const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'H
 };
 
 /**
+ * Extract Supabase storage folder path from a public URL
+ * @param url - Supabase public storage URL
+ * @returns Folder path or null if extraction fails
+ */
+function extractSupabasePublicFolderFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    // Expected: /storage/v1/object/public/<bucket>/<folder>/<filename>
+    const marker = '/storage/v1/object/public/';
+    const i = u.pathname.indexOf(marker);
+    if (i === -1) return null;
+
+    const after = u.pathname.substring(i + marker.length); // "<bucket>/<folder>/<filename>"
+    const parts = after.split('/').filter(Boolean);
+    if (parts.length < 3) return null; // Need at least bucket + folder + filename
+
+    // Drop bucket (parts[0]) and filename (last part)
+    const folderParts = parts.slice(1, -1);
+    return folderParts.join('/');
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Check if a Saludatum is at risk (past or within 10 days from today)
  * @param saludatumStr - Saludatum string in YYYY-MM-DD format
  * @returns true if Saludatum is in the past or within 10 days, false otherwise
@@ -1378,24 +1404,22 @@ export default function CheckInForm() {
                       }
                     }
                     
+                    // Determine media link - prefer folder view over direct file URL
+                    const folderFromUploads = d.uploads?.folder || '';
+                    const folderFromHandledUrl = extractSupabasePublicFolderFromUrl(d.handledPhotoUrls?.[0] || null);
+                    const folder = folderFromUploads || folderFromHandledUrl || '';
+                    const folderHref = folder ? `/media/${folder}` : '';
+                    const fileHref = d.handledPhotoUrls?.[0] || '';
+                    
+                    // Use folder link if available, otherwise fall back to file link
+                    const mediaHref = folderHref || fileHref;
+                    
                     return (
                       <div key={d.id} className="damage-list-item">
                         {i + 1}. {displayText}
-                        {hasMedia && mediaUrls.length > 0 && (
+                        {hasMedia && mediaHref && (
                           <a 
-                            href={mediaUrls[0]}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="damage-media-link"
-                            aria-label="Visa media för denna skada"
-                            title="Öppna mediefiler för denna skada"
-                          >
-                            📁 Visa media
-                          </a>
-                        )}
-                        {hasMedia && !mediaUrls.length && d.uploads.folder && (
-                          <a 
-                            href={`/media/${d.uploads.folder}`} 
+                            href={mediaHref}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="damage-media-link"
