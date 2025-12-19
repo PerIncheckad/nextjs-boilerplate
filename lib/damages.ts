@@ -119,8 +119,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const lastCheckinData = lastCheckinResponse.data || null;
   const lastCheckinId = lastCheckinData?.id || null;
 
-  // Step 2: Fetch all other data, including checkin_damages for the specific latest checkin
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, handledDamagesResponse] = await Promise.all([
+  // Step 2: Fetch all other data in parallel
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -142,17 +142,19 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
-      .maybeSingle(),
-    // Fetch checkin_damages ONLY for the latest completed checkin, sorted by created_at ASC for deterministic ordering
-    // Note: No nested join - we use checker_name from lastCheckinData instead to avoid PostgREST join issues
-    lastCheckinId ? supabase
-      .from('checkin_damages')
-      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
-      .eq('checkin_id', lastCheckinId)
-      .in('type', ['not_found', 'existing', 'documented'])
-      .order('created_at', { ascending: true }) // ASC for stable index matching (1st damage → 1st entry)
-      : Promise.resolve({ data: [], error: null })
+      .maybeSingle()
   ]);
+  
+  // Step 2b: Fetch checkin_damages for the specific latest checkin (separate to avoid conditional in Promise.all)
+  // Note: No nested join - we use checker_name from lastCheckinData instead to avoid PostgREST join issues
+  const handledDamagesResponse = lastCheckinId 
+    ? await supabase
+        .from('checkin_damages')
+        .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
+        .eq('checkin_id', lastCheckinId)
+        .in('type', ['not_found', 'existing', 'documented'])
+        .order('created_at', { ascending: true }) // ASC for stable index matching (1st damage → 1st entry)
+    : { data: [], error: null };
 
   // Step 3: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
@@ -161,10 +163,14 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const dbDamages = dbDamagesResponse.data || [];
   const handledDamages = (handledDamagesResponse.data || []) as CheckinDamageData[];
   
-  // Debug: Log if we have a checkin but no handled damages (might indicate query issue)
-  if (lastCheckinId && handledDamages.length === 0) {
-    console.warn(`[damages.ts] Found checkin ${lastCheckinId} for ${cleanedRegnr} but no checkin_damages. This may indicate a query issue.`);
-  }
+  // Debug logging (A): Log detailed info about the fetch
+  console.log('[getVehicleInfo]', cleanedRegnr, {
+    lastCheckinId,
+    lastCheckinCompleted: lastCheckinData?.completed_at,
+    handledCount: handledDamages.length,
+    handledErr: handledDamagesResponse.error,
+    firstHandled: handledDamages.length > 0 ? handledDamages[0] : null,
+  });
   
   // Get the date of the last check-in for display purposes
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
@@ -203,6 +209,14 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       });
     }
   }
+  
+  // Debug logging (B): Log handledDamagesList after building
+  console.log('[getVehicleInfo] handledDamagesList built:', {
+    regnr: cleanedRegnr,
+    handledListCount: handledDamagesList.length,
+    checkerName,
+    items: handledDamagesList.map(h => ({ type: h.type, damage_type: h.damage_type, car_part: h.car_part })),
+  });
   
   // Create a lookup map of inventoried damages for efficient access
   const inventoriedMap = new Map<string, string>();
