@@ -93,8 +93,21 @@ function getLegacyDamageText(damage: LegacyDamage): string {
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
-  // Step 1: Fetch all data concurrently, including handled damages from checkin_damages and last check-in
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, handledDamagesResponse, lastCheckinResponse] = await Promise.all([
+  // Step 1: First fetch the latest completed check-in to get its checkin_id
+  const lastCheckinResponse = await supabase
+    .from('checkins')
+    .select('id, current_station, checker_name, completed_at')
+    .eq('regnr', cleanedRegnr)
+    .eq('status', 'COMPLETED')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  
+  const lastCheckinData = lastCheckinResponse.data || null;
+  const lastCheckinId = lastCheckinData?.id || null;
+
+  // Step 2: Fetch all other data, including checkin_damages for the specific latest checkin
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, handledDamagesResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -117,32 +130,24 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
-    supabase
+    // Fetch checkin_damages ONLY for the latest completed checkin, sorted by created_at ASC for deterministic ordering
+    lastCheckinId ? supabase
       .from('checkin_damages')
       .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins!inner(regnr, checker_name)')
-      .eq('checkins.regnr', cleanedRegnr)
+      .eq('checkin_id', lastCheckinId)
       .in('type', ['not_found', 'existing', 'documented'])
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('checkins')
-      .select('current_station, checker_name, completed_at')
-      .eq('regnr', cleanedRegnr)
-      .eq('status', 'COMPLETED')
-      .order('completed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .order('created_at', { ascending: true }) // ASC for stable index matching (1st damage → 1st entry)
+      : Promise.resolve({ data: [], error: null })
   ]);
 
-  // Step 2: Process the fetched data
+  // Step 3: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
   const handledDamages = handledDamagesResponse.data || [];
-  const lastCheckinData = lastCheckinResponse.data || null;
   
-  // Get the date of the last check-in to filter damages older than that
-  // If last check-in exists and is newer than a damage's date, that damage is considered handled
+  // Get the date of the last check-in for display purposes
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
   
   // Build a list of handled damages in chronological order for order-based matching
