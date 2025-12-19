@@ -116,20 +116,7 @@ function normalizeDamageType(damageType: string): { typeCode: string } {
 async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
-  // Step 1: First fetch the latest completed check-in to get its checkin_id
-  const lastCheckinResponse = await supabaseAdmin
-    .from('checkins')
-    .select('id, current_station, checker_name, completed_at')
-    .eq('regnr', cleanedRegnr)
-    .eq('status', 'COMPLETED')
-    .order('completed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  
-  const lastCheckinData = lastCheckinResponse.data || null;
-  const lastCheckinId = lastCheckinData?.id || null;
-
-  // Step 2: Fetch all other data in parallel
+  // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
   const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
     supabaseAdmin
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
@@ -155,29 +142,86 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .maybeSingle()
   ]);
   
-  // Step 2b: Fetch checkin_damages for the specific latest checkin (server-side, bypasses RLS)
-  const handledDamagesResponse = lastCheckinId 
-    ? await supabaseAdmin
-        .from('checkin_damages')
-        .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
-        .eq('checkin_id', lastCheckinId)
-        .in('type', ['not_found', 'existing', 'documented'])
-        .order('created_at', { ascending: true })
-    : { data: [], error: null };
-
-  // Step 3: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
-  const handledDamages = (handledDamagesResponse.data || []) as CheckinDamageData[];
+  const L = legacyDamages.length; // Number of BUHS damages
+  
+  // Step 2: Fetch last N completed checkins for historical matching
+  const N = 10; // Start with 10, can be increased if needed
+  const checkinsResponse = await supabaseAdmin
+    .from('checkins')
+    .select('id, current_station, checker_name, completed_at')
+    .eq('regnr', cleanedRegnr)
+    .eq('status', 'COMPLETED')
+    .order('completed_at', { ascending: false })
+    .limit(N);
+  
+  const checkins = checkinsResponse.data || [];
+  const checkinIds = checkins.map(c => c.id);
+  
+  // Step 3: Fetch all checkin_damages for these checkin IDs
+  const allCheckinDamagesResponse = checkinIds.length > 0
+    ? await supabaseAdmin
+        .from('checkin_damages')
+        .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
+        .in('checkin_id', checkinIds)
+        .in('type', ['not_found', 'existing', 'documented'])
+        .order('created_at', { ascending: true })
+    : { data: [], error: null };
+  
+  const allCheckinDamages = (allCheckinDamagesResponse.data || []) as CheckinDamageData[];
+  
+  // Step 4: Find "winning checkin" - most recent checkin where handledCount >= L
+  let winningCheckinId: string | null = null;
+  let winningCheckinData: typeof checkins[0] | null = null;
+  let handledDamages: CheckinDamageData[] = [];
+  
+  for (const checkin of checkins) {
+    const checkinHandledDamages = allCheckinDamages.filter(d => d.checkin_id === checkin.id);
+    const handledCount = checkinHandledDamages.length;
+    
+    if (handledCount >= L) {
+      winningCheckinId = checkin.id;
+      winningCheckinData = checkin;
+      handledDamages = checkinHandledDamages;
+      break; // Found the most recent checkin with sufficient handled damages
+    }
+  }
+  
+  // Step 5: Fallback if no winning checkin found
+  if (!winningCheckinId && checkins.length > 0) {
+    // Use the most recent checkin even if handledCount < L
+    const latestCheckin = checkins[0];
+    winningCheckinId = latestCheckin.id;
+    winningCheckinData = latestCheckin;
+    handledDamages = allCheckinDamages.filter(d => d.checkin_id === latestCheckin.id);
+    
+    // Log warning for data integrity issue
+    console.warn(`[getVehicleInfoServer] No winning checkin found for ${cleanedRegnr}`, {
+      L,
+      N,
+      checkinsFound: checkins.length,
+      perCheckinCounts: checkins.map(c => ({
+        id: c.id,
+        completed_at: c.completed_at,
+        handledCount: allCheckinDamages.filter(d => d.checkin_id === c.id).length
+      }))
+    });
+  }
+  
+  const lastCheckinData = winningCheckinData;
+  const lastCheckinId = winningCheckinId;
   
   // Debug logging (server-side - will appear in Vercel logs)
   console.log('[getVehicleInfoServer]', cleanedRegnr, {
-    lastCheckinId,
-    lastCheckinCompleted: lastCheckinData?.completed_at,
+    L,
+    checkinsScanned: checkins.length,
+    winningCheckinId,
+    winningCheckinCompleted: winningCheckinData?.completed_at,
     handledCount: handledDamages.length,
-    handledErr: handledDamagesResponse.error,
+    handledErr: allCheckinDamagesResponse.error,
     firstHandled: handledDamages.length > 0 ? handledDamages[0] : null,
   });
   
