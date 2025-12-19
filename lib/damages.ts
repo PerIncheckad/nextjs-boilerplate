@@ -15,8 +15,8 @@ type LegacyDamage = {
   damage_date: string | null; // <<< CORRECTED: Ensure this field is fetched
 };
 
-// Type for checkin_damages data with nested checkins join
-type CheckinDamageWithCheckin = {
+// Type for checkin_damages data (without nested join to avoid PostgREST issues)
+type CheckinDamageData = {
   type: 'existing' | 'not_found' | 'documented';
   damage_type: string | null;
   car_part: string | null;
@@ -26,10 +26,6 @@ type CheckinDamageWithCheckin = {
   video_urls: unknown;
   created_at: string;
   checkin_id: string;
-  checkins: {
-    regnr: string;
-    checker_name: string;
-  } | null;
 };
 
 // Represents an already inventoried damage from our main 'damages' table
@@ -148,9 +144,10 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .limit(1)
       .maybeSingle(),
     // Fetch checkin_damages ONLY for the latest completed checkin, sorted by created_at ASC for deterministic ordering
+    // Note: No nested join - we use checker_name from lastCheckinData instead to avoid PostgREST join issues
     lastCheckinId ? supabase
       .from('checkin_damages')
-      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id, checkins!inner(regnr, checker_name)')
+      .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
       .eq('checkin_id', lastCheckinId)
       .in('type', ['not_found', 'existing', 'documented'])
       .order('created_at', { ascending: true }) // ASC for stable index matching (1st damage → 1st entry)
@@ -162,7 +159,12 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
-  const handledDamages = (handledDamagesResponse.data || []) as CheckinDamageWithCheckin[];
+  const handledDamages = (handledDamagesResponse.data || []) as CheckinDamageData[];
+  
+  // Debug: Log if we have a checkin but no handled damages (might indicate query issue)
+  if (lastCheckinId && handledDamages.length === 0) {
+    console.warn(`[damages.ts] Found checkin ${lastCheckinId} for ${cleanedRegnr} but no checkin_damages. This may indicate a query issue.`);
+  }
   
   // Get the date of the last check-in for display purposes
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
@@ -182,10 +184,11 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   };
   const handledDamagesList: HandledDamageInfo[] = [];
   
+  // Get checker name from the last checkin data (not from nested join)
+  const checkerName = lastCheckinData?.checker_name || 'Okänd';
+  
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
-      // Get the checker name from the nested checkin join
-      const checkerName = handled.checkins?.checker_name || 'Okänd';
       handledDamagesList.push({
         type: handled.type,
         // damage_type can be null/undefined in rare cases (data integrity issues)
