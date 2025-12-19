@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback, useRef, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
+import { VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 import { DAMAGE_OPTIONS } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
@@ -606,7 +606,12 @@ export default function CheckInForm() {
     setExistingDamages([]);
     try {
       const normalized = reg.toUpperCase().replace(/\s/g, '');
-      const info = await getVehicleInfo(normalized);
+      // Fetch vehicle info from server-side API (bypasses RLS issues)
+      const response = await fetch(`/api/vehicle-info?reg=${encodeURIComponent(normalized)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch vehicle info');
+      }
+      const info: VehicleInfo = await response.json();
   
       if (info.status === 'NO_MATCH' || info.status === 'PARTIAL_MATCH_DAMAGE_ONLY') {
         setConfirmDialog({
