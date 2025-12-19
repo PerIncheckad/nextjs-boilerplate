@@ -137,6 +137,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
       .eq('checkin_id', lastCheckinData.id)
       .in('type', ['not_found', 'existing', 'documented'])
+      // IMPORTANT: Sort ascending to match the order damages were created during checkin
+      // This creates a deterministic 1:1 mapping with BUHS damages: 1st BUHS → 1st checkin_damage, etc.
       .order('created_at', { ascending: true });
   } else {
     handledDamagesResponse = { data: [] };
