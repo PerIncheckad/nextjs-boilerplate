@@ -279,7 +279,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     items: handledDamagesList.map(h => ({ type: h.type, damage_type: h.damage_type, car_part: h.car_part })),
   });
   
-  // Create inventoried map
+  // Helper function to normalize keys for consistent matching (trim + collapse whitespace)
+  function normalizeKey(text: string): string {
+    return text.trim().replace(/\s+/g, ' ');
+  }
+  
+  // Create inventoried map with normalized keys
   const inventoriedMap = new Map<string, string>();
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
@@ -299,17 +304,19 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
           }
         }
         
-        inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        const normalizedKey = normalizeKey(inv.legacy_damage_source_text);
+        inventoriedMap.set(normalizedKey, newText);
       }
     }
   }
   
-  // Create folder lookup map from dbDamages
+  // Create folder lookup map from dbDamages with normalized keys
   // Maps legacy_damage_source_text -> uploads.folder
   const folderMap = new Map<string, string>();
   for (const dbDamage of dbDamages) {
     if (dbDamage.legacy_damage_source_text && (dbDamage.uploads as any)?.folder) {
-      folderMap.set(dbDamage.legacy_damage_source_text, (dbDamage.uploads as any).folder);
+      const normalizedKey = normalizeKey(dbDamage.legacy_damage_source_text);
+      folderMap.set(normalizedKey, (dbDamage.uploads as any).folder);
     }
   }
 
@@ -322,8 +329,20 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   for (let i = 0; i < legacyDamages.length; i++) {
     const leg = legacyDamages[i];
     const originalText = getLegacyDamageText(leg);
-    const isInventoried = inventoriedMap.has(originalText);
-    const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
+    const normalizedKey = normalizeKey(originalText);
+    const isInventoried = inventoriedMap.has(normalizedKey);
+    const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : originalText;
+
+    // Debug logging for JBD26N specifically
+    if (cleanedRegnr === 'JBD26N') {
+      console.log(`[${cleanedRegnr}] Processing legacy damage #${i}:`, {
+        originalText,
+        normalizedKey,
+        inventoriedMapKeys: Array.from(inventoriedMap.keys()),
+        isInventoried,
+        displayText,
+      });
+    }
 
     if (displayText) {
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
@@ -344,7 +363,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         text: displayText,
         damage_date: leg.damage_date,
         is_inventoried: isInventoried || (handledInfo !== null),
-        folder: folderMap.get(originalText) || null,
+        folder: folderMap.get(normalizedKey) || null,
         handled_type: handledInfo?.type || null,
         handled_damage_type: handledInfo?.damage_type || null,
         handled_car_part: handledInfo?.car_part || null,
