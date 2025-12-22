@@ -116,11 +116,6 @@ function normalizeDamageType(damageType: string): { typeCode: string } {
 async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
-  // Debug logging at start for JBD26N - using exact format requested
-  if (regnr === "JBD26N") {
-    console.log("JBD26N_DEBUG_START", { regnr, now: new Date().toISOString() });
-  }
-
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
   const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
     supabaseAdmin
@@ -234,17 +229,6 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const lastCheckinData = winningCheckinData;
   const lastCheckinId = winningCheckinId;
   
-  // Debug logging (server-side - will appear in Vercel logs)
-  console.log('[getVehicleInfoServer]', cleanedRegnr, {
-    L,
-    checkinsScanned: checkins.length,
-    winningCheckinId,
-    winningCheckinCompleted: winningCheckinData?.completed_at,
-    handledCount: handledDamages.length,
-    handledErr: allCheckinDamagesError,
-    firstHandled: handledDamages.length > 0 ? handledDamages[0] : null,
-  });
-  
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
   
   // Build handled damages list
@@ -276,13 +260,6 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       });
     }
   }
-  
-  console.log('[getVehicleInfoServer] handledDamagesList built:', {
-    regnr: cleanedRegnr,
-    handledListCount: handledDamagesList.length,
-    checkerName,
-    items: handledDamagesList.map(h => ({ type: h.type, damage_type: h.damage_type, car_part: h.car_part })),
-  });
   
   // Helper function to normalize keys for consistent matching (trim + collapse whitespace)
   function normalizeKey(text: string): string {
@@ -337,32 +314,6 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     const normalizedKey = normalizeKey(originalText);
     const isInventoried = inventoriedMap.has(normalizedKey);
     const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : originalText;
-
-    // Comprehensive debug logging for JBD26N specifically with searchable tag
-    // Log for first legacy damage only to keep logs manageable
-    if (cleanedRegnr === 'JBD26N' && i === 0) {
-      const folderValue = folderMap.get(normalizedKey) || null;
-      const newTextFromMap = inventoriedMap.get(normalizedKey) || null;
-      
-      console.log('JBD26N_DEBUG_KEYS_DETAIL', {
-        damageIndex: i,
-        rawRegnr: regnr,
-        cleanedRegnr,
-        legacyDamageText: originalText,
-        normalizedOriginalKey: normalizedKey,
-        inventoriedMapSize: inventoriedMap.size,
-        inventoriedMapHasKey: inventoriedMap.has(normalizedKey),
-        newTextFromMap,
-        first10InventoriedKeys: Array.from(inventoriedMap.keys()).slice(0, 10).map(k => ({
-          raw: k,
-          normalized: normalizeKey(k),
-        })),
-        folderMapHasKey: folderMap.has(normalizedKey),
-        folderValue,
-        finalDisplayText: displayText,
-      });
-    }
-
     if (displayText) {
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
@@ -510,9 +461,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const reg = searchParams.get('reg');
 
-    // Debug logging for all requests
-    console.log("JBD26N_DEBUG_REQ", { reg, debug: searchParams.get("debug"), ts: searchParams.get("ts") });
-
     if (!reg) {
       return NextResponse.json(
         { error: 'Missing registration number parameter' },
@@ -521,24 +469,6 @@ export async function GET(request: Request) {
     }
 
     const vehicleInfo = await getVehicleInfoServer(reg);
-    
-    // Enhanced debug dump for JBD26N showing actual API response
-    if (reg === "JBD26N") {
-      console.log("JBD26N_DEBUG_DUMP", {
-        reg,
-        cleanedRegnr: reg.toUpperCase().trim(),
-        now: new Date().toISOString(),
-        existingDamagesCount: vehicleInfo.existing_damages.length,
-        firstDamage: vehicleInfo.existing_damages[0] || null,
-        firstDamageDetails: vehicleInfo.existing_damages[0] ? {
-          text: vehicleInfo.existing_damages[0].text,
-          is_inventoried: vehicleInfo.existing_damages[0].is_inventoried,
-          folder: vehicleInfo.existing_damages[0].folder,
-          handled_type: vehicleInfo.existing_damages[0].handled_type,
-          handled_damage_type: vehicleInfo.existing_damages[0].handled_damage_type,
-        } : null,
-      });
-    }
     
     return NextResponse.json(vehicleInfo);
   } catch (error) {
