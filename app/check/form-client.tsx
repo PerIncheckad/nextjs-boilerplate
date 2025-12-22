@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback, useRef, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getVehicleInfo, VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
+import { VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 import { DAMAGE_OPTIONS } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
@@ -59,7 +59,7 @@ type ExistingDamage = {
   resolvedComment?: string;
   media: MediaFile[];
   uploads: Uploads;
-  handledType?: 'existing' | 'not_found' | null;
+  handledType?: 'existing' | 'not_found' | 'documented' | null;
   handledDamageType?: string | null;
   handledCarPart?: string | null;
   handledPosition?: string | null;
@@ -128,6 +128,32 @@ const formatDate = (date: Date, format: 'YYYYMMDD' | 'YYYY-MM-DD' | 'HH.MM' | 'H
     if (format === 'HH-MM') return `${hours}-${minutes}`;
     return '';
 };
+
+/**
+ * Extract Supabase storage folder path from a public URL
+ * @param url - Supabase public storage URL
+ * @returns Folder path or null if extraction fails
+ */
+function extractSupabasePublicFolderFromUrl(url?: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    // Expected: /storage/v1/object/public/<bucket>/<folder>/<filename>
+    const marker = '/storage/v1/object/public/';
+    const i = u.pathname.indexOf(marker);
+    if (i === -1) return null;
+
+    const after = u.pathname.substring(i + marker.length); // "<bucket>/<folder>/<filename>"
+    const parts = after.split('/').filter(Boolean);
+    if (parts.length < 3) return null; // Need at least bucket + folder + filename
+
+    // Drop bucket (parts[0]) and filename (last part)
+    const folderParts = parts.slice(1, -1);
+    return folderParts.join('/');
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Check if a Saludatum is at risk (past or within 10 days from today)
@@ -606,7 +632,12 @@ export default function CheckInForm() {
     setExistingDamages([]);
     try {
       const normalized = reg.toUpperCase().replace(/\s/g, '');
-      const info = await getVehicleInfo(normalized);
+      // Fetch vehicle info from server-side API (bypasses RLS issues)
+      const response = await fetch(`/api/vehicle-info?reg=${encodeURIComponent(normalized)}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch vehicle info');
+      }
+      const info: VehicleInfo = await response.json();
   
       if (info.status === 'NO_MATCH' || info.status === 'PARTIAL_MATCH_DAMAGE_ONLY') {
         setConfirmDialog({
@@ -1328,8 +1359,8 @@ export default function CheckInForm() {
                     let hasMedia = false;
                     let mediaUrls: string[] = [];
                     
-                    if (d.handledType === 'existing') {
-                      // Dokumenterade skador (type='existing')
+                    if (d.handledType === 'existing' || d.handledType === 'documented') {
+                      // Dokumenterade skador (type='existing' or type='documented')
                       // Use structured data from checkin_damages
                       // Format: {damage_type} - {car_part} - {position} ({description if exists})
                       const parts: string[] = [];
@@ -1373,24 +1404,22 @@ export default function CheckInForm() {
                       }
                     }
                     
+                    // Determine media link - prefer folder view over direct file URL
+                    const folderFromUploads = d.uploads?.folder || '';
+                    const folderFromHandledUrl = extractSupabasePublicFolderFromUrl(d.handledPhotoUrls?.[0] || null);
+                    const folder = folderFromUploads || folderFromHandledUrl || '';
+                    const folderHref = folder ? `/media/${folder}` : '';
+                    const fileHref = d.handledPhotoUrls?.[0] || '';
+                    
+                    // Use folder link if available, otherwise fall back to file link
+                    const mediaHref = folderHref || fileHref;
+                    
                     return (
                       <div key={d.id} className="damage-list-item">
                         {i + 1}. {displayText}
-                        {hasMedia && mediaUrls.length > 0 && (
+                        {hasMedia && mediaHref && (
                           <a 
-                            href={mediaUrls[0]}
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="damage-media-link"
-                            aria-label="Visa media för denna skada"
-                            title="Öppna mediefiler för denna skada"
-                          >
-                            📁 Visa media
-                          </a>
-                        )}
-                        {hasMedia && !mediaUrls.length && d.uploads.folder && (
-                          <a 
-                            href={`/media/${d.uploads.folder}`} 
+                            href={mediaHref}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="damage-media-link"
