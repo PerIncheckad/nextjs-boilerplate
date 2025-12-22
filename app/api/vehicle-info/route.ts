@@ -272,7 +272,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   
   // Helper function to normalize keys for consistent matching (trim + collapse whitespace)
   function normalizeKey(text: string): string {
-    return text.trim().replace(/\s+/g, ' ');
+    return text.toLowerCase().trim().replace(/\s+/g, ' ');
   }
   
   // Create inventoried map with normalized keys
