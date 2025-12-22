@@ -339,7 +339,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : originalText;
 
     // Comprehensive debug logging for JBD26N specifically with searchable tag
-    if (cleanedRegnr === 'JBD26N') {
+    // Log for first legacy damage only to keep logs manageable
+    if (cleanedRegnr === 'JBD26N' && i === 0) {
       const folderValue = folderMap.get(normalizedKey) || null;
       const newTextFromMap = inventoriedMap.get(normalizedKey) || null;
       
@@ -352,19 +353,13 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         inventoriedMapSize: inventoriedMap.size,
         inventoriedMapHasKey: inventoriedMap.has(normalizedKey),
         newTextFromMap,
-        inventoriedMapKeys: Array.from(inventoriedMap.keys()).slice(0, 10).map(k => ({
+        first10InventoriedKeys: Array.from(inventoriedMap.keys()).slice(0, 10).map(k => ({
           raw: k,
           normalized: normalizeKey(k),
         })),
-        displayText,
-        willUseRawBUHS: !isInventoried,
-        folderMapSize: folderMap.size,
         folderMapHasKey: folderMap.has(normalizedKey),
         folderValue,
-        folderMapKeys: Array.from(folderMap.keys()).slice(0, 10).map(k => ({
-          raw: k,
-          normalized: normalizeKey(k),
-        })),
+        finalDisplayText: displayText,
       });
     }
 
