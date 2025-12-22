@@ -95,7 +95,7 @@ function formatSaludatum(dateStr: string | null | undefined): string {
 
 function getLegacyDamageText(damage: LegacyDamage): string {
   const parts = [
-    damage.damage_type_raw ? formatDamageType(damage.damage_type_raw) : null,
+    damage.damage_type_raw,
     damage.note_customer,
     damage.note_internal,
   ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
