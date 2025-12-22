@@ -510,16 +510,24 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const regnr = searchParams.get('reg');
+    const reg = searchParams.get('reg');
 
-    if (!regnr) {
+    // Debug logging for all requests
+    console.log("JBD26N_DEBUG_REQ", { reg, debug: searchParams.get("debug"), ts: searchParams.get("ts") });
+
+    // Additional debug for JBD26N specifically
+    if (reg === "JBD26N") {
+      console.log("JBD26N_DEBUG_DUMP", { reg, now: new Date().toISOString() });
+    }
+
+    if (!reg) {
       return NextResponse.json(
         { error: 'Missing registration number parameter' },
         { status: 400 }
       );
     }
 
-    const vehicleInfo = await getVehicleInfoServer(regnr);
+    const vehicleInfo = await getVehicleInfoServer(reg);
     
     return NextResponse.json(vehicleInfo);
   } catch (error) {
