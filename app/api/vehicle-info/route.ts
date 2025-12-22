@@ -341,7 +341,9 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     // Comprehensive debug logging for JBD26N specifically with searchable tag
     if (cleanedRegnr === 'JBD26N') {
       const folderValue = folderMap.get(normalizedKey) || null;
-      console.log('JBD26N_DEBUG_DUMP', {
+      const newTextFromMap = inventoriedMap.get(normalizedKey) || null;
+      
+      console.log('JBD26N_DEBUG_KEYS_DETAIL', {
         damageIndex: i,
         rawRegnr: regnr,
         cleanedRegnr,
@@ -349,6 +351,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         normalizedOriginalKey: normalizedKey,
         inventoriedMapSize: inventoriedMap.size,
         inventoriedMapHasKey: inventoriedMap.has(normalizedKey),
+        newTextFromMap,
         inventoriedMapKeys: Array.from(inventoriedMap.keys()).slice(0, 10).map(k => ({
           raw: k,
           normalized: normalizeKey(k),
@@ -515,11 +518,6 @@ export async function GET(request: Request) {
     // Debug logging for all requests
     console.log("JBD26N_DEBUG_REQ", { reg, debug: searchParams.get("debug"), ts: searchParams.get("ts") });
 
-    // Additional debug for JBD26N specifically
-    if (reg === "JBD26N") {
-      console.log("JBD26N_DEBUG_DUMP", { reg, now: new Date().toISOString() });
-    }
-
     if (!reg) {
       return NextResponse.json(
         { error: 'Missing registration number parameter' },
@@ -528,6 +526,24 @@ export async function GET(request: Request) {
     }
 
     const vehicleInfo = await getVehicleInfoServer(reg);
+    
+    // Enhanced debug dump for JBD26N showing actual API response
+    if (reg === "JBD26N") {
+      console.log("JBD26N_DEBUG_DUMP", {
+        reg,
+        cleanedRegnr: reg.toUpperCase().trim(),
+        now: new Date().toISOString(),
+        existingDamagesCount: vehicleInfo.existing_damages.length,
+        firstDamage: vehicleInfo.existing_damages[0] || null,
+        firstDamageDetails: vehicleInfo.existing_damages[0] ? {
+          text: vehicleInfo.existing_damages[0].text,
+          is_inventoried: vehicleInfo.existing_damages[0].is_inventoried,
+          folder: vehicleInfo.existing_damages[0].folder,
+          handled_type: vehicleInfo.existing_damages[0].handled_type,
+          handled_damage_type: vehicleInfo.existing_damages[0].handled_damage_type,
+        } : null,
+      });
+    }
     
     return NextResponse.json(vehicleInfo);
   } catch (error) {
