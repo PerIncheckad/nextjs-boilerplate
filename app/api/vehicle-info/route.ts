@@ -323,7 +323,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     const originalText = getLegacyDamageText(leg);
     const normalizedKey = normalizeKey(originalText);
     const isInventoried = inventoriedMap.has(normalizedKey);
-    const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : originalText;
+    const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : formatDamageType(originalText);
     if (displayText) {
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
