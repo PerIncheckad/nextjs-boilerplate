@@ -95,7 +95,7 @@ function formatSaludatum(dateStr: string | null | undefined): string {
 
 function getLegacyDamageText(damage: LegacyDamage): string {
   const parts = [
-    damage.damage_type_raw,
+    damage.damage_type_raw ? formatDamageType(damage.damage_type_raw) : null,
     damage.note_customer,
     damage.note_internal,
   ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
@@ -107,6 +107,15 @@ function getLegacyDamageText(damage: LegacyDamage): string {
 function normalizeDamageType(damageType: string): { typeCode: string } {
   const normalized = damageType.toUpperCase().trim();
   return { typeCode: normalized };
+}
+
+// Helper function to format damage types from "FÄLGSKADA_VINTERHJUL" to "Fälgskada vinterhjul"
+function formatDamageType(damageType: string | null | undefined): string {
+  if (!damageType) return 'Okänd skada';
+  return damageType
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
 }
 
 // =================================================================
@@ -131,7 +140,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .from('damages')
       .select('id, regnr, source, user_type, damage_type_raw, user_positions, damage_date, created_at, legacy_damage_source_text, uploads')
       .eq('regnr', cleanedRegnr)
-      .in('source', ['CHECK', 'NYBIL'])
+      .in('source', ['CHECK', 'NYBIL', 'BUHS'])
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('nybil_inventering')
@@ -274,11 +283,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         let newText: string;
         
         if (inv.user_type) {
+          const formattedType = formatDamageType(inv.user_type);
           const positions = (inv.user_positions as any[] || [])
             .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
             .filter(Boolean)
             .join(', ');
-          newText = positions ? `${inv.user_type}: ${positions}` : inv.user_type;
+          newText = positions ? `${formattedType}: ${positions}` : formattedType;
         } else {
           newText = (inv.legacy_damage_source_text || '').split(' (Går ej:')[0].trim();
           if (!newText) {
@@ -355,11 +365,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     let displayText: string;
     const damageType = dbDamage.user_type || dbDamage.damage_type_raw;
     if (damageType) {
+      const formattedType = formatDamageType(damageType);
       const positions = (dbDamage.user_positions as any[] || [])
         .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
         .filter(Boolean)
         .join(', ');
-      displayText = positions ? `${damageType}: ${positions}` : damageType;
+      displayText = positions ? `${formattedType}: ${positions}` : formattedType;
     } else {
       displayText = 'Skada';
     }
