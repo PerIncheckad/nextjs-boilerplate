@@ -613,8 +613,16 @@ function buildLaddningInfo(checkin: any): string | undefined {
 export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResult> {
   const cleanedRegnr = regnr.toUpperCase().trim().replace(/\s/g, '');
   
+  // Stage tracking for debugging
+  let stage = 'init';
+  
+  // Store fetched data for graceful degradation in catch block
+  let legacyDamagesResponse: any = null;
+  let checkinsResponse: any = null;
+  
   // Wrap entire function in try-catch to prevent any crashes
   try {
+    stage = 'validate_input';
     if (!cleanedRegnr || cleanedRegnr.length < 5) {
       return {
         found: false,
@@ -626,8 +634,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       };
     }
 
+    stage = 'fetch_data';
     // Fetch data from all sources concurrently
-    const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse] = await Promise.all([
+    const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponseTemp, checkinsResponseTemp] = await Promise.all([
       // nybil_inventering - newest first
       supabase
         .from('nybil_inventering')
@@ -660,6 +669,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         .order('created_at', { ascending: false }),
     ]);
 
+    // Store for graceful degradation
+    legacyDamagesResponse = legacyDamagesResponseTemp;
+    checkinsResponse = checkinsResponseTemp;
+    
+    stage = 'extract_data';
     const nybilData = nybilResponse.data;
     const vehicleData = vehicleResponse.data?.[0] || null;
     const damages = damagesResponse.data || [];
@@ -669,12 +683,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Debug logging to help diagnose preview issues
     console.log('getVehicleStatus debug', {
       regnr: cleanedRegnr,
+      stage,
       legacyDamagesCount: legacyDamagesResponse.data?.length ?? null,
       legacyDamagesError: legacyDamagesResponse.error ?? null,
       checkinsCount: checkinsResponse.data?.length ?? null,
       vehicleCount: vehicleResponse.data?.length ?? null,
     });
     
+    stage = 'fetch_checkin_damages';
     // Fetch checkin_damages for all checkins
     // Note: We must fetch via checkin_id because checkin_damages.regnr can be NULL
     // (e.g., for type='not_found' damages like NGE97D where regnr is NULL)
@@ -689,29 +705,31 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     const checkinDamages = checkinDamagesResponse.data || [];
   
-  // Get saludatum from legacy damages if available
-  const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
+    stage = 'determine_source';
+    // Get saludatum from legacy damages if available
+    const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
 
-  // Determine source
-  let source: 'nybil_inventering' | 'vehicles' | 'both' | 'checkins' | 'buhs' | 'none' = 'none';
-  if (nybilData && vehicleData) source = 'both';
-  else if (nybilData) source = 'nybil_inventering';
-  else if (vehicleData) source = 'vehicles';
-  else if (checkins.length > 0) source = 'checkins';
-  else if (legacyDamages.length > 0) source = 'buhs'; // BUHS damages exist
+    // Determine source
+    let source: 'nybil_inventering' | 'vehicles' | 'both' | 'checkins' | 'buhs' | 'none' = 'none';
+    if (nybilData && vehicleData) source = 'both';
+    else if (nybilData) source = 'nybil_inventering';
+    else if (vehicleData) source = 'vehicles';
+    else if (checkins.length > 0) source = 'checkins';
+    else if (legacyDamages.length > 0) source = 'buhs'; // BUHS damages exist
 
-  if (source === 'none') {
-    return {
-      found: false,
-      source: 'none',
-      vehicle: null,
-      damages: [],
-      history: [],
-      nybilPhotos: null,
-    };
-  }
+    if (source === 'none') {
+      return {
+        found: false,
+        source: 'none',
+        vehicle: null,
+        damages: [],
+        history: [],
+        nybilPhotos: null,
+      };
+    }
 
-  // Get latest checkin for current location and odometer
+    stage = 'get_latest_checkin';
+    // Get latest checkin for current location and odometer
   const latestCheckin = checkins[0] || null;
 
   // If source is 'checkins', build a minimal vehicle data from checkin records
@@ -1348,48 +1366,51 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     legacyDamageKeys.add(key);
   }
   
-  // Build a map of checkin_damages by checkin_id for easy lookup
-  // Group by checkin_id and type to make matching easier
-  const checkinDamagesMap = new Map<string, CheckinDamageData[]>();
-  for (const cd of checkinDamages) {
-    const key = cd.checkin_id;
-    if (!checkinDamagesMap.has(key)) {
-      checkinDamagesMap.set(key, []);
+    stage = 'build_checkin_damages_map';
+    // Build a map of checkin_damages by checkin_id for easy lookup
+    // Group by checkin_id and type to make matching easier
+    const checkinDamagesMap = new Map<string, CheckinDamageData[]>();
+    for (const cd of checkinDamages) {
+      const key = cd.checkin_id;
+      if (!checkinDamagesMap.has(key)) {
+        checkinDamagesMap.set(key, []);
+      }
+      checkinDamagesMap.get(key)!.push(cd);
     }
-    checkinDamagesMap.get(key)!.push(cd);
-  }
-  
-  /**
-   * Build a mapping of BUHS damages to their matched checkin_damages.
-   * This is done once to avoid N×M performance issues.
-   * 
-   * Matching strategy:
-   * 1. Text-based match: Match BUHS note_customer/note_internal with checkin_damages.description
-   *    - Normalize whitespace and compare case-insensitively
-   *    - If BUHS text is a substring of checkin description, it's a match
-   *    - Only match with type='documented' or type='not_found' checkin_damages
-   * 
-   * 2. Fallback match: single-damage-of-type strategy
-   *    - If no text match found, but there's only ONE BUHS damage of this normalized type on the vehicle,
-   *      AND only ONE checkin_damage of this type exists across all checkins,
-   *      then match them (this handles cases where descriptions don't align)
-   */
-  
-  // Helper to normalize text for comparison
-  function normalizeTextForMatching(text: string | null | undefined): string {
-    if (!text) return '';
-    return text.toLowerCase().replace(/\s+/g, ' ').trim();
-  }
-  
-  // Initialize maps with empty defaults (will be populated in try-catch)
-  let buhsToCheckinMap = new Map<number, CheckinDamageData>();
-  let usedCheckinDamageIds = new Set<number>();
-  
-  // Wrap matching logic in try-catch to prevent runtime crashes
-  try {
-    // Pre-compute normalized types and texts for performance
-    const buhsNormalizedData = new Map<number, { typeCode: string; text: string }>();
-    for (const buhs of legacyDamages) {
+    
+    stage = 'buhs_matching_init';
+    /**
+     * Build a mapping of BUHS damages to their matched checkin_damages.
+     * This is done once to avoid N×M performance issues.
+     * 
+     * Matching strategy:
+     * 1. Text-based match: Match BUHS note_customer/note_internal with checkin_damages.description
+     *    - Normalize whitespace and compare case-insensitively
+     *    - If BUHS text is a substring of checkin description, it's a match
+     *    - Only match with type='documented' or type='not_found' checkin_damages
+     * 
+     * 2. Fallback match: single-damage-of-type strategy
+     *    - If no text match found, but there's only ONE BUHS damage of this normalized type on the vehicle,
+     *      AND only ONE checkin_damage of this type exists across all checkins,
+     *      then match them (this handles cases where descriptions don't align)
+     */
+    
+    // Helper to normalize text for comparison
+    function normalizeTextForMatching(text: string | null | undefined): string {
+      if (!text) return '';
+      return text.toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+    
+    // Initialize maps with empty defaults (will be populated in try-catch)
+    let buhsToCheckinMap = new Map<number, CheckinDamageData>();
+    let usedCheckinDamageIds = new Set<number>();
+    
+    stage = 'buhs_matching_execute';
+    // Wrap matching logic in try-catch to prevent runtime crashes
+    try {
+      // Pre-compute normalized types and texts for performance
+      const buhsNormalizedData = new Map<number, { typeCode: string; text: string }>();
+      for (const buhs of legacyDamages) {
       const normalized = normalizeDamageType(buhs.damage_type_raw);
       // Combine note_customer and note_internal for text matching
       const combinedText = [buhs.note_customer, buhs.note_internal]
@@ -1473,10 +1494,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     usedCheckinDamageIds = new Set();
   }
   
-  // Build damage records from legacy damages (BUHS)
-  const damageRecords: DamageRecord[] = [];
-  
-  for (const d of legacyDamages) {
+    stage = 'build_damage_records';
+    // Build damage records from legacy damages (BUHS)
+    const damageRecords: DamageRecord[] = [];
+    
+    for (const d of legacyDamages) {
     const legacyText = getLegacyDamageText(d);
     
     // Get matched checkin_damage from pre-built map
@@ -2020,19 +2042,123 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     anteckningar: nybilData.anteckningar || '---',
   } : undefined;
 
-  return {
-    found: true,
-    source,
-    vehicle,
-    damages: damageRecords,
-    history: historyRecords,
-    nybilPhotos,
-    nybilFullData,
-  };
+    stage = 'return_success';
+    return {
+      found: true,
+      source,
+      vehicle,
+      damages: damageRecords,
+      history: historyRecords,
+      nybilPhotos,
+      nybilFullData,
+    };
   
   } catch (err) {
-    // Log error and return safe fallback to prevent crashes
-    console.error('getVehicleStatus crashed', { regnr: cleanedRegnr, err });
+    // Log error with stage tracking and stack trace
+    const errorObj = err as Error;
+    console.error('getVehicleStatus crashed', { 
+      regnr: cleanedRegnr, 
+      stage, 
+      error: errorObj.message,
+      stack: errorObj.stack 
+    });
+    
+    // Graceful degradation: if we have BUHS data, show it even if processing failed
+    if (legacyDamagesResponse?.data && legacyDamagesResponse.data.length > 0) {
+      const legacyDamages = legacyDamagesResponse.data || [];
+      const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
+      
+      // Build minimal vehicle status data - only BUHS damages available
+      const vehicle: VehicleStatusData = {
+        regnr: cleanedRegnr,
+        bilmarkeModell: '---',
+        bilenStarNu: '---',
+        matarstallning: '---',
+        hjultyp: '---',
+        hjulforvaring: '---',
+        drivmedel: '---',
+        vaxel: '---',
+        serviceintervall: '---',
+        maxKmManad: '---',
+        avgiftOverKm: '---',
+        saludatum: legacySaludatum ? formatDate(legacySaludatum) : '---',
+        antalSkador: legacyDamages.length,
+        stoldGps: '---',
+        klarForUthyrning: '---',
+        planeradStation: '---',
+        utrustning: '---',
+        saluinfo: '---',
+        hjulForvaringInfo: '---',
+        reservnyckelInfo: '---',
+        laddkablarForvaringInfo: '---',
+        instruktionsbokForvaringInfo: '---',
+        cocForvaringInfo: '---',
+        antalNycklar: '---',
+        antalLaddkablar: '---',
+        antalInsynsskydd: '---',
+        harInstruktionsbok: '---',
+        harCoc: '---',
+        harLasbultar: '---',
+        harDragkrok: '---',
+        harGummimattor: '---',
+        harDackkompressor: '---',
+        saluStation: '---',
+        saluKopare: '---',
+        saluRetur: '---',
+        saluReturadress: '---',
+        saluAttention: '---',
+        saluNotering: '---',
+        tankningInfo: '---',
+        tankstatusVidLeverans: '---',
+        anteckningar: '---',
+        harSkadorVidLeverans: null,
+        isSold: null,
+      };
+
+      // Build damage records from BUHS only (no checkin matching)
+      const damageRecords: DamageRecord[] = legacyDamages.map((d: LegacyDamage) => {
+        const legacyText = getLegacyDamageText(d);
+        return {
+          id: d.id,
+          regnr: cleanedRegnr,
+          skadetyp: legacyText || 'Okänd',
+          datum: formatDate(d.damage_date),
+          status: 'Befintlig',
+          source: 'legacy' as const,
+          sourceInfo: 'Källa: BUHS\n(Matchning misslyckades - data kan vara ofullständig)',
+        };
+      });
+
+      // Build history with BUHS events only
+      const historyRecords: HistoryRecord[] = damageRecords.map(damage => ({
+        id: `buhs-${damage.id}`,
+        datum: damage.datum,
+        rawTimestamp: damage.datum || '',
+        typ: 'buhs_skada' as const,
+        sammanfattning: 'Ej dokumenterad i Incheckad',
+        utfordAv: 'System (BUHS)',
+        buhsSkadaDetaljer: {
+          skadetyp: damage.skadetyp,
+          legacy_damage_source_text: damage.skadetyp,
+        },
+      }));
+
+      console.log('getVehicleStatus graceful degradation: returning BUHS-only data', {
+        regnr: cleanedRegnr,
+        damageCount: damageRecords.length,
+      });
+
+      return {
+        found: true,
+        source: 'buhs',
+        vehicle,
+        damages: damageRecords,
+        history: historyRecords,
+        nybilPhotos: null,
+      };
+    }
+    
+    // No BUHS data available - return not found
     return {
       found: false,
       source: 'none',
