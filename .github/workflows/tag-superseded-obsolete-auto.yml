@@ -1,0 +1,108 @@
+name: Tag Superseded and Obsolete PRs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: tag-superseded-obsolete
+  cancel-in-progress: false
+
+jobs:
+  tag-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure labels exist and tag PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumbers = [74, 75, 76, 77, 78];
+
+            const labels = [
+              {
+                name: 'superseded',
+                color: 'b60205',
+                description: 'Superseded by a newer PR'
+              },
+              {
+                name: 'obsolete',
+                color: 'c2e0c6',
+                description: 'No longer needed or relevant'
+              }
+            ];
+
+            // Ensure labels exist (create if missing)
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name
+                });
+                console.log(`Label "${label.name}" already exists`);
+              } catch (error) {
+                if (error.status === 404) {
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                  console.log(`Created label "${label.name}"`);
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            // Apply labels to PRs
+            for (const prNumber of prNumbers) {
+              try {
+                // Get current labels for the PR
+                const { data: pr } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber
+                });
+
+                const currentLabels = pr.labels.map(label => label.name);
+                const labelsToAdd = labels
+                  .map(l => l.name)
+                  .filter(name => !currentLabels.includes(name));
+
+                if (labelsToAdd.length > 0) {
+                  await github.rest.issues.addLabels({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    labels: labelsToAdd
+                  });
+                  console.log(
+                    `Added labels [${labelsToAdd.join(', ')}] ` +
+                    `to PR #${prNumber}`
+                  );
+                } else {
+                  console.log(
+                    `PR #${prNumber} already has all required labels`
+                  );
+                }
+              } catch (error) {
+                if (error.status === 404) {
+                  console.log(`PR #${prNumber} not found (may be deleted)`);
+                } else {
+                  console.error(
+                    `Error processing PR #${prNumber}:`,
+                    error.message
+                  );
+                  throw error;
+                }
+              }
+            }
+
+            console.log('Successfully processed all PRs');
