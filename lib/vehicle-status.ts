@@ -1370,79 +1370,96 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     return text.toLowerCase().replace(/\s+/g, ' ').trim();
   }
   
-  // Pre-compute normalized types and texts for performance
-  const buhsNormalizedData = new Map<number, { typeCode: string; text: string }>();
-  for (const buhs of legacyDamages) {
-    const normalized = normalizeDamageType(buhs.damage_type_raw);
-    // Combine note_customer and note_internal for text matching
-    const combinedText = [buhs.note_customer, buhs.note_internal]
-      .filter(t => t && t.trim() && t.trim() !== '-')
-      .join(' ');
-    buhsNormalizedData.set(buhs.id, {
-      typeCode: normalized.typeCode,
-      text: normalizeTextForMatching(combinedText),
-    });
-  }
+  // Initialize maps with empty defaults (will be populated in try-catch)
+  let buhsToCheckinMap = new Map<number, CheckinDamageData>();
+  let usedCheckinDamageIds = new Set<number>();
   
-  const checkinNormalizedData = new Map<number, { typeCode: string; text: string }>();
-  for (const cd of checkinDamages) {
-    if (cd.damage_type) {
-      const normalized = normalizeDamageType(cd.damage_type);
-      checkinNormalizedData.set(cd.id, {
+  // Wrap matching logic in try-catch to prevent runtime crashes
+  try {
+    // Pre-compute normalized types and texts for performance
+    const buhsNormalizedData = new Map<number, { typeCode: string; text: string }>();
+    for (const buhs of legacyDamages) {
+      const normalized = normalizeDamageType(buhs.damage_type_raw);
+      // Combine note_customer and note_internal for text matching
+      const combinedText = [buhs.note_customer, buhs.note_internal]
+        .filter(t => t && t.trim() && t.trim() !== '-')
+        .join(' ');
+      buhsNormalizedData.set(buhs.id, {
         typeCode: normalized.typeCode,
-        text: normalizeTextForMatching(cd.description),
+        text: normalizeTextForMatching(combinedText),
       });
     }
-  }
-  
-  // Build the matching map
-  const buhsToCheckinMap = new Map<number, CheckinDamageData>();
-  const usedCheckinDamageIds = new Set<number>(); // Track used checkin_damages to prevent double-matching
-  
-  for (const buhs of legacyDamages) {
-    const buhsInfo = buhsNormalizedData.get(buhs.id);
-    if (!buhsInfo) continue;
     
-    // Primary match: text-based matching with checkin_damages that are documented or not_found
-    const relevantCheckinDamages = checkinDamages.filter(cd => 
-      (cd.type === 'documented' || cd.type === 'not_found') && !usedCheckinDamageIds.has(cd.id)
-    );
-    
-    // Only match if both texts are non-empty (prevent empty string matching)
-    if (buhsInfo.text) {
-      // Try to find a checkin_damage where BUHS text is substring of description
-      const textMatch = relevantCheckinDamages.find(cd => {
-        const cdInfo = checkinNormalizedData.get(cd.id);
-        if (!cdInfo || !cdInfo.text) return false; // Skip if checkin text is empty
-        // Check if BUHS text is substring of checkin description OR vice versa
-        return cdInfo.text.includes(buhsInfo.text) || buhsInfo.text.includes(cdInfo.text);
-      });
-      
-      if (textMatch) {
-        buhsToCheckinMap.set(buhs.id, textMatch);
-        usedCheckinDamageIds.add(textMatch.id); // Mark this checkin_damage as used
-        continue;
+    const checkinNormalizedData = new Map<number, { typeCode: string; text: string }>();
+    for (const cd of checkinDamages) {
+      if (cd.damage_type) {
+        const normalized = normalizeDamageType(cd.damage_type);
+        checkinNormalizedData.set(cd.id, {
+          typeCode: normalized.typeCode,
+          text: normalizeTextForMatching(cd.description),
+        });
       }
     }
     
-    // Fallback: single-damage-of-type strategy
-    // Count how many BUHS damages have this type
-    const buhsWithSameType = legacyDamages.filter(d => {
-      const info = buhsNormalizedData.get(d.id);
-      return info && info.typeCode === buhsInfo.typeCode;
-    });
+    // Build the matching map
+    const tempBuhsToCheckinMap = new Map<number, CheckinDamageData>();
+    const tempUsedCheckinDamageIds = new Set<number>(); // Track used checkin_damages to prevent double-matching
     
-    // Count how many relevant checkin_damages have this type (excluding already used ones)
-    const checkinWithSameType = relevantCheckinDamages.filter(cd => {
-      const info = checkinNormalizedData.get(cd.id);
-      return info && info.typeCode === buhsInfo.typeCode && !usedCheckinDamageIds.has(cd.id);
-    });
-    
-    // Only match if both counts are exactly 1 (unambiguous case)
-    if (buhsWithSameType.length === 1 && checkinWithSameType.length === 1) {
-      buhsToCheckinMap.set(buhs.id, checkinWithSameType[0]);
-      usedCheckinDamageIds.add(checkinWithSameType[0].id); // Mark as used
+    for (const buhs of legacyDamages) {
+      const buhsInfo = buhsNormalizedData.get(buhs.id);
+      if (!buhsInfo) continue;
+      
+      // Primary match: text-based matching with checkin_damages that are documented or not_found
+      const relevantCheckinDamages = checkinDamages.filter(cd => 
+        (cd.type === 'documented' || cd.type === 'not_found') && !tempUsedCheckinDamageIds.has(cd.id)
+      );
+      
+      // Only match if both texts are non-empty and have minimum length (prevent empty/short string matching)
+      if (buhsInfo.text && buhsInfo.text.length >= 6) {
+        // Try to find a checkin_damage where BUHS text is substring of description
+        const textMatch = relevantCheckinDamages.find(cd => {
+          const cdInfo = checkinNormalizedData.get(cd.id);
+          if (!cdInfo || !cdInfo.text || cdInfo.text.length < 6) return false; // Skip if checkin text is empty or too short
+          // Check if BUHS text is substring of checkin description OR vice versa
+          return cdInfo.text.includes(buhsInfo.text) || buhsInfo.text.includes(cdInfo.text);
+        });
+        
+        if (textMatch) {
+          tempBuhsToCheckinMap.set(buhs.id, textMatch);
+          tempUsedCheckinDamageIds.add(textMatch.id); // Mark this checkin_damage as used
+          continue;
+        }
+      }
+      
+      // Fallback: single-damage-of-type strategy
+      // Count how many BUHS damages have this type
+      const buhsWithSameType = legacyDamages.filter(d => {
+        const info = buhsNormalizedData.get(d.id);
+        return info && info.typeCode === buhsInfo.typeCode;
+      });
+      
+      // Count how many relevant checkin_damages have this type (excluding already used ones)
+      const checkinWithSameType = relevantCheckinDamages.filter(cd => {
+        const info = checkinNormalizedData.get(cd.id);
+        return info && info.typeCode === buhsInfo.typeCode && !tempUsedCheckinDamageIds.has(cd.id);
+      });
+      
+      // Only match if both counts are exactly 1 (unambiguous case)
+      if (buhsWithSameType.length === 1 && checkinWithSameType.length === 1) {
+        tempBuhsToCheckinMap.set(buhs.id, checkinWithSameType[0]);
+        tempUsedCheckinDamageIds.add(checkinWithSameType[0].id); // Mark as used
+      }
     }
+    
+    // If we got here without error, use the computed maps
+    buhsToCheckinMap = tempBuhsToCheckinMap;
+    usedCheckinDamageIds = tempUsedCheckinDamageIds;
+    
+  } catch (err) {
+    // Log error but don't crash - fall back to empty maps
+    console.error('BUHS matching failed', { regnr: cleanedRegnr, err });
+    buhsToCheckinMap = new Map();
+    usedCheckinDamageIds = new Set();
   }
   
   // Build damage records from legacy damages (BUHS)
