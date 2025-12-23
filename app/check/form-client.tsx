@@ -2058,5 +2058,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       .grid-3-col { grid-template-columns: 1fr; }
       .damage-item-actions { flex-direction: column; }
       .damage-item-actions .btn { width: 100%; }
+      .form-actions { margin-bottom: 80px; }
     }
 `}</style>);
