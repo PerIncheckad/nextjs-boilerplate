@@ -673,13 +673,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     legacyDamagesResponse = legacyDamagesResponseTemp;
     checkinsResponse = checkinsResponseTemp;
     
-    stage = 'extract_data';
+    stage = 'extract_data:start';
     const nybilData = nybilResponse.data;
+    
+    stage = 'extract_data:vehicle';
     const vehicleData = vehicleResponse.data?.[0] || null;
+    
+    stage = 'extract_data:damages';
     const damages = damagesResponse.data || [];
+    
+    stage = 'extract_data:legacy_damages';
     const legacyDamages = legacyDamagesResponse.data || [];
+    
+    stage = 'extract_data:checkins';
     const checkins = checkinsResponse.data || [];
     
+    stage = 'extract_data:debug_log';
     // Debug logging to help diagnose preview issues
     console.log('getVehicleStatus debug', {
       regnr: cleanedRegnr,
@@ -690,11 +699,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       vehicleCount: vehicleResponse.data?.length ?? null,
     });
     
-    stage = 'fetch_checkin_damages';
+    stage = 'fetch_checkin_damages:start';
     // Fetch checkin_damages for all checkins
     // Note: We must fetch via checkin_id because checkin_damages.regnr can be NULL
     // (e.g., for type='not_found' damages like NGE97D where regnr is NULL)
+    stage = 'fetch_checkin_damages:extract_ids';
     const checkinIds = checkins.map(c => c.id).filter(Boolean);
+    
+    stage = 'fetch_checkin_damages:query';
     const checkinDamagesResponse = checkinIds.length > 0
       ? await supabase
           .from('checkin_damages')
@@ -703,12 +715,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           .order('created_at', { ascending: true })
       : { data: [], error: null };
     
+    stage = 'fetch_checkin_damages:extract';
     const checkinDamages = checkinDamagesResponse.data || [];
   
-    stage = 'determine_source';
+    stage = 'determine_source:start';
     // Get saludatum from legacy damages if available
     const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
 
+    stage = 'determine_source:logic';
     // Determine source
     let source: 'nybil_inventering' | 'vehicles' | 'both' | 'checkins' | 'buhs' | 'none' = 'none';
     if (nybilData && vehicleData) source = 'both';
@@ -717,6 +731,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     else if (checkins.length > 0) source = 'checkins';
     else if (legacyDamages.length > 0) source = 'buhs'; // BUHS damages exist
 
+    stage = 'determine_source:check_none';
     if (source === 'none') {
       return {
         found: false,
@@ -730,12 +745,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     stage = 'get_latest_checkin';
     // Get latest checkin for current location and odometer
-  const latestCheckin = checkins[0] || null;
+    const latestCheckin = checkins[0] || null;
 
-  // If source is 'checkins', build a minimal vehicle data from checkin records
-  if (source === 'checkins') {
-    // Build vehicle status data from checkin records
-    const vehicle: VehicleStatusData = {
+    stage = 'build_vehicle_data:check_source';
+    // If source is 'checkins', build a minimal vehicle data from checkin records
+    if (source === 'checkins') {
+      stage = 'build_vehicle_data:checkins_source';
+      // Build vehicle status data from checkin records
+      const vehicle: VehicleStatusData = {
       regnr: cleanedRegnr,
       
       // Bilmärke & Modell: from checkins.car_model if available
@@ -1111,10 +1128,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     };
   }
 
-  // If source is 'buhs', build a minimal vehicle data from BUHS damages only
-  if (source === 'buhs') {
-    // Build minimal vehicle status data - only BUHS damages available
-    const vehicle: VehicleStatusData = {
+    stage = 'build_vehicle_data:buhs_check';
+    // If source is 'buhs', build a minimal vehicle data from BUHS damages only
+    if (source === 'buhs') {
+      stage = 'build_vehicle_data:buhs_source';
+      // Build minimal vehicle status data - only BUHS damages available
+      const vehicle: VehicleStatusData = {
       regnr: cleanedRegnr,
       bilmarkeModell: '---',
       bilenStarNu: '---',
@@ -1205,8 +1224,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     };
   }
 
-  // Build vehicle status data using priority order
-  const vehicle: VehicleStatusData = {
+    stage = 'build_vehicle_data:standard';
+    // Build vehicle status data using priority order
+    const vehicle: VehicleStatusData = {
     regnr: cleanedRegnr,
     
     // Bilmärke & Modell: nybil_inventering → vehicles (using formatModel for consistent display)
