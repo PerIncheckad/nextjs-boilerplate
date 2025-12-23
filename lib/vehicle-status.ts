@@ -507,12 +507,12 @@ type CheckinDamageData = {
   type: 'existing' | 'not_found' | 'documented' | 'new';
   damage_type: string | null;
   car_part: string | null;
-  position: string | null;
-  description: string | null;
-  photo_urls: string[] | null;
-  video_urls: string[] | null;
+  position: string | null; // Position on car part, e.g., "Fram", "Bak", "Höger"
+  description: string | null; // Optional comment from checker about the damage
+  photo_urls: string[] | null; // Array of photo URLs, or null if no photos
+  video_urls: string[] | null; // Array of video URLs, or null if no videos
   created_at: string;
-  regnr: string | null; // Can be NULL for not_found damages
+  regnr: string | null; // Can be NULL for not_found damages (e.g., when damage couldn't be located on vehicle)
 };
 
 // Helper to format damage type from UPPERCASE_WITH_UNDERSCORES to Title Case
@@ -1217,7 +1217,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
   
   /**
-   * Match BUHS damage with checkin_damages deterministically.
+   * Build a mapping of BUHS damages to their matched checkin_damages.
+   * This is done once to avoid N×M performance issues.
    * 
    * Matching strategy:
    * 1. Primary match: damage_type (normalized) + damage_date match
@@ -1228,66 +1229,78 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
    *    - If no date match found, but there's only ONE BUHS damage of this normalized type on the vehicle,
    *      AND only ONE checkin_damage of this type exists across all checkins,
    *      then match them (this handles cases where dates might not align perfectly)
-   * 
-   * @param buhsDamage - The BUHS damage to match
-   * @param allBuhsDamages - All BUHS damages for this vehicle (for uniqueness check)
-   * @param allCheckinDamages - All checkin_damages for this vehicle
-   * @returns Matched checkin_damage or null
    */
-  function matchBuhsDamageWithCheckinDamage(
-    buhsDamage: LegacyDamage,
-    allBuhsDamages: LegacyDamage[],
-    allCheckinDamages: CheckinDamageData[]
-  ): CheckinDamageData | null {
-    // Normalize BUHS damage type
-    const buhsNormalized = normalizeDamageType(buhsDamage.damage_type_raw);
-    const buhsTypeCode = buhsNormalized.typeCode;
-    const buhsDate = buhsDamage.damage_date ? formatDate(buhsDamage.damage_date) : null;
+  
+  // Pre-compute normalized types for performance
+  const buhsNormalizedTypes = new Map<number, { typeCode: string; date: string | null }>();
+  for (const buhs of legacyDamages) {
+    const normalized = normalizeDamageType(buhs.damage_type_raw);
+    buhsNormalizedTypes.set(buhs.id, {
+      typeCode: normalized.typeCode,
+      date: buhs.damage_date ? formatDate(buhs.damage_date) : null,
+    });
+  }
+  
+  const checkinNormalizedTypes = new Map<number, { typeCode: string; date: string }>();
+  for (const cd of checkinDamages) {
+    if (cd.damage_type) {
+      const normalized = normalizeDamageType(cd.damage_type);
+      checkinNormalizedTypes.set(cd.id, {
+        typeCode: normalized.typeCode,
+        date: formatDate(cd.created_at),
+      });
+    }
+  }
+  
+  // Build the matching map
+  const buhsToCheckinMap = new Map<number, CheckinDamageData>();
+  
+  for (const buhs of legacyDamages) {
+    const buhsInfo = buhsNormalizedTypes.get(buhs.id);
+    if (!buhsInfo) continue;
     
     // Primary match: type + date
-    if (buhsDate) {
-      const dateMatches = allCheckinDamages.filter(cd => {
-        if (!cd.damage_type) return false;
-        const cdNormalized = normalizeDamageType(cd.damage_type);
-        const cdDate = formatDate(cd.created_at);
-        return cdNormalized.typeCode === buhsTypeCode && cdDate === buhsDate;
+    if (buhsInfo.date) {
+      const dateMatches = checkinDamages.filter(cd => {
+        const cdInfo = checkinNormalizedTypes.get(cd.id);
+        return cdInfo && cdInfo.typeCode === buhsInfo.typeCode && cdInfo.date === buhsInfo.date;
       });
       
       if (dateMatches.length === 1) {
-        return dateMatches[0];
+        buhsToCheckinMap.set(buhs.id, dateMatches[0]);
+        continue;
       }
       
       // If multiple matches on same date, pick the first documented/not_found one
       const prioritized = dateMatches.find(cd => cd.type === 'documented' || cd.type === 'not_found');
       if (prioritized) {
-        return prioritized;
+        buhsToCheckinMap.set(buhs.id, prioritized);
+        continue;
       }
       
       if (dateMatches.length > 0) {
-        return dateMatches[0];
+        buhsToCheckinMap.set(buhs.id, dateMatches[0]);
+        continue;
       }
     }
     
     // Fallback: single-damage-of-type strategy
     // Count how many BUHS damages have this type
-    const buhsWithSameType = allBuhsDamages.filter(d => {
-      const normalized = normalizeDamageType(d.damage_type_raw);
-      return normalized.typeCode === buhsTypeCode;
+    const buhsWithSameType = legacyDamages.filter(d => {
+      const info = buhsNormalizedTypes.get(d.id);
+      return info && info.typeCode === buhsInfo.typeCode;
     });
     
     // Count how many checkin_damages have this type
-    const checkinWithSameType = allCheckinDamages.filter(cd => {
-      if (!cd.damage_type) return false;
-      const normalized = normalizeDamageType(cd.damage_type);
-      return normalized.typeCode === buhsTypeCode;
+    const checkinWithSameType = checkinDamages.filter(cd => {
+      const info = checkinNormalizedTypes.get(cd.id);
+      return info && info.typeCode === buhsInfo.typeCode;
     });
     
     // Only match if both counts are exactly 1
     if (buhsWithSameType.length === 1 && checkinWithSameType.length === 1) {
-      return checkinWithSameType[0];
+      buhsToCheckinMap.set(buhs.id, checkinWithSameType[0]);
     }
-    
-    return null;
   }
   
   // Build damage records from legacy damages (BUHS)
@@ -1296,8 +1309,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   for (const d of legacyDamages) {
     const legacyText = getLegacyDamageText(d);
     
-    // Try to match this BUHS damage with a checkin_damage
-    const matchedCheckinDamage = matchBuhsDamageWithCheckinDamage(d, legacyDamages, checkinDamages);
+    // Get matched checkin_damage from pre-built map
+    const matchedCheckinDamage = buhsToCheckinMap.get(d.id) || null;
     
     // Build sourceInfo and display text based on matching status
     let sourceInfo = 'Källa: BUHS';
