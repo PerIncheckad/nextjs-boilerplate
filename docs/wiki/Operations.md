@@ -8,6 +8,11 @@
    - Filtrera Route: `/api/notify`
    - Sök: `Media counts received`, `CHECKIN INSERT OK`, `BUHS DAMAGE INSERT OK`, `SKIPPED`
 
+## Testläge (dryRun)
+- Lägg till `?dryRun=1` i URL:en på sidan `/check` innan du skickar formuläret.
+- Effekt: mejl skickas, men inga rader skrivs till `public.checkins`, `public.checkin_damages` eller `public.damages`.
+- API‑svaret innehåller `{ ok: true, dryRun: true }`.
+
 ## Vercel Logs
 - Project → Logs → filtrera på Route
 - Preview: tänk på att Vercel Authentication skyddar hela deployen (kräver Vercel‑login)
