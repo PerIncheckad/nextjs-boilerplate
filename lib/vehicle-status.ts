@@ -613,70 +613,81 @@ function buildLaddningInfo(checkin: any): string | undefined {
 export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResult> {
   const cleanedRegnr = regnr.toUpperCase().trim().replace(/\s/g, '');
   
-  if (!cleanedRegnr || cleanedRegnr.length < 5) {
-    return {
-      found: false,
-      source: 'none',
-      vehicle: null,
-      damages: [],
-      history: [],
-      nybilPhotos: null,
-    };
-  }
+  // Wrap entire function in try-catch to prevent any crashes
+  try {
+    if (!cleanedRegnr || cleanedRegnr.length < 5) {
+      return {
+        found: false,
+        source: 'none',
+        vehicle: null,
+        damages: [],
+        history: [],
+        nybilPhotos: null,
+      };
+    }
 
-  // Fetch data from all sources concurrently
-  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse] = await Promise.all([
-    // nybil_inventering - newest first
-    supabase
-      .from('nybil_inventering')
-      .select('*')
-      .ilike('regnr', cleanedRegnr)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    
-    // vehicles (Bilkontroll-filen) - use RPC for trimmed search
-    supabase
-      .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
-    
-    // damages (from our damages table)
-    supabase
-      .from('damages')
-      .select('*')
-      .eq('regnr', cleanedRegnr)
-      .order('created_at', { ascending: false }),
-    
-    // legacy damages (from BUHS via RPC) - includes saludatum
-    supabase
-      .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
-    
-    // checkins - order by created_at
-    supabase
-      .from('checkins')
-      .select('*')
-      .eq('regnr', cleanedRegnr)
-      .order('created_at', { ascending: false }),
-  ]);
-
-  const nybilData = nybilResponse.data;
-  const vehicleData = vehicleResponse.data?.[0] || null;
-  const damages = damagesResponse.data || [];
-  const legacyDamages = legacyDamagesResponse.data || [];
-  const checkins = checkinsResponse.data || [];
-  
-  // Fetch checkin_damages for all checkins
-  // Note: We must fetch via checkin_id because checkin_damages.regnr can be NULL
-  // (e.g., for type='not_found' damages like NGE97D where regnr is NULL)
-  const checkinIds = checkins.map(c => c.id).filter(Boolean);
-  const checkinDamagesResponse = checkinIds.length > 0
-    ? await supabase
-        .from('checkin_damages')
+    // Fetch data from all sources concurrently
+    const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse] = await Promise.all([
+      // nybil_inventering - newest first
+      supabase
+        .from('nybil_inventering')
         .select('*')
-        .in('checkin_id', checkinIds)
-        .order('created_at', { ascending: true })
-    : { data: [], error: null };
-  
-  const checkinDamages = checkinDamagesResponse.data || [];
+        .ilike('regnr', cleanedRegnr)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      
+      // vehicles (Bilkontroll-filen) - use RPC for trimmed search
+      supabase
+        .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
+      
+      // damages (from our damages table)
+      supabase
+        .from('damages')
+        .select('*')
+        .eq('regnr', cleanedRegnr)
+        .order('created_at', { ascending: false }),
+      
+      // legacy damages (from BUHS via RPC) - includes saludatum
+      supabase
+        .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
+      
+      // checkins - order by created_at
+      supabase
+        .from('checkins')
+        .select('*')
+        .eq('regnr', cleanedRegnr)
+        .order('created_at', { ascending: false }),
+    ]);
+
+    const nybilData = nybilResponse.data;
+    const vehicleData = vehicleResponse.data?.[0] || null;
+    const damages = damagesResponse.data || [];
+    const legacyDamages = legacyDamagesResponse.data || [];
+    const checkins = checkinsResponse.data || [];
+    
+    // Debug logging to help diagnose preview issues
+    console.log('getVehicleStatus debug', {
+      regnr: cleanedRegnr,
+      legacyDamagesCount: legacyDamagesResponse.data?.length ?? null,
+      legacyDamagesError: legacyDamagesResponse.error ?? null,
+      checkinsCount: checkinsResponse.data?.length ?? null,
+      vehicleCount: vehicleResponse.data?.length ?? null,
+    });
+    
+    // Fetch checkin_damages for all checkins
+    // Note: We must fetch via checkin_id because checkin_damages.regnr can be NULL
+    // (e.g., for type='not_found' damages like NGE97D where regnr is NULL)
+    const checkinIds = checkins.map(c => c.id).filter(Boolean);
+    const checkinDamagesResponse = checkinIds.length > 0
+      ? await supabase
+          .from('checkin_damages')
+          .select('*')
+          .in('checkin_id', checkinIds)
+          .order('created_at', { ascending: true })
+      : { data: [], error: null };
+    
+    const checkinDamages = checkinDamagesResponse.data || [];
   
   // Get saludatum from legacy damages if available
   const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
@@ -2018,6 +2029,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     nybilPhotos,
     nybilFullData,
   };
+  
+  } catch (err) {
+    // Log error and return safe fallback to prevent crashes
+    console.error('getVehicleStatus crashed', { regnr: cleanedRegnr, err });
+    return {
+      found: false,
+      source: 'none',
+      vehicle: null,
+      damages: [],
+      history: [],
+      nybilPhotos: null,
+    };
+  }
 }
 
 // =================================================================
