@@ -938,18 +938,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // Extract media URL from Supabase Storage format
           if (cd.photo_urls && cd.photo_urls.length > 0) {
             const firstPhotoUrl = cd.photo_urls[0];
+            // Remove query string if present
+            const urlWithoutQuery = firstPhotoUrl.split('?')[0];
+            
             // Try to extract from damage-photos path
-            const damagePhotosMatch = firstPhotoUrl.match(/\/damage-photos\/([^\/]+)/);
-            if (damagePhotosMatch) {
-              mediaUrl = `/media/${damagePhotosMatch[1]}`;
-              // Also add to mediaLankar
-              const damageMediaKey = `skada-cd-${cd.id}`;
-              if (!mediaLankar[damageMediaKey]) {
-                mediaLankar[damageMediaKey] = mediaUrl;
+            const damagePhotosIndex = urlWithoutQuery.indexOf('/damage-photos/');
+            if (damagePhotosIndex !== -1) {
+              // Get everything after /damage-photos/
+              const afterDamagePhotos = urlWithoutQuery.substring(damagePhotosIndex + '/damage-photos/'.length);
+              // Remove the filename (everything after the last /)
+              const lastSlashIndex = afterDamagePhotos.lastIndexOf('/');
+              if (lastSlashIndex !== -1) {
+                const folder = afterDamagePhotos.substring(0, lastSlashIndex);
+                mediaUrl = `/media/${folder}`;
+                // Also add to mediaLankar
+                const damageMediaKey = `skada-cd-${cd.id}`;
+                if (!mediaLankar[damageMediaKey]) {
+                  mediaLankar[damageMediaKey] = mediaUrl;
+                }
               }
             } else {
               // Fallback: try old /media/ pattern
-              const mediaMatch = firstPhotoUrl.match(/\/media\/([^\/]+)\//);
+              const mediaMatch = urlWithoutQuery.match(/\/media\/([^\/]+)\//);
               if (mediaMatch) {
                 mediaUrl = `/media/${mediaMatch[1]}`;
                 const damageMediaKey = `skada-cd-${cd.id}`;
@@ -1387,6 +1397,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   // Build the matching map
   const buhsToCheckinMap = new Map<number, CheckinDamageData>();
+  const usedCheckinDamageIds = new Set<number>(); // Track used checkin_damages to prevent double-matching
   
   for (const buhs of legacyDamages) {
     const buhsInfo = buhsNormalizedData.get(buhs.id);
@@ -1394,20 +1405,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Primary match: text-based matching with checkin_damages that are documented or not_found
     const relevantCheckinDamages = checkinDamages.filter(cd => 
-      cd.type === 'documented' || cd.type === 'not_found'
+      (cd.type === 'documented' || cd.type === 'not_found') && !usedCheckinDamageIds.has(cd.id)
     );
     
+    // Only match if both texts are non-empty (prevent empty string matching)
     if (buhsInfo.text) {
       // Try to find a checkin_damage where BUHS text is substring of description
       const textMatch = relevantCheckinDamages.find(cd => {
         const cdInfo = checkinNormalizedData.get(cd.id);
-        if (!cdInfo || !cdInfo.text) return false;
+        if (!cdInfo || !cdInfo.text) return false; // Skip if checkin text is empty
         // Check if BUHS text is substring of checkin description OR vice versa
         return cdInfo.text.includes(buhsInfo.text) || buhsInfo.text.includes(cdInfo.text);
       });
       
       if (textMatch) {
         buhsToCheckinMap.set(buhs.id, textMatch);
+        usedCheckinDamageIds.add(textMatch.id); // Mark this checkin_damage as used
         continue;
       }
     }
@@ -1419,15 +1432,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       return info && info.typeCode === buhsInfo.typeCode;
     });
     
-    // Count how many relevant checkin_damages have this type
+    // Count how many relevant checkin_damages have this type (excluding already used ones)
     const checkinWithSameType = relevantCheckinDamages.filter(cd => {
       const info = checkinNormalizedData.get(cd.id);
-      return info && info.typeCode === buhsInfo.typeCode;
+      return info && info.typeCode === buhsInfo.typeCode && !usedCheckinDamageIds.has(cd.id);
     });
     
     // Only match if both counts are exactly 1 (unambiguous case)
     if (buhsWithSameType.length === 1 && checkinWithSameType.length === 1) {
       buhsToCheckinMap.set(buhs.id, checkinWithSameType[0]);
+      usedCheckinDamageIds.add(checkinWithSameType[0].id); // Mark as used
     }
   }
   
@@ -1490,15 +1504,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         // Extract folder from Supabase Storage URLs
         // Format: .../storage/v1/object/public/damage-photos/<folder>/<file>
+        // Need to extract everything after /damage-photos/ up to the last /
         if (matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
           const firstPhotoUrl = matchedCheckinDamage.photo_urls[0];
+          // Remove query string if present
+          const urlWithoutQuery = firstPhotoUrl.split('?')[0];
+          
           // Try to extract from damage-photos path
-          const damagePhotosMatch = firstPhotoUrl.match(/\/damage-photos\/([^\/]+)/);
-          if (damagePhotosMatch) {
-            folder = damagePhotosMatch[1];
+          const damagePhotosIndex = urlWithoutQuery.indexOf('/damage-photos/');
+          if (damagePhotosIndex !== -1) {
+            // Get everything after /damage-photos/
+            const afterDamagePhotos = urlWithoutQuery.substring(damagePhotosIndex + '/damage-photos/'.length);
+            // Remove the filename (everything after the last /)
+            const lastSlashIndex = afterDamagePhotos.lastIndexOf('/');
+            if (lastSlashIndex !== -1) {
+              folder = afterDamagePhotos.substring(0, lastSlashIndex);
+            } else {
+              // No slash means the folder is the whole string (unlikely but handle it)
+              folder = afterDamagePhotos;
+            }
           } else {
             // Fallback: try old /media/ pattern
-            const mediaMatch = firstPhotoUrl.match(/\/media\/([^\/]+)\//);
+            const mediaMatch = urlWithoutQuery.match(/\/media\/([^\/]+)\//);
             if (mediaMatch) {
               folder = mediaMatch[1];
             }
@@ -1693,18 +1720,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Extract media URL from Supabase Storage format
         if (cd.photo_urls && cd.photo_urls.length > 0) {
           const firstPhotoUrl = cd.photo_urls[0];
+          // Remove query string if present
+          const urlWithoutQuery = firstPhotoUrl.split('?')[0];
+          
           // Try to extract from damage-photos path
-          const damagePhotosMatch = firstPhotoUrl.match(/\/damage-photos\/([^\/]+)/);
-          if (damagePhotosMatch) {
-            mediaUrl = `/media/${damagePhotosMatch[1]}`;
-            // Also add to mediaLankar
-            const damageMediaKey = `skada-cd-${cd.id}`;
-            if (!mediaLankar[damageMediaKey]) {
-              mediaLankar[damageMediaKey] = mediaUrl;
+          const damagePhotosIndex = urlWithoutQuery.indexOf('/damage-photos/');
+          if (damagePhotosIndex !== -1) {
+            // Get everything after /damage-photos/
+            const afterDamagePhotos = urlWithoutQuery.substring(damagePhotosIndex + '/damage-photos/'.length);
+            // Remove the filename (everything after the last /)
+            const lastSlashIndex = afterDamagePhotos.lastIndexOf('/');
+            if (lastSlashIndex !== -1) {
+              const folder = afterDamagePhotos.substring(0, lastSlashIndex);
+              mediaUrl = `/media/${folder}`;
+              // Also add to mediaLankar
+              const damageMediaKey = `skada-cd-${cd.id}`;
+              if (!mediaLankar[damageMediaKey]) {
+                mediaLankar[damageMediaKey] = mediaUrl;
+              }
             }
           } else {
             // Fallback: try old /media/ pattern
-            const mediaMatch = firstPhotoUrl.match(/\/media\/([^\/]+)\//);
+            const mediaMatch = urlWithoutQuery.match(/\/media\/([^\/]+)\//);
             if (mediaMatch) {
               mediaUrl = `/media/${mediaMatch[1]}`;
               const damageMediaKey = `skada-cd-${cd.id}`;
