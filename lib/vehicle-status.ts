@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
+import { normalizeDamageType } from '@/lib/normalizeDamageType';
 
 // =================================================================
 // 1. TYPE DEFINITIONS
