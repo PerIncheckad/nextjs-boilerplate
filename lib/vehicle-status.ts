@@ -894,10 +894,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         if (cdType === 'documented') {
           const damageType = matchedCheckinDamage.damage_type || 'Okänd';
           
+          // Priority: positions[0] > car_part/position
           if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
               matchedCheckinDamage.positions.length > 0) {
-            const positionsStr = formatDamagePositions(matchedCheckinDamage.positions);
-            skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
+            // Use positions[0] first
+            const pos = matchedCheckinDamage.positions[0];
+            const parts: string[] = [];
+            if (pos.carPart) parts.push(pos.carPart);
+            if (pos.position) parts.push(pos.position);
+            const posStr = parts.join(' - ');
+            skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
           } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
             const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
             skadetyp = `${damageType} - ${parts.join(' - ')}`;
@@ -912,6 +918,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             const firstUrl = matchedCheckinDamage.photo_urls[0];
             const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
             folder = match ? match[1] : undefined;
+          }
+          
+          // Fallback: check damages table for uploads.folder
+          if (!folder) {
+            const damageEntry = damages.find(dmg => 
+              dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
+            );
+            if (damageEntry && damageEntry.uploads) {
+              folder = (damageEntry.uploads as any).folder;
+            }
           }
           
           const checkerName = checkin?.checker_name || 'Okänd';
@@ -1331,6 +1347,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // NEW: Match BUHS damages with checkin_damages
   // ==================================================================
   
+  // Debug logging for specific regnr
+  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F'];
+  const shouldDebug = debugRegnrs.includes(cleanedRegnr);
+  
+  if (shouldDebug) {
+    console.log(`[DEBUG ${cleanedRegnr}] BUHS damages count:`, legacyDamages.length);
+    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages count:`, allCheckinDamages.length);
+    console.log(`[DEBUG ${cleanedRegnr}] BUHS damages:`, legacyDamages.map(d => ({
+      id: d.id,
+      damage_type_raw: d.damage_type_raw,
+      note_customer: d.note_customer,
+      note_internal: d.note_internal,
+      damage_date: d.damage_date,
+    })));
+    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages:`, allCheckinDamages.map(cd => ({
+      id: cd.id,
+      type: cd.type,
+      damage_type: cd.damage_type,
+      description: cd.description?.substring(0, 50),
+    })));
+  }
+  
   // Build damage records from legacy damages (BUHS) merged with checkin_damages
   const damageRecords: DamageRecord[] = [];
   const matchedCheckinDamageIds = new Set<number>(); // Track which checkin_damages we've matched
@@ -1345,6 +1383,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     let matchedCheckinDamage: CheckinDamageData | null = null;
     
     // Try primary text matching first
+    // Compare BUHS note_internal/note_customer/legacy_damage_source_text against cd.description
     for (const cd of allCheckinDamages) {
       if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue; // Skip if no ID or already matched
       
@@ -1357,6 +1396,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           textsMatch(d.damage_type_raw, cdDescription)) {
         matchedCheckinDamage = cd;
         matchedCheckinDamageIds.add(cd.id);
+        
+        if (shouldDebug) {
+          console.log(`[DEBUG ${cleanedRegnr}] Text match for BUHS ${d.id}:`, {
+            matched_cd_id: cd.id,
+            matched_cd_type: cd.type,
+            matched_cd_desc: cd.description?.substring(0, 50),
+          });
+        }
         break;
       }
     }
@@ -1374,11 +1421,30 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
                normalizedCdType === normalizedBuhsType;
       });
       
+      if (shouldDebug && candidatesForLooseMatch.length > 0) {
+        console.log(`[DEBUG ${cleanedRegnr}] Loose match candidates for BUHS ${d.id}:`, candidatesForLooseMatch.map(cd => ({
+          id: cd.id,
+          type: cd.type,
+          damage_type: cd.damage_type,
+        })));
+      }
+      
       // If there's exactly one candidate (unambiguous), use it
       if (candidatesForLooseMatch.length === 1) {
         matchedCheckinDamage = candidatesForLooseMatch[0];
         if (matchedCheckinDamage.id) matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+        
+        if (shouldDebug) {
+          console.log(`[DEBUG ${cleanedRegnr}] Loose match for BUHS ${d.id}:`, {
+            matched_cd_id: matchedCheckinDamage.id,
+            matched_cd_type: matchedCheckinDamage.type,
+          });
+        }
       }
+    }
+    
+    if (shouldDebug && !matchedCheckinDamage) {
+      console.log(`[DEBUG ${cleanedRegnr}] No match for BUHS ${d.id}`);
     }
     
     // Build the damage record based on whether we found a match
@@ -1395,11 +1461,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Build structured text from checkin_damages positions
         const damageType = matchedCheckinDamage.damage_type || 'Okänd';
         
+        // Priority: positions[0] > car_part/position > user_positions
         if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
             matchedCheckinDamage.positions.length > 0) {
-          const positionsStr = formatDamagePositions(matchedCheckinDamage.positions);
-          skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
+          // Use positions[0] first
+          const pos = matchedCheckinDamage.positions[0];
+          const parts: string[] = [];
+          if (pos.carPart) parts.push(pos.carPart);
+          if (pos.position) parts.push(pos.position);
+          const posStr = parts.join(' - ');
+          skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
         } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
+          // Fallback to car_part/position
           const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
           skadetyp = `${damageType} - ${parts.join(' - ')}`;
         } else {
@@ -1408,9 +1481,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         status = `Dokumenterad (urspr. BUHS ${damageDate})`;
         
-        // Use folder from checkin_damages if available, or build from checkin info
-        // Note: checkin_damages has photo_urls array, not a folder field
-        // We need to get the folder from the corresponding checkin
+        // Use folder from checkin_damages photo_urls, or fallback to damages.uploads
         const checkin = checkins.find(c => c.id === matchedCheckinDamage.checkin_id);
         if (checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
           // Extract folder from first photo URL
@@ -1418,6 +1489,24 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           const firstUrl = matchedCheckinDamage.photo_urls[0];
           const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
           folder = match ? match[1] : undefined;
+        }
+        
+        // Fallback: check damages table for uploads.folder
+        if (!folder) {
+          const damageEntry = damages.find(dmg => 
+            dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
+          );
+          if (damageEntry && damageEntry.uploads) {
+            folder = (damageEntry.uploads as any).folder;
+          }
+        }
+        
+        if (shouldDebug) {
+          console.log(`[DEBUG ${cleanedRegnr}] Media folder for BUHS ${d.id}:`, {
+            folder,
+            photo_urls_count: matchedCheckinDamage.photo_urls?.length || 0,
+            source: folder ? 'extracted' : 'none',
+          });
         }
         
         const checkerName = checkin?.checker_name || 'Okänd';

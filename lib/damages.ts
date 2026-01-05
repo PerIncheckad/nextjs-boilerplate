@@ -219,6 +219,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     damage_type: string;
     car_part: string | null;
     position: string | null;
+    positions?: any[] | null;
     description: string;
     checker: string;
     photo_urls: string[];
@@ -239,6 +240,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         damage_type: handled.damage_type || 'Okänd',
         car_part: handled.car_part || null,
         position: handled.position || null,
+        positions: (handled as any).positions || null,
         description: handled.description || '',
         checker: checkerName,
         photo_urls: (handled.photo_urls as string[]) || [],
