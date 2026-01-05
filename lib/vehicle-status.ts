@@ -1123,56 +1123,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       };
     }
 
-        maxKmManad: '---',
-        avgiftOverKm: '---',
-        saludatum: '---',
-        antalSkador: 0, // Will be updated below
-        stoldGps: '---',
-        klarForUthyrning: '---',
-        planeradStation: '---',
-        utrustning: '---',
-        saluinfo: '---',
-        hjulForvaringInfo: '---',
-        reservnyckelInfo: '---',
-        laddkablarForvaringInfo: '---',
-        instruktionsbokForvaringInfo: '---',
-        cocForvaringInfo: '---',
-        antalNycklar: '---',
-        antalLaddkablar: '---',
-        antalInsynsskydd: '---',
-        harInstruktionsbok: '---',
-        harCoc: '---',
-        harLasbultar: '---',
-        harDragkrok: '---',
-        harGummimattor: '---',
-        harDackkompressor: '---',
-        saluStation: '---',
-        saluKopare: '---',
-        saluRetur: '---',
-        saluReturadress: '---',
-        saluAttention: '---',
-        saluNotering: '---',
-        tankningInfo: '---',
-        tankstatusVidLeverans: '---',
-        anteckningar: '---',
-        harSkadorVidLeverans: null,
-        isSold: null,
-      };
-    }
-
-    // Update the vehicle's damage count to reflect the actual list
-    vehicle.antalSkador = damageRecords.length;
-
-    return {
-      found: true,
-      source,
-      vehicle,
-      damages: damageRecords,
-      history: historyRecords,
-      nybilPhotos: null, // No nybil photos when source is 'checkins' only
-    };
-  }
-
     stage = 'build_vehicle_data:buhs_check';
     // If source is 'buhs' and vehicle not already built, build minimal vehicle data from BUHS damages only
     if (source === 'buhs' && vehicle === null) {
