@@ -606,6 +606,100 @@ function buildLaddningInfo(checkin: any): string | undefined {
   return parts.join(' ');
 }
 
+/**
+ * Helper function to build vehicle data from checkin records.
+ * Extracted to avoid TDZ (Temporal Dead Zone) issues in minified code.
+ */
+function buildVehicleFromCheckins(
+  cleanedRegnr: string,
+  latestCheckin: any | null,
+  legacySaludatum: string | null
+): VehicleStatusData {
+  return {
+    regnr: cleanedRegnr,
+    
+    // Bilmärke & Modell: from checkins.car_model if available
+    bilmarkeModell: latestCheckin?.car_model || '---',
+    
+    // Senast incheckad vid: from latest checkin with datetime and checker
+    bilenStarNu: latestCheckin?.current_city && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
+      ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
+      : latestCheckin?.current_city && latestCheckin?.current_station
+        ? `${latestCheckin.current_city} / ${latestCheckin.current_station}`
+        : '---',
+    
+    // Mätarställning: from latest checkin
+    matarstallning: latestCheckin?.odometer_km
+      ? `${latestCheckin.odometer_km} km`
+      : '---',
+    
+    // Däck som sitter på: from latest checkin
+    hjultyp: latestCheckin?.hjultyp || '---',
+    
+    // Hjulförvaring: not available from checkins
+    hjulforvaring: '---',
+    
+    // Drivmedel: not available from checkins
+    drivmedel: '---',
+    
+    // Växellåda: not available from checkins
+    vaxel: '---',
+    
+    // Serviceintervall: not available from checkins
+    serviceintervall: '---',
+    
+    // Max km/månad: not available from checkins
+    maxKmManad: '---',
+    
+    // Avgift över-km: not available from checkins
+    avgiftOverKm: '---',
+    
+    // Saludatum: from legacy damages if available
+    saludatum: legacySaludatum
+      ? formatDate(legacySaludatum)
+      : '---',
+    
+    // Antal registrerade skador: will be updated after building damageRecords
+    antalSkador: 0,
+    
+    // Stöld-GPS monterad: not available from checkins
+    stoldGps: '---',
+    
+    // Klar för uthyrning: not available from checkins
+    klarForUthyrning: '---',
+    
+    // Additional detailed fields: not available from checkins
+    planeradStation: '---',
+    utrustning: '---',
+    saluinfo: '---',
+    hjulForvaringInfo: '---',
+    reservnyckelInfo: '---',
+    laddkablarForvaringInfo: '---',
+    instruktionsbokForvaringInfo: '---',
+    cocForvaringInfo: '---',
+    antalNycklar: '---',
+    antalLaddkablar: '---',
+    antalInsynsskydd: '---',
+    harInstruktionsbok: '---',
+    harCoc: '---',
+    harLasbultar: '---',
+    harDragkrok: '---',
+    harGummimattor: '---',
+    harDackkompressor: '---',
+    saluStation: '---',
+    saluKopare: '---',
+    saluRetur: '---',
+    saluReturadress: '---',
+    saluAttention: '---',
+    saluNotering: '---',
+    tankningInfo: '---',
+    tankstatusVidLeverans: '---',
+    anteckningar: '---',
+    harSkadorVidLeverans: null,
+    isSold: null,
+  };
+}
+
 // =================================================================
 // 3. MAIN DATA FETCHING FUNCTION
 // =================================================================
@@ -749,92 +843,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     stage = 'build_vehicle_data:check_source';
     // If source is 'checkins', build a minimal vehicle data from checkin records
+    let vehicle: VehicleStatusData | null = null;
     if (source === 'checkins') {
       stage = 'build_vehicle_data:checkins_source';
-      // Build vehicle status data from checkin records
-      const vehicle: VehicleStatusData = {
-      regnr: cleanedRegnr,
-      
-      // Bilmärke & Modell: from checkins.car_model if available
-      bilmarkeModell: latestCheckin?.car_model || '---',
-      
-      // Senast incheckad vid: from latest checkin with datetime and checker
-      bilenStarNu: latestCheckin?.current_city && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-        ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
-        : latestCheckin?.current_city && latestCheckin?.current_station
-          ? `${latestCheckin.current_city} / ${latestCheckin.current_station}`
-          : '---',
-      
-      // Mätarställning: from latest checkin
-      matarstallning: latestCheckin?.odometer_km
-        ? `${latestCheckin.odometer_km} km`
-        : '---',
-      
-      // Däck som sitter på: from latest checkin
-      hjultyp: latestCheckin?.hjultyp || '---',
-      
-      // Hjulförvaring: not available from checkins
-      hjulforvaring: '---',
-      
-      // Drivmedel: not available from checkins
-      drivmedel: '---',
-      
-      // Växellåda: not available from checkins
-      vaxel: '---',
-      
-      // Serviceintervall: not available from checkins
-      serviceintervall: '---',
-      
-      // Max km/månad: not available from checkins
-      maxKmManad: '---',
-      
-      // Avgift över-km: not available from checkins
-      avgiftOverKm: '---',
-      
-      // Saludatum: from legacy damages if available
-      saludatum: legacySaludatum
-        ? formatDate(legacySaludatum)
-        : '---',
-      
-      // Antal registrerade skador: will be updated after building damageRecords
-      antalSkador: 0,
-      
-      // Stöld-GPS monterad: not available from checkins
-      stoldGps: '---',
-      
-      // Klar för uthyrning: not available from checkins
-      klarForUthyrning: '---',
-      
-      // Additional detailed fields: not available from checkins
-      planeradStation: '---',
-      utrustning: '---',
-      saluinfo: '---',
-      hjulForvaringInfo: '---',
-      reservnyckelInfo: '---',
-      laddkablarForvaringInfo: '---',
-      instruktionsbokForvaringInfo: '---',
-      cocForvaringInfo: '---',
-      antalNycklar: '---',
-      antalLaddkablar: '---',
-      antalInsynsskydd: '---',
-      harInstruktionsbok: '---',
-      harCoc: '---',
-      harLasbultar: '---',
-      harDragkrok: '---',
-      harGummimattor: '---',
-      harDackkompressor: '---',
-      saluStation: '---',
-      saluKopare: '---',
-      saluRetur: '---',
-      saluReturadress: '---',
-      saluAttention: '---',
-      saluNotering: '---',
-      tankningInfo: '---',
-      tankstatusVidLeverans: '---',
-      anteckningar: '---',
-      harSkadorVidLeverans: null,
-      isSold: null,
-    };
+      // Build vehicle status data from checkin records using helper function
+      // Wrapped in try-catch to prevent TDZ issues in minified code
+      try {
+        vehicle = buildVehicleFromCheckins(cleanedRegnr, latestCheckin, legacySaludatum);
+      } catch (err) {
+        console.error('buildVehicleFromCheckins failed', { regnr: cleanedRegnr, err });
+        // Fall back - let source handling continue below
+        stage = 'build_vehicle_data:checkins_source:fallback';
+      }
+    }
+    
+    // Only continue with checkins-specific damage/history building if vehicle was successfully built
+    if (source === 'checkins' && vehicle !== null) {
 
     // Build damage records from legacy damages (BUHS)
     // Note: Since source is 'checkins', the vehicle has never been checked in
@@ -1129,11 +1153,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
 
     stage = 'build_vehicle_data:buhs_check';
-    // If source is 'buhs', build a minimal vehicle data from BUHS damages only
-    if (source === 'buhs') {
+    // If source is 'buhs' and vehicle not already built, build minimal vehicle data from BUHS damages only
+    if (source === 'buhs' && vehicle === null) {
       stage = 'build_vehicle_data:buhs_source';
       // Build minimal vehicle status data - only BUHS damages available
-      const vehicle: VehicleStatusData = {
+      vehicle = {
       regnr: cleanedRegnr,
       bilmarkeModell: '---',
       bilenStarNu: '---',
@@ -1225,8 +1249,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
 
     stage = 'build_vehicle_data:standard';
-    // Build vehicle status data using priority order
-    const vehicle: VehicleStatusData = {
+    // Build vehicle status data using priority order (if not already built)
+    if (vehicle === null) {
+      vehicle = {
     regnr: cleanedRegnr,
     
     // Bilmärke & Modell: nybil_inventering → vehicles (using formatModel for consistent display)
@@ -1374,6 +1399,57 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? vehicleData.is_sold 
         : null,
   };
+}
+
+  // Safety check: if vehicle is still null after all attempts, create minimal fallback
+  if (vehicle === null) {
+    console.error('Failed to build vehicle from any source', { regnr: cleanedRegnr, source });
+    vehicle = {
+      regnr: cleanedRegnr,
+      bilmarkeModell: '---',
+      bilenStarNu: '---',
+      matarstallning: '---',
+      hjultyp: '---',
+      hjulforvaring: '---',
+      drivmedel: '---',
+      vaxel: '---',
+      serviceintervall: '---',
+      maxKmManad: '---',
+      avgiftOverKm: '---',
+      saludatum: legacySaludatum ? formatDate(legacySaludatum) : '---',
+      antalSkador: 0,
+      stoldGps: '---',
+      klarForUthyrning: '---',
+      planeradStation: '---',
+      utrustning: '---',
+      saluinfo: '---',
+      hjulForvaringInfo: '---',
+      reservnyckelInfo: '---',
+      laddkablarForvaringInfo: '---',
+      instruktionsbokForvaringInfo: '---',
+      cocForvaringInfo: '---',
+      antalNycklar: '---',
+      antalLaddkablar: '---',
+      antalInsynsskydd: '---',
+      harInstruktionsbok: '---',
+      harCoc: '---',
+      harLasbultar: '---',
+      harDragkrok: '---',
+      harGummimattor: '---',
+      harDackkompressor: '---',
+      saluStation: '---',
+      saluKopare: '---',
+      saluRetur: '---',
+      saluReturadress: '---',
+      saluAttention: '---',
+      saluNotering: '---',
+      tankningInfo: '---',
+      tankstatusVidLeverans: '---',
+      anteckningar: '---',
+      harSkadorVidLeverans: null,
+      isSold: null,
+    };
+  }
 
   // Determine if vehicle has ever been checked in
   const hasBeenCheckedIn = checkins.length > 0;
