@@ -606,100 +606,6 @@ function buildLaddningInfo(checkin: any): string | undefined {
   return parts.join(' ');
 }
 
-/**
- * Helper function to build vehicle data from checkin records.
- * Extracted to avoid TDZ (Temporal Dead Zone) issues in minified code.
- */
-function buildVehicleFromCheckins(
-  cleanedRegnr: string,
-  latestCheckin: any | null,
-  legacySaludatum: string | null
-): VehicleStatusData {
-  return {
-    regnr: cleanedRegnr,
-    
-    // Bilmärke & Modell: from checkins.car_model if available
-    bilmarkeModell: latestCheckin?.car_model || '---',
-    
-    // Senast incheckad vid: from latest checkin with datetime and checker
-    bilenStarNu: latestCheckin?.current_city && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-      ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
-      : latestCheckin?.current_city && latestCheckin?.current_station
-        ? `${latestCheckin.current_city} / ${latestCheckin.current_station}`
-        : '---',
-    
-    // Mätarställning: from latest checkin
-    matarstallning: latestCheckin?.odometer_km
-      ? `${latestCheckin.odometer_km} km`
-      : '---',
-    
-    // Däck som sitter på: from latest checkin
-    hjultyp: latestCheckin?.hjultyp || '---',
-    
-    // Hjulförvaring: not available from checkins
-    hjulforvaring: '---',
-    
-    // Drivmedel: not available from checkins
-    drivmedel: '---',
-    
-    // Växellåda: not available from checkins
-    vaxel: '---',
-    
-    // Serviceintervall: not available from checkins
-    serviceintervall: '---',
-    
-    // Max km/månad: not available from checkins
-    maxKmManad: '---',
-    
-    // Avgift över-km: not available from checkins
-    avgiftOverKm: '---',
-    
-    // Saludatum: from legacy damages if available
-    saludatum: legacySaludatum
-      ? formatDate(legacySaludatum)
-      : '---',
-    
-    // Antal registrerade skador: will be updated after building damageRecords
-    antalSkador: 0,
-    
-    // Stöld-GPS monterad: not available from checkins
-    stoldGps: '---',
-    
-    // Klar för uthyrning: not available from checkins
-    klarForUthyrning: '---',
-    
-    // Additional detailed fields: not available from checkins
-    planeradStation: '---',
-    utrustning: '---',
-    saluinfo: '---',
-    hjulForvaringInfo: '---',
-    reservnyckelInfo: '---',
-    laddkablarForvaringInfo: '---',
-    instruktionsbokForvaringInfo: '---',
-    cocForvaringInfo: '---',
-    antalNycklar: '---',
-    antalLaddkablar: '---',
-    antalInsynsskydd: '---',
-    harInstruktionsbok: '---',
-    harCoc: '---',
-    harLasbultar: '---',
-    harDragkrok: '---',
-    harGummimattor: '---',
-    harDackkompressor: '---',
-    saluStation: '---',
-    saluKopare: '---',
-    saluRetur: '---',
-    saluReturadress: '---',
-    saluAttention: '---',
-    saluNotering: '---',
-    tankningInfo: '---',
-    tankstatusVidLeverans: '---',
-    anteckningar: '---',
-    harSkadorVidLeverans: null,
-    isSold: null,
-  };
-}
-
 // =================================================================
 // 3. MAIN DATA FETCHING FUNCTION
 // =================================================================
@@ -842,23 +748,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const latestCheckin = checkins[0] || null;
 
     stage = 'build_vehicle_data:check_source';
-    // If source is 'checkins', build a minimal vehicle data from checkin records
+    // DISABLED: Vehicle building from checkins to avoid TDZ errors in minified code
+    // Instead, vehicle will be built from BUHS (if legacyDamages exist) or standard sources
+    // But we still use checkins and checkin_damages for history and damage matching
     let vehicle: VehicleStatusData | null = null;
-    if (source === 'checkins') {
-      stage = 'build_vehicle_data:checkins_source';
-      // Build vehicle status data from checkin records using helper function
-      // Wrapped in try-catch to prevent TDZ issues in minified code
-      try {
-        vehicle = buildVehicleFromCheckins(cleanedRegnr, latestCheckin, legacySaludatum);
-      } catch (err) {
-        console.error('buildVehicleFromCheckins failed', { regnr: cleanedRegnr, err });
-        // Fall back - let source handling continue below
-        stage = 'build_vehicle_data:checkins_source:fallback';
-      }
-    }
     
-    // Only continue with checkins-specific damage/history building if vehicle was successfully built
-    if (source === 'checkins' && vehicle !== null) {
+    // Continue with checkins-specific damage/history building regardless of vehicle source
+    // This ensures checkin events and damage handling (documented/not_found) are always shown
+    if (source === 'checkins') {
 
     // Build damage records from legacy damages (BUHS)
     // Note: Since source is 'checkins', the vehicle has never been checked in
@@ -1138,6 +1035,103 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const dateB = new Date(b.rawTimestamp);
       return dateB.getTime() - dateA.getTime();
     });
+
+    // Build vehicle from BUHS or minimal fallback (NOT from checkins to avoid TDZ)
+    // Use BUHS-minimal vehicle if legacy damages exist, otherwise use minimal fallback
+    if (legacyDamages.length > 0) {
+      vehicle = {
+        regnr: cleanedRegnr,
+        bilmarkeModell: '---',
+        bilenStarNu: latestCheckin ? `${latestCheckin.current_city || '?'} / ${latestCheckin.current_station || '?'}` : '---',
+        matarstallning: latestCheckin?.odometer_km ? `${latestCheckin.odometer_km} km` : '---',
+        hjultyp: latestCheckin?.hjultyp || '---',
+        hjulforvaring: '---',
+        drivmedel: '---',
+        vaxel: '---',
+        serviceintervall: '---',
+        maxKmManad: '---',
+        avgiftOverKm: '---',
+        saludatum: legacySaludatum ? formatDate(legacySaludatum) : '---',
+        antalSkador: 0, // Will be updated below
+        stoldGps: '---',
+        klarForUthyrning: '---',
+        planeradStation: '---',
+        utrustning: '---',
+        saluinfo: '---',
+        hjulForvaringInfo: '---',
+        reservnyckelInfo: '---',
+        laddkablarForvaringInfo: '---',
+        instruktionsbokForvaringInfo: '---',
+        cocForvaringInfo: '---',
+        antalNycklar: '---',
+        antalLaddkablar: '---',
+        antalInsynsskydd: '---',
+        harInstruktionsbok: '---',
+        harCoc: '---',
+        harLasbultar: '---',
+        harDragkrok: '---',
+        harGummimattor: '---',
+        harDackkompressor: '---',
+        saluStation: '---',
+        saluKopare: '---',
+        saluRetur: '---',
+        saluReturadress: '---',
+        saluAttention: '---',
+        saluNotering: '---',
+        tankningInfo: '---',
+        tankstatusVidLeverans: '---',
+        anteckningar: '---',
+        harSkadorVidLeverans: null,
+        isSold: null,
+      };
+    } else {
+      // Minimal fallback vehicle
+      vehicle = {
+        regnr: cleanedRegnr,
+        bilmarkeModell: '---',
+        bilenStarNu: latestCheckin ? `${latestCheckin.current_city || '?'} / ${latestCheckin.current_station || '?'}` : '---',
+        matarstallning: latestCheckin?.odometer_km ? `${latestCheckin.odometer_km} km` : '---',
+        hjultyp: latestCheckin?.hjultyp || '---',
+        hjulforvaring: '---',
+        drivmedel: '---',
+        vaxel: '---',
+        serviceintervall: '---',
+        maxKmManad: '---',
+        avgiftOverKm: '---',
+        saludatum: '---',
+        antalSkador: 0, // Will be updated below
+        stoldGps: '---',
+        klarForUthyrning: '---',
+        planeradStation: '---',
+        utrustning: '---',
+        saluinfo: '---',
+        hjulForvaringInfo: '---',
+        reservnyckelInfo: '---',
+        laddkablarForvaringInfo: '---',
+        instruktionsbokForvaringInfo: '---',
+        cocForvaringInfo: '---',
+        antalNycklar: '---',
+        antalLaddkablar: '---',
+        antalInsynsskydd: '---',
+        harInstruktionsbok: '---',
+        harCoc: '---',
+        harLasbultar: '---',
+        harDragkrok: '---',
+        harGummimattor: '---',
+        harDackkompressor: '---',
+        saluStation: '---',
+        saluKopare: '---',
+        saluRetur: '---',
+        saluReturadress: '---',
+        saluAttention: '---',
+        saluNotering: '---',
+        tankningInfo: '---',
+        tankstatusVidLeverans: '---',
+        anteckningar: '---',
+        harSkadorVidLeverans: null,
+        isSold: null,
+      };
+    }
 
     // Update the vehicle's damage count to reflect the actual list
     vehicle.antalSkador = damageRecords.length;
