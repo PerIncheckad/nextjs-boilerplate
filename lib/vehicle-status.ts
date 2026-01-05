@@ -693,8 +693,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     console.log('getVehicleStatus debug', {
       regnr: cleanedRegnr,
       stage,
-      commit: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || 'local',
-      env: process.env.NEXT_PUBLIC_VERCEL_ENV || 'development',
       legacyDamagesCount: legacyDamagesResponse.data?.length ?? null,
       legacyDamagesError: legacyDamagesResponse.error ?? null,
       checkinsCount: checkinsResponse.data?.length ?? null,
@@ -750,69 +748,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const latestCheckin = checkins[0] || null;
 
     stage = 'build_vehicle_data:check_source';
-    // CRITICAL: ALL complex operations (map, for loops, const declarations) must be OUTSIDE
-    // the `if (source === 'checkins')` block to avoid TDZ errors in minified code.
-    // Only simple variable assignments allowed inside source-specific blocks.
+    // DISABLED: Vehicle building from checkins to avoid TDZ errors in minified code
+    // Instead, vehicle will be built from BUHS (if legacyDamages exist) or standard sources
+    // But we still use checkins and checkin_damages for history and damage matching
     let vehicle: VehicleStatusData | null = null;
     
-    // Minimal vehicle building for checkins source - NO COMPLEX OPERATIONS
+    // Continue with checkins-specific damage/history building regardless of vehicle source
+    // This ensures checkin events and damage handling (documented/not_found) are always shown
     if (source === 'checkins') {
-      // Simple vehicle object - only basic field assignments, no loops/maps/complex logic
-      const location = latestCheckin ? `${latestCheckin.current_city || '?'} / ${latestCheckin.current_station || '?'}` : '---';
-      const odometer = latestCheckin?.odometer_km ? `${latestCheckin.odometer_km} km` : '---';
-      const wheels = latestCheckin?.hjultyp || '---';
-      const saluDatum = legacySaludatum ? formatDate(legacySaludatum) : '---';
-      
-      vehicle = {
-        regnr: cleanedRegnr,
-        bilmarkeModell: '---',
-        bilenStarNu: location,
-        matarstallning: odometer,
-        hjultyp: wheels,
-        hjulforvaring: '---',
-        drivmedel: '---',
-        vaxel: '---',
-        serviceintervall: '---',
-        maxKmManad: '---',
-        avgiftOverKm: '---',
-        saludatum: saluDatum,
-        antalSkador: 0, // Will be updated later in shared code path
-        stoldGps: '---',
-        klarForUthyrning: '---',
-        planeradStation: '---',
-        utrustning: '---',
-        saluinfo: '---',
-        hjulForvaringInfo: '---',
-        reservnyckelInfo: '---',
-        laddkablarForvaringInfo: '---',
-        instruktionsbokForvaringInfo: '---',
-        cocForvaringInfo: '---',
-        antalNycklar: '---',
-        antalLaddkablar: '---',
-        antalInsynsskydd: '---',
-        harInstruktionsbok: '---',
-        harCoc: '---',
-        harLasbultar: '---',
-        harDragkrok: '---',
-        harGummimattor: '---',
-        harDackkompressor: '---',
-        saluStation: '---',
-        saluKopare: '---',
-        saluRetur: '---',
-        saluReturadress: '---',
-        saluAttention: '---',
-        saluNotering: '---',
-        tankningInfo: '---',
-        tankstatusVidLeverans: '---',
-        anteckningar: '---',
-        harSkadorVidLeverans: null,
-        isSold: null,
-      };
-    }
-    
-    stage = 'build_damage_records_shared';
-    // SHARED CODE PATH: Build damage records for ALL sources (checkins, buhs, standard)
-    // This avoids TDZ issues by having single code path that runs outside source-specific blocks
+
+    // Build damage records from legacy damages (BUHS)
+    // Note: Since source is 'checkins', the vehicle has never been checked in
     const damageRecords: DamageRecord[] = legacyDamages.map((d: LegacyDamage) => ({
       id: d.id,
       regnr: cleanedRegnr,
@@ -820,26 +766,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDate(d.damage_date),
       status: 'Befintlig',
       source: 'legacy' as const,
-      sourceInfo: source === 'checkins' 
-        ? 'Källa: BUHS\nReg. nr har aldrig checkats in med incheckad.se/check'
-        : 'Källa: BUHS',
+      sourceInfo: 'Källa: BUHS\nReg. nr har aldrig checkats in med incheckad.se/check',
     }));
 
-    stage = 'build_damage_records_shared';
-    // SHARED CODE PATH: Build damage records for ALL sources (checkins, buhs, standard)
-    // This avoids TDZ issues by having single code path that runs outside source-specific blocks
-    const damageRecords: DamageRecord[] = legacyDamages.map((d: LegacyDamage) => ({
-      id: d.id,
-      regnr: cleanedRegnr,
-      skadetyp: getLegacyDamageText(d) || 'Okänd',
-      datum: formatDate(d.damage_date),
-      status: 'Befintlig',
-      source: 'legacy' as const,
-      sourceInfo: source === 'checkins' 
-        ? 'Källa: BUHS\nReg. nr har aldrig checkats in med incheckad.se/check'
-        : 'Källa: BUHS',
-    }));
-    
     // Add damages from damages table (new damages from checkins)
     for (const damage of damages) {
       let skadetyp: string;
@@ -879,9 +808,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo: sourceInfo,
       });
     }
-    
-    stage = 'build_history_records_shared';
-    // SHARED CODE PATH: Build history records for ALL sources
+
+    // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
     const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
     
@@ -1080,7 +1008,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         },
       });
     }
-    
+
     // Add BUHS damage history events
     // Create a separate history event for each BUHS damage (source='legacy')
     // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
@@ -1107,21 +1035,116 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const dateB = new Date(b.rawTimestamp);
       return dateB.getTime() - dateA.getTime();
     });
-    
-    // Update vehicle damage count if vehicle was built from checkins source
-    if (source === 'checkins' && vehicle !== null) {
-      vehicle.antalSkador = damageRecords.length;
-      
-      // Return early for checkins source - all done
-      return {
-        found: true,
-        source,
-        vehicle,
-        damages: damageRecords,
-        history: historyRecords,
-        nybilPhotos: null, // No nybil photos when source is 'checkins' only
+
+    // Build vehicle from BUHS or minimal fallback (NOT from checkins to avoid TDZ)
+    // Use BUHS-minimal vehicle if legacy damages exist, otherwise use minimal fallback
+    if (legacyDamages.length > 0) {
+      vehicle = {
+        regnr: cleanedRegnr,
+        bilmarkeModell: '---',
+        bilenStarNu: latestCheckin ? `${latestCheckin.current_city || '?'} / ${latestCheckin.current_station || '?'}` : '---',
+        matarstallning: latestCheckin?.odometer_km ? `${latestCheckin.odometer_km} km` : '---',
+        hjultyp: latestCheckin?.hjultyp || '---',
+        hjulforvaring: '---',
+        drivmedel: '---',
+        vaxel: '---',
+        serviceintervall: '---',
+        maxKmManad: '---',
+        avgiftOverKm: '---',
+        saludatum: legacySaludatum ? formatDate(legacySaludatum) : '---',
+        antalSkador: 0, // Will be updated below
+        stoldGps: '---',
+        klarForUthyrning: '---',
+        planeradStation: '---',
+        utrustning: '---',
+        saluinfo: '---',
+        hjulForvaringInfo: '---',
+        reservnyckelInfo: '---',
+        laddkablarForvaringInfo: '---',
+        instruktionsbokForvaringInfo: '---',
+        cocForvaringInfo: '---',
+        antalNycklar: '---',
+        antalLaddkablar: '---',
+        antalInsynsskydd: '---',
+        harInstruktionsbok: '---',
+        harCoc: '---',
+        harLasbultar: '---',
+        harDragkrok: '---',
+        harGummimattor: '---',
+        harDackkompressor: '---',
+        saluStation: '---',
+        saluKopare: '---',
+        saluRetur: '---',
+        saluReturadress: '---',
+        saluAttention: '---',
+        saluNotering: '---',
+        tankningInfo: '---',
+        tankstatusVidLeverans: '---',
+        anteckningar: '---',
+        harSkadorVidLeverans: null,
+        isSold: null,
+      };
+    } else {
+      // Minimal fallback vehicle
+      vehicle = {
+        regnr: cleanedRegnr,
+        bilmarkeModell: '---',
+        bilenStarNu: latestCheckin ? `${latestCheckin.current_city || '?'} / ${latestCheckin.current_station || '?'}` : '---',
+        matarstallning: latestCheckin?.odometer_km ? `${latestCheckin.odometer_km} km` : '---',
+        hjultyp: latestCheckin?.hjultyp || '---',
+        hjulforvaring: '---',
+        drivmedel: '---',
+        vaxel: '---',
+        serviceintervall: '---',
+        maxKmManad: '---',
+        avgiftOverKm: '---',
+        saludatum: '---',
+        antalSkador: 0, // Will be updated below
+        stoldGps: '---',
+        klarForUthyrning: '---',
+        planeradStation: '---',
+        utrustning: '---',
+        saluinfo: '---',
+        hjulForvaringInfo: '---',
+        reservnyckelInfo: '---',
+        laddkablarForvaringInfo: '---',
+        instruktionsbokForvaringInfo: '---',
+        cocForvaringInfo: '---',
+        antalNycklar: '---',
+        antalLaddkablar: '---',
+        antalInsynsskydd: '---',
+        harInstruktionsbok: '---',
+        harCoc: '---',
+        harLasbultar: '---',
+        harDragkrok: '---',
+        harGummimattor: '---',
+        harDackkompressor: '---',
+        saluStation: '---',
+        saluKopare: '---',
+        saluRetur: '---',
+        saluReturadress: '---',
+        saluAttention: '---',
+        saluNotering: '---',
+        tankningInfo: '---',
+        tankstatusVidLeverans: '---',
+        anteckningar: '---',
+        harSkadorVidLeverans: null,
+        isSold: null,
       };
     }
+
+    // Update the vehicle's damage count to reflect the actual list
+    vehicle.antalSkador = damageRecords.length;
+
+    return {
+      found: true,
+      source,
+      vehicle,
+      damages: damageRecords,
+      history: historyRecords,
+      nybilPhotos: null, // No nybil photos when source is 'checkins' only
+    };
+  }
 
     stage = 'build_vehicle_data:buhs_check';
     // If source is 'buhs' and vehicle not already built, build minimal vehicle data from BUHS damages only
