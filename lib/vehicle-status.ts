@@ -850,7 +850,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Try primary text matching first
       for (const cd of allCheckinDamages) {
-        if (matchedCheckinDamageIds.has(cd.id!)) continue;
+        if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue; // Skip if no ID or already matched
         
         const cdDescription = cd.description || '';
         
@@ -859,7 +859,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             textsMatch(d.note_internal, cdDescription) ||
             textsMatch(d.damage_type_raw, cdDescription)) {
           matchedCheckinDamage = cd;
-          if (cd.id) matchedCheckinDamageIds.add(cd.id);
+          matchedCheckinDamageIds.add(cd.id);
           break;
         }
       }
@@ -869,7 +869,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const normalizedBuhsType = normalizeDamageTypeForKey(d.damage_type_raw);
         
         const candidatesForLooseMatch = allCheckinDamages.filter(cd => {
-          if (matchedCheckinDamageIds.has(cd.id!)) return false;
+          if (!cd.id || matchedCheckinDamageIds.has(cd.id)) return false;
           
           const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
           return normalizedCdType && normalizedBuhsType &&
@@ -1346,7 +1346,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Try primary text matching first
     for (const cd of allCheckinDamages) {
-      if (matchedCheckinDamageIds.has(cd.id!)) continue; // Already matched
+      if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue; // Skip if no ID or already matched
       
       // Check if checkin_damage description matches any of the BUHS text fields
       const cdDescription = cd.description || '';
@@ -1356,7 +1356,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           textsMatch(d.note_internal, cdDescription) ||
           textsMatch(d.damage_type_raw, cdDescription)) {
         matchedCheckinDamage = cd;
-        if (cd.id) matchedCheckinDamageIds.add(cd.id);
+        matchedCheckinDamageIds.add(cd.id);
         break;
       }
     }
@@ -1367,7 +1367,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Find checkin_damages with matching date and similar damage type
       const candidatesForLooseMatch = allCheckinDamages.filter(cd => {
-        if (matchedCheckinDamageIds.has(cd.id!)) return false;
+        if (!cd.id || matchedCheckinDamageIds.has(cd.id)) return false;
         
         const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
         return normalizedCdType && normalizedBuhsType &&

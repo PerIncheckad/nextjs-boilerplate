@@ -306,7 +306,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       
       // Try primary text matching first
       for (const handled of handledDamagesList) {
-        if (matchedHandledIds.has(handled.id)) continue; // Already matched
+        if (!handled.id || matchedHandledIds.has(handled.id)) continue; // Skip if no ID or already matched
         
         // Check if handled description matches any of the BUHS text fields
         if (textsMatch(originalText, handled.description) ||
@@ -324,7 +324,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         const normalizedBuhsType = normalizeDamageTypeForKey(leg.damage_type_raw);
         
         const candidatesForLooseMatch = handledDamagesList.filter(handled => {
-          if (matchedHandledIds.has(handled.id)) return false;
+          if (!handled.id || matchedHandledIds.has(handled.id)) return false;
           
           const normalizedHandledType = normalizeDamageTypeForKey(handled.damage_type);
           return normalizedHandledType && normalizedBuhsType &&
