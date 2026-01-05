@@ -879,6 +879,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Note: Even though source is 'checkins', we still need to match with checkin_damages
     const damageRecords: DamageRecord[] = [];
     const matchedCheckinDamageIds = new Set<number>();
+    const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
     
     for (const d of legacyDamages) {
       const legacyText = getLegacyDamageText(d);
@@ -899,6 +900,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             textsMatch(d.damage_type_raw, cdDescription)) {
           matchedCheckinDamage = cd;
           matchedCheckinDamageIds.add(cd.id);
+          matchedLegacyTexts.add(legacyText); // Track matched BUHS text
           break;
         }
       }
@@ -917,7 +919,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         if (candidatesForLooseMatch.length === 1) {
           matchedCheckinDamage = candidatesForLooseMatch[0];
-          if (matchedCheckinDamage.id) matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+          if (matchedCheckinDamage.id) {
+            matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+            matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+          }
         }
       }
       
@@ -1061,7 +1066,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
 
     // Add damages from damages table (new damages from checkins)
+    // Skip damages whose legacy_damage_source_text matches a matched BUHS damage
     for (const damage of damages) {
+      // Skip if this damage's legacy_damage_source_text was matched to a BUHS damage
+      if (damage.legacy_damage_source_text && matchedLegacyTexts.has(damage.legacy_damage_source_text)) {
+        // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
+        continue;
+      }
+      
       let skadetyp: string;
       if (damage.damage_type_raw) {
         skadetyp = damage.damage_type_raw;
@@ -1452,6 +1464,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Build damage records from legacy damages (BUHS) merged with checkin_damages
   const damageRecords: DamageRecord[] = [];
   const matchedCheckinDamageIds = new Set<number>(); // Track which checkin_damages we've matched
+  const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
   
   for (const d of legacyDamages) {
     const legacyText = getLegacyDamageText(d);
@@ -1476,6 +1489,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           textsMatch(d.damage_type_raw, cdDescription)) {
         matchedCheckinDamage = cd;
         matchedCheckinDamageIds.add(cd.id);
+        matchedLegacyTexts.add(legacyText); // Track matched BUHS text
         
         if (shouldDebug) {
           console.log(`[DEBUG ${cleanedRegnr}] Text match for BUHS ${d.id}:`, {
@@ -1512,7 +1526,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // If there's exactly one candidate (unambiguous), use it
       if (candidatesForLooseMatch.length === 1) {
         matchedCheckinDamage = candidatesForLooseMatch[0];
-        if (matchedCheckinDamage.id) matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+        if (matchedCheckinDamage.id) {
+          matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+          matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+        }
         
         if (shouldDebug) {
           console.log(`[DEBUG ${cleanedRegnr}] Loose match for BUHS ${d.id}:`, {
@@ -1690,6 +1707,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   // Add damages from damages table (nybil delivery damages only)
   // Skip damages that match legacy damages by regnr + damage_date
+  // Skip damages whose legacy_damage_source_text matches a matched BUHS damage
   for (const damage of damages) {
     // Check if this damage matches a legacy damage (same regnr + damage_date)
     const damageKey = `${cleanedRegnr}-${formatDate(damage.damage_date || damage.created_at || damage.datum)}`;
@@ -1697,6 +1715,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // This damage already exists in legacy damages, skip it
       continue;
     }
+    
+    // Skip if this damage's legacy_damage_source_text was matched to a BUHS damage
+    if (damage.legacy_damage_source_text && matchedLegacyTexts.has(damage.legacy_damage_source_text)) {
+      // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
+      continue;
+    }
+    
     // Build damage description from type and positions
     // Use damage_type_raw if available, otherwise format damage_type
     let skadetyp: string;
