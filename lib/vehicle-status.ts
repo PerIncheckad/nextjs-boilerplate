@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 
 // =================================================================
 // 1. TYPE DEFINITIONS
@@ -723,6 +724,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   let allCheckinDamages: CheckinDamageData[] = [];
   
+  // Try anon fetch first
   const checkinDamagesResp = checkinIds.length > 0
     ? await supabase
         .from('checkin_damages')
@@ -731,22 +733,60 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         .order('created_at', { ascending: true })
     : { data: [], error: null };
   
-  // Log fetch result
+  // Log anon fetch result
   if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages fetch:`, {
+    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages anon fetch:`, {
       checkinIds,
       error: checkinDamagesResp.error,
       dataLength: checkinDamagesResp.data?.length || 0,
     });
   }
   
-  if (checkinDamagesResp.error) {
-    console.error(`[ERROR ${cleanedRegnr}] Failed to fetch checkin_damages:`, checkinDamagesResp.error);
+  // Fallback to service role if anon fetch returns empty or error
+  // Only available server-side (won't work in browser)
+  const needsServiceRoleFallback = 
+    checkinIds.length > 0 && 
+    (checkinDamagesResp.error || (checkinDamagesResp.data?.length || 0) === 0);
+  
+  let serviceRoleResp: { data: any[] | null; error: any } | null = null;
+  
+  if (needsServiceRoleFallback && typeof process !== 'undefined' && process.env?.SUPABASE_SERVICE_ROLE_KEY) {
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr}] Attempting service role fallback...`);
+    }
+    
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+      const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+      
+      serviceRoleResp = await supabaseAdmin
+        .from('checkin_damages')
+        .select('*')
+        .in('checkin_id', checkinIds)
+        .order('created_at', { ascending: true });
+      
+      if (shouldDebug) {
+        console.log(`[DEBUG ${cleanedRegnr}] checkin_damages service role fetch:`, {
+          error: serviceRoleResp.error,
+          dataLength: serviceRoleResp.data?.length || 0,
+        });
+      }
+    } catch (err) {
+      console.error(`[ERROR ${cleanedRegnr}] Service role fallback failed:`, err);
+    }
+  }
+  
+  // Use service role data if available, otherwise use anon data
+  const finalResp = serviceRoleResp?.data ? serviceRoleResp : checkinDamagesResp;
+  
+  if (finalResp.error) {
+    console.error(`[ERROR ${cleanedRegnr}] Failed to fetch checkin_damages:`, finalResp.error);
     // Fallback to empty array but continue execution
     allCheckinDamages = [];
   } else {
     // Filter to only documented/not_found/existing types in code
-    const rawData = (checkinDamagesResp.data || []) as CheckinDamageData[];
+    const rawData = (finalResp.data || []) as CheckinDamageData[];
     allCheckinDamages = rawData.filter(cd => 
       cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
     );
