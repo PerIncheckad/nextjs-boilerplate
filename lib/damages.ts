@@ -190,23 +190,66 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .maybeSingle()
   ]);
   
-  // Step 2b: Fetch checkin_damages for the specific latest checkin (separate to avoid conditional in Promise.all)
-  // Note: No nested join - we use checker_name from lastCheckinData instead to avoid PostgREST join issues
-  const handledDamagesResponse = lastCheckinId 
-    ? await supabase
-        .from('checkin_damages')
-        .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
-        .eq('checkin_id', lastCheckinId)
-        .in('type', ['not_found', 'existing', 'documented'])
-        .order('created_at', { ascending: true }) // ASC for stable index matching (1st damage → 1st entry)
-    : { data: [], error: null };
+  // Debug logging for specific regnr
+  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F'];
+  const shouldDebug = debugRegnrs.includes(cleanedRegnr);
+  
+  // Step 2b: Fetch checkin_damages for the specific latest checkin
+  // Note: Fetch ALL types first, then filter in code to avoid RLS issues
+  let handledDamages: CheckinDamageData[] = [];
+  
+  if (lastCheckinId) {
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr} /check] lastCheckinId:`, lastCheckinId);
+    }
+    
+    const handledDamagesResponse = await supabase
+      .from('checkin_damages')
+      .select('*')
+      .eq('checkin_id', lastCheckinId)
+      .order('created_at', { ascending: true });
+    
+    // Explicit logging of fetch result
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr} /check] checkin_damages fetch result:`, {
+        lastCheckinId,
+        checkinDamagesCount: handledDamagesResponse.data?.length || 0,
+        error: handledDamagesResponse.error,
+        rawData: handledDamagesResponse.data?.map(cd => ({
+          id: (cd as any).id,
+          type: (cd as any).type,
+          damage_type: (cd as any).damage_type,
+        })),
+      });
+    }
+    
+    if (handledDamagesResponse.error) {
+      console.error(`[ERROR ${cleanedRegnr} /check] Failed to fetch checkin_damages:`, handledDamagesResponse.error);
+      // Fallback to empty array but continue execution
+      handledDamages = [];
+    } else {
+      // Filter to only documented/not_found/existing types in code
+      const rawData = (handledDamagesResponse.data || []) as CheckinDamageData[];
+      handledDamages = rawData.filter(cd => 
+        cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
+      );
+      
+      if (shouldDebug) {
+        console.log(`[DEBUG ${cleanedRegnr} /check] Filtered checkin_damages (documented/not_found/existing):`, handledDamages.length);
+      }
+    }
+  } else {
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr} /check] No lastCheckinId found, skipping checkin_damages fetch`);
+    }
+  }
 
   // Step 3: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
-  const handledDamages = (handledDamagesResponse.data || []) as CheckinDamageData[];
+  // handledDamages is now defined earlier
   
   // Get the date of the last check-in for display purposes
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;

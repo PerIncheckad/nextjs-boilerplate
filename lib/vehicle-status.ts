@@ -709,20 +709,61 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
   
-  // Fetch all checkin_damages for this regnr (documented/not_found/existing types)
-  // We need these to merge with BUHS damages
+  // Fetch all checkin_damages for this regnr
+  // Note: Fetch ALL types first, then filter in code to avoid RLS issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
+  
+  // Debug logging for specific regnr
+  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F'];
+  const shouldDebug = debugRegnrs.includes(cleanedRegnr);
+  
+  if (shouldDebug) {
+    console.log(`[DEBUG ${cleanedRegnr}] checkinIds:`, checkinIds);
+  }
+  
   let allCheckinDamages: CheckinDamageData[] = [];
   
   if (checkinIds.length > 0) {
-    const { data: checkinDamagesData } = await supabase
+    const checkinDamagesResp = await supabase
       .from('checkin_damages')
       .select('*')
       .in('checkin_id', checkinIds)
-      .in('type', ['documented', 'not_found', 'existing'])
       .order('created_at', { ascending: true });
     
-    allCheckinDamages = (checkinDamagesData || []) as CheckinDamageData[];
+    // Explicit logging of fetch result
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr}] checkin_damages fetch result:`, {
+        checkinIds,
+        checkinDamagesCount: checkinDamagesResp.data?.length || 0,
+        error: checkinDamagesResp.error,
+        rawData: checkinDamagesResp.data?.map(cd => ({
+          id: cd.id,
+          checkin_id: (cd as any).checkin_id,
+          type: (cd as any).type,
+          damage_type: (cd as any).damage_type,
+        })),
+      });
+    }
+    
+    if (checkinDamagesResp.error) {
+      console.error(`[ERROR ${cleanedRegnr}] Failed to fetch checkin_damages:`, checkinDamagesResp.error);
+      // Fallback to empty array but continue execution
+      allCheckinDamages = [];
+    } else {
+      // Filter to only documented/not_found/existing types in code
+      const rawData = (checkinDamagesResp.data || []) as CheckinDamageData[];
+      allCheckinDamages = rawData.filter(cd => 
+        cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
+      );
+      
+      if (shouldDebug) {
+        console.log(`[DEBUG ${cleanedRegnr}] Filtered checkin_damages (documented/not_found/existing):`, allCheckinDamages.length);
+      }
+    }
+  } else {
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr}] No checkins found, skipping checkin_damages fetch`);
+    }
   }
   
   // Get saludatum from legacy damages if available
@@ -1347,10 +1388,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // NEW: Match BUHS damages with checkin_damages
   // ==================================================================
   
-  // Debug logging for specific regnr
-  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F'];
-  const shouldDebug = debugRegnrs.includes(cleanedRegnr);
-  
+  // shouldDebug is already defined earlier, reuse it
   if (shouldDebug) {
     console.log(`[DEBUG ${cleanedRegnr}] BUHS damages count:`, legacyDamages.length);
     console.log(`[DEBUG ${cleanedRegnr}] checkin_damages count:`, allCheckinDamages.length);
