@@ -714,6 +714,11 @@ export default function CheckInForm() {
   }, []);
 
   // Effects
+  // Health check: log Supabase URL
+  useEffect(() => {
+    console.log('[/check] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  }, []);
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();

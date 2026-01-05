@@ -208,6 +208,11 @@ export default function StatusForm() {
     }
   }, []);
 
+  // Health check: log Supabase URL
+  useEffect(() => {
+    console.log('[/status] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  }, []);
+
   // Get user info
   useEffect(() => {
     const getUser = async () => {
