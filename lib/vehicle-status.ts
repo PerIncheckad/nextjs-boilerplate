@@ -984,15 +984,59 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           const comment = matchedCheckinDamage.description || 'Ingen kommentar';
           sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
           
-        } else {
-          skadetyp = legacyText || 'Okänd';
-          status = 'Befintlig (bekräftad)';
-          folder = undefined;
+        } else if (cdType === 'existing') {
+          // type === 'existing' - damage was acknowledged/confirmed
+          // Treat similar to 'documented' but without photos
+          const damageType = matchedCheckinDamage.damage_type || 'Okänd';
           
+          // Priority: positions[0] > car_part/position
+          if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
+              matchedCheckinDamage.positions.length > 0) {
+            // Use positions[0] first
+            const pos = matchedCheckinDamage.positions[0];
+            const parts: string[] = [];
+            if (pos.carPart) parts.push(pos.carPart);
+            if (pos.position) parts.push(pos.position);
+            const posStr = parts.join(' - ');
+            skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
+          } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
+            // Fallback to car_part/position
+            const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
+            skadetyp = `${damageType} - ${parts.join(' - ')}`;
+          } else {
+            skadetyp = legacyText || damageType;
+          }
+          
+          status = `Dokumenterad (urspr. BUHS ${damageDate})`;
+          
+          // Try to get folder from checkin_damages photo_urls first
           const checkin = checkins.find(c => c.id === matchedCheckinDamage.checkin_id);
+          if (checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
+            const firstUrl = matchedCheckinDamage.photo_urls[0];
+            const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
+            folder = match ? match[1] : undefined;
+          }
+          
+          // Fallback: check damages table for uploads.folder
+          if (!folder) {
+            const damageEntry = damages.find(dmg => 
+              dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
+            );
+            if (damageEntry && damageEntry.uploads) {
+              folder = (damageEntry.uploads as any).folder;
+            }
+          }
+          
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
-          sourceInfo = `Källa: BUHS\nBekräftad ${checkinDate} av ${checkerName}`;
+          sourceInfo = `Källa: BUHS\nDokumenterad ${checkinDate} av ${checkerName}`;
+          
+        } else {
+          // Unknown type - shouldn't happen but handle gracefully
+          skadetyp = legacyText || 'Okänd';
+          status = 'Befintlig';
+          folder = undefined;
+          sourceInfo = 'Källa: BUHS';
         }
         
       } else {
@@ -1561,16 +1605,59 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const comment = matchedCheckinDamage.description || 'Ingen kommentar';
         sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
         
-      } else {
-        // type === 'existing' - damage was acknowledged but not photographed
-        skadetyp = legacyText || 'Okänd';
-        status = 'Befintlig (bekräftad)';
-        folder = undefined;
+      } else if (cdType === 'existing') {
+        // type === 'existing' - damage was acknowledged/confirmed
+        // Treat similar to 'documented' but without photos
+        const damageType = matchedCheckinDamage.damage_type || 'Okänd';
         
+        // Priority: positions[0] > car_part/position
+        if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
+            matchedCheckinDamage.positions.length > 0) {
+          // Use positions[0] first
+          const pos = matchedCheckinDamage.positions[0];
+          const parts: string[] = [];
+          if (pos.carPart) parts.push(pos.carPart);
+          if (pos.position) parts.push(pos.position);
+          const posStr = parts.join(' - ');
+          skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
+        } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
+          // Fallback to car_part/position
+          const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
+          skadetyp = `${damageType} - ${parts.join(' - ')}`;
+        } else {
+          skadetyp = legacyText || damageType;
+        }
+        
+        status = `Dokumenterad (urspr. BUHS ${damageDate})`;
+        
+        // Try to get folder from checkin_damages photo_urls first
         const checkin = checkins.find(c => c.id === matchedCheckinDamage.checkin_id);
+        if (checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
+          const firstUrl = matchedCheckinDamage.photo_urls[0];
+          const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
+          folder = match ? match[1] : undefined;
+        }
+        
+        // Fallback: check damages table for uploads.folder
+        if (!folder) {
+          const damageEntry = damages.find(dmg => 
+            dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
+          );
+          if (damageEntry && damageEntry.uploads) {
+            folder = (damageEntry.uploads as any).folder;
+          }
+        }
+        
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
-        sourceInfo = `Källa: BUHS\nBekräftad ${checkinDate} av ${checkerName}`;
+        sourceInfo = `Källa: BUHS\nDokumenterad ${checkinDate} av ${checkerName}`;
+        
+      } else {
+        // Unknown type - shouldn't happen but handle gracefully
+        skadetyp = legacyText || 'Okänd';
+        status = 'Befintlig';
+        folder = undefined;
+        sourceInfo = 'Källa: BUHS';
       }
       
     } else {
