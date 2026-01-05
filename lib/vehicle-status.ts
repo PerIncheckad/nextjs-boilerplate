@@ -989,12 +989,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
       } else if (cdType === 'not_found') {
         skadetyp = legacyText || 'Okänd';
-        status = `Gick ej att dokumentera`;
-        folder = undefined;
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
         const comment = matchedCheckinDamage.description || 'Ingen kommentar';
+        
+        // Include checker and date in status for visibility
+        status = `Gick ej att dokumentera (${checkinDate} av ${checkerName})`;
+        folder = undefined;
         sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
         
       } else {
@@ -1028,13 +1030,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
       
+      // Try to extract media folder from damages table if available
+      let folder: string | undefined;
+      const damageEntry = damages.find(dmg => 
+        dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
+      );
+      if (damageEntry && damageEntry.uploads) {
+        folder = (damageEntry.uploads as any).folder;
+      }
+      
       damageRecords.push({
         id: d.id,
         regnr: cleanedRegnr,
         skadetyp: legacyText || 'Okänd',
         datum: damageDate,
         status: 'Källa BUHS',
-        folder: undefined,
+        folder: folder,
         source: 'legacy' as const,
         sourceInfo: 'Källa: BUHS',
         legacy_damage_source_text: legacyText,
@@ -1603,12 +1614,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     } else if (cdType === 'not_found') {
       // Damage could not be documented (e.g., already repaired)
       skadetyp = legacyText || 'Okänd';
-      status = `Gick ej att dokumentera`;
-      folder = undefined; // no media for not_found damages
       
       const checkerName = checkin?.checker_name || 'Okänd';
       const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
       const comment = matchedCheckinDamage.description || 'Ingen kommentar';
+      
+      // Include checker and date in status for visibility
+      status = `Gick ej att dokumentera (${checkinDate} av ${checkerName})`;
+      folder = undefined; // no media for not_found damages
       sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
       
     } else {
@@ -1642,13 +1655,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const legacyText = getLegacyDamageText(d);
     const damageDate = formatDate(d.damage_date);
     
+    // Try to extract media folder from damages table if available
+    let folder: string | undefined;
+    const damageEntry = damages.find(dmg => 
+      dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
+    );
+    if (damageEntry && damageEntry.uploads) {
+      folder = (damageEntry.uploads as any).folder;
+    }
+    
     damageRecords.push({
       id: d.id,
       regnr: cleanedRegnr,
       skadetyp: legacyText || 'Okänd',
       datum: damageDate,
       status: 'Källa BUHS',
-      folder: undefined,
+      folder: folder,
       source: 'legacy' as const,
       sourceInfo: 'Källa: BUHS',
       legacy_damage_source_text: legacyText,
