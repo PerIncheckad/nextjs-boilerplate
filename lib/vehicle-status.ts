@@ -710,7 +710,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const checkins = checkinsResponse.data || [];
   
   // Fetch all checkin_damages for this regnr
-  // Note: Fetch ALL types first, then filter in code to avoid RLS issues
+  // Note: Fetch ALL types, then filter in code to avoid PostgREST URL issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
   
   // Debug logging for specific regnr
@@ -723,46 +723,36 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   let allCheckinDamages: CheckinDamageData[] = [];
   
-  if (checkinIds.length > 0) {
-    const checkinDamagesResp = await supabase
-      .from('checkin_damages')
-      .select('*')
-      .in('checkin_id', checkinIds)
-      .order('created_at', { ascending: true });
-    
-    // Explicit logging of fetch result
-    if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr}] checkin_damages fetch result:`, {
-        checkinIds,
-        checkinDamagesCount: checkinDamagesResp.data?.length || 0,
-        error: checkinDamagesResp.error,
-        rawData: checkinDamagesResp.data?.map(cd => ({
-          id: cd.id,
-          checkin_id: (cd as any).checkin_id,
-          type: (cd as any).type,
-          damage_type: (cd as any).damage_type,
-        })),
-      });
-    }
-    
-    if (checkinDamagesResp.error) {
-      console.error(`[ERROR ${cleanedRegnr}] Failed to fetch checkin_damages:`, checkinDamagesResp.error);
-      // Fallback to empty array but continue execution
-      allCheckinDamages = [];
-    } else {
-      // Filter to only documented/not_found/existing types in code
-      const rawData = (checkinDamagesResp.data || []) as CheckinDamageData[];
-      allCheckinDamages = rawData.filter(cd => 
-        cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
-      );
-      
-      if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] Filtered checkin_damages (documented/not_found/existing):`, allCheckinDamages.length);
-      }
-    }
+  const checkinDamagesResp = checkinIds.length > 0
+    ? await supabase
+        .from('checkin_damages')
+        .select('*')
+        .in('checkin_id', checkinIds)
+        .order('created_at', { ascending: true })
+    : { data: [], error: null };
+  
+  // Log fetch result
+  if (shouldDebug) {
+    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages fetch:`, {
+      checkinIds,
+      error: checkinDamagesResp.error,
+      dataLength: checkinDamagesResp.data?.length || 0,
+    });
+  }
+  
+  if (checkinDamagesResp.error) {
+    console.error(`[ERROR ${cleanedRegnr}] Failed to fetch checkin_damages:`, checkinDamagesResp.error);
+    // Fallback to empty array but continue execution
+    allCheckinDamages = [];
   } else {
+    // Filter to only documented/not_found/existing types in code
+    const rawData = (checkinDamagesResp.data || []) as CheckinDamageData[];
+    allCheckinDamages = rawData.filter(cd => 
+      cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
+    );
+    
     if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr}] No checkins found, skipping checkin_damages fetch`);
+      console.log(`[DEBUG ${cleanedRegnr}] Filtered checkin_damages (documented/not_found/existing):`, allCheckinDamages.length);
     }
   }
   
