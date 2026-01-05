@@ -1242,12 +1242,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
     for (const damage of damageRecords) {
       if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
+        // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
+        // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
+        const sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+        
         historyRecords.push({
           id: `buhs-${damage.id}`,
           datum: damage.datum,
           rawTimestamp: damage.datum || '',
           typ: 'buhs_skada',
-          sammanfattning: 'Ej dokumenterad i Incheckad',
+          sammanfattning,
           utfordAv: 'System (BUHS)',
           buhsSkadaDetaljer: {
             skadetyp: damage.skadetyp,
@@ -1965,12 +1969,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
   for (const damage of damageRecords) {
     if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
+      // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
+      // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
+      const sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+      
       historyRecords.push({
         id: `buhs-${damage.id}`,
         datum: damage.datum,
         rawTimestamp: damage.datum || '',
         typ: 'buhs_skada',
-        sammanfattning: 'Ej dokumenterad i Incheckad',
+        sammanfattning,
         utfordAv: 'System (BUHS)',
         buhsSkadaDetaljer: {
           skadetyp: damage.skadetyp,
