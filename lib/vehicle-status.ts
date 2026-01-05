@@ -1530,6 +1530,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     // Only process and add matched BUHS damages in this loop
+    // Unmatched BUHS damages will be added in the second pass below
+    // This two-pass approach prevents duplicates: matched BUHS damages appear once
+    // as merged records, while unmatched damages appear as "Källa BUHS" entries
     if (!matchedCheckinDamage) {
       continue; // Skip unmatched, will add in second pass
     }
@@ -1543,8 +1546,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const cdType = matchedCheckinDamage.type;
     const checkin = checkins.find(c => c.id === matchedCheckinDamage.checkin_id);
     
+    // Both 'documented' and 'existing' are treated as "Dokumenterad"
+    // documented: damage was documented with photos during checkin
+    // existing: damage was confirmed/acknowledged during checkin
+    // Both use same structured display and media fallback logic
     if (cdType === 'documented' || cdType === 'existing') {
-      // Both documented and existing are treated as "Dokumenterad"
       const damageType = matchedCheckinDamage.damage_type || 'Okänd';
       
       // Priority: positions[0] > car_part/position > user_positions
