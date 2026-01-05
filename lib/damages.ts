@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { createClient } from '@supabase/supabase-js';
 import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
 
 // =================================================================
@@ -196,14 +195,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const shouldDebug = debugRegnrs.includes(cleanedRegnr);
   
   // Step 2b: Fetch checkin_damages for the specific latest checkin
-  // Note: Fetch ALL types, then filter in code to avoid PostgREST URL issues
+  // Note: This function is only called server-side, so direct fetch should work
   let handledDamages: CheckinDamageData[] = [];
   
   if (shouldDebug && lastCheckinId) {
-    console.log(`[DEBUG ${cleanedRegnr} /check] lastCheckinId:`, lastCheckinId);
+    console.log(`[DEBUG ${cleanedRegnr} /damages.ts] lastCheckinId:`, lastCheckinId);
   }
   
-  // Try anon fetch first
   const handledDamagesResponse = lastCheckinId
     ? await supabase
         .from('checkin_damages')
@@ -212,66 +210,26 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         .order('created_at', { ascending: true })
     : { data: [], error: null };
   
-  // Log anon fetch result
   if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr} /check] checkin_damages anon fetch:`, {
+    console.log(`[DEBUG ${cleanedRegnr} /damages.ts] checkin_damages fetch:`, {
       lastCheckinId,
       error: handledDamagesResponse.error,
       dataLength: handledDamagesResponse.data?.length || 0,
     });
   }
   
-  // Fallback to service role if anon fetch returns empty or error
-  // Only available server-side (won't work in browser)
-  const needsServiceRoleFallback = 
-    lastCheckinId && 
-    (handledDamagesResponse.error || (handledDamagesResponse.data?.length || 0) === 0);
-  
-  let serviceRoleResp: { data: any[] | null; error: any } | null = null;
-  
-  if (needsServiceRoleFallback && typeof process !== 'undefined' && process.env?.SUPABASE_SERVICE_ROLE_KEY) {
-    if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr} /check] Attempting service role fallback...`);
-    }
-    
-    try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-      const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-      
-      serviceRoleResp = await supabaseAdmin
-        .from('checkin_damages')
-        .select('*')
-        .eq('checkin_id', lastCheckinId)
-        .order('created_at', { ascending: true });
-      
-      if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr} /check] checkin_damages service role fetch:`, {
-          error: serviceRoleResp.error,
-          dataLength: serviceRoleResp.data?.length || 0,
-        });
-      }
-    } catch (err) {
-      console.error(`[ERROR ${cleanedRegnr} /check] Service role fallback failed:`, err);
-    }
-  }
-  
-  // Use service role data if available, otherwise use anon data
-  const finalResp = serviceRoleResp?.data ? serviceRoleResp : handledDamagesResponse;
-  
-  if (finalResp.error) {
-    console.error(`[ERROR ${cleanedRegnr} /check] Failed to fetch checkin_damages:`, finalResp.error);
-    // Fallback to empty array but continue execution
+  if (handledDamagesResponse.error) {
+    console.error(`[ERROR ${cleanedRegnr} /damages.ts] Failed to fetch checkin_damages:`, handledDamagesResponse.error);
     handledDamages = [];
   } else {
     // Filter to only documented/not_found/existing types in code
-    const rawData = (finalResp.data || []) as CheckinDamageData[];
+    const rawData = (handledDamagesResponse.data || []) as CheckinDamageData[];
     handledDamages = rawData.filter(cd => 
       cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
     );
     
     if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr} /check] Filtered checkin_damages (documented/not_found/existing):`, handledDamages.length);
+      console.log(`[DEBUG ${cleanedRegnr} /damages.ts] Filtered checkin_damages:`, handledDamages.length);
     }
   }
 

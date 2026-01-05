@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { createClient } from '@supabase/supabase-js';
 
 // =================================================================
 // 1. TYPE DEFINITIONS
@@ -710,8 +709,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
   
-  // Fetch all checkin_damages for this regnr
-  // Note: Fetch ALL types, then filter in code to avoid PostgREST URL issues
+  // Fetch all checkin_damages for this regnr via server-side API
+  // This uses service role on the server to bypass RLS issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
   
   // Debug logging for specific regnr
@@ -724,76 +723,45 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   let allCheckinDamages: CheckinDamageData[] = [];
   
-  // Try anon fetch first
-  const checkinDamagesResp = checkinIds.length > 0
-    ? await supabase
-        .from('checkin_damages')
-        .select('*')
-        .in('checkin_id', checkinIds)
-        .order('created_at', { ascending: true })
-    : { data: [], error: null };
-  
-  // Log anon fetch result
-  if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages anon fetch:`, {
-      checkinIds,
-      error: checkinDamagesResp.error,
-      dataLength: checkinDamagesResp.data?.length || 0,
-    });
-  }
-  
-  // Fallback to service role if anon fetch returns empty or error
-  // Only available server-side (won't work in browser)
-  const needsServiceRoleFallback = 
-    checkinIds.length > 0 && 
-    (checkinDamagesResp.error || (checkinDamagesResp.data?.length || 0) === 0);
-  
-  let serviceRoleResp: { data: any[] | null; error: any } | null = null;
-  
-  if (needsServiceRoleFallback && typeof process !== 'undefined' && process.env?.SUPABASE_SERVICE_ROLE_KEY) {
-    if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr}] Attempting service role fallback...`);
-    }
-    
+  // Fetch checkin_damages via API route (server-side with service role)
+  if (checkinIds.length > 0) {
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-      const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-      
-      serviceRoleResp = await supabaseAdmin
-        .from('checkin_damages')
-        .select('*')
-        .in('checkin_id', checkinIds)
-        .order('created_at', { ascending: true });
-      
       if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] checkin_damages service role fetch:`, {
-          error: serviceRoleResp.error,
-          dataLength: serviceRoleResp.data?.length || 0,
-        });
+        console.log(`[DEBUG ${cleanedRegnr}] Calling /api/checkin-damages...`);
+      }
+      
+      const apiResponse = await fetch(`/api/checkin-damages?regnr=${encodeURIComponent(cleanedRegnr)}`);
+      
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json();
+        console.error(`[ERROR ${cleanedRegnr}] API /checkin-damages failed:`, errorData);
+      } else {
+        const apiData = await apiResponse.json();
+        
+        if (shouldDebug) {
+          console.log(`[DEBUG ${cleanedRegnr}] API /checkin-damages response:`, {
+            dataLength: apiData.data?.length || 0,
+            checkinIds: apiData.checkinIds,
+          });
+        }
+        
+        // Filter to only documented/not_found/existing types in code
+        const rawData = (apiData.data || []) as CheckinDamageData[];
+        allCheckinDamages = rawData.filter(cd => 
+          cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
+        );
+        
+        if (shouldDebug) {
+          console.log(`[DEBUG ${cleanedRegnr}] Filtered checkin_damages (documented/not_found/existing):`, allCheckinDamages.length);
+        }
       }
     } catch (err) {
-      console.error(`[ERROR ${cleanedRegnr}] Service role fallback failed:`, err);
+      console.error(`[ERROR ${cleanedRegnr}] Failed to call /api/checkin-damages:`, err);
+      // Continue with empty array
+      allCheckinDamages = [];
     }
-  }
-  
-  // Use service role data if available, otherwise use anon data
-  const finalResp = serviceRoleResp?.data ? serviceRoleResp : checkinDamagesResp;
-  
-  if (finalResp.error) {
-    console.error(`[ERROR ${cleanedRegnr}] Failed to fetch checkin_damages:`, finalResp.error);
-    // Fallback to empty array but continue execution
-    allCheckinDamages = [];
-  } else {
-    // Filter to only documented/not_found/existing types in code
-    const rawData = (finalResp.data || []) as CheckinDamageData[];
-    allCheckinDamages = rawData.filter(cd => 
-      cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
-    );
-    
-    if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr}] Filtered checkin_damages (documented/not_found/existing):`, allCheckinDamages.length);
-    }
+  } else if (shouldDebug) {
+    console.log(`[DEBUG ${cleanedRegnr}] No checkins found, skipping checkin_damages fetch`);
   }
   
   // Get saludatum from legacy damages if available
