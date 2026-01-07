@@ -72,6 +72,9 @@ export type DamageRecord = {
   // For BUHS damages (legacy)
   legacy_damage_source_text?: string | null;
   original_damage_date?: string | null;
+  // For documented BUHS damages - track where they were documented
+  checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
+  documentedBy?: string | null; // checker_name who documented it
 };
 
 export type HistoryRecord = {
@@ -159,6 +162,8 @@ export type HistoryRecord = {
     legacy_damage_source_text?: string;
     damageDate?: string; // BUHS damage date for formatting history
     damageStatus?: string; // Full status string (e.g., "Dokumenterad (urspr. BUHS ...)")
+    checkinWhereDocumented?: number | null; // checkin_id where this BUHS damage was documented
+    documentedBy?: string | null; // checker_name who documented it
   };
 };
 
@@ -1020,6 +1025,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo,
         legacy_damage_source_text: legacyText,
         original_damage_date: damageDate,
+        checkinWhereDocumented: checkin?.id || null,
+        documentedBy: checkin?.checker_name || null,
       });
     }
     
@@ -1269,10 +1276,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // For unmatched BUHS, use "Källa BUHS"
         let sammanfattning: string;
         if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-          // Documented or existing damage - format with BUHS description on first line
+          // Documented or existing damage - format with BUHS description WITHOUT parentheses
           const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
           const buhsDate = damage.original_damage_date || damage.datum;
-          sammanfattning = `(BUHS ${buhsDate}: ${buhsDescription})`;
+          sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
         } else {
           // not_found or unmatched BUHS - use status as is
           sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
@@ -1290,6 +1297,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             legacy_damage_source_text: damage.legacy_damage_source_text,
             damageDate: damage.original_damage_date || damage.datum,
             damageStatus: damage.status,
+            checkinWhereDocumented: damage.checkinWhereDocumented || null,
+            documentedBy: damage.documentedBy || null,
           },
         });
       }
@@ -1689,6 +1698,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       sourceInfo,
       legacy_damage_source_text: legacyText,
       original_damage_date: damageDate,
+      checkinWhereDocumented: checkin?.id || null,
+      documentedBy: checkin?.checker_name || null,
     });
   }
   
@@ -2016,15 +2027,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
       // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
       
-      // For documented/existing damages, format as: "(BUHS date: description)\nDokumenterad (urspr. BUHS date)"
+      // For documented/existing damages, format as: "BUHS date: description" (no parentheses)
       // For not_found damages, use the full status which includes comment
       // For unmatched BUHS, use "Källa BUHS"
       let sammanfattning: string;
       if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-        // Documented or existing damage - format with BUHS description on first line
+        // Documented or existing damage - format with BUHS description WITHOUT parentheses
         const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
         const buhsDate = damage.original_damage_date || damage.datum;
-        sammanfattning = `(BUHS ${buhsDate}: ${buhsDescription})`;
+        sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
       } else {
         // not_found or unmatched BUHS - use status as is
         sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
@@ -2042,6 +2053,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           legacy_damage_source_text: damage.legacy_damage_source_text,
           damageDate: damage.original_damage_date || damage.datum,
           damageStatus: damage.status,
+          checkinWhereDocumented: damage.checkinWhereDocumented || null,
+          documentedBy: damage.documentedBy || null,
         },
       });
     }
