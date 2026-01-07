@@ -135,6 +135,10 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   // - handled_* fields = null/empty (no structured data from previous invalid documentation)
   // - folder = null (no media shown)
   // - text = BUHS raw text (legacy format)
+  // 
+  // NOTE: This is intentionally hardcoded as a temporary special case.
+  // It should be removed from this list once GEU29F has been correctly documented.
+  // See docs/IMPLEMENTATION_GEU29F_FIX.md for removal instructions.
   // ========================================================================
   const SPECIAL_FORCE_UNDOCUMENTED = ['GEU29F']; // List of regnr that should be treated as undocumented
   const isForceUndocumented = SPECIAL_FORCE_UNDOCUMENTED.includes(cleanedRegnr);
@@ -345,6 +349,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       let handledInfo: HandledDamageInfo | null = null;
       
       // Skip handled info for force-undocumented vehicles (e.g., GEU29F)
+      // Note: This processes one vehicle at a time, so skipping handledInfo for
+      // force-undocumented vehicles doesn't affect other vehicles' processing.
       if (!isForceUndocumented && handledDamageIndex < handledDamagesList.length) {
         handledInfo = handledDamagesList[handledDamageIndex];
         handledDamageIndex++;
@@ -366,22 +372,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       
       if (handledInfo) {
         // Primary: Use checkin_damages media if available
-        if (handledInfo.photo_urls && handledInfo.photo_urls.length > 0) {
-          finalPhotoUrls = handledInfo.photo_urls;
-        }
-        if (handledInfo.video_urls && handledInfo.video_urls.length > 0) {
-          finalVideoUrls = handledInfo.video_urls;
-        }
-        
-        // Fallback: Use damages.uploads.folder if checkin_damages media is missing
-        if (finalPhotoUrls.length === 0 && finalVideoUrls.length === 0) {
-          const folderFromDamages = folderMap.get(normalizedKey);
-          if (folderFromDamages) {
-            finalFolder = folderFromDamages;
-          }
-        }
-      } else {
-        // No handledInfo: use folder from damages table if available
+        finalPhotoUrls = handledInfo.photo_urls || [];
+        finalVideoUrls = handledInfo.video_urls || [];
+      }
+      
+      // Fallback: Use damages.uploads.folder if no media from checkin_damages
+      if (finalPhotoUrls.length === 0 && finalVideoUrls.length === 0) {
         finalFolder = folderMap.get(normalizedKey) || null;
       }
       
