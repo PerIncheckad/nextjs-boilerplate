@@ -157,6 +157,8 @@ export type HistoryRecord = {
   buhsSkadaDetaljer?: {
     skadetyp: string;
     legacy_damage_source_text?: string;
+    damageDate?: string; // BUHS damage date for formatting history
+    damageStatus?: string; // Full status string (e.g., "Dokumenterad (urspr. BUHS ...)")
   };
 };
 
@@ -994,8 +996,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
         const comment = matchedCheckinDamage.description || 'Ingen kommentar';
         
-        // Include checker and date in status for visibility
-        status = `Gick ej att dokumentera (${checkinDate} av ${checkerName})`;
+        // Include checker, date, and comment in status for full context
+        status = `Gick ej att dokumentera (${checkinDate} av ${checkerName}): ${comment}`;
         folder = undefined;
         sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
         
@@ -1030,19 +1032,48 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
       
-      // Try to extract media folder from damages table if available
+      // Try to extract media folder and structured information from damages table if available
       let folder: string | undefined;
+      let skadetyp: string;
+      
       const damageEntry = damages.find(dmg => 
         dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
       );
-      if (damageEntry && damageEntry.uploads) {
-        folder = (damageEntry.uploads as any).folder;
+      
+      if (damageEntry) {
+        // Extract media folder
+        if (damageEntry.uploads) {
+          folder = (damageEntry.uploads as any).folder;
+        }
+        
+        // Build structured text from damages table if available
+        // Priority: damage_type + user_positions > damage_type + car_part > legacyText
+        const damageType = damageEntry.damage_type_raw || (damageEntry.damage_type ? formatDamageType(damageEntry.damage_type) : null);
+        
+        if (damageType) {
+          if (damageEntry.user_positions && Array.isArray(damageEntry.user_positions) && damageEntry.user_positions.length > 0) {
+            // Use structured positions
+            const positionsStr = formatDamagePositions(damageEntry.user_positions);
+            skadetyp = positionsStr ? `Källa BUHS – ${damageType} – ${positionsStr}` : `Källa BUHS – ${damageType}`;
+          } else if (damageEntry.car_part) {
+            // Use car_part if available
+            skadetyp = `Källa BUHS – ${damageType} – ${damageEntry.car_part}`;
+          } else {
+            skadetyp = `Källa BUHS – ${damageType}`;
+          }
+        } else {
+          // No damage_type in damages table, use legacyText
+          skadetyp = legacyText || 'Källa BUHS – Okänd';
+        }
+      } else {
+        // No matching entry in damages table, use legacyText
+        skadetyp = legacyText || 'Källa BUHS – Okänd';
       }
       
       damageRecords.push({
         id: d.id,
         regnr: cleanedRegnr,
-        skadetyp: legacyText || 'Okänd',
+        skadetyp: skadetyp,
         datum: damageDate,
         status: 'Källa BUHS',
         folder: folder,
@@ -1232,7 +1263,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
         // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
         // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
-        const sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+        
+        // For documented/existing damages, format as: "(BUHS date: description)\nDokumenterad (urspr. BUHS date)"
+        // For not_found damages, use the full status which includes comment
+        // For unmatched BUHS, use "Källa BUHS"
+        let sammanfattning: string;
+        if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
+          // Documented or existing damage - format with BUHS description on first line
+          const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
+          const buhsDate = damage.original_damage_date || damage.datum;
+          sammanfattning = `(BUHS ${buhsDate}: ${buhsDescription})`;
+        } else {
+          // not_found or unmatched BUHS - use status as is
+          sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+        }
         
         historyRecords.push({
           id: `buhs-${damage.id}`,
@@ -1244,6 +1288,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           buhsSkadaDetaljer: {
             skadetyp: damage.skadetyp,
             legacy_damage_source_text: damage.legacy_damage_source_text,
+            damageDate: damage.original_damage_date || damage.datum,
+            damageStatus: damage.status,
           },
         });
       }
@@ -1619,8 +1665,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
       const comment = matchedCheckinDamage.description || 'Ingen kommentar';
       
-      // Include checker and date in status for visibility
-      status = `Gick ej att dokumentera (${checkinDate} av ${checkerName})`;
+      // Include checker, date, and comment in status for full context
+      status = `Gick ej att dokumentera (${checkinDate} av ${checkerName}): ${comment}`;
       folder = undefined; // no media for not_found damages
       sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
       
@@ -1655,19 +1701,48 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const legacyText = getLegacyDamageText(d);
     const damageDate = formatDate(d.damage_date);
     
-    // Try to extract media folder from damages table if available
+    // Try to extract media folder and structured information from damages table if available
     let folder: string | undefined;
+    let skadetyp: string;
+    
     const damageEntry = damages.find(dmg => 
       dmg.legacy_damage_source_text && textsMatch(dmg.legacy_damage_source_text, legacyText)
     );
-    if (damageEntry && damageEntry.uploads) {
-      folder = (damageEntry.uploads as any).folder;
+    
+    if (damageEntry) {
+      // Extract media folder
+      if (damageEntry.uploads) {
+        folder = (damageEntry.uploads as any).folder;
+      }
+      
+      // Build structured text from damages table if available
+      // Priority: damage_type + user_positions > damage_type + car_part > legacyText
+      const damageType = damageEntry.damage_type_raw || (damageEntry.damage_type ? formatDamageType(damageEntry.damage_type) : null);
+      
+      if (damageType) {
+        if (damageEntry.user_positions && Array.isArray(damageEntry.user_positions) && damageEntry.user_positions.length > 0) {
+          // Use structured positions
+          const positionsStr = formatDamagePositions(damageEntry.user_positions);
+          skadetyp = positionsStr ? `Källa BUHS – ${damageType} – ${positionsStr}` : `Källa BUHS – ${damageType}`;
+        } else if (damageEntry.car_part) {
+          // Use car_part if available
+          skadetyp = `Källa BUHS – ${damageType} – ${damageEntry.car_part}`;
+        } else {
+          skadetyp = `Källa BUHS – ${damageType}`;
+        }
+      } else {
+        // No damage_type in damages table, use legacyText
+        skadetyp = legacyText || 'Källa BUHS – Okänd';
+      }
+    } else {
+      // No matching entry in damages table, use legacyText
+      skadetyp = legacyText || 'Källa BUHS – Okänd';
     }
     
     damageRecords.push({
       id: d.id,
       regnr: cleanedRegnr,
-      skadetyp: legacyText || 'Okänd',
+      skadetyp: skadetyp,
       datum: damageDate,
       status: 'Källa BUHS',
       folder: folder,
@@ -1940,7 +2015,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
       // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
       // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
-      const sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+      
+      // For documented/existing damages, format as: "(BUHS date: description)\nDokumenterad (urspr. BUHS date)"
+      // For not_found damages, use the full status which includes comment
+      // For unmatched BUHS, use "Källa BUHS"
+      let sammanfattning: string;
+      if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
+        // Documented or existing damage - format with BUHS description on first line
+        const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
+        const buhsDate = damage.original_damage_date || damage.datum;
+        sammanfattning = `(BUHS ${buhsDate}: ${buhsDescription})`;
+      } else {
+        // not_found or unmatched BUHS - use status as is
+        sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+      }
       
       historyRecords.push({
         id: `buhs-${damage.id}`,
@@ -1952,6 +2040,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         buhsSkadaDetaljer: {
           skadetyp: damage.skadetyp,
           legacy_damage_source_text: damage.legacy_damage_source_text,
+          damageDate: damage.original_damage_date || damage.datum,
+          damageStatus: damage.status,
         },
       });
     }
