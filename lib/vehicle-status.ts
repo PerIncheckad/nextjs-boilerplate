@@ -1578,8 +1578,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Try primary text matching first
     // Compare BUHS note_internal/note_customer/legacy_damage_source_text against cd.description
+    // For GEU29F: skip type=existing/documented due to data integrity issues (Kommentar C)
     for (const cd of allCheckinDamages) {
       if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue; // Skip if no ID or already matched
+      if (isGEU29F && (cd.type === 'existing' || cd.type === 'documented')) continue; // Skip existing/documented for GEU29F
       
       // Check if checkin_damage description matches any of the BUHS text fields
       const cdDescription = cd.description || '';
@@ -1611,6 +1613,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Find checkin_damages with matching date and similar damage type
       const candidatesForLooseMatch = allCheckinDamages.filter(cd => {
         if (!cd.id || matchedCheckinDamageIds.has(cd.id)) return false;
+        if (isGEU29F && (cd.type === 'existing' || cd.type === 'documented')) return false; // Skip existing/documented for GEU29F
         
         const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
         return normalizedCdType && normalizedBuhsType &&
@@ -1645,7 +1648,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Final fallback: if still no match, try to use first unmatched checkin_damage with type=existing
     // This handles cases where BUHS damages are documented but text doesn't match well
-    if (!matchedCheckinDamage) {
+    // Skip for GEU29F due to data integrity issues (Kommentar C)
+    if (!matchedCheckinDamage && !isGEU29F) {
       const unmatchedExisting = allCheckinDamages.find(cd => 
         cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.type === 'existing'
       );
@@ -1738,6 +1742,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         });
       }
       
+      // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
+      if (isGEU29F) {
+        folder = undefined;
+      }
+      
       const checkerName = checkin?.checker_name || 'Okänd';
       const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
       sourceInfo = `Källa: BUHS\nDokumenterad ${checkinDate} av ${checkerName}`;
@@ -1824,6 +1833,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     } else {
       // No matching entry in damages table, use legacyText
       skadetyp = legacyText || 'Källa BUHS – Okänd';
+    }
+    
+    // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
+    if (isGEU29F) {
+      folder = undefined;
     }
     
     damageRecords.push({
