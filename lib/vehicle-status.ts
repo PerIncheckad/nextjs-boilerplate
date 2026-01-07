@@ -665,6 +665,9 @@ function buildLaddningInfo(checkin: any): string | undefined {
 export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResult> {
   const cleanedRegnr = regnr.toUpperCase().trim().replace(/\s/g, '');
   
+  // Feature flag for GEU29F: Treat as undocumented due to data integrity issues (Kommentar C)
+  const isGEU29F = cleanedRegnr === 'GEU29F';
+  
   if (!cleanedRegnr || cleanedRegnr.length < 5) {
     return {
       found: false,
@@ -907,8 +910,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       let matchedCheckinDamage: CheckinDamageData | null = null;
       
       // Try primary text matching first
+      // For GEU29F: skip type=existing/documented due to data integrity issues (Kommentar C)
       for (const cd of allCheckinDamages) {
         if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue; // Skip if no ID or already matched
+        if (isGEU29F && (cd.type === 'existing' || cd.type === 'documented')) continue; // Skip existing/documented for GEU29F
         
         const cdDescription = cd.description || '';
         
@@ -930,6 +935,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         const candidatesForLooseMatch = allCheckinDamages.filter(cd => {
           if (!cd.id || matchedCheckinDamageIds.has(cd.id)) return false;
+          if (isGEU29F && (cd.type === 'existing' || cd.type === 'documented')) return false; // Skip existing/documented for GEU29F
           
           const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
           return normalizedCdType && normalizedBuhsType &&
@@ -948,7 +954,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Final fallback: if still no match, try to use first unmatched checkin_damage with type=existing
       // This handles cases where BUHS damages are documented but text doesn't match well
-      if (!matchedCheckinDamage) {
+      // Skip for GEU29F due to data integrity issues (Kommentar C)
+      if (!matchedCheckinDamage && !isGEU29F) {
         const unmatchedExisting = allCheckinDamages.find(cd => 
           cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.type === 'existing'
         );
@@ -1014,6 +1021,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           if (damageEntry && damageEntry.uploads) {
             folder = (damageEntry.uploads as any).folder;
           }
+        }
+        
+        // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
+        if (isGEU29F) {
+          folder = undefined;
         }
         
         const checkerName = checkin?.checker_name || 'Okänd';
@@ -1101,6 +1113,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       } else {
         // No matching entry in damages table, use legacyText
         skadetyp = legacyText || 'Källa BUHS – Okänd';
+      }
+      
+      // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
+      if (isGEU29F) {
+        folder = undefined;
       }
       
       damageRecords.push({
