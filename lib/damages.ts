@@ -98,6 +98,51 @@ function getLegacyDamageText(damage: LegacyDamage): string {
     return uniqueParts.join(' - ');
 }
 
+// Helper to normalize text for matching (case/whitespace insensitive, allow Repa/Repor mismatch)
+function normalizeTextForMatching(text: string | null | undefined): string {
+  if (!text) return '';
+  return text
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/repor/g, 'repa') // Normalize Repor → Repa
+    .trim();
+}
+
+// Helper to check if two texts match (primary matching strategy)
+function textsMatch(text1: string | null | undefined, text2: string | null | undefined): boolean {
+  const norm1 = normalizeTextForMatching(text1);
+  const norm2 = normalizeTextForMatching(text2);
+  
+  if (!norm1 || !norm2) return false;
+  
+  // Exact match after normalization
+  if (norm1 === norm2) return true;
+  
+  // Fuzzy match: one contains the other (helps with variations)
+  // But require significant overlap (at least 80% of shorter text)
+  const shorter = norm1.length < norm2.length ? norm1 : norm2;
+  const longer = norm1.length < norm2.length ? norm2 : norm1;
+  
+  if (longer.includes(shorter) && shorter.length >= 10) {
+    return true;
+  }
+  
+  return false;
+}
+
+// Helper to normalize damage type for loose key matching
+function normalizeDamageTypeForKey(damageType: string | null | undefined): string {
+  if (!damageType) return '';
+  return damageType
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/repor/g, 'repa')
+    .replace(/repa/g, 'rep') // Further normalize to just "rep"
+    .replace(/skrapmärke/g, 'skrap')
+    .replace(/stenskott/g, 'sten')
+    .trim();
+}
+
 
 // =================================================================
 // 3. CORE DATA FETCHING FUNCTION
@@ -145,35 +190,68 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .maybeSingle()
   ]);
   
-  // Step 2b: Fetch checkin_damages for the specific latest checkin (separate to avoid conditional in Promise.all)
-  // Note: No nested join - we use checker_name from lastCheckinData instead to avoid PostgREST join issues
-  const handledDamagesResponse = lastCheckinId 
+  // Debug logging for specific regnr
+  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F'];
+  const shouldDebug = debugRegnrs.includes(cleanedRegnr);
+  
+  // Step 2b: Fetch checkin_damages for the specific latest checkin
+  // Note: This function is only called server-side, so direct fetch should work
+  let handledDamages: CheckinDamageData[] = [];
+  
+  if (shouldDebug && lastCheckinId) {
+    console.log(`[DEBUG ${cleanedRegnr} /damages.ts] lastCheckinId:`, lastCheckinId);
+  }
+  
+  const handledDamagesResponse = lastCheckinId
     ? await supabase
         .from('checkin_damages')
-        .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
+        .select('*')
         .eq('checkin_id', lastCheckinId)
-        .in('type', ['not_found', 'existing', 'documented'])
-        .order('created_at', { ascending: true }) // ASC for stable index matching (1st damage → 1st entry)
+        .order('created_at', { ascending: true })
     : { data: [], error: null };
+  
+  if (shouldDebug) {
+    console.log(`[DEBUG ${cleanedRegnr} /damages.ts] checkin_damages fetch:`, {
+      lastCheckinId,
+      error: handledDamagesResponse.error,
+      dataLength: handledDamagesResponse.data?.length || 0,
+    });
+  }
+  
+  if (handledDamagesResponse.error) {
+    console.error(`[ERROR ${cleanedRegnr} /damages.ts] Failed to fetch checkin_damages:`, handledDamagesResponse.error);
+    handledDamages = [];
+  } else {
+    // Filter to only documented/not_found/existing types in code
+    const rawData = (handledDamagesResponse.data || []) as CheckinDamageData[];
+    handledDamages = rawData.filter(cd => 
+      cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
+    );
+    
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr} /damages.ts] Filtered checkin_damages:`, handledDamages.length);
+    }
+  }
 
   // Step 3: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
-  const handledDamages = (handledDamagesResponse.data || []) as CheckinDamageData[];
+  // handledDamages is now defined earlier
   
   // Get the date of the last check-in for display purposes
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
   
-  // Build a list of handled damages in chronological order for order-based matching
-  // We can't match by damage_type because BUHS "Skrapad och buckla" != checkin_damages "Krockskada"
-  // Instead, we match by order: 1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
+  // Build a list of handled damages for text-based matching
+  // Note: We now match by text instead of index for more accurate matching
   type HandledDamageInfo = {
+    id: number;
     type: 'existing' | 'not_found' | 'documented';
     damage_type: string;
     car_part: string | null;
     position: string | null;
+    positions?: any[] | null;
     description: string;
     checker: string;
     photo_urls: string[];
@@ -187,12 +265,14 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
       handledDamagesList.push({
+        id: handled.id || 0,
         type: handled.type,
         // damage_type can be null/undefined in rare cases (data integrity issues)
         // Use fallback 'Okänd' to ensure display always has a value
         damage_type: handled.damage_type || 'Okänd',
         car_part: handled.car_part || null,
         position: handled.position || null,
+        positions: (handled as any).positions || null,
         description: handled.description || '',
         checker: checkerName,
         photo_urls: (handled.photo_urls as string[]) || [],
@@ -236,12 +316,12 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Track damages from damages table to avoid duplicates between BUHS and damages table
   const dbDamageKeys = new Set<string>();
   
+  // Track which checkin_damages we've matched
+  const matchedHandledIds = new Set<number>();
+  
   // Add BUHS damages (from legacy source)
-  // Each BUHS damage is unique - do NOT deduplicate within BUHS
-  // Match with checkin_damages by INDEX for damages from the same date, not by damage_type
-  // This is because users can select different damage types when documenting
-  // (e.g., BUHS "Skrapad och buckla" → user documents as "Krockskada")
-  let handledDamageIndex = 0;
+  // Match with checkin_damages by TEXT (primary) or by loose key (secondary)
+  // This is more accurate than index-based matching
   
   for (let i = 0; i < legacyDamages.length; i++) {
     const leg = legacyDamages[i];
@@ -255,13 +335,41 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const normalized = normalizeDamageType(damageType);
       
       // Determine if this damage has been handled in the last check-in
-      // Match by index: 1st BUHS damage → 1st checkin_damage, 2nd → 2nd, etc.
-      // This is deterministic and doesn't rely on fragile date comparisons
+      // NEW: Match by TEXT instead of index for better accuracy
       let handledInfo: HandledDamageInfo | null = null;
       
-      if (handledDamageIndex < handledDamagesList.length) {
-        handledInfo = handledDamagesList[handledDamageIndex];
-        handledDamageIndex++;
+      // Try primary text matching first
+      for (const handled of handledDamagesList) {
+        if (!handled.id || matchedHandledIds.has(handled.id)) continue; // Skip if no ID or already matched
+        
+        // Check if handled description matches any of the BUHS text fields
+        if (textsMatch(originalText, handled.description) ||
+            textsMatch(leg.note_customer, handled.description) ||
+            textsMatch(leg.note_internal, handled.description) ||
+            textsMatch(leg.damage_type_raw, handled.description)) {
+          handledInfo = handled;
+          matchedHandledIds.add(handled.id);
+          break;
+        }
+      }
+      
+      // If no text match, try loose key matching (damage_type only)
+      if (!handledInfo) {
+        const normalizedBuhsType = normalizeDamageTypeForKey(leg.damage_type_raw);
+        
+        const candidatesForLooseMatch = handledDamagesList.filter(handled => {
+          if (!handled.id || matchedHandledIds.has(handled.id)) return false;
+          
+          const normalizedHandledType = normalizeDamageTypeForKey(handled.damage_type);
+          return normalizedHandledType && normalizedBuhsType &&
+                 normalizedHandledType === normalizedBuhsType;
+        });
+        
+        // If there's exactly one candidate (unambiguous), use it
+        if (candidatesForLooseMatch.length === 1) {
+          handledInfo = candidatesForLooseMatch[0];
+          matchedHandledIds.add(handledInfo.id);
+        }
       }
       
       // Track this damage to avoid duplicates from damages table
