@@ -140,7 +140,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   // It should be removed from this list once GEU29F has been correctly documented.
   // See docs/IMPLEMENTATION_GEU29F_FIX.md for removal instructions.
   // ========================================================================
-  const SPECIAL_FORCE_UNDOCUMENTED = ['GEU29F']; // List of regnr that should be treated as undocumented
+  const SPECIAL_FORCE_UNDOCUMENTED = ['GEU29F']; // List of registration numbers that should be treated as undocumented
   const isForceUndocumented = SPECIAL_FORCE_UNDOCUMENTED.includes(cleanedRegnr);
 
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)

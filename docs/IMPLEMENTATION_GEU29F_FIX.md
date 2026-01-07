@@ -61,22 +61,12 @@ let finalFolder: string | null = null;
 ```typescript
 if (handledInfo) {
   // Primary: Use checkin_damages media if available
-  if (handledInfo.photo_urls && handledInfo.photo_urls.length > 0) {
-    finalPhotoUrls = handledInfo.photo_urls;
-  }
-  if (handledInfo.video_urls && handledInfo.video_urls.length > 0) {
-    finalVideoUrls = handledInfo.video_urls;
-  }
-  
-  // Fallback: Use damages.uploads.folder if checkin_damages media is missing
-  if (finalPhotoUrls.length === 0 && finalVideoUrls.length === 0) {
-    const folderFromDamages = folderMap.get(normalizedKey);
-    if (folderFromDamages) {
-      finalFolder = folderFromDamages;
-    }
-  }
-} else {
-  // No handledInfo: use folder from damages table if available
+  finalPhotoUrls = handledInfo.photo_urls || [];
+  finalVideoUrls = handledInfo.video_urls || [];
+}
+
+// Fallback: Use damages.uploads.folder if no media from checkin_damages
+if (finalPhotoUrls.length === 0 && finalVideoUrls.length === 0) {
   finalFolder = folderMap.get(normalizedKey) || null;
 }
 
