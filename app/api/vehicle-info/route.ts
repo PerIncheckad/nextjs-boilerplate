@@ -124,6 +124,20 @@ function formatDamageType(damageType: string | null | undefined): string {
 
 async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
+  
+  // ========================================================================
+  // SPECIAL HANDLING: GEU29F force-undocumented flag
+  // ========================================================================
+  // GEU29F should be treated as never documented due to invalid previous documentation.
+  // When correctly documented in the future, this special flag MUST be removed.
+  // This ensures:
+  // - is_inventoried = false (enables "Dokumentera befintliga skador" section in /check)
+  // - handled_* fields = null/empty (no structured data from previous invalid documentation)
+  // - folder = null (no media shown)
+  // - text = BUHS raw text (legacy format)
+  // ========================================================================
+  const SPECIAL_FORCE_UNDOCUMENTED = ['GEU29F']; // List of regnr that should be treated as undocumented
+  const isForceUndocumented = SPECIAL_FORCE_UNDOCUMENTED.includes(cleanedRegnr);
 
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
   const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
@@ -330,7 +344,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       
       let handledInfo: HandledDamageInfo | null = null;
       
-      if (handledDamageIndex < handledDamagesList.length) {
+      // Skip handled info for force-undocumented vehicles (e.g., GEU29F)
+      if (!isForceUndocumented && handledDamageIndex < handledDamagesList.length) {
         handledInfo = handledDamagesList[handledDamageIndex];
         handledDamageIndex++;
       }
@@ -338,20 +353,64 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;
       dbDamageKeys.add(dedupeKey);
       
+      // ========================================================================
+      // GENERAL MAPPING FIX: Populate handled_* fields from checkin_damages/damages
+      // ========================================================================
+      // When is_inventoried is true and handledInfo exists, populate all handled_* fields.
+      // For media, use checkin_damages photo_urls/video_urls if present,
+      // otherwise fallback to damages.uploads.folder/photo_urls.
+      // ========================================================================
+      let finalPhotoUrls: string[] = [];
+      let finalVideoUrls: string[] = [];
+      let finalFolder: string | null = null;
+      
+      if (handledInfo) {
+        // Primary: Use checkin_damages media if available
+        if (handledInfo.photo_urls && handledInfo.photo_urls.length > 0) {
+          finalPhotoUrls = handledInfo.photo_urls;
+        }
+        if (handledInfo.video_urls && handledInfo.video_urls.length > 0) {
+          finalVideoUrls = handledInfo.video_urls;
+        }
+        
+        // Fallback: Use damages.uploads.folder if checkin_damages media is missing
+        if (finalPhotoUrls.length === 0 && finalVideoUrls.length === 0) {
+          const folderFromDamages = folderMap.get(normalizedKey);
+          if (folderFromDamages) {
+            finalFolder = folderFromDamages;
+          }
+        }
+      } else {
+        // No handledInfo: use folder from damages table if available
+        finalFolder = folderMap.get(normalizedKey) || null;
+      }
+      
+      // Apply force-undocumented override for special vehicles (e.g., GEU29F)
+      const finalIsInventoried = isForceUndocumented ? false : (isInventoried || (handledInfo !== null));
+      const finalHandledType = isForceUndocumented ? null : (handledInfo?.type || null);
+      const finalHandledDamageType = isForceUndocumented ? null : (handledInfo?.damage_type || null);
+      const finalHandledCarPart = isForceUndocumented ? null : (handledInfo?.car_part || null);
+      const finalHandledPosition = isForceUndocumented ? null : (handledInfo?.position || null);
+      const finalHandledComment = isForceUndocumented ? null : (handledInfo?.description || null);
+      const finalHandledBy = isForceUndocumented ? null : (handledInfo?.checker || null);
+      const finalHandledPhotoUrls = isForceUndocumented ? [] : finalPhotoUrls;
+      const finalHandledVideoUrls = isForceUndocumented ? [] : finalVideoUrls;
+      const finalFolderValue = isForceUndocumented ? null : finalFolder;
+      
       consolidatedDamages.push({
         id: leg.id,
         text: displayText,
         damage_date: leg.damage_date,
-        is_inventoried: isInventoried || (handledInfo !== null),
-        folder: folderMap.get(normalizedKey) || null,
-        handled_type: handledInfo?.type || null,
-        handled_damage_type: handledInfo?.damage_type || null,
-        handled_car_part: handledInfo?.car_part || null,
-        handled_position: handledInfo?.position || null,
-        handled_comment: handledInfo?.description || null,
-        handled_by: handledInfo?.checker || null,
-        handled_photo_urls: handledInfo?.photo_urls || [],
-        handled_video_urls: handledInfo?.video_urls || [],
+        is_inventoried: finalIsInventoried,
+        folder: finalFolderValue,
+        handled_type: finalHandledType,
+        handled_damage_type: finalHandledDamageType,
+        handled_car_part: finalHandledCarPart,
+        handled_position: finalHandledPosition,
+        handled_comment: finalHandledComment,
+        handled_by: finalHandledBy,
+        handled_photo_urls: finalHandledPhotoUrls,
+        handled_video_urls: finalHandledVideoUrls,
       });
     }
   }
