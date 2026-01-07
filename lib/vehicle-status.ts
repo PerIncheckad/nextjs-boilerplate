@@ -937,6 +937,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
+      // Final fallback: if still no match, try to use first unmatched checkin_damage with type=existing
+      // This handles cases where BUHS damages are documented but text doesn't match well
+      if (!matchedCheckinDamage) {
+        const unmatchedExisting = allCheckinDamages.find(cd => 
+          cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.type === 'existing'
+        );
+        if (unmatchedExisting && unmatchedExisting.id) {
+          matchedCheckinDamage = unmatchedExisting;
+          matchedCheckinDamageIds.add(unmatchedExisting.id);
+          matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+          matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
+        }
+      }
+      
       // Only process and add matched BUHS damages in this loop
       if (!matchedCheckinDamage) {
         continue; // Skip unmatched, will add in second pass
@@ -1586,6 +1600,27 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           console.log(`[DEBUG ${cleanedRegnr}] Loose match for BUHS ${d.id}:`, {
             matched_cd_id: matchedCheckinDamage.id,
             matched_cd_type: matchedCheckinDamage.type,
+          });
+        }
+      }
+    }
+    
+    // Final fallback: if still no match, try to use first unmatched checkin_damage with type=existing
+    // This handles cases where BUHS damages are documented but text doesn't match well
+    if (!matchedCheckinDamage) {
+      const unmatchedExisting = allCheckinDamages.find(cd => 
+        cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.type === 'existing'
+      );
+      if (unmatchedExisting && unmatchedExisting.id) {
+        matchedCheckinDamage = unmatchedExisting;
+        matchedCheckinDamageIds.add(unmatchedExisting.id);
+        matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+        matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
+        
+        if (shouldDebug) {
+          console.log(`[DEBUG ${cleanedRegnr}] Fallback match for BUHS ${d.id} using unmatched existing:`, {
+            matched_cd_id: unmatchedExisting.id,
+            matched_cd_type: unmatchedExisting.type,
           });
         }
       }
