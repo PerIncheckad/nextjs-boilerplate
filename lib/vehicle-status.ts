@@ -110,6 +110,7 @@ export type HistoryRecord = {
       mediaUrl?: string;
       isDocumentedOlder?: boolean; // True if this is a documented older BUHS damage
       originalDamageDate?: string; // Original damage date for documented older damages
+      isNotFoundOlder?: boolean; // True if this is a not_found older BUHS damage (Kommentar 1)
     }>;
   };
   
@@ -164,6 +165,7 @@ export type HistoryRecord = {
     damageStatus?: string; // Full status string (e.g., "Dokumenterad (urspr. BUHS ...)")
     checkinWhereDocumented?: number | null; // checkin_id where this BUHS damage was documented
     documentedBy?: string | null; // checker_name who documented it
+    mediaFolder?: string | null; // media folder for linking to damage photos (Kommentar 2)
   };
 };
 
@@ -888,11 +890,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const matchedCheckinDamageIds = new Set<number>();
     const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
     const matchedBuhsDamageIds = new Set<number>(); // Track which BUHS damages were matched
+    const processedBuhsKeys = new Set<string>(); // Track stable keys (legacyText + damageDate) to prevent duplicates (Kommentar 1)
     
     // First pass: Add matched BUHS damages only
     for (const d of legacyDamages) {
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
+      
+      // Create stable dedup key to prevent duplicate BUHS damages (Kommentar 1)
+      const stableKey = `${legacyText}_${damageDate}`;
+      if (processedBuhsKeys.has(stableKey)) {
+        continue; // Skip duplicate BUHS damage with same text + date
+      }
       
       // Try to find matching checkin_damage entry (same matching logic as main branch)
       let matchedCheckinDamage: CheckinDamageData | null = null;
@@ -956,6 +965,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         continue; // Skip unmatched, will add in second pass
       }
       
+      // Mark this stable key as processed to prevent duplicates (Kommentar 1)
+      processedBuhsKeys.add(stableKey);
+      
       // Build the merged damage record
       let skadetyp: string;
       let status: string;
@@ -1013,12 +1025,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
-        const comment = matchedCheckinDamage.description || 'Ingen kommentar';
+        const comment = matchedCheckinDamage.description || '';
         
         // Include checker, date, and comment in status for full context
-        status = `Gick ej att dokumentera (${checkinDate} av ${checkerName}): ${comment}`;
-        folder = undefined;
-        sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
+        status = comment ? `Gick ej att dokumentera (${checkinDate} av ${checkerName}): ${comment}` : `Gick ej att dokumentera (${checkinDate} av ${checkerName})`;
+        folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
+        sourceInfo = comment ? `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}` : `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}`;
         
       } else {
         // Unknown type - shouldn't happen but handle gracefully
@@ -1237,8 +1249,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           typ: damage.skadetyp,
           beskrivning: '', // Kept for compatibility with display logic
           mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
-          isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null,
+          isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
+          isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
         };
       });
       
@@ -1313,6 +1326,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             damageStatus: damage.status,
             checkinWhereDocumented: damage.checkinWhereDocumented || null,
             documentedBy: damage.documentedBy || null,
+            mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
           },
         });
       }
@@ -1527,11 +1541,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const matchedCheckinDamageIds = new Set<number>(); // Track which checkin_damages we've matched
   const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
   const matchedBuhsDamageIds = new Set<number>(); // Track which BUHS damages were matched
+  const processedBuhsKeys = new Set<string>(); // Track stable keys (legacyText + damageDate) to prevent duplicates
   
   // First pass: Add matched BUHS damages only
   for (const d of legacyDamages) {
     const legacyText = getLegacyDamageText(d);
     const damageDate = formatDate(d.damage_date);
+    
+    // Create stable dedup key to prevent duplicate BUHS damages (Kommentar 1)
+    const stableKey = `${legacyText}_${damageDate}`;
+    if (processedBuhsKeys.has(stableKey)) {
+      continue; // Skip duplicate BUHS damage with same text + date
+    }
     
     // Try to find matching checkin_damage entry
     // Strategy 1: Primary text match (case/whitespace insensitive, allow Repa/Repor)
@@ -1638,6 +1659,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       continue; // Skip unmatched, will add in second pass
     }
     
+    // Mark this stable key as processed to prevent duplicates (Kommentar 1)
+    processedBuhsKeys.add(stableKey);
+    
     // Build the merged damage record
     let skadetyp: string;
     let status: string;
@@ -1707,12 +1731,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       const checkerName = checkin?.checker_name || 'Okänd';
       const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
-      const comment = matchedCheckinDamage.description || 'Ingen kommentar';
+      const comment = matchedCheckinDamage.description || '';
       
       // Include checker, date, and comment in status for full context
-      status = `Gick ej att dokumentera (${checkinDate} av ${checkerName}): ${comment}`;
-      folder = undefined; // no media for not_found damages
-      sourceInfo = `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}`;
+      status = comment ? `Gick ej att dokumentera (${checkinDate} av ${checkerName}): ${comment}` : `Gick ej att dokumentera (${checkinDate} av ${checkerName})`;
+      folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
+      sourceInfo = comment ? `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}\nKommentar: ${comment}` : `Källa: BUHS\nGick ej att dokumentera ${checkinDate} av ${checkerName}`;
       
     } else {
       // Unknown type - shouldn't happen but handle gracefully
@@ -1946,8 +1970,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         typ: damage.skadetyp,
         beskrivning: '', // Kept for compatibility with display logic
         mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
-        isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null,
+        isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
+        isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
       };
     });
     
@@ -2090,6 +2115,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           damageStatus: damage.status,
           checkinWhereDocumented: damage.checkinWhereDocumented || null,
           documentedBy: damage.documentedBy || null,
+          mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
         },
       });
     }
