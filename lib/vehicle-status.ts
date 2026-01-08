@@ -71,6 +71,7 @@ export type DamageRecord = {
   sourceInfo?: string; // e.g., "Källa: BUHS" or "Incheckad av Per Andersson 2025-12-03 14:30"
   // For BUHS damages (legacy)
   legacy_damage_source_text?: string | null;
+  legacy_buhs_text?: string | null; // Original BUHS description (combined from damage_type_raw, notes, etc.)
   original_damage_date?: string | null;
   // For documented BUHS damages - track where they were documented
   checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
@@ -1095,6 +1096,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         source: 'legacy' as const,
         sourceInfo,
         legacy_damage_source_text: legacyText,
+        legacy_buhs_text: legacyText, // Store original BUHS description
         original_damage_date: damageDate,
         checkinWhereDocumented: checkin?.id || null,
         documentedBy: checkin?.checker_name || null,
@@ -1166,6 +1168,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         source: 'legacy' as const,
         sourceInfo: 'Källa: BUHS',
         legacy_damage_source_text: legacyText,
+        legacy_buhs_text: legacyText, // Store original BUHS description
         original_damage_date: damageDate,
         is_unmatched_buhs: true, // Flag for unmatched BUHS damages
       });
@@ -1211,7 +1214,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: formatDate(damage.damage_date || damage.created_at),
-        status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : 'Ny',
+        status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : '',
         folder: damage.uploads?.folder || undefined,
         source: 'damages' as const,
         sourceInfo: sourceInfo,
@@ -1354,9 +1357,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Determine if this damage should get a SKADA event
         const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
         const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
-        // For GEU29F and other force-undocumented vehicles, always create events for unmatched BUHS
-        // even if shown in checkin, to ensure all damages appear in HISTORIK
-        const shouldCreateEvent = isHandled || (isGEU29F && isUnmatchedBuhs) || !damagesShownInCheckins.has(damage.id);
+        // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
+        // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
+        const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
         
         if (shouldCreateEvent) {
           // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
@@ -1367,8 +1370,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
           let sammanfattning: string;
           if (damage.status?.startsWith('Dokumenterad')) {
-            // Documented or existing damage - use the status which is already formatted correctly
+            // Documented or existing damage - show status and append original BUHS text
             sammanfattning = damage.status;
+            if (damage.legacy_buhs_text) {
+              sammanfattning += `\nUrsprunglig beskrivning i BUHS: ${damage.legacy_buhs_text}`;
+            }
           } else if (damage.is_unmatched_buhs) {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
             sammanfattning = '';
@@ -1845,6 +1851,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       source: 'legacy' as const,
       sourceInfo,
       legacy_damage_source_text: legacyText,
+      legacy_buhs_text: legacyText, // Store original BUHS description
       original_damage_date: damageDate,
       checkinWhereDocumented: checkin?.id || null,
       documentedBy: checkin?.checker_name || null,
@@ -1916,6 +1923,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       source: 'legacy' as const,
       sourceInfo: 'Källa: BUHS',
       legacy_damage_source_text: legacyText,
+      legacy_buhs_text: legacyText, // Store original BUHS description
       original_damage_date: damageDate,
       is_unmatched_buhs: true, // Flag for unmatched BUHS damages
     });
@@ -1974,7 +1982,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: formatDate(damage.created_at || damage.damage_date || damage.datum),
-      status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : 'Befintlig',
+      status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : '',
       folder: damage.uploads?.folder || damage.folder,
       source: 'damages' as const,
       sourceInfo,
@@ -2187,9 +2195,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Determine if this damage should get a SKADA event
       const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
       const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
-      // For GEU29F and other force-undocumented vehicles, always create events for unmatched BUHS
-      // even if shown in checkin, to ensure all damages appear in HISTORIK
-      const shouldCreateEvent = isHandled || (isGEU29F && isUnmatchedBuhs) || !damagesShownInCheckins.has(damage.id);
+      // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
+      // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
+      const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
       
       if (shouldCreateEvent) {
         // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
@@ -2200,8 +2208,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
         let sammanfattning: string;
         if (damage.status?.startsWith('Dokumenterad')) {
-          // Documented or existing damage - use the status which is already formatted correctly
+          // Documented or existing damage - show status and append original BUHS text
           sammanfattning = damage.status;
+          if (damage.legacy_buhs_text) {
+            sammanfattning += `\nUrsprunglig beskrivning i BUHS: ${damage.legacy_buhs_text}`;
+          }
         } else if (damage.is_unmatched_buhs) {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
           sammanfattning = '';
