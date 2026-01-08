@@ -75,6 +75,7 @@ export type DamageRecord = {
   // For documented BUHS damages - track where they were documented
   checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
   documentedBy?: string | null; // checker_name who documented it
+  documentedDate?: string | null; // Date when damage was documented (checkin date)
 };
 
 export type HistoryRecord = {
@@ -907,16 +908,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
     const matchedBuhsDamageIds = new Set<number>(); // Track which BUHS damages were matched
     const processedBuhsKeys = new Set<string>(); // Track stable keys (legacyText + damageDate) to prevent duplicates (Kommentar 1)
+    const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
     
     // First pass: Add matched BUHS damages only
     for (const d of legacyDamages) {
+      // For GEU29F and other force-undocumented vehicles, skip text+date deduplication
+      // Only deduplicate by actual database ID to show all damages
+      if (processedBuhsIds.has(d.id)) {
+        continue; // Skip if we've already processed this exact damage record
+      }
+      processedBuhsIds.add(d.id);
+      
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
       
       // Create stable dedup key to prevent duplicate BUHS damages (Kommentar 1)
+      // For GEU29F, we skip this check since we want to show all damages
       const stableKey = `${legacyText}_${damageDate}`;
-      if (processedBuhsKeys.has(stableKey)) {
-        continue; // Skip duplicate BUHS damage with same text + date
+      if (!isGEU29F && processedBuhsKeys.has(stableKey)) {
+        continue; // Skip duplicate BUHS damage with same text + date (except for GEU29F)
+      }
+      if (!isGEU29F) {
+        processedBuhsKeys.add(stableKey);
       }
       
       // Try to find matching checkin_damage entry (same matching logic as main branch)
@@ -1080,6 +1093,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         original_damage_date: damageDate,
         checkinWhereDocumented: checkin?.id || null,
         documentedBy: checkin?.checker_name || null,
+        documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
       });
     }
     
@@ -1344,11 +1358,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
             // Documented or existing damage - show when and by whom it was documented
             const documentedBy = damage.documentedBy || 'Okänd';
-            // Extract the date from the checkin where it was documented
-            // The datum field of the damage is the BUHS original date, but we want the checkin date
-            // We'll use the datum from checkin, which should be available
-            // For now, use the original_damage_date and documented info
-            const docDate = damage.datum; // This is when the checkin happened
+            // Use the checkin date when it was documented, not the original damage date
+            const docDate = damage.documentedDate || damage.datum;
             sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
           } else if (damage.status === 'Källa BUHS') {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
@@ -1589,16 +1600,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
   const matchedBuhsDamageIds = new Set<number>(); // Track which BUHS damages were matched
   const processedBuhsKeys = new Set<string>(); // Track stable keys (legacyText + damageDate) to prevent duplicates
+  const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
   
   // First pass: Add matched BUHS damages only
   for (const d of legacyDamages) {
+    // For GEU29F and other force-undocumented vehicles, skip text+date deduplication
+    // Only deduplicate by actual database ID to show all damages
+    if (processedBuhsIds.has(d.id)) {
+      continue; // Skip if we've already processed this exact damage record
+    }
+    processedBuhsIds.add(d.id);
+    
     const legacyText = getLegacyDamageText(d);
     const damageDate = formatDate(d.damage_date);
     
     // Create stable dedup key to prevent duplicate BUHS damages (Kommentar 1)
+    // For GEU29F, we skip this check since we want to show all damages
     const stableKey = `${legacyText}_${damageDate}`;
-    if (processedBuhsKeys.has(stableKey)) {
-      continue; // Skip duplicate BUHS damage with same text + date
+    if (!isGEU29F && processedBuhsKeys.has(stableKey)) {
+      continue; // Skip duplicate BUHS damage with same text + date (except for GEU29F)
+    }
+    if (!isGEU29F) {
+      processedBuhsKeys.add(stableKey);
     }
     
     // Try to find matching checkin_damage entry
@@ -1817,6 +1840,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       original_damage_date: damageDate,
       checkinWhereDocumented: checkin?.id || null,
       documentedBy: checkin?.checker_name || null,
+      documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
     });
   }
   
@@ -2164,7 +2188,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
           // Documented or existing damage - show when and by whom it was documented
           const documentedBy = damage.documentedBy || 'Okänd';
-          const docDate = damage.datum; // This is when the checkin happened
+          // Use the checkin date when it was documented, not the original damage date
+          const docDate = damage.documentedDate || damage.datum;
           sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
         } else if (damage.status === 'Källa BUHS') {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
