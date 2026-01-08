@@ -34,6 +34,7 @@ type CheckinDamageData = {
   video_urls: unknown;
   created_at: string;
   checkin_id: string;
+  handled_at?: string | null; // When damage was actually handled (if available)
 };
 
 type InventoriedDamage = {
@@ -55,6 +56,7 @@ export type ConsolidatedDamage = {
   handled_by?: string | null;
   handled_photo_urls?: string[];
   handled_video_urls?: string[];
+  handled_at?: string | null; // Timestamp when damage was handled
 };
 
 export type VehicleInfo = {
@@ -204,7 +206,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     const allCheckinDamagesResponse = checkinIds.length > 0
       ? await supabaseAdmin
           .from('checkin_damages')
-          .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, checkin_id')
+          .select('type, damage_type, car_part, position, description, photo_urls, video_urls, created_at, handled_at, checkin_id')
           .in('checkin_id', checkinIds)
           .in('type', ['not_found', 'existing', 'documented'])
           .order('created_at', { ascending: true }) // Sorted for stable index matching
@@ -268,10 +270,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     checker: string;
     photo_urls: string[];
     video_urls: string[];
+    handled_at: string | null; // Timestamp when damage was handled
   };
   const handledDamagesList: HandledDamageInfo[] = [];
   
   const checkerName = lastCheckinData?.checker_name || 'Okänd';
+  const checkinCompletedAt = lastCheckinData?.completed_at || null;
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
@@ -284,6 +288,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         checker: checkerName,
         photo_urls: (handled.photo_urls as string[]) || [],
         video_urls: (handled.video_urls as string[]) || [],
+        handled_at: handled.handled_at || checkinCompletedAt, // Use handled_at if available, else checkin completed_at
       });
     }
   }
@@ -392,6 +397,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       const finalHandledPhotoUrls = isForceUndocumented ? [] : finalPhotoUrls;
       const finalHandledVideoUrls = isForceUndocumented ? [] : finalVideoUrls;
       const finalFolderValue = isForceUndocumented ? null : finalFolder;
+      const finalHandledAt = isForceUndocumented ? null : (handledInfo?.handled_at || null);
       
       consolidatedDamages.push({
         id: leg.id,
@@ -407,6 +413,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         handled_by: finalHandledBy,
         handled_photo_urls: finalHandledPhotoUrls,
         handled_video_urls: finalHandledVideoUrls,
+        handled_at: finalHandledAt,
       });
     }
   }

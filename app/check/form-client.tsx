@@ -67,6 +67,7 @@ type ExistingDamage = {
   handledBy?: string | null;
   handledPhotoUrls?: string[];
   handledVideoUrls?: string[];
+  handledAt?: string | null; // Timestamp when damage was handled
 };
 
 type NewDamage = {
@@ -91,6 +92,19 @@ const hasPhoto = (files?: MediaFile[]) => Array.isArray(files) && files.some(f =
 const hasVideo = (files?: MediaFile[]) => Array.isArray(files) && files.some(f => f?.type === 'video');
 const hasAnyMedia = (files?: MediaFile[]) => hasPhoto(files) || hasVideo(files);
 
+function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    const datePart = date.toISOString().split('T')[0];
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${datePart} kl ${hours}:${minutes}`;
+  } catch {
+    return '';
+  }
+}
 
 function slugify(str: string): string {
     if (!str) return '';
@@ -667,7 +681,8 @@ export default function CheckInForm() {
                 handledComment: d.handled_comment || null,
                 handledBy: d.handled_by || null,
                 handledPhotoUrls: d.handled_photo_urls || [],
-                handledVideoUrls: d.handled_video_urls || []
+                handledVideoUrls: d.handled_video_urls || [],
+                handledAt: d.handled_at || null
               })));
             }
           },
@@ -699,7 +714,8 @@ export default function CheckInForm() {
               handledComment: d.handled_comment || null,
               handledBy: d.handled_by || null,
               handledPhotoUrls: d.handled_photo_urls || [],
-              handledVideoUrls: d.handled_video_urls || []
+              handledVideoUrls: d.handled_video_urls || [],
+              handledAt: d.handled_at || null
           })));
       }
   
@@ -1397,7 +1413,20 @@ export default function CheckInForm() {
                       }
                       if (d.handledBy) {
                         const firstName = d.handledBy.split(' ')[0] || d.handledBy;
-                        displayText += ` (${firstName})`;
+                        displayText += ` (${firstName}`;
+                        if (d.handledAt) {
+                          const timestamp = formatDateTime(d.handledAt);
+                          if (timestamp) {
+                            displayText += `, ${timestamp}`;
+                          }
+                        }
+                        displayText += ')';
+                      } else if (d.handledAt) {
+                        // No checker name but have timestamp
+                        const timestamp = formatDateTime(d.handledAt);
+                        if (timestamp) {
+                          displayText += ` (${timestamp})`;
+                        }
                       }
                     } else {
                       // Unhandled damages - show BUHS text with (BUHS) suffix
