@@ -414,6 +414,18 @@ function normalizeDamageTypeForKey(damageType: string | null | undefined): strin
     .trim();
 }
 
+// Helper to format BUHS damage text with (BUHS) suffix
+function formatBuhsDamageText(text: string | null | undefined): string {
+  return text ? `${text} (BUHS)` : 'Okänd (BUHS)';
+}
+
+// Helper to format not_found status message
+function formatNotFoundStatus(comment: string, checkerName: string, checkinDateTime: string): string {
+  return comment 
+    ? `Gick ej att dokumentera "${comment}" (${checkerName}, ${checkinDateTime})` 
+    : `Gick ej att dokumentera (${checkerName}, ${checkinDateTime})`;
+}
+
 function getFirstNameFromEmail(email: string): string {
   if (!email) return 'Okänd';
   const namePart = email.split('@')[0];
@@ -1034,7 +1046,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
       } else if (cdType === 'not_found') {
         // Display as: "<text> (BUHS)" for skadetyp
-        skadetyp = legacyText ? `${legacyText} (BUHS)` : 'Okänd (BUHS)';
+        skadetyp = formatBuhsDamageText(legacyText);
         
         const checkerName = checkin?.checker_name || 'Okänd';
         // Use formatDateTime for full timestamp with time
@@ -1042,13 +1054,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const comment = matchedCheckinDamage.description || '';
         
         // Include checker, date+time, and comment in status for full context
-        status = comment ? `Gick ej att dokumentera "${comment}" (${checkerName}, ${checkinDateTime})` : `Gick ej att dokumentera (${checkerName}, ${checkinDateTime})`;
+        status = formatNotFoundStatus(comment, checkerName, checkinDateTime);
         folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
         sourceInfo = comment ? `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}\nKommentar: ${comment}` : `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}`;
         
       } else {
         // Unknown type - shouldn't happen but handle gracefully
-        skadetyp = legacyText ? `${legacyText} (BUHS)` : 'Okänd (BUHS)';
+        skadetyp = formatBuhsDamageText(legacyText);
         status = 'Källa BUHS';
         folder = undefined;
         sourceInfo = 'Källa: BUHS';
@@ -1070,7 +1082,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
     }
     
-    // Second pass: Add unmatched BUHS damages with "Källa BUHS" status
+    // Second pass: Add unmatched BUHS damages with "(BUHS)" suffix
     for (const d of legacyDamages) {
       if (matchedBuhsDamageIds.has(d.id)) {
         continue; // Skip already matched BUHS damages
@@ -1101,20 +1113,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           if (damageEntry.user_positions && Array.isArray(damageEntry.user_positions) && damageEntry.user_positions.length > 0) {
             // Use structured positions
             const positionsStr = formatDamagePositions(damageEntry.user_positions);
-            skadetyp = positionsStr ? `Källa BUHS – ${damageType} – ${positionsStr}` : `Källa BUHS – ${damageType}`;
+            skadetyp = positionsStr ? `${damageType} – ${positionsStr} (BUHS)` : `${damageType} (BUHS)`;
           } else if (damageEntry.car_part) {
             // Use car_part if available
-            skadetyp = `Källa BUHS – ${damageType} – ${damageEntry.car_part}`;
+            skadetyp = `${damageType} – ${damageEntry.car_part} (BUHS)`;
           } else {
-            skadetyp = `Källa BUHS – ${damageType}`;
+            skadetyp = `${damageType} (BUHS)`;
           }
         } else {
           // No damage_type in damages table, use legacyText
-          skadetyp = legacyText || 'Källa BUHS – Okänd';
+          skadetyp = formatBuhsDamageText(legacyText);
         }
       } else {
         // No matching entry in damages table, use legacyText
-        skadetyp = legacyText || 'Källa BUHS – Okänd';
+        skadetyp = formatBuhsDamageText(legacyText);
       }
       
       // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
@@ -1756,7 +1768,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     } else if (cdType === 'not_found') {
       // Damage could not be documented (e.g., already repaired)
       // Display as: "<text> (BUHS)" for skadetyp
-      skadetyp = legacyText ? `${legacyText} (BUHS)` : 'Okänd (BUHS)';
+      skadetyp = formatBuhsDamageText(legacyText);
       
       const checkerName = checkin?.checker_name || 'Okänd';
       // Use formatDateTime for full timestamp with time
@@ -1764,13 +1776,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const comment = matchedCheckinDamage.description || '';
       
       // Include checker, date+time, and comment in status for full context
-      status = comment ? `Gick ej att dokumentera "${comment}" (${checkerName}, ${checkinDateTime})` : `Gick ej att dokumentera (${checkerName}, ${checkinDateTime})`;
+      status = formatNotFoundStatus(comment, checkerName, checkinDateTime);
       folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
       sourceInfo = comment ? `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}\nKommentar: ${comment}` : `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}`;
       
     } else {
       // Unknown type - shouldn't happen but handle gracefully
-      skadetyp = legacyText ? `${legacyText} (BUHS)` : 'Okänd (BUHS)';
+      skadetyp = formatBuhsDamageText(legacyText);
       status = 'Källa BUHS';
       folder = undefined;
       sourceInfo = 'Källa: BUHS';
