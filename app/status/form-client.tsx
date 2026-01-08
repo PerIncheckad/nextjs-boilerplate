@@ -1290,6 +1290,8 @@ const HistoryItem: React.FC<{
                   <li key={idx}>
                     {skada.isDocumentedOlder && skada.originalDamageDate ? (
                       <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
+                    ) : skada.isNotFoundOlder && skada.handledStatus ? (
+                      <>{skada.typ}. {skada.handledStatus}</>
                     ) : (
                       <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
                     )}

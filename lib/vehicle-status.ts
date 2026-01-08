@@ -111,6 +111,7 @@ export type HistoryRecord = {
       isDocumentedOlder?: boolean; // True if this is a documented older BUHS damage
       originalDamageDate?: string; // Original damage date for documented older damages
       isNotFoundOlder?: boolean; // True if this is a not_found older BUHS damage (Kommentar 1)
+      handledStatus?: string; // Full handled status text (e.g., "Gick ej att dokumentera ...")
     }>;
   };
   
@@ -1283,6 +1284,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
+          handledStatus: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera') ? damage.status : undefined, // Full handled status text
         };
       });
       
@@ -2023,6 +2025,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
         isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
+        handledStatus: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera') ? damage.status : undefined, // Full handled status text
       };
     });
     
