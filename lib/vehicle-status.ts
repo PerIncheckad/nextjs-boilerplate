@@ -1094,6 +1094,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         checkinWhereDocumented: checkin?.id || null,
         documentedBy: checkin?.checker_name || null,
         documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
+        is_handled: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as handled
       });
     }
     
