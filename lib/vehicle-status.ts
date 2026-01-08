@@ -2271,3 +2271,4 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     nybilFullData,
   };
 }
+}
