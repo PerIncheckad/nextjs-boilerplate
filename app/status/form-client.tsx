@@ -1029,6 +1029,9 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
       <div className="damage-info">
         <span className="damage-type">{damage.skadetyp}</span>
         <span className="damage-date">{damage.datum}</span>
+        {damage.status && (
+          <span className="damage-status">{damage.status}</span>
+        )}
         {damage.sourceInfo && (
           <span className="damage-source" style={{ whiteSpace: 'pre-line' }}>
             {damage.sourceInfo}
@@ -1290,10 +1293,10 @@ const HistoryItem: React.FC<{
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
                 {record.checkinDetaljer.skador.map((skada, idx) => (
                   <li key={idx}>
-                    {skada.isDocumentedOlder && skada.originalDamageDate ? (
-                      <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
-                    ) : skada.isNotFoundOlder && skada.handledStatus ? (
+                    {skada.handledStatus ? (
                       <>{skada.typ}. {skada.handledStatus}</>
+                    ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
+                      <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
                     ) : (
                       <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
                     )}
