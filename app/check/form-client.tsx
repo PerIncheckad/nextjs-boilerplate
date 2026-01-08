@@ -1384,14 +1384,14 @@ export default function CheckInForm() {
                         mediaUrls = d.handledPhotoUrls;
                       }
                     } else if (d.handledType === 'not_found') {
-                      // Ej dokumenterade skador (type='not_found')
-                      // Format: {damage_type}. Ej dokumenterad. "{description}" ({checker_name})
+                      // Handled as "not_found" (Gick ej att dokumentera)
+                      // Format: {damage_type} (BUHS). Gick ej att dokumentera "{description}" ({checker_name}, YYYY-MM-DD kl HH:MM)
                       let damageTypeName = d.handledDamageType;
                       if (!damageTypeName && d.fullText) {
                         const parts = d.fullText.split(' - ');
                         damageTypeName = parts.length > 0 ? parts[0] : d.fullText;
                       }
-                      displayText = (damageTypeName || 'Skada') + '. Ej dokumenterad.';
+                      displayText = (damageTypeName || 'Skada') + ' (BUHS). Gick ej att dokumentera';
                       if (d.handledComment) {
                         displayText += ` "${d.handledComment}"`;
                       }
@@ -1400,8 +1400,8 @@ export default function CheckInForm() {
                         displayText += ` (${firstName})`;
                       }
                     } else {
-                      // Unhandled damages - show BUHS text as is
-                      displayText = d.fullText;
+                      // Unhandled damages - show BUHS text with (BUHS) suffix
+                      displayText = d.fullText ? `${d.fullText} (BUHS)` : 'Okänd (BUHS)';
                       
                       // Check for media from uploads folder
                       if (d.uploads.folder) {
