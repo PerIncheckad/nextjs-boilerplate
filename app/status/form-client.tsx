@@ -1700,6 +1700,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       color: var(--color-text-secondary);
     }
 
+    .damage-status {
+      font-size: 0.875rem;
+      color: var(--color-text);
+    }
+
     .damage-source {
       font-size: 0.75rem;
       color: var(--color-text-secondary);

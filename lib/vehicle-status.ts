@@ -76,6 +76,9 @@ export type DamageRecord = {
   checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
   documentedBy?: string | null; // checker_name who documented it
   documentedDate?: string | null; // Date when damage was documented (checkin date)
+  // Flags for handled/inventoried status
+  is_handled?: boolean; // True if damage was handled (documented/not_found/existing)
+  is_inventoried?: boolean; // True if damage was inventoried during checkin
 };
 
 export type HistoryRecord = {
@@ -1030,8 +1033,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           skadetyp = legacyText || damageType;
         }
         
-        status = `Dokumenterad (urspr. BUHS ${damageDate})`;
-        
         // Try to get folder from checkin_damages photo_urls first
         if (checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
           const firstUrl = matchedCheckinDamage.photo_urls[0];
@@ -1057,7 +1058,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
         status = `Dokumenterad ${checkinDate} av ${checkerName}`;
-        sourceInfo = ''; // Don't show sourceInfo separately - it's already in status
+        sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
         
       } else if (cdType === 'not_found') {
         // Display as: "<text> (BUHS)" for skadetyp
@@ -1071,7 +1072,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Include checker, date+time, and comment in status for full context
         status = formatNotFoundStatus(comment, checkerName, checkinDateTime);
         folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
-        sourceInfo = ''; // Don't show sourceInfo separately - it's already in status
+        sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
         
       } else {
         // Unknown type - shouldn't happen but handle gracefully
@@ -1096,6 +1097,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         documentedBy: checkin?.checker_name || null,
         documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
         is_handled: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as handled
+        is_inventoried: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as inventoried
       });
     }
     
@@ -1300,17 +1302,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
-          handledStatus: damage.source === 'legacy' ? (() => {
-            // For documented damages, show the status which is already "Dokumenterad [date] av [name]"
-            if (damage.status?.startsWith('Dokumenterad')) {
-              return damage.status;
-            }
-            // For not_found damages, use the full status which includes comment
-            if (damage.status?.startsWith('Gick ej att dokumentera')) {
-              return damage.status;
-            }
-            return undefined;
-          })() : undefined,
+          handledStatus: damage.source === 'legacy' && damage.is_handled ? damage.status : undefined,
         };
       });
       
@@ -1370,12 +1362,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // For not_found damages, use the full status which includes comment
           // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
           let sammanfattning: string;
-          if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-            // Documented or existing damage - show when and by whom it was documented
-            const documentedBy = damage.documentedBy || 'Okänd';
-            // Use the checkin date when it was documented, not the original damage date
-            const docDate = damage.documentedDate || damage.datum;
-            sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
+          if (damage.status?.startsWith('Dokumenterad')) {
+            // Documented or existing damage - use the status which is already formatted correctly
+            sammanfattning = damage.status;
           } else if (damage.status === 'Källa BUHS') {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
             sammanfattning = '';
@@ -1783,8 +1772,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         skadetyp = legacyText || damageType;
       }
       
-      status = `Dokumenterad (urspr. BUHS ${damageDate})`;
-      
       // Try to get folder from checkin_damages photo_urls first
       if (checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
         const firstUrl = matchedCheckinDamage.photo_urls[0];
@@ -1817,7 +1804,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       const checkerName = checkin?.checker_name || 'Okänd';
       const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
-      sourceInfo = `Källa: BUHS\nDokumenterad ${checkinDate} av ${checkerName}`;
+      status = `Dokumenterad ${checkinDate} av ${checkerName}`;
+      sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
       
     } else if (cdType === 'not_found') {
       // Damage could not be documented (e.g., already repaired)
@@ -1832,7 +1820,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Include checker, date+time, and comment in status for full context
       status = formatNotFoundStatus(comment, checkerName, checkinDateTime);
       folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
-      sourceInfo = comment ? `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}\nKommentar: ${comment}` : `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}`;
+      sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
       
     } else {
       // Unknown type - shouldn't happen but handle gracefully
@@ -1856,6 +1844,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       checkinWhereDocumented: checkin?.id || null,
       documentedBy: checkin?.checker_name || null,
       documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
+      is_handled: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as handled
+      is_inventoried: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as inventoried
     });
   }
   
@@ -2075,19 +2065,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
         isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
-        handledStatus: damage.source === 'legacy' ? (() => {
-          // For documented damages, show "Dokumenterad [date] av [name]"
-          if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-            const documentedBy = damage.documentedBy || 'Okänd';
-            const docDate = damage.documentedDate || damage.datum;
-            return `Dokumenterad ${docDate} av ${documentedBy}`;
-          }
-          // For not_found damages, use the full status which includes comment
-          if (damage.status?.startsWith('Gick ej att dokumentera')) {
-            return damage.status;
-          }
-          return undefined;
-        })() : undefined,
+        handledStatus: damage.source === 'legacy' && damage.is_handled ? damage.status : undefined,
       };
     });
     
@@ -2215,12 +2193,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // For not_found damages, use the full status which includes comment
         // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
         let sammanfattning: string;
-        if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-          // Documented or existing damage - show when and by whom it was documented
-          const documentedBy = damage.documentedBy || 'Okänd';
-          // Use the checkin date when it was documented, not the original damage date
-          const docDate = damage.documentedDate || damage.datum;
-          sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
+        if (damage.status?.startsWith('Dokumenterad')) {
+          // Documented or existing damage - use the status which is already formatted correctly
+          sammanfattning = damage.status;
         } else if (damage.status === 'Källa BUHS') {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
           sammanfattning = '';
