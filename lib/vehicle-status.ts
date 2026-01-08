@@ -1844,11 +1844,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       } else {
         // No damage_type in damages table, use legacyText
-        skadetyp = legacyText ? `${legacyText} (BUHS)` : 'Okänd (BUHS)';
+        skadetyp = formatBuhsDamageText(legacyText);
       }
     } else {
       // No matching entry in damages table, use legacyText
-      skadetyp = legacyText ? `${legacyText} (BUHS)` : 'Okänd (BUHS)';
+      skadetyp = formatBuhsDamageText(legacyText);
     }
     
     // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
