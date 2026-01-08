@@ -1092,7 +1092,7 @@ const HistoryItem: React.FC<{
           {isBuhsSkada && record.buhsSkadaDetaljer && (
             <span className="history-buhs-label">{record.buhsSkadaDetaljer.skadetyp}</span>
           )}
-          {isBuhsSkada && (
+          {isBuhsSkada && record.sammanfattning && (
             <span className="history-buhs-summary">{record.sammanfattning}</span>
           )}
           <span className="history-date-label">{record.datum}</span>

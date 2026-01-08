@@ -1331,15 +1331,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         // For documented/existing damages, format as: "(BUHS date: description)\nDokumenterad (urspr. BUHS date)"
         // For not_found damages, use the full status which includes comment
-        // For unmatched BUHS, use "Källa BUHS"
+        // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
         let sammanfattning: string;
         if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
           // Documented or existing damage - format with BUHS description WITHOUT parentheses
           const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
           const buhsDate = damage.original_damage_date || damage.datum;
           sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
+        } else if (damage.status === 'Källa BUHS') {
+          // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
+          sammanfattning = '';
         } else {
-          // not_found or unmatched BUHS - use status as is
+          // not_found or other status - use status as is
           sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
         }
         
@@ -2136,15 +2139,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // For documented/existing damages, format as: "BUHS date: description" (no parentheses)
       // For not_found damages, use the full status which includes comment
-      // For unmatched BUHS, use "Källa BUHS"
+      // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
       let sammanfattning: string;
       if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
         // Documented or existing damage - format with BUHS description WITHOUT parentheses
         const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
         const buhsDate = damage.original_damage_date || damage.datum;
         sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
+      } else if (damage.status === 'Källa BUHS') {
+        // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
+        sammanfattning = '';
       } else {
-        // not_found or unmatched BUHS - use status as is
+        // not_found or other status - use status as is
         sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
       }
       
