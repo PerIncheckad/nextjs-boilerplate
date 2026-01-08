@@ -1056,7 +1056,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
-        sourceInfo = `Källa: BUHS\nDokumenterad ${checkinDate} av ${checkerName}`;
+        status = `Dokumenterad ${checkinDate} av ${checkerName}`;
+        sourceInfo = ''; // Don't show sourceInfo separately - it's already in status
         
       } else if (cdType === 'not_found') {
         // Display as: "<text> (BUHS)" for skadetyp
@@ -1070,7 +1071,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Include checker, date+time, and comment in status for full context
         status = formatNotFoundStatus(comment, checkerName, checkinDateTime);
         folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
-        sourceInfo = comment ? `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}\nKommentar: ${comment}` : `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}`;
+        sourceInfo = ''; // Don't show sourceInfo separately - it's already in status
         
       } else {
         // Unknown type - shouldn't happen but handle gracefully
@@ -1300,11 +1301,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
           handledStatus: damage.source === 'legacy' ? (() => {
-            // For documented damages, show "Dokumenterad [date] av [name]"
-            if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-              const documentedBy = damage.documentedBy || 'Okänd';
-              const docDate = damage.documentedDate || damage.datum;
-              return `Dokumenterad ${docDate} av ${documentedBy}`;
+            // For documented damages, show the status which is already "Dokumenterad [date] av [name]"
+            if (damage.status?.startsWith('Dokumenterad')) {
+              return damage.status;
             }
             // For not_found damages, use the full status which includes comment
             if (damage.status?.startsWith('Gick ej att dokumentera')) {
