@@ -386,6 +386,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       }
       
       // Apply force-undocumented override for special vehicles (e.g., GEU29F)
+      // For normal vehicles: is_inventoried=true if damage is in nybil_inventering (isInventoried)
+      // OR if it has been handled in a checkin (handledInfo !== null)
       const finalIsInventoried = isForceUndocumented ? false : (isInventoried || (handledInfo !== null));
       const finalHandledType = isForceUndocumented ? null : (handledInfo?.type || null);
       const finalHandledDamageType = isForceUndocumented ? null : (handledInfo?.damage_type || null);
