@@ -743,7 +743,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
   
   // Debug logging for specific regnr
-  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F'];
+  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F', 'TLJ05S', 'NPN32L', 'JBD26N'];
   const shouldDebug = debugRegnrs.includes(cleanedRegnr);
   
   if (shouldDebug) {
