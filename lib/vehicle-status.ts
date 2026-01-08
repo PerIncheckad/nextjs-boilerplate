@@ -2271,28 +2271,3 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     nybilFullData,
   };
 }
-
-// =================================================================
-// 4. SEARCH/AUTOCOMPLETE FUNCTION
-// =================================================================
-
-export async function searchVehicles(query: string): Promise<string[]> {
-  if (!query || query.length < 2) return [];
-  
-  const upperQuery = query.toUpperCase().replace(/\s/g, '');
-  
-  // Use the existing RPC to get all plates
-  const { data, error } = await supabase.rpc('get_all_allowed_plates');
-  
-  if (error) {
-    console.error('Error fetching plates:', error);
-    return [];
-  }
-  
-  if (!data) return [];
-  
-  // Filter plates that start with the query
-  return data
-    .map((item: any) => item.regnr as string)
-    .filter((regnr: string) => regnr && regnr.toUpperCase().startsWith(upperQuery));
-}
