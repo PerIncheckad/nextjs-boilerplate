@@ -1325,46 +1325,53 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Add BUHS damage history events
     // Create a separate history event for each BUHS damage (source='legacy')
-    // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
+    // For handled damages (documented/not_found/existing), always create SKADA event
+    // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
     for (const damage of damageRecords) {
-      if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
-        // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
-        // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
+      if (damage.source === 'legacy') {
+        // Determine if this damage should get a SKADA event
+        const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
+        const shouldCreateEvent = isHandled || !damagesShownInCheckins.has(damage.id);
         
-        // For documented/existing damages, format as: "(BUHS date: description)\nDokumenterad (urspr. BUHS date)"
-        // For not_found damages, use the full status which includes comment
-        // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
-        let sammanfattning: string;
-        if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-          // Documented or existing damage - format with BUHS description WITHOUT parentheses
-          const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
-          const buhsDate = damage.original_damage_date || damage.datum;
-          sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
-        } else if (damage.status === 'Källa BUHS') {
-          // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
-          sammanfattning = '';
-        } else {
-          // not_found or other status - use status as is
-          sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+        if (shouldCreateEvent) {
+          // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
+          // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
+          
+          // For documented/existing damages, format as: "(BUHS date: description)\nDokumenterad (urspr. BUHS date)"
+          // For not_found damages, use the full status which includes comment
+          // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
+          let sammanfattning: string;
+          if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
+            // Documented or existing damage - format with BUHS description WITHOUT parentheses
+            const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
+            const buhsDate = damage.original_damage_date || damage.datum;
+            sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
+          } else if (damage.status === 'Källa BUHS') {
+            // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
+            sammanfattning = '';
+          } else {
+            // not_found or other status - use status as is
+            sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+          }
+          
+          historyRecords.push({
+            id: `buhs-${damage.id}`,
+            datum: damage.datum,
+            rawTimestamp: damage.datum || '',
+            typ: 'buhs_skada',
+            sammanfattning,
+            utfordAv: 'System (BUHS)',
+            buhsSkadaDetaljer: {
+              skadetyp: damage.skadetyp,
+              legacy_damage_source_text: damage.legacy_damage_source_text,
+              damageDate: damage.original_damage_date || damage.datum,
+              damageStatus: damage.status,
+              checkinWhereDocumented: damage.checkinWhereDocumented || null,
+              documentedBy: damage.documentedBy || null,
+              mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
+            },
+          });
         }
-        
-        historyRecords.push({
-          id: `buhs-${damage.id}`,
-          datum: damage.datum,
-          rawTimestamp: damage.datum || '',
-          typ: 'buhs_skada',
-          sammanfattning,
-          utfordAv: 'System (BUHS)',
-          buhsSkadaDetaljer: {
-            skadetyp: damage.skadetyp,
-            legacy_damage_source_text: damage.legacy_damage_source_text,
-            damageDate: damage.original_damage_date || damage.datum,
-            damageStatus: damage.status,
-            checkinWhereDocumented: damage.checkinWhereDocumented || null,
-            documentedBy: damage.documentedBy || null,
-            mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
-          },
-        });
       }
     }
     
@@ -2134,38 +2141,44 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Add BUHS damage history events
   // Create a separate history event for each BUHS damage (source='legacy')
-  // that wasn't shown in any checkin (already tracked in damagesShownInCheckins set)
+  // For handled damages (documented/not_found/existing), always create SKADA event
+  // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
   for (const damage of damageRecords) {
-    if (damage.source === 'legacy' && !damagesShownInCheckins.has(damage.id)) {
-      // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
-      // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
+    if (damage.source === 'legacy') {
+      // Determine if this damage should get a SKADA event
+      const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
+      const shouldCreateEvent = isHandled || !damagesShownInCheckins.has(damage.id);
       
-      // For documented/existing damages, format as: "BUHS date: description" (no parentheses)
-      // For not_found damages, use the full status which includes comment
-      // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
-      let sammanfattning: string;
-      if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-        // Documented or existing damage - format with BUHS description WITHOUT parentheses
-        const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
-        const buhsDate = damage.original_damage_date || damage.datum;
-        sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
-      } else if (damage.status === 'Källa BUHS') {
-        // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
-        sammanfattning = '';
-      } else {
-        // not_found or other status - use status as is
-        sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
-      }
-      
-      historyRecords.push({
-        id: `buhs-${damage.id}`,
-        datum: damage.datum,
-        rawTimestamp: damage.datum || '',
-        typ: 'buhs_skada',
-        sammanfattning,
-        utfordAv: 'System (BUHS)',
-        buhsSkadaDetaljer: {
-          skadetyp: damage.skadetyp,
+      if (shouldCreateEvent) {
+        // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
+        // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
+        
+        // For documented/existing damages, format as: "BUHS date: description" (no parentheses)
+        // For not_found damages, use the full status which includes comment
+        // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
+        let sammanfattning: string;
+        if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
+          // Documented or existing damage - format with BUHS description WITHOUT parentheses
+          const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
+          const buhsDate = damage.original_damage_date || damage.datum;
+          sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
+        } else if (damage.status === 'Källa BUHS') {
+          // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
+          sammanfattning = '';
+        } else {
+          // not_found or other status - use status as is
+          sammanfattning = damage.status || 'Ej dokumenterad i Incheckad';
+        }
+        
+        historyRecords.push({
+          id: `buhs-${damage.id}`,
+          datum: damage.datum,
+          rawTimestamp: damage.datum || '',
+          typ: 'buhs_skada',
+          sammanfattning,
+          utfordAv: 'System (BUHS)',
+          buhsSkadaDetaljer: {
+            skadetyp: damage.skadetyp,
           legacy_damage_source_text: damage.legacy_damage_source_text,
           damageDate: damage.original_damage_date || damage.datum,
           damageStatus: damage.status,
