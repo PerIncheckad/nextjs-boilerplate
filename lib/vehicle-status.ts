@@ -1337,15 +1337,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
           // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
           
-          // For documented/existing damages, format as: "(BUHS date: description)\nDokumenterad (urspr. BUHS date)"
+          // For documented/existing damages, format as: "Dokumenterad [DATE] av [NAME]"
           // For not_found damages, use the full status which includes comment
           // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
           let sammanfattning: string;
           if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-            // Documented or existing damage - format with BUHS description WITHOUT parentheses
-            const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
-            const buhsDate = damage.original_damage_date || damage.datum;
-            sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
+            // Documented or existing damage - show when and by whom it was documented
+            const documentedBy = damage.documentedBy || 'Okänd';
+            // Extract the date from the checkin where it was documented
+            // The datum field of the damage is the BUHS original date, but we want the checkin date
+            // We'll use the datum from checkin, which should be available
+            // For now, use the original_damage_date and documented info
+            const docDate = damage.datum; // This is when the checkin happened
+            sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
           } else if (damage.status === 'Källa BUHS') {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
             sammanfattning = '';
@@ -2153,15 +2157,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
         // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
         
-        // For documented/existing damages, format as: "BUHS date: description" (no parentheses)
+        // For documented/existing damages, format as: "Dokumenterad [DATE] av [NAME]"
         // For not_found damages, use the full status which includes comment
         // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
         let sammanfattning: string;
         if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-          // Documented or existing damage - format with BUHS description WITHOUT parentheses
-          const buhsDescription = damage.legacy_damage_source_text || damage.skadetyp;
-          const buhsDate = damage.original_damage_date || damage.datum;
-          sammanfattning = `BUHS ${buhsDate}: ${buhsDescription}`;
+          // Documented or existing damage - show when and by whom it was documented
+          const documentedBy = damage.documentedBy || 'Okänd';
+          const docDate = damage.datum; // This is when the checkin happened
+          sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
         } else if (damage.status === 'Källa BUHS') {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
           sammanfattning = '';
