@@ -1075,7 +1075,9 @@ const HistoryItem: React.FC<{
       record.nybilDetaljer.mediaLankar.rokning
     ))
   );
-  const isNonExpandable = isBuhsSkada || (isNybil && !nybilHasExpandableContent);
+  // Make BUHS skada expandable if it has a media folder
+  const buhsHasExpandableContent = isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder;
+  const isNonExpandable = (isBuhsSkada && !buhsHasExpandableContent) || (isNybil && !nybilHasExpandableContent);
 
   return (
     <div className="history-item-expandable">
@@ -1403,6 +1405,20 @@ const HistoryItem: React.FC<{
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          
+          {/* For BUHS skada with media */}
+          {record.typ === 'buhs_skada' && record.buhsSkadaDetaljer?.mediaFolder && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <a 
+                href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#1a73e8', fontWeight: 500 }}
+              >
+                📁 Visa media
+              </a>
             </div>
           )}
         </div>
