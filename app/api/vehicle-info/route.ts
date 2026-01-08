@@ -55,6 +55,7 @@ export type ConsolidatedDamage = {
   handled_by?: string | null;
   handled_photo_urls?: string[];
   handled_video_urls?: string[];
+  handled_at?: string | null; // Timestamp when damage was handled
 };
 
 export type VehicleInfo = {
@@ -268,10 +269,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     checker: string;
     photo_urls: string[];
     video_urls: string[];
+    completed_at: string; // Use checkin completed_at as timestamp
   };
   const handledDamagesList: HandledDamageInfo[] = [];
   
   const checkerName = lastCheckinData?.checker_name || 'Okänd';
+  const checkinCompletedAt = lastCheckinData?.completed_at || null;
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
@@ -284,6 +287,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         checker: checkerName,
         photo_urls: (handled.photo_urls as string[]) || [],
         video_urls: (handled.video_urls as string[]) || [],
+        completed_at: checkinCompletedAt || '', // Use checkin completed_at
       });
     }
   }
@@ -382,6 +386,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       }
       
       // Apply force-undocumented override for special vehicles (e.g., GEU29F)
+      // For normal vehicles: is_inventoried=true if damage is in nybil_inventering (isInventoried)
+      // OR if it has been handled in a checkin (handledInfo !== null)
       const finalIsInventoried = isForceUndocumented ? false : (isInventoried || (handledInfo !== null));
       const finalHandledType = isForceUndocumented ? null : (handledInfo?.type || null);
       const finalHandledDamageType = isForceUndocumented ? null : (handledInfo?.damage_type || null);
@@ -392,6 +398,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       const finalHandledPhotoUrls = isForceUndocumented ? [] : finalPhotoUrls;
       const finalHandledVideoUrls = isForceUndocumented ? [] : finalVideoUrls;
       const finalFolderValue = isForceUndocumented ? null : finalFolder;
+      const finalHandledAt = isForceUndocumented ? null : (handledInfo?.completed_at || null);
       
       consolidatedDamages.push({
         id: leg.id,
@@ -407,6 +414,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         handled_by: finalHandledBy,
         handled_photo_urls: finalHandledPhotoUrls,
         handled_video_urls: finalHandledVideoUrls,
+        handled_at: finalHandledAt,
       });
     }
   }

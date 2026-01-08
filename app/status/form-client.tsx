@@ -1029,6 +1029,9 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
       <div className="damage-info">
         <span className="damage-type">{damage.skadetyp}</span>
         <span className="damage-date">{damage.datum}</span>
+        {damage.status && (
+          <span className="damage-status">{damage.status}</span>
+        )}
         {damage.sourceInfo && (
           <span className="damage-source" style={{ whiteSpace: 'pre-line' }}>
             {damage.sourceInfo}
@@ -1075,7 +1078,9 @@ const HistoryItem: React.FC<{
       record.nybilDetaljer.mediaLankar.rokning
     ))
   );
-  const isNonExpandable = isBuhsSkada || (isNybil && !nybilHasExpandableContent);
+  // Make BUHS skada expandable if it has a media folder
+  const buhsHasExpandableContent = isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder;
+  const isNonExpandable = (isBuhsSkada && !buhsHasExpandableContent) || (isNybil && !nybilHasExpandableContent);
 
   return (
     <div className="history-item-expandable">
@@ -1092,7 +1097,7 @@ const HistoryItem: React.FC<{
           {isBuhsSkada && record.buhsSkadaDetaljer && (
             <span className="history-buhs-label">{record.buhsSkadaDetaljer.skadetyp}</span>
           )}
-          {isBuhsSkada && (
+          {isBuhsSkada && record.sammanfattning && (
             <span className="history-buhs-summary">{record.sammanfattning}</span>
           )}
           <span className="history-date-label">{record.datum}</span>
@@ -1288,7 +1293,9 @@ const HistoryItem: React.FC<{
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
                 {record.checkinDetaljer.skador.map((skada, idx) => (
                   <li key={idx}>
-                    {skada.isDocumentedOlder && skada.originalDamageDate ? (
+                    {skada.handledStatus ? (
+                      <>{skada.typ}. {skada.handledStatus}</>
+                    ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
                       <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
                     ) : (
                       <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
@@ -1401,6 +1408,20 @@ const HistoryItem: React.FC<{
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          
+          {/* For BUHS skada with media */}
+          {record.typ === 'buhs_skada' && record.buhsSkadaDetaljer?.mediaFolder && (
+            <div style={{ marginTop: '0.5rem' }}>
+              <a 
+                href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: '#1a73e8', fontWeight: 500 }}
+              >
+                📁 Visa media
+              </a>
             </div>
           )}
         </div>
