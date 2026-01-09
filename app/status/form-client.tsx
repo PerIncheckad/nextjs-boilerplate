@@ -1098,7 +1098,7 @@ const HistoryItem: React.FC<{
             <span className="history-buhs-label">{record.buhsSkadaDetaljer.skadetyp}</span>
           )}
           {isBuhsSkada && record.sammanfattning && (
-            <span className="history-buhs-summary">{record.sammanfattning}</span>
+            <span className="history-buhs-summary" style={{ whiteSpace: 'pre-line' }}>{record.sammanfattning}</span>
           )}
           <span className="history-date-label">{record.datum}</span>
         </div>
