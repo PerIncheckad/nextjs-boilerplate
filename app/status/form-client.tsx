@@ -1428,15 +1428,6 @@ const HistoryItem: React.FC<{
               </a>
             </div>
           )}
-          
-          {/* For BUHS skada with original BUHS text */}
-          {record.typ === 'buhs_skada' && record.buhsSkadaDetaljer?.buhsOriginalText && (
-            <div style={{ marginTop: '0.5rem', fontStyle: 'italic', color: '#666' }}>
-              <strong>Ursprunglig beskrivning i BUHS:</strong>
-              <br />
-              "{record.buhsSkadaDetaljer.buhsOriginalText}"
-            </div>
-          )}
         </div>
       )}
     </div>
