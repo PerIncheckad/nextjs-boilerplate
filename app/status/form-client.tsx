@@ -1853,6 +1853,12 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       margin-left: auto;
     }
 
+    .history-buhs-summary {
+      display: block;
+      width: 100%;
+      text-align: left;
+    }
+
     .history-toggle-icon {
       font-size: 0.875rem;
       color: var(--color-text-secondary);
