@@ -39,12 +39,13 @@ export async function compressImage(file: File): Promise<File> {
     const img = await loadImage(file);
     const needsDimensionCompression = Math.max(img.width, img.height) > MAX_DIMENSION;
     
-    // If file is already good, return original
+    // If file is already good, return original with preserved extension
     if (!needsSizeCompression && !needsDimensionCompression) {
       console.log(`Image ${file.name} is already optimized (${formatBytes(file.size)}, ${img.width}x${img.height})`);
-      return file;
+      return file; // Return original - no compression needed
     }
 
+    // File needs compression - proceed with Canvas API compression
     console.log(`Compressing image ${file.name} (${formatBytes(file.size)}, ${img.width}x${img.height})...`);
 
     // Calculate new dimensions maintaining aspect ratio
@@ -83,9 +84,10 @@ export async function compressImage(file: File): Promise<File> {
     }
 
     // Create new File object from blob
+    // Note: Extension changed to .jpg since we're converting to JPEG format
     const compressedFile = new File(
       [compressedBlob],
-      file.name.replace(/\.[^.]+$/, '.jpg'), // Change extension to .jpg
+      file.name.replace(/\.[^.]+$/, '.jpg'),
       { type: 'image/jpeg', lastModified: Date.now() }
     );
 
