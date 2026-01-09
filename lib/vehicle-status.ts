@@ -429,8 +429,8 @@ function formatBuhsDamageText(text: string | null | undefined): string {
 // Helper to format not_found status message
 function formatNotFoundStatus(comment: string, checkerName: string, checkinDateTime: string): string {
   return comment 
-    ? `Gick ej att dokumentera "${comment}" (${checkerName}, ${checkinDateTime})` 
-    : `Gick ej att dokumentera (${checkerName}, ${checkinDateTime})`;
+    ? `Gick ej att dokumentera. "${comment}" (${checkerName}, ${checkinDateTime})` 
+    : `Gick ej att dokumentera. (${checkerName}, ${checkinDateTime})`;
 }
 
 function getFirstNameFromEmail(email: string): string {
@@ -1278,16 +1278,39 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
       }
       
-      // Match damages from damageRecords to this checkin by date
-      // Use the same damageRecords that powers the "Skador" section
+      // Match damages from damageRecords to this checkin
+      // Include: 1) damages by date matching, 2) BUHS damages where checkinWhereDocumented matches this checkin
       const checkinDateStr = checkin.completed_at || checkin.created_at;
-      const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
-        // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
-        const checkinDate = new Date(checkinDateStr);
-        if (isNaN(checkinDate.getTime())) return false;
-        const checkinYMD = checkinDate.toISOString().split('T')[0];
-        return damage.datum === checkinYMD;
-      }) : [];
+      const matchedDamages = damageRecords.filter(damage => {
+        // Match BUHS damages that were handled in this checkin
+        if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+          return true;
+        }
+        
+        // Match damages by date: damage.datum should match checkin date (YYYY-MM-DD)
+        if (checkinDateStr) {
+          const checkinDate = new Date(checkinDateStr);
+          if (!isNaN(checkinDate.getTime())) {
+            const checkinYMD = checkinDate.toISOString().split('T')[0];
+            if (damage.datum === checkinYMD) {
+              return true;
+            }
+          }
+        }
+        
+        return false;
+      });
+      
+      if (shouldDebug) {
+        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched damages:`, matchedDamages.map(d => ({
+          id: d.id,
+          skadetyp: d.skadetyp,
+          source: d.source,
+          is_handled: d.is_handled,
+          checkinWhereDocumented: d.checkinWhereDocumented,
+          handledStatus: d.source === 'legacy' && d.is_handled ? d.status : undefined,
+        })));
+      }
       
       // Track which damages are shown in this checkin
       matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -1361,6 +1384,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
         const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
         
+        if (shouldDebug && isGEU29F) {
+          console.log(`[DEBUG ${cleanedRegnr}] GEU29F SKADA event decision for damage ${damage.id}:`, {
+            skadetyp: damage.skadetyp,
+            isHandled,
+            isUnmatchedBuhs,
+            shownInCheckin: damagesShownInCheckins.has(damage.id),
+            shouldCreateEvent,
+          });
+        }
+        
         if (shouldCreateEvent) {
           // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
           // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
@@ -1373,7 +1406,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             // Documented or existing damage - show status and append original BUHS text
             sammanfattning = damage.status;
             if (damage.legacy_buhs_text) {
-              sammanfattning += `\nUrsprunglig beskrivning i BUHS: ${damage.legacy_buhs_text}`;
+              sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n"${damage.legacy_buhs_text}"`;
             }
           } else if (damage.is_unmatched_buhs) {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
@@ -2047,16 +2080,39 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
     }
     
-    // Match damages from damageRecords to this checkin by date
-    // Use the same damageRecords that powers the "Skador" section
+    // Match damages from damageRecords to this checkin
+    // Include: 1) damages by date matching, 2) BUHS damages where checkinWhereDocumented matches this checkin
     const checkinDateStr = checkin.completed_at || checkin.created_at;
-    const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
-      // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
-      const checkinDate = new Date(checkinDateStr);
-      if (isNaN(checkinDate.getTime())) return false;
-      const checkinYMD = checkinDate.toISOString().split('T')[0];
-      return damage.datum === checkinYMD;
-    }) : [];
+    const matchedDamages = damageRecords.filter(damage => {
+      // Match BUHS damages that were handled in this checkin
+      if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+        return true;
+      }
+      
+      // Match damages by date: damage.datum should match checkin date (YYYY-MM-DD)
+      if (checkinDateStr) {
+        const checkinDate = new Date(checkinDateStr);
+        if (!isNaN(checkinDate.getTime())) {
+          const checkinYMD = checkinDate.toISOString().split('T')[0];
+          if (damage.datum === checkinYMD) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    });
+    
+    if (shouldDebug) {
+      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched damages:`, matchedDamages.map(d => ({
+        id: d.id,
+        skadetyp: d.skadetyp,
+        source: d.source,
+        is_handled: d.is_handled,
+        checkinWhereDocumented: d.checkinWhereDocumented,
+        handledStatus: d.source === 'legacy' && d.is_handled ? d.status : undefined,
+      })));
+    }
     
     // Track which damages are shown in this checkin
     matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -2199,6 +2255,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
       const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
       
+      if (shouldDebug && isGEU29F) {
+        console.log(`[DEBUG ${cleanedRegnr}] GEU29F SKADA event decision for damage ${damage.id}:`, {
+          skadetyp: damage.skadetyp,
+          isHandled,
+          isUnmatchedBuhs,
+          shownInCheckin: damagesShownInCheckins.has(damage.id),
+          shouldCreateEvent,
+        });
+      }
+      
       if (shouldCreateEvent) {
         // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
         // The status reflects whether it was matched to checkin_damages (documented/not_found/existing)
@@ -2211,7 +2277,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // Documented or existing damage - show status and append original BUHS text
           sammanfattning = damage.status;
           if (damage.legacy_buhs_text) {
-            sammanfattning += `\nUrsprunglig beskrivning i BUHS: ${damage.legacy_buhs_text}`;
+            sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n"${damage.legacy_buhs_text}"`;
           }
         } else if (damage.is_unmatched_buhs) {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
