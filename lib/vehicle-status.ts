@@ -829,11 +829,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       bilmarkeModell: latestCheckin?.car_model || '---',
       
       // Senast incheckad vid: from latest checkin with datetime and checker
-      bilenStarNu: latestCheckin?.current_city && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-        ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
-        : latestCheckin?.current_city && latestCheckin?.current_station
-          ? `${latestCheckin.current_city} / ${latestCheckin.current_station}`
-          : '---',
+      // Show datetime even if city/station is missing
+      bilenStarNu: latestCheckin?.completed_at || latestCheckin?.created_at
+        ? latestCheckin?.current_city && latestCheckin?.current_station
+          ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
+          : `${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'}`
+        : '---',
       
       // Mätarställning: from latest checkin
       matarstallning: latestCheckin?.odometer_km
@@ -1279,37 +1280,62 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       // Match damages from damageRecords to this checkin
-      // Include: 1) damages by date matching, 2) BUHS damages where checkinWhereDocumented matches this checkin
+      // For BUHS damages: filter allCheckinDamages by checkin_id and match to damageRecords
+      // For new damages: match by date
       const checkinDateStr = checkin.completed_at || checkin.created_at;
-      const matchedDamages = damageRecords.filter(damage => {
-        // Match BUHS damages that were handled in this checkin
+      
+      // Get checkin_damages for this specific checkin
+      const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
+      
+      // Match BUHS damages that were handled in this checkin
+      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+        // Find the corresponding BUHS damage in damageRecords by matching damage_type
+        // The BUHS damage should already be in damageRecords with the right skadetyp and status
+        return damageRecords.find(damage => 
+          damage.source === 'legacy' && 
+          damage.checkinWhereDocumented === checkin.id &&
+          (damage.skadetyp.includes(cd.damage_type || '') || 
+           damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
+        );
+      }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+      
+      // Also match damages by date (for new damages created during this checkin)
+      const matchedDateDamages = checkinDateStr ? damageRecords.filter(damage => {
+        // Skip BUHS damages already matched above
         if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
-          return true;
+          return false;
         }
         
-        // Match damages by date: damage.datum should match checkin date (YYYY-MM-DD)
-        if (checkinDateStr) {
-          const checkinDate = new Date(checkinDateStr);
-          if (!isNaN(checkinDate.getTime())) {
-            const checkinYMD = checkinDate.toISOString().split('T')[0];
-            if (damage.datum === checkinYMD) {
-              return true;
-            }
+        // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
+        const checkinDate = new Date(checkinDateStr);
+        if (!isNaN(checkinDate.getTime())) {
+          const checkinYMD = checkinDate.toISOString().split('T')[0];
+          if (damage.datum === checkinYMD) {
+            return true;
           }
         }
         
         return false;
-      });
+      }) : [];
+      
+      // Combine both types of matches
+      const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
       
       if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched damages:`, matchedDamages.map(d => ({
+        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} checkin_damages:`, checkinDamagesForThisCheckin.map(cd => ({
+          id: cd.id,
+          type: cd.type,
+          damage_type: cd.damage_type,
+          description: cd.description,
+        })));
+        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched BUHS damages:`, matchedBuhsDamages.map(d => ({
           id: d.id,
           skadetyp: d.skadetyp,
           source: d.source,
           is_handled: d.is_handled,
-          checkinWhereDocumented: d.checkinWhereDocumented,
           handledStatus: d.source === 'legacy' && d.is_handled ? d.status : undefined,
         })));
+        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} total matched damages:`, matchedDamages.length);
       }
       
       // Track which damages are shown in this checkin
@@ -1471,13 +1497,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           : '---',
     
     // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
-    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
-      : latestCheckin?.current_ort && latestCheckin?.current_station
-        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
-        : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
-          ? `${nybilData.plats_aktuell_ort} / ${nybilData.plats_aktuell_station}`
-          : '---',
+    // Show datetime even if city/station is missing
+    bilenStarNu: latestCheckin?.completed_at || latestCheckin?.created_at
+      ? latestCheckin?.current_ort && latestCheckin?.current_station
+        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
+        : `${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')}`
+      : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
+        ? `${nybilData.plats_aktuell_ort} / ${nybilData.plats_aktuell_station}`
+        : '---',
     
     // Mätarställning: checkins.odometer_km (senaste) → nybil_inventering.matarstallning_aktuell
     matarstallning: latestCheckin?.odometer_km
@@ -2081,37 +2108,62 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     // Match damages from damageRecords to this checkin
-    // Include: 1) damages by date matching, 2) BUHS damages where checkinWhereDocumented matches this checkin
+    // For BUHS damages: filter allCheckinDamages by checkin_id and match to damageRecords
+    // For new damages: match by date
     const checkinDateStr = checkin.completed_at || checkin.created_at;
-    const matchedDamages = damageRecords.filter(damage => {
-      // Match BUHS damages that were handled in this checkin
+    
+    // Get checkin_damages for this specific checkin
+    const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
+    
+    // Match BUHS damages that were handled in this checkin
+    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+      // Find the corresponding BUHS damage in damageRecords by matching damage_type
+      // The BUHS damage should already be in damageRecords with the right skadetyp and status
+      return damageRecords.find(damage => 
+        damage.source === 'legacy' && 
+        damage.checkinWhereDocumented === checkin.id &&
+        (damage.skadetyp.includes(cd.damage_type || '') || 
+         damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
+      );
+    }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+    
+    // Also match damages by date (for new damages created during this checkin)
+    const matchedDateDamages = checkinDateStr ? damageRecords.filter(damage => {
+      // Skip BUHS damages already matched above
       if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
-        return true;
+        return false;
       }
       
-      // Match damages by date: damage.datum should match checkin date (YYYY-MM-DD)
-      if (checkinDateStr) {
-        const checkinDate = new Date(checkinDateStr);
-        if (!isNaN(checkinDate.getTime())) {
-          const checkinYMD = checkinDate.toISOString().split('T')[0];
-          if (damage.datum === checkinYMD) {
-            return true;
-          }
+      // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
+      const checkinDate = new Date(checkinDateStr);
+      if (!isNaN(checkinDate.getTime())) {
+        const checkinYMD = checkinDate.toISOString().split('T')[0];
+        if (damage.datum === checkinYMD) {
+          return true;
         }
       }
       
       return false;
-    });
+    }) : [];
+    
+    // Combine both types of matches
+    const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
     
     if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched damages:`, matchedDamages.map(d => ({
+      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} checkin_damages:`, checkinDamagesForThisCheckin.map(cd => ({
+        id: cd.id,
+        type: cd.type,
+        damage_type: cd.damage_type,
+        description: cd.description,
+      })));
+      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched BUHS damages:`, matchedBuhsDamages.map(d => ({
         id: d.id,
         skadetyp: d.skadetyp,
         source: d.source,
         is_handled: d.is_handled,
-        checkinWhereDocumented: d.checkinWhereDocumented,
         handledStatus: d.source === 'legacy' && d.is_handled ? d.status : undefined,
       })));
+      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} total matched damages:`, matchedDamages.length);
     }
     
     // Track which damages are shown in this checkin
