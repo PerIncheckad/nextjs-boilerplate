@@ -1835,19 +1835,11 @@ export default function NybilForm() {
         {needsLaddkablar && (
           <>
             <Field label="Antal laddkablar *">
-              {isHybrid ? (
-                <div className="grid-3-col">
-                  <ChoiceButton onClick={() => { setAntalLaddkablar(0); setLaddkablarForvaringOrt(''); setLaddkablarForvaringSpec(''); }} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
-                  <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
-                  <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
-                </div>
-              ) : (
-                <div className="grid-3-col">
-                  <ChoiceButton onClick={() => { setAntalLaddkablar(0); setLaddkablarForvaringOrt(''); setLaddkablarForvaringSpec(''); }} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
-                  <ChoiceButton onClick={() => { setAntalLaddkablar(1); setLaddkablarForvaringOrt(''); setLaddkablarForvaringSpec(''); }} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
-                  <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
-                </div>
-              )}
+              <div className="grid-3-col">
+                <ChoiceButton onClick={() => { setAntalLaddkablar(0); setLaddkablarForvaringOrt(''); setLaddkablarForvaringSpec(''); }} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
+                <ChoiceButton onClick={() => { setAntalLaddkablar(1); if (isElectric) { setLaddkablarForvaringOrt(''); setLaddkablarForvaringSpec(''); } }} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
+                <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
+              </div>
             </Field>
             {laddkablarNeedsStorage && (
               <>
