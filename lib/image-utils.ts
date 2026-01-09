@@ -20,6 +20,10 @@ const MAX_FILE_SIZE = 8 * 1024 * 1024; // 8 MB (margin under 10 MB)
  * - If image is ≤8 MB AND dimensions ≤2048px → return original
  * - Otherwise → scale down and compress with Canvas API
  * - If compression fails → return original (no blocking)
+ * 
+ * Note: This function may take a few seconds for large images. 
+ * Consider adding UI feedback (spinner/loading state) when calling this function
+ * to provide better user experience, especially for images >5 MB.
  */
 export async function compressImage(file: File): Promise<File> {
   // Only process image files
@@ -114,13 +118,21 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
+    
+    // Set a timeout to prevent memory leaks from abandoned URLs
+    const timeoutId = setTimeout(() => {
+      URL.revokeObjectURL(url);
+      reject(new Error(`Image loading timeout for: ${file.name}`));
+    }, 30000); // 30 second timeout
 
     img.onload = () => {
+      clearTimeout(timeoutId);
       URL.revokeObjectURL(url);
       resolve(img);
     };
 
     img.onerror = () => {
+      clearTimeout(timeoutId);
       URL.revokeObjectURL(url);
       reject(new Error(`Failed to load image: ${file.name}`));
     };
