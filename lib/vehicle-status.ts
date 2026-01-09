@@ -917,7 +917,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
     
     // First pass: Add matched BUHS damages only
-    for (const d of legacyDamages) {
+    for (let i = 0; i < legacyDamages.length; i++) {
+      const d = legacyDamages[i];
       // For GEU29F and other force-undocumented vehicles, skip text+date deduplication
       // Only deduplicate by actual database ID to show all damages
       if (processedBuhsIds.has(d.id)) {
@@ -1088,7 +1089,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       damageRecords.push({
-        id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
+        id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
@@ -1108,7 +1109,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     // Second pass: Add unmatched BUHS damages with "(BUHS)" suffix
-    for (const d of legacyDamages) {
+    for (let i = 0; i < legacyDamages.length; i++) {
+      const d = legacyDamages[i];
       if (matchedBuhsDamageIds.has(d.id)) {
         if (shouldDebug && isGEU29F) {
           console.log(`[DEBUG ${cleanedRegnr}] Second pass - BUHS ${d.id} already matched, skipping`);
@@ -1172,7 +1174,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       damageRecords.push({
-        id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
+        id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
@@ -1664,7 +1666,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Build set of legacy damage keys (regnr + damage_date) from RPC
   // to filter out duplicates in damages table
   const legacyDamageKeys = new Set<string>();
-  for (const d of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const d = legacyDamages[i];
     const key = `${cleanedRegnr}-${formatDate(d.damage_date)}`;
     legacyDamageKeys.add(key);
   }
@@ -1701,7 +1704,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
   
   // First pass: Add matched BUHS damages only
-  for (const d of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const d = legacyDamages[i];
     // For GEU29F and other force-undocumented vehicles, skip text+date deduplication
     // Only deduplicate by actual database ID to show all damages
     if (processedBuhsIds.has(d.id)) {
@@ -1926,7 +1930,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     damageRecords.push({
-      id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
+      id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
@@ -1946,7 +1950,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
   
   // Second pass: Add unmatched BUHS damages with "(BUHS)" suffix
-  for (const d of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const d = legacyDamages[i];
     if (matchedBuhsDamageIds.has(d.id)) {
       if (shouldDebug && isGEU29F) {
         console.log(`[DEBUG ${cleanedRegnr}] Second pass - BUHS ${d.id} already matched, skipping`);
@@ -2010,7 +2015,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     damageRecords.push({
-      id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
+      id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
