@@ -1088,7 +1088,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       damageRecords.push({
-        id: d.id,
+        id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
@@ -1172,7 +1172,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       damageRecords.push({
-        id: d.id,
+        id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
@@ -1926,7 +1926,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     damageRecords.push({
-      id: d.id,
+      id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
@@ -2010,7 +2010,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     damageRecords.push({
-      id: d.id,
+      id: d.id || `legacy-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
