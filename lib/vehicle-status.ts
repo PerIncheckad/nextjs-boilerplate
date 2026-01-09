@@ -1110,7 +1110,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Second pass: Add unmatched BUHS damages with "(BUHS)" suffix
     for (const d of legacyDamages) {
       if (matchedBuhsDamageIds.has(d.id)) {
+        if (shouldDebug && isGEU29F) {
+          console.log(`[DEBUG ${cleanedRegnr}] Second pass - BUHS ${d.id} already matched, skipping`);
+        }
         continue; // Skip already matched BUHS damages
+      }
+      
+      if (shouldDebug && isGEU29F) {
+        const legacyText = getLegacyDamageText(d);
+        console.log(`[DEBUG ${cleanedRegnr}] Second pass - unmatched BUHS:`, {
+          id: d.id,
+          legacyText: legacyText.substring(0, 30),
+          alreadyMatched: matchedBuhsDamageIds.has(d.id),
+        });
       }
       
       const legacyText = getLegacyDamageText(d);
@@ -1401,6 +1413,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Create a separate history event for each BUHS damage (source='legacy')
     // For handled damages (documented/not_found/existing), always create SKADA event
     // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
+    
+    if (shouldDebug && isGEU29F) {
+      console.log(`[DEBUG ${cleanedRegnr}] damageRecords before SKADA loop:`, damageRecords.length);
+      console.log(`[DEBUG ${cleanedRegnr}] legacy damageRecords:`, damageRecords.filter(d => d.source === 'legacy').map(d => ({
+        id: d.id,
+        skadetyp: d.skadetyp,
+        status: d.status,
+        is_handled: d.is_handled,
+        is_unmatched_buhs: d.is_unmatched_buhs,
+      })));
+    }
+    
     for (const damage of damageRecords) {
       if (damage.source === 'legacy') {
         // Determine if this damage should get a SKADA event
@@ -1924,7 +1948,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Second pass: Add unmatched BUHS damages with "(BUHS)" suffix
   for (const d of legacyDamages) {
     if (matchedBuhsDamageIds.has(d.id)) {
+      if (shouldDebug && isGEU29F) {
+        console.log(`[DEBUG ${cleanedRegnr}] Second pass - BUHS ${d.id} already matched, skipping`);
+      }
       continue; // Skip already matched BUHS damages
+    }
+    
+    if (shouldDebug && isGEU29F) {
+      const legacyText = getLegacyDamageText(d);
+      console.log(`[DEBUG ${cleanedRegnr}] Second pass - unmatched BUHS:`, {
+        id: d.id,
+        legacyText: legacyText.substring(0, 30),
+        alreadyMatched: matchedBuhsDamageIds.has(d.id),
+      });
     }
     
     const legacyText = getLegacyDamageText(d);
@@ -2298,6 +2334,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Create a separate history event for each BUHS damage (source='legacy')
   // For handled damages (documented/not_found/existing), always create SKADA event
   // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
+  
+  if (shouldDebug && isGEU29F) {
+    console.log(`[DEBUG ${cleanedRegnr}] damageRecords before SKADA loop:`, damageRecords.length);
+    console.log(`[DEBUG ${cleanedRegnr}] legacy damageRecords:`, damageRecords.filter(d => d.source === 'legacy').map(d => ({
+      id: d.id,
+      skadetyp: d.skadetyp,
+      status: d.status,
+      is_handled: d.is_handled,
+      is_unmatched_buhs: d.is_unmatched_buhs,
+    })));
+  }
+  
   for (const damage of damageRecords) {
     if (damage.source === 'legacy') {
       // Determine if this damage should get a SKADA event
