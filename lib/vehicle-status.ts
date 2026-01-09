@@ -1429,6 +1429,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     for (const damage of damageRecords) {
       if (damage.source === 'legacy') {
+        if (shouldDebug && isGEU29F) {
+          console.log(`[DEBUG ${cleanedRegnr}] Processing legacy damage:`, damage.id);
+        }
+        
         // Determine if this damage should get a SKADA event
         const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
         const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
@@ -1485,6 +1489,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
               mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
             },
           });
+          
+          if (shouldDebug && isGEU29F) {
+            console.log(`[DEBUG ${cleanedRegnr}] Created SKADA event for:`, damage.id);
+          }
         }
       }
     }
@@ -2353,6 +2361,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   for (const damage of damageRecords) {
     if (damage.source === 'legacy') {
+      if (shouldDebug && isGEU29F) {
+        console.log(`[DEBUG ${cleanedRegnr}] Processing legacy damage:`, damage.id);
+      }
+      
       // Determine if this damage should get a SKADA event
       const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
       const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
@@ -2409,6 +2421,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
         },
       });
+        
+        if (shouldDebug && isGEU29F) {
+          console.log(`[DEBUG ${cleanedRegnr}] Created SKADA event for:`, damage.id);
+        }
+      }
     }
   }
 
@@ -2492,5 +2509,4 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     nybilPhotos,
     nybilFullData,
   };
-}
 }
