@@ -744,23 +744,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // This uses service role on the server to bypass RLS issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
   
-  // Debug logging for specific regnr
-  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F', 'TLJ05S', 'NPN32L', 'JBD26N'];
-  const shouldDebug = debugRegnrs.includes(cleanedRegnr);
-  
-  if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] checkinIds:`, checkinIds);
-  }
-  
   let allCheckinDamages: CheckinDamageData[] = [];
   
   // Fetch checkin_damages via API route (server-side with service role)
   if (checkinIds.length > 0) {
     try {
-      if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] Calling /api/checkin-damages...`);
-      }
-      
       const apiResponse = await fetch(`/api/checkin-damages?regnr=${encodeURIComponent(cleanedRegnr)}`);
       
       if (!apiResponse.ok) {
@@ -769,30 +757,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       } else {
         const apiData = await apiResponse.json();
         
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] API /checkin-damages response:`, {
-            dataLength: apiData.data?.length || 0,
-            checkinIds: apiData.checkinIds,
-          });
-        }
-        
         // Filter to only documented/not_found/existing types in code
         const rawData = (apiData.data || []) as CheckinDamageData[];
         allCheckinDamages = rawData.filter(cd => 
           cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
         );
-        
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Filtered checkin_damages (documented/not_found/existing):`, allCheckinDamages.length);
-        }
       }
     } catch (err) {
       console.error(`[ERROR ${cleanedRegnr}] Failed to call /api/checkin-damages:`, err);
       // Continue with empty array
       allCheckinDamages = [];
     }
-  } else if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] No checkins found, skipping checkin_damages fetch`);
   }
   
   // Get saludatum from legacy damages if available
@@ -1324,23 +1299,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Combine both types of matches
       const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
       
-      if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} checkin_damages:`, checkinDamagesForThisCheckin.map(cd => ({
-          id: cd.id,
-          type: cd.type,
-          damage_type: cd.damage_type,
-          description: cd.description,
-        })));
-        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched BUHS damages:`, matchedBuhsDamages.map(d => ({
-          id: d.id,
-          skadetyp: d.skadetyp,
-          source: d.source,
-          is_handled: d.is_handled,
-          handledStatus: d.source === 'legacy' && d.is_handled ? d.status : undefined,
-        })));
-        console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} total matched damages:`, matchedDamages.length);
-      }
-      
       // Track which damages are shown in this checkin
       matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
       
@@ -1425,7 +1383,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           let sammanfattning: string;
           if (damage.status?.startsWith('Dokumenterad')) {
             // Documented or existing damage - show status and append original BUHS text
-            sammanfattning = damage.status;
+            sammanfattning = damage.status + '.';
             if (damage.legacy_buhs_text) {
               sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n\n"${damage.legacy_buhs_text}"`;
             }
@@ -1645,25 +1603,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // NEW: Match BUHS damages with checkin_damages
   // ==================================================================
   
-  // shouldDebug is already defined earlier, reuse it
-  if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] BUHS damages count:`, legacyDamages.length);
-    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages count:`, allCheckinDamages.length);
-    console.log(`[DEBUG ${cleanedRegnr}] BUHS damages:`, legacyDamages.map(d => ({
-      id: d.id,
-      damage_type_raw: d.damage_type_raw,
-      note_customer: d.note_customer,
-      note_internal: d.note_internal,
-      damage_date: d.damage_date,
-    })));
-    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages:`, allCheckinDamages.map(cd => ({
-      id: cd.id,
-      type: cd.type,
-      damage_type: cd.damage_type,
-      description: cd.description?.substring(0, 50),
-    })));
-  }
-  
   // Build damage records from legacy damages (BUHS) merged with checkin_damages
   const damageRecords: DamageRecord[] = [];
   const matchedCheckinDamageIds = new Set<number>(); // Track which checkin_damages we've matched
@@ -1718,14 +1657,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         matchedCheckinDamageIds.add(cd.id);
         matchedLegacyTexts.add(legacyText); // Track matched BUHS text
         matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
-        
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Text match for BUHS ${d.id}:`, {
-            matched_cd_id: cd.id,
-            matched_cd_type: cd.type,
-            matched_cd_desc: cd.description?.substring(0, 50),
-          });
-        }
         break;
       }
     }
@@ -1744,14 +1675,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
                normalizedCdType === normalizedBuhsType;
       });
       
-      if (shouldDebug && candidatesForLooseMatch.length > 0) {
-        console.log(`[DEBUG ${cleanedRegnr}] Loose match candidates for BUHS ${d.id}:`, candidatesForLooseMatch.map(cd => ({
-          id: cd.id,
-          type: cd.type,
-          damage_type: cd.damage_type,
-        })));
-      }
-      
       // If we have candidates, use the first one (even if multiple exist)
       // This handles cases where multiple checkin_damages have the same damage_type
       if (candidatesForLooseMatch.length > 0) {
@@ -1760,13 +1683,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           matchedCheckinDamageIds.add(matchedCheckinDamage.id);
           matchedLegacyTexts.add(legacyText); // Track matched BUHS text
           matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
-        }
-        
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Loose match for BUHS ${d.id}:`, {
-            matched_cd_id: matchedCheckinDamage.id,
-            matched_cd_type: matchedCheckinDamage.type,
-          });
         }
       }
     }
@@ -1783,18 +1699,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         matchedCheckinDamageIds.add(unmatchedExisting.id);
         matchedLegacyTexts.add(legacyText); // Track matched BUHS text
         matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
-        
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Fallback match for BUHS ${d.id} using unmatched existing:`, {
-            matched_cd_id: unmatchedExisting.id,
-            matched_cd_type: unmatchedExisting.type,
-          });
-        }
       }
-    }
-    
-    if (shouldDebug && !matchedCheckinDamage) {
-      console.log(`[DEBUG ${cleanedRegnr}] No match for BUHS ${d.id}`);
     }
     
     // Only process and add matched BUHS damages in this loop
@@ -1855,14 +1760,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         if (damageEntry && damageEntry.uploads) {
           folder = (damageEntry.uploads as any).folder;
         }
-      }
-      
-      if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] Media folder for BUHS ${d.id}:`, {
-          folder,
-          photo_urls_count: matchedCheckinDamage.photo_urls?.length || 0,
-          source: folder ? 'extracted' : 'none',
-        });
       }
       
       // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
@@ -2146,23 +2043,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Combine both types of matches
     const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
-    
-    if (shouldDebug) {
-      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} checkin_damages:`, checkinDamagesForThisCheckin.map(cd => ({
-        id: cd.id,
-        type: cd.type,
-        damage_type: cd.damage_type,
-        description: cd.description,
-      })));
-      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} matched BUHS damages:`, matchedBuhsDamages.map(d => ({
-        id: d.id,
-        skadetyp: d.skadetyp,
-        source: d.source,
-        is_handled: d.is_handled,
-        handledStatus: d.source === 'legacy' && d.is_handled ? d.status : undefined,
-      })));
-      console.log(`[DEBUG ${cleanedRegnr}] INCHECKNING ${checkin.id} total matched damages:`, matchedDamages.length);
-    }
     
     // Track which damages are shown in this checkin
     matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
