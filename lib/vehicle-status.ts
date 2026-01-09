@@ -1385,7 +1385,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             // Documented or existing damage - show status and append original BUHS text
             sammanfattning = damage.status;
             if (damage.legacy_buhs_text) {
-              sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n\n"${damage.legacy_buhs_text}"`;
+              sammanfattning += `\nUrsprunglig beskrivning i BUHS: "${damage.legacy_buhs_text}"`;
             }
           } else if (damage.is_unmatched_buhs) {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
@@ -2200,7 +2200,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // Documented or existing damage - show status and append original BUHS text
           sammanfattning = damage.status;
           if (damage.legacy_buhs_text) {
-            sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n\n"${damage.legacy_buhs_text}"`;
+            sammanfattning += `\nUrsprunglig beskrivning i BUHS: "${damage.legacy_buhs_text}"`;
           }
         } else if (damage.is_unmatched_buhs) {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
