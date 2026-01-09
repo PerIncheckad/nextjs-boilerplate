@@ -1098,14 +1098,7 @@ const HistoryItem: React.FC<{
             <span className="history-buhs-label">{record.buhsSkadaDetaljer.skadetyp}</span>
           )}
           {isBuhsSkada && record.sammanfattning && (
-            <span className="history-buhs-summary">
-              {record.sammanfattning.split('\n').map((line, idx, arr) => (
-                <React.Fragment key={idx}>
-                  {line}
-                  {idx < arr.length - 1 && <br />}
-                </React.Fragment>
-              ))}
-            </span>
+            <span className="history-buhs-summary">{record.sammanfattning}</span>
           )}
           <span className="history-date-label">{record.datum}</span>
         </div>
@@ -1433,6 +1426,15 @@ const HistoryItem: React.FC<{
               >
                 📁 Visa media
               </a>
+            </div>
+          )}
+          
+          {/* For BUHS skada with original BUHS text */}
+          {record.typ === 'buhs_skada' && record.buhsSkadaDetaljer?.buhsOriginalText && (
+            <div style={{ marginTop: '0.5rem', fontStyle: 'italic', color: '#666' }}>
+              <strong>Ursprunglig beskrivning i BUHS:</strong>
+              <br />
+              "{record.buhsSkadaDetaljer.buhsOriginalText}"
             </div>
           )}
         </div>
