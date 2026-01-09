@@ -1112,20 +1112,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     for (let i = 0; i < legacyDamages.length; i++) {
       const d = legacyDamages[i];
       if (matchedBuhsDamageIds.has(d.id)) {
-        if (shouldDebug && isGEU29F) {
-          console.log(`[DEBUG ${cleanedRegnr}] Second pass - BUHS ${d.id} already matched, skipping`);
-        }
         continue; // Skip already matched BUHS damages
       }
       
-      if (shouldDebug && isGEU29F) {
-        const legacyText = getLegacyDamageText(d);
-        console.log(`[DEBUG ${cleanedRegnr}] Second pass - unmatched BUHS:`, {
-          id: d.id,
-          legacyText: legacyText.substring(0, 30),
-          alreadyMatched: matchedBuhsDamageIds.has(d.id),
-        });
-      }
       
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
@@ -1416,22 +1405,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // For handled damages (documented/not_found/existing), always create SKADA event
     // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
     
-    if (shouldDebug && isGEU29F) {
-      console.log(`[DEBUG ${cleanedRegnr}] damageRecords before SKADA loop:`, damageRecords.length);
-      console.log(`[DEBUG ${cleanedRegnr}] legacy damageRecords:`, damageRecords.filter(d => d.source === 'legacy').map(d => ({
-        id: d.id,
-        skadetyp: d.skadetyp,
-        status: d.status,
-        is_handled: d.is_handled,
-        is_unmatched_buhs: d.is_unmatched_buhs,
-      })));
-    }
-    
     for (const damage of damageRecords) {
       if (damage.source === 'legacy') {
-        if (shouldDebug && isGEU29F) {
-          console.log(`[DEBUG ${cleanedRegnr}] Processing legacy damage:`, damage.id);
-        }
         
         // Determine if this damage should get a SKADA event
         const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
@@ -1439,16 +1414,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
         // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
         const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
-        
-        if (shouldDebug && isGEU29F) {
-          console.log(`[DEBUG ${cleanedRegnr}] GEU29F SKADA event decision for damage ${damage.id}:`, {
-            skadetyp: damage.skadetyp,
-            isHandled,
-            isUnmatchedBuhs,
-            shownInCheckin: damagesShownInCheckins.has(damage.id),
-            shouldCreateEvent,
-          });
-        }
         
         if (shouldCreateEvent) {
           // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
@@ -1462,7 +1427,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             // Documented or existing damage - show status and append original BUHS text
             sammanfattning = damage.status;
             if (damage.legacy_buhs_text) {
-              sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n"${damage.legacy_buhs_text}"`;
+              sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n\n"${damage.legacy_buhs_text}"`;
             }
           } else if (damage.is_unmatched_buhs) {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
@@ -1489,10 +1454,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
               mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
             },
           });
-          
-          if (shouldDebug && isGEU29F) {
-            console.log(`[DEBUG ${cleanedRegnr}] Created SKADA event for:`, damage.id);
-          }
         }
       }
     }
@@ -1961,19 +1922,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   for (let i = 0; i < legacyDamages.length; i++) {
     const d = legacyDamages[i];
     if (matchedBuhsDamageIds.has(d.id)) {
-      if (shouldDebug && isGEU29F) {
-        console.log(`[DEBUG ${cleanedRegnr}] Second pass - BUHS ${d.id} already matched, skipping`);
-      }
       continue; // Skip already matched BUHS damages
-    }
-    
-    if (shouldDebug && isGEU29F) {
-      const legacyText = getLegacyDamageText(d);
-      console.log(`[DEBUG ${cleanedRegnr}] Second pass - unmatched BUHS:`, {
-        id: d.id,
-        legacyText: legacyText.substring(0, 30),
-        alreadyMatched: matchedBuhsDamageIds.has(d.id),
-      });
     }
     
     const legacyText = getLegacyDamageText(d);
@@ -2348,22 +2297,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // For handled damages (documented/not_found/existing), always create SKADA event
   // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
   
-  if (shouldDebug && isGEU29F) {
-    console.log(`[DEBUG ${cleanedRegnr}] damageRecords before SKADA loop:`, damageRecords.length);
-    console.log(`[DEBUG ${cleanedRegnr}] legacy damageRecords:`, damageRecords.filter(d => d.source === 'legacy').map(d => ({
-      id: d.id,
-      skadetyp: d.skadetyp,
-      status: d.status,
-      is_handled: d.is_handled,
-      is_unmatched_buhs: d.is_unmatched_buhs,
-    })));
-  }
-  
   for (const damage of damageRecords) {
     if (damage.source === 'legacy') {
-      if (shouldDebug && isGEU29F) {
-        console.log(`[DEBUG ${cleanedRegnr}] Processing legacy damage:`, damage.id);
-      }
       
       // Determine if this damage should get a SKADA event
       const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
@@ -2371,16 +2306,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
       // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
       const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
-      
-      if (shouldDebug && isGEU29F) {
-        console.log(`[DEBUG ${cleanedRegnr}] GEU29F SKADA event decision for damage ${damage.id}:`, {
-          skadetyp: damage.skadetyp,
-          isHandled,
-          isUnmatchedBuhs,
-          shownInCheckin: damagesShownInCheckins.has(damage.id),
-          shouldCreateEvent,
-        });
-      }
       
       if (shouldCreateEvent) {
         // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
@@ -2394,7 +2319,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // Documented or existing damage - show status and append original BUHS text
           sammanfattning = damage.status;
           if (damage.legacy_buhs_text) {
-            sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n"${damage.legacy_buhs_text}"`;
+            sammanfattning += `\n\nUrsprunglig beskrivning i BUHS:\n\n"${damage.legacy_buhs_text}"`;
           }
         } else if (damage.is_unmatched_buhs) {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
@@ -2421,10 +2346,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
         },
       });
-        
-        if (shouldDebug && isGEU29F) {
-          console.log(`[DEBUG ${cleanedRegnr}] Created SKADA event for:`, damage.id);
-        }
       }
     }
   }

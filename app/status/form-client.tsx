@@ -1078,9 +1078,9 @@ const HistoryItem: React.FC<{
       record.nybilDetaljer.mediaLankar.rokning
     ))
   );
-  // Make BUHS skada expandable if it has a media folder
-  const buhsHasExpandableContent = isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder;
-  const isNonExpandable = (isBuhsSkada && !buhsHasExpandableContent) || (isNybil && !nybilHasExpandableContent);
+  // Make BUHS skada (SKADA events) always non-expandable (content shows directly in summary)
+  const buhsHasExpandableContent = false; // Always show SKADA content in collapsed view
+  const isNonExpandable = isBuhsSkada || (isNybil && !nybilHasExpandableContent);
 
   return (
     <div className="history-item-expandable">
@@ -1289,32 +1289,36 @@ const HistoryItem: React.FC<{
           {/* Damages registered at this checkin - shown after avvikelser */}
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              <strong style={{ color: '#B30E0E' }}>Skador registrerade vid denna incheckning:</strong>
+              <strong style={{ color: '#B30E0E' }}>Befintliga skador hanterade:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                {record.checkinDetaljer.skador.map((skada, idx) => (
-                  <li key={idx}>
-                    {skada.handledStatus ? (
-                      <>{skada.typ}. {skada.handledStatus}</>
-                    ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
-                      <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
-                    ) : (
-                      <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
-                    )}
-                    {skada.mediaUrl && (
-                      <span>
-                        {' '}
-                        <a 
-                          href={skada.mediaUrl} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
-                        >
-                          Visa media 📎
-                        </a>
-                      </span>
-                    )}
-                  </li>
-                ))}
+                {(() => {
+                  // Deduplicate damages by skadetyp to avoid showing same damage multiple times
+                  const uniqueSkador = [...new Map(record.checkinDetaljer.skador.map(s => [s.typ, s])).values()];
+                  return uniqueSkador.map((skada, idx) => (
+                    <li key={idx}>
+                      {skada.handledStatus ? (
+                        <>{skada.typ}. {skada.handledStatus}</>
+                      ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
+                        <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
+                      ) : (
+                        <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
+                      )}
+                      {skada.mediaUrl && (
+                        <span>
+                          {' '}
+                          <a 
+                            href={skada.mediaUrl} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
+                          >
+                            📁 Visa media
+                          </a>
+                        </span>
+                      )}
+                    </li>
+                  ));
+                })()}
               </ul>
             </div>
           )}
