@@ -6,6 +6,7 @@ import { VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 import { DAMAGE_OPTIONS } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
+import { compressImage } from '@/lib/image-utils';
 
 // =================================================================
 // 1. DATA, TYPES & HELPERS
@@ -297,7 +298,9 @@ const processFiles = async (files: FileList): Promise<MediaFile[]> => {
       const thumbnail = await createVideoThumbnail(file);
       return { file, type, thumbnail };
     }
-    return { file, type, preview: URL.createObjectURL(file) };
+    // Compress images before creating preview
+    const compressedFile = await compressImage(file);
+    return { file: compressedFile, type, preview: URL.createObjectURL(compressedFile) };
   }));
 };
 
