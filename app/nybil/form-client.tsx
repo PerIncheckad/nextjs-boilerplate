@@ -1721,11 +1721,11 @@ export default function NybilForm() {
         <SectionHeader title="Avtalsvillkor" />
         <Field label="Serviceintervall km *">
           <div className="grid-5-col">
-            <ChoiceButton onClick={() => { setServiceintervall(''); setServiceintervallAnnat(''); }} isActive={serviceintervall === ''} isSet={serviceintervall !== null}>Vet ej</ChoiceButton>
             <ChoiceButton onClick={() => { setServiceintervall('15000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '15000'} isSet={serviceintervall !== null}>15000</ChoiceButton>
             <ChoiceButton onClick={() => { setServiceintervall('25000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '25000'} isSet={serviceintervall !== null}>25000</ChoiceButton>
             <ChoiceButton onClick={() => { setServiceintervall('30000'); setServiceintervallAnnat(''); }} isActive={serviceintervall === '30000'} isSet={serviceintervall !== null}>30000</ChoiceButton>
             <ChoiceButton onClick={() => setServiceintervall('Annat')} isActive={serviceintervall === 'Annat'} isSet={serviceintervall !== null}>Annat</ChoiceButton>
+            <ChoiceButton onClick={() => { setServiceintervall(''); setServiceintervallAnnat(''); }} isActive={serviceintervall === ''} isSet={serviceintervall !== null}>Vet ej</ChoiceButton>
           </div>
         </Field>
         {serviceintervall === 'Annat' && (
@@ -1735,10 +1735,10 @@ export default function NybilForm() {
         )}
         <Field label="Max km/månad *">
           <div className="grid-4-col">
-            <ChoiceButton onClick={() => { setMaxKmManad(''); setMaxKmManadAnnat(''); }} isActive={maxKmManad === ''} isSet={maxKmManad !== null}>Vet ej</ChoiceButton>
             <ChoiceButton onClick={() => { setMaxKmManad('1200'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '1200'} isSet={maxKmManad !== null}>1200</ChoiceButton>
             <ChoiceButton onClick={() => { setMaxKmManad('3000'); setMaxKmManadAnnat(''); }} isActive={maxKmManad === '3000'} isSet={maxKmManad !== null}>3000</ChoiceButton>
             <ChoiceButton onClick={() => setMaxKmManad('Annat')} isActive={maxKmManad === 'Annat'} isSet={maxKmManad !== null}>Annat</ChoiceButton>
+            <ChoiceButton onClick={() => { setMaxKmManad(''); setMaxKmManadAnnat(''); }} isActive={maxKmManad === ''} isSet={maxKmManad !== null}>Vet ej</ChoiceButton>
           </div>
         </Field>
         {maxKmManad === 'Annat' && (
@@ -1748,10 +1748,10 @@ export default function NybilForm() {
         )}
         <Field label="Avgift över-km *">
           <div className="grid-4-col">
-            <ChoiceButton onClick={() => { setAvgiftOverKm(''); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === ''} isSet={avgiftOverKm !== null}>Vet ej</ChoiceButton>
             <ChoiceButton onClick={() => { setAvgiftOverKm('1'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '1'} isSet={avgiftOverKm !== null}>1 kr</ChoiceButton>
             <ChoiceButton onClick={() => { setAvgiftOverKm('2'); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === '2'} isSet={avgiftOverKm !== null}>2 kr</ChoiceButton>
             <ChoiceButton onClick={() => setAvgiftOverKm('Annat')} isActive={avgiftOverKm === 'Annat'} isSet={avgiftOverKm !== null}>Annat</ChoiceButton>
+            <ChoiceButton onClick={() => { setAvgiftOverKm(''); setAvgiftOverKmAnnat(''); }} isActive={avgiftOverKm === ''} isSet={avgiftOverKm !== null}>Vet ej</ChoiceButton>
           </div>
         </Field>
         {avgiftOverKm === 'Annat' && (
