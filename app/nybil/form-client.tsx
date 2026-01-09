@@ -287,7 +287,7 @@ export default function NybilForm() {
   const [attention, setAttention] = useState('');
   const [noteringForsaljning, setNoteringForsaljning] = useState('');
   
-  // Notes (ÖVRIGT)
+  // Notes (KOMMENTARER)
   const [anteckningar, setAnteckningar] = useState('');
   
   // Ready for rental (KLAR FÖR UTHYRNING)
@@ -1619,6 +1619,7 @@ export default function NybilForm() {
       {/* PLANERAD STATION Section */}
       <Card>
         <SectionHeader title="Planerad station" />
+        <p className="section-note">Frivillig sektion</p>
         <Field label="Planerad station">
           <select value={planeradStation} onChange={e => setPlaneradStation(e.target.value)}>
             <option value="">Välj planerad station</option>
@@ -2157,9 +2158,10 @@ export default function NybilForm() {
         )}
       </Card>
       
-      {/* ÖVRIGT Section */}
+      {/* KOMMENTARER Section */}
       <Card>
-        <SectionHeader title="Övrigt" />
+        <SectionHeader title="Kommentarer" />
+        <p className="section-note">Frivillig sektion</p>
         <Field label="Anteckningar (frivilligt)">
           <textarea value={anteckningar} onChange={e => setAnteckningar(e.target.value)} placeholder="Övrig information om bilen..." rows={4} />
         </Field>

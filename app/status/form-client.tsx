@@ -623,7 +623,7 @@ export default function StatusForm() {
                       : '---'}
                 </span>
               </Fragment>
-              <InfoRow label="Övrig info" value={vehicleStatus.vehicle.anteckningar} />
+              <InfoRow label="Kommentarer" value={vehicleStatus.vehicle.anteckningar} />
             </div>
           </Card>
         )}
