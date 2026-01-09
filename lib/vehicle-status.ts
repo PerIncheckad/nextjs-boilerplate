@@ -71,11 +71,16 @@ export type DamageRecord = {
   sourceInfo?: string; // e.g., "Källa: BUHS" or "Incheckad av Per Andersson 2025-12-03 14:30"
   // For BUHS damages (legacy)
   legacy_damage_source_text?: string | null;
+  legacy_buhs_text?: string | null; // Original BUHS description (combined from damage_type_raw, notes, etc.)
   original_damage_date?: string | null;
   // For documented BUHS damages - track where they were documented
   checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
   documentedBy?: string | null; // checker_name who documented it
   documentedDate?: string | null; // Date when damage was documented (checkin date)
+  // Flags for handled/inventoried status
+  is_handled?: boolean; // True if damage was handled (documented/not_found/existing)
+  is_inventoried?: boolean; // True if damage was inventoried during checkin
+  is_unmatched_buhs?: boolean; // True if this is an unmatched BUHS damage
 };
 
 export type HistoryRecord = {
@@ -424,8 +429,8 @@ function formatBuhsDamageText(text: string | null | undefined): string {
 // Helper to format not_found status message
 function formatNotFoundStatus(comment: string, checkerName: string, checkinDateTime: string): string {
   return comment 
-    ? `Gick ej att dokumentera "${comment}" (${checkerName}, ${checkinDateTime})` 
-    : `Gick ej att dokumentera (${checkerName}, ${checkinDateTime})`;
+    ? `Gick ej att dokumentera. "${comment}" (${checkerName}, ${checkinDateTime})` 
+    : `Gick ej att dokumentera. (${checkerName}, ${checkinDateTime})`;
 }
 
 function getFirstNameFromEmail(email: string): string {
@@ -739,23 +744,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // This uses service role on the server to bypass RLS issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
   
-  // Debug logging for specific regnr
-  const debugRegnrs = ['NGE97D', 'ZAG53Y', 'GEU29F'];
-  const shouldDebug = debugRegnrs.includes(cleanedRegnr);
-  
-  if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] checkinIds:`, checkinIds);
-  }
-  
   let allCheckinDamages: CheckinDamageData[] = [];
   
   // Fetch checkin_damages via API route (server-side with service role)
   if (checkinIds.length > 0) {
     try {
-      if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] Calling /api/checkin-damages...`);
-      }
-      
       const apiResponse = await fetch(`/api/checkin-damages?regnr=${encodeURIComponent(cleanedRegnr)}`);
       
       if (!apiResponse.ok) {
@@ -764,30 +757,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       } else {
         const apiData = await apiResponse.json();
         
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] API /checkin-damages response:`, {
-            dataLength: apiData.data?.length || 0,
-            checkinIds: apiData.checkinIds,
-          });
-        }
-        
         // Filter to only documented/not_found/existing types in code
         const rawData = (apiData.data || []) as CheckinDamageData[];
         allCheckinDamages = rawData.filter(cd => 
           cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
         );
-        
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Filtered checkin_damages (documented/not_found/existing):`, allCheckinDamages.length);
-        }
       }
     } catch (err) {
       console.error(`[ERROR ${cleanedRegnr}] Failed to call /api/checkin-damages:`, err);
       // Continue with empty array
       allCheckinDamages = [];
     }
-  } else if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] No checkins found, skipping checkin_damages fetch`);
   }
   
   // Get saludatum from legacy damages if available
@@ -824,11 +804,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       bilmarkeModell: latestCheckin?.car_model || '---',
       
       // Senast incheckad vid: from latest checkin with datetime and checker
-      bilenStarNu: latestCheckin?.current_city && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-        ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
-        : latestCheckin?.current_city && latestCheckin?.current_station
-          ? `${latestCheckin.current_city} / ${latestCheckin.current_station}`
-          : '---',
+      // Show datetime even if city/station is missing
+      bilenStarNu: latestCheckin?.completed_at || latestCheckin?.created_at
+        ? latestCheckin?.current_city && latestCheckin?.current_station
+          ? `${latestCheckin.current_city} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'})`
+          : `${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'}`
+        : '---',
       
       // Mätarställning: from latest checkin
       matarstallning: latestCheckin?.odometer_km
@@ -911,7 +892,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
     
     // First pass: Add matched BUHS damages only
-    for (const d of legacyDamages) {
+    for (let i = 0; i < legacyDamages.length; i++) {
+      const d = legacyDamages[i];
       // For GEU29F and other force-undocumented vehicles, skip text+date deduplication
       // Only deduplicate by actual database ID to show all damages
       if (processedBuhsIds.has(d.id)) {
@@ -968,7 +950,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
                  normalizedCdType === normalizedBuhsType;
         });
         
-        if (candidatesForLooseMatch.length === 1) {
+        // If we have candidates, use the first one (even if multiple exist)
+        // This handles cases where multiple checkin_damages have the same damage_type
+        if (candidatesForLooseMatch.length > 0) {
           matchedCheckinDamage = candidatesForLooseMatch[0];
           if (matchedCheckinDamage.id) {
             matchedCheckinDamageIds.add(matchedCheckinDamage.id);
@@ -1030,8 +1014,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           skadetyp = legacyText || damageType;
         }
         
-        status = `Dokumenterad (urspr. BUHS ${damageDate})`;
-        
         // Try to get folder from checkin_damages photo_urls first
         if (checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
           const firstUrl = matchedCheckinDamage.photo_urls[0];
@@ -1057,7 +1039,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
         status = `Dokumenterad ${checkinDate} av ${checkerName}`;
-        sourceInfo = ''; // Don't show sourceInfo separately - it's already in status
+        sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
         
       } else if (cdType === 'not_found') {
         // Display as: "<text> (BUHS)" for skadetyp
@@ -1071,18 +1053,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Include checker, date+time, and comment in status for full context
         status = formatNotFoundStatus(comment, checkerName, checkinDateTime);
         folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
-        sourceInfo = ''; // Don't show sourceInfo separately - it's already in status
+        sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
         
       } else {
         // Unknown type - shouldn't happen but handle gracefully
         skadetyp = formatBuhsDamageText(legacyText);
-        status = 'Källa BUHS';
+        status = ''; // Don't show status for unmatched BUHS - only sourceInfo
         folder = undefined;
         sourceInfo = 'Källa: BUHS';
       }
       
       damageRecords.push({
-        id: d.id,
+        id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
@@ -1091,19 +1073,23 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         source: 'legacy' as const,
         sourceInfo,
         legacy_damage_source_text: legacyText,
+        legacy_buhs_text: legacyText, // Store original BUHS description
         original_damage_date: damageDate,
         checkinWhereDocumented: checkin?.id || null,
         documentedBy: checkin?.checker_name || null,
         documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
         is_handled: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as handled
+        is_inventoried: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as inventoried
       });
     }
     
     // Second pass: Add unmatched BUHS damages with "(BUHS)" suffix
-    for (const d of legacyDamages) {
+    for (let i = 0; i < legacyDamages.length; i++) {
+      const d = legacyDamages[i];
       if (matchedBuhsDamageIds.has(d.id)) {
         continue; // Skip already matched BUHS damages
       }
+      
       
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
@@ -1152,16 +1138,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       damageRecords.push({
-        id: d.id,
+        id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
-        status: 'Källa BUHS',
+        status: '', // Don't show status for unmatched BUHS - only sourceInfo
         folder: folder,
         source: 'legacy' as const,
         sourceInfo: 'Källa: BUHS',
         legacy_damage_source_text: legacyText,
+        legacy_buhs_text: legacyText, // Store original BUHS description
         original_damage_date: damageDate,
+        is_unmatched_buhs: true, // Flag for unmatched BUHS damages
       });
     }
 
@@ -1205,7 +1193,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: formatDate(damage.damage_date || damage.created_at),
-        status: damage.status || 'Ny',
+        status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : '',
         folder: damage.uploads?.folder || undefined,
         source: 'damages' as const,
         sourceInfo: sourceInfo,
@@ -1269,16 +1257,47 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
       }
       
-      // Match damages from damageRecords to this checkin by date
-      // Use the same damageRecords that powers the "Skador" section
+      // Match damages from damageRecords to this checkin
+      // For BUHS damages: filter allCheckinDamages by checkin_id and match to damageRecords
+      // For new damages: match by date
       const checkinDateStr = checkin.completed_at || checkin.created_at;
-      const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
+      
+      // Get checkin_damages for this specific checkin
+      const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
+      
+      // Match BUHS damages that were handled in this checkin
+      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+        // Find the corresponding BUHS damage in damageRecords by matching damage_type
+        // The BUHS damage should already be in damageRecords with the right skadetyp and status
+        return damageRecords.find(damage => 
+          damage.source === 'legacy' && 
+          damage.checkinWhereDocumented === checkin.id &&
+          (damage.skadetyp.includes(cd.damage_type || '') || 
+           damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
+        );
+      }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+      
+      // Also match damages by date (for new damages created during this checkin)
+      const matchedDateDamages = checkinDateStr ? damageRecords.filter(damage => {
+        // Skip BUHS damages already matched above
+        if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+          return false;
+        }
+        
         // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
         const checkinDate = new Date(checkinDateStr);
-        if (isNaN(checkinDate.getTime())) return false;
-        const checkinYMD = checkinDate.toISOString().split('T')[0];
-        return damage.datum === checkinYMD;
+        if (!isNaN(checkinDate.getTime())) {
+          const checkinYMD = checkinDate.toISOString().split('T')[0];
+          if (damage.datum === checkinYMD) {
+            return true;
+          }
+        }
+        
+        return false;
       }) : [];
+      
+      // Combine both types of matches
+      const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
       
       // Track which damages are shown in this checkin
       matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -1300,17 +1319,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
-          handledStatus: damage.source === 'legacy' ? (() => {
-            // For documented damages, show the status which is already "Dokumenterad [date] av [name]"
-            if (damage.status?.startsWith('Dokumenterad')) {
-              return damage.status;
-            }
-            // For not_found damages, use the full status which includes comment
-            if (damage.status?.startsWith('Gick ej att dokumentera')) {
-              return damage.status;
-            }
-            return undefined;
-          })() : undefined,
+          handledStatus: damage.source === 'legacy' && damage.is_handled ? damage.status : undefined,
         };
       });
       
@@ -1353,14 +1362,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Create a separate history event for each BUHS damage (source='legacy')
     // For handled damages (documented/not_found/existing), always create SKADA event
     // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
+    
     for (const damage of damageRecords) {
       if (damage.source === 'legacy') {
+        
         // Determine if this damage should get a SKADA event
         const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
-        const isUnmatchedBuhs = damage.status === 'Källa BUHS';
-        // For GEU29F and other force-undocumented vehicles, always create events for unmatched BUHS
-        // even if shown in checkin, to ensure all damages appear in HISTORIK
-        const shouldCreateEvent = isHandled || (isGEU29F && isUnmatchedBuhs) || !damagesShownInCheckins.has(damage.id);
+        const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
+        // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
+        // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
+        const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
         
         if (shouldCreateEvent) {
           // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
@@ -1370,13 +1381,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // For not_found damages, use the full status which includes comment
           // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
           let sammanfattning: string;
-          if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-            // Documented or existing damage - show when and by whom it was documented
-            const documentedBy = damage.documentedBy || 'Okänd';
-            // Use the checkin date when it was documented, not the original damage date
-            const docDate = damage.documentedDate || damage.datum;
-            sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
-          } else if (damage.status === 'Källa BUHS') {
+          if (damage.status?.startsWith('Dokumenterad')) {
+            // Documented or existing damage - show status and append original BUHS text
+            sammanfattning = damage.status;
+            if (damage.legacy_buhs_text) {
+              sammanfattning += `\nUrsprunglig beskrivning i BUHS: "${damage.legacy_buhs_text}"`;
+            }
+          } else if (damage.is_unmatched_buhs) {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
             sammanfattning = '';
           } else {
@@ -1439,13 +1450,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           : '---',
     
     // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
-    bilenStarNu: latestCheckin?.current_ort && latestCheckin?.current_station && (latestCheckin?.completed_at || latestCheckin?.created_at)
-      ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
-      : latestCheckin?.current_ort && latestCheckin?.current_station
-        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station}`
-        : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
-          ? `${nybilData.plats_aktuell_ort} / ${nybilData.plats_aktuell_station}`
-          : '---',
+    // Show datetime even if city/station is missing
+    bilenStarNu: latestCheckin?.completed_at || latestCheckin?.created_at
+      ? latestCheckin?.current_ort && latestCheckin?.current_station
+        ? `${latestCheckin.current_ort} / ${latestCheckin.current_station} (${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')})`
+        : `${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || getFullNameFromEmail(latestCheckin.user_email || latestCheckin.incheckare || 'Okänd')}`
+      : nybilData?.plats_aktuell_ort && nybilData?.plats_aktuell_station
+        ? `${nybilData.plats_aktuell_ort} / ${nybilData.plats_aktuell_station}`
+        : '---',
     
     // Mätarställning: checkins.odometer_km (senaste) → nybil_inventering.matarstallning_aktuell
     matarstallning: latestCheckin?.odometer_km
@@ -1581,7 +1593,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Build set of legacy damage keys (regnr + damage_date) from RPC
   // to filter out duplicates in damages table
   const legacyDamageKeys = new Set<string>();
-  for (const d of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const d = legacyDamages[i];
     const key = `${cleanedRegnr}-${formatDate(d.damage_date)}`;
     legacyDamageKeys.add(key);
   }
@@ -1589,25 +1602,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // ==================================================================
   // NEW: Match BUHS damages with checkin_damages
   // ==================================================================
-  
-  // shouldDebug is already defined earlier, reuse it
-  if (shouldDebug) {
-    console.log(`[DEBUG ${cleanedRegnr}] BUHS damages count:`, legacyDamages.length);
-    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages count:`, allCheckinDamages.length);
-    console.log(`[DEBUG ${cleanedRegnr}] BUHS damages:`, legacyDamages.map(d => ({
-      id: d.id,
-      damage_type_raw: d.damage_type_raw,
-      note_customer: d.note_customer,
-      note_internal: d.note_internal,
-      damage_date: d.damage_date,
-    })));
-    console.log(`[DEBUG ${cleanedRegnr}] checkin_damages:`, allCheckinDamages.map(cd => ({
-      id: cd.id,
-      type: cd.type,
-      damage_type: cd.damage_type,
-      description: cd.description?.substring(0, 50),
-    })));
-  }
   
   // Build damage records from legacy damages (BUHS) merged with checkin_damages
   const damageRecords: DamageRecord[] = [];
@@ -1618,7 +1612,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
   
   // First pass: Add matched BUHS damages only
-  for (const d of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const d = legacyDamages[i];
     // For GEU29F and other force-undocumented vehicles, skip text+date deduplication
     // Only deduplicate by actual database ID to show all damages
     if (processedBuhsIds.has(d.id)) {
@@ -1663,13 +1658,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         matchedLegacyTexts.add(legacyText); // Track matched BUHS text
         matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
         
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Text match for BUHS ${d.id}:`, {
-            matched_cd_id: cd.id,
-            matched_cd_type: cd.type,
-            matched_cd_desc: cd.description?.substring(0, 50),
-          });
-        }
         break;
       }
     }
@@ -1688,28 +1676,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
                normalizedCdType === normalizedBuhsType;
       });
       
-      if (shouldDebug && candidatesForLooseMatch.length > 0) {
-        console.log(`[DEBUG ${cleanedRegnr}] Loose match candidates for BUHS ${d.id}:`, candidatesForLooseMatch.map(cd => ({
-          id: cd.id,
-          type: cd.type,
-          damage_type: cd.damage_type,
-        })));
-      }
-      
-      // If there's exactly one candidate (unambiguous), use it
-      if (candidatesForLooseMatch.length === 1) {
+      // If we have candidates, use the first one (even if multiple exist)
+      // This handles cases where multiple checkin_damages have the same damage_type
+      if (candidatesForLooseMatch.length > 0) {
         matchedCheckinDamage = candidatesForLooseMatch[0];
         if (matchedCheckinDamage.id) {
           matchedCheckinDamageIds.add(matchedCheckinDamage.id);
           matchedLegacyTexts.add(legacyText); // Track matched BUHS text
           matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
-        }
-        
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Loose match for BUHS ${d.id}:`, {
-            matched_cd_id: matchedCheckinDamage.id,
-            matched_cd_type: matchedCheckinDamage.type,
-          });
         }
       }
     }
@@ -1726,18 +1700,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         matchedCheckinDamageIds.add(unmatchedExisting.id);
         matchedLegacyTexts.add(legacyText); // Track matched BUHS text
         matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
-        
-        if (shouldDebug) {
-          console.log(`[DEBUG ${cleanedRegnr}] Fallback match for BUHS ${d.id} using unmatched existing:`, {
-            matched_cd_id: unmatchedExisting.id,
-            matched_cd_type: unmatchedExisting.type,
-          });
-        }
       }
-    }
-    
-    if (shouldDebug && !matchedCheckinDamage) {
-      console.log(`[DEBUG ${cleanedRegnr}] No match for BUHS ${d.id}`);
     }
     
     // Only process and add matched BUHS damages in this loop
@@ -1783,8 +1746,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         skadetyp = legacyText || damageType;
       }
       
-      status = `Dokumenterad (urspr. BUHS ${damageDate})`;
-      
       // Try to get folder from checkin_damages photo_urls first
       if (checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
         const firstUrl = matchedCheckinDamage.photo_urls[0];
@@ -1802,14 +1763,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
-      if (shouldDebug) {
-        console.log(`[DEBUG ${cleanedRegnr}] Media folder for BUHS ${d.id}:`, {
-          folder,
-          photo_urls_count: matchedCheckinDamage.photo_urls?.length || 0,
-          source: folder ? 'extracted' : 'none',
-        });
-      }
-      
       // GEU29F: Override folder to undefined due to data integrity issues (Kommentar C)
       if (isGEU29F) {
         folder = undefined;
@@ -1817,7 +1770,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       const checkerName = checkin?.checker_name || 'Okänd';
       const checkinDate = checkin ? formatDate(checkin.completed_at || checkin.created_at) : damageDate;
-      sourceInfo = `Källa: BUHS\nDokumenterad ${checkinDate} av ${checkerName}`;
+      status = `Dokumenterad ${checkinDate} av ${checkerName}`;
+      sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
       
     } else if (cdType === 'not_found') {
       // Damage could not be documented (e.g., already repaired)
@@ -1832,18 +1786,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Include checker, date+time, and comment in status for full context
       status = formatNotFoundStatus(comment, checkerName, checkinDateTime);
       folder = undefined; // no media for not_found damages (Kommentar 1 - hide media button)
-      sourceInfo = comment ? `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}\nKommentar: ${comment}` : `Källa: BUHS\nGick ej att dokumentera ${checkinDateTime} av ${checkerName}`;
+      sourceInfo = 'Källa: BUHS'; // Small italic "Källa: BUHS" for sourceInfo
       
     } else {
       // Unknown type - shouldn't happen but handle gracefully
       skadetyp = formatBuhsDamageText(legacyText);
-      status = 'Källa BUHS';
+      status = ''; // Don't show status for unmatched BUHS - only sourceInfo
       folder = undefined;
       sourceInfo = 'Källa: BUHS';
     }
     
     damageRecords.push({
-      id: d.id,
+      id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
@@ -1852,15 +1806,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       source: 'legacy' as const,
       sourceInfo,
       legacy_damage_source_text: legacyText,
+      legacy_buhs_text: legacyText, // Store original BUHS description
       original_damage_date: damageDate,
       checkinWhereDocumented: checkin?.id || null,
       documentedBy: checkin?.checker_name || null,
       documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
+      is_handled: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as handled
+      is_inventoried: (cdType === 'documented' || cdType === 'not_found' || cdType === 'existing'), // Mark as inventoried
     });
   }
   
   // Second pass: Add unmatched BUHS damages with "(BUHS)" suffix
-  for (const d of legacyDamages) {
+  for (let i = 0; i < legacyDamages.length; i++) {
+    const d = legacyDamages[i];
     if (matchedBuhsDamageIds.has(d.id)) {
       continue; // Skip already matched BUHS damages
     }
@@ -1912,16 +1870,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     damageRecords.push({
-      id: d.id,
+      id: d.id ?? `legacy-${i}-${d.damage_date}-${legacyText.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '-')}`,
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
-      status: 'Källa BUHS',
+      status: '', // Don't show status for unmatched BUHS - only sourceInfo
       folder: folder,
       source: 'legacy' as const,
       sourceInfo: 'Källa: BUHS',
       legacy_damage_source_text: legacyText,
+      legacy_buhs_text: legacyText, // Store original BUHS description
       original_damage_date: damageDate,
+      is_unmatched_buhs: true, // Flag for unmatched BUHS damages
     });
   }
   
@@ -1978,7 +1938,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: formatDate(damage.created_at || damage.damage_date || damage.datum),
-      status: damage.status || 'Befintlig',
+      status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : '',
       folder: damage.uploads?.folder || damage.folder,
       source: 'damages' as const,
       sourceInfo,
@@ -2043,16 +2003,47 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
     }
     
-    // Match damages from damageRecords to this checkin by date
-    // Use the same damageRecords that powers the "Skador" section
+    // Match damages from damageRecords to this checkin
+    // For BUHS damages: filter allCheckinDamages by checkin_id and match to damageRecords
+    // For new damages: match by date
     const checkinDateStr = checkin.completed_at || checkin.created_at;
-    const matchedDamages = checkinDateStr ? damageRecords.filter(damage => {
+    
+    // Get checkin_damages for this specific checkin
+    const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
+    
+    // Match BUHS damages that were handled in this checkin
+    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+      // Find the corresponding BUHS damage in damageRecords by matching damage_type
+      // The BUHS damage should already be in damageRecords with the right skadetyp and status
+      return damageRecords.find(damage => 
+        damage.source === 'legacy' && 
+        damage.checkinWhereDocumented === checkin.id &&
+        (damage.skadetyp.includes(cd.damage_type || '') || 
+         damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
+      );
+    }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+    
+    // Also match damages by date (for new damages created during this checkin)
+    const matchedDateDamages = checkinDateStr ? damageRecords.filter(damage => {
+      // Skip BUHS damages already matched above
+      if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+        return false;
+      }
+      
       // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
       const checkinDate = new Date(checkinDateStr);
-      if (isNaN(checkinDate.getTime())) return false;
-      const checkinYMD = checkinDate.toISOString().split('T')[0];
-      return damage.datum === checkinYMD;
+      if (!isNaN(checkinDate.getTime())) {
+        const checkinYMD = checkinDate.toISOString().split('T')[0];
+        if (damage.datum === checkinYMD) {
+          return true;
+        }
+      }
+      
+      return false;
     }) : [];
+    
+    // Combine both types of matches
+    const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
     
     // Track which damages are shown in this checkin
     matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -2075,19 +2066,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
         isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
-        handledStatus: damage.source === 'legacy' ? (() => {
-          // For documented damages, show "Dokumenterad [date] av [name]"
-          if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-            const documentedBy = damage.documentedBy || 'Okänd';
-            const docDate = damage.documentedDate || damage.datum;
-            return `Dokumenterad ${docDate} av ${documentedBy}`;
-          }
-          // For not_found damages, use the full status which includes comment
-          if (damage.status?.startsWith('Gick ej att dokumentera')) {
-            return damage.status;
-          }
-          return undefined;
-        })() : undefined,
+        handledStatus: damage.source === 'legacy' && damage.is_handled ? damage.status : undefined,
       };
     });
     
@@ -2198,14 +2177,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Create a separate history event for each BUHS damage (source='legacy')
   // For handled damages (documented/not_found/existing), always create SKADA event
   // For unmatched BUHS (status="Källa BUHS"), only create if not shown in checkin
+  
   for (const damage of damageRecords) {
     if (damage.source === 'legacy') {
+      
       // Determine if this damage should get a SKADA event
       const isHandled = damage.status?.startsWith('Dokumenterad') || damage.status?.startsWith('Gick ej att dokumentera');
-      const isUnmatchedBuhs = damage.status === 'Källa BUHS';
-      // For GEU29F and other force-undocumented vehicles, always create events for unmatched BUHS
-      // even if shown in checkin, to ensure all damages appear in HISTORIK
-      const shouldCreateEvent = isHandled || (isGEU29F && isUnmatchedBuhs) || !damagesShownInCheckins.has(damage.id);
+      const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
+      // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
+      // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
+      const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
       
       if (shouldCreateEvent) {
         // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
@@ -2215,13 +2196,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // For not_found damages, use the full status which includes comment
         // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
         let sammanfattning: string;
-        if (damage.status?.startsWith('Dokumenterad (urspr. BUHS')) {
-          // Documented or existing damage - show when and by whom it was documented
-          const documentedBy = damage.documentedBy || 'Okänd';
-          // Use the checkin date when it was documented, not the original damage date
-          const docDate = damage.documentedDate || damage.datum;
-          sammanfattning = `Dokumenterad ${docDate} av ${documentedBy}`;
-        } else if (damage.status === 'Källa BUHS') {
+        if (damage.status?.startsWith('Dokumenterad')) {
+          // Documented or existing damage - show status and append original BUHS text
+          sammanfattning = damage.status;
+          if (damage.legacy_buhs_text) {
+            sammanfattning += `\nUrsprunglig beskrivning i BUHS: "${damage.legacy_buhs_text}"`;
+          }
+        } else if (damage.is_unmatched_buhs) {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
           sammanfattning = '';
         } else {
@@ -2246,6 +2227,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           mediaFolder: damage.folder || null, // Kommentar 2 - include media folder for history
         },
       });
+      }
     }
   }
 
@@ -2329,5 +2311,4 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     nybilPhotos,
     nybilFullData,
   };
-}
 }

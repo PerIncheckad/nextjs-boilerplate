@@ -1078,9 +1078,9 @@ const HistoryItem: React.FC<{
       record.nybilDetaljer.mediaLankar.rokning
     ))
   );
-  // Make BUHS skada expandable if it has a media folder
-  const buhsHasExpandableContent = isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder;
-  const isNonExpandable = (isBuhsSkada && !buhsHasExpandableContent) || (isNybil && !nybilHasExpandableContent);
+  // Make BUHS skada (SKADA events) always non-expandable (content shows directly in summary)
+  const buhsHasExpandableContent = false; // Always show SKADA content in collapsed view
+  const isNonExpandable = isBuhsSkada || (isNybil && !nybilHasExpandableContent);
 
   return (
     <div className="history-item-expandable">
@@ -1098,7 +1098,26 @@ const HistoryItem: React.FC<{
             <span className="history-buhs-label">{record.buhsSkadaDetaljer.skadetyp}</span>
           )}
           {isBuhsSkada && record.sammanfattning && (
-            <span className="history-buhs-summary">{record.sammanfattning}</span>
+            <span className="history-buhs-summary">
+              {record.sammanfattning.split('\n').map((line, idx, arr) => (
+                <React.Fragment key={idx}>
+                  {line}
+                  {idx < arr.length - 1 && <br />}
+                </React.Fragment>
+              ))}
+            </span>
+          )}
+          {/* Media link for BUHS SKADA events - show in collapsed view */}
+          {isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder && (
+            <a 
+              href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#1a73e8', fontWeight: 'normal', marginLeft: '0.5rem' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              📁 Visa media
+            </a>
           )}
           <span className="history-date-label">{record.datum}</span>
         </div>
@@ -1289,32 +1308,36 @@ const HistoryItem: React.FC<{
           {/* Damages registered at this checkin - shown after avvikelser */}
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              <strong style={{ color: '#B30E0E' }}>Skador registrerade vid denna incheckning:</strong>
+              <strong style={{ color: '#B30E0E' }}>Befintliga skador hanterade:</strong>
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                {record.checkinDetaljer.skador.map((skada, idx) => (
-                  <li key={idx}>
-                    {skada.handledStatus ? (
-                      <>{skada.typ}. {skada.handledStatus}</>
-                    ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
-                      <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
-                    ) : (
-                      <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
-                    )}
-                    {skada.mediaUrl && (
-                      <span>
-                        {' '}
-                        <a 
-                          href={skada.mediaUrl} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
-                        >
-                          Visa media 📎
-                        </a>
-                      </span>
-                    )}
-                  </li>
-                ))}
+                {(() => {
+                  // Deduplicate damages by skadetyp to avoid showing same damage multiple times
+                  const uniqueSkador = [...new Map(record.checkinDetaljer.skador.map(s => [s.typ, s])).values()];
+                  return uniqueSkador.map((skada, idx) => (
+                    <li key={idx}>
+                      {skada.handledStatus ? (
+                        <>{skada.typ}. {skada.handledStatus}</>
+                      ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
+                        <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
+                      ) : (
+                        <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
+                      )}
+                      {skada.mediaUrl && (
+                        <span>
+                          {' '}
+                          <a 
+                            href={skada.mediaUrl} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
+                          >
+                            📁 Visa media
+                          </a>
+                        </span>
+                      )}
+                    </li>
+                  ));
+                })()}
               </ul>
             </div>
           )}
@@ -1408,20 +1431,6 @@ const HistoryItem: React.FC<{
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-          
-          {/* For BUHS skada with media */}
-          {record.typ === 'buhs_skada' && record.buhsSkadaDetaljer?.mediaFolder && (
-            <div style={{ marginTop: '0.5rem' }}>
-              <a 
-                href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#1a73e8', fontWeight: 500 }}
-              >
-                📁 Visa media
-              </a>
             </div>
           )}
         </div>
@@ -1700,6 +1709,11 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       color: var(--color-text-secondary);
     }
 
+    .damage-status {
+      font-size: 0.875rem;
+      color: var(--color-text);
+    }
+
     .damage-source {
       font-size: 0.75rem;
       color: var(--color-text-secondary);
@@ -1837,6 +1851,12 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
       font-size: 0.875rem;
       color: var(--color-text-secondary);
       margin-left: auto;
+    }
+
+    .history-buhs-summary {
+      display: block;
+      width: 100%;
+      text-align: left;
     }
 
     .history-toggle-icon {
