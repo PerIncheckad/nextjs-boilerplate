@@ -1106,7 +1106,7 @@ const HistoryItem: React.FC<{
               href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#1a73e8', fontWeight: 500, marginLeft: '0.5rem' }}
+              style={{ color: '#1a73e8', fontWeight: 'normal', marginLeft: '0.5rem' }}
               onClick={(e) => e.stopPropagation()}
             >
               📁 Visa media
