@@ -2424,7 +2424,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
         <h4>Avtalsvillkor</h4>
         <p><strong>Serviceintervall:</strong> {summary.avtalsvillkor.serviceintervall}</p>
         <p><strong>Max km/månad:</strong> {summary.avtalsvillkor.maxKmManad}</p>
-        <p><strong>Avgift över-km:</strong> {summary.avtalsvillkor.avgiftOverKm} kr</p>
+        <p><strong>Avgift över-km:</strong> {summary.avtalsvillkor.avgiftOverKm}{summary.avtalsvillkor.avgiftOverKm !== 'Vet ej' && summary.avtalsvillkor.avgiftOverKm ? ' kr' : ''}</p>
       </div>
       <div className="summary-section">
         <h4>Utrustning</h4>
