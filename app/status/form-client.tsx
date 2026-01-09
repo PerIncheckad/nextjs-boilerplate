@@ -1100,6 +1100,18 @@ const HistoryItem: React.FC<{
           {isBuhsSkada && record.sammanfattning && (
             <span className="history-buhs-summary">{record.sammanfattning}</span>
           )}
+          {/* Media link for BUHS SKADA events - show in collapsed view */}
+          {isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder && (
+            <a 
+              href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#1a73e8', fontWeight: 500, marginLeft: '0.5rem' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              📁 Visa media
+            </a>
+          )}
           <span className="history-date-label">{record.datum}</span>
         </div>
         {!isNonExpandable && <span className="history-toggle-icon">{isExpanded ? '▲' : '▼'}</span>}
@@ -1412,20 +1424,6 @@ const HistoryItem: React.FC<{
                   </li>
                 ))}
               </ul>
-            </div>
-          )}
-          
-          {/* For BUHS skada with media */}
-          {record.typ === 'buhs_skada' && record.buhsSkadaDetaljer?.mediaFolder && (
-            <div style={{ marginTop: '0.5rem' }}>
-              <a 
-                href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#1a73e8', fontWeight: 500 }}
-              >
-                📁 Visa media
-              </a>
             </div>
           )}
         </div>
