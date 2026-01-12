@@ -1308,12 +1308,24 @@ const HistoryItem: React.FC<{
           {/* Damages registered at this checkin - shown after avvikelser */}
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              <strong style={{ color: '#B30E0E' }}>Befintliga skador hanterade:</strong>
+              {(() => {
+                // Determine heading based on damage types
+                const hasLegacyDamages = record.checkinDetaljer.skador.some(s => s.handledStatus || s.isDocumentedOlder);
+                const hasNewDamages = record.checkinDetaljer.skador.some(s => !s.handledStatus && !s.isDocumentedOlder);
+                
+                let heading = 'Skador hanterade:';
+                if (hasNewDamages && !hasLegacyDamages) {
+                  heading = 'Nya skador dokumenterade:';
+                } else if (hasLegacyDamages && !hasNewDamages) {
+                  heading = 'Befintliga skador hanterade:';
+                }
+                
+                return <strong style={{ color: '#B30E0E' }}>{heading}</strong>;
+              })()}
               <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
                 {(() => {
-                  // Deduplicate damages by skadetyp to avoid showing same damage multiple times
-                  const uniqueSkador = [...new Map(record.checkinDetaljer.skador.map(s => [s.typ, s])).values()];
-                  return uniqueSkador.map((skada, idx) => (
+                  // Show all damages without deduplication
+                  return record.checkinDetaljer.skador.map((skada, idx) => (
                     <li key={idx}>
                       {skada.handledStatus ? (
                         <>{skada.typ}. {skada.handledStatus}</>
