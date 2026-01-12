@@ -757,10 +757,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       } else {
         const apiData = await apiResponse.json();
         
-        // Filter to only documented/not_found/existing types in code
+        // Include all damage types: new, documented, not_found, and existing
         const rawData = (apiData.data || []) as CheckinDamageData[];
         allCheckinDamages = rawData.filter(cd => 
-          cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing'
+          cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing' || cd.type === 'new'
         );
       }
     } catch (err) {
