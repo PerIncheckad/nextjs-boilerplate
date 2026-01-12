@@ -6,6 +6,7 @@ import { VehicleInfo, ConsolidatedDamage } from '@/lib/damages';
 import { notifyCheckin } from '@/lib/notify';
 import { DAMAGE_OPTIONS } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
+import { compressImage } from '@/lib/image-utils';
 
 // =================================================================
 // 1. DATA, TYPES & HELPERS
@@ -291,14 +292,23 @@ const createVideoThumbnail = (file: File): Promise<string> => new Promise(resolv
 });
 
 const processFiles = async (files: FileList): Promise<MediaFile[]> => {
-  return await Promise.all(Array.from(files).map(async file => {
+  const processed = await Promise.all(Array.from(files).map(async file => {
     const type = getFileType(file);
     if (type === 'video') {
       const thumbnail = await createVideoThumbnail(file);
       return { file, type, thumbnail };
     }
-    return { file, type, preview: URL.createObjectURL(file) };
+    // Compress images before creating preview
+    const compressedFile = await compressImage(file);
+    // If compression returned null (file too large), skip this file
+    if (!compressedFile) {
+      return null;
+    }
+    return { file: compressedFile, type, preview: URL.createObjectURL(compressedFile) };
   }));
+  
+  // Filter out null values (rejected files)
+  return processed.filter((item): item is MediaFile => item !== null);
 };
 
 const capitalizeFirstLetter = (str: string): string => {

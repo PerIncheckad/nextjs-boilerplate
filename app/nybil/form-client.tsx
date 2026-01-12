@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
+import { compressImage } from '@/lib/image-utils';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
@@ -399,33 +400,55 @@ export default function NybilForm() {
   };
   
   // Photo handlers
-  const handlePhotoFrontChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoFrontChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       // Revoke previous preview URL if exists
       if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
-      setPhotoFront({ file, preview: URL.createObjectURL(file) });
+      // Compress image before creating preview
+      const compressedFile = await compressImage(file);
+      // If compression returned null (file too large), don't set photo
+      if (compressedFile) {
+        setPhotoFront({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      }
     }
     // Reset input value so same file can be selected again
     e.target.value = '';
   };
   
-  const handlePhotoBackChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoBackChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
-      setPhotoBack({ file, preview: URL.createObjectURL(file) });
+      // Compress image before creating preview
+      const compressedFile = await compressImage(file);
+      // If compression returned null (file too large), don't set photo
+      if (compressedFile) {
+        setPhotoBack({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      }
     }
     e.target.value = '';
   };
   
-  const handleAdditionalPhotosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAdditionalPhotosChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const newPhotos: PhotoFile[] = Array.from(files).map(file => ({
-        file,
-        preview: URL.createObjectURL(file)
-      }));
+      // Compress all images before creating previews
+      const compressed = await Promise.all(
+        Array.from(files).map(async file => {
+          const compressedFile = await compressImage(file);
+          // If compression returned null (file too large), return null
+          if (!compressedFile) {
+            return null;
+          }
+          return {
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile)
+          };
+        })
+      );
+      // Filter out null values (rejected files)
+      const newPhotos = compressed.filter((photo): photo is PhotoFile => photo !== null);
       setAdditionalPhotos(prev => [...prev, ...newPhotos]);
     }
     e.target.value = '';
@@ -761,7 +784,7 @@ export default function NybilForm() {
     }));
   };
   
-  const handleDamagePhotoChange = (damageId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDamagePhotoChange = async (damageId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const firstFile = files[0];
@@ -773,11 +796,22 @@ export default function NybilForm() {
         e.target.value = '';
         return;
       }
-      // Process remaining files
-      const newPhotos: PhotoFile[] = Array.from(files).map(file => ({
-        file,
-        preview: URL.createObjectURL(file)
-      }));
+      // Process remaining files - compress images before creating previews
+      const compressed = await Promise.all(
+        Array.from(files).map(async file => {
+          const compressedFile = await compressImage(file);
+          // If compression returned null (file too large), return null
+          if (!compressedFile) {
+            return null;
+          }
+          return {
+            file: compressedFile,
+            preview: URL.createObjectURL(compressedFile)
+          };
+        })
+      );
+      // Filter out null values (rejected files)
+      const newPhotos = compressed.filter((photo): photo is PhotoFile => photo !== null);
       setDamages(prev => prev.map(d => {
         if (d.id !== damageId) return d;
         return { ...d, photos: [...d.photos, ...newPhotos] };
@@ -787,12 +821,24 @@ export default function NybilForm() {
   };
   
   // Handle annotator save
-  const handleAnnotatorSave = (annotatedFile: File) => {
+  const handleAnnotatorSave = async (annotatedFile: File) => {
     if (!annotatorDamageId) return;
 
+    // Compress the annotated file before saving
+    const compressedFile = await compressImage(annotatedFile);
+
+    // If compression returned null (file too large), don't add photo
+    if (!compressedFile) {
+      // Close annotator without saving
+      setShowAnnotator(false);
+      setAnnotatorImage(null);
+      setAnnotatorDamageId(null);
+      return;
+    }
+
     const newPhoto: PhotoFile = {
-      file: annotatedFile,
-      preview: URL.createObjectURL(annotatedFile)
+      file: compressedFile,
+      preview: URL.createObjectURL(compressedFile)
     };
 
     setDamages(prev => prev.map(d => {
