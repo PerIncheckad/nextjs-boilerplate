@@ -292,7 +292,7 @@ const createVideoThumbnail = (file: File): Promise<string> => new Promise(resolv
 });
 
 const processFiles = async (files: FileList): Promise<MediaFile[]> => {
-  return await Promise.all(Array.from(files).map(async file => {
+  const processed = await Promise.all(Array.from(files).map(async file => {
     const type = getFileType(file);
     if (type === 'video') {
       const thumbnail = await createVideoThumbnail(file);
@@ -300,8 +300,15 @@ const processFiles = async (files: FileList): Promise<MediaFile[]> => {
     }
     // Compress images before creating preview
     const compressedFile = await compressImage(file);
+    // If compression returned null (file too large), skip this file
+    if (!compressedFile) {
+      return null;
+    }
     return { file: compressedFile, type, preview: URL.createObjectURL(compressedFile) };
   }));
+  
+  // Filter out null values (rejected files)
+  return processed.filter((item): item is MediaFile => item !== null);
 };
 
 const capitalizeFirstLetter = (str: string): string => {

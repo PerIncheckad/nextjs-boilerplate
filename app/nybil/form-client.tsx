@@ -407,7 +407,10 @@ export default function NybilForm() {
       if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
       // Compress image before creating preview
       const compressedFile = await compressImage(file);
-      setPhotoFront({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      // If compression returned null (file too large), don't set photo
+      if (compressedFile) {
+        setPhotoFront({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      }
     }
     // Reset input value so same file can be selected again
     e.target.value = '';
@@ -419,7 +422,10 @@ export default function NybilForm() {
       if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
       // Compress image before creating preview
       const compressedFile = await compressImage(file);
-      setPhotoBack({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      // If compression returned null (file too large), don't set photo
+      if (compressedFile) {
+        setPhotoBack({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      }
     }
     e.target.value = '';
   };
@@ -428,15 +434,21 @@ export default function NybilForm() {
     const files = e.target.files;
     if (files && files.length > 0) {
       // Compress all images before creating previews
-      const newPhotos: PhotoFile[] = await Promise.all(
+      const compressed = await Promise.all(
         Array.from(files).map(async file => {
           const compressedFile = await compressImage(file);
+          // If compression returned null (file too large), return null
+          if (!compressedFile) {
+            return null;
+          }
           return {
             file: compressedFile,
             preview: URL.createObjectURL(compressedFile)
           };
         })
       );
+      // Filter out null values (rejected files)
+      const newPhotos = compressed.filter((photo): photo is PhotoFile => photo !== null);
       setAdditionalPhotos(prev => [...prev, ...newPhotos]);
     }
     e.target.value = '';
@@ -785,15 +797,21 @@ export default function NybilForm() {
         return;
       }
       // Process remaining files - compress images before creating previews
-      const newPhotos: PhotoFile[] = await Promise.all(
+      const compressed = await Promise.all(
         Array.from(files).map(async file => {
           const compressedFile = await compressImage(file);
+          // If compression returned null (file too large), return null
+          if (!compressedFile) {
+            return null;
+          }
           return {
             file: compressedFile,
             preview: URL.createObjectURL(compressedFile)
           };
         })
       );
+      // Filter out null values (rejected files)
+      const newPhotos = compressed.filter((photo): photo is PhotoFile => photo !== null);
       setDamages(prev => prev.map(d => {
         if (d.id !== damageId) return d;
         return { ...d, photos: [...d.photos, ...newPhotos] };
@@ -808,6 +826,15 @@ export default function NybilForm() {
 
     // Compress the annotated file before saving
     const compressedFile = await compressImage(annotatedFile);
+
+    // If compression returned null (file too large), don't add photo
+    if (!compressedFile) {
+      // Close annotator without saving
+      setShowAnnotator(false);
+      setAnnotatorImage(null);
+      setAnnotatorDamageId(null);
+      return;
+    }
 
     const newPhoto: PhotoFile = {
       file: compressedFile,
