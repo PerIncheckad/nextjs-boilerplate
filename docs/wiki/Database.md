@@ -1,16 +1,17 @@
 # Database - Supabase
 
-Detta dokument beskriver databasstrukturen för Incheckad-systemet.
+Detta dokument beskriver databasstrukturen för Incheckad-systemet. 
 
 ## Översikt
 
-Systemet använder Supabase (PostgreSQL) med följande huvudtabeller: 
+Systemet använder Supabase (PostgreSQL) med följande huvudtabeller:
 
 | Tabell | Syfte |
 |--------|-------|
 | `checkins` | Incheckningar av fordon |
 | `checkin_damages` | Skador kopplade till en specifik incheckning |
 | `damages` | Konsoliderad skadehistorik per fordon |
+| `damages_external` | BUHS-skador (Skadefilen) - importerad CSV |
 | `nybil_inventering` | Nybilsregistreringar vid leverans |
 | `vehicles` | Fordonsmaster från Bilkontroll-filen (BUHS) |
 
@@ -204,6 +205,24 @@ Konsoliderad skadehistorik per fordon.  Innehåller både BUHS-importerade skado
 
 ---
 
+### damages_external
+
+**Skadefilen från BUHS** - importerad CSV med legacy-skador.  Denna tabell är källan för BUHS-skador som hämtas via RPC-funktionen `get_damages_by_trimmed_regnr`.
+
+| Kolumn | Typ | Nullable | Beskrivning |
+|--------|-----|----------|-------------|
+| `regnr` | text | NO | Registreringsnummer (primärnyckel) |
+| `saludatum` | date | YES | Saludatum |
+| `damage_date` | date | YES | Skadedatum |
+| `damage_type_raw` | text | YES | Skadetyp (t.ex. "Repa", "Spricka") |
+| `note_customer` | text | YES | Kundnotering |
+| `note_internal` | text | YES | Intern notering |
+| `vehiclenote` | text | YES | Fordonsnotering |
+
+**Viktigt:** Denna tabell uppdateras genom manuell CSV-import.  Den innehåller ~566 rader (januari 2026).
+
+---
+
 ### nybil_inventering
 
 Nybilsregistreringar vid leverans till MABI. 
@@ -305,7 +324,7 @@ Fordonsmaster från Bilkontroll-filen (BUHS).
 
 ### damage-photos
 
-Offentlig bucket för skadefoton.
+Offentlig bucket för skadefoton från `/check`.
 
 **Mappstruktur:**
 ```
@@ -328,6 +347,22 @@ damage-photos/
             └── kommentar.txt
 ```
 
+### nybil-photos
+
+Offentlig bucket för nybilsfoton från `/nybil`.
+
+**Mappstruktur:**
+```
+nybil-photos/
+└── {REGNR}/
+    └── {REGNR}-{YYYYMMDD}/
+        ├── {REGNR}-framifran. jpg
+        ├── {REGNR}-bakifran.jpg
+        └── skador/
+            └── {skadetyp}-{position}/
+                └── {REGNR}-{skadetyp}-{position}_1.jpg
+```
+
 ---
 
 ## RPC-funktioner
@@ -342,11 +377,13 @@ get_vehicle_by_trimmed_regnr(p_regnr text)
 
 ### get_damages_by_trimmed_regnr
 
-Hämtar BUHS-skador för ett fordon. 
+Hämtar BUHS-skador från `damages_external`-tabellen för ett fordon.
 
 ```sql
 get_damages_by_trimmed_regnr(p_regnr text)
 ```
+
+**Returnerar:** Alla rader från `damages_external` där `TRIM(UPPER(regnr)) = TRIM(UPPER(p_regnr))`
 
 ---
 
@@ -355,7 +392,7 @@ get_damages_by_trimmed_regnr(p_regnr text)
 ### checkins. wheel_type
 
 ```sql
-CHECK ((wheel_type = ANY (ARRAY['sommar'::text, 'vinter'::text])))
+CHECK ((wheel_type = ANY (ARRAY['sommar':: text, 'vinter'::text])))
 ```
 
 ---
@@ -366,18 +403,25 @@ CHECK ((wheel_type = ANY (ARRAY['sommar'::text, 'vinter'::text])))
 
 1. **checkins**:  Ny rad skapas med fordons- och incheckarinfo
 2. **checkin_damages**:  Rad per skada (nya + hanterade BUHS)
-3. **damages**: Rad per NY skada (source = 'CHECK')
+3. **damages**:  Rad per NY skada (source = 'CHECK')
 
 ### Vid nybilsinventering (/nybil → /api/notify-nybil)
 
 1. **nybil_inventering**:  Ny rad med all fordonsinfo
-2. **damages**: Rad per skada (source = 'NYBIL')
+2. **damages**:  Rad per skada (source = 'NYBIL')
 
 ### Vid /status-sökning
 
-1. Hämtar data från:  `nybil_inventering`, `vehicles`, `damages`, `checkins`, `checkin_damages`
+1. Hämtar data från:  `nybil_inventering`, `vehicles`, `damages`, `checkins`, `checkin_damages`, `damages_external` (via RPC)
 2. Prioritetsordning för fordonsinfo: `checkins` (senaste) → `nybil_inventering` → `vehicles`
-3. Skador hämtas från både `damages` och legacy BUHS via RPC
+3. Skador hämtas från både `damages` och `damages_external` (BUHS via RPC)
+
+### Vid /check-sökning (faktarutan)
+
+1. Hämtar fordonsinfo via `get_vehicle_by_trimmed_regnr` (från `vehicles`)
+2. Hämtar BUHS-skador via `get_damages_by_trimmed_regnr` (från `damages_external`)
+3. Hämtar dokumenterade skador från `damages` (för att avgöra `is_inventoried`)
+4. Hämtar senaste `checkin_damages` för att visa hanteringsstatus
 
 ---
 
@@ -389,7 +433,7 @@ CHECK ((wheel_type = ANY (ARRAY['sommar'::text, 'vinter'::text])))
 |--------|----------|------------|
 | `damage_type` | Normaliserad (UPPERCASE): JACK, REPA, REPOR | Matchning, filtrering |
 | `damage_type_raw` | Originaltext:  Jack, Repa, Repor | Visning i /status |
-| `user_type` | Användarens val: Jack, Repa, Repor | Legacy, samma som damage_type_raw |
+| `user_type` | Användarens val:  Jack, Repa, Repor | Legacy, samma som damage_type_raw |
 
 ### user_positions (jsonb)
 
@@ -413,4 +457,65 @@ Innehåller referens till media i Storage:
 }
 ```
 
-`folder` används för att bygga "Visa media"-länken i /status. 
+`folder` används för att bygga "Visa media"-länken i /status.
+
+---
+
+## Matchningslogik för BUHS-skador
+
+### Hur `is_inventoried` bestäms (lib/damages.ts)
+
+En BUHS-skada markeras som `is_inventoried = true` (och visas INTE i "Befintliga skador att hantera") om **någon** av följande villkor uppfylls: 
+
+1. **Textmatchning (primär):** Det finns en rad i `damages`-tabellen med matchande `legacy_damage_source_text`
+
+2. **Checkin_damage-matchning:** Skadan matchas mot en `checkin_damage` via textlikhet eller skadetyp
+
+3. **Datum-baserad backup (PR #234):** Om: 
+   - `senaste_incheckning > BUHS_skadedatum`
+   - OCH det finns minst en `checkin_damage` för fordonet med type IN ('documented', 'not_found', 'existing')
+   - → Då antas alla BUHS-skador från det datumet eller tidigare vara hanterade
+
+**Varför datum-backup behövs:** Om någon ändrar BUHS-texten i källsystemet efter att skadan dokumenterats, misslyckas textmatchningen.  Datum-logiken förhindrar att skadan dyker upp som "att hantera" igen.
+
+---
+
+## Vanliga SQL-frågor för felsökning
+
+### Visa alla incheckningar för ett fordon
+```sql
+SELECT id, regnr, checker_name, current_station, completed_at
+FROM checkins
+WHERE UPPER(TRIM(regnr)) = 'ABC123'
+ORDER BY completed_at DESC;
+```
+
+### Visa BUHS-skador för ett fordon
+```sql
+SELECT * FROM get_damages_by_trimmed_regnr('ABC123');
+```
+
+### Visa checkin_damages för en specifik incheckning
+```sql
+SELECT cd.*, c.checker_name, c. completed_at
+FROM checkin_damages cd
+JOIN checkins c ON cd.checkin_id = c.id
+WHERE UPPER(TRIM(c.regnr)) = 'ABC123'
+ORDER BY cd.created_at DESC;
+```
+
+### Kontrollera om BUHS-skador skulle hanteras av datum-logik
+```sql
+SELECT 
+  de.regnr,
+  de.damage_date as buhs_datum,
+  c.completed_at as senaste_incheckning,
+  CASE 
+    WHEN c.completed_at > de.damage_date THEN 'Datum-backup aktiveras ✅'
+    ELSE 'Förlitar sig på textmatchning'
+  END as status
+FROM damages_external de
+JOIN checkins c ON UPPER(TRIM(de.regnr)) = UPPER(TRIM(c.regnr))
+WHERE de.regnr = 'ABC123'
+ORDER BY de. damage_date;
+```
