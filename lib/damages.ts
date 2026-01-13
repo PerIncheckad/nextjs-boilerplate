@@ -381,9 +381,10 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       // then the damage is considered handled regardless of text matching
       const hasAnyHandledDamages = handledDamagesList.length > 0;
       const damageDate = leg.damage_date ? new Date(leg.damage_date) : null;
+      const isValidDamageDate = damageDate !== null && !isNaN(damageDate.getTime());
       const isHandledByDateLogic = hasAnyHandledDamages && 
                                     lastCheckinDate !== null && 
-                                    damageDate !== null && 
+                                    isValidDamageDate && 
                                     lastCheckinDate > damageDate;
       
       consolidatedDamages.push({
