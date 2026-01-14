@@ -2,11 +2,11 @@
 
 Mål:
 - Icke-destruktiv import (rör inte dokumenterade rader; tar aldrig bort Helsingborgs arbete).
-- "N2 per datum": Nya BUHS-rader med nytt datum ska kräva dokumentation; samma datum ska inte trigga igen.
-- Snapshots före import.
+- "N2 per datum":  Nya BUHS-rader med nytt datum ska kräva dokumentation; samma datum ska inte trigga igen.
+- Snapshots före import. 
 
 Förutsättningar:
-- Tidszon Europe/Stockholm.
+- Tidszon Europe/Stockholm. 
 - BUHS hämtas från public.damages (importerade rader har `damage_type_raw` ifylld).
 - "Dokumenterade" rader har `legacy_damage_source_text IS NOT NULL`.
 - "Nya skador" i appen har typiskt `legacy_damage_source_text IS NULL` och `damage_type_raw IS NULL` (rör inte dessa).
@@ -15,13 +15,13 @@ Förutsättningar:
 
 ## 1) Källfiler och förberedelse
 
-Innan du kan importera data behöver du förbereda källfilerna korrekt.
+Innan du kan importera data behöver du förbereda källfilerna korrekt. 
 
 ### 1.1 Skadefilen (BUHS)
 
 **Originalfil:** `Skador Albarone[dagens datum].xlsx`
 
-**Källa:** Mejlas till per.andersson@mabi.se varje vardag kl 8.
+**Källa:** Mejlas till per. andersson@mabi.se varje vardag kl 8. 
 
 **Förbered filen:**
 
@@ -43,7 +43,7 @@ Innan du kan importera data behöver du förbereda källfilerna korrekt.
 
 **Originalfil:** `MABISYD Bilkontroll 2024-2025.xlsx`
 
-**Källa:** Finns på MABI Syds OneDrive, ägs av Bilkontroll. Uppdateras oregelbundet (ibland flera gånger i veckan).
+**Källa:** Finns på MABI Syds OneDrive, ägs av Bilkontroll.  Uppdateras oregelbundet (ibland flera gånger i veckan).
 
 **Förbered filen:**
 
@@ -56,134 +56,197 @@ Innan du kan importera data behöver du förbereda källfilerna korrekt.
    | `Märke` | `brand` |
    | `MODELL` | `model` |
    | `FÖRVARING` | `wheel_storage_location` |
-4. **OBS! Ta bort ALLA andra kolumner**, även de som ser tomma ut till höger (dessa genererar fel i Supabase)
+4. **OBS!  Ta bort ALLA andra kolumner**, även de som ser tomma ut till höger (dessa genererar fel i Supabase)
 5. Spara som **"CSV UTF-8 (kommaavgränsad)"** (.csv)
 
 ---
 
-## 2) Snapshots (alltid innan import)
+## 2) Importera Skadefilen (BUHS)
 
-Kör i Supabase SQL Editor:
+### Steg 1: Skapa backup
+
+**VIKTIGT:  Kör alltid backup INNAN import! **
 
 ```sql
-CREATE TABLE IF NOT EXISTS public.damages_backup_{{YYYYMMDD}} AS TABLE public.damages WITH DATA;
-CREATE TABLE IF NOT EXISTS public.vehicles_backup_{{YYYYMMDD}} AS TABLE public.vehicles WITH DATA;
+CREATE TABLE IF NOT EXISTS public.damages_backup_YYYYMMDD AS 
+TABLE public.damages WITH DATA;
 ```
 
-Ersätt `{{YYYYMMDD}}` med dagens datum (t.ex. 20251114).
+*(Byt ut `YYYYMMDD` mot dagens datum, t.ex. `damages_backup_20260114`)*
 
 ---
 
-## 3) Skadefilen (BUHS)
-
-### 3.1 Staging-tabell tömning + import
-
-Vi använder staging-tabellen `public.mabi_damage_data_raw_new`. Om den saknas, skapa den:
-
-```sql
-CREATE TABLE IF NOT EXISTS public.mabi_damage_data_raw_new (
-  regnr text,
-  damage_date date,
-  damage_type_raw text,
-  note_customer text,
-  note_internal text,
-  vehiclenote text,
-  saludatum date
-);
-```
-
-Töm staging innan import:
+### Steg 2: Töm staging-tabellen
 
 ```sql
 TRUNCATE public.mabi_damage_data_raw_new;
 ```
 
-Importera din CSV till `public.mabi_damage_data_raw_new` via Supabase Table Editor (kolumnnamnen ska matcha exakt).
+---
 
-### 3.2 Dubbletthantering i staging
+### Steg 3: Importera CSV till staging
 
-Ta bort eventuella dubbletter från staging-tabellen:
+1. Gå till **Table Editor** → `mabi_damage_data_raw_new`
+2. Klicka **Insert** → **Import data from CSV**
+3. Ladda upp din förberedda CSV-fil
+4. Verifiera att kolumnerna matchar (regnr, saludatum, damage_date, etc.)
+
+---
+
+### Steg 4: Radera dubbletter i staging
 
 ```sql
 DELETE FROM public.mabi_damage_data_raw_new
 WHERE ctid NOT IN (
   SELECT MIN(ctid)
   FROM public.mabi_damage_data_raw_new
-  GROUP BY regnr, damage_date, damage_type_raw, note_customer
+  GROUP BY regnr, damage_date, damage_type_raw, COALESCE(note_customer, '')
 );
 ```
 
-### 3.3 UPSERT till public.damages
-
-**Förutsättning:** Tabellen `public.damages` måste ha en UNIQUE constraint `damages_regnr_date_type_customer_unique` på kolumnerna `(regnr, damage_date, damage_type_raw, note_customer)`.
-
-Om constraint saknas, skapa den:
-
+**Verifiera:**
 ```sql
-ALTER TABLE public.damages 
-ADD CONSTRAINT damages_regnr_date_type_customer_unique 
-UNIQUE (regnr, damage_date, damage_type_raw, note_customer);
-```
-
-Kör följande för att lägga till nya skador och uppdatera befintliga:
-
-```sql
-INSERT INTO public.damages (regnr, damage_date, damage_type, damage_type_raw, note_customer, note_internal, vehiclenote, saludatum, imported_at)
-SELECT 
-  regnr,
-  damage_date,
-  damage_type_raw AS damage_type,
-  damage_type_raw,
-  note_customer,
-  note_internal,
-  vehiclenote,
-  saludatum,
-  NOW() AS imported_at
-FROM public.mabi_damage_data_raw_new
-ON CONFLICT (regnr, damage_date, damage_type_raw, note_customer) 
-DO UPDATE SET
-  note_internal = EXCLUDED.note_internal,
-  vehiclenote = EXCLUDED.vehiclenote,
-  saludatum = EXCLUDED.saludatum,
-  imported_at = NOW();
-```
-
-### 3.4 Verifiering
-
-Kontrollera att importen lyckades:
-
-```sql
-SELECT COUNT(*) AS total_damages FROM public.damages;
+SELECT COUNT(*) FROM public.mabi_damage_data_raw_new;
+-- Kontrollera att antalet rader är rimligt (t.ex. 200-600 st)
 ```
 
 ---
 
-## 4) Bilkontroll (vehicles)
+### Steg 5: UPSERT från staging till damages
 
-### 4.1 Staging-tabell tömning + import
-
-Vi använder `public.vehicles_staging`. Skapa om saknas:
+**⚠️ KRITISKT: Denna SQL sätter `source='BUHS'` för alla importerade skador! **
 
 ```sql
-CREATE TABLE IF NOT EXISTS public.vehicles_staging (
+INSERT INTO public.damages (
+  regnr,
+  saludatum,
+  damage_date,
+  damage_type_raw,
+  note_customer,
+  note_internal,
+  vehiclenote,
+  source,                    -- KRITISKT FÄLT!  
+  imported_at
+)
+SELECT 
+  UPPER(TRIM(regnr)),
+  saludatum,
+  damage_date,
+  damage_type_raw,
+  note_customer,
+  note_internal,
+  vehiclenote,
+  'BUHS',                    -- ← Sätt source till BUHS (inte CHECK!)
+  NOW()
+FROM public.mabi_damage_data_raw_new
+ON CONFLICT (regnr, damage_date, damage_type_raw, COALESCE(note_customer, ''))
+DO UPDATE SET
+  saludatum = EXCLUDED.saludatum,
+  note_internal = EXCLUDED.note_internal,
+  vehiclenote = EXCLUDED. vehiclenote,
+  source = 'BUHS',           -- Uppdatera även vid konflikt
+  imported_at = NOW();
+```
+
+---
+
+### Steg 6: Verifiera importen
+
+```sql
+-- Kontrollera antal nya rader
+SELECT COUNT(*) FROM public.damages WHERE DATE(imported_at) = CURRENT_DATE;
+
+-- Kontrollera att source är korrekt
+SELECT source, COUNT(*) 
+FROM public.damages 
+WHERE DATE(imported_at) = CURRENT_DATE
+GROUP BY source;
+-- Förväntat: alla rader ska ha source='BUHS'
+
+-- Kontrollera specifika regnr (byt ut GEU29F mot ett regnr från din import)
+SELECT * FROM public.damages 
+WHERE regnr = 'GEU29F' 
+ORDER BY damage_date DESC;
+```
+
+---
+
+### Steg 7: Uppdatera damages_external (RPC-källa)
+
+**OBS! `/check` läser BUHS-skador från `damages_external` via RPC `get_damages_by_trimmed_regnr`**
+
+```sql
+-- Töm damages_external
+TRUNCATE public.damages_external;
+
+-- Kopiera alla BUHS-skador från damages
+INSERT INTO public.damages_external (
+  regnr,
+  saludatum,
+  damage_date,
+  damage_type_raw,
+  note_customer,
+  note_internal,
+  vehiclenote
+)
+SELECT 
+  regnr,
+  saludatum,
+  damage_date,
+  damage_type_raw,
+  note_customer,
+  note_internal,
+  vehiclenote
+FROM public.damages
+WHERE source = 'BUHS';
+```
+
+**Verifiera:**
+```sql
+SELECT COUNT(*) FROM public.damages_external;
+-- Ska matcha antalet BUHS-skador i damages
+```
+
+---
+
+## 3) Importera Bilkontrollfilen
+
+### Steg 1: Skapa backup
+
+```sql
+CREATE TABLE IF NOT EXISTS public.vehicles_backup_YYYYMMDD AS 
+TABLE public.vehicles WITH DATA;
+```
+
+---
+
+### Steg 2: Töm staging-tabellen
+
+```sql
+-- Skapa staging om den inte finns
+CREATE TABLE IF NOT EXISTS public. vehicles_staging (
   regnr text,
   brand text,
   model text,
   wheel_storage_location text
 );
+
+-- Töm staging
+TRUNCATE public. vehicles_staging;
 ```
 
-Töm staging innan import:
+---
 
-```sql
-TRUNCATE public.vehicles_staging;
-```
+### Steg 3: Importera CSV till staging
 
-Importera CSV via Supabase Table Editor (rubriker: regnr, brand, model, wheel_storage_location).
+1. Gå till **Table Editor** → `vehicles_staging`
+2. Klicka **Insert** → **Import data from CSV**
+3. Ladda upp din förberedda CSV-fil
+4. Verifiera att kolumnerna matchar (regnr, brand, model, wheel_storage_location)
 
-### 4.2 Dubbletthantering i staging
+---
 
-Ta bort eventuella dubbletter från staging-tabellen:
+### Steg 4: Radera dubbletter i staging
 
 ```sql
 DELETE FROM public.vehicles_staging
@@ -194,86 +257,113 @@ WHERE ctid NOT IN (
 );
 ```
 
-### 4.3 UPSERT till public.vehicles
+---
 
-Uppdatera befintliga fordon och lägg till nya i två steg:
-
-**Steg 1 - UPDATE befintliga fordon:**
+### Steg 5: UPSERT från staging till vehicles
 
 ```sql
-UPDATE public.vehicles v
-SET 
-  brand = s.brand,
-  model = s.model,
-  wheel_storage_location = s.wheel_storage_location
-FROM public.vehicles_staging s
-WHERE UPPER(TRIM(v.regnr)) = UPPER(TRIM(s.regnr));
-```
-
-**Steg 2 - INSERT nya fordon:**
-
-```sql
-INSERT INTO public.vehicles (regnr, brand, model, wheel_storage_location)
-SELECT UPPER(TRIM(s.regnr)), s.brand, s.model, s.wheel_storage_location
-FROM public.vehicles_staging s
-LEFT JOIN public.vehicles v ON UPPER(TRIM(v.regnr)) = UPPER(TRIM(s.regnr))
-WHERE v.regnr IS NULL;
-```
-
-### 4.4 Verifiering
-
-Kontrollera att importen lyckades:
-
-```sql
-SELECT COUNT(*) AS total_vehicles FROM public.vehicles;
+INSERT INTO public.vehicles (
+  regnr,
+  brand,
+  model,
+  wheel_storage_location,
+  updated_at
+)
+SELECT 
+  UPPER(TRIM(regnr)),
+  brand,
+  model,
+  wheel_storage_location,
+  NOW()
+FROM public.vehicles_staging
+ON CONFLICT (regnr)
+DO UPDATE SET
+  brand = EXCLUDED.brand,
+  model = EXCLUDED.model,
+  wheel_storage_location = EXCLUDED.wheel_storage_location,
+  updated_at = NOW();
 ```
 
 ---
 
-## 5) "N2 per datum" – kontrollfråga (valfri)
-
-Skador som fortfarande skulle kräva dokumentation per dagens data:
+### Steg 6: Verifiera importen
 
 ```sql
-WITH documented AS (
-  SELECT DISTINCT regnr, original_damage_date AS ddate
-  FROM public.damages
-  WHERE legacy_damage_source_text IS NOT NULL
-),
-buhs AS (
-  SELECT regnr, damage_date AS ddate, damage_type_raw, note_customer, note_internal, vehiclenote
-  FROM public.damages
-  WHERE damage_type_raw IS NOT NULL
-)
-SELECT b.*
-FROM buhs b
-LEFT JOIN documented d ON UPPER(d.regnr)=UPPER(b.regnr) AND d.ddate = b.ddate
-WHERE d.regnr IS NULL
-ORDER BY b.regnr, b.ddate DESC
-LIMIT 500;
+-- Kontrollera antal uppdaterade rader
+SELECT COUNT(*) FROM public.vehicles WHERE DATE(updated_at) = CURRENT_DATE;
+
+-- Kontrollera specifika regnr
+SELECT * FROM public.vehicles WHERE regnr = 'GEU29F';
 ```
 
-Tips:
-- Om "app‑standardiserade" texter ("Skadetyp - Placering - Position") dyker upp i BUHS‑kolumnerna så är de redan app‑dokumenterade; dessa triggar inte ny dokumentation och filtreras även i UI.
+---
 
-# UPPDATERING 2025-12-05
+## 4) Felsökning
 
-# CSV-import till Supabase
+### Problem: "duplicate key value violates unique constraint"
 
-## Skadefilen (BUHS)
+**Orsak:** Dubbletter i CSV-filen eller staging-tabellen. 
 
-1. Exportera från BUHS
-2. Ladda upp till staging-tabell `mabi_damage_data_raw_new`
-3.  Kör UPSERT till `damages` via SQL
+**Lösning:** Kör dedup-SQL (Steg 4) igen.
 
-## Bilkontroll-filen
+---
 
-1.  Exportera från Bilkontroll
-2. Ladda upp till `vehicles`-tabellen
-3.  Använd RPC `get_vehicle_by_trimmed_regnr` för sökning
+### Problem: "column 'source' not found" vid Skadefil-import
 
-## Viktigt
+**Orsak:** Äldre version av `damages`-tabellen saknar `source`-kolumnen.
 
-- `legacy_damage_source_text` = NULL → tolkas som nybilsskada
-- `legacy_damage_source_text` = text → tolkas som BUHS-skada
-- Undvik dubletter genom att matcha på `regnr` + `damage_date`
+**Lösning:**
+```sql
+-- Lägg till source-kolumnen om den saknas
+ALTER TABLE public. damages 
+ADD COLUMN IF NOT EXISTS source text DEFAULT 'CHECK';
+```
+
+---
+
+### Problem: Befintliga BUHS-skador har `source='CHECK'` (fel)
+
+**Orsak:** Tidigare importer gjordes INNAN `source`-fältet lades till i UPSERT-SQL.
+
+**Lösning:**
+```sql
+-- Fixa befintliga BUHS-skador
+UPDATE public.damages
+SET source = 'BUHS'
+WHERE source = 'CHECK'
+  AND user_type IS NULL
+  AND user_positions IS NULL
+  AND uploads IS NULL
+  AND DATE(imported_at) IN ('2025-11-03', '2025-11-26', '2025-12-04');
+
+-- Verifiera
+SELECT source, COUNT(*) FROM public.damages GROUP BY source;
+```
+
+---
+
+## 5) Checklista efter import
+
+- [ ] Backup skapad (damages_backup_YYYYMMDD / vehicles_backup_YYYYMMDD)
+- [ ] CSV-fil förberedd (rätt kolumnnamn, UTF-8, kommaavgränsad)
+- [ ] Import till staging klar (mabi_damage_data_raw_new / vehicles_staging)
+- [ ] Dubbletter raderade i staging
+- [ ] UPSERT till huvudtabell klar (damages / vehicles)
+- [ ] Verifiering klar (rätt antal rader, rätt source för BUHS)
+- [ ] `damages_external` uppdaterad (endast för Skadefil)
+- [ ] Testregistreringsnummer kontrollerat i `/check` och `/status`
+
+---
+
+## 6) Framtida förbättringar
+
+- **Automatisera CSV-import:** Skapa script som läser CSV direkt och kör alla SQL-steg automatiskt
+- **Validering:** Lägg till kontroller för obligatoriska fält (regnr, damage_date, etc.)
+- **Loggning:** Spara import-loggar i en separat tabell (import_log) för att kunna spåra historik
+- **Notifikationer:** Skicka mejl när import är klar med sammanfattning (antal nya rader, fel, etc.)
+
+---
+
+**Senast uppdaterad:** 2026-01-14  
+**Ägare:** Per Andersson (per.andersson@mabi.se)  
+**Version:** 2.0 (fixad source='BUHS' för BUHS-import)
