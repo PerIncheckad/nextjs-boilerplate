@@ -1,12 +1,12 @@
 # CSV-import (BUHS "Skadefilen" och Bilkontroll)
 
-Mål:
+Mål: 
 - Icke-destruktiv import (rör inte dokumenterade rader; tar aldrig bort Helsingborgs arbete).
 - "N2 per datum":  Nya BUHS-rader med nytt datum ska kräva dokumentation; samma datum ska inte trigga igen.
 - Snapshots före import. 
 
 Förutsättningar:
-- Tidszon Europe/Stockholm. 
+- Tidszon Europe/Stockholm.
 - BUHS hämtas från public.damages (importerade rader har `damage_type_raw` ifylld).
 - "Dokumenterade" rader har `legacy_damage_source_text IS NOT NULL`.
 - "Nya skador" i appen har typiskt `legacy_damage_source_text IS NULL` och `damage_type_raw IS NULL` (rör inte dessa).
@@ -19,14 +19,14 @@ Innan du kan importera data behöver du förbereda källfilerna korrekt.
 
 ### 1.1 Skadefilen (BUHS)
 
-**Originalfil:** `Skador Albarone[dagens datum].xlsx`
+**Originalfil:** `Skador Albarone[dagens datum]. xlsx`
 
 **Källa:** Mejlas till per. andersson@mabi.se varje vardag kl 8. 
 
 **Förbered filen:**
 
 1. Öppna filen i Excel
-2. **Behåll endast följande kolumner** och byt namn på dem:
+2. **Behåll endast följande kolumner** och byt namn på dem: 
    | Originalnamn | Nytt namn |
    |--------------|-----------|
    | `RegNr` | `regnr` |
@@ -37,7 +37,7 @@ Innan du kan importera data behöver du förbereda källfilerna korrekt.
    | `Intern notering` | `note_internal` |
    | `VehicleNote` | `vehiclenote` |
 3. **Ta bort alla andra kolumner**
-4. Spara som **"CSV UTF-8 (kommaavgränsad)"** (.csv)
+4. Spara som **"CSV UTF-8 (kommaavgränsad)"** (. csv)
 
 ### 1.2 Bilkontrollfilen
 
@@ -65,7 +65,7 @@ Innan du kan importera data behöver du förbereda källfilerna korrekt.
 
 ### Steg 1: Skapa backup
 
-**VIKTIGT:  Kör alltid backup INNAN import! **
+**VIKTIGT:  Kör alltid backup INNAN import!**
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.damages_backup_YYYYMMDD AS 
@@ -86,7 +86,7 @@ TRUNCATE public.mabi_damage_data_raw_new;
 
 ### Steg 3: Importera CSV till staging
 
-1. Gå till **Table Editor** → `mabi_damage_data_raw_new`
+1.  Gå till **Table Editor** → `mabi_damage_data_raw_new`
 2. Klicka **Insert** → **Import data from CSV**
 3. Ladda upp din förberedda CSV-fil
 4. Verifiera att kolumnerna matchar (regnr, saludatum, damage_date, etc.)
@@ -114,7 +114,7 @@ SELECT COUNT(*) FROM public.mabi_damage_data_raw_new;
 
 ### Steg 5: UPSERT från staging till damages
 
-**⚠️ KRITISKT: Denna SQL sätter `source='BUHS'` för alla importerade skador! **
+**⚠️ KRITISKT:  Denna SQL sätter `source='BUHS'` OCH bygger `legacy_damage_source_text`! **
 
 ```sql
 INSERT INTO public.damages (
@@ -125,7 +125,8 @@ INSERT INTO public.damages (
   note_customer,
   note_internal,
   vehiclenote,
-  source,                    -- KRITISKT FÄLT!  
+  source,
+  legacy_damage_source_text,  -- KRITISKT FÄLT!
   imported_at
 )
 SELECT 
@@ -136,15 +137,39 @@ SELECT
   note_customer,
   note_internal,
   vehiclenote,
-  'BUHS',                    -- ← Sätt source till BUHS (inte CHECK!)
+  'BUHS',  -- ← Sätt source till BUHS (inte CHECK!)
+  -- ↓ Bygg legacy_damage_source_text från kolumner D-G
+  damage_type_raw || 
+    CASE 
+      WHEN note_customer IS NOT NULL 
+           AND note_customer != '' 
+           AND note_customer != damage_type_raw
+      THEN ' - ' || note_customer 
+      ELSE '' 
+    END ||
+    CASE 
+      WHEN note_internal IS NOT NULL 
+           AND note_internal != '' 
+           AND note_internal != '-'
+      THEN ' (' || note_internal || ')'
+      ELSE '' 
+    END ||
+    CASE 
+      WHEN vehiclenote IS NOT NULL 
+           AND vehiclenote != '' 
+           AND vehiclenote != '-'
+      THEN ' [' || vehiclenote || ']'
+      ELSE '' 
+    END,
   NOW()
 FROM public.mabi_damage_data_raw_new
 ON CONFLICT (regnr, damage_date, damage_type_raw, COALESCE(note_customer, ''))
 DO UPDATE SET
   saludatum = EXCLUDED.saludatum,
   note_internal = EXCLUDED.note_internal,
-  vehiclenote = EXCLUDED. vehiclenote,
-  source = 'BUHS',           -- Uppdatera även vid konflikt
+  vehiclenote = EXCLUDED.vehiclenote,
+  source = 'BUHS',  -- Uppdatera även vid konflikt
+  legacy_damage_source_text = EXCLUDED.legacy_damage_source_text,  -- Uppdatera även vid konflikt
   imported_at = NOW();
 ```
 
@@ -163,10 +188,12 @@ WHERE DATE(imported_at) = CURRENT_DATE
 GROUP BY source;
 -- Förväntat: alla rader ska ha source='BUHS'
 
--- Kontrollera specifika regnr (byt ut GEU29F mot ett regnr från din import)
-SELECT * FROM public.damages 
-WHERE regnr = 'GEU29F' 
+-- Kontrollera specifika regnr (byt ut SAM31A mot ett regnr från din import)
+SELECT regnr, damage_type_raw, legacy_damage_source_text
+FROM public.damages 
+WHERE regnr = 'SAM31A' 
 ORDER BY damage_date DESC;
+-- Förväntat: legacy_damage_source_text ska vara ifylld (t.ex. "Lackskada - Lackskada, båda stötfångarna bak")
 ```
 
 ---
@@ -205,6 +232,9 @@ WHERE source = 'BUHS';
 ```sql
 SELECT COUNT(*) FROM public.damages_external;
 -- Ska matcha antalet BUHS-skador i damages
+
+SELECT COUNT(*) FROM public.damages WHERE source = 'BUHS';
+-- Dessa två COUNT ska vara samma! 
 ```
 
 ---
@@ -232,7 +262,7 @@ CREATE TABLE IF NOT EXISTS public. vehicles_staging (
 );
 
 -- Töm staging
-TRUNCATE public. vehicles_staging;
+TRUNCATE public.vehicles_staging;
 ```
 
 ---
@@ -278,9 +308,9 @@ SELECT
 FROM public.vehicles_staging
 ON CONFLICT (regnr)
 DO UPDATE SET
-  brand = EXCLUDED.brand,
-  model = EXCLUDED.model,
-  wheel_storage_location = EXCLUDED.wheel_storage_location,
+  brand = COALESCE(NULLIF(EXCLUDED.brand, ''), vehicles.brand),  -- Behåll befintlig om ny är tom
+  model = COALESCE(NULLIF(EXCLUDED. model, ''), vehicles.model),
+  wheel_storage_location = EXCLUDED.wheel_storage_location,  -- Uppdatera alltid (viktig info!)
   updated_at = NOW();
 ```
 
@@ -293,7 +323,7 @@ DO UPDATE SET
 SELECT COUNT(*) FROM public.vehicles WHERE DATE(updated_at) = CURRENT_DATE;
 
 -- Kontrollera specifika regnr
-SELECT * FROM public.vehicles WHERE regnr = 'GEU29F';
+SELECT * FROM public.vehicles WHERE regnr IN ('SAM31A', 'PJO748', 'MJA22G');
 ```
 
 ---
@@ -302,7 +332,7 @@ SELECT * FROM public.vehicles WHERE regnr = 'GEU29F';
 
 ### Problem: "duplicate key value violates unique constraint"
 
-**Orsak:** Dubbletter i CSV-filen eller staging-tabellen. 
+**Orsak:** Dubbletter i CSV-filen eller staging-tabellen.
 
 **Lösning:** Kör dedup-SQL (Steg 4) igen.
 
@@ -321,7 +351,20 @@ ADD COLUMN IF NOT EXISTS source text DEFAULT 'CHECK';
 
 ---
 
-### Problem: Befintliga BUHS-skador har `source='CHECK'` (fel)
+### Problem: "column 'legacy_damage_source_text' not found"
+
+**Orsak:** Äldre version av `damages`-tabellen saknar `legacy_damage_source_text`-kolumnen.
+
+**Lösning:**
+```sql
+-- Lägg till kolumnen om den saknas
+ALTER TABLE public.damages 
+ADD COLUMN IF NOT EXISTS legacy_damage_source_text text;
+```
+
+---
+
+### Problem:  Befintliga BUHS-skador har `source='CHECK'` (fel)
 
 **Orsak:** Tidigare importer gjordes INNAN `source`-fältet lades till i UPSERT-SQL.
 
@@ -329,7 +372,24 @@ ADD COLUMN IF NOT EXISTS source text DEFAULT 'CHECK';
 ```sql
 -- Fixa befintliga BUHS-skador
 UPDATE public.damages
-SET source = 'BUHS'
+SET 
+  source = 'BUHS',
+  legacy_damage_source_text = 
+    damage_type_raw || 
+    CASE 
+      WHEN note_customer IS NOT NULL 
+           AND note_customer != '' 
+           AND note_customer != damage_type_raw
+      THEN ' - ' || note_customer 
+      ELSE '' 
+    END ||
+    CASE 
+      WHEN note_internal IS NOT NULL 
+           AND note_internal != '' 
+           AND note_internal != '-'
+      THEN ' (' || note_internal || ')'
+      ELSE '' 
+    END
 WHERE source = 'CHECK'
   AND user_type IS NULL
   AND user_positions IS NULL
@@ -349,7 +409,7 @@ SELECT source, COUNT(*) FROM public.damages GROUP BY source;
 - [ ] Import till staging klar (mabi_damage_data_raw_new / vehicles_staging)
 - [ ] Dubbletter raderade i staging
 - [ ] UPSERT till huvudtabell klar (damages / vehicles)
-- [ ] Verifiering klar (rätt antal rader, rätt source för BUHS)
+- [ ] Verifiering klar (rätt antal rader, rätt source för BUHS, legacy_damage_source_text ifylld)
 - [ ] `damages_external` uppdaterad (endast för Skadefil)
 - [ ] Testregistreringsnummer kontrollerat i `/check` och `/status`
 
@@ -365,5 +425,5 @@ SELECT source, COUNT(*) FROM public.damages GROUP BY source;
 ---
 
 **Senast uppdaterad:** 2026-01-14  
-**Ägare:** Per Andersson (per.andersson@mabi.se)  
-**Version:** 2.0 (fixad source='BUHS' för BUHS-import)
+**Ägare:** Per Andersson (per.andersson@mabi. se)  
+**Version:** 2.1 (fixad legacy_damage_source_text-byggande i UPSERT)
