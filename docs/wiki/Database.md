@@ -225,14 +225,36 @@ Konsoliderad skadehistorik per fordon.   Innehåller både BUHS-importerade skad
 | `NYBIL` | Skada från nybilsinventering | `/nybil`-formulär → `/api/notify-nybil` |
 | `BUHS` | Skada importerad från BUHS-systemet | CSV-import (manuell) |
 
-#### legacy_damage_source_text - Viktigt för dubbel-rad hantering!  
+#### legacy_damage_source_text - Matchning & Spårbarhet
 
-**Typiska värden:**
-- `'buhs_v1_api'` = Importerad via BUHS API (automatisk vid `/check`)
-- `'buhs_csv_import'` = Importerad via CSV-fil (manuell import)
-- `NULL` = Ny skada dokumenterad i appen (inte från BUHS)
+**Typ:** `TEXT` (nullable)
 
-**Användning:** Se [csv-import-dubbel-rad. md](./csv-import-dubbel-rad.md) för detaljer om loose matching.
+**Värden:**
+- `NULL` - Ny skada dokumenterad i appen (från `/check` eller `/nybil`)
+- `'buhs_csv_import|YYYY-MM-DD|Typ|Notering'` - CSV-import från BUHS (manuell)
+- `'buhs_v1_api|..  .'` - BUHS API-import (automatisk, framtida)
+- `'Beskrivande text'` - Gamla BUHS-skador (före systematisk import, legacy)
+
+**Används för:**
+- **Loose matching** i `/check` - Identifierar och filtrerar BUHS-dubbletter från olika källor
+- **Idempotens vid CSV-import** - Förhindrar duplicering via unique constraint
+- **Spårbarhet** - Identifierar datakälla och tidpunkt för varje skada
+
+**Exempel:**
+```sql
+-- CSV-import genererar unik text per skada:   
+'buhs_csv_import|2025-12-22|Buckla|Buckla+ lack förarsida, 3 bucklor.'
+
+-- Loose matching matchar alla som börjar med 'buhs_': 
+SELECT * FROM damages 
+WHERE legacy_damage_source_text LIKE 'buhs_%' 
+  AND regnr = 'GDE67X'
+  AND original_damage_date = '2025-12-22';
+Se även:
+
+csv-import-dubbel-rad. md - Loose matching-logik
+CSV-import-skador - gör så här. md - Import-process
+database-constraints.md - Unique constraint på detta fält
 
 ---
 
