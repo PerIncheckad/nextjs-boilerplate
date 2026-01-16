@@ -266,6 +266,39 @@ const formatTankning = (tankning: any): string => {
   return '---';
 };
 
+/**
+ * Build odometer HTML for email display
+ * Shows dual odometer readings when locations differ, single reading otherwise
+ */
+const buildOdometerHtml = (payload: any): string => {
+  const platsOrt = payload.ort || '---';
+  const platsStation = payload.station || '---';
+  const bilenStarNuOrt = payload.bilen_star_nu?.ort || platsOrt;
+  const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
+  
+  const locationsDiffer = (platsOrt !== bilenStarNuOrt) || (platsStation !== bilenStarNuStation);
+  const matarstallningIncheckning = payload.matarstallning;
+  const matarstallningNu = payload.bilen_star_nu?.matarstallning_avlamning;
+  
+  if (locationsDiffer && matarstallningIncheckning && matarstallningNu) {
+    // Locations differ - show both readings with escaped location values
+    const escapedPlatsOrt = escapeHtml(platsOrt);
+    const escapedPlatsStation = escapeHtml(platsStation);
+    const escapedBilenStarNuOrt = escapeHtml(bilenStarNuOrt);
+    const escapedBilenStarNuStation = escapeHtml(bilenStarNuStation);
+    
+    return `
+      <tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning (${escapedPlatsOrt}/${escapedPlatsStation}):</strong> ${matarstallningIncheckning} km</td></tr>
+      <tr><td style="padding:4px 0;"><strong>Mätarställning nu (${escapedBilenStarNuOrt}/${escapedBilenStarNuStation}):</strong> ${matarstallningNu} km</td></tr>
+    `;
+  } else {
+    // Locations same or only one reading available - show single reading
+    const matarstallning = matarstallningNu || matarstallningIncheckning || '---';
+    const displayValue = matarstallning !== '---' ? `${matarstallning} km` : '---';
+    return `<tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${displayValue}</td></tr>`;
+  }
+};
+
 const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: string): string => {
   const bilagor: string[] = [];
   if (rekond.folder && rekond.hasMedia)
@@ -344,24 +377,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
   const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
   
-  // Odometer logic: show double reading if locations differ
-  const locationsDiffer = (platsOrt !== bilenStarNuOrt) || (platsStation !== bilenStarNuStation);
-  const matarstallningIncheckning = payload.matarstallning;
-  const matarstallningNu = payload.bilen_star_nu?.matarstallning_avlamning;
-  
-  let odometerHtml = '';
-  if (locationsDiffer && matarstallningIncheckning && matarstallningNu) {
-    // Locations differ - show both readings
-    odometerHtml = `
-      <tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning (${platsOrt}/${platsStation}):</strong> ${matarstallningIncheckning} km</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Mätarställning nu (${bilenStarNuOrt}/${bilenStarNuStation}):</strong> ${matarstallningNu} km</td></tr>
-    `;
-  } else {
-    // Locations same or only one reading available - show single reading
-    const matarstallning = matarstallningNu || matarstallningIncheckning || '---';
-    const displayValue = matarstallning !== '---' ? `${matarstallning} km` : '---';
-    odometerHtml = `<tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${displayValue}</td></tr>`;
-  }
+  // Build odometer HTML (handles dual/single display logic)
+  const odometerHtml = buildOdometerHtml(payload);
   
   // Saludatum purple banner (vehicle-level, not damage-specific)
   const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
@@ -488,24 +505,8 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
   const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
   
-  // Odometer logic: show double reading if locations differ
-  const locationsDiffer = (platsOrt !== bilenStarNuOrt) || (platsStation !== bilenStarNuStation);
-  const matarstallningIncheckning = payload.matarstallning;
-  const matarstallningNu = payload.bilen_star_nu?.matarstallning_avlamning;
-  
-  let odometerHtml = '';
-  if (locationsDiffer && matarstallningIncheckning && matarstallningNu) {
-    // Locations differ - show both readings
-    odometerHtml = `
-      <tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning (${platsOrt}/${platsStation}):</strong> ${matarstallningIncheckning} km</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Mätarställning nu (${bilenStarNuOrt}/${bilenStarNuStation}):</strong> ${matarstallningNu} km</td></tr>
-    `;
-  } else {
-    // Locations same or only one reading available - show single reading
-    const matarstallning = matarstallningNu || matarstallningIncheckning || '---';
-    const displayValue = matarstallning !== '---' ? `${matarstallning} km` : '---';
-    odometerHtml = `<tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${displayValue}</td></tr>`;
-  }
+  // Build odometer HTML (handles dual/single display logic)
+  const odometerHtml = buildOdometerHtml(payload);
   
   // Damage sections
   const existingDamages = payload.dokumenterade_skador || [];
