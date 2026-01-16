@@ -24,3 +24,30 @@
 - `/media` är skyddad
 - `/public-media` är publik (endast galleri, bucket är publik)
 - Ingen känslig data i public-media‑UI
+
+
+---
+
+## CSV-import:     BUHS Skadedata
+
+**Fullständig guide:** `CSV-import-skador - gör så här. md`
+
+### Snabbversion
+
+1. **Importera CSV** → Supabase Table Editor → `mabi_damage_data_raw_new`
+2. **Kör dedup-SQL** - Ta bort exakta dubbletter
+3. **Kör upsert-SQL** - Importera till `damages` med unik `legacy_damage_source_text`
+4. **Synka `damages_external`** - TRUNCATE + INSERT från `damages WHERE source='BUHS'`
+5. **Verifiera** - Kör verifieringsfrågor (antal, senaste import, inga dubbletter)
+6. **Testa** - Öppna `/check` med ett regnr från CSV: en
+
+**Frekvens:** Vid behov (när BUHS-data uppdateras)
+
+**Senaste import:**  
+- **Datum:** 2026-01-16
+- **Resultat:** 143 nya + 346 uppdaterade
+- **Totalt BUHS-skador:** 727
+
+**Viktig constraint:** `ux_damages_regnr_legacy_text` kräver unik text per (regnr, legacy_damage_source_text)
+- CSV-import löser detta genom att bygga:    `'buhs_csv_import|datum|typ|notering'`
+- Se `database-constraints.md` för detaljer
