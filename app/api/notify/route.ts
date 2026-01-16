@@ -665,6 +665,9 @@ export async function POST(request: Request) {
 
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
     const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
+    const hasSaludatumRisk = payload.hasRiskSaludatum === true;
+    
+    // "Other warnings" excludes low charge and saludatum risk
     const hasOtherWarnings =
       payload.rental?.unavailable ||
       payload.varningslampa?.lyser ||
@@ -677,20 +680,34 @@ export async function POST(request: Request) {
       payload.husdjur?.sanerad ||
       payload.rokning?.sanerad;
 
-    // Build emoji marker: ⚡ for low charge, ⚠️ for other warnings
+    // Build emoji marker: ⚡ for low charge, ⚠️ for saludatum or other warnings
     let emojiMarker = '';
-    if (showChargeWarning && hasOtherWarnings) {
+    if (showChargeWarning && (hasSaludatumRisk || hasOtherWarnings)) {
+      // Low charge + saludatum/other warnings: show both emojis
       emojiMarker = ' - ⚡ ⚠️ - ';
+    } else if (hasSaludatumRisk && hasOtherWarnings) {
+      // Saludatum + other warnings: show warning emoji
+      emojiMarker = ' - ⚠️ - ';
     } else if (showChargeWarning) {
+      // Only low charge emoji
       emojiMarker = ' - ⚡ - ';
+    } else if (hasSaludatumRisk) {
+      // Only saludatum warning emoji
+      emojiMarker = ' - ⚠️ - ';
     } else if (hasOtherWarnings) {
+      // Only other warnings emoji
       emojiMarker = ' - ⚠️ - ';
     } else {
+      // No warnings
       emojiMarker = ' - ';
     }
 
-    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}HUVUDSTATION`;
-    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}BILKONTROLL`;
+    // Add "!!!" for severe warnings (but NOT if only low charge or only saludatum)
+    const needsExclamation = hasOtherWarnings || (showChargeWarning && hasSaludatumRisk);
+    const exclamationMarker = needsExclamation ? '!!! - ' : '';
+
+    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}${exclamationMarker}HUVUDSTATION`;
+    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}${exclamationMarker}BILKONTROLL`;
 
     // =================================================================
     // DATABASE PERSISTENCE (normaliserad damage_type)
