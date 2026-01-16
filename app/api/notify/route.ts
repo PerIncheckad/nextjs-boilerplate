@@ -665,12 +665,14 @@ export async function POST(request: Request) {
 
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
     const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
-    const hasFarligaConditions =
+    const hasSaludatumRisk = payload.hasRiskSaludatum === true;
+    
+    // "Other warnings" excludes low charge and saludatum risk
+    const hasOtherWarnings =
       payload.rental?.unavailable ||
       payload.varningslampa?.lyser ||
       payload.rekond?.behoverRekond ||
       notRefueled ||
-      showChargeWarning ||
       payload.status?.insynsskyddSaknas ||
       (payload.nya_skador && payload.nya_skador.length > 0) ||
       (payload.dokumenterade_skador && payload.dokumenterade_skador.length > 0) ||
@@ -678,9 +680,38 @@ export async function POST(request: Request) {
       payload.husdjur?.sanerad ||
       payload.rokning?.sanerad;
 
-    const testMarker = hasFarligaConditions ? ' - !!! - ' : ' - ';
-    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}HUVUDSTATION`;
-    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}BILKONTROLL`;
+    // Build emoji marker: ⚡ for low charge, ⚠️ for saludatum or other warnings
+    // Priority order: low charge takes precedence, then saludatum, then other warnings
+    let emojiMarker = '';
+    if (showChargeWarning && (hasSaludatumRisk || hasOtherWarnings)) {
+      // Low charge + saludatum/other warnings: show both emojis
+      emojiMarker = ' - ⚡ ⚠️ - ';
+    } else if (hasSaludatumRisk && hasOtherWarnings) {
+      // Saludatum + other warnings (no low charge): show warning emoji only
+      emojiMarker = ' - ⚠️ - ';
+    } else if (showChargeWarning) {
+      // Only low charge emoji
+      emojiMarker = ' - ⚡ - ';
+    } else if (hasSaludatumRisk) {
+      // Only saludatum warning emoji
+      emojiMarker = ' - ⚠️ - ';
+    } else if (hasOtherWarnings) {
+      // Only other warnings emoji
+      emojiMarker = ' - ⚠️ - ';
+    } else {
+      // No warnings
+      emojiMarker = ' - ';
+    }
+
+    // Add "!!!" for severe warnings, with exceptions:
+    // - No "!!!" if ONLY low charge warning
+    // - No "!!!" if ONLY saludatum risk warning
+    // - Include "!!!" when: other warnings exist OR (both low charge AND saludatum present)
+    const needsExclamation = hasOtherWarnings || (showChargeWarning && hasSaludatumRisk);
+    const exclamationMarker = needsExclamation ? '!!! - ' : '';
+
+    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}${exclamationMarker}HUVUDSTATION`;
+    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}${exclamationMarker}BILKONTROLL`;
 
     // =================================================================
     // DATABASE PERSISTENCE (normaliserad damage_type)
