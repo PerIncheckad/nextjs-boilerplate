@@ -266,6 +266,43 @@ const formatTankning = (tankning: any): string => {
   return '---';
 };
 
+/**
+ * Build odometer HTML rows for email display
+ * Returns object with separate rows for "vid incheckning" and "nu" positions
+ * Shows dual odometer readings when locations differ, single reading otherwise
+ */
+const buildOdometerHtml = (payload: any): { vidIncheckning: string; nu: string } => {
+  const platsOrt = payload.ort || '---';
+  const platsStation = payload.station || '---';
+  const bilenStarNuOrt = payload.bilen_star_nu?.ort || platsOrt;
+  const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
+  
+  const locationsDiffer = (platsOrt !== bilenStarNuOrt) || (platsStation !== bilenStarNuStation);
+  const matarstallningIncheckning = payload.matarstallning;
+  const matarstallningNu = payload.bilen_star_nu?.matarstallning_avlamning;
+  
+  if (locationsDiffer && matarstallningIncheckning && matarstallningNu) {
+    // Locations differ - show both readings
+    const escapedIncheckning = escapeHtml(String(matarstallningIncheckning));
+    const escapedNu = escapeHtml(String(matarstallningNu));
+    
+    return {
+      vidIncheckning: `<tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning:</strong> ${escapedIncheckning} km</td></tr>`,
+      nu: `<tr><td style="padding:4px 0;"><strong>Mätarställning nu:</strong> ${escapedNu} km</td></tr>`
+    };
+  } else {
+    // Locations same or only one reading available - show single reading in "vid incheckning" position
+    const matarstallning = matarstallningNu || matarstallningIncheckning || '---';
+    const displayValue = matarstallning !== '---' ? `${matarstallning} km` : '---';
+    const escapedDisplayValue = escapeHtml(displayValue);
+    
+    return {
+      vidIncheckning: `<tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning:</strong> ${escapedDisplayValue}</td></tr>`,
+      nu: '' // No second row when locations are the same
+    };
+  }
+};
+
 const buildBilagorSection = (rekond: any, husdjur: any, rokning: any, siteUrl: string): string => {
   const bilagor: string[] = [];
   if (rekond.folder && rekond.hasMedia)
@@ -323,8 +360,6 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   
   // Build fact box content
   const bilModel = payload.bilmodel || payload.brand_model || '---';
-  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
-  const hjultyp = payload.hjultyp || '---';
   
   // Fuel or charge info
   let fuelOrChargeInfo = '';
@@ -344,6 +379,9 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const bilenStarNuOrt = payload.bilen_star_nu?.ort || platsOrt;
   const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
   const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
+  
+  // Build odometer HTML (handles dual/single display logic)
+  const odometerHtml = buildOdometerHtml(payload);
   
   // Saludatum purple banner (vehicle-level, not damage-specific)
   const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
@@ -427,11 +465,11 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         <table width="100%" style="font-size:14px;">
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${bilModel}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${matarstallning}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${hjultyp}</td></tr>
-            ${fuelOrChargeInfo}
             <tr><td style="padding:4px 0;"><strong>Plats för incheckning:</strong> ${platsOrt} / ${platsStation}</td></tr>
+            ${odometerHtml.vidIncheckning}
+            ${fuelOrChargeInfo}
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+            ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
           </tbody>
         </table>
@@ -462,12 +500,16 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   
   // Build fact box content
   const bilModel = payload.bilmodel || payload.brand_model || '---';
-  const matarstallning = payload.matarstallning ? `${payload.matarstallning} km` : '---';
   
   // Location info
-  const bilenStarNuOrt = payload.bilen_star_nu?.ort || payload.ort || '---';
-  const bilenStarNuStation = payload.bilen_star_nu?.station || payload.station || '---';
+  const platsOrt = payload.ort || '---';
+  const platsStation = payload.station || '---';
+  const bilenStarNuOrt = payload.bilen_star_nu?.ort || platsOrt;
+  const bilenStarNuStation = payload.bilen_star_nu?.station || platsStation;
   const parkeringsInfo = payload.bilen_star_nu?.kommentar || null;
+  
+  // Build odometer HTML (handles dual/single display logic)
+  const odometerHtml = buildOdometerHtml(payload);
   
   // Damage sections
   const existingDamages = payload.dokumenterade_skador || [];
@@ -529,8 +571,10 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         <table width="100%" style="font-size:14px;">
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${bilModel}</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${matarstallning}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Plats för incheckning:</strong> ${platsOrt} / ${platsStation}</td></tr>
+            ${odometerHtml.vidIncheckning}
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+            ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
           </tbody>
         </table>
