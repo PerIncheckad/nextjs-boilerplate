@@ -681,12 +681,13 @@ export async function POST(request: Request) {
       payload.rokning?.sanerad;
 
     // Build emoji marker: ⚡ for low charge, ⚠️ for saludatum or other warnings
+    // Priority order: low charge takes precedence, then saludatum, then other warnings
     let emojiMarker = '';
     if (showChargeWarning && (hasSaludatumRisk || hasOtherWarnings)) {
       // Low charge + saludatum/other warnings: show both emojis
       emojiMarker = ' - ⚡ ⚠️ - ';
     } else if (hasSaludatumRisk && hasOtherWarnings) {
-      // Saludatum + other warnings: show warning emoji
+      // Saludatum + other warnings (no low charge): show warning emoji only
       emojiMarker = ' - ⚠️ - ';
     } else if (showChargeWarning) {
       // Only low charge emoji
@@ -702,7 +703,10 @@ export async function POST(request: Request) {
       emojiMarker = ' - ';
     }
 
-    // Add "!!!" for severe warnings (but NOT if only low charge or only saludatum)
+    // Add "!!!" for severe warnings, with exceptions:
+    // - No "!!!" if ONLY low charge warning
+    // - No "!!!" if ONLY saludatum risk warning
+    // - Include "!!!" when: other warnings exist OR (both low charge AND saludatum present)
     const needsExclamation = hasOtherWarnings || (showChargeWarning && hasSaludatumRisk);
     const exclamationMarker = needsExclamation ? '!!! - ' : '';
 
