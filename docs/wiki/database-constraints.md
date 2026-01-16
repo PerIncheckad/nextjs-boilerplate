@@ -149,6 +149,35 @@ VALUES ('ABC123', 'REPA', 'BUHS', ...);
 
 ---
 
+
+Code
+---
+
+### Unique Index:    `ux_damages_regnr_legacy_text`
+
+**Syfte:** Förhindra att samma BUHS-skada sparas flera gånger med exakt samma textbeskrivning per regnr.
+
+**Definition:**
+```sql
+CREATE UNIQUE INDEX ux_damages_regnr_legacy_text
+  ON public.damages (regnr, legacy_damage_source_text)
+  WHERE legacy_damage_source_text IS NOT NULL;
+Viktigt för CSV-import:
+
+CSV-import använder unika texter per skada: 'buhs_csv_import|YYYY-MM-DD|Typ|Notering'
+Detta gör att flera skador från samma regnr kan importeras utan konflikt
+Constrainten förhindrar att EXAKT samma BUHS-text dupliceras
+Se CSV-import-skador - gör så här. md för detaljer
+Exempel:
+
+Code
+GDE67X kan ha:   
+✅ 'buhs_csv_import|2025-12-22|Buckla|Buckla+ lack förarsida, 3 bucklor.'
+✅ 'buhs_csv_import|2025-12-22|Buckla|En Buckla höger sida'
+❌ 'buhs_csv_import|2025-12-22|Buckla|Buckla+ lack förarsida, 3 bucklor.' (dublett)
+
+---
+
 ## 3) `nybil_inventering`-tabellen
 
 ### Bränsletyp (`bransletyp`)
