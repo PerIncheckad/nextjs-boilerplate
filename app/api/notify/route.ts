@@ -665,12 +665,11 @@ export async function POST(request: Request) {
 
     const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
     const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
-    const hasFarligaConditions =
+    const hasOtherWarnings =
       payload.rental?.unavailable ||
       payload.varningslampa?.lyser ||
       payload.rekond?.behoverRekond ||
       notRefueled ||
-      showChargeWarning ||
       payload.status?.insynsskyddSaknas ||
       (payload.nya_skador && payload.nya_skador.length > 0) ||
       (payload.dokumenterade_skador && payload.dokumenterade_skador.length > 0) ||
@@ -678,9 +677,20 @@ export async function POST(request: Request) {
       payload.husdjur?.sanerad ||
       payload.rokning?.sanerad;
 
-    const testMarker = hasFarligaConditions ? ' - !!! - ' : ' - ';
-    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}HUVUDSTATION`;
-    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${testMarker}BILKONTROLL`;
+    // Build emoji marker: ⚡ for low charge, ⚠️ for other warnings
+    let emojiMarker = '';
+    if (showChargeWarning && hasOtherWarnings) {
+      emojiMarker = ' - ⚡ ⚠️ - ';
+    } else if (showChargeWarning) {
+      emojiMarker = ' - ⚡ - ';
+    } else if (hasOtherWarnings) {
+      emojiMarker = ' - ⚠️ - ';
+    } else {
+      emojiMarker = ' - ';
+    }
+
+    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}HUVUDSTATION`;
+    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}BILKONTROLL`;
 
     // =================================================================
     // DATABASE PERSISTENCE (normaliserad damage_type)
