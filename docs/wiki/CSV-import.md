@@ -112,6 +112,10 @@ SELECT COUNT(*) FROM public.mabi_damage_data_raw_new;
 
 ---
 
+### Problem:  CSV-import visar "NYA SKADOR" fast de redan importerats via API
+
+**Se:** [Hantering av dubbel-rad BUHS-import](./csv-import-dubbel-rad.md)
+
 ### Steg 5: UPSERT från staging till damages
 
 **⚠️ KRITISKT:  Denna SQL sätter `source='BUHS'` OCH bygger `legacy_damage_source_text`! **
