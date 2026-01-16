@@ -148,6 +148,11 @@ function normalizeDamageTypeForKey(damageType: string | null | undefined): strin
 // 3. CORE DATA FETCHING FUNCTION
 // =================================================================
 
+// Helper to create a loose BUHS matching key (matches all BUHS sources for same date)
+function createLooseBuhsKey(regnr: string, date: string): string {
+  return `${regnr}|${date}|BUHS_LOOSE`;
+}
+
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
@@ -283,7 +288,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   // Create a lookup map of inventoried damages for efficient access
   const inventoriedMap = new Map<string, string>();
-  const looseBuhsMap = new Map<string, boolean>();  // NEW: Loose BUHS matching
+  const looseBuhsSet = new Set<string>();  // NEW: Loose BUHS matching
 
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
@@ -312,8 +317,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         
         // LOOSE BUHS KEY (matches all BUHS sources for same date) - NEW!
         if (inv.legacy_damage_source_text.startsWith('buhs_') && inv.original_damage_date) {
-          const looseBuhsKey = `${cleanedRegnr}|${inv.original_damage_date}|BUHS_LOOSE`;
-          looseBuhsMap.set(looseBuhsKey, true);
+          looseBuhsSet.add(createLooseBuhsKey(cleanedRegnr, inv.original_damage_date));
         }
       }
     }
@@ -339,7 +343,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     
     // NEW: Check BOTH exact text AND loose BUHS key
     const isLooseBuhsMatch = leg.damage_date 
-      ? looseBuhsMap.has(`${cleanedRegnr}|${leg.damage_date}|BUHS_LOOSE`)
+      ? looseBuhsSet.has(createLooseBuhsKey(cleanedRegnr, leg.damage_date))
       : false;
     
     const finalIsInventoried = isInventoried || isLooseBuhsMatch;  // COMBINE!
