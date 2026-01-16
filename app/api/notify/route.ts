@@ -286,16 +286,19 @@ const buildOdometerHtml = (payload: any): string => {
     const escapedPlatsStation = escapeHtml(platsStation);
     const escapedBilenStarNuOrt = escapeHtml(bilenStarNuOrt);
     const escapedBilenStarNuStation = escapeHtml(bilenStarNuStation);
+    const escapedIncheckning = escapeHtml(String(matarstallningIncheckning));
+    const escapedNu = escapeHtml(String(matarstallningNu));
     
     return `
-      <tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning (${escapedPlatsOrt}/${escapedPlatsStation}):</strong> ${matarstallningIncheckning} km</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Mätarställning nu (${escapedBilenStarNuOrt}/${escapedBilenStarNuStation}):</strong> ${matarstallningNu} km</td></tr>
+      <tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning (${escapedPlatsOrt}/${escapedPlatsStation}):</strong> ${escapedIncheckning} km</td></tr>
+      <tr><td style="padding:4px 0;"><strong>Mätarställning nu (${escapedBilenStarNuOrt}/${escapedBilenStarNuStation}):</strong> ${escapedNu} km</td></tr>
     `;
   } else {
     // Locations same or only one reading available - show single reading
     const matarstallning = matarstallningNu || matarstallningIncheckning || '---';
     const displayValue = matarstallning !== '---' ? `${matarstallning} km` : '---';
-    return `<tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${displayValue}</td></tr>`;
+    const escapedDisplayValue = escapeHtml(displayValue);
+    return `<tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${escapedDisplayValue}</td></tr>`;
   }
 };
 
