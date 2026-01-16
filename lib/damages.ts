@@ -148,6 +148,11 @@ function normalizeDamageTypeForKey(damageType: string | null | undefined): strin
 // 3. CORE DATA FETCHING FUNCTION
 // =================================================================
 
+// Helper to create a loose BUHS matching key (matches all BUHS sources for same date)
+function createLooseBuhsKey(regnr: string, date: string): string {
+  return `${regnr}|${date}|BUHS_LOOSE`;
+}
+
 export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const cleanedRegnr = regnr.toUpperCase().trim();
 
@@ -172,7 +177,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
       .from('damages')
-      .select('legacy_damage_source_text, user_type, user_positions')
+      .select('legacy_damage_source_text, user_type, user_positions, original_damage_date')
       .eq('regnr', cleanedRegnr)
       .not('legacy_damage_source_text', 'is', null),
     supabase
@@ -283,6 +288,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   // Create a lookup map of inventoried damages for efficient access
   const inventoriedMap = new Map<string, string>();
+  const looseBuhsSet = new Set<string>();  // NEW: Loose BUHS matching
+
   if (inventoriedDamagesResponse.data) {
     for (const inv of inventoriedDamagesResponse.data) {
       if (inv.legacy_damage_source_text) {
@@ -305,7 +312,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
           }
         }
         
+        // EXACT KEY (for exact text matching)
         inventoriedMap.set(inv.legacy_damage_source_text, newText);
+        
+        // LOOSE BUHS KEY (matches all BUHS sources for same date) - NEW!
+        if (inv.legacy_damage_source_text.startsWith('buhs_') && inv.original_damage_date) {
+          looseBuhsSet.add(createLooseBuhsKey(cleanedRegnr, inv.original_damage_date));
+        }
       }
     }
   }
@@ -327,6 +340,14 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     const leg = legacyDamages[i];
     const originalText = getLegacyDamageText(leg);
     const isInventoried = inventoriedMap.has(originalText);
+    
+    // NEW: Check BOTH exact text AND loose BUHS key
+    const isLooseBuhsMatch = leg.damage_date 
+      ? looseBuhsSet.has(createLooseBuhsKey(cleanedRegnr, leg.damage_date))
+      : false;
+    
+    const finalIsInventoried = isInventoried || isLooseBuhsMatch;  // COMBINE!
+    
     const displayText = isInventoried ? inventoriedMap.get(originalText)! : originalText;
 
     if (displayText) {
@@ -394,7 +415,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         // Mark as inventoried if already documented OR if handled in last check-in
         // OR if handled by date-based backup logic
         // This prevents the damage from showing in "Befintliga skador att hantera"
-        is_inventoried: isInventoried || (handledInfo !== null) || isHandledByDateLogic,
+        is_inventoried: finalIsInventoried || (handledInfo !== null) || isHandledByDateLogic,  // USE finalIsInventoried
         handled_type: handledInfo?.type || null,
         handled_damage_type: handledInfo?.damage_type || null,
         handled_car_part: handledInfo?.car_part || null,
