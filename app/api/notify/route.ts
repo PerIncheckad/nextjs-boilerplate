@@ -267,10 +267,11 @@ const formatTankning = (tankning: any): string => {
 };
 
 /**
- * Build odometer HTML for email display
+ * Build odometer HTML rows for email display
+ * Returns object with separate rows for "vid incheckning" and "nu" positions
  * Shows dual odometer readings when locations differ, single reading otherwise
  */
-const buildOdometerHtml = (payload: any): string => {
+const buildOdometerHtml = (payload: any): { vidIncheckning: string; nu: string } => {
   const platsOrt = payload.ort || '---';
   const platsStation = payload.station || '---';
   const bilenStarNuOrt = payload.bilen_star_nu?.ort || platsOrt;
@@ -281,24 +282,24 @@ const buildOdometerHtml = (payload: any): string => {
   const matarstallningNu = payload.bilen_star_nu?.matarstallning_avlamning;
   
   if (locationsDiffer && matarstallningIncheckning && matarstallningNu) {
-    // Locations differ - show both readings with escaped location values
-    const escapedPlatsOrt = escapeHtml(platsOrt);
-    const escapedPlatsStation = escapeHtml(platsStation);
-    const escapedBilenStarNuOrt = escapeHtml(bilenStarNuOrt);
-    const escapedBilenStarNuStation = escapeHtml(bilenStarNuStation);
+    // Locations differ - show both readings
     const escapedIncheckning = escapeHtml(String(matarstallningIncheckning));
     const escapedNu = escapeHtml(String(matarstallningNu));
     
-    return `
-      <tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning (${escapedPlatsOrt}/${escapedPlatsStation}):</strong> ${escapedIncheckning} km</td></tr>
-      <tr><td style="padding:4px 0;"><strong>Mätarställning nu (${escapedBilenStarNuOrt}/${escapedBilenStarNuStation}):</strong> ${escapedNu} km</td></tr>
-    `;
+    return {
+      vidIncheckning: `<tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning:</strong> ${escapedIncheckning} km</td></tr>`,
+      nu: `<tr><td style="padding:4px 0;"><strong>Mätarställning nu:</strong> ${escapedNu} km</td></tr>`
+    };
   } else {
-    // Locations same or only one reading available - show single reading
+    // Locations same or only one reading available - show single reading in "vid incheckning" position
     const matarstallning = matarstallningNu || matarstallningIncheckning || '---';
     const displayValue = matarstallning !== '---' ? `${matarstallning} km` : '---';
     const escapedDisplayValue = escapeHtml(displayValue);
-    return `<tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${escapedDisplayValue}</td></tr>`;
+    
+    return {
+      vidIncheckning: `<tr><td style="padding:4px 0;"><strong>Mätarställning vid incheckning:</strong> ${escapedDisplayValue}</td></tr>`,
+      nu: '' // No second row when locations are the same
+    };
   }
 };
 
@@ -359,7 +360,6 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   
   // Build fact box content
   const bilModel = payload.bilmodel || payload.brand_model || '---';
-  const hjultyp = payload.hjultyp || '---';
   
   // Fuel or charge info
   let fuelOrChargeInfo = '';
@@ -465,11 +465,11 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         <table width="100%" style="font-size:14px;">
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${bilModel}</td></tr>
-            ${odometerHtml}
-            <tr><td style="padding:4px 0;"><strong>Hjultyp:</strong> ${hjultyp}</td></tr>
-            ${fuelOrChargeInfo}
             <tr><td style="padding:4px 0;"><strong>Plats för incheckning:</strong> ${platsOrt} / ${platsStation}</td></tr>
+            ${odometerHtml.vidIncheckning}
+            ${fuelOrChargeInfo}
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+            ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
           </tbody>
         </table>
@@ -571,8 +571,10 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
         <table width="100%" style="font-size:14px;">
           <tbody>
             <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${bilModel}</td></tr>
-            ${odometerHtml}
+            <tr><td style="padding:4px 0;"><strong>Plats för incheckning:</strong> ${platsOrt} / ${platsStation}</td></tr>
+            ${odometerHtml.vidIncheckning}
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+            ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
           </tbody>
         </table>
