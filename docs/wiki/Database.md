@@ -1,19 +1,39 @@
 # Database - Supabase
 
-Detta dokument beskriver databasstrukturen för Incheckad-systemet. 
+Detta dokument beskriver databasstrukturen för Incheckad-systemet.  
+
+---
+
+## 📋 Snabblänkar
+
+- [Översikt](#översikt)
+- [Tabeller](#tabeller)
+- [Constraints & Giltiga Värden](#constraints--giltiga-värden) ⭐ NYA
+- [Storage Buckets](#storage-buckets)
+- [RPC-funktioner](#rpc-funktioner)
+- [Dataflöde](#dataflöde)
+- [Matchningslogik för BUHS-skador](#matchningslogik-för-buhs-skador)
+- [Vanliga SQL-frågor](#vanliga-sql-frågor-för-felsökning)
+
+**Se även:**
+- [database-constraints.md](./database-constraints.md) - Detaljerad constraint-referens
+- [CSV-import. md](./CSV-import.md) - CSV-import av BUHS & Bilkontroll
+- [troubleshooting.md](./troubleshooting.md) - Felsökning
+
+---
 
 ## Översikt
 
 Systemet använder Supabase (PostgreSQL) med följande huvudtabeller:
 
-| Tabell | Syfte |
-|--------|-------|
-| `checkins` | Incheckningar av fordon |
-| `checkin_damages` | Skador kopplade till en specifik incheckning |
-| `damages` | Konsoliderad skadehistorik per fordon |
-| `damages_external` | BUHS-skador (Skadefilen) - importerad CSV |
-| `nybil_inventering` | Nybilsregistreringar vid leverans |
-| `vehicles` | Fordonsmaster från Bilkontroll-filen (BUHS) |
+| Tabell | Syfte | Källa |
+|--------|-------|-------|
+| `checkins` | Incheckningar av fordon | `/check`-formulär |
+| `checkin_damages` | Skador kopplade till specifik incheckning | `/check`-formulär |
+| `damages` | Konsoliderad skadehistorik per fordon | `/check`, `/nybil`, CSV-import |
+| `damages_external` | BUHS-skador (Skadefilen) - RPC-källa | CSV-import (manuell) |
+| `nybil_inventering` | Nybilsregistreringar vid leverans | `/nybil`-formulär |
+| `vehicles` | Fordonsmaster från Bilkontroll | CSV-import (manuell) |
 
 ---
 
@@ -21,13 +41,13 @@ Systemet använder Supabase (PostgreSQL) med följande huvudtabeller:
 
 ### checkins
 
-Lagrar varje incheckning av ett fordon. 
+Lagrar varje incheckning av ett fordon.  
 
 | Kolumn | Typ | Nullable | Default | Beskrivning |
 |--------|-----|----------|---------|-------------|
 | `id` | uuid | NO | gen_random_uuid() | Primärnyckel |
 | `created_at` | timestamptz | NO | now() | Skapad tidpunkt |
-| `regnr` | text | NO | - | Registreringsnummer |
+| `regnr` | text | NO | - | Registreringsnummer (UPPERCASE) |
 | `notes` | text | YES | - | Anteckningar |
 | `photo_urls` | text[] | YES | '{}' | Foto-URLer |
 | `station_id` | uuid | YES | - | Stations-ID (FK) |
@@ -35,26 +55,26 @@ Lagrar varje incheckning av ett fordon.
 | `employee_id` | uuid | YES | - | Anställd-ID |
 | `regnr_valid` | boolean | YES | - | Regnr validerat |
 | `no_damage` | boolean | YES | false | Inga skador |
-| `odometer_km` | integer | YES | - | Mätarställning i km |
+| `odometer_km` | integer | YES | - | Mätarställning i km (>=0) |
 | `fuel_full` | boolean | YES | - | Fulltankad |
 | `adblue_ok` | boolean | YES | - | AdBlue OK |
 | `washer_ok` | boolean | YES | - | Spolarvätska OK |
 | `cargo_cover_ok` | boolean | YES | - | Lastskydd OK |
-| `charge_cables_count` | smallint | YES | - | Antal laddkablar |
+| `charge_cables_count` | smallint | YES | - | Antal laddkablar (legacy) |
 | `no_new_damage` | boolean | YES | - | Inga nya skador |
-| `tires_type` | text | YES | - | Däcktyp (legacy) |
+| `tires_type` | text | YES | - | Däcktyp:   'sommar' \| 'vinter' |
 | `privacy_cover_ok` | boolean | YES | - | Insynsskydd OK |
-| `wheel_type` | text | YES | - | Hjultyp (constraint:  'sommar' \| 'vinter') |
+| `wheel_type` | text | YES | - | Hjultyp:  'sommar' \| 'vinter' |
 | `chargers_count` | integer | YES | - | Antal laddare |
 | `parcel_shelf_ok` | boolean | YES | - | Hatthylla OK |
 | `wheels_on` | USER-DEFINED | YES | - | Monterade hjul |
-| `charging_cables` | smallint | YES | - | Laddkablar |
+| `charging_cables` | smallint | YES | - | Laddkablar (0-2) |
 | `wash_needed` | boolean | YES | - | Tvätt behövs |
 | `vacuum_needed` | boolean | YES | - | Dammsugning behövs |
-| `region` | text | YES | - | Region |
+| `region` | text | YES | - | Region:   'NORR' \| 'MITT' \| 'SYD' ⭐ |
 | `city` | text | YES | - | Stad för incheckning |
 | `station` | text | YES | - | Station för incheckning |
-| `status` | text | YES | - | Status |
+| `status` | text | YES | - | Status:  NULL \| 'checked_in' \| 'COMPLETED' ⭐ |
 | `checklist` | jsonb | YES | '{}' | Checklista (se struktur nedan) |
 | `tvattad` | boolean | YES | - | Tvättad |
 | `rekond_behov` | boolean | YES | - | Rekond behövs |
@@ -68,8 +88,8 @@ Lagrar varje incheckning av ett fordon.
 | `locked_until` | timestamptz | YES | - | Låst till |
 | `updated_at` | timestamptz | YES | now() | Uppdaterad |
 | `adblue` | text | YES | - | AdBlue-status |
-| `current_city` | text | YES | - | Bilen står nu:  Ort |
-| `current_station` | text | YES | - | Bilen står nu: Station |
+| `current_city` | text | YES | - | Bilen står nu:   Ort |
+| `current_station` | text | YES | - | Bilen står nu:  Station |
 | `current_location_note` | text | YES | - | Platsnotering |
 | `checker_name` | text | YES | - | Incheckarens namn |
 | `checker_email` | text | YES | - | Incheckarens email |
@@ -95,7 +115,7 @@ Lagrar varje incheckning av ett fordon.
   "pet_sanitation_comment": string,
   "pet_sanitation_folder": string,
   "smoking_sanitation_needed": boolean,
-  "smoking_sanitation_comment": string,
+  "smoking_sanitation_comment":  string,
   "smoking_sanitation_folder": string,
   "privacy_cover_missing": boolean,
   "rekond_comment": string,
@@ -122,16 +142,18 @@ Skador dokumenterade vid en specifik incheckning.
 | `position` | varchar | YES | - | Position (Höger fram, Vänster bak, etc.) |
 | `video_urls` | text[] | YES | - | Video-URLer |
 | `positions` | jsonb | YES | - | Positioner (array, se struktur nedan) |
-| `regnr` | text | YES | - | Registreringsnummer |
+| `regnr` | text | YES | - | Registreringsnummer (UPPERCASE) |
+
+**OBS! ** `checkin_damages` har **INTE** kolumnen `note_customer` (finns endast i `damages`).
 
 #### type-värden
 
-| Värde | Beskrivning |
-|-------|-------------|
-| `new` | Ny skada dokumenterad vid denna incheckning |
-| `documented` | Befintlig BUHS-skada dokumenterad med foton |
-| `existing` | Befintlig BUHS-skada bekräftad |
-| `not_found` | Befintlig BUHS-skada kunde inte hittas |
+| Värde | Beskrivning | När används |
+|-------|-------------|-------------|
+| `new` | Ny skada dokumenterad vid denna incheckning | `/check` - "Nya skador" |
+| `documented` | Befintlig BUHS-skada dokumenterad med foton | `/check` - "Hantera befintliga" |
+| `existing` | Befintlig BUHS-skada bekräftad | `/check` - "Hantera befintliga" |
+| `not_found` | Befintlig BUHS-skada kunde inte hittas | `/check` - "Hantera befintliga" |
 
 #### positions (jsonb) struktur
 
@@ -140,7 +162,7 @@ Skador dokumenterade vid en specifik incheckning.
   {
     "id": "pos-1768219789568",
     "carPart": "Dörr utsida",
-    "position": "Höger bak"
+    "position":  "Höger bak"
   }
 ]
 ```
@@ -149,12 +171,12 @@ Skador dokumenterade vid en specifik incheckning.
 
 ### damages
 
-Konsoliderad skadehistorik per fordon.  Innehåller både BUHS-importerade skador och skador från incheckningar.
+Konsoliderad skadehistorik per fordon.   Innehåller både BUHS-importerade skador och skador från incheckningar.
 
 | Kolumn | Typ | Nullable | Default | Beskrivning |
 |--------|-----|----------|---------|-------------|
 | `id` | uuid | NO | gen_random_uuid() | Primärnyckel |
-| `regnr` | text | NO | - | Registreringsnummer |
+| `regnr` | text | NO | - | Registreringsnummer (UPPERCASE) |
 | `damage_date` | date | YES | - | Skadedatum |
 | `region` | text | YES | - | Region |
 | `ort` | text | YES | - | Ort |
@@ -175,14 +197,14 @@ Konsoliderad skadehistorik per fordon.  Innehåller både BUHS-importerade skado
 | `vehiclenote` | text | YES | - | Fordonsnotering |
 | `media_url` | text | YES | - | Media-URL (legacy) |
 | `notering` | text | YES | - | Notering |
-| `legacy_damage_source_text` | text | YES | - | Original BUHS-text för matchning |
+| `legacy_damage_source_text` | text | YES | - | Original BUHS-text för matchning ⭐ |
 | `user_type` | text | YES | - | Skadetyp vald av användare (Jack, Repa, etc.) |
 | `user_positions` | jsonb | YES | - | Positioner (samma format som checkin_damages) |
 | `original_damage_date` | date | YES | - | Ursprungligt skadedatum |
 | `legacy_loose_key` | text | YES | - | Legacy matchningsnyckel |
 | `uploads` | jsonb | YES | - | Media-uploads (se struktur nedan) |
 | `imported_at` | timestamptz | YES | now() | Importerad tidpunkt |
-| `source` | text | YES | 'CHECK' | Källa:  'CHECK' \| 'NYBIL' \| 'BUHS' |
+| `source` | text | YES | 'CHECK' | Källa:   'CHECK' \| 'NYBIL' \| 'BUHS' ⭐ |
 | `nybil_inventering_id` | uuid | YES | - | FK till nybil_inventering.id |
 
 #### uploads (jsonb) struktur
@@ -197,11 +219,20 @@ Konsoliderad skadehistorik per fordon.  Innehåller både BUHS-importerade skado
 
 #### source-värden
 
-| Värde | Beskrivning |
-|-------|-------------|
-| `CHECK` | Skada från incheckning |
-| `NYBIL` | Skada från nybilsinventering |
-| `BUHS` | Skada importerad från BUHS-systemet |
+| Värde | Beskrivning | Används när |
+|-------|-------------|-------------|
+| `CHECK` | Skada från incheckning | `/check`-formulär → `/api/notify` |
+| `NYBIL` | Skada från nybilsinventering | `/nybil`-formulär → `/api/notify-nybil` |
+| `BUHS` | Skada importerad från BUHS-systemet | CSV-import (manuell) |
+
+#### legacy_damage_source_text - Viktigt för dubbel-rad hantering!  
+
+**Typiska värden:**
+- `'buhs_v1_api'` = Importerad via BUHS API (automatisk vid `/check`)
+- `'buhs_csv_import'` = Importerad via CSV-fil (manuell import)
+- `NULL` = Ny skada dokumenterad i appen (inte från BUHS)
+
+**Användning:** Se [csv-import-dubbel-rad. md](./csv-import-dubbel-rad.md) för detaljer om loose matching.
 
 ---
 
@@ -211,7 +242,7 @@ Konsoliderad skadehistorik per fordon.  Innehåller både BUHS-importerade skado
 
 | Kolumn | Typ | Nullable | Beskrivning |
 |--------|-----|----------|-------------|
-| `regnr` | text | NO | Registreringsnummer (primärnyckel) |
+| `regnr` | text | NO | Registreringsnummer (primärnyckel, UPPERCASE) |
 | `saludatum` | date | YES | Saludatum |
 | `damage_date` | date | YES | Skadedatum |
 | `damage_type_raw` | text | YES | Skadetyp (t.ex. "Repa", "Spricka") |
@@ -219,27 +250,38 @@ Konsoliderad skadehistorik per fordon.  Innehåller både BUHS-importerade skado
 | `note_internal` | text | YES | Intern notering |
 | `vehiclenote` | text | YES | Fordonsnotering |
 
-**Viktigt:** Denna tabell uppdateras genom manuell CSV-import.  Den innehåller ~566 rader (januari 2026).
+**Viktigt:** 
+- Denna tabell uppdateras genom manuell CSV-import.   
+- Den innehåller ~566 rader (januari 2026).
+- **MÅSTE** synkroniseras med `damages`-tabellen efter varje BUHS-import!  
+
+**Synkronisering:**
+```sql
+TRUNCATE damages_external;
+INSERT INTO damages_external SELECT ...  FROM damages WHERE source = 'BUHS';
+```
+
+**Se:** [CSV-import. md § 2 Steg 7](./CSV-import.md#steg-7-uppdatera-damages_external-rpc-källa)
 
 ---
 
 ### nybil_inventering
 
-Nybilsregistreringar vid leverans till MABI. 
+Nybilsregistreringar vid leverans till MABI.  
 
 | Kolumn | Typ | Nullable | Default | Beskrivning |
 |--------|-----|----------|---------|-------------|
 | `id` | uuid | NO | gen_random_uuid() | Primärnyckel |
 | `created_at` | timestamptz | NO | now() | Skapad tidpunkt |
 | `updated_at` | timestamptz | NO | now() | Uppdaterad tidpunkt |
-| `regnr` | text | NO | - | Registreringsnummer |
+| `regnr` | text | NO | - | Registreringsnummer (UPPERCASE) |
 | `ankomstdatum` | date | YES | - | Ankomstdatum |
 | `fordonstyp` | text | YES | - | Fordonstyp |
 | `bilmarke` | text | YES | - | Bilmärke |
 | `bilmodell` | text | YES | - | Bilmodell (legacy) |
 | `modell` | text | YES | - | Modell |
 | `vaxel` | text | YES | - | Växellåda |
-| `bransletyp` | text | YES | - | Bränsletyp |
+| `bransletyp` | text | YES | - | Bränsletyp:   'bensin_diesel' \| 'elbil' \| 'hybrid' \| 'laddhybrid' ⭐ |
 | `mabi_nr` | text | YES | - | MABI-nummer |
 | `dragkrok` | boolean | YES | - | Har dragkrok |
 | `gummimattor` | boolean | YES | - | Har gummimattor |
@@ -271,7 +313,7 @@ Nybilsregistreringar vid leverans till MABI.
 | `plats_aktuell_station` | text | YES | - | Aktuell plats station |
 | `matarstallning_inkop` | integer | YES | - | Mätarställning vid inköp |
 | `matarstallning_aktuell` | integer | YES | - | Aktuell mätarställning |
-| `tankstatus` | text | YES | - | Tankstatus vid leverans |
+| `tankstatus` | text | YES | - | Tankstatus:   NULL \| 'mottogs_fulltankad' \| 'tankad_nu' \| 'ej_upptankad' ⭐ |
 | `upptankning_liter` | numeric | YES | - | Upptankade liter |
 | `upptankning_literpris` | numeric | YES | - | Literpris |
 | `laddniva_procent` | smallint | YES | - | Laddningsnivå % |
@@ -310,13 +352,40 @@ Fordonsmaster från Bilkontroll-filen (BUHS).
 
 | Kolumn | Typ | Nullable | Default | Beskrivning |
 |--------|-----|----------|---------|-------------|
-| `regnr` | text | NO | - | Primärnyckel (registreringsnummer) |
+| `regnr` | text | NO | - | Primärnyckel (registreringsnummer, UPPERCASE) |
 | `brand` | text | YES | - | Bilmärke |
 | `model` | text | YES | - | Modell |
 | `wheel_storage_location` | text | YES | - | Hjulförvaringsplats |
 | `created_at` | timestamptz | YES | now() | Skapad tidpunkt |
+| `updated_at` | timestamptz | YES | now() | Uppdaterad tidpunkt ⭐ NYT |
 | `is_sold` | boolean | YES | false | Är såld |
 | `sold_date` | date | YES | - | Såld datum |
+
+**Uppdateras via:** CSV-import från Bilkontrollfilen (MABISYD Bilkontroll 2024-2025.xlsx)
+
+**Se:** [CSV-import.md § 3](./CSV-import.md#3-importera-bilkontrollfilen)
+
+---
+
+## Constraints & Giltiga Värden
+
+### checkins-constraints
+
+| Fält | Constraint | Giltiga värden |
+|------|-----------|---------------|
+| `region` | `checkins_region_chk` | `'NORR'`, `'MITT'`, `'SYD'` |
+| `status` | `checkins_status_chk` | `NULL`, `'checked_in'`, `'COMPLETED'` |
+| `tires_type` | `checkins_tires_type_check` | `'sommar'`, `'vinter'` |
+| `wheel_type` | `checkins_wheel_type_check` | `'sommar'`, `'vinter'` |
+| `charging_cables` | `checkins_charging_cables_check` | `0`, `1`, `2` |
+| `odometer_km` | `checkins_odometer_km_check` | `>= 0` |
+
+**OBS!  Case-sensitivity:**
+- `region`: VERSALER (`'SYD'` ✅, `'Syd'` ❌)
+- `status`: BLANDAD (`'COMPLETED'` ✅, `'checked_in'` ✅, `'completed'` ❌)
+- `tires_type`, `wheel_type`: GEMENER (`'vinter'` ✅, `'VINTER'` ❌)
+
+**Detaljerad referens:** [database-constraints.md](./database-constraints.md)
 
 ---
 
@@ -375,6 +444,10 @@ Hämtar fordonsinfo från `vehicles`-tabellen med trimmad sökning.
 get_vehicle_by_trimmed_regnr(p_regnr text)
 ```
 
+**Returnerar:** Första matchande rad från `vehicles` där `TRIM(UPPER(regnr)) = TRIM(UPPER(p_regnr))`
+
+---
+
 ### get_damages_by_trimmed_regnr
 
 Hämtar BUHS-skador från `damages_external`-tabellen för ett fordon.
@@ -385,15 +458,8 @@ get_damages_by_trimmed_regnr(p_regnr text)
 
 **Returnerar:** Alla rader från `damages_external` där `TRIM(UPPER(regnr)) = TRIM(UPPER(p_regnr))`
 
----
-
-## Constraints
-
-### checkins. wheel_type
-
-```sql
-CHECK ((wheel_type = ANY (ARRAY['sommar':: text, 'vinter'::text])))
-```
+**Viktigt:** Denna RPC hämtar endast från `damages_external`, INTE från `damages`!   
+→ `damages_external` måste uppdateras efter varje BUHS-import! 
 
 ---
 
@@ -402,12 +468,12 @@ CHECK ((wheel_type = ANY (ARRAY['sommar':: text, 'vinter'::text])))
 ### Vid incheckning (/check → /api/notify)
 
 1. **checkins**:  Ny rad skapas med fordons- och incheckarinfo
-2. **checkin_damages**:  Rad per skada (nya + hanterade BUHS)
-3. **damages**:  Rad per NY skada (source = 'CHECK')
+2. **checkin_damages**: Rad per skada (nya + hanterade BUHS)
+3. **damages**: Rad per NY skada (source = 'CHECK')
 
 ### Vid nybilsinventering (/nybil → /api/notify-nybil)
 
-1. **nybil_inventering**:  Ny rad med all fordonsinfo
+1. **nybil_inventering**: Ny rad med all fordonsinfo
 2. **damages**:  Rad per skada (source = 'NYBIL')
 
 ### Vid /status-sökning
@@ -451,13 +517,13 @@ Innehåller referens till media i Storage:
 
 ```json
 {
-  "folder":  "GFX46X/GFX46X-20251216/20251216-jack-dorr-utsida-hoger-fram-oliwer",
+  "folder": "GFX46X/GFX46X-20251216/20251216-jack-dorr-utsida-hoger-fram-oliwer",
   "photo_urls": ["https://..."],
-  "video_urls": []
+  "video_urls":  []
 }
 ```
 
-`folder` används för att bygga "Visa media"-länken i /status.
+`folder` används för att bygga "Visa media"-länken i /status. 
 
 ---
 
@@ -465,18 +531,22 @@ Innehåller referens till media i Storage:
 
 ### Hur `is_inventoried` bestäms (lib/damages.ts)
 
-En BUHS-skada markeras som `is_inventoried = true` (och visas INTE i "Befintliga skador att hantera") om **någon** av följande villkor uppfylls: 
+En BUHS-skada markeras som `is_inventoried = true` (och visas INTE i "Befintliga skador att hantera") om **någon** av följande villkor uppfylls:
 
 1. **Textmatchning (primär):** Det finns en rad i `damages`-tabellen med matchande `legacy_damage_source_text`
 
-2. **Checkin_damage-matchning:** Skadan matchas mot en `checkin_damage` via textlikhet eller skadetyp
+2. **Loose BUHS Matching (NY!):** Om `legacy_damage_source_text` börjar med `'buhs_'` matchas alla källor med samma datum
 
-3. **Datum-baserad backup (PR #234):** Om: 
+3. **Checkin_damage-matchning:** Skadan matchas mot en `checkin_damage` via textlikhet eller skadetyp
+
+4. **Datum-baserad backup (PR #234):** Om: 
    - `senaste_incheckning > BUHS_skadedatum`
    - OCH det finns minst en `checkin_damage` för fordonet med type IN ('documented', 'not_found', 'existing')
    - → Då antas alla BUHS-skador från det datumet eller tidigare vara hanterade
 
 **Varför datum-backup behövs:** Om någon ändrar BUHS-texten i källsystemet efter att skadan dokumenterats, misslyckas textmatchningen.  Datum-logiken förhindrar att skadan dyker upp som "att hantera" igen.
+
+**Detaljerad dokumentation:** [csv-import-dubbel-rad.md](./csv-import-dubbel-rad.md)
 
 ---
 
@@ -497,7 +567,7 @@ SELECT * FROM get_damages_by_trimmed_regnr('ABC123');
 
 ### Visa checkin_damages för en specifik incheckning
 ```sql
-SELECT cd.*, c.checker_name, c. completed_at
+SELECT cd.*, c.checker_name, c.completed_at
 FROM checkin_damages cd
 JOIN checkins c ON cd.checkin_id = c.id
 WHERE UPPER(TRIM(c.regnr)) = 'ABC123'
@@ -517,5 +587,39 @@ SELECT
 FROM damages_external de
 JOIN checkins c ON UPPER(TRIM(de.regnr)) = UPPER(TRIM(c.regnr))
 WHERE de.regnr = 'ABC123'
-ORDER BY de. damage_date;
+ORDER BY de.damage_date;
 ```
+
+### Kontrollera source-distribution i damages
+```sql
+SELECT source, COUNT(*) 
+FROM damages 
+GROUP BY source;
+```
+
+**Förväntat:**
+```
+CHECK | ~X antal
+NYBIL | ~Y antal
+BUHS  | ~566 antal (ska matcha damages_external)
+```
+
+### Hitta dubbletter (samma skada från flera källor)
+```sql
+SELECT 
+  regnr, 
+  original_damage_date, 
+  legacy_damage_source_text,
+  COUNT(*) as antal
+FROM damages
+WHERE legacy_damage_source_text LIKE 'buhs_%'
+GROUP BY regnr, original_damage_date, legacy_damage_source_text
+HAVING COUNT(*) > 1
+ORDER BY antal DESC;
+```
+
+---
+
+**Senast uppdaterad:** 2026-01-16  
+**Ägare:** Per Andersson (per@incheckad.se)  
+**Version:** 3.0 (komplettering efter overnight-analys)
