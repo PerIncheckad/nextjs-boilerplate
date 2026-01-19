@@ -1239,27 +1239,50 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         );
       }).filter((d): d is typeof damageRecords[0] => d !== undefined);
       
-      // Also match damages by date (for new damages created during this checkin)
-      const matchedDateDamages = checkinDateStr ? damageRecords.filter(damage => {
-        // Skip BUHS damages already matched above
+      // Also match damages documented via CHECK merge on this checkin's date
+      // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
+      const checkinDate = checkinDateStr ? new Date(checkinDateStr) : null;
+      const checkinYMD = checkinDate && !isNaN(checkinDate.getTime()) 
+        ? checkinDate.toISOString().split('T')[0] 
+        : null;
+      
+      const matchedCheckDamages = checkinYMD ? damageRecords.filter(damage => {
+        // Skip damages already matched above
         if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
           return false;
         }
         
-        // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
-        const checkinDate = new Date(checkinDateStr);
-        if (!isNaN(checkinDate.getTime())) {
-          const checkinYMD = checkinDate.toISOString().split('T')[0];
-          if (damage.datum === checkinYMD) {
-            return true;
-          }
+        // Match damages with documented date matching this checkin's date
+        // These are merged BUHS+CHECK damages with CHECK metadata
+        if (damage.source === 'legacy' && damage.documentedDate === checkinYMD && damage.folder) {
+          return true;
         }
         
         return false;
       }) : [];
       
-      // Combine both types of matches
-      const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
+      // Also match damages by date (for new damages created during this checkin)
+      const matchedDateDamages = checkinYMD ? damageRecords.filter(damage => {
+        // Skip BUHS damages already matched above
+        if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+          return false;
+        }
+        
+        // Skip CHECK-merged damages already matched above
+        if (damage.source === 'legacy' && damage.documentedDate === checkinYMD && damage.folder) {
+          return false;
+        }
+        
+        // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
+        if (damage.datum === checkinYMD) {
+          return true;
+        }
+        
+        return false;
+      }) : [];
+      
+      // Combine all types of matches
+      const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
       // Track which damages are shown in this checkin
       matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -1941,27 +1964,50 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       );
     }).filter((d): d is typeof damageRecords[0] => d !== undefined);
     
-    // Also match damages by date (for new damages created during this checkin)
-    const matchedDateDamages = checkinDateStr ? damageRecords.filter(damage => {
-      // Skip BUHS damages already matched above
+    // Also match damages documented via CHECK merge on this checkin's date
+    // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
+    const checkinDate = checkinDateStr ? new Date(checkinDateStr) : null;
+    const checkinYMD = checkinDate && !isNaN(checkinDate.getTime()) 
+      ? checkinDate.toISOString().split('T')[0] 
+      : null;
+    
+    const matchedCheckDamages = checkinYMD ? damageRecords.filter(damage => {
+      // Skip damages already matched above
       if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
         return false;
       }
       
-      // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
-      const checkinDate = new Date(checkinDateStr);
-      if (!isNaN(checkinDate.getTime())) {
-        const checkinYMD = checkinDate.toISOString().split('T')[0];
-        if (damage.datum === checkinYMD) {
-          return true;
-        }
+      // Match damages with documented date matching this checkin's date
+      // These are merged BUHS+CHECK damages with CHECK metadata
+      if (damage.source === 'legacy' && damage.documentedDate === checkinYMD && damage.folder) {
+        return true;
       }
       
       return false;
     }) : [];
     
-    // Combine both types of matches
-    const matchedDamages = [...matchedBuhsDamages, ...matchedDateDamages];
+    // Also match damages by date (for new damages created during this checkin)
+    const matchedDateDamages = checkinYMD ? damageRecords.filter(damage => {
+      // Skip BUHS damages already matched above
+      if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+        return false;
+      }
+      
+      // Skip CHECK-merged damages already matched above
+      if (damage.source === 'legacy' && damage.documentedDate === checkinYMD && damage.folder) {
+        return false;
+      }
+      
+      // Match by date: damage.datum should match checkin date (YYYY-MM-DD)
+      if (damage.datum === checkinYMD) {
+        return true;
+      }
+      
+      return false;
+    }) : [];
+    
+    // Combine all types of matches
+    const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
     
     // Track which damages are shown in this checkin
     matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
