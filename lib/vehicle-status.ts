@@ -1395,11 +1395,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
           let sammanfattning: string;
           if (damage.status?.startsWith('Dokumenterad')) {
-            // Documented or existing damage - show status and append original BUHS text
+            // Documented or existing damage - show status only
+            // The 3-line format is: 1) skadetyp, 2) status (documented date + person), 3) media link
             sammanfattning = damage.status;
-            if (damage.legacy_buhs_text) {
-              sammanfattning += `\nUrsprunglig beskrivning i BUHS: "${damage.legacy_buhs_text}"`;
-            }
           } else if (damage.is_unmatched_buhs) {
             // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
             sammanfattning = '';
@@ -2215,11 +2213,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // For unmatched BUHS, don't show status (damage description already has (BUHS) suffix)
         let sammanfattning: string;
         if (damage.status?.startsWith('Dokumenterad')) {
-          // Documented or existing damage - show status and append original BUHS text
+          // Documented or existing damage - show status only
+          // The 3-line format is: 1) skadetyp, 2) status (documented date + person), 3) media link
           sammanfattning = damage.status;
-          if (damage.legacy_buhs_text) {
-            sammanfattning += `\nUrsprunglig beskrivning i BUHS: "${damage.legacy_buhs_text}"`;
-          }
         } else if (damage.is_unmatched_buhs) {
           // Unmatched BUHS - don't show status since damage description already has (BUHS) suffix
           sammanfattning = '';
