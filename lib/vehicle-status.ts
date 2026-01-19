@@ -1179,7 +1179,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       // Get CHECK media folder
-      const checkFolder = damage.uploads?.folder || undefined;
+      const checkFolder = damage.uploads?.folder || damage.folder;
       
       // Check if already in map from BUHS processing
       if (damageMap.has(stableKey)) {
