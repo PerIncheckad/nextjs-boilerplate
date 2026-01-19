@@ -367,10 +367,10 @@ function createBuhsDamageKey(regnr: string, legacySourceText: string | null | un
 
 // Helper to create stable key for deterministic damage deduplication
 // Used to merge BUHS and CHECK sources by legacy_damage_source_text + date
-// date should be: original_damage_date || damage_date
-function createStableKey(legacyDamageSourceText: string | null | undefined, date: string | null | undefined): string {
+// date1 and date2 should be the same value: original_damage_date || damage_date
+function createStableKey(legacyDamageSourceText: string | null | undefined, date1: string | null | undefined, date2: string | null | undefined): string {
   const text = (legacyDamageSourceText || '').trim();
-  const dateStr = (date || '').trim();
+  const dateStr = (date1 || date2 || '').trim();
   return `${text}|||${dateStr}`;
 }
 
@@ -921,7 +921,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
       
-      const stableKey = createStableKey(legacyText, damageDate);
+      // BUHS: date = damage_date
+      const stableKey = createStableKey(legacyText, damageDate, damageDate);
       
       if (damageMap.has(stableKey)) {
         continue;
@@ -994,8 +995,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         continue;
       }
       
+      // CHECK: date = original_damage_date || damage_date || created_at
       const checkDate = damage.original_damage_date || damage.damage_date || damage.created_at;
-      const stableKey = createStableKey(damage.legacy_damage_source_text, formatDate(checkDate));
+      const stableKey = createStableKey(damage.legacy_damage_source_text, formatDate(checkDate), formatDate(checkDate));
       
       const damageTypeRaw = damage.damage_type_raw || null;
       const userPositions = (damage.user_positions && Array.isArray(damage.user_positions)) 
@@ -1575,8 +1577,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const legacyText = getLegacyDamageText(d);
     const damageDate = formatDate(d.damage_date);
     
-    // Create stable key for BUHS: date = damage_date (not original_damage_date)
-    const stableKey = createStableKey(legacyText, damageDate);
+    // BUHS: date = damage_date (not original_damage_date)
+    const stableKey = createStableKey(legacyText, damageDate, damageDate);
     
     // For GWG66Z and similar vehicles, skip duplicate entries by actual ID
     // For others, skip if same stableKey already exists (deterministic dedup)
@@ -1665,9 +1667,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       continue; // Skip non-CHECK or entries without legacy text
     }
     
-    // Create stable key for CHECK: date = original_damage_date || damage_date
+    // CHECK: date = original_damage_date || damage_date || created_at
     const checkDate = damage.original_damage_date || damage.damage_date || damage.created_at;
-    const stableKey = createStableKey(damage.legacy_damage_source_text, formatDate(checkDate));
+    const stableKey = createStableKey(damage.legacy_damage_source_text, formatDate(checkDate), formatDate(checkDate));
     
     // Extract CHECK data for merge/add
     const damageTypeRaw = damage.damage_type_raw || null;
