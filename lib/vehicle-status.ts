@@ -369,7 +369,9 @@ function createBuhsDamageKey(regnr: string, legacySourceText: string | null | un
  * Helper to create a stable deduplication key from normalized legacy text + damage date.
  * This is used to merge BUHS and CHECK damages that represent the same physical damage.
  * @param legacyText - The legacy damage source text (will be normalized for matching)
- * @param damageDate - Damage date in YYYY-MM-DD format (from formatDate())
+ * @param damageDate - Original damage date in YYYY-MM-DD format (from formatDate()).
+ *                     For BUHS damages: use damage_date (already the original).
+ *                     For CHECK damages: use original_damage_date (the BUHS date it was documented from).
  * @returns Stable key combining normalized text and date
  */
 function createStableDedupKey(legacyText: string | null | undefined, damageDate: string | null | undefined): string {
@@ -1171,8 +1173,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     for (const damage of damages) {
       // Skip if this damage's legacy_damage_source_text + damage_date was matched to a BUHS damage
       if (damage.legacy_damage_source_text) {
-        // Build the stable key for this CHECK damage using its legacy text and original damage date
-        const damageDate = formatDate(damage.damage_date || damage.created_at);
+        // Build the stable key for this CHECK damage using its legacy text and ORIGINAL damage date
+        // Use original_damage_date (from BUHS) if available, otherwise fall back to damage_date
+        const damageDate = formatDate(damage.original_damage_date || damage.damage_date || damage.created_at);
         const checkStableKey = createStableDedupKey(damage.legacy_damage_source_text, damageDate);
         if (matchedStableKeys.has(checkStableKey)) {
           // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
@@ -1914,8 +1917,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Skip if this damage's legacy_damage_source_text + damage_date was matched to a BUHS damage
     if (damage.legacy_damage_source_text) {
-      // Build the stable key for this CHECK damage using its legacy text and original damage date
-      const damageDate = formatDate(damage.damage_date || damage.created_at);
+      // Build the stable key for this CHECK damage using its legacy text and ORIGINAL damage date
+      // Use original_damage_date (from BUHS) if available, otherwise fall back to damage_date
+      const damageDate = formatDate(damage.original_damage_date || damage.damage_date || damage.created_at);
       const checkStableKey = createStableDedupKey(damage.legacy_damage_source_text, damageDate);
       if (matchedStableKeys.has(checkStableKey)) {
         // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
