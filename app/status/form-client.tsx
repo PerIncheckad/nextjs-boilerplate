@@ -1328,24 +1328,28 @@ const HistoryItem: React.FC<{
                   return record.checkinDetaljer.skador.map((skada, idx) => (
                     <li key={idx}>
                       {skada.handledStatus ? (
-                        <>{skada.typ}. {skada.handledStatus}</>
+                        <>
+                          {skada.typ}
+                          <br />
+                          {skada.handledStatus}
+                        </>
                       ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
                         <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
                       ) : (
                         <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
                       )}
                       {skada.mediaUrl && (
-                        <span>
-                          {' '}
+                        <>
+                          <br />
                           <a 
                             href={skada.mediaUrl} 
                             target="_blank"
                             rel="noopener noreferrer"
-                            style={{ color: '#1a73e8', marginLeft: '0.5rem' }}
+                            style={{ color: '#1a73e8' }}
                           >
                             📁 Visa media
                           </a>
-                        </span>
+                        </>
                       )}
                     </li>
                   ));
