@@ -1026,6 +1026,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const folder = (damage.uploads as any)?.folder || damage.folder || null;
       const photoUrls = damage.photo_urls || null;
       
+      // Extract CHECK documentation metadata
+      const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
+      const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
+      
       if (damageMap.has(stableKey)) {
         const entry = damageMap.get(stableKey)!;
         entry.damageTypeRaw = damageTypeRaw;
@@ -1033,6 +1037,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         entry.folder = folder;
         entry.photoUrls = photoUrls;
         entry.source = 'BUHS';
+        // Set CHECK documentation metadata for history matching
+        entry.documentedDate = checkDocumentedDate;
+        entry.documentedBy = checkDocumentedBy;
       } else {
         damageMap.set(stableKey, {
           id: damage.id,
@@ -1046,6 +1053,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           photoUrls,
           matchedCheckinDamage: null,
           checkin: null,
+          documentedDate: checkDocumentedDate,
+          documentedBy: checkDocumentedBy,
         });
       }
     }
@@ -1770,6 +1779,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const folder = (damage.uploads as any)?.folder || damage.folder || null;
     const photoUrls = damage.photo_urls || null;
     
+    // Extract CHECK documentation metadata
+    const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
+    const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
+    
     if (damageMap.has(stableKey)) {
       // MERGE: Entry exists from BUHS, update with CHECK data (CHECK wins for title/positions/media)
       const entry = damageMap.get(stableKey)!;
@@ -1778,6 +1791,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       entry.folder = folder; // CHECK wins for media
       entry.photoUrls = photoUrls;
       entry.source = 'BUHS'; // Keep source as BUHS since it originated there
+      // Set CHECK documentation metadata for history matching
+      entry.documentedDate = checkDocumentedDate;
+      entry.documentedBy = checkDocumentedBy;
     } else {
       // ADD: No BUHS entry with this stableKey, add new entry from CHECK
       // This should rarely happen for CHECK damages with legacy_damage_source_text
@@ -1794,6 +1810,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         photoUrls,
         matchedCheckinDamage: null,
         checkin: null,
+        documentedDate: checkDocumentedDate,
+        documentedBy: checkDocumentedBy,
       });
     }
   }
