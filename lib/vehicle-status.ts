@@ -1909,7 +1909,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Skip damages whose legacy_damage_source_text matches a matched BUHS damage
   for (const damage of damages) {
     // Check if this damage matches a legacy damage (same regnr + damage_date)
-    const damageKey = `${cleanedRegnr}-${formatDate(damage.damage_date || damage.created_at || damage.datum)}`;
+    // For CHECK damages with original_damage_date, use that; otherwise use damage_date
+    const damageKey = `${cleanedRegnr}-${formatDate(damage.original_damage_date || damage.damage_date || damage.created_at || damage.datum)}`;
     if (legacyDamageKeys.has(damageKey)) {
       // This damage already exists in legacy damages, skip it
       continue;
