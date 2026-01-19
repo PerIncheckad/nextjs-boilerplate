@@ -1162,6 +1162,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
+      // Add description if available (checkins-only path preserves description)
+      if (damage.description) {
+        skadetyp = `${skadetyp}: ${damage.description}`;
+      }
+      
       // Build sourceInfo based on damage.source
       let sourceInfo: string;
       if (damage.source === 'CHECK') {
