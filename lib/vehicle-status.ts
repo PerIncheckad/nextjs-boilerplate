@@ -1633,6 +1633,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // First pass: Add matched BUHS damages only
   for (let i = 0; i < legacyDamages.length; i++) {
     const d = legacyDamages[i];
+    
+    // DEBUG: Log for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] Processing BUHS damage:', {
+        id: d.id,
+        damage_date: d.damage_date,
+        legacy_text: getLegacyDamageText(d),
+        note_customer: d.note_customer,
+        note_internal: d.note_internal
+      });
+    }
+    
     // For GEU29F and other force-undocumented vehicles, skip text+date deduplication
     // Only deduplicate by actual database ID to show all damages
     if (processedBuhsIds.has(d.id)) {
@@ -1646,6 +1658,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Create stable dedup key to prevent duplicate BUHS damages
     // Use normalized text to handle variations in legacy damage descriptions
     const stableKey = createStableDedupKey(legacyText, damageDate);
+    
+    // DEBUG: Log stable key for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] BUHS stable key:', stableKey);
+    }
+    
     if (!isGEU29F && processedBuhsKeys.has(stableKey)) {
       continue; // Skip duplicate BUHS damage with same text + date (except for GEU29F)
     }
@@ -1657,6 +1675,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Strategy 1: Primary text match (case/whitespace insensitive, allow Repa/Repor)
     // Strategy 2: Loose key match (damage_type + damage_date)
     let matchedCheckinDamage: CheckinDamageData | null = null;
+    
+    // DEBUG: Log checkin_damages count for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] Total checkin_damages:', allCheckinDamages.length);
+    }
     
     // Try primary text matching first
     // Compare BUHS note_internal/note_customer/legacy_damage_source_text against cd.description
@@ -1676,6 +1699,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         matchedCheckinDamageIds.add(cd.id);
         matchedStableKeys.add(stableKey); // Track matched stable key
         matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
+        
+        // DEBUG: Log match for GWG66Z
+        if (cleanedRegnr === 'GWG66Z') {
+          console.log('[GWG66Z DEBUG] Found checkin_damage match:', {
+            cd_id: cd.id,
+            cd_type: cd.type,
+            cd_description: cdDescription,
+            stableKey
+          });
+        }
         
         break;
       }
@@ -1727,7 +1760,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // This two-pass approach prevents duplicates: matched BUHS damages appear once
     // as merged records, while unmatched damages appear as "Källa BUHS" entries
     if (!matchedCheckinDamage) {
+      // DEBUG: Log for GWG66Z
+      if (cleanedRegnr === 'GWG66Z') {
+        console.log('[GWG66Z DEBUG] No checkin_damage match found, will be added in second pass');
+      }
       continue; // Skip unmatched, will add in second pass
+    }
+    
+    // DEBUG: Log for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] Adding matched BUHS damage to damageRecords');
     }
     
     // Mark this stable key as processed to prevent duplicates (Kommentar 1)
@@ -1845,6 +1887,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const legacyText = getLegacyDamageText(d);
     const damageDate = formatDate(d.damage_date);
     
+    // DEBUG: Log for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] Adding unmatched BUHS damage in second pass:', {
+        id: d.id,
+        legacyText,
+        damageDate
+      });
+    }
+    
     // Try to extract media folder and structured information from damages table if available
     let folder: string | undefined;
     let skadetyp: string;
@@ -1911,8 +1962,25 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Check if this damage matches a legacy damage (same regnr + damage_date)
     // For CHECK damages with original_damage_date, use that; otherwise use damage_date
     const damageKey = `${cleanedRegnr}-${formatDate(damage.original_damage_date || damage.damage_date || damage.created_at || damage.datum)}`;
+    
+    // DEBUG: Log for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] Processing damage from damages table:', {
+        id: damage.id,
+        source: damage.source,
+        legacy_text: damage.legacy_damage_source_text,
+        original_damage_date: damage.original_damage_date,
+        damage_date: damage.damage_date,
+        damageKey,
+        legacyDamageKeysHas: legacyDamageKeys.has(damageKey)
+      });
+    }
+    
     if (legacyDamageKeys.has(damageKey)) {
       // This damage already exists in legacy damages, skip it
+      if (cleanedRegnr === 'GWG66Z') {
+        console.log('[GWG66Z DEBUG] Skipped due to legacyDamageKeys match');
+      }
       continue;
     }
     
@@ -1922,8 +1990,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Use original_damage_date (from BUHS) if available, otherwise fall back to damage_date
       const damageDate = formatDate(damage.original_damage_date || damage.damage_date || damage.created_at);
       const checkStableKey = createStableDedupKey(damage.legacy_damage_source_text, damageDate);
+      
+      // DEBUG: Log stable key check for GWG66Z
+      if (cleanedRegnr === 'GWG66Z') {
+        console.log('[GWG66Z DEBUG] Checking stable key:', {
+          checkStableKey,
+          matchedStableKeysHas: matchedStableKeys.has(checkStableKey),
+          matchedStableKeysSize: matchedStableKeys.size,
+          matchedStableKeysArray: Array.from(matchedStableKeys)
+        });
+      }
+      
       if (matchedStableKeys.has(checkStableKey)) {
         // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
+        if (cleanedRegnr === 'GWG66Z') {
+          console.log('[GWG66Z DEBUG] Skipped due to matchedStableKeys match');
+        }
         continue;
       }
     }
@@ -2264,6 +2346,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Update the vehicle's damage count to reflect the filtered list
   vehicle.antalSkador = damageRecords.length;
+  
+  // DEBUG: Final summary for GWG66Z
+  if (cleanedRegnr === 'GWG66Z') {
+    console.log('[GWG66Z DEBUG] Final damage count:', {
+      totalDamageRecords: damageRecords.length,
+      damageRecords: damageRecords.map(dr => ({
+        id: dr.id,
+        skadetyp: dr.skadetyp,
+        source: dr.source,
+        legacy_text: dr.legacy_damage_source_text,
+        original_damage_date: dr.original_damage_date
+      }))
+    });
+  }
 
   // Extract nybil reference photos if available
   const nybilPhotos = nybilData && Array.isArray(nybilData.photo_urls) && nybilData.photo_urls.length > 0
