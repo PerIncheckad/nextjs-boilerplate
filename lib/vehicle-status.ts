@@ -1134,16 +1134,39 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
     }
     
-    // Step 2: Process damages from damages table
+    // Step 2: Process damages from damages table (CHECK-documented damages only)
+    // Only process damages with legacy_damage_source_text
+    // Skip nybil/new damages if there are any BUHS/CHECK damages for this regnr
+    const hasBuhsOrCheckDamages = damageMap.size > 0;
+    
     for (const damage of damages) {
-      if (damage.legacy_damage_source_text) {
-        const legacyText = damage.legacy_damage_source_text;
-        const damageDate = formatDate(damage.damage_date || damage.created_at);
-        const stableKey = createStableKey(legacyText, damage.damage_date || null, damageDate);
-        
-        if (damageMap.has(stableKey)) {
+      // Only process CHECK-documented damages (have legacy_damage_source_text)
+      if (!damage.legacy_damage_source_text) {
+        // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
+        if (hasBuhsOrCheckDamages) {
           continue;
         }
+        continue;
+      }
+      
+      // This is a CHECK-documented damage with legacy_damage_source_text
+      const legacyText = damage.legacy_damage_source_text;
+      const damageDate = formatDate(damage.damage_date || damage.created_at);
+      const stableKey = createStableKey(legacyText, damage.damage_date || null, damageDate);
+      
+      // Skip if already in map from BUHS processing
+      if (damageMap.has(stableKey)) {
+        continue;
+      }
+      
+      // Skip if matches legacy damage by regnr + date
+      const legacyKey = `${cleanedRegnr}-${damageDate}`;
+      const legacyDamageKeys = new Set<string>();
+      for (const d of legacyDamages) {
+        legacyDamageKeys.add(`${cleanedRegnr}-${formatDate(d.damage_date)}`);
+      }
+      if (legacyDamageKeys.has(legacyKey)) {
+        continue;
       }
       
       let skadetyp: string;
@@ -1167,32 +1190,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         skadetyp = `${skadetyp}: ${damage.description}`;
       }
       
-      // Build sourceInfo based on damage.source
-      let sourceInfo: string;
-      if (damage.source === 'CHECK') {
-        // Only create "registrerad vid incheckning" if there are actual checkin_damages
-        if (allCheckinDamages.length === 0) {
-          continue;
-        }
-        
-        sourceInfo = damage.inchecker_name 
-          ? `Registrerad vid incheckning av ${damage.inchecker_name}`
-          : 'Registrerad vid incheckning';
-      } else {
-        sourceInfo = damage.inchecker_name 
-          ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
-          : 'Registrerad vid nybilsleverans';
+      // Only create if there are checkin_damages
+      if (allCheckinDamages.length === 0) {
+        continue;
       }
       
-      // Create unique stable key for non-BUHS damages
-      // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_<originalDate>)
-      // This is intentional - these are truly new damages, not duplicates of BUHS entries
-      const damageDate = formatDate(damage.created_at || damage.damage_date);
-      const stableKey = `new_${damage.id}_${damageDate}`;
+      const sourceInfo = damage.inchecker_name 
+        ? `Registrerad vid incheckning av ${damage.inchecker_name}`
+        : 'Registrerad vid incheckning';
       
       damageMap.set(stableKey, {
         id: damage.id,
-        legacyText: '',
+        legacyText,
         originalDamageDate: damageDate,
         damageDate: damageDate,
         skadetyp,
@@ -1200,6 +1209,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         folder: damage.uploads?.folder || undefined,
         sourceInfo,
         source: 'damages',
+        legacy_damage_source_text: legacyText,
       });
     }
     
@@ -1860,24 +1870,45 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     });
   }
   
-  // Step 2: Process damages from damages table (CHECK-registered or nybil damages)
-  // Only add if not already in map (via stable key matching)
+  // Step 2: Process damages from damages table (CHECK-documented damages only)
+  // Only process damages with legacy_damage_source_text (CHECK-documented BUHS damages)
+  // Skip nybil/new damages if there are any BUHS/CHECK damages for this regnr
+  const hasBuhsOrCheckDamages = damageMap.size > 0;
+  
   for (const damage of damages) {
-    // Skip if this damage has legacy_damage_source_text that matches a BUHS damage
-    // This means it's the same damage, just stored in both places
-    if (damage.legacy_damage_source_text) {
-      const legacyText = damage.legacy_damage_source_text;
-      const damageDate = formatDate(damage.damage_date || damage.created_at);
-      const stableKey = createStableKey(legacyText, damage.damage_date || null, damageDate);
-      
-      if (damageMap.has(stableKey)) {
-        // This damage is already in the map from BUHS processing
-        // Skip to avoid duplicates
+    // Only process CHECK-documented damages (have legacy_damage_source_text)
+    if (!damage.legacy_damage_source_text) {
+      // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
+      if (hasBuhsOrCheckDamages) {
         continue;
       }
+      // If no BUHS/CHECK damages exist, this logic won't be reached anyway
+      // since we only want BUHS+CHECK in the dedup map
+      continue;
     }
     
-    // Build damage description from type and positions
+    // This is a CHECK-documented damage with legacy_damage_source_text
+    const legacyText = damage.legacy_damage_source_text;
+    const damageDate = formatDate(damage.damage_date || damage.created_at);
+    const stableKey = createStableKey(legacyText, damage.damage_date || null, damageDate);
+    
+    // Skip if already in map from BUHS processing
+    if (damageMap.has(stableKey)) {
+      continue;
+    }
+    
+    // Skip if matches legacy damage by regnr + date
+    const legacyKey = `${cleanedRegnr}-${damageDate}`;
+    const legacyDamageKeys = new Set<string>();
+    for (const d of legacyDamages) {
+      legacyDamageKeys.add(`${cleanedRegnr}-${formatDate(d.damage_date)}`);
+    }
+    if (legacyDamageKeys.has(legacyKey)) {
+      continue;
+    }
+    
+    // This is a CHECK-documented damage that's not in BUHS
+    // Build structured damage info with CHECK priority
     let skadetyp: string;
     if (damage.damage_type_raw) {
       skadetyp = damage.damage_type_raw;
@@ -1894,33 +1925,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     }
     
-    // Build sourceInfo based on damage.source
-    let sourceInfo: string;
-    if (damage.source === 'CHECK') {
-      // Only create "registrerad vid incheckning" if there are actual checkin_damages
-      // If checkin_damages is empty, don't create these rows
-      if (allCheckinDamages.length === 0) {
-        continue; // Skip CHECK damages if no checkin_damages exist
-      }
-      
-      sourceInfo = damage.inchecker_name 
-        ? `Registrerad vid incheckning av ${damage.inchecker_name}`
-        : 'Registrerad vid incheckning';
-    } else {
-      sourceInfo = damage.inchecker_name 
-        ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
-        : 'Registrerad vid nybilsleverans';
+    // Only create if there are checkin_damages
+    if (allCheckinDamages.length === 0) {
+      continue;
     }
     
-    // Create unique stable key for non-BUHS damages
-    // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_<originalDate>)
-    // This is intentional - these are truly new damages, not duplicates of BUHS entries
-    const damageDate = formatDate(damage.created_at || damage.damage_date);
-    const stableKey = `new_${damage.id}_${damageDate}`;
+    const sourceInfo = damage.inchecker_name 
+      ? `Registrerad vid incheckning av ${damage.inchecker_name}`
+      : 'Registrerad vid incheckning';
     
     damageMap.set(stableKey, {
       id: damage.id,
-      legacyText: '',
+      legacyText,
       originalDamageDate: damageDate,
       damageDate: damageDate,
       skadetyp,
@@ -1928,6 +1944,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       folder: damage.uploads?.folder || damage.folder,
       sourceInfo,
       source: 'damages',
+      legacy_damage_source_text: legacyText,
     });
   }
   
