@@ -365,6 +365,14 @@ function createBuhsDamageKey(regnr: string, legacySourceText: string | null | un
   return `${regnr}-${legacySourceText || ''}`;
 }
 
+// Helper to create a stable deduplication key from normalized legacy text + damage date
+// This is used to merge BUHS and CHECK damages that represent the same physical damage
+function createStableDedupKey(legacyText: string | null | undefined, damageDate: string | null | undefined): string {
+  const normalizedText = normalizeTextForMatching(legacyText);
+  const dateStr = damageDate || '';
+  return `${normalizedText}_${dateStr}`;
+}
+
 // Helper to format damage positions from user_positions array
 function formatDamagePositions(userPositions: any[]): string {
   const positions = userPositions.map((pos: any) => {
@@ -886,9 +894,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Note: Even though source is 'checkins', we still need to match with checkin_damages
     const damageRecords: DamageRecord[] = [];
     const matchedCheckinDamageIds = new Set<number>();
-    const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
+    const matchedStableKeys = new Set<string>(); // Track stable dedup keys for matched BUHS+CHECK damages
     const matchedBuhsDamageIds = new Set<number>(); // Track which BUHS damages were matched
-    const processedBuhsKeys = new Set<string>(); // Track stable keys (legacyText + damageDate) to prevent duplicates (Kommentar 1)
+    const processedBuhsKeys = new Set<string>(); // Track stable keys (legacyText + damageDate) to prevent duplicates
     const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
     
     // First pass: Add matched BUHS damages only
@@ -904,9 +912,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const legacyText = getLegacyDamageText(d);
       const damageDate = formatDate(d.damage_date);
       
-      // Create stable dedup key to prevent duplicate BUHS damages (Kommentar 1)
-      // For GEU29F, we skip this check since we want to show all damages
-      const stableKey = `${legacyText}_${damageDate}`;
+      // Create stable dedup key to prevent duplicate BUHS damages
+      // Use normalized text to handle variations in legacy damage descriptions
+      const stableKey = createStableDedupKey(legacyText, damageDate);
       if (!isGEU29F && processedBuhsKeys.has(stableKey)) {
         continue; // Skip duplicate BUHS damage with same text + date (except for GEU29F)
       }
@@ -931,7 +939,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             textsMatch(d.damage_type_raw, cdDescription)) {
           matchedCheckinDamage = cd;
           matchedCheckinDamageIds.add(cd.id);
-          matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+          matchedStableKeys.add(stableKey); // Track matched stable key
           matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
           break;
         }
@@ -956,7 +964,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           matchedCheckinDamage = candidatesForLooseMatch[0];
           if (matchedCheckinDamage.id) {
             matchedCheckinDamageIds.add(matchedCheckinDamage.id);
-            matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+            matchedStableKeys.add(stableKey); // Track matched stable key
             matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
           }
         }
@@ -972,7 +980,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         if (unmatchedExisting && unmatchedExisting.id) {
           matchedCheckinDamage = unmatchedExisting;
           matchedCheckinDamageIds.add(unmatchedExisting.id);
-          matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+          matchedStableKeys.add(stableKey); // Track matched stable key
           matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
         }
       }
@@ -1154,12 +1162,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
 
     // Add damages from damages table (new damages from checkins)
-    // Skip damages whose legacy_damage_source_text matches a matched BUHS damage
+    // Skip damages whose legacy_damage_source_text + damage_date matches a matched BUHS damage
     for (const damage of damages) {
-      // Skip if this damage's legacy_damage_source_text was matched to a BUHS damage
-      if (damage.legacy_damage_source_text && matchedLegacyTexts.has(damage.legacy_damage_source_text)) {
-        // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
-        continue;
+      // Skip if this damage's legacy_damage_source_text + damage_date was matched to a BUHS damage
+      if (damage.legacy_damage_source_text) {
+        // Build the stable key for this CHECK damage using its legacy text and original damage date
+        const damageDate = formatDate(damage.damage_date || damage.created_at);
+        const checkStableKey = createStableDedupKey(damage.legacy_damage_source_text, damageDate);
+        if (matchedStableKeys.has(checkStableKey)) {
+          // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
+          continue;
+        }
       }
       
       let skadetyp: string;
@@ -1606,7 +1619,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Build damage records from legacy damages (BUHS) merged with checkin_damages
   const damageRecords: DamageRecord[] = [];
   const matchedCheckinDamageIds = new Set<number>(); // Track which checkin_damages we've matched
-  const matchedLegacyTexts = new Set<string>(); // Track which BUHS legacy texts were matched
+  const matchedStableKeys = new Set<string>(); // Track stable dedup keys for matched BUHS+CHECK damages
   const matchedBuhsDamageIds = new Set<number>(); // Track which BUHS damages were matched
   const processedBuhsKeys = new Set<string>(); // Track stable keys (legacyText + damageDate) to prevent duplicates
   const processedBuhsIds = new Set<number>(); // Track processed BUHS damage IDs to prevent true duplicates
@@ -1624,9 +1637,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const legacyText = getLegacyDamageText(d);
     const damageDate = formatDate(d.damage_date);
     
-    // Create stable dedup key to prevent duplicate BUHS damages (Kommentar 1)
-    // For GEU29F, we skip this check since we want to show all damages
-    const stableKey = `${legacyText}_${damageDate}`;
+    // Create stable dedup key to prevent duplicate BUHS damages
+    // Use normalized text to handle variations in legacy damage descriptions
+    const stableKey = createStableDedupKey(legacyText, damageDate);
     if (!isGEU29F && processedBuhsKeys.has(stableKey)) {
       continue; // Skip duplicate BUHS damage with same text + date (except for GEU29F)
     }
@@ -1655,7 +1668,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           textsMatch(d.damage_type_raw, cdDescription)) {
         matchedCheckinDamage = cd;
         matchedCheckinDamageIds.add(cd.id);
-        matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+        matchedStableKeys.add(stableKey); // Track matched stable key
         matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
         
         break;
@@ -1682,7 +1695,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         matchedCheckinDamage = candidatesForLooseMatch[0];
         if (matchedCheckinDamage.id) {
           matchedCheckinDamageIds.add(matchedCheckinDamage.id);
-          matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+          matchedStableKeys.add(stableKey); // Track matched stable key
           matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
         }
       }
@@ -1698,7 +1711,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       if (unmatchedExisting && unmatchedExisting.id) {
         matchedCheckinDamage = unmatchedExisting;
         matchedCheckinDamageIds.add(unmatchedExisting.id);
-        matchedLegacyTexts.add(legacyText); // Track matched BUHS text
+        matchedStableKeys.add(stableKey); // Track matched stable key
         matchedBuhsDamageIds.add(d.id); // Track matched BUHS damage ID
       }
     }
@@ -1896,10 +1909,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       continue;
     }
     
-    // Skip if this damage's legacy_damage_source_text was matched to a BUHS damage
-    if (damage.legacy_damage_source_text && matchedLegacyTexts.has(damage.legacy_damage_source_text)) {
-      // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
-      continue;
+    // Skip if this damage's legacy_damage_source_text + damage_date was matched to a BUHS damage
+    if (damage.legacy_damage_source_text) {
+      // Build the stable key for this CHECK damage using its legacy text and original damage date
+      const damageDate = formatDate(damage.damage_date || damage.created_at);
+      const checkStableKey = createStableDedupKey(damage.legacy_damage_source_text, damageDate);
+      if (matchedStableKeys.has(checkStableKey)) {
+        // This damage corresponds to a matched BUHS damage, skip to avoid duplicates
+        continue;
+      }
     }
     
     // Build damage description from type and positions
