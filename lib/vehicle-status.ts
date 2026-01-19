@@ -924,6 +924,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const damageMap = new Map<string, DamageEntry>();
     const matchedCheckinDamageIds = new Set<number>();
     
+    // Build BUHS text→date map for robust CHECK date fallback
+    const buhsDateByText = new Map<string, string>();
+    
     // PASS 1: Add all BUHS damages to map
     for (let i = 0; i < legacyDamages.length; i++) {
       const d = legacyDamages[i];
@@ -931,6 +934,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // BUHS: date = damage_date (raw, no formatting)
       const date = d.damage_date;
+      
+      // Store in BUHS text→date map for CHECK fallback
+      const normalizedText = normalizeTextForMatching(legacyText);
+      buhsDateByText.set(normalizedText, toDateOnly(date));
+      
       const stableKey = createStableKey(legacyText, date);
       
       if (damageMap.has(stableKey)) {
@@ -1004,9 +1012,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         continue;
       }
       
-      // CHECK: date = original_damage_date || damage_date || created_at (raw, no formatting)
-      const date = damage.original_damage_date || damage.damage_date || damage.created_at;
-      const stableKey = createStableKey(damage.legacy_damage_source_text, date);
+      // CHECK: Use BUHS date fallback if original_damage_date is missing
+      const legacyText = damage.legacy_damage_source_text;
+      const normalizedText = normalizeTextForMatching(legacyText);
+      const buhsDate = buhsDateByText.get(normalizedText);
+      const rawDate = damage.original_damage_date || buhsDate || damage.damage_date || damage.created_at;
+      const stableKey = createStableKey(legacyText, rawDate); // createStableKey uses toDateOnly internally
       
       const damageTypeRaw = damage.damage_type_raw || null;
       const userPositions = (damage.user_positions && Array.isArray(damage.user_positions)) 
@@ -1027,7 +1038,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           id: damage.id,
           stableKey,
           legacyDamageSourceText: damage.legacy_damage_source_text,
-          date: formatDate(date),
+          date: formatDate(rawDate),
           source: 'CHECK',
           damageTypeRaw,
           userPositions,
@@ -1578,6 +1589,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const damageMap = new Map<string, DamageEntry>();
   const matchedCheckinDamageIds = new Set<number>(); // Track which checkin_damages we've matched
   
+  // Build BUHS text→date map for robust CHECK date fallback
+  const buhsDateByText = new Map<string, string>();
+  
   // ====================================================================================
   // PASS 1: Add all BUHS damages to map using stable key (legacy_damage_source_text, damage_date)
   // ====================================================================================
@@ -1587,6 +1601,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // BUHS: date = damage_date (raw, no formatting)
     const date = d.damage_date;
+    
+    // Store in BUHS text→date map for CHECK fallback
+    const normalizedText = normalizeTextForMatching(legacyText);
+    buhsDateByText.set(normalizedText, toDateOnly(date));
+    
     const stableKey = createStableKey(legacyText, date);
     
     // For GWG66Z and similar vehicles, skip duplicate entries by actual ID
@@ -1676,9 +1695,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       continue; // Skip non-CHECK or entries without legacy text
     }
     
-    // CHECK: date = original_damage_date || damage_date || created_at (raw, no formatting)
-    const date = damage.original_damage_date || damage.damage_date || damage.created_at;
-    const stableKey = createStableKey(damage.legacy_damage_source_text, date);
+    // CHECK: Use BUHS date fallback if original_damage_date is missing
+    const legacyText = damage.legacy_damage_source_text;
+    const normalizedText = normalizeTextForMatching(legacyText);
+    const buhsDate = buhsDateByText.get(normalizedText);
+    const rawDate = damage.original_damage_date || buhsDate || damage.damage_date || damage.created_at;
+    const stableKey = createStableKey(legacyText, rawDate); // createStableKey uses toDateOnly internally
     
     // Extract CHECK data for merge/add
     const damageTypeRaw = damage.damage_type_raw || null;
@@ -1704,7 +1726,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         id: damage.id,
         stableKey,
         legacyDamageSourceText: damage.legacy_damage_source_text,
-        date: formatDate(date),
+        date: formatDate(rawDate),
         source: 'CHECK',
         damageTypeRaw,
         userPositions,
