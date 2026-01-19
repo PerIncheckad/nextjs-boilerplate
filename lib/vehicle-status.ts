@@ -1139,13 +1139,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Skip nybil/new damages if there are any BUHS/CHECK damages for this regnr
     const hasBuhsOrCheckDamages = damageMap.size > 0;
     
+    // Build legacy damage keys set once (for performance)
+    const legacyDamageKeys = new Set<string>();
+    for (const d of legacyDamages) {
+      legacyDamageKeys.add(`${cleanedRegnr}-${formatDate(d.damage_date)}`);
+    }
+    
     for (const damage of damages) {
       // Only process CHECK-documented damages (have legacy_damage_source_text)
+      // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
       if (!damage.legacy_damage_source_text) {
-        // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
         if (hasBuhsOrCheckDamages) {
           continue;
         }
+        // No legacy_damage_source_text = not a CHECK-documented damage, skip
         continue;
       }
       
@@ -1161,10 +1168,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Skip if matches legacy damage by regnr + date
       const legacyKey = `${cleanedRegnr}-${damageDate}`;
-      const legacyDamageKeys = new Set<string>();
-      for (const d of legacyDamages) {
-        legacyDamageKeys.add(`${cleanedRegnr}-${formatDate(d.damage_date)}`);
-      }
       if (legacyDamageKeys.has(legacyKey)) {
         continue;
       }
@@ -1875,15 +1878,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Skip nybil/new damages if there are any BUHS/CHECK damages for this regnr
   const hasBuhsOrCheckDamages = damageMap.size > 0;
   
+  // Build legacy damage keys set once (for performance)
+  const legacyDamageKeys = new Set<string>();
+  for (const d of legacyDamages) {
+    legacyDamageKeys.add(`${cleanedRegnr}-${formatDate(d.damage_date)}`);
+  }
+  
   for (const damage of damages) {
     // Only process CHECK-documented damages (have legacy_damage_source_text)
+    // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
     if (!damage.legacy_damage_source_text) {
-      // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
       if (hasBuhsOrCheckDamages) {
         continue;
       }
-      // If no BUHS/CHECK damages exist, this logic won't be reached anyway
-      // since we only want BUHS+CHECK in the dedup map
+      // No legacy_damage_source_text = not a CHECK-documented damage, skip
       continue;
     }
     
@@ -1899,10 +1907,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Skip if matches legacy damage by regnr + date
     const legacyKey = `${cleanedRegnr}-${damageDate}`;
-    const legacyDamageKeys = new Set<string>();
-    for (const d of legacyDamages) {
-      legacyDamageKeys.add(`${cleanedRegnr}-${formatDate(d.damage_date)}`);
-    }
     if (legacyDamageKeys.has(legacyKey)) {
       continue;
     }
