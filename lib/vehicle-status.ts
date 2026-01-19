@@ -1162,17 +1162,25 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
-      // Only create "registrerad vid incheckning" if there are actual checkin_damages
-      if (allCheckinDamages.length === 0) {
-        continue;
+      // Build sourceInfo based on damage.source
+      let sourceInfo: string;
+      if (damage.source === 'CHECK') {
+        // Only create "registrerad vid incheckning" if there are actual checkin_damages
+        if (allCheckinDamages.length === 0) {
+          continue;
+        }
+        
+        sourceInfo = damage.inchecker_name 
+          ? `Registrerad vid incheckning av ${damage.inchecker_name}`
+          : 'Registrerad vid incheckning';
+      } else {
+        sourceInfo = damage.inchecker_name 
+          ? `Registrerad vid nybilsleverans av ${damage.inchecker_name}`
+          : 'Registrerad vid nybilsleverans';
       }
       
-      const sourceInfo = damage.inchecker_name 
-        ? `Registrerad vid incheckning av ${damage.inchecker_name}`
-        : 'Registrerad vid incheckning';
-      
       // Create unique stable key for non-BUHS damages
-      // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_date)
+      // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_<originalDate>)
       // This is intentional - these are truly new damages, not duplicates of BUHS entries
       const damageDate = formatDate(damage.created_at || damage.damage_date);
       const stableKey = `new_${damage.id}_${damageDate}`;
@@ -1900,7 +1908,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     // Create unique stable key for non-BUHS damages
-    // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_date)
+    // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_<originalDate>)
     // This is intentional - these are truly new damages, not duplicates of BUHS entries
     const damageDate = formatDate(damage.created_at || damage.damage_date);
     const stableKey = `new_${damage.id}_${damageDate}`;
