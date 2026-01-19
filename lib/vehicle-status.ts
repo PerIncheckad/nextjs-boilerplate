@@ -365,8 +365,13 @@ function createBuhsDamageKey(regnr: string, legacySourceText: string | null | un
   return `${regnr}-${legacySourceText || ''}`;
 }
 
-// Helper to create a stable deduplication key from normalized legacy text + damage date
-// This is used to merge BUHS and CHECK damages that represent the same physical damage
+/**
+ * Helper to create a stable deduplication key from normalized legacy text + damage date.
+ * This is used to merge BUHS and CHECK damages that represent the same physical damage.
+ * @param legacyText - The legacy damage source text (will be normalized for matching)
+ * @param damageDate - Damage date in YYYY-MM-DD format (from formatDate())
+ * @returns Stable key combining normalized text and date
+ */
 function createStableDedupKey(legacyText: string | null | undefined, damageDate: string | null | undefined): string {
   const normalizedText = normalizeTextForMatching(legacyText);
   const dateStr = damageDate || '';
