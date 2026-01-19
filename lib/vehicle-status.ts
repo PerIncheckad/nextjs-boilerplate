@@ -365,13 +365,22 @@ function createBuhsDamageKey(regnr: string, legacySourceText: string | null | un
   return `${regnr}-${legacySourceText || ''}`;
 }
 
+// Helper to extract date-only part from a date string (strips time)
+// Ensures consistent keys regardless of whether timestamp is included
+function toDateOnly(d: any): string {
+  if (!d) return "";
+  const s = String(d).trim();
+  const t = s.indexOf("T");
+  return t === -1 ? s : s.slice(0, t);
+}
+
 // Helper to create stable key for deterministic damage deduplication
 // Used to merge BUHS and CHECK sources by legacy_damage_source_text + date
-// Uses normalized text + raw date (no formatting)
+// Uses normalized text + date-only (no time component)
 function createStableKey(legacyDamageSourceText: string | null | undefined, date: string | null | undefined): string {
   const normalizedText = normalizeTextForMatching(legacyDamageSourceText);
-  const dateStr = (date || '').trim();
-  return `${normalizedText}_${dateStr}`;
+  const dateOnly = toDateOnly(date);
+  return `${normalizedText}_${dateOnly}`;
 }
 
 // Helper to format damage positions from user_positions array
