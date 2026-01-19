@@ -1136,8 +1136,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Step 2: Process damages from damages table (CHECK-documented damages only)
     // Only process damages with legacy_damage_source_text
-    // Skip nybil/new damages if there are any BUHS/CHECK damages for this regnr
-    const hasBuhsOrCheckDamages = damageMap.size > 0;
+    // Skip nybil/new damages - we only want BUHS + CHECK in dedup
     
     // Build legacy damage keys set once (for performance)
     const legacyDamageKeys = new Set<string>();
@@ -1871,8 +1870,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   // Step 2: Process damages from damages table (CHECK-documented damages only)
   // Only process damages with legacy_damage_source_text (CHECK-documented BUHS damages)
-  // Skip nybil/new damages if there are any BUHS/CHECK damages for this regnr
-  const hasBuhsOrCheckDamages = damageMap.size > 0;
+  // Skip nybil/new damages - we only want BUHS + CHECK in dedup
   
   // Build legacy damage keys set once (for performance)
   const legacyDamageKeys = new Set<string>();
