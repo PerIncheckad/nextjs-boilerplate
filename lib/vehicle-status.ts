@@ -1156,17 +1156,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const damageDate = formatDate(damage.damage_date || damage.created_at);
       const stableKey = createStableKey(legacyText, damage.damage_date || null, damageDate);
       
-      // Skip if already in map from BUHS processing
-      if (damageMap.has(stableKey)) {
-        continue;
-      }
-      
-      // Skip if matches legacy damage by regnr + date
-      const legacyKey = `${cleanedRegnr}-${damageDate}`;
-      if (legacyDamageKeys.has(legacyKey)) {
-        continue;
-      }
-      
+      // Build CHECK damage info with CHECK priority
       let skadetyp: string;
       if (damage.damage_type_raw) {
         skadetyp = damage.damage_type_raw;
@@ -1188,11 +1178,33 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         skadetyp = `${skadetyp}: ${damage.description}`;
       }
       
+      // Get CHECK media folder
+      const checkFolder = damage.uploads?.folder || undefined;
+      
+      // Check if already in map from BUHS processing
+      if (damageMap.has(stableKey)) {
+        // MERGE: Update existing entry with CHECK data (CHECK wins on title/positions/media)
+        const existingEntry = damageMap.get(stableKey)!;
+        existingEntry.skadetyp = skadetyp; // CHECK title wins
+        if (checkFolder) {
+          existingEntry.folder = checkFolder; // CHECK media wins
+        }
+        // Keep other fields from BUHS (status, sourceInfo, metadata)
+        continue;
+      }
+      
+      // Skip if matches legacy damage by regnr + date
+      const legacyKey = `${cleanedRegnr}-${damageDate}`;
+      if (legacyDamageKeys.has(legacyKey)) {
+        continue;
+      }
+      
       // Only create if there are checkin_damages
       if (allCheckinDamages.length === 0) {
         continue;
       }
       
+      // This is a CHECK-documented damage that's not in BUHS - create new entry
       const sourceInfo = damage.inchecker_name 
         ? `Registrerad vid incheckning av ${damage.inchecker_name}`
         : 'Registrerad vid incheckning';
@@ -1204,7 +1216,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         damageDate,
         skadetyp,
         status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : '',
-        folder: damage.uploads?.folder || undefined,
+        folder: checkFolder,
         sourceInfo,
         source: 'damages',
         legacy_damage_source_text: legacyText,
@@ -1890,19 +1902,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const damageDate = formatDate(damage.damage_date || damage.created_at);
     const stableKey = createStableKey(legacyText, damage.damage_date || null, damageDate);
     
-    // Skip if already in map from BUHS processing
-    if (damageMap.has(stableKey)) {
-      continue;
-    }
-    
-    // Skip if matches legacy damage by regnr + date
-    const legacyKey = `${cleanedRegnr}-${damageDate}`;
-    if (legacyDamageKeys.has(legacyKey)) {
-      continue;
-    }
-    
-    // This is a CHECK-documented damage that's not in BUHS
-    // Build structured damage info with CHECK priority
+    // Build CHECK damage info with CHECK priority
     let skadetyp: string;
     if (damage.damage_type_raw) {
       skadetyp = damage.damage_type_raw;
@@ -1919,11 +1919,33 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     }
     
+    // Get CHECK media folder
+    const checkFolder = damage.uploads?.folder || damage.folder;
+    
+    // Check if already in map from BUHS processing
+    if (damageMap.has(stableKey)) {
+      // MERGE: Update existing entry with CHECK data (CHECK wins on title/positions/media)
+      const existingEntry = damageMap.get(stableKey)!;
+      existingEntry.skadetyp = skadetyp; // CHECK title wins
+      if (checkFolder) {
+        existingEntry.folder = checkFolder; // CHECK media wins
+      }
+      // Keep other fields from BUHS (status, sourceInfo, metadata)
+      continue;
+    }
+    
+    // Skip if matches legacy damage by regnr + date
+    const legacyKey = `${cleanedRegnr}-${damageDate}`;
+    if (legacyDamageKeys.has(legacyKey)) {
+      continue;
+    }
+    
     // Only create if there are checkin_damages
     if (allCheckinDamages.length === 0) {
       continue;
     }
     
+    // This is a CHECK-documented damage that's not in BUHS - create new entry
     const sourceInfo = damage.inchecker_name 
       ? `Registrerad vid incheckning av ${damage.inchecker_name}`
       : 'Registrerad vid incheckning';
@@ -1935,7 +1957,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       damageDate,
       skadetyp,
       status: (damage.status && damage.status !== 'complete' && damage.status !== 'COMPLETED') ? damage.status : '',
-      folder: damage.uploads?.folder || damage.folder,
+      folder: checkFolder,
       sourceInfo,
       source: 'damages',
       legacy_damage_source_text: legacyText,
