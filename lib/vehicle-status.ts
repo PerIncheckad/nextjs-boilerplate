@@ -1163,8 +1163,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         legacy_buhs_text: legacyText,
         original_damage_date: damageDate,
         checkinWhereDocumented: checkin?.id || null,
-        documentedBy: checkin?.checker_name || null,
-        documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
+        documentedBy: entry.documentedBy || checkin?.checker_name || null,
+        documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
         is_handled: matchedCheckinDamage !== null,
         is_inventoried: matchedCheckinDamage !== null,
         is_unmatched_buhs: matchedCheckinDamage === null,
@@ -1232,6 +1232,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // For BUHS damages: filter allCheckinDamages by checkin_id and match to damageRecords
       // For new damages: match by date
       const checkinDateStr = checkin.completed_at || checkin.created_at;
+      
+      // DEBUG LOGGING for GWG66Z - Log damageRecords before matching
+      if (cleanedRegnr === 'GWG66Z') {
+        console.log('[GWG66Z DEBUG] damageRecords for history', damageRecords.map(d => ({
+          stableKey: d.legacy_damage_source_text ? 
+            `${normalizeTextForMatching(d.legacy_damage_source_text)}_${toDateOnly(d.datum)}` : 'N/A',
+          documentedDate: d.documentedDate,
+          folder: d.folder,
+          source: d.source,
+          checkinWhereDocumented: d.checkinWhereDocumented,
+          handledBy: d.documentedBy,
+        })));
+      }
       
       // Get checkin_damages for this specific checkin
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
@@ -1933,8 +1946,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       legacy_buhs_text: legacyText,
       original_damage_date: damageDate,
       checkinWhereDocumented: checkin?.id || null,
-      documentedBy: checkin?.checker_name || null,
-      documentedDate: checkin ? formatDate(checkin.completed_at || checkin.created_at) : null,
+      documentedBy: entry.documentedBy || checkin?.checker_name || null,
+      documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
       is_handled: matchedCheckinDamage !== null,
       is_inventoried: matchedCheckinDamage !== null,
       is_unmatched_buhs: matchedCheckinDamage === null,
@@ -2003,6 +2016,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // For BUHS damages: filter allCheckinDamages by checkin_id and match to damageRecords
     // For new damages: match by date
     const checkinDateStr = checkin.completed_at || checkin.created_at;
+    
+    // DEBUG LOGGING for GWG66Z - Log damageRecords before matching
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] damageRecords for history', damageRecords.map(d => ({
+        stableKey: d.legacy_damage_source_text ? 
+          `${normalizeTextForMatching(d.legacy_damage_source_text)}_${toDateOnly(d.datum)}` : 'N/A',
+        documentedDate: d.documentedDate,
+        folder: d.folder,
+        source: d.source,
+        checkinWhereDocumented: d.checkinWhereDocumented,
+        handledBy: d.documentedBy,
+      })));
+    }
     
     // Get checkin_damages for this specific checkin
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
