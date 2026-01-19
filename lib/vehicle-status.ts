@@ -386,8 +386,25 @@ function normalizeTextForMatching(text: string | null | undefined): string {
     .trim();
 }
 
-// Helper to create stable key for damage deduplication
-// Used for deterministic single-pass Map merge
+/**
+ * Create stable deduplication key for damage entries across all sources.
+ * 
+ * This function ensures deterministic deduplication by creating a stable key that:
+ * 1. Normalizes legacy text (case-insensitive, whitespace-normalized, repa/repor unified)
+ * 2. Appends the original damage date (or fallback date)
+ * 
+ * Used to deduplicate damages from:
+ * - BUHS RPC (legacy damages)
+ * - damages table (CHECK-documented or nybil damages)
+ * - checkin_damages (inventory entries)
+ * 
+ * Example: "repa stötfångare_2025-04-16"
+ * 
+ * @param legacyText - The legacy damage description text
+ * @param originalDate - The original damage date (nullable)
+ * @param damageDate - The fallback damage date (formatted)
+ * @returns A stable deduplication key string
+ */
 function createStableKey(legacyText: string, originalDate: string | null, damageDate: string): string {
   const normalized = normalizeTextForMatching(legacyText);
   const dateToUse = originalDate || damageDate;
@@ -1154,6 +1171,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? `Registrerad vid incheckning av ${damage.inchecker_name}`
         : 'Registrerad vid incheckning';
       
+      // Create unique stable key for non-BUHS damages
+      // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_date)
+      // This is intentional - these are truly new damages, not duplicates of BUHS entries
       const damageDate = formatDate(damage.created_at || damage.damage_date);
       const stableKey = `new_${damage.id}_${damageDate}`;
       
@@ -1879,7 +1899,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         : 'Registrerad vid nybilsleverans';
     }
     
-    // Create a unique stable key for this damage (not BUHS)
+    // Create unique stable key for non-BUHS damages
+    // Note: Different format than BUHS damages (new_<id>_<date> vs normalized_text_date)
+    // This is intentional - these are truly new damages, not duplicates of BUHS entries
     const damageDate = formatDate(damage.created_at || damage.damage_date);
     const stableKey = `new_${damage.id}_${damageDate}`;
     
