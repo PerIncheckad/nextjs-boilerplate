@@ -1246,15 +1246,36 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? checkinDate.toISOString().split('T')[0] 
         : null;
       
-      const matchedCheckDamages = checkinYMD ? damageRecords.filter(damage => {
+      // DEBUG LOGGING for GWG66Z
+      if (cleanedRegnr === 'GWG66Z') {
+        console.log('[GWG66Z DEBUG] Checkin:', {
+          id: checkin.id,
+          checkinYMD,
+          checkerName: checkin.checker_name,
+          completedAt: checkin.completed_at,
+        });
+        console.log('[GWG66Z DEBUG] All damageRecords:', damageRecords.map(d => ({
+          id: d.id,
+          source: d.source,
+          stableKey: d.legacy_damage_source_text ? 
+            `${normalizeTextForMatching(d.legacy_damage_source_text)}_${toDateOnly(d.datum)}` : 'N/A',
+          documentedDate: d.documentedDate,
+          checkinWhereDocumented: d.checkinWhereDocumented,
+          folder: d.folder,
+          documentedBy: d.documentedBy,
+          skadetyp: d.skadetyp,
+        })));
+      }
+      
+      const matchedCheckDamages = checkinYMD ? damageRecords.filter(d => {
         // Skip damages already matched above
-        if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+        if (d.source === 'legacy' && d.checkinWhereDocumented === checkin.id) {
           return false;
         }
         
         // Match damages with documented date matching this checkin's date
         // These are merged BUHS+CHECK damages with CHECK metadata
-        if (damage.source === 'legacy' && damage.documentedDate === checkinYMD && damage.folder) {
+        if (d.source === 'legacy' && d.documentedDate === checkinYMD && d.folder) {
           return true;
         }
         
@@ -1280,6 +1301,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
         return false;
       }) : [];
+      
+      // DEBUG LOGGING for GWG66Z
+      if (cleanedRegnr === 'GWG66Z') {
+        console.log('[GWG66Z DEBUG] Match results:', {
+          matchedBuhsDamages: matchedBuhsDamages.length,
+          matchedCheckDamages: matchedCheckDamages.length,
+          matchedDateDamages: matchedDateDamages.length,
+          matchedCheckDamagesDetails: matchedCheckDamages.map(d => ({
+            id: d.id,
+            skadetyp: d.skadetyp,
+            documentedDate: d.documentedDate,
+            documentedBy: d.documentedBy,
+            folder: d.folder,
+          })),
+        });
+      }
       
       // Combine all types of matches
       const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
@@ -1971,15 +2008,36 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? checkinDate.toISOString().split('T')[0] 
       : null;
     
-    const matchedCheckDamages = checkinYMD ? damageRecords.filter(damage => {
+    // DEBUG LOGGING for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] Checkin:', {
+        id: checkin.id,
+        checkinYMD,
+        checkerName: checkin.checker_name,
+        completedAt: checkin.completed_at,
+      });
+      console.log('[GWG66Z DEBUG] All damageRecords:', damageRecords.map(d => ({
+        id: d.id,
+        source: d.source,
+        stableKey: d.legacy_damage_source_text ? 
+          `${normalizeTextForMatching(d.legacy_damage_source_text)}_${toDateOnly(d.datum)}` : 'N/A',
+        documentedDate: d.documentedDate,
+        checkinWhereDocumented: d.checkinWhereDocumented,
+        folder: d.folder,
+        documentedBy: d.documentedBy,
+        skadetyp: d.skadetyp,
+      })));
+    }
+    
+    const matchedCheckDamages = checkinYMD ? damageRecords.filter(d => {
       // Skip damages already matched above
-      if (damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id) {
+      if (d.source === 'legacy' && d.checkinWhereDocumented === checkin.id) {
         return false;
       }
       
       // Match damages with documented date matching this checkin's date
       // These are merged BUHS+CHECK damages with CHECK metadata
-      if (damage.source === 'legacy' && damage.documentedDate === checkinYMD && damage.folder) {
+      if (d.source === 'legacy' && d.documentedDate === checkinYMD && d.folder) {
         return true;
       }
       
@@ -2005,6 +2063,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       return false;
     }) : [];
+    
+    // DEBUG LOGGING for GWG66Z
+    if (cleanedRegnr === 'GWG66Z') {
+      console.log('[GWG66Z DEBUG] Match results:', {
+        matchedBuhsDamages: matchedBuhsDamages.length,
+        matchedCheckDamages: matchedCheckDamages.length,
+        matchedDateDamages: matchedDateDamages.length,
+        matchedCheckDamagesDetails: matchedCheckDamages.map(d => ({
+          id: d.id,
+          skadetyp: d.skadetyp,
+          documentedDate: d.documentedDate,
+          documentedBy: d.documentedBy,
+          folder: d.folder,
+        })),
+      });
+    }
     
     // Combine all types of matches
     const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
