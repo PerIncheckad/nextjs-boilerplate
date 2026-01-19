@@ -1149,10 +1149,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Only process CHECK-documented damages (have legacy_damage_source_text)
       // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
       if (!damage.legacy_damage_source_text) {
-        if (hasBuhsOrCheckDamages) {
-          continue;
-        }
-        // No legacy_damage_source_text = not a CHECK-documented damage, skip
         continue;
       }
       
@@ -1888,10 +1884,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Only process CHECK-documented damages (have legacy_damage_source_text)
     // Skip nybil/new damages if there are BUHS/CHECK damages for this vehicle
     if (!damage.legacy_damage_source_text) {
-      if (hasBuhsOrCheckDamages) {
-        continue;
-      }
-      // No legacy_damage_source_text = not a CHECK-documented damage, skip
       continue;
     }
     
