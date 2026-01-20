@@ -1085,32 +1085,43 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
       const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
       
+      // Create new entry for priority comparison
+      const newEntry: DamageEntry = {
+        id: damage.id,
+        stableKey,
+        legacyDamageSourceText: damage.legacy_damage_source_text,
+        date: formatDate(rawDate),
+        source: 'CHECK',
+        damageTypeRaw,
+        userPositions,
+        folder,
+        photoUrls,
+        matchedCheckinDamage: null,
+        checkin: null,
+        documentedDate: checkDocumentedDate,
+        documentedBy: checkDocumentedBy,
+      };
+      
       if (damageMap.has(stableKey)) {
-        const entry = damageMap.get(stableKey)!;
-        entry.damageTypeRaw = damageTypeRaw;
-        entry.userPositions = userPositions;
-        entry.folder = folder;
-        entry.photoUrls = photoUrls;
-        entry.source = 'BUHS';
-        // Set CHECK documentation metadata for history matching
-        entry.documentedDate = checkDocumentedDate;
-        entry.documentedBy = checkDocumentedBy;
+        // Priority-based replacement: compare priorities
+        const existingEntry = damageMap.get(stableKey)!;
+        const existingPriority = getDamageEntryPriority(existingEntry);
+        const newPriority = getDamageEntryPriority(newEntry);
+        
+        if (newPriority < existingPriority) {
+          // New entry has higher priority, replace
+          damageMap.set(stableKey, newEntry);
+        } else {
+          // Existing entry has equal or higher priority, but merge CHECK metadata into it
+          existingEntry.damageTypeRaw = damageTypeRaw;
+          existingEntry.userPositions = userPositions;
+          existingEntry.folder = folder;
+          existingEntry.photoUrls = photoUrls;
+          existingEntry.documentedDate = checkDocumentedDate;
+          existingEntry.documentedBy = checkDocumentedBy;
+        }
       } else {
-        damageMap.set(stableKey, {
-          id: damage.id,
-          stableKey,
-          legacyDamageSourceText: damage.legacy_damage_source_text,
-          date: formatDate(rawDate),
-          source: 'CHECK',
-          damageTypeRaw,
-          userPositions,
-          folder,
-          photoUrls,
-          matchedCheckinDamage: null,
-          checkin: null,
-          documentedDate: checkDocumentedDate,
-          documentedBy: checkDocumentedBy,
-        });
+        damageMap.set(stableKey, newEntry);
       }
     }
     
@@ -1842,48 +1853,56 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
     const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
     
+    // Create new entry for priority comparison
+    const newEntry: DamageEntry = {
+      id: damage.id,
+      stableKey,
+      legacyDamageSourceText: damage.legacy_damage_source_text,
+      date: formatDate(rawDate),
+      source: 'CHECK',
+      damageTypeRaw,
+      userPositions,
+      folder,
+      photoUrls,
+      matchedCheckinDamage: null, // CHECK damages don't have direct checkin_damage matches in this context
+      checkin: null,
+      documentedDate: checkDocumentedDate,
+      documentedBy: checkDocumentedBy,
+    };
+    
     if (damageMap.has(stableKey)) {
-      // MERGE: Entry exists from BUHS, update with CHECK data (CHECK wins for title/positions/media)
-      const entry = damageMap.get(stableKey)!;
+      // Priority-based replacement: compare priorities
+      const existingEntry = damageMap.get(stableKey)!;
+      const existingPriority = getDamageEntryPriority(existingEntry);
+      const newPriority = getDamageEntryPriority(newEntry);
       
       // DEBUG: Log for LRA75R
       if (cleanedRegnr === 'LRA75R') {
-        console.log(`[DEBUG LRA75R] CHECK PASS2 Merging into existing key "${stableKey}": folder=${folder}`);
+        console.log(`[DEBUG LRA75R] CHECK PASS2 Duplicate key "${stableKey}": existing priority=${existingPriority}, new priority=${newPriority}, winner=${newPriority < existingPriority ? 'NEW' : 'EXISTING'}`);
       }
       
-      entry.damageTypeRaw = damageTypeRaw;
-      entry.userPositions = userPositions;
-      entry.folder = folder; // CHECK wins for media
-      entry.photoUrls = photoUrls;
-      entry.source = 'BUHS'; // Keep source as BUHS since it originated there
-      // Set CHECK documentation metadata for history matching
-      entry.documentedDate = checkDocumentedDate;
-      entry.documentedBy = checkDocumentedBy;
+      if (newPriority < existingPriority) {
+        // New entry has higher priority, replace
+        damageMap.set(stableKey, newEntry);
+      } else {
+        // Existing entry has equal or higher priority, but merge CHECK metadata into it
+        // (CHECK wins for title/positions/media even if priority is same/lower)
+        existingEntry.damageTypeRaw = damageTypeRaw;
+        existingEntry.userPositions = userPositions;
+        existingEntry.folder = folder;
+        existingEntry.photoUrls = photoUrls;
+        existingEntry.documentedDate = checkDocumentedDate;
+        existingEntry.documentedBy = checkDocumentedBy;
+      }
     } else {
-      // ADD: No BUHS entry with this stableKey, add new entry from CHECK
-      // This should rarely happen for CHECK damages with legacy_damage_source_text
-      // but we handle it per requirements
+      // ADD: No entry with this stableKey exists yet
       
       // DEBUG: Log for LRA75R
       if (cleanedRegnr === 'LRA75R') {
         console.log(`[DEBUG LRA75R] CHECK PASS2 Adding new key "${stableKey}": folder=${folder}`);
       }
       
-      damageMap.set(stableKey, {
-        id: damage.id,
-        stableKey,
-        legacyDamageSourceText: damage.legacy_damage_source_text,
-        date: formatDate(rawDate),
-        source: 'CHECK',
-        damageTypeRaw,
-        userPositions,
-        folder,
-        photoUrls,
-        matchedCheckinDamage: null,
-        checkin: null,
-        documentedDate: checkDocumentedDate,
-        documentedBy: checkDocumentedBy,
-      });
+      damageMap.set(stableKey, newEntry);
     }
   }
   
