@@ -1097,6 +1097,13 @@ const HistoryItem: React.FC<{
           {isBuhsSkada && record.buhsSkadaDetaljer && (
             <span className="history-buhs-label">{record.buhsSkadaDetaljer.skadetyp}</span>
           )}
+          {/* For SKADA, show date on title row (same layout as INCHECKNING) */}
+          {isBuhsSkada ? (
+            <span className="history-date-label">{record.datum}</span>
+          ) : (
+            <span className="history-date-label">{record.datum}</span>
+          )}
+          {/* Keep "Dokumenterad …" on next line */}
           {isBuhsSkada && record.sammanfattning && (
             <span className="history-buhs-summary">
               {record.sammanfattning.split('\n').map((line, idx, arr) => (
@@ -1107,19 +1114,18 @@ const HistoryItem: React.FC<{
               ))}
             </span>
           )}
-          {/* Media link for BUHS SKADA events - show in collapsed view */}
+          {/* Left-align "Visa media" link without indent */}
           {isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder && (
             <a 
               href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: '#1a73e8', fontWeight: 'normal', marginLeft: '0.5rem' }}
+              style={{ color: '#1a73e8', fontWeight: 'normal' }}
               onClick={(e) => e.stopPropagation()}
             >
               📁 Visa media
             </a>
           )}
-          <span className="history-date-label">{record.datum}</span>
         </div>
         {!isNonExpandable && <span className="history-toggle-icon">{isExpanded ? '▲' : '▼'}</span>}
       </div>

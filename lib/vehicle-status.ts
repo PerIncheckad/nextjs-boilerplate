@@ -377,10 +377,18 @@ function toDateOnly(d: any): string {
 // Helper to create stable key for deterministic damage deduplication
 // Used to merge BUHS and CHECK sources by legacy_damage_source_text + date
 // Uses normalized text + date-only (no time component)
+// Updated normalization: gemener, trim, compress whitespace, repor→repa
 function createStableKey(legacyDamageSourceText: string | null | undefined, date: string | null | undefined): string {
   const normalizedText = normalizeTextForMatching(legacyDamageSourceText);
   const dateOnly = toDateOnly(date);
   return `${normalizedText}_${dateOnly}`;
+}
+
+// Dedup helper: determines priority for same-key damages
+// Priority: handled (documented/existing/not_found) > BUHS-unmatched
+function getDamageEntryPriority(entry: { matchedCheckinDamage?: any | null }): number {
+  if (entry.matchedCheckinDamage) return 1; // handled = highest priority
+  return 2; // BUHS-unmatched = lower priority
 }
 
 // Helper to format damage positions from user_positions array
@@ -758,6 +766,27 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
   
+  // DEBUG: Log raw data for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] Raw damages from Supabase:', damages.map(d => ({
+      id: d.id,
+      legacy_damage_source_text: d.legacy_damage_source_text,
+      original_damage_date: d.original_damage_date,
+      damage_date: d.damage_date,
+      created_at: d.created_at,
+      source: d.source,
+      folder: (d.uploads as any)?.folder || d.folder,
+      photo_urls: d.photo_urls,
+    })));
+    console.log('[DEBUG LRA75R] Legacy damages from RPC:', legacyDamages.map(d => ({
+      id: d.id,
+      damage_type_raw: d.damage_type_raw,
+      note_customer: d.note_customer,
+      note_internal: d.note_internal,
+      damage_date: d.damage_date,
+    })));
+  }
+  
   // Fetch all checkin_damages for this regnr via server-side API
   // This uses service role on the server to bypass RLS issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
@@ -780,6 +809,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         allCheckinDamages = rawData.filter(cd => 
           cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing' || cd.type === 'new'
         );
+        
+        // DEBUG: Log checkin_damages for LRA75R
+        if (cleanedRegnr === 'LRA75R') {
+          console.log('[DEBUG LRA75R] All checkin_damages:', allCheckinDamages.map(cd => ({
+            id: cd.id,
+            checkin_id: cd.checkin_id,
+            type: cd.type,
+            damage_type: cd.damage_type,
+            car_part: cd.car_part,
+            position: cd.position,
+            description: cd.description,
+            photo_urls: cd.photo_urls,
+            video_urls: cd.video_urls,
+          })));
+        }
       }
     } catch (err) {
       console.error(`[ERROR ${cleanedRegnr}] Failed to call /api/checkin-damages:`, err);
@@ -941,10 +985,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       const stableKey = createStableKey(legacyText, date);
       
-      if (damageMap.has(stableKey)) {
-        continue;
-      }
-      
       let matchedCheckinDamage: CheckinDamageData | null = null;
       
       if (!isGEU29F) {
@@ -993,7 +1033,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
         : null;
       
-      damageMap.set(stableKey, {
+      const newEntry: DamageEntry = {
         id: d.id,
         stableKey,
         legacyDamageSourceText: legacyText,
@@ -1003,7 +1043,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         buhsId: d.id,
         matchedCheckinDamage,
         checkin,
-      });
+      };
+      
+      // Priority-based dedup: keep handled over BUHS-unmatched
+      if (damageMap.has(stableKey)) {
+        const existingEntry = damageMap.get(stableKey)!;
+        const existingPriority = getDamageEntryPriority(existingEntry);
+        const newPriority = getDamageEntryPriority(newEntry);
+        
+        // Only replace if new entry has higher priority (lower number = higher priority)
+        if (newPriority < existingPriority) {
+          damageMap.set(stableKey, newEntry);
+        }
+        // If same priority, keep the first one (skip this duplicate)
+      } else {
+        damageMap.set(stableKey, newEntry);
+      }
     }
     
     // PASS 2: Process CHECK damages (damages table with legacy_damage_source_text)
@@ -1030,32 +1085,76 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
       const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
       
+      // Match CHECK damage to checkin_damages to determine if it's handled
+      let matchedCheckinDamage: CheckinDamageData | null = null;
+      
+      if (!isGEU29F) {
+        // Try to match by damage ID first (most reliable)
+        const damageId = damage.id;
+        matchedCheckinDamage = allCheckinDamages.find(cd => 
+          cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.damage_id === damageId
+        ) || null;
+        
+        // If no match by ID, try text matching
+        if (!matchedCheckinDamage) {
+          for (const cd of allCheckinDamages) {
+            if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue;
+            
+            const cdDescription = cd.description || '';
+            if (textsMatch(legacyText, cdDescription) ||
+                textsMatch(damageTypeRaw, cdDescription)) {
+              matchedCheckinDamage = cd;
+              matchedCheckinDamageIds.add(cd.id);
+              break;
+            }
+          }
+        } else if (matchedCheckinDamage.id) {
+          matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+        }
+      }
+      
+      // Find matching checkin for this checkin_damage
+      const checkin = matchedCheckinDamage 
+        ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
+        : null;
+      
+      // Create new entry for priority comparison
+      const newEntry: DamageEntry = {
+        id: damage.id,
+        stableKey,
+        legacyDamageSourceText: damage.legacy_damage_source_text,
+        date: formatDate(rawDate),
+        source: 'CHECK',
+        damageTypeRaw,
+        userPositions,
+        folder,
+        photoUrls,
+        matchedCheckinDamage, // Now properly matched!
+        checkin,
+        documentedDate: checkDocumentedDate,
+        documentedBy: checkDocumentedBy,
+      };
+      
       if (damageMap.has(stableKey)) {
-        const entry = damageMap.get(stableKey)!;
-        entry.damageTypeRaw = damageTypeRaw;
-        entry.userPositions = userPositions;
-        entry.folder = folder;
-        entry.photoUrls = photoUrls;
-        entry.source = 'BUHS';
-        // Set CHECK documentation metadata for history matching
-        entry.documentedDate = checkDocumentedDate;
-        entry.documentedBy = checkDocumentedBy;
+        // Priority-based replacement: compare priorities
+        const existingEntry = damageMap.get(stableKey)!;
+        const existingPriority = getDamageEntryPriority(existingEntry);
+        const newPriority = getDamageEntryPriority(newEntry);
+        
+        if (newPriority < existingPriority) {
+          // New entry has higher priority, replace
+          damageMap.set(stableKey, newEntry);
+        } else {
+          // Existing entry has equal or higher priority, but merge CHECK metadata into it
+          existingEntry.damageTypeRaw = damageTypeRaw;
+          existingEntry.userPositions = userPositions;
+          existingEntry.folder = folder;
+          existingEntry.photoUrls = photoUrls;
+          existingEntry.documentedDate = checkDocumentedDate;
+          existingEntry.documentedBy = checkDocumentedBy;
+        }
       } else {
-        damageMap.set(stableKey, {
-          id: damage.id,
-          stableKey,
-          legacyDamageSourceText: damage.legacy_damage_source_text,
-          date: formatDate(rawDate),
-          source: 'CHECK',
-          damageTypeRaw,
-          userPositions,
-          folder,
-          photoUrls,
-          matchedCheckinDamage: null,
-          checkin: null,
-          documentedDate: checkDocumentedDate,
-          documentedBy: checkDocumentedBy,
-        });
+        damageMap.set(stableKey, newEntry);
       }
     }
     
@@ -1114,7 +1213,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           sourceInfo = 'Källa: BUHS';
           
         } else if (cdType === 'not_found') {
-          skadetyp = formatBuhsDamageText(legacyText);
+          // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
+          skadetyp = legacyText || 'Okänd skada';
           
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -1168,6 +1268,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         is_handled: matchedCheckinDamage !== null,
         is_inventoried: matchedCheckinDamage !== null,
         is_unmatched_buhs: matchedCheckinDamage === null,
+        _stableKey: entry.stableKey, // Store actual stableKey for debugging
       });
     }
 
@@ -1282,13 +1383,30 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Combine all types of matches
       const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
+      // Dedup by damage.id (Fix 2.1)
+      const seenDamageIds = new Set<number | string>();
+      const dedupedMatchedDamages = matchedDamages.filter(damage => {
+        if (seenDamageIds.has(damage.id)) {
+          return false; // Skip duplicate
+        }
+        seenDamageIds.add(damage.id);
+        return true;
+      });
+      
       // Track which damages are shown in this checkin
-      matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+      dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
       
       // Build skador array from matched damageRecords
-      const skador = matchedDamages.map(damage => {
-        // Add damage media to mediaLankar if not already there
-        if (damage.folder) {
+      const skador = dedupedMatchedDamages.map(damage => {
+        // Determine if this is a not_found damage
+        const isNotFound = damage.status?.startsWith('Gick ej att dokumentera');
+        
+        // For not_found: NO media link (Fix 2.2)
+        // For documented/existing: media link only if folder exists (Fix 2.4)
+        const shouldShowMedia = !isNotFound && damage.folder;
+        
+        // Add damage media to mediaLankar if should show media and not already there
+        if (shouldShowMedia) {
           const damageMediaKey = `skada-${damage.id}`;
           if (!mediaLankar[damageMediaKey]) {
             mediaLankar[damageMediaKey] = `/media/${damage.folder}`;
@@ -1296,13 +1414,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
         
         return {
-          typ: damage.skadetyp,
+          // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
+          typ: isNotFound ? damage.status : damage.skadetyp,
           beskrivning: '', // Kept for compatibility with display logic
-          mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
+          // Fix 2.2: For not_found, NO media link
+          mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
-          isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
-          handledStatus: damage.source === 'legacy' && damage.is_handled ? damage.status : undefined,
+          isNotFoundOlder: isNotFound, // Kommentar 1
+          // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
+          handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
         };
       });
       
@@ -1629,12 +1750,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     const stableKey = createStableKey(legacyText, date);
     
-    // For GWG66Z and similar vehicles, skip duplicate entries by actual ID
-    // For others, skip if same stableKey already exists (deterministic dedup)
-    if (damageMap.has(stableKey)) {
-      continue; // Skip duplicate BUHS damage with same legacy text + date
-    }
-    
     // Try to find matching checkin_damage entry for this BUHS damage
     let matchedCheckinDamage: CheckinDamageData | null = null;
     
@@ -1689,8 +1804,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
       : null;
     
-    // Add BUHS damage to map
-    damageMap.set(stableKey, {
+    const newEntry: DamageEntry = {
       id: d.id,
       stableKey,
       legacyDamageSourceText: legacyText,
@@ -1700,7 +1814,44 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       buhsId: d.id,
       matchedCheckinDamage,
       checkin,
-    });
+    };
+    
+    // Priority-based dedup: keep handled over BUHS-unmatched
+    if (damageMap.has(stableKey)) {
+      const existingEntry = damageMap.get(stableKey)!;
+      const existingPriority = getDamageEntryPriority(existingEntry);
+      const newPriority = getDamageEntryPriority(newEntry);
+      
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] BUHS PASS1 Duplicate key "${stableKey}": existing priority=${existingPriority}, new priority=${newPriority}, winner=${newPriority < existingPriority ? 'NEW' : 'EXISTING'}`);
+      }
+      
+      // Only replace if new entry has higher priority (lower number = higher priority)
+      if (newPriority < existingPriority) {
+        damageMap.set(stableKey, newEntry);
+      }
+      // If same priority, keep the first one (skip this duplicate)
+    } else {
+      damageMap.set(stableKey, newEntry);
+      
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] BUHS PASS1 New key "${stableKey}": handled=${!!newEntry.matchedCheckinDamage}, type=${newEntry.matchedCheckinDamage?.type || 'unmatched'}`);
+      }
+    }
+  }
+  
+  // DEBUG: Log damageMap after PASS 1 for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] damageMap after PASS 1:', Array.from(damageMap.entries()).map(([key, entry]) => ({
+      stableKey: key,
+      source: entry.source,
+      handled: !!entry.matchedCheckinDamage,
+      type: entry.matchedCheckinDamage?.type || 'unmatched',
+      legacyText: entry.legacyDamageSourceText,
+      date: entry.date,
+    })));
   }
   
   // ====================================================================================
@@ -1735,37 +1886,103 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
     const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
     
-    if (damageMap.has(stableKey)) {
-      // MERGE: Entry exists from BUHS, update with CHECK data (CHECK wins for title/positions/media)
-      const entry = damageMap.get(stableKey)!;
-      entry.damageTypeRaw = damageTypeRaw;
-      entry.userPositions = userPositions;
-      entry.folder = folder; // CHECK wins for media
-      entry.photoUrls = photoUrls;
-      entry.source = 'BUHS'; // Keep source as BUHS since it originated there
-      // Set CHECK documentation metadata for history matching
-      entry.documentedDate = checkDocumentedDate;
-      entry.documentedBy = checkDocumentedBy;
-    } else {
-      // ADD: No BUHS entry with this stableKey, add new entry from CHECK
-      // This should rarely happen for CHECK damages with legacy_damage_source_text
-      // but we handle it per requirements
-      damageMap.set(stableKey, {
-        id: damage.id,
-        stableKey,
-        legacyDamageSourceText: damage.legacy_damage_source_text,
-        date: formatDate(rawDate),
-        source: 'CHECK',
-        damageTypeRaw,
-        userPositions,
-        folder,
-        photoUrls,
-        matchedCheckinDamage: null,
-        checkin: null,
-        documentedDate: checkDocumentedDate,
-        documentedBy: checkDocumentedBy,
-      });
+    // Match CHECK damage to checkin_damages to determine if it's handled
+    let matchedCheckinDamage: CheckinDamageData | null = null;
+    
+    if (!isGEU29F) {
+      // Try to match by damage ID first (most reliable)
+      const damageId = damage.id;
+      matchedCheckinDamage = allCheckinDamages.find(cd => 
+        cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.damage_id === damageId
+      ) || null;
+      
+      // If no match by ID, try text matching
+      if (!matchedCheckinDamage) {
+        for (const cd of allCheckinDamages) {
+          if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue;
+          
+          const cdDescription = cd.description || '';
+          if (textsMatch(legacyText, cdDescription) ||
+              textsMatch(damageTypeRaw, cdDescription)) {
+            matchedCheckinDamage = cd;
+            matchedCheckinDamageIds.add(cd.id);
+            break;
+          }
+        }
+      } else if (matchedCheckinDamage.id) {
+        matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+      }
     }
+    
+    // Find matching checkin for this checkin_damage
+    const checkin = matchedCheckinDamage 
+      ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
+      : null;
+    
+    // Create new entry for priority comparison
+    const newEntry: DamageEntry = {
+      id: damage.id,
+      stableKey,
+      legacyDamageSourceText: damage.legacy_damage_source_text,
+      date: formatDate(rawDate),
+      source: 'CHECK',
+      damageTypeRaw,
+      userPositions,
+      folder,
+      photoUrls,
+      matchedCheckinDamage, // Now properly matched!
+      checkin,
+      documentedDate: checkDocumentedDate,
+      documentedBy: checkDocumentedBy,
+    };
+    
+    if (damageMap.has(stableKey)) {
+      // Priority-based replacement: compare priorities
+      const existingEntry = damageMap.get(stableKey)!;
+      const existingPriority = getDamageEntryPriority(existingEntry);
+      const newPriority = getDamageEntryPriority(newEntry);
+      
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] CHECK PASS2 Duplicate key "${stableKey}": existing priority=${existingPriority}, new priority=${newPriority}, winner=${newPriority < existingPriority ? 'NEW' : 'EXISTING'}`);
+      }
+      
+      if (newPriority < existingPriority) {
+        // New entry has higher priority, replace
+        damageMap.set(stableKey, newEntry);
+      } else {
+        // Existing entry has equal or higher priority, but merge CHECK metadata into it
+        // (CHECK wins for title/positions/media even if priority is same/lower)
+        existingEntry.damageTypeRaw = damageTypeRaw;
+        existingEntry.userPositions = userPositions;
+        existingEntry.folder = folder;
+        existingEntry.photoUrls = photoUrls;
+        existingEntry.documentedDate = checkDocumentedDate;
+        existingEntry.documentedBy = checkDocumentedBy;
+      }
+    } else {
+      // ADD: No entry with this stableKey exists yet
+      
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] CHECK PASS2 Adding new key "${stableKey}": folder=${folder}`);
+      }
+      
+      damageMap.set(stableKey, newEntry);
+    }
+  }
+  
+  // DEBUG: Log damageMap after PASS 2 for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] damageMap after PASS 2 (size=' + damageMap.size + '):', Array.from(damageMap.entries()).map(([key, entry]) => ({
+      stableKey: key,
+      source: entry.source,
+      handled: !!entry.matchedCheckinDamage,
+      type: entry.matchedCheckinDamage?.type || 'unmatched',
+      folder: entry.folder,
+      legacyText: entry.legacyDamageSourceText,
+      date: entry.date,
+    })));
   }
   
   // ====================================================================================
@@ -1831,8 +2048,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo = 'Källa: BUHS';
         
       } else if (cdType === 'not_found') {
-        // Display as: "<text> (BUHS)" for skadetyp
-        skadetyp = formatBuhsDamageText(legacyText);
+        // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
+        skadetyp = legacyText || 'Okänd skada';
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -1890,7 +2107,36 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       is_handled: matchedCheckinDamage !== null,
       is_inventoried: matchedCheckinDamage !== null,
       is_unmatched_buhs: matchedCheckinDamage === null,
+      _stableKey: entry.stableKey, // Store actual stableKey for debugging
     });
+  }
+
+  // DEBUG: Log final damageRecords for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] Final damageRecords count:', damageRecords.length);
+    console.log('[DEBUG LRA75R] Final damageRecords:', damageRecords.map(d => ({
+      id: d.id,
+      stableKey: (d as any)._stableKey, // Use actual stored stableKey
+      skadetyp: d.skadetyp,
+      status: d.status,
+      folder: d.folder,
+      source: d.source,
+      is_handled: d.is_handled,
+      is_unmatched_buhs: d.is_unmatched_buhs,
+    })));
+    
+    // Check for duplicates by stableKey
+    const stableKeyCounts = new Map<string, number>();
+    damageRecords.forEach(d => {
+      const key = (d as any)._stableKey;
+      if (key) {
+        stableKeyCounts.set(key, (stableKeyCounts.get(key) || 0) + 1);
+      }
+    });
+    const duplicates = Array.from(stableKeyCounts.entries()).filter(([_, count]) => count > 1);
+    if (duplicates.length > 0) {
+      console.error('[DEBUG LRA75R] DUPLICATE stableKeys found:', duplicates);
+    }
   }
 
   // Build history records
@@ -2005,13 +2251,50 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Combine all types of matches
     const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
     
+    // DEBUG: Log matched damages for LRA75R
+    if (cleanedRegnr === 'LRA75R') {
+      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages BEFORE dedup:`, matchedDamages.map(d => ({
+        id: d.id,
+        status: d.status,
+        folder: d.folder,
+        skadetyp: d.skadetyp,
+      })));
+    }
+    
+    // Dedup by damage.id (Fix 2.1)
+    const seenDamageIds = new Set<number | string>();
+    const dedupedMatchedDamages = matchedDamages.filter(damage => {
+      if (seenDamageIds.has(damage.id)) {
+        return false; // Skip duplicate
+      }
+      seenDamageIds.add(damage.id);
+      return true;
+    });
+    
+    // DEBUG: Log matched damages for LRA75R after dedup
+    if (cleanedRegnr === 'LRA75R') {
+      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages AFTER dedup:`, dedupedMatchedDamages.map(d => ({
+        id: d.id,
+        status: d.status,
+        folder: d.folder,
+        skadetyp: d.skadetyp,
+      })));
+    }
+    
     // Track which damages are shown in this checkin
-    matchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+    dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
     
     // Build skador array from matched damageRecords
-    const skador = matchedDamages.map(damage => {
-      // Add damage media to mediaLankar if not already there
-      if (damage.folder) {
+    const skador = dedupedMatchedDamages.map(damage => {
+      // Determine if this is a not_found damage
+      const isNotFound = damage.status?.startsWith('Gick ej att dokumentera');
+      
+      // For not_found: NO media link (Fix 2.2)
+      // For documented/existing: media link only if folder exists (Fix 2.4)
+      const shouldShowMedia = !isNotFound && damage.folder;
+      
+      // Add damage media to mediaLankar if should show media and not already there
+      if (shouldShowMedia) {
         // Use damage folder for media link
         const damageMediaKey = `skada-${damage.id}`;
         if (!mediaLankar[damageMediaKey]) {
@@ -2020,13 +2303,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       return {
-        typ: damage.skadetyp,
+        // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
+        typ: isNotFound ? damage.status : damage.skadetyp,
         beskrivning: '', // Kept for compatibility with display logic
-        mediaUrl: damage.folder ? `/media/${damage.folder}` : undefined,
+        // Fix 2.2: For not_found, NO media link
+        mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
-        isNotFoundOlder: damage.source === 'legacy' && damage.status?.startsWith('Gick ej att dokumentera'), // Kommentar 1
-        handledStatus: damage.source === 'legacy' && damage.is_handled ? damage.status : undefined,
+        isNotFoundOlder: isNotFound, // Kommentar 1
+        // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
+        handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
       };
     });
     
