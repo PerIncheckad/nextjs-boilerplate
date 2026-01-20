@@ -572,6 +572,48 @@ En BUHS-skada markeras som `is_inventoried = true` (och visas INTE i "Befintliga
 
 ---
 
+## Matchningslogik för BUHS-/CHECK-skador (dedup + historik)
+
+**Stabil nyckel (stableKey)**  
+- `stableKey = normalize(legacy_damage_source_text) + "_" + toDateOnly(original_damage_date || damage_date)`  
+- `normalize`: gemener, trim, komprimerar whitespace, “repor” → “repa”.  
+- `toDateOnly`: tar YYYY-MM-DD och strippar tidsdel (om “T” finns).  
+- BUHS (legacy/RPC): datum = `damage_date`.  
+- CHECK (damages med `legacy_damage_source_text`): datum = `original_damage_date` || (fallback: BUHS text→date-map) || `damage_date` || `created_at`.
+
+**Merge-regler (Map-baserad dedup)**  
+- Lägg BUHS först (stableKey ovan).  
+- Lägg CHECK:  
+  - Om stableKey finns → MERGE (CHECK vinner på titel/positions/media).  
+  - Om stableKey saknas → ADD.  
+- Ignorera nybil/newDamage utan `legacy_damage_source_text` när legacy finns (för att undvika falska matchningar).  
+- `antalSkador = size(damageMap)` efter merge (används för “Antal registrerade skador”).
+
+**Media-prio**  
+- Media/folder/photo_urls: CHECK först, annars BUHS.  
+- Visa “Visa media” endast om folder/photo_urls finns; ingen länk till tom mapp.
+
+**checkin_damages**  
+- Används för documented/not_found/existing/new.  
+- Om tabellen är tom → inga spökrader.  
+- Matchning till BUHS/CHECK via stableKey + text/typ (enligt kod i lib/vehicle-status.ts).
+
+**Historik**  
+- En SKADA-händelse per stableKey:  
+  - Dokumenterad BUHS: “Dokumenterad <datum> av <checker>” (+ ev. BUHS-ursprungstext).  
+  - not_found: visar status med kommentar.  
+  - Unmatched BUHS: visas utan status (bara skadetext).  
+  - Media-länk om folder finns.  
+- Incheckningshändelse visar “Skador hanterade” för skador som matchar incheckningen (documented/not_found/existing) via stableKey/date-match.
+
+**Datumformat**  
+- All matching använder date-only (YYYY-MM-DD) utan tidsdel för att undvika drift (t.ex. “2025-04-16” vs “2025-04-16T00:00:00Z”).
+
+**Speciella fall**  
+- GEU29F: särskild hantering i koden (kan noteras separat); annars gäller reglerna ovan.
+
+---
+
 ## Vanliga SQL-frågor för felsökning
 
 ### Visa alla incheckningar för ett fordon
