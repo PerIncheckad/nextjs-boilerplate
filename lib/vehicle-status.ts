@@ -766,6 +766,27 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
   
+  // DEBUG: Log raw data for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] Raw damages from Supabase:', damages.map(d => ({
+      id: d.id,
+      legacy_damage_source_text: d.legacy_damage_source_text,
+      original_damage_date: d.original_damage_date,
+      damage_date: d.damage_date,
+      created_at: d.created_at,
+      source: d.source,
+      folder: (d.uploads as any)?.folder || d.folder,
+      photo_urls: d.photo_urls,
+    })));
+    console.log('[DEBUG LRA75R] Legacy damages from RPC:', legacyDamages.map(d => ({
+      id: d.id,
+      damage_type_raw: d.damage_type_raw,
+      note_customer: d.note_customer,
+      note_internal: d.note_internal,
+      damage_date: d.damage_date,
+    })));
+  }
+  
   // Fetch all checkin_damages for this regnr via server-side API
   // This uses service role on the server to bypass RLS issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
@@ -788,6 +809,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         allCheckinDamages = rawData.filter(cd => 
           cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing' || cd.type === 'new'
         );
+        
+        // DEBUG: Log checkin_damages for LRA75R
+        if (cleanedRegnr === 'LRA75R') {
+          console.log('[DEBUG LRA75R] All checkin_damages:', allCheckinDamages.map(cd => ({
+            id: cd.id,
+            checkin_id: cd.checkin_id,
+            type: cd.type,
+            damage_type: cd.damage_type,
+            car_part: cd.car_part,
+            position: cd.position,
+            description: cd.description,
+            photo_urls: cd.photo_urls,
+            video_urls: cd.video_urls,
+          })));
+        }
       }
     } catch (err) {
       console.error(`[ERROR ${cleanedRegnr}] Failed to call /api/checkin-damages:`, err);
@@ -1741,6 +1777,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const existingPriority = getDamageEntryPriority(existingEntry);
       const newPriority = getDamageEntryPriority(newEntry);
       
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] BUHS PASS1 Duplicate key "${stableKey}": existing priority=${existingPriority}, new priority=${newPriority}, winner=${newPriority < existingPriority ? 'NEW' : 'EXISTING'}`);
+      }
+      
       // Only replace if new entry has higher priority (lower number = higher priority)
       if (newPriority < existingPriority) {
         damageMap.set(stableKey, newEntry);
@@ -1748,7 +1789,24 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // If same priority, keep the first one (skip this duplicate)
     } else {
       damageMap.set(stableKey, newEntry);
+      
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] BUHS PASS1 New key "${stableKey}": handled=${!!newEntry.matchedCheckinDamage}, type=${newEntry.matchedCheckinDamage?.type || 'unmatched'}`);
+      }
     }
+  }
+  
+  // DEBUG: Log damageMap after PASS 1 for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] damageMap after PASS 1:', Array.from(damageMap.entries()).map(([key, entry]) => ({
+      stableKey: key,
+      source: entry.source,
+      handled: !!entry.matchedCheckinDamage,
+      type: entry.matchedCheckinDamage?.type || 'unmatched',
+      legacyText: entry.legacyDamageSourceText,
+      date: entry.date,
+    })));
   }
   
   // ====================================================================================
@@ -1786,6 +1844,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     if (damageMap.has(stableKey)) {
       // MERGE: Entry exists from BUHS, update with CHECK data (CHECK wins for title/positions/media)
       const entry = damageMap.get(stableKey)!;
+      
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] CHECK PASS2 Merging into existing key "${stableKey}": folder=${folder}`);
+      }
+      
       entry.damageTypeRaw = damageTypeRaw;
       entry.userPositions = userPositions;
       entry.folder = folder; // CHECK wins for media
@@ -1798,6 +1862,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // ADD: No BUHS entry with this stableKey, add new entry from CHECK
       // This should rarely happen for CHECK damages with legacy_damage_source_text
       // but we handle it per requirements
+      
+      // DEBUG: Log for LRA75R
+      if (cleanedRegnr === 'LRA75R') {
+        console.log(`[DEBUG LRA75R] CHECK PASS2 Adding new key "${stableKey}": folder=${folder}`);
+      }
+      
       damageMap.set(stableKey, {
         id: damage.id,
         stableKey,
@@ -1814,6 +1884,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         documentedBy: checkDocumentedBy,
       });
     }
+  }
+  
+  // DEBUG: Log damageMap after PASS 2 for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] damageMap after PASS 2:', Array.from(damageMap.entries()).map(([key, entry]) => ({
+      stableKey: key,
+      source: entry.source,
+      handled: !!entry.matchedCheckinDamage,
+      type: entry.matchedCheckinDamage?.type || 'unmatched',
+      folder: entry.folder,
+      legacyText: entry.legacyDamageSourceText,
+      date: entry.date,
+    })));
   }
   
   // ====================================================================================
@@ -1941,6 +2024,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     });
   }
 
+  // DEBUG: Log final damageRecords for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[DEBUG LRA75R] Final damageRecords count:', damageRecords.length);
+    console.log('[DEBUG LRA75R] Final damageRecords:', damageRecords.map(d => ({
+      id: d.id,
+      skadetyp: d.skadetyp,
+      status: d.status,
+      folder: d.folder,
+      source: d.source,
+      is_handled: d.is_handled,
+      is_unmatched_buhs: d.is_unmatched_buhs,
+    })));
+  }
+
   // Build history records
   const historyRecords: HistoryRecord[] = [];
   const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
@@ -2053,6 +2150,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Combine all types of matches
     const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
     
+    // DEBUG: Log matched damages for LRA75R
+    if (cleanedRegnr === 'LRA75R') {
+      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages BEFORE dedup:`, matchedDamages.map(d => ({
+        id: d.id,
+        status: d.status,
+        folder: d.folder,
+        skadetyp: d.skadetyp,
+      })));
+    }
+    
     // Dedup by damage.id (Fix 2.1)
     const seenDamageIds = new Set<number | string>();
     const dedupedMatchedDamages = matchedDamages.filter(damage => {
@@ -2062,6 +2169,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       seenDamageIds.add(damage.id);
       return true;
     });
+    
+    // DEBUG: Log matched damages for LRA75R after dedup
+    if (cleanedRegnr === 'LRA75R') {
+      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages AFTER dedup:`, dedupedMatchedDamages.map(d => ({
+        id: d.id,
+        status: d.status,
+        folder: d.folder,
+        skadetyp: d.skadetyp,
+      })));
+    }
     
     // Track which damages are shown in this checkin
     dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
