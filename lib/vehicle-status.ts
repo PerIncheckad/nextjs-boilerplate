@@ -311,6 +311,7 @@ type CheckinDamageData = {
   photo_urls: string[] | null;
   video_urls: string[] | null;
   positions?: any[] | null;
+  regnr?: string | null;
   created_at: string;
 };
 
