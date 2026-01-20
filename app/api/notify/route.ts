@@ -899,9 +899,9 @@ export async function POST(request: Request) {
             const rawType = skada.userType || skada.type || null;
             const normalized = normalizeDamageType(rawType);
 
-            // BUHS damages already exist in `damages` table (imported from CSV).
-            // Documenting a BUHS damage should only create a `checkin_damages` record.
-            // Do NOT insert into `damageInserts` to avoid duplicates.
+            // BUHS damages already exist in `damages` table (imported from CSV with source='BUHS').
+            // Documenting a BUHS damage should only create a `checkin_damages` record with type='documented'
+            // that links to the existing damage. Do NOT insert into `damageInserts` to avoid duplicates.
 
             const positions = skada.userPositions || skada.positions || [];
             if (positions.length > 0) {
