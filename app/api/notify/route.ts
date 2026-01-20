@@ -865,6 +865,7 @@ export async function POST(request: Request) {
               positions.forEach((pos: any) => {
                 checkinDamageInserts.push({
                   checkin_id: checkinId,
+                  regnr: regNr,
                   type: 'new',
                   damage_type: normalized.typeCode,
                   car_part: pos.carPart || null,
@@ -879,6 +880,7 @@ export async function POST(request: Request) {
             } else {
               checkinDamageInserts.push({
                 checkin_id: checkinId,
+                regnr: regNr,
                 type: 'new',
                 damage_type: normalized.typeCode,
                 car_part: null,
@@ -947,6 +949,7 @@ export async function POST(request: Request) {
             // Add to checkin_damages with type 'not_found'
             checkinDamageInserts.push({
               checkin_id: checkinId,
+              regnr: regNr,
               type: 'not_found',
               damage_type: normalized.typeCode,
               car_part: null,
