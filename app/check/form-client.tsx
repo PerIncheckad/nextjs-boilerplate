@@ -663,7 +663,13 @@ export default function CheckInForm() {
       }
       const info: VehicleInfo = await response.json();
   
-      if (info.status === 'NO_MATCH' || info.status === 'PARTIAL_MATCH_DAMAGE_ONLY') {
+      // Check if this regnr exists in get_all_allowed_plates (vehicles, nybil_inventering, and checkins)
+      const regExistsInAllowedPlates = allRegistrations.some(r => r.toUpperCase().replace(/\s/g, '') === normalized);
+      
+      // Only show the "unknown reg" modal if:
+      // 1. Status is NO_MATCH or PARTIAL_MATCH_DAMAGE_ONLY, AND
+      // 2. The reg does NOT exist in get_all_allowed_plates
+      if ((info.status === 'NO_MATCH' || info.status === 'PARTIAL_MATCH_DAMAGE_ONLY') && !regExistsInAllowedPlates) {
         setConfirmDialog({
           isOpen: true,
           title: '⚠️ Reg.nr saknas!',
@@ -737,7 +743,7 @@ export default function CheckInForm() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [allRegistrations]);
 
   // Effects
   // Health check: log Supabase URL

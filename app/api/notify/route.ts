@@ -102,13 +102,15 @@ const createAlertBanner = (
   details?: string,
   folderPath?: string,
   siteUrl?: string,
-  count?: number
+  count?: number,
+  icon?: string
 ): string => {
   if (!condition) return '';
   const storageLink = siteUrl ? createStorageLink(folderPath, siteUrl) : null;
   let bannerText = text;
   if (count !== undefined && count > 0 && Number.isInteger(count)) bannerText += ` (${count})`;
-  let fullText = `⚠️ ${bannerText}`;
+  const emoji = icon || '⚠️';
+  let fullText = `${emoji} ${bannerText}`;
   if (details) fullText += `<br>${details}`;
   const bannerContent = `<div style="background-color:${BANNER_COLOR_RED}!important;border:1px solid ${BANNER_COLOR_RED};padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">${fullText}</div>`;
   return `<tr><td style="padding:6px 0;">${
@@ -407,7 +409,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
     ${saludatumBanner}
     ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
     ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
-    ${createAlertBanner(showChargeWarning, 'LÅG LADDNIVÅ', `Laddnivå: ${payload.laddning?.laddniva}%`)}
+    ${createAlertBanner(showChargeWarning, 'LÅG LADDNIVÅ', `Laddnivå: ${payload.laddning?.laddniva}%`, undefined, undefined, undefined, '⚡')}
     ${createAlertBanner(notRefueled, 'EJ UPPTANKAD')}
     ${createAlertBanner(payload.rekond?.behoverRekond, 'REKOND BEHÖVS', payload.rekond?.text || '', payload.rekond?.folder, siteUrl)}
     ${createAlertBanner(payload.husdjur?.sanerad, 'HUSDJUR (SANERING)', payload.husdjur?.text || '', payload.husdjur?.folder, siteUrl)}
@@ -680,27 +682,38 @@ export async function POST(request: Request) {
       payload.husdjur?.sanerad ||
       payload.rokning?.sanerad;
 
-    // Build emoji marker: ⚡ for low charge, ⚠️ for saludatum or other warnings
+    // Build emoji marker for Huvudstation: ⚡ for low charge, ⚠️ for saludatum or other warnings
     // Priority order: low charge takes precedence, then saludatum, then other warnings
-    let emojiMarker = '';
+    let huvudstationEmojiMarker = '';
     if (showChargeWarning && (hasSaludatumRisk || hasOtherWarnings)) {
       // Low charge + saludatum/other warnings: show both emojis
-      emojiMarker = ' - ⚡ ⚠️ - ';
+      huvudstationEmojiMarker = ' - ⚡ ⚠️ - ';
     } else if (hasSaludatumRisk && hasOtherWarnings) {
       // Saludatum + other warnings (no low charge): show warning emoji only
-      emojiMarker = ' - ⚠️ - ';
+      huvudstationEmojiMarker = ' - ⚠️ - ';
     } else if (showChargeWarning) {
       // Only low charge emoji
-      emojiMarker = ' - ⚡ - ';
+      huvudstationEmojiMarker = ' - ⚡ - ';
     } else if (hasSaludatumRisk) {
       // Only saludatum warning emoji
-      emojiMarker = ' - ⚠️ - ';
+      huvudstationEmojiMarker = ' - ⚠️ - ';
     } else if (hasOtherWarnings) {
       // Only other warnings emoji
-      emojiMarker = ' - ⚠️ - ';
+      huvudstationEmojiMarker = ' - ⚠️ - ';
     } else {
       // No warnings
-      emojiMarker = ' - ';
+      huvudstationEmojiMarker = ' - ';
+    }
+
+    // Build emoji marker for Bilkontroll: ⚠️ for saludatum or other warnings (NO ⚡ for low battery)
+    // Bilkontroll is not interested in charge level
+    let bilkontrollEmojiMarker = '';
+    if (hasSaludatumRisk || hasOtherWarnings) {
+      // Saludatum or other warnings: show warning emoji
+      bilkontrollEmojiMarker = ' - ⚠️ - ';
+    } else {
+      // No warnings (or only low charge which Bilkontroll doesn't care about)
+      bilkontrollEmojiMarker = ' - ';
     }
 
     // Add "!!!" for severe warnings, with exceptions:
@@ -710,8 +723,8 @@ export async function POST(request: Request) {
     const needsExclamation = hasOtherWarnings || (showChargeWarning && hasSaludatumRisk);
     const exclamationMarker = needsExclamation ? '!!! - ' : '';
 
-    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}${exclamationMarker}HUVUDSTATION`;
-    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${emojiMarker}${exclamationMarker}BILKONTROLL`;
+    const huvudstationSubject = `INCHECKAD: ${regNr} - ${cleanStation}${huvudstationEmojiMarker}${exclamationMarker}HUVUDSTATION`;
+    const bilkontrollSubject = `INCHECKAD: ${regNr} - ${cleanStation}${bilkontrollEmojiMarker}${exclamationMarker}BILKONTROLL`;
 
     // =================================================================
     // DATABASE PERSISTENCE (normaliserad damage_type)
