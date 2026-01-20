@@ -897,32 +897,16 @@ export async function POST(request: Request) {
             const rawType = skada.userType || skada.type || null;
             const normalized = normalizeDamageType(rawType);
 
-            damageInserts.push({
-              regnr: regNr,
-              damage_date: now.toISOString().split('T')[0],
-              region: region || payload.region || null,
-              ort: payload.ort || null,
-              station_namn: payload.station || null,
-              damage_type: normalized.typeCode,
-              damage_type_raw: rawType,
-              user_type: rawType,
-              user_positions: skada.userPositions || skada.positions || null,
-              description: getDescription(skada),
-              inchecker_name: checkinData.checker_name,
-              inchecker_email: checkinData.checker_email,
-              status: 'complete',
-              uploads: skada.uploads || null,
-              legacy_damage_source_text: skada.fullText || null,
-              // original_damage_date: skada.damage_date || null,                // (valfritt för idempotens)
-              // legacy_loose_key: skada.damage_date ? `${regNr}|${skada.damage_date}` : null, // (valfritt)
-              created_at: now.toISOString(),
-            });
+            // BUHS damages already exist in `damages` table (imported from CSV).
+            // Documenting a BUHS damage should only create a `checkin_damages` record.
+            // Do NOT insert into `damageInserts` to avoid duplicates.
 
             const positions = skada.userPositions || skada.positions || [];
             if (positions.length > 0) {
               positions.forEach((pos: any) => {
                 checkinDamageInserts.push({
                   checkin_id: checkinId,
+                  regnr: regNr,
                   type: 'documented',
                   damage_type: normalized.typeCode,
                   car_part: pos.carPart || null,
@@ -937,6 +921,7 @@ export async function POST(request: Request) {
             } else {
               checkinDamageInserts.push({
                 checkin_id: checkinId,
+                regnr: regNr,
                 type: 'documented',
                 damage_type: normalized.typeCode,
                 car_part: null,
