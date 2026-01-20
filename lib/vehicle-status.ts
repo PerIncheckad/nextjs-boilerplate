@@ -1888,7 +1888,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   
   // DEBUG: Log damageMap after PASS 2 for LRA75R
   if (cleanedRegnr === 'LRA75R') {
-    console.log('[DEBUG LRA75R] damageMap after PASS 2:', Array.from(damageMap.entries()).map(([key, entry]) => ({
+    console.log('[DEBUG LRA75R] damageMap after PASS 2 (size=' + damageMap.size + '):', Array.from(damageMap.entries()).map(([key, entry]) => ({
       stableKey: key,
       source: entry.source,
       handled: !!entry.matchedCheckinDamage,
@@ -2029,6 +2029,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     console.log('[DEBUG LRA75R] Final damageRecords count:', damageRecords.length);
     console.log('[DEBUG LRA75R] Final damageRecords:', damageRecords.map(d => ({
       id: d.id,
+      stableKey: d.legacy_damage_source_text ? createStableKey(d.legacy_damage_source_text, d.original_damage_date || d.datum) : 'N/A',
       skadetyp: d.skadetyp,
       status: d.status,
       folder: d.folder,
@@ -2036,6 +2037,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       is_handled: d.is_handled,
       is_unmatched_buhs: d.is_unmatched_buhs,
     })));
+    
+    // Check for duplicates by stableKey
+    const stableKeyCounts = new Map<string, number>();
+    damageRecords.forEach(d => {
+      if (d.legacy_damage_source_text) {
+        const key = createStableKey(d.legacy_damage_source_text, d.original_damage_date || d.datum);
+        stableKeyCounts.set(key, (stableKeyCounts.get(key) || 0) + 1);
+      }
+    });
+    const duplicates = Array.from(stableKeyCounts.entries()).filter(([_, count]) => count > 1);
+    if (duplicates.length > 0) {
+      console.error('[DEBUG LRA75R] DUPLICATE stableKeys found:', duplicates);
+    }
   }
 
   // Build history records
