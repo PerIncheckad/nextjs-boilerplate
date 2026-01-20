@@ -1085,6 +1085,39 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
       const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
       
+      // Match CHECK damage to checkin_damages to determine if it's handled
+      let matchedCheckinDamage: CheckinDamageData | null = null;
+      
+      if (!isGEU29F) {
+        // Try to match by damage ID first (most reliable)
+        const damageId = damage.id;
+        matchedCheckinDamage = allCheckinDamages.find(cd => 
+          cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.damage_id === damageId
+        ) || null;
+        
+        // If no match by ID, try text matching
+        if (!matchedCheckinDamage) {
+          for (const cd of allCheckinDamages) {
+            if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue;
+            
+            const cdDescription = cd.description || '';
+            if (textsMatch(legacyText, cdDescription) ||
+                textsMatch(damageTypeRaw, cdDescription)) {
+              matchedCheckinDamage = cd;
+              matchedCheckinDamageIds.add(cd.id);
+              break;
+            }
+          }
+        } else if (matchedCheckinDamage.id) {
+          matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+        }
+      }
+      
+      // Find matching checkin for this checkin_damage
+      const checkin = matchedCheckinDamage 
+        ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
+        : null;
+      
       // Create new entry for priority comparison
       const newEntry: DamageEntry = {
         id: damage.id,
@@ -1096,8 +1129,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         userPositions,
         folder,
         photoUrls,
-        matchedCheckinDamage: null,
-        checkin: null,
+        matchedCheckinDamage, // Now properly matched!
+        checkin,
         documentedDate: checkDocumentedDate,
         documentedBy: checkDocumentedBy,
       };
@@ -1853,6 +1886,39 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkDocumentedDate = toDateOnly(damage.damage_date || damage.created_at);
     const checkDocumentedBy = (damage as any).handled_by_name || (damage as any).author || null;
     
+    // Match CHECK damage to checkin_damages to determine if it's handled
+    let matchedCheckinDamage: CheckinDamageData | null = null;
+    
+    if (!isGEU29F) {
+      // Try to match by damage ID first (most reliable)
+      const damageId = damage.id;
+      matchedCheckinDamage = allCheckinDamages.find(cd => 
+        cd.id && !matchedCheckinDamageIds.has(cd.id) && cd.damage_id === damageId
+      ) || null;
+      
+      // If no match by ID, try text matching
+      if (!matchedCheckinDamage) {
+        for (const cd of allCheckinDamages) {
+          if (!cd.id || matchedCheckinDamageIds.has(cd.id)) continue;
+          
+          const cdDescription = cd.description || '';
+          if (textsMatch(legacyText, cdDescription) ||
+              textsMatch(damageTypeRaw, cdDescription)) {
+            matchedCheckinDamage = cd;
+            matchedCheckinDamageIds.add(cd.id);
+            break;
+          }
+        }
+      } else if (matchedCheckinDamage.id) {
+        matchedCheckinDamageIds.add(matchedCheckinDamage.id);
+      }
+    }
+    
+    // Find matching checkin for this checkin_damage
+    const checkin = matchedCheckinDamage 
+      ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
+      : null;
+    
     // Create new entry for priority comparison
     const newEntry: DamageEntry = {
       id: damage.id,
@@ -1864,8 +1930,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       userPositions,
       folder,
       photoUrls,
-      matchedCheckinDamage: null, // CHECK damages don't have direct checkin_damage matches in this context
-      checkin: null,
+      matchedCheckinDamage, // Now properly matched!
+      checkin,
       documentedDate: checkDocumentedDate,
       documentedBy: checkDocumentedBy,
     };
