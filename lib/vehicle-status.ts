@@ -704,6 +704,74 @@ function buildLaddningInfo(checkin: any): string | undefined {
   return parts.join(' ');
 }
 
+/**
+ * Add new damages from checkin_damages (type='new') to damageRecords
+ * These are ALWAYS unique - never deduplicate
+ */
+function addNewDamagesToRecords(
+  damageRecords: DamageRecord[],
+  allCheckinDamages: CheckinDamageData[],
+  checkins: any[],
+  cleanedRegnr: string,
+  isGEU29F: boolean
+): void {
+  for (const cd of allCheckinDamages.filter(cd => cd.type === 'new')) {
+    // Find the checkin for this damage
+    const checkin = checkins.find(c => c.id === cd.checkin_id);
+    
+    // Build damage type with positions
+    let skadetyp: string;
+    const damageType = cd.damage_type || 'Okänd';
+    
+    if (cd.positions && Array.isArray(cd.positions) && cd.positions.length > 0) {
+      const positionsStr = formatDamagePositions(cd.positions);
+      skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
+    } else if (cd.car_part || cd.position) {
+      const parts = [cd.car_part, cd.position].filter(Boolean);
+      skadetyp = `${damageType} - ${parts.join(' - ')}`;
+    } else {
+      skadetyp = damageType;
+    }
+    
+    // Extract folder from photo_urls if available
+    let folder: string | undefined;
+    if (cd.photo_urls && cd.photo_urls.length > 0) {
+      const firstUrl = cd.photo_urls[0];
+      const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
+      folder = match ? match[1] : undefined;
+    }
+    
+    // GEU29F: Override folder to undefined due to data integrity issues
+    if (isGEU29F) {
+      folder = undefined;
+    }
+    
+    const checkerName = checkin?.checker_name || 'Okänd';
+    const damageDate = formatDate(cd.created_at);
+    
+    // New damages are added directly to damageRecords (no deduplication)
+    damageRecords.push({
+      id: `checkin_new_${cd.id}`,
+      regnr: cleanedRegnr,
+      skadetyp,
+      datum: damageDate,
+      status: '', // New damages don't have a status
+      folder,
+      source: 'checkin' as const,
+      sourceInfo: `Registrerad ${damageDate} av ${checkerName}`,
+      legacy_damage_source_text: null,
+      legacy_buhs_text: null,
+      original_damage_date: null,
+      checkinWhereDocumented: checkin?.id || null,
+      documentedBy: checkerName,
+      documentedDate: damageDate,
+      is_handled: false, // New damages are not "handled" (they're not from BUHS)
+      is_inventoried: true, // New damages are inventoried during checkin
+      is_unmatched_buhs: false,
+    });
+  }
+}
+
 // =================================================================
 // 3. MAIN DATA FETCHING FUNCTION
 // =================================================================
@@ -1277,61 +1345,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Add new damages from checkin_damages (type='new')
     // These are ALWAYS unique - never deduplicate
     // ====================================================================================
-    for (const cd of allCheckinDamages.filter(cd => cd.type === 'new')) {
-      // Find the checkin for this damage
-      const checkin = checkins.find(c => c.id === cd.checkin_id);
-      
-      // Build damage type with positions
-      let skadetyp: string;
-      const damageType = cd.damage_type || 'Okänd';
-      
-      if (cd.positions && Array.isArray(cd.positions) && cd.positions.length > 0) {
-        const positionsStr = formatDamagePositions(cd.positions);
-        skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
-      } else if (cd.car_part || cd.position) {
-        const parts = [cd.car_part, cd.position].filter(Boolean);
-        skadetyp = `${damageType} - ${parts.join(' - ')}`;
-      } else {
-        skadetyp = damageType;
-      }
-      
-      // Extract folder from photo_urls if available
-      let folder: string | undefined;
-      if (cd.photo_urls && cd.photo_urls.length > 0) {
-        const firstUrl = cd.photo_urls[0];
-        const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
-        folder = match ? match[1] : undefined;
-      }
-      
-      // GEU29F: Override folder to undefined due to data integrity issues
-      if (isGEU29F) {
-        folder = undefined;
-      }
-      
-      const checkerName = checkin?.checker_name || 'Okänd';
-      const damageDate = formatDate(cd.created_at);
-      
-      // New damages are added directly to damageRecords (no deduplication)
-      damageRecords.push({
-        id: `checkin_new_${cd.id}`,
-        regnr: cleanedRegnr,
-        skadetyp,
-        datum: damageDate,
-        status: '', // New damages don't have a status
-        folder,
-        source: 'checkin' as const,
-        sourceInfo: `Registrerad ${damageDate} av ${checkerName}`,
-        legacy_damage_source_text: null,
-        legacy_buhs_text: null,
-        original_damage_date: null,
-        checkinWhereDocumented: checkin?.id || null,
-        documentedBy: checkerName,
-        documentedDate: damageDate,
-        is_handled: false, // New damages are not "handled" (they're not from BUHS)
-        is_inventoried: true, // New damages are inventoried during checkin
-        is_unmatched_buhs: false,
-      });
-    }
+    addNewDamagesToRecords(damageRecords, allCheckinDamages, checkins, cleanedRegnr, isGEU29F);
 
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
@@ -2176,61 +2190,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Add new damages from checkin_damages (type='new')
   // These are ALWAYS unique - never deduplicate
   // ====================================================================================
-  for (const cd of allCheckinDamages.filter(cd => cd.type === 'new')) {
-    // Find the checkin for this damage
-    const checkin = checkins.find(c => c.id === cd.checkin_id);
-    
-    // Build damage type with positions
-    let skadetyp: string;
-    const damageType = cd.damage_type || 'Okänd';
-    
-    if (cd.positions && Array.isArray(cd.positions) && cd.positions.length > 0) {
-      const positionsStr = formatDamagePositions(cd.positions);
-      skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
-    } else if (cd.car_part || cd.position) {
-      const parts = [cd.car_part, cd.position].filter(Boolean);
-      skadetyp = `${damageType} - ${parts.join(' - ')}`;
-    } else {
-      skadetyp = damageType;
-    }
-    
-    // Extract folder from photo_urls if available
-    let folder: string | undefined;
-    if (cd.photo_urls && cd.photo_urls.length > 0) {
-      const firstUrl = cd.photo_urls[0];
-      const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
-      folder = match ? match[1] : undefined;
-    }
-    
-    // GEU29F: Override folder to undefined due to data integrity issues
-    if (isGEU29F) {
-      folder = undefined;
-    }
-    
-    const checkerName = checkin?.checker_name || 'Okänd';
-    const damageDate = formatDate(cd.created_at);
-    
-    // New damages are added directly to damageRecords (no deduplication)
-    damageRecords.push({
-      id: `checkin_new_${cd.id}`,
-      regnr: cleanedRegnr,
-      skadetyp,
-      datum: damageDate,
-      status: '', // New damages don't have a status
-      folder,
-      source: 'checkin' as const,
-      sourceInfo: `Registrerad ${damageDate} av ${checkerName}`,
-      legacy_damage_source_text: null,
-      legacy_buhs_text: null,
-      original_damage_date: null,
-      checkinWhereDocumented: checkin?.id || null,
-      documentedBy: checkerName,
-      documentedDate: damageDate,
-      is_handled: false, // New damages are not "handled" (they're not from BUHS)
-      is_inventoried: true, // New damages are inventoried during checkin
-      is_unmatched_buhs: false,
-    });
-  }
+  addNewDamagesToRecords(damageRecords, allCheckinDamages, checkins, cleanedRegnr, isGEU29F);
 
   // DEBUG: Log final damageRecords for LRA75R
   if (cleanedRegnr === 'LRA75R') {
