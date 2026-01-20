@@ -1224,6 +1224,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         is_handled: matchedCheckinDamage !== null,
         is_inventoried: matchedCheckinDamage !== null,
         is_unmatched_buhs: matchedCheckinDamage === null,
+        _stableKey: entry.stableKey, // Store actual stableKey for debugging
       });
     }
 
@@ -2021,6 +2022,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       is_handled: matchedCheckinDamage !== null,
       is_inventoried: matchedCheckinDamage !== null,
       is_unmatched_buhs: matchedCheckinDamage === null,
+      _stableKey: entry.stableKey, // Store actual stableKey for debugging
     });
   }
 
@@ -2029,7 +2031,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     console.log('[DEBUG LRA75R] Final damageRecords count:', damageRecords.length);
     console.log('[DEBUG LRA75R] Final damageRecords:', damageRecords.map(d => ({
       id: d.id,
-      stableKey: d.legacy_damage_source_text ? createStableKey(d.legacy_damage_source_text, d.original_damage_date || d.datum) : 'N/A',
+      stableKey: (d as any)._stableKey, // Use actual stored stableKey
       skadetyp: d.skadetyp,
       status: d.status,
       folder: d.folder,
@@ -2041,8 +2043,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Check for duplicates by stableKey
     const stableKeyCounts = new Map<string, number>();
     damageRecords.forEach(d => {
-      if (d.legacy_damage_source_text) {
-        const key = createStableKey(d.legacy_damage_source_text, d.original_damage_date || d.datum);
+      const key = (d as any)._stableKey;
+      if (key) {
         stableKeyCounts.set(key, (stableKeyCounts.get(key) || 0) + 1);
       }
     });
