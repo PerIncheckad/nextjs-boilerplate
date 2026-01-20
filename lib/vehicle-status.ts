@@ -1133,7 +1133,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           sourceInfo = 'Källa: BUHS';
           
         } else if (cdType === 'not_found') {
-          skadetyp = formatBuhsDamageText(legacyText);
+          // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
+          skadetyp = legacyText || 'Okänd skada';
           
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -1878,8 +1879,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo = 'Källa: BUHS';
         
       } else if (cdType === 'not_found') {
-        // Display as: "<text> (BUHS)" for skadetyp
-        skadetyp = formatBuhsDamageText(legacyText);
+        // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
+        skadetyp = legacyText || 'Okänd skada';
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
