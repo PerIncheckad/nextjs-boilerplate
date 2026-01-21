@@ -1492,7 +1492,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         return {
           // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
           typ: isNotFound ? damage.status : damage.skadetyp,
-          beskrivning: '', // Kept for compatibility with display logic
+          beskrivning: damage.beskrivning || '', // Use actual damage description
           // Fix 2.2: For not_found, NO media link
           mediaUrl: shouldShowMedia ? `/public-media/${damage.folder}` : undefined,
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
@@ -2387,7 +2387,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       return {
         // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
         typ: isNotFound ? damage.status : damage.skadetyp,
-        beskrivning: '', // Kept for compatibility with display logic
+        beskrivning: damage.beskrivning || '', // Use actual damage description
         // Fix 2.2: For not_found, NO media link
         mediaUrl: shouldShowMedia ? `/public-media/${damage.folder}` : undefined,
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
