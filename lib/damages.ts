@@ -28,6 +28,12 @@ type CheckinDamageData = {
   checkin_id: string;
 };
 
+// Type for position objects
+type DamagePosition = {
+  carPart?: string;
+  position?: string;
+};
+
 // Represents an already inventoried damage from our main 'damages' table
 type InventoriedDamage = {
   legacy_damage_source_text: string; // The original text, used as a key
@@ -141,6 +147,29 @@ function normalizeDamageTypeForKey(damageType: string | null | undefined): strin
     .replace(/skrapmärke/g, 'skrap')
     .replace(/stenskott/g, 'sten')
     .trim();
+}
+
+// Helper to build damage display text from damage type and positions
+function buildDamageDisplayText(
+  damageType: string | null, 
+  positions: DamagePosition[] | null,
+  carPart?: string | null,
+  position?: string | null
+): string {
+  const type = damageType || 'Okänd';
+  
+  if (positions && Array.isArray(positions) && positions.length > 0) {
+    const positionsStr = positions
+      .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
+      .filter(Boolean)
+      .join(', ');
+    return positionsStr ? `${type} - ${positionsStr}` : type;
+  } else if (carPart || position) {
+    const parts = [carPart, position].filter(Boolean);
+    return `${type} - ${parts.join(' - ')}`;
+  }
+  
+  return type;
 }
 
 
@@ -490,22 +519,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   if (!previousNewDamagesResponse.error && previousNewDamagesResponse.data) {
     for (const newDamage of previousNewDamagesResponse.data) {
-      // Build display text from damage_type and positions
-      let displayText: string;
-      const damageType = newDamage.damage_type || 'Okänd';
-      
-      if (newDamage.positions && Array.isArray(newDamage.positions) && newDamage.positions.length > 0) {
-        const positions = newDamage.positions
-          .map((p: any) => `${p.carPart || ''} ${p.position || ''}`.trim())
-          .filter(Boolean)
-          .join(', ');
-        displayText = positions ? `${damageType} - ${positions}` : damageType;
-      } else if (newDamage.car_part || newDamage.position) {
-        const parts = [newDamage.car_part, newDamage.position].filter(Boolean);
-        displayText = `${damageType} - ${parts.join(' - ')}`;
-      } else {
-        displayText = damageType;
-      }
+      // Build display text from damage_type and positions using helper function
+      const displayText = buildDamageDisplayText(
+        newDamage.damage_type,
+        newDamage.positions as DamagePosition[] | null,
+        newDamage.car_part,
+        newDamage.position
+      );
       
       // Extract folder from photo_urls if available
       let folder: string | null = null;
