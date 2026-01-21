@@ -172,6 +172,36 @@ function buildDamageDisplayText(
   return type;
 }
 
+// Helper to create a robust signature for deduplication between damages and checkin_damages
+// This signature should match the same physical damage across both tables
+function createDamageSignature(
+  regnr: string,
+  damageType: string | null,
+  positions: DamagePosition[] | null,
+  carPart: string | null,
+  position: string | null,
+  date: string
+): string {
+  const type = (damageType || 'unknown').toLowerCase().trim().replace(/\s+/g, '');
+  
+  // Create position signature
+  let positionsStr: string;
+  if (positions && Array.isArray(positions) && positions.length > 0) {
+    positionsStr = positions
+      .map(p => `${(p.carPart || '').toLowerCase().trim().replace(/\s+/g, '')}:${(p.position || '').toLowerCase().trim().replace(/\s+/g, '')}`)
+      .filter(Boolean)
+      .sort()
+      .join('|');
+  } else {
+    positionsStr = `${(carPart || '').toLowerCase().trim().replace(/\s+/g, '')}:${(position || '').toLowerCase().trim().replace(/\s+/g, '')}`;
+  }
+  
+  // Get date part only (YYYY-MM-DD)
+  const dateOnly = date.split('T')[0];
+  
+  return `${regnr}|${dateOnly}|${type}|${positionsStr}`;
+}
+
 
 // =================================================================
 // 3. CORE DATA FETCHING FUNCTION
@@ -459,6 +489,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   
   // Add damages from damages table (CHECK and NYBIL sources)
   // These are damages registered via /check or /nybil that are NOT duplicates of BUHS damages
+  const damageSignatures = new Set<string>(); // Track signatures for deduplication
+  
   for (const dbDamage of dbDamages) {
     // Skip if this damage is already in the legacy damages list (avoid duplicates)
     // A damage is a duplicate if it has legacy_damage_source_text that matches a BUHS damage
@@ -491,6 +523,19 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     }
     dbDamageKeys.add(dedupeKey);
     
+    // Create signature for dedup with checkin_damages (for CHECK damages)
+    if (dbDamage.source === 'CHECK') {
+      const signature = createDamageSignature(
+        cleanedRegnr,
+        damageType,
+        dbDamage.user_positions as DamagePosition[] | null,
+        null,
+        null,
+        damageDate
+      );
+      damageSignatures.add(signature);
+    }
+    
     consolidatedDamages.push({
       id: dbDamage.id,
       text: displayText,
@@ -511,6 +556,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Add new damages from previous check-ins (type='new' from checkin_damages)
   // These are damages that were registered as new during previous check-ins
   // We need to fetch all checkin_damages with type='new' for this vehicle
+  // BUT skip any that already exist in damages table with source='CHECK' (same physical damage)
   const previousNewDamagesResponse = await supabase
     .from('checkin_damages')
     .select('*, checkins!inner(regnr, checker_name, completed_at, created_at)')
@@ -539,7 +585,23 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const checkinData = (newDamage as any).checkins;
       const damageDate = checkinData?.completed_at || checkinData?.created_at || newDamage.created_at;
       
-      // Create a unique key for deduplication
+      // Create signature for dedup with damages table
+      const signature = createDamageSignature(
+        cleanedRegnr,
+        newDamage.damage_type,
+        newDamage.positions as DamagePosition[] | null,
+        newDamage.car_part,
+        newDamage.position,
+        damageDate
+      );
+      
+      // Skip if this damage already exists in damages table with source='CHECK'
+      // This prevents duplicates between damages.source='CHECK' and checkin_damages.type='new'
+      if (damageSignatures.has(signature)) {
+        continue;
+      }
+      
+      // Also use the old dedup key as a fallback
       const normalized = normalizeDamageType(newDamage.damage_type);
       const dedupeKey = `${cleanedRegnr}|${damageDate}|${normalized.typeCode}`;
       
