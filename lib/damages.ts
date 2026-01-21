@@ -540,7 +540,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const damageDate = checkinData?.completed_at || checkinData?.created_at || newDamage.created_at;
       
       // Create a unique key for deduplication
-      const normalized = normalizeDamageType(damageType);
+      const normalized = normalizeDamageType(newDamage.damage_type);
       const dedupeKey = `${cleanedRegnr}|${damageDate}|${normalized.typeCode}`;
       
       // Skip if this damage was already added (avoid duplicates)
