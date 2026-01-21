@@ -1029,6 +1029,9 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
       <div className="damage-info">
         <span className="damage-type">{damage.skadetyp}</span>
         <span className="damage-date">{damage.datum}</span>
+        {damage.beskrivning && (
+          <span className="damage-description">{damage.beskrivning}</span>
+        )}
         {damage.status && (
           <span className="damage-status">{damage.status}</span>
         )}
@@ -1117,7 +1120,7 @@ const HistoryItem: React.FC<{
           {/* Left-align "Visa media" link without indent */}
           {isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder && (
             <a 
-              href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
+              href={`/public-media/${record.buhsSkadaDetaljer.mediaFolder}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#1a73e8', fontWeight: 'normal' }}

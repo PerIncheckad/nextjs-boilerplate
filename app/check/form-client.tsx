@@ -1458,7 +1458,7 @@ export default function CheckInForm() {
                     const folderFromUploads = d.uploads?.folder || '';
                     const folderFromHandledUrl = extractSupabasePublicFolderFromUrl(d.handledPhotoUrls?.[0] || null);
                     const folder = folderFromUploads || folderFromHandledUrl || '';
-                    const folderHref = folder ? `/media/${folder}` : '';
+                    const folderHref = folder ? `/public-media/${folder}` : '';
                     const fileHref = d.handledPhotoUrls?.[0] || '';
                     
                     // Use folder link if available, otherwise fall back to file link

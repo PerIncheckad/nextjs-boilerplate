@@ -67,6 +67,7 @@ export type DamageRecord = {
   status: string;
   folder?: string;
   source: 'legacy' | 'damages' | 'checkin';
+  beskrivning?: string; // Damage description
   // Source info for display
   sourceInfo?: string; // e.g., "Källa: BUHS" or "Incheckad av Per Andersson 2025-12-03 14:30"
   // For BUHS damages (legacy)
@@ -358,7 +359,7 @@ function formatDateForFolder(dateStr: string | null | undefined): string {
 // Helper to build media URL for a damage based on its folder
 function buildDamageMediaUrl(folder: string | undefined): string | undefined {
   if (!folder) return undefined;
-  return `/media/${folder}`;
+  return `/public-media/${folder}`;
 }
 
 // Helper to create a damage key for matching BUHS damages
@@ -1395,13 +1396,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Build media links based on checklist folders
       const mediaLankar: any = {};
       if (checklist.rekond_folder) {
-        mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+        mediaLankar.rekond = `/public-media/${checklist.rekond_folder}`;
       }
       if (checklist.pet_sanitation_folder) {
-        mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+        mediaLankar.husdjur = `/public-media/${checklist.pet_sanitation_folder}`;
       }
       if (checklist.smoking_sanitation_folder) {
-        mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+        mediaLankar.rokning = `/public-media/${checklist.smoking_sanitation_folder}`;
       }
       
       // Match damages from damageRecords to this checkin
@@ -1484,7 +1485,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         if (shouldShowMedia) {
           const damageMediaKey = `skada-${damage.id}`;
           if (!mediaLankar[damageMediaKey]) {
-            mediaLankar[damageMediaKey] = `/media/${damage.folder}`;
+            mediaLankar[damageMediaKey] = `/public-media/${damage.folder}`;
           }
         }
         
@@ -1493,7 +1494,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           typ: isNotFound ? damage.status : damage.skadetyp,
           beskrivning: '', // Kept for compatibility with display logic
           // Fix 2.2: For not_found, NO media link
-          mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
+          mediaUrl: shouldShowMedia ? `/public-media/${damage.folder}` : undefined,
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: isNotFound, // Kommentar 1
@@ -2269,13 +2270,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Build media links based on checklist folders
     const mediaLankar: any = {};
     if (checklist.rekond_folder) {
-      mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+      mediaLankar.rekond = `/public-media/${checklist.rekond_folder}`;
     }
     if (checklist.pet_sanitation_folder) {
-      mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+      mediaLankar.husdjur = `/public-media/${checklist.pet_sanitation_folder}`;
     }
     if (checklist.smoking_sanitation_folder) {
-      mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+      mediaLankar.rokning = `/public-media/${checklist.smoking_sanitation_folder}`;
     }
     
     // Match damages from damageRecords to this checkin
@@ -2379,7 +2380,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Use damage folder for media link
         const damageMediaKey = `skada-${damage.id}`;
         if (!mediaLankar[damageMediaKey]) {
-          mediaLankar[damageMediaKey] = `/media/${damage.folder}`;
+          mediaLankar[damageMediaKey] = `/public-media/${damage.folder}`;
         }
       }
       
@@ -2388,7 +2389,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         typ: isNotFound ? damage.status : damage.skadetyp,
         beskrivning: '', // Kept for compatibility with display logic
         // Fix 2.2: For not_found, NO media link
-        mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
+        mediaUrl: shouldShowMedia ? `/public-media/${damage.folder}` : undefined,
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
         isNotFoundOlder: isNotFound, // Kommentar 1
