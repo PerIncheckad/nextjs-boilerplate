@@ -149,6 +149,12 @@ function normalizeDamageTypeForKey(damageType: string | null | undefined): strin
     .trim();
 }
 
+// Helper to normalize text for matching (lowercase, no spaces)
+function normalizeText(text: string | null | undefined): string {
+  if (!text) return '';
+  return text.toLowerCase().trim().replace(/\s+/g, '');
+}
+
 // Helper to build damage display text from damage type and positions
 function buildDamageDisplayText(
   damageType: string | null, 
@@ -158,7 +164,7 @@ function buildDamageDisplayText(
 ): string {
   const type = damageType || 'Okänd';
   
-  if (positions && Array.isArray(positions) && positions.length > 0) {
+  if (positions && positions.length > 0) {
     const positionsStr = positions
       .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
       .filter(Boolean)
@@ -172,8 +178,15 @@ function buildDamageDisplayText(
   return type;
 }
 
-// Helper to create a robust signature for deduplication between damages and checkin_damages
-// This signature should match the same physical damage across both tables
+/**
+ * Creates a robust signature for deduplication between damages and checkin_damages tables.
+ * 
+ * The signature is designed to match the same physical damage even when represented differently
+ * across tables (e.g., different timestamp formats, slight text variations).
+ * 
+ * @returns A normalized signature string in the format: "REGNR|YYYY-MM-DD|damagetype|carpart:position"
+ * Example: "JBK29K|2025-12-09|repa|dörrutsida:högerbak"
+ */
 function createDamageSignature(
   regnr: string,
   damageType: string | null,
@@ -182,22 +195,29 @@ function createDamageSignature(
   position: string | null,
   date: string
 ): string {
-  const type = (damageType || 'unknown').toLowerCase().trim().replace(/\s+/g, '');
+  const type = normalizeText(damageType || 'unknown');
   
   // Create position signature
   let positionsStr: string;
-  if (positions && Array.isArray(positions) && positions.length > 0) {
+  if (positions && positions.length > 0) {
     positionsStr = positions
-      .map(p => `${(p.carPart || '').toLowerCase().trim().replace(/\s+/g, '')}:${(p.position || '').toLowerCase().trim().replace(/\s+/g, '')}`)
+      .map(p => `${normalizeText(p.carPart)}:${normalizeText(p.position)}`)
       .filter(Boolean)
       .sort()
       .join('|');
   } else {
-    positionsStr = `${(carPart || '').toLowerCase().trim().replace(/\s+/g, '')}:${(position || '').toLowerCase().trim().replace(/\s+/g, '')}`;
+    positionsStr = `${normalizeText(carPart)}:${normalizeText(position)}`;
   }
   
-  // Get date part only (YYYY-MM-DD)
-  const dateOnly = date.split('T')[0];
+  // Get date part only (YYYY-MM-DD), handling both ISO timestamps and date strings
+  let dateOnly: string;
+  if (date.includes('T')) {
+    dateOnly = date.split('T')[0];
+  } else if (date.length >= 10) {
+    dateOnly = date.substring(0, 10); // Handle YYYY-MM-DD format
+  } else {
+    dateOnly = date; // Fallback to original if format is unexpected
+  }
   
   return `${regnr}|${dateOnly}|${type}|${positionsStr}`;
 }
