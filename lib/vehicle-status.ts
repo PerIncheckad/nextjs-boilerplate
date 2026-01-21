@@ -81,6 +81,8 @@ export type DamageRecord = {
   is_handled?: boolean; // True if damage was handled (documented/not_found/existing)
   is_inventoried?: boolean; // True if damage was inventoried during checkin
   is_unmatched_buhs?: boolean; // True if this is an unmatched BUHS damage
+  // Description from checkin_damages
+  description?: string | null; // Description/comment from checkin_damages
 };
 
 export type HistoryRecord = {
@@ -768,6 +770,7 @@ function addNewDamagesToRecords(
       is_handled: false, // New damages are not "handled" (they're not from BUHS)
       is_inventoried: true, // New damages are inventoried during checkin
       is_unmatched_buhs: false,
+      description: cd.description || null, // Add description from checkin_damages
     });
   }
 }
@@ -1337,6 +1340,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         is_handled: matchedCheckinDamage !== null,
         is_inventoried: matchedCheckinDamage !== null,
         is_unmatched_buhs: matchedCheckinDamage === null,
+        description: matchedCheckinDamage?.description || null, // Add description from checkin_damages
         _stableKey: entry.stableKey, // Store actual stableKey for debugging
       });
     }
@@ -1395,13 +1399,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Build media links based on checklist folders
       const mediaLankar: any = {};
       if (checklist.rekond_folder) {
-        mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+        mediaLankar.rekond = `/public-media/${checklist.rekond_folder}`;
       }
       if (checklist.pet_sanitation_folder) {
-        mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+        mediaLankar.husdjur = `/public-media/${checklist.pet_sanitation_folder}`;
       }
       if (checklist.smoking_sanitation_folder) {
-        mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+        mediaLankar.rokning = `/public-media/${checklist.smoking_sanitation_folder}`;
       }
       
       // Match damages from damageRecords to this checkin
@@ -1484,16 +1488,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         if (shouldShowMedia) {
           const damageMediaKey = `skada-${damage.id}`;
           if (!mediaLankar[damageMediaKey]) {
-            mediaLankar[damageMediaKey] = `/media/${damage.folder}`;
+            mediaLankar[damageMediaKey] = `/public-media/${damage.folder}`;
           }
         }
         
         return {
           // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
           typ: isNotFound ? damage.status : damage.skadetyp,
-          beskrivning: '', // Kept for compatibility with display logic
+          beskrivning: damage.description || '', // Show description from checkin_damages
           // Fix 2.2: For not_found, NO media link
-          mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
+          mediaUrl: shouldShowMedia ? `/public-media/${damage.folder}` : undefined,
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: isNotFound, // Kommentar 1
@@ -2269,13 +2273,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Build media links based on checklist folders
     const mediaLankar: any = {};
     if (checklist.rekond_folder) {
-      mediaLankar.rekond = `/media/${checklist.rekond_folder}`;
+      mediaLankar.rekond = `/public-media/${checklist.rekond_folder}`;
     }
     if (checklist.pet_sanitation_folder) {
-      mediaLankar.husdjur = `/media/${checklist.pet_sanitation_folder}`;
+      mediaLankar.husdjur = `/public-media/${checklist.pet_sanitation_folder}`;
     }
     if (checklist.smoking_sanitation_folder) {
-      mediaLankar.rokning = `/media/${checklist.smoking_sanitation_folder}`;
+      mediaLankar.rokning = `/public-media/${checklist.smoking_sanitation_folder}`;
     }
     
     // Match damages from damageRecords to this checkin
@@ -2379,16 +2383,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Use damage folder for media link
         const damageMediaKey = `skada-${damage.id}`;
         if (!mediaLankar[damageMediaKey]) {
-          mediaLankar[damageMediaKey] = `/media/${damage.folder}`;
+          mediaLankar[damageMediaKey] = `/public-media/${damage.folder}`;
         }
       }
       
       return {
         // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
         typ: isNotFound ? damage.status : damage.skadetyp,
-        beskrivning: '', // Kept for compatibility with display logic
+        beskrivning: damage.description || '', // Show description from checkin_damages
         // Fix 2.2: For not_found, NO media link
-        mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
+        mediaUrl: shouldShowMedia ? `/public-media/${damage.folder}` : undefined,
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
         isNotFoundOlder: isNotFound, // Kommentar 1

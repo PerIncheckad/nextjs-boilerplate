@@ -479,6 +479,74 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     });
   }
 
+  // Add new damages from previous check-ins (type='new' from checkin_damages)
+  // These are damages that were registered as new during previous check-ins
+  // We need to fetch all checkin_damages with type='new' for this vehicle
+  const previousNewDamagesResponse = await supabase
+    .from('checkin_damages')
+    .select('*, checkins!inner(regnr, checker_name, completed_at, created_at)')
+    .eq('checkins.regnr', cleanedRegnr)
+    .eq('type', 'new');
+  
+  if (!previousNewDamagesResponse.error && previousNewDamagesResponse.data) {
+    for (const newDamage of previousNewDamagesResponse.data) {
+      // Build display text from damage_type and positions
+      let displayText: string;
+      const damageType = newDamage.damage_type || 'Okänd';
+      
+      if (newDamage.positions && Array.isArray(newDamage.positions) && newDamage.positions.length > 0) {
+        const positions = newDamage.positions
+          .map((p: any) => `${p.carPart || ''} ${p.position || ''}`.trim())
+          .filter(Boolean)
+          .join(', ');
+        displayText = positions ? `${damageType} - ${positions}` : damageType;
+      } else if (newDamage.car_part || newDamage.position) {
+        const parts = [newDamage.car_part, newDamage.position].filter(Boolean);
+        displayText = `${damageType} - ${parts.join(' - ')}`;
+      } else {
+        displayText = damageType;
+      }
+      
+      // Extract folder from photo_urls if available
+      let folder: string | null = null;
+      if (newDamage.photo_urls && Array.isArray(newDamage.photo_urls) && newDamage.photo_urls.length > 0) {
+        const firstUrl = newDamage.photo_urls[0];
+        const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
+        folder = match ? match[1] : null;
+      }
+      
+      // Get the checkin date for this damage
+      const checkinData = (newDamage as any).checkins;
+      const damageDate = checkinData?.completed_at || checkinData?.created_at || newDamage.created_at;
+      
+      // Create a unique key for deduplication
+      const normalized = normalizeDamageType(damageType);
+      const dedupeKey = `${cleanedRegnr}|${damageDate}|${normalized.typeCode}`;
+      
+      // Skip if this damage was already added (avoid duplicates)
+      if (dbDamageKeys.has(dedupeKey)) {
+        continue;
+      }
+      dbDamageKeys.add(dedupeKey);
+      
+      consolidatedDamages.push({
+        id: `checkin_new_${newDamage.id}`,
+        text: displayText,
+        damage_date: damageDate,
+        is_inventoried: true, // New damages from previous check-ins are already inventoried
+        folder: folder,
+        handled_type: null,
+        handled_damage_type: null,
+        handled_car_part: null,
+        handled_position: null,
+        handled_comment: newDamage.description || null,
+        handled_by: checkinData?.checker_name || null,
+        handled_photo_urls: (newDamage.photo_urls as string[]) || [],
+        handled_video_urls: (newDamage.video_urls as string[]) || [],
+      });
+    }
+  }
+
   const latestSaludatum = legacyDamages.length > 0 ? legacyDamages[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
