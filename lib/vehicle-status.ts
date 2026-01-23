@@ -461,7 +461,7 @@ function formatBuhsDamageText(text: string | null | undefined): string {
 // Helper to format not_found status message
 function formatNotFoundStatus(comment: string, checkerName: string, checkinDateTime: string): string {
   return comment 
-    ? `Gick ej att dokumentera. "${comment}" (${checkerName}, ${checkinDateTime})` 
+    ? `Gick ej att dokumentera. Kommentar: "${comment}" (${checkerName}, ${checkinDateTime})` 
     : `Gick ej att dokumentera. (${checkerName}, ${checkinDateTime})`;
 }
 
