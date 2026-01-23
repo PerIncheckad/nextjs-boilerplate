@@ -110,6 +110,18 @@ function normalizeDamageType(damageType: string): { typeCode: string } {
   return { typeCode: normalized };
 }
 
+// Helper to normalize damage type for matching (handles Swedish characters)
+function normalizeDamageTypeForKey(damageType: string | null | undefined): string {
+  if (!damageType) return '';
+  return damageType
+    .toLowerCase()
+    .replace(/[_\s-]+/g, '') // Remove underscores, spaces, and hyphens
+    .replace(/ä/g, 'a')
+    .replace(/ö/g, 'o')
+    .replace(/å/g, 'a')
+    .trim();
+}
+
 // Helper function to format damage types from "FÄLGSKADA_VINTERHJUL" to "Fälgskada vinterhjul"
 function formatDamageType(damageType: string | null | undefined): string {
   if (!damageType) return 'Okänd skada';
@@ -340,7 +352,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const consolidatedDamages: ConsolidatedDamage[] = [];
   const dbDamageKeys = new Set<string>();
   
-  let handledDamageIndex = 0;
+  // Track which checkin_damages have been matched
+  const matchedHandledIndices = new Set<number>();
   
   for (let i = 0; i < legacyDamages.length; i++) {
     const leg = legacyDamages[i];
@@ -353,14 +366,26 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);
       
+      // Match this BUHS damage to checkin_damages by normalizing damage types
       let handledInfo: HandledDamageInfo | null = null;
       
-      // Skip handled info for force-undocumented vehicles (e.g., GEU29F)
-      // Note: This processes one vehicle at a time, so skipping handledInfo for
-      // force-undocumented vehicles doesn't affect other vehicles' processing.
-      if (!isForceUndocumented && handledDamageIndex < handledDamagesList.length) {
-        handledInfo = handledDamagesList[handledDamageIndex];
-        handledDamageIndex++;
+      if (!isForceUndocumented) {
+        const normalizedBuhsType = normalizeDamageTypeForKey(leg.damage_type_raw);
+        
+        // Try to find a matching checkin_damage
+        for (let j = 0; j < handledDamagesList.length; j++) {
+          if (matchedHandledIndices.has(j)) continue; // Skip already matched
+          
+          const handled = handledDamagesList[j];
+          const normalizedHandledType = normalizeDamageTypeForKey(handled.damage_type);
+          
+          // Match if normalized types are the same
+          if (normalizedBuhsType && normalizedHandledType && normalizedBuhsType === normalizedHandledType) {
+            handledInfo = handled;
+            matchedHandledIndices.add(j);
+            break;
+          }
+        }
       }
       
       const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;

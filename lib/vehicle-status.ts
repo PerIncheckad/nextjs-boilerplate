@@ -2219,6 +2219,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // ====================================================================================
   addNewDamagesToRecords(damageRecords, allCheckinDamages, checkins, cleanedRegnr, isGEU29F);
 
+  // ====================================================================================
+  // PROBLEM E: Sort damages chronologically (oldest first)
+  // ====================================================================================
+  damageRecords.sort((a, b) => {
+    const dateA = a.datum ? new Date(a.datum).getTime() : 0;
+    const dateB = b.datum ? new Date(b.datum).getTime() : 0;
+    return dateA - dateB; // Oldest first
+  });
+
   // DEBUG: Log final damageRecords for LRA75R
   if (cleanedRegnr === 'LRA75R') {
     console.log('[DEBUG LRA75R] Final damageRecords count:', damageRecords.length);
