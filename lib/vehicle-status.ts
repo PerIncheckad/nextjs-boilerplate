@@ -460,6 +460,31 @@ function formatNotFoundStatus(comment: string, checkerName: string, checkinDateT
     : `Gick ej att dokumentera. (${checkerName}, ${checkinDateTime})`;
 }
 
+// Helper to match BUHS damages from checkin_damages for HISTORIK section
+function matchBuhsDamageForCheckin(
+  cd: CheckinDamageData,
+  checkinId: string,
+  damageRecords: DamageRecord[]
+): DamageRecord | undefined {
+  // Normalize damage_type for comparison to handle case/format differences
+  const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type || '');
+  
+  return damageRecords.find(damage => {
+    if (damage.source !== 'legacy' || damage.checkinWhereDocumented !== checkinId) {
+      return false;
+    }
+    
+    // Remove (BUHS) suffix from skadetyp before comparison
+    const skadeTypWithoutBuhs = damage.skadetyp.replace(/\s*\(BUHS\)\s*$/, '');
+    const normalizedSkadetyp = normalizeDamageTypeForKey(skadeTypWithoutBuhs);
+    const normalizedLegacyText = normalizeDamageTypeForKey(damage.legacy_damage_source_text || '');
+    
+    return normalizedSkadetyp.includes(normalizedCdType) || 
+           normalizedLegacyText.includes(normalizedCdType) ||
+           normalizedCdType.includes(normalizedSkadetyp);
+  });
+}
+
 function getFirstNameFromEmail(email: string): string {
   if (!email) return 'Okänd';
   const namePart = email.split('@')[0];
@@ -1414,25 +1439,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Match BUHS damages that were handled in this checkin
       const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        // Find the corresponding BUHS damage in damageRecords by matching damage_type
-        // The BUHS damage should already be in damageRecords with the right skadetyp and status
-        // Normalize both sides for comparison to handle case/format differences
-        const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type || '');
-        
-        return damageRecords.find(damage => {
-          if (damage.source !== 'legacy' || damage.checkinWhereDocumented !== checkin.id) {
-            return false;
-          }
-          
-          // Remove (BUHS) suffix from skadetyp before comparison
-          const skadeTypWithoutBuhs = damage.skadetyp.replace(/\s*\(BUHS\)\s*$/, '');
-          const normalizedSkadetyp = normalizeDamageTypeForKey(skadeTypWithoutBuhs);
-          const normalizedLegacyText = normalizeDamageTypeForKey(damage.legacy_damage_source_text || '');
-          
-          return normalizedSkadetyp.includes(normalizedCdType) || 
-                 normalizedLegacyText.includes(normalizedCdType) ||
-                 normalizedCdType.includes(normalizedSkadetyp);
-        });
+        return matchBuhsDamageForCheckin(cd, checkin.id, damageRecords);
       }).filter((d): d is typeof damageRecords[0] => d !== undefined);
       
       // Also match damages documented via CHECK merge on this checkin's date
@@ -2303,25 +2310,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Match BUHS damages that were handled in this checkin
     const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      // Find the corresponding BUHS damage in damageRecords by matching damage_type
-      // The BUHS damage should already be in damageRecords with the right skadetyp and status
-      // Normalize both sides for comparison to handle case/format differences
-      const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type || '');
-      
-      return damageRecords.find(damage => {
-        if (damage.source !== 'legacy' || damage.checkinWhereDocumented !== checkin.id) {
-          return false;
-        }
-        
-        // Remove (BUHS) suffix from skadetyp before comparison
-        const skadeTypWithoutBuhs = damage.skadetyp.replace(/\s*\(BUHS\)\s*$/, '');
-        const normalizedSkadetyp = normalizeDamageTypeForKey(skadeTypWithoutBuhs);
-        const normalizedLegacyText = normalizeDamageTypeForKey(damage.legacy_damage_source_text || '');
-        
-        return normalizedSkadetyp.includes(normalizedCdType) || 
-               normalizedLegacyText.includes(normalizedCdType) ||
-               normalizedCdType.includes(normalizedSkadetyp);
-      });
+      return matchBuhsDamageForCheckin(cd, checkin.id, damageRecords);
     }).filter((d): d is typeof damageRecords[0] => d !== undefined);
     
     // Also match damages documented via CHECK merge on this checkin's date
