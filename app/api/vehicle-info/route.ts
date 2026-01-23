@@ -96,7 +96,7 @@ function formatSaludatum(dateStr: string | null | undefined): string {
 
 function getLegacyDamageText(damage: LegacyDamage): string {
   const parts = [
-    damage.damage_type_raw ? formatDamageType(damage.damage_type_raw) : null,
+    damage.damage_type_raw, // Use raw damage_type_raw to preserve Swedish characters
     damage.note_customer,
     damage.note_internal,
   ].filter(p => p && p.trim() !== '' && p.trim() !== '-');
@@ -278,12 +278,11 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
-      // Apply formatDamageType to convert "FALGSKADA_SOMMARHJUL" to "Fälgskada Sommarhjul"
-      const formattedDamageType = formatDamageType(handled.damage_type || 'Okänd');
-      
+      // Keep damage_type as-is from checkin_damages for matching purposes
+      // The display text will come from BUHS damage_type_raw which has Swedish characters
       handledDamagesList.push({
         type: handled.type,
-        damage_type: formattedDamageType,
+        damage_type: handled.damage_type || 'Okänd',
         car_part: handled.car_part || null,
         position: handled.position || null,
         description: handled.description || '',
@@ -348,7 +347,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     const originalText = getLegacyDamageText(leg);
     const normalizedKey = normalizeKey(originalText);
     const isInventoried = inventoriedMap.has(normalizedKey);
-    const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : formatDamageType(originalText);
+    // Use original damage_type_raw to preserve Swedish characters, not formatDamageType
+    const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : (leg.damage_type_raw || originalText);
     if (displayText) {
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);

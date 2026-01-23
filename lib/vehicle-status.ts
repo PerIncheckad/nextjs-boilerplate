@@ -436,14 +436,19 @@ function textsMatch(text1: string | null | undefined, text2: string | null | und
 }
 
 // Helper to normalize damage type for loose key matching
+// Handles Swedish characters (ä->a, ö->o, å->a) for matching
 function normalizeDamageTypeForKey(damageType: string | null | undefined): string {
   if (!damageType) return '';
   return damageType
     .toLowerCase()
-    .replace(/\s+/g, '')
+    .replace(/[_\s-]+/g, '') // Remove underscores, spaces, and hyphens
+    .replace(/ä/g, 'a')
+    .replace(/ö/g, 'o')
+    .replace(/å/g, 'a')
     .replace(/repor/g, 'repa')
     .replace(/repa/g, 'rep') // Further normalize to just "rep"
     .replace(/skrapmärke/g, 'skrap')
+    .replace(/skrapmarke/g, 'skrap') // After ä->a conversion
     .replace(/stenskott/g, 'sten')
     .trim();
 }
@@ -1135,6 +1140,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         source: 'BUHS',
         buhsText: legacyText,
         buhsId: d.id,
+        damageTypeRaw: d.damage_type_raw, // Store original damage_type_raw with Swedish characters
         matchedCheckinDamage,
         checkin,
       };
@@ -1270,7 +1276,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const cdType = matchedCheckinDamage.type;
         
         if (cdType === 'documented' || cdType === 'existing') {
-          const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          // Use entry.damageTypeRaw (from BUHS damage_type_raw) which preserves Swedish characters
+          const damageType = entry.damageTypeRaw || 'Okänd';
           
           if (entry.userPositions && entry.userPositions.length > 0) {
             const positionsStr = formatDamagePositions(entry.userPositions);
@@ -1307,8 +1314,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           sourceInfo = 'Källa: BUHS';
           
         } else if (cdType === 'not_found') {
-          // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-          skadetyp = legacyText || 'Okänd skada';
+          // not_found damages: use BUHS damage_type_raw (preserves Swedish characters)
+          skadetyp = entry.damageTypeRaw || legacyText || 'Okänd skada';
           
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -2100,10 +2107,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const cdType = matchedCheckinDamage.type;
       
       if (cdType === 'documented' || cdType === 'existing') {
-        // Build structured title: prefer CHECK data if available (merged), else use checkin_damage data
-        // Apply formatDamageType to convert "FALGSKADA_SOMMARHJUL" to "Fälgskada Sommarhjul"
-        const rawDamageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
-        const damageType = formatDamageType(rawDamageType);
+        // Build structured title: prefer CHECK data if available (merged), else use BUHS damage_type_raw with Swedish characters
+        // Use entry.damageTypeRaw (from BUHS damage_type_raw) which preserves Swedish characters like "Fälgskada sommarhjul"
+        const damageType = entry.damageTypeRaw || 'Okänd';
         
         // Priority: userPositions from CHECK > positions from checkin_damage > car_part/position from checkin_damage
         if (entry.userPositions && entry.userPositions.length > 0) {
@@ -2143,10 +2149,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo = 'Källa: BUHS';
         
       } else if (cdType === 'not_found') {
-        // not_found damages don't need (BUHS) suffix since status text clarifies
-        // Apply formatDamageType to convert "FALGSKADA_SOMMARHJUL" to "Fälgskada Sommarhjul"
-        const rawType = matchedCheckinDamage.damage_type || legacyText || 'Okänd skada';
-        skadetyp = formatDamageType(rawType);
+        // not_found damages: use BUHS damage_type_raw (preserves Swedish characters)
+        // Do NOT add (BUHS) suffix - status text clarifies it was handled
+        skadetyp = entry.damageTypeRaw || legacyText || 'Okänd skada';
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
