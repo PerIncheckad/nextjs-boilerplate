@@ -319,12 +319,14 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         let newText: string;
         
         if (inv.user_type) {
-          const formattedType = formatDamageType(inv.user_type);
+          // For CHECK-documented damages with structured data, preserve the formatting
+          // user_type comes from CHECK and may be in uppercase (e.g., "OVRIGT")
+          // We keep it as-is for now - the display logic will use BUHS damage_type_raw when available
           const positions = (inv.user_positions as any[] || [])
             .map(p => `${p.carPart || ''} ${p.position || ''}`.trim())
             .filter(Boolean)
             .join(', ');
-          newText = positions ? `${formattedType}: ${positions}` : formattedType;
+          newText = positions ? `${inv.user_type}: ${positions}` : inv.user_type;
         } else {
           newText = (inv.legacy_damage_source_text || '').split(' (Går ej:')[0].trim();
           if (!newText) {
@@ -360,8 +362,22 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     const originalText = getLegacyDamageText(leg);
     const normalizedKey = normalizeKey(originalText);
     const isInventoried = inventoriedMap.has(normalizedKey);
-    // Use original damage_type_raw to preserve Swedish characters, not formatDamageType
-    const displayText = isInventoried ? inventoriedMap.get(normalizedKey)! : (leg.damage_type_raw || originalText);
+    
+    // Build display text using BUHS damage_type_raw to preserve Swedish characters
+    let displayText: string;
+    if (isInventoried) {
+      const inventoriedText = inventoriedMap.get(normalizedKey)!;
+      // If inventoried text has positions (contains ':'), combine BUHS damage_type_raw with positions
+      if (inventoriedText.includes(':')) {
+        const positions = inventoriedText.split(':')[1].trim();
+        displayText = positions ? `${leg.damage_type_raw} - ${positions}` : (leg.damage_type_raw || originalText);
+      } else {
+        displayText = leg.damage_type_raw || inventoriedText;
+      }
+    } else {
+      displayText = leg.damage_type_raw || originalText;
+    }
+    
     if (displayText) {
       const damageType = leg.damage_type_raw || displayText.split(' - ')[0].trim();
       const normalized = normalizeDamageType(damageType);

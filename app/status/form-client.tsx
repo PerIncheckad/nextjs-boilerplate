@@ -1315,52 +1315,86 @@ const HistoryItem: React.FC<{
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
               {(() => {
-                // Determine heading based on damage types
-                const hasLegacyDamages = record.checkinDetaljer.skador.some(s => s.handledStatus || s.isDocumentedOlder);
-                const hasNewDamages = record.checkinDetaljer.skador.some(s => !s.handledStatus && !s.isDocumentedOlder);
+                // Group damages by type
+                const documentedOlder = record.checkinDetaljer.skador.filter(s => s.isDocumentedOlder);
+                const notFoundOlder = record.checkinDetaljer.skador.filter(s => s.isNotFoundOlder);
+                const newDamages = record.checkinDetaljer.skador.filter(s => !s.isDocumentedOlder && !s.isNotFoundOlder);
                 
-                let heading = 'Skador hanterade:';
-                if (hasNewDamages && !hasLegacyDamages) {
-                  heading = 'Nya skador dokumenterade:';
-                } else if (hasLegacyDamages && !hasNewDamages) {
-                  heading = 'Befintliga skador hanterade:';
-                }
-                
-                return <strong style={{ color: '#B30E0E' }}>{heading}</strong>;
+                return (
+                  <>
+                    {/* Documented older damages */}
+                    {documentedOlder.length > 0 && (
+                      <>
+                        <strong style={{ color: '#B30E0E' }}>Befintliga skador som dokumenterades:</strong>
+                        <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                          {documentedOlder.map((skada, idx) => (
+                            <li key={`doc-${idx}`}>
+                              {skada.originalDamageDate && `Dokumenterad äldre skada [${skada.originalDamageDate}]: `}
+                              {skada.typ}
+                              {skada.beskrivning && ` - ${skada.beskrivning}`}
+                              {skada.mediaUrl && (
+                                <>
+                                  <br />
+                                  <a 
+                                    href={skada.mediaUrl} 
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#1a73e8' }}
+                                  >
+                                    📁 Visa media
+                                  </a>
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                    
+                    {/* Not found older damages */}
+                    {notFoundOlder.length > 0 && (
+                      <>
+                        <strong style={{ color: '#B30E0E' }}>Befintliga skador som inte kunde dokumenteras:</strong>
+                        <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                          {notFoundOlder.map((skada, idx) => (
+                            <li key={`notfound-${idx}`}>
+                              {skada.typ}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                    
+                    {/* New damages */}
+                    {newDamages.length > 0 && (
+                      <>
+                        <strong style={{ color: '#B30E0E' }}>Nya skador dokumenterade:</strong>
+                        <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                          {newDamages.map((skada, idx) => (
+                            <li key={`new-${idx}`}>
+                              {skada.typ}
+                              {skada.beskrivning && `: ${skada.beskrivning}`}
+                              {skada.mediaUrl && (
+                                <>
+                                  <br />
+                                  <a 
+                                    href={skada.mediaUrl} 
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#1a73e8' }}
+                                  >
+                                    📁 Visa media
+                                  </a>
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </>
+                );
               })()}
-              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                {(() => {
-                  // Show all damages without deduplication
-                  return record.checkinDetaljer.skador.map((skada, idx) => (
-                    <li key={idx}>
-                      {skada.handledStatus ? (
-                        <>
-                          {skada.typ}
-                          <br />
-                          {skada.handledStatus}
-                        </>
-                      ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
-                        <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
-                      ) : (
-                        <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
-                      )}
-                      {skada.mediaUrl && (
-                        <>
-                          <br />
-                          <a 
-                            href={skada.mediaUrl} 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#1a73e8' }}
-                          >
-                            📁 Visa media
-                          </a>
-                        </>
-                      )}
-                    </li>
-                  ));
-                })()}
-              </ul>
             </div>
           )}
 

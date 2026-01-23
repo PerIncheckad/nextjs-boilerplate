@@ -2220,12 +2220,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   addNewDamagesToRecords(damageRecords, allCheckinDamages, checkins, cleanedRegnr, isGEU29F);
 
   // ====================================================================================
-  // PROBLEM E: Sort damages chronologically (oldest first)
+  // PROBLEM E: Sort damages chronologically (newest first)
   // ====================================================================================
   damageRecords.sort((a, b) => {
     const dateA = a.datum ? new Date(a.datum).getTime() : 0;
     const dateB = b.datum ? new Date(b.datum).getTime() : 0;
-    return dateA - dateB; // Oldest first
+    return dateB - dateA; // Newest first
   });
 
   // DEBUG: Log final damageRecords for LRA75R
