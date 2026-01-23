@@ -1,3 +1,4 @@
+// Vehicle info API endpoint - handles damage display with Swedish character preservation
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
