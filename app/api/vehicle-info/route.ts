@@ -278,9 +278,12 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
+      // Apply formatDamageType to convert "FALGSKADA_SOMMARHJUL" to "Fälgskada Sommarhjul"
+      const formattedDamageType = formatDamageType(handled.damage_type || 'Okänd');
+      
       handledDamagesList.push({
         type: handled.type,
-        damage_type: handled.damage_type || 'Okänd',
+        damage_type: formattedDamageType,
         car_part: handled.car_part || null,
         position: handled.position || null,
         description: handled.description || '',

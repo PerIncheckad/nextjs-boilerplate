@@ -1416,12 +1416,23 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
         // Find the corresponding BUHS damage in damageRecords by matching damage_type
         // The BUHS damage should already be in damageRecords with the right skadetyp and status
-        return damageRecords.find(damage => 
-          damage.source === 'legacy' && 
-          damage.checkinWhereDocumented === checkin.id &&
-          (damage.skadetyp.includes(cd.damage_type || '') || 
-           damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
-        );
+        // Normalize both sides for comparison to handle case/format differences
+        const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type || '');
+        
+        return damageRecords.find(damage => {
+          if (damage.source !== 'legacy' || damage.checkinWhereDocumented !== checkin.id) {
+            return false;
+          }
+          
+          // Remove (BUHS) suffix from skadetyp before comparison
+          const skadeTypWithoutBuhs = damage.skadetyp.replace(/\s*\(BUHS\)\s*$/, '');
+          const normalizedSkadetyp = normalizeDamageTypeForKey(skadeTypWithoutBuhs);
+          const normalizedLegacyText = normalizeDamageTypeForKey(damage.legacy_damage_source_text || '');
+          
+          return normalizedSkadetyp.includes(normalizedCdType) || 
+                 normalizedLegacyText.includes(normalizedCdType) ||
+                 normalizedCdType.includes(normalizedSkadetyp);
+        });
       }).filter((d): d is typeof damageRecords[0] => d !== undefined);
       
       // Also match damages documented via CHECK merge on this checkin's date
@@ -2083,7 +2094,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       if (cdType === 'documented' || cdType === 'existing') {
         // Build structured title: prefer CHECK data if available (merged), else use checkin_damage data
-        const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        // Apply formatDamageType to convert "FALGSKADA_SOMMARHJUL" to "Fälgskada Sommarhjul"
+        const rawDamageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageType = formatDamageType(rawDamageType);
         
         // Priority: userPositions from CHECK > positions from checkin_damage > car_part/position from checkin_damage
         if (entry.userPositions && entry.userPositions.length > 0) {
@@ -2123,8 +2136,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo = 'Källa: BUHS';
         
       } else if (cdType === 'not_found') {
-        // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-        skadetyp = legacyText || 'Okänd skada';
+        // not_found damages don't need (BUHS) suffix since status text clarifies
+        // Apply formatDamageType to convert "FALGSKADA_SOMMARHJUL" to "Fälgskada Sommarhjul"
+        const rawType = matchedCheckinDamage.damage_type || legacyText || 'Okänd skada';
+        skadetyp = formatDamageType(rawType);
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -2290,12 +2305,23 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
       // Find the corresponding BUHS damage in damageRecords by matching damage_type
       // The BUHS damage should already be in damageRecords with the right skadetyp and status
-      return damageRecords.find(damage => 
-        damage.source === 'legacy' && 
-        damage.checkinWhereDocumented === checkin.id &&
-        (damage.skadetyp.includes(cd.damage_type || '') || 
-         damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
-      );
+      // Normalize both sides for comparison to handle case/format differences
+      const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type || '');
+      
+      return damageRecords.find(damage => {
+        if (damage.source !== 'legacy' || damage.checkinWhereDocumented !== checkin.id) {
+          return false;
+        }
+        
+        // Remove (BUHS) suffix from skadetyp before comparison
+        const skadeTypWithoutBuhs = damage.skadetyp.replace(/\s*\(BUHS\)\s*$/, '');
+        const normalizedSkadetyp = normalizeDamageTypeForKey(skadeTypWithoutBuhs);
+        const normalizedLegacyText = normalizeDamageTypeForKey(damage.legacy_damage_source_text || '');
+        
+        return normalizedSkadetyp.includes(normalizedCdType) || 
+               normalizedLegacyText.includes(normalizedCdType) ||
+               normalizedCdType.includes(normalizedSkadetyp);
+      });
     }).filter((d): d is typeof damageRecords[0] => d !== undefined);
     
     // Also match damages documented via CHECK merge on this checkin's date
