@@ -1514,16 +1514,17 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
         
         return {
-          // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
-          typ: isNotFound ? damage.status : damage.skadetyp,
+          // For not_found: show damage type (skadetyp), not status
+          // For documented/existing: show only skadetyp
+          typ: damage.skadetyp,
           beskrivning: '', // Kept for compatibility with display logic
           // Fix 2.2: For not_found, NO media link
           mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: isNotFound, // Kommentar 1
-          // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
-          handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
+          // For not_found, include the status as handledStatus so frontend can display it
+          handledStatus: isNotFound ? damage.status : undefined,
         };
       });
       

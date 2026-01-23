@@ -1359,6 +1359,12 @@ const HistoryItem: React.FC<{
                           {notFoundOlder.map((skada, idx) => (
                             <li key={`notfound-${idx}`}>
                               {skada.typ}
+                              {skada.handledStatus && (
+                                <>
+                                  <br />
+                                  {skada.handledStatus}
+                                </>
+                              )}
                             </li>
                           ))}
                         </ul>

@@ -408,6 +408,35 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       dbDamageKeys.add(dedupeKey);
       
       // ========================================================================
+      // Build final display text based on handled status
+      // ========================================================================
+      let finalDisplayText = displayText;
+      
+      if (handledInfo) {
+        // Damage was handled during checkin
+        if (handledInfo.type === 'documented') {
+          // For documented damages: use BUHS damage_type_raw + position info from CHECK
+          if (isInventoried && inventoriedMap.has(normalizedKey)) {
+            const inventoriedText = inventoriedMap.get(normalizedKey)!;
+            if (inventoriedText.includes(':')) {
+              const positions = inventoriedText.split(':')[1].trim();
+              finalDisplayText = positions ? `${leg.damage_type_raw} - ${positions}` : (leg.damage_type_raw || displayText);
+            } else {
+              finalDisplayText = leg.damage_type_raw || displayText;
+            }
+          } else {
+            finalDisplayText = leg.damage_type_raw || displayText;
+          }
+        } else if (handledInfo.type === 'not_found') {
+          // For not_found damages: use BUHS damage_type_raw (no BUHS suffix)
+          finalDisplayText = leg.damage_type_raw || displayText;
+        } else {
+          // existing type
+          finalDisplayText = leg.damage_type_raw || displayText;
+        }
+      }
+      
+      // ========================================================================
       // GENERAL MAPPING FIX: Populate handled_* fields from checkin_damages/damages
       // ========================================================================
       // When is_inventoried is true and handledInfo exists, populate all handled_* fields.
@@ -446,7 +475,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       
       consolidatedDamages.push({
         id: leg.id,
-        text: displayText,
+        text: finalDisplayText,
         damage_date: leg.damage_date,
         is_inventoried: finalIsInventoried,
         folder: finalFolderValue,
