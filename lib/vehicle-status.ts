@@ -469,12 +469,18 @@ function formatNotFoundStatus(comment: string, checkerName: string, checkinDateT
 function matchBuhsDamageForCheckin(
   cd: CheckinDamageData,
   checkinId: string,
-  damageRecords: DamageRecord[]
+  damageRecords: DamageRecord[],
+  matchedDamageIds: Set<string> = new Set()
 ): DamageRecord | undefined {
   // Normalize damage_type for comparison to handle case/format differences
   const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type || '');
   
   return damageRecords.find(damage => {
+    // Skip if already matched to avoid double-matching
+    if (matchedDamageIds.has(damage.id)) {
+      return false;
+    }
+    
     if (damage.source !== 'legacy' || damage.checkinWhereDocumented !== checkinId) {
       return false;
     }
@@ -1445,8 +1451,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
       
       // Match BUHS damages that were handled in this checkin
+      // Track matched damage IDs to avoid double-matching
+      const matchedDamageIds = new Set<string>();
       const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        return matchBuhsDamageForCheckin(cd, checkin.id, damageRecords);
+        const matched = matchBuhsDamageForCheckin(cd, checkin.id, damageRecords, matchedDamageIds);
+        if (matched) {
+          matchedDamageIds.add(matched.id);
+        }
+        return matched;
       }).filter((d): d is typeof damageRecords[0] => d !== undefined);
       
       // Also match damages documented via CHECK merge on this checkin's date
@@ -2324,8 +2336,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
     
     // Match BUHS damages that were handled in this checkin
+    // Track matched damage IDs to avoid double-matching
+    const matchedDamageIds = new Set<string>();
     const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      return matchBuhsDamageForCheckin(cd, checkin.id, damageRecords);
+      const matched = matchBuhsDamageForCheckin(cd, checkin.id, damageRecords, matchedDamageIds);
+      if (matched) {
+        matchedDamageIds.add(matched.id);
+      }
+      return matched;
     }).filter((d): d is typeof damageRecords[0] => d !== undefined);
     
     // Also match damages documented via CHECK merge on this checkin's date
