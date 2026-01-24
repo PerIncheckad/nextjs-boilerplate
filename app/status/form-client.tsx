@@ -1315,52 +1315,105 @@ const HistoryItem: React.FC<{
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
               {(() => {
-                // Determine heading based on damage types
-                const hasLegacyDamages = record.checkinDetaljer.skador.some(s => s.handledStatus || s.isDocumentedOlder);
-                const hasNewDamages = record.checkinDetaljer.skador.some(s => !s.handledStatus && !s.isDocumentedOlder);
+                // Separate damages into categories
+                const documentedDamages = record.checkinDetaljer.skador.filter(s => s.isDocumentedOlder);
+                const notFoundDamages = record.checkinDetaljer.skador.filter(s => s.isNotFoundOlder);
+                const newDamages = record.checkinDetaljer.skador.filter(s => !s.isDocumentedOlder && !s.isNotFoundOlder);
                 
-                let heading = 'Skador hanterade:';
-                if (hasNewDamages && !hasLegacyDamages) {
-                  heading = 'Nya skador dokumenterade:';
-                } else if (hasLegacyDamages && !hasNewDamages) {
-                  heading = 'Befintliga skador hanterade:';
-                }
-                
-                return <strong style={{ color: '#B30E0E' }}>{heading}</strong>;
+                return (
+                  <>
+                    {/* Documented existing damages */}
+                    {documentedDamages.length > 0 && (
+                      <>
+                        <strong style={{ color: '#B30E0E' }}>Befintliga skador som dokumenterades:</strong>
+                        <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                          {documentedDamages.map((skada, idx) => (
+                            <li key={idx}>
+                              {skada.typ}
+                              {skada.comment && (
+                                <>
+                                  <br />
+                                  Kommentar: {skada.comment}
+                                </>
+                              )}
+                              {skada.mediaUrl && (
+                                <>
+                                  <br />
+                                  <a 
+                                    href={skada.mediaUrl} 
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#1a73e8' }}
+                                  >
+                                    📁 Visa media
+                                  </a>
+                                </>
+                              )}
+                              {(skada.handledBy || skada.handledDate) && (
+                                <>
+                                  <br />
+                                  <span style={{ fontSize: '0.9em', color: '#666' }}>
+                                    {skada.handledBy && skada.handledDate 
+                                      ? `${skada.handledBy}, ${skada.handledDate}`
+                                      : skada.handledBy || skada.handledDate}
+                                  </span>
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                    
+                    {/* Not found existing damages */}
+                    {notFoundDamages.length > 0 && (
+                      <>
+                        <strong style={{ color: '#B30E0E' }}>Befintliga skador som inte kunde dokumenteras:</strong>
+                        <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                          {notFoundDamages.map((skada, idx) => (
+                            <li key={idx}>
+                              {skada.typ}
+                              {skada.comment && (
+                                <>
+                                  <br />
+                                  Kommentar: {skada.comment}
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                    
+                    {/* New damages (if any) */}
+                    {newDamages.length > 0 && (
+                      <>
+                        <strong style={{ color: '#B30E0E' }}>Nya skador dokumenterade:</strong>
+                        <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
+                          {newDamages.map((skada, idx) => (
+                            <li key={idx}>
+                              {skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}
+                              {skada.mediaUrl && (
+                                <>
+                                  <br />
+                                  <a 
+                                    href={skada.mediaUrl} 
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ color: '#1a73e8' }}
+                                  >
+                                    📁 Visa media
+                                  </a>
+                                </>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </>
+                );
               })()}
-              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                {(() => {
-                  // Show all damages without deduplication
-                  return record.checkinDetaljer.skador.map((skada, idx) => (
-                    <li key={idx}>
-                      {skada.handledStatus ? (
-                        <>
-                          {skada.typ}
-                          <br />
-                          {skada.handledStatus}
-                        </>
-                      ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
-                        <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
-                      ) : (
-                        <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
-                      )}
-                      {skada.mediaUrl && (
-                        <>
-                          <br />
-                          <a 
-                            href={skada.mediaUrl} 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#1a73e8' }}
-                          >
-                            📁 Visa media
-                          </a>
-                        </>
-                      )}
-                    </li>
-                  ));
-                })()}
-              </ul>
             </div>
           )}
 

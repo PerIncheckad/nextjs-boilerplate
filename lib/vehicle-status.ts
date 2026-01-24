@@ -118,6 +118,10 @@ export type HistoryRecord = {
       originalDamageDate?: string; // Original damage date for documented older damages
       isNotFoundOlder?: boolean; // True if this is a not_found older BUHS damage (Kommentar 1)
       handledStatus?: string; // Full handled status text (e.g., "Gick ej att dokumentera ...")
+      damageType?: string; // Damage type for not_found damages (e.g., "Fälgskada sommarhjul")
+      comment?: string; // Comment for not_found damages
+      handledBy?: string; // Name of person who handled the damage
+      handledDate?: string; // Date when damage was handled
     }>;
   };
   
@@ -1488,9 +1492,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           }
         }
         
+        // Extract comment and handler info for not_found damages
+        let extractedComment: string | undefined;
+        let extractedHandler: string | undefined;
+        let extractedDate: string | undefined;
+        if (isNotFound && damage.status) {
+          // Format: Gick ej att dokumentera. "comment" (name, date) or Gick ej att dokumentera. (name, date)
+          const commentMatch = damage.status.match(/"([^"]+)"/);
+          if (commentMatch) {
+            extractedComment = commentMatch[1];
+          }
+          const handlerMatch = damage.status.match(/\(([^,]+),\s*([^)]+)\)/);
+          if (handlerMatch) {
+            extractedHandler = handlerMatch[1].trim();
+            extractedDate = handlerMatch[2].trim();
+          }
+        }
+        
         return {
-          // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
-          typ: isNotFound ? damage.status : damage.skadetyp,
+          // Fix 2.2 & 2.3: For not_found, show damage type; for documented/existing, show only skadetyp
+          typ: isNotFound ? damage.skadetyp : damage.skadetyp,
           beskrivning: '', // Kept for compatibility with display logic
           // Fix 2.2: For not_found, NO media link
           mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
@@ -1499,6 +1520,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           isNotFoundOlder: isNotFound, // Kommentar 1
           // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
           handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
+          damageType: isNotFound ? damage.skadetyp : undefined,
+          comment: extractedComment,
+          handledBy: extractedHandler || (damage.documentedBy || undefined),
+          handledDate: extractedDate || (damage.documentedDate || damage.datum || undefined),
         };
       });
       
@@ -2383,9 +2408,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
+      // Extract comment and handler info for not_found damages
+      let extractedComment: string | undefined;
+      let extractedHandler: string | undefined;
+      let extractedDate: string | undefined;
+      if (isNotFound && damage.status) {
+        // Format: Gick ej att dokumentera. "comment" (name, date) or Gick ej att dokumentera. (name, date)
+        const commentMatch = damage.status.match(/"([^"]+)"/);
+        if (commentMatch) {
+          extractedComment = commentMatch[1];
+        }
+        const handlerMatch = damage.status.match(/\(([^,]+),\s*([^)]+)\)/);
+        if (handlerMatch) {
+          extractedHandler = handlerMatch[1].trim();
+          extractedDate = handlerMatch[2].trim();
+        }
+      }
+      
       return {
-        // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
-        typ: isNotFound ? damage.status : damage.skadetyp,
+        // Fix 2.2 & 2.3: For not_found, show damage type; for documented/existing, show only skadetyp
+        typ: isNotFound ? damage.skadetyp : damage.skadetyp,
         beskrivning: '', // Kept for compatibility with display logic
         // Fix 2.2: For not_found, NO media link
         mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
@@ -2394,6 +2436,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         isNotFoundOlder: isNotFound, // Kommentar 1
         // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
         handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
+        damageType: isNotFound ? damage.skadetyp : undefined,
+        comment: extractedComment,
+        handledBy: extractedHandler || (damage.documentedBy || undefined),
+        handledDate: extractedDate || (damage.documentedDate || damage.datum || undefined),
       };
     });
     
