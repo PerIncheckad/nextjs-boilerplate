@@ -1398,14 +1398,21 @@ export default function CheckInForm() {
                     
                     if (d.handledType === 'existing' || d.handledType === 'documented') {
                       // Dokumenterade skador (type='existing' or type='documented')
-                      // Use structured data from checkin_damages
-                      // Format: {damage_type} - {car_part} - {position} ({description if exists})
+                      // Format: {damage_type} - {car_part} - {position}. Dokumenterad {date} av {checker_name}
                       const parts: string[] = [];
                       if (d.handledDamageType) parts.push(d.handledDamageType);
                       if (d.handledCarPart) parts.push(d.handledCarPart);
                       if (d.handledPosition) parts.push(d.handledPosition);
                       
                       displayText = parts.length > 0 ? parts.join(' - ') : (d.fullText || 'Dokumenterad skada');
+                      
+                      // Add documentation info
+                      if (d.handledAt && d.handledBy) {
+                        const date = d.handledAt.split('T')[0]; // Extract date from ISO string
+                        const firstName = d.handledBy.split(' ')[0] || d.handledBy;
+                        displayText += `. Dokumenterad ${date} av ${firstName}`;
+                      }
+                      
                       if (d.handledComment) {
                         displayText += ` (${d.handledComment})`;
                       }
@@ -1417,15 +1424,15 @@ export default function CheckInForm() {
                       }
                     } else if (d.handledType === 'not_found') {
                       // Handled as "not_found" (Gick ej att dokumentera)
-                      // Format: {damage_type} (BUHS). Gick ej att dokumentera "{description}" ({checker_name}, YYYY-MM-DD kl HH:MM)
+                      // Format: {damage_type}. Gick ej att dokumentera. Kommentar: "{description}" ({checker_name}, YYYY-MM-DD kl HH:MM)
                       let damageTypeName = d.handledDamageType;
                       if (!damageTypeName && d.fullText) {
                         const parts = d.fullText.split(' - ');
                         damageTypeName = parts.length > 0 ? parts[0] : d.fullText;
                       }
-                      displayText = (damageTypeName || 'Skada') + ' (BUHS). Gick ej att dokumentera';
+                      displayText = (damageTypeName || 'Skada') + '. Gick ej att dokumentera.';
                       if (d.handledComment) {
-                        displayText += ` "${d.handledComment}"`;
+                        displayText += ` Kommentar: "${d.handledComment}"`;
                       }
                       if (d.handledBy) {
                         const firstName = d.handledBy.split(' ')[0] || d.handledBy;
