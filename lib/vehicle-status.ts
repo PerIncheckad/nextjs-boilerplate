@@ -1286,8 +1286,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           sourceInfo = 'Källa: BUHS';
           
         } else if (cdType === 'not_found') {
-          // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-          skadetyp = legacyText || 'Okänd skada';
+          // Fix 3: not_found damages should show formatted damage type like documented damages
+          const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          
+          if (entry.userPositions && entry.userPositions.length > 0) {
+            const positionsStr = formatDamagePositions(entry.userPositions);
+            skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
+          } else if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
+                     matchedCheckinDamage.positions.length > 0) {
+            const pos = matchedCheckinDamage.positions[0];
+            const parts: string[] = [];
+            if (pos.carPart) parts.push(pos.carPart);
+            if (pos.position) parts.push(pos.position);
+            const posStr = parts.join(' - ');
+            skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
+          } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
+            const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
+            skadetyp = `${damageType} - ${parts.join(' - ')}`;
+          } else {
+            skadetyp = damageType;
+          }
           
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -1633,6 +1651,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Update the vehicle's damage count to reflect the actual list
     vehicle.antalSkador = damageRecords.length;
+
+    // Sort damages by date (newest first)
+    damageRecords.sort((a, b) => {
+      const dateA = new Date(a.datum || '');
+      const dateB = new Date(b.datum || '');
+      return dateB.getTime() - dateA.getTime(); // DESC order = newest first
+    });
 
     return {
       found: true,
@@ -2152,8 +2177,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo = 'Källa: BUHS';
         
       } else if (cdType === 'not_found') {
-        // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-        skadetyp = legacyText || 'Okänd skada';
+        // Fix 3: not_found damages should show formatted damage type like documented damages
+        const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        
+        if (entry.userPositions && entry.userPositions.length > 0) {
+          const positionsStr = formatDamagePositions(entry.userPositions);
+          skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
+        } else if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
+                   matchedCheckinDamage.positions.length > 0) {
+          const pos = matchedCheckinDamage.positions[0];
+          const parts: string[] = [];
+          if (pos.carPart) parts.push(pos.carPart);
+          if (pos.position) parts.push(pos.position);
+          const posStr = parts.join(' - ');
+          skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
+        } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
+          const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
+          skadetyp = `${damageType} - ${parts.join(' - ')}`;
+        } else {
+          skadetyp = damageType;
+        }
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -2672,6 +2715,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     klarForUthyrning: nybilData.klar_for_uthyrning === true ? 'Ja' : nybilData.klar_for_uthyrning === false ? 'Nej' : '---',
     anteckningar: nybilData.anteckningar || '---',
   } : undefined;
+
+  // Sort damages by date (newest first)
+  damageRecords.sort((a, b) => {
+    const dateA = new Date(a.datum || '');
+    const dateB = new Date(b.datum || '');
+    return dateB.getTime() - dateA.getTime(); // DESC order = newest first
+  });
 
   return {
     found: true,
