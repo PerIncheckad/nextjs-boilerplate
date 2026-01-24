@@ -1408,7 +1408,9 @@ export default function CheckInForm() {
                       
                       // Add documentation info
                       if (d.handledAt && d.handledBy) {
-                        const date = d.handledAt.split('T')[0]; // Extract date from ISO string
+                        // Extract date from ISO string or datetime string
+                        const dateMatch = d.handledAt.match(/^\d{4}-\d{2}-\d{2}/);
+                        const date = dateMatch ? dateMatch[0] : d.handledAt.split('T')[0];
                         const firstName = d.handledBy.split(' ')[0] || d.handledBy;
                         displayText += `. Dokumenterad ${date} av ${firstName}`;
                       }
