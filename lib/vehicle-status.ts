@@ -1510,8 +1510,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
         
         return {
-          // Fix 2.2 & 2.3: For not_found, show damage type; for documented/existing, show only skadetyp
-          typ: isNotFound ? damage.skadetyp : damage.skadetyp,
+          // For all damage types, show the damage type from skadetyp
+          typ: damage.skadetyp,
           beskrivning: '', // Kept for compatibility with display logic
           // Fix 2.2: For not_found, NO media link
           mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
@@ -2426,8 +2426,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       return {
-        // Fix 2.2 & 2.3: For not_found, show damage type; for documented/existing, show only skadetyp
-        typ: isNotFound ? damage.skadetyp : damage.skadetyp,
+        // For all damage types, show the damage type from skadetyp
+        typ: damage.skadetyp,
         beskrivning: '', // Kept for compatibility with display logic
         // Fix 2.2: For not_found, NO media link
         mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
