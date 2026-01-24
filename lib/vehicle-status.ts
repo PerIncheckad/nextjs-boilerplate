@@ -1417,16 +1417,25 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
       
       // Match BUHS damages that were handled in this checkin
-      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        // Find the corresponding BUHS damage in damageRecords by matching damage_type
-        // The BUHS damage should already be in damageRecords with the right skadetyp and status
-        return damageRecords.find(damage => 
+      // Track which damage IDs have been matched to avoid duplicates
+      const matchedDamageIds = new Set<number | string>();
+      const matchedBuhsDamages: typeof damageRecords = [];
+      
+      for (const cd of checkinDamagesForThisCheckin) {
+        // Find the corresponding BUHS damage in damageRecords
+        const matchingDamage = damageRecords.find(damage => 
           damage.source === 'legacy' && 
           damage.checkinWhereDocumented === checkin.id &&
+          !matchedDamageIds.has(damage.id) && // Ensure each damage is matched only once
           (damage.skadetyp.includes(cd.damage_type || '') || 
            damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
         );
-      }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+        
+        if (matchingDamage) {
+          matchedBuhsDamages.push(matchingDamage);
+          matchedDamageIds.add(matchingDamage.id);
+        }
+      }
       
       // Also match damages documented via CHECK merge on this checkin's date
       // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -1436,6 +1445,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         : null;
       
       const matchedCheckDamages = checkinYMD ? damageRecords.filter(d => {
+        if (matchedDamageIds.has(d.id)) return false; // Skip already matched
         if (d.source === 'legacy' && d.folder) {
           if (d.checkinWhereDocumented === checkin.id) return true; // Allow
           if (d.documentedDate === checkinYMD) return true; // Date match
@@ -1445,6 +1455,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Also match damages by date (for new damages created during this checkin)
       const matchedDateDamages = checkinYMD ? damageRecords.filter(damage => {
+        if (matchedDamageIds.has(damage.id)) return false; // Skip already matched
         // Skip damages already matched in matchedCheckDamages
         if (damage.source === 'legacy' && damage.folder) {
           if (damage.checkinWhereDocumented === checkin.id) return false;
@@ -1462,15 +1473,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Combine all types of matches
       const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
-      // Dedup by damage.id (Fix 2.1)
-      const seenDamageIds = new Set<number | string>();
-      const dedupedMatchedDamages = matchedDamages.filter(damage => {
-        if (seenDamageIds.has(damage.id)) {
-          return false; // Skip duplicate
-        }
-        seenDamageIds.add(damage.id);
-        return true;
-      });
+      // No need to dedup since we're tracking matchedDamageIds
+      const dedupedMatchedDamages = matchedDamages;
       
       // Track which damages are shown in this checkin
       dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -2312,16 +2316,25 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
     
     // Match BUHS damages that were handled in this checkin
-    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      // Find the corresponding BUHS damage in damageRecords by matching damage_type
-      // The BUHS damage should already be in damageRecords with the right skadetyp and status
-      return damageRecords.find(damage => 
+    // Track which damage IDs have been matched to avoid duplicates
+    const matchedDamageIds = new Set<number | string>();
+    const matchedBuhsDamages: typeof damageRecords = [];
+    
+    for (const cd of checkinDamagesForThisCheckin) {
+      // Find the corresponding BUHS damage in damageRecords
+      const matchingDamage = damageRecords.find(damage => 
         damage.source === 'legacy' && 
         damage.checkinWhereDocumented === checkin.id &&
+        !matchedDamageIds.has(damage.id) && // Ensure each damage is matched only once
         (damage.skadetyp.includes(cd.damage_type || '') || 
          damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
       );
-    }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+      
+      if (matchingDamage) {
+        matchedBuhsDamages.push(matchingDamage);
+        matchedDamageIds.add(matchingDamage.id);
+      }
+    }
     
     // Also match damages documented via CHECK merge on this checkin's date
     // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -2331,6 +2344,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : null;
     
     const matchedCheckDamages = checkinYMD ? damageRecords.filter(d => {
+      if (matchedDamageIds.has(d.id)) return false; // Skip already matched
       if (d.source === 'legacy' && d.folder) {
         if (d.checkinWhereDocumented === checkin.id) return true; // Allow
         if (d.documentedDate === checkinYMD) return true; // Date match
@@ -2340,6 +2354,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Also match damages by date (for new damages created during this checkin)
     const matchedDateDamages = checkinYMD ? damageRecords.filter(damage => {
+      if (matchedDamageIds.has(damage.id)) return false; // Skip already matched
       // Skip damages already matched in matchedCheckDamages
       if (damage.source === 'legacy' && damage.folder) {
         if (damage.checkinWhereDocumented === checkin.id) return false;
@@ -2359,7 +2374,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // DEBUG: Log matched damages for LRA75R
     if (cleanedRegnr === 'LRA75R') {
-      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages BEFORE dedup:`, matchedDamages.map(d => ({
+      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages (no dedup needed):`, matchedDamages.map(d => ({
         id: d.id,
         status: d.status,
         folder: d.folder,
@@ -2367,25 +2382,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       })));
     }
     
-    // Dedup by damage.id (Fix 2.1)
-    const seenDamageIds = new Set<number | string>();
-    const dedupedMatchedDamages = matchedDamages.filter(damage => {
-      if (seenDamageIds.has(damage.id)) {
-        return false; // Skip duplicate
-      }
-      seenDamageIds.add(damage.id);
-      return true;
-    });
-    
-    // DEBUG: Log matched damages for LRA75R after dedup
-    if (cleanedRegnr === 'LRA75R') {
-      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages AFTER dedup:`, dedupedMatchedDamages.map(d => ({
-        id: d.id,
-        status: d.status,
-        folder: d.folder,
-        skadetyp: d.skadetyp,
-      })));
-    }
+    // No need to dedup since we're tracking matchedDamageIds
+    const dedupedMatchedDamages = matchedDamages;
     
     // Track which damages are shown in this checkin
     dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
