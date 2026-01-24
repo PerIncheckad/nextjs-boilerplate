@@ -1522,8 +1522,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
           damageType: isNotFound ? damage.skadetyp : undefined,
           comment: extractedComment,
-          handledBy: extractedHandler || (damage.documentedBy || undefined),
-          handledDate: extractedDate || (damage.documentedDate || damage.datum || undefined),
+          handledBy: extractedHandler || damage.documentedBy || undefined,
+          handledDate: extractedDate || damage.documentedDate || damage.datum || undefined,
         };
       });
       
@@ -2438,8 +2438,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
         damageType: isNotFound ? damage.skadetyp : undefined,
         comment: extractedComment,
-        handledBy: extractedHandler || (damage.documentedBy || undefined),
-        handledDate: extractedDate || (damage.documentedDate || damage.datum || undefined),
+        handledBy: extractedHandler || damage.documentedBy || undefined,
+        handledDate: extractedDate || damage.documentedDate || damage.datum || undefined,
       };
     });
     
