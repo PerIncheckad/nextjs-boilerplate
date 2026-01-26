@@ -1417,13 +1417,14 @@ export default function CheckInForm() {
                       }
                     } else if (d.handledType === 'not_found') {
                       // Handled as "not_found" (Gick ej att dokumentera)
-                      // Format: {damage_type} (BUHS). Gick ej att dokumentera "{description}" ({checker_name}, YYYY-MM-DD kl HH:MM)
+                      // Format: {damage_type}. Gick ej att dokumentera "{description}" ({checker_name}, YYYY-MM-DD kl HH:MM)
+                      // Note: No (BUHS) suffix for handled damages
                       let damageTypeName = d.handledDamageType;
                       if (!damageTypeName && d.fullText) {
                         const parts = d.fullText.split(' - ');
                         damageTypeName = parts.length > 0 ? parts[0] : d.fullText;
                       }
-                      displayText = (damageTypeName || 'Skada') + ' (BUHS). Gick ej att dokumentera';
+                      displayText = (damageTypeName || 'Skada') + '. Gick ej att dokumentera';
                       if (d.handledComment) {
                         displayText += ` "${d.handledComment}"`;
                       }

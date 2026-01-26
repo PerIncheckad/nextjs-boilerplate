@@ -463,9 +463,11 @@ function formatBuhsDamageText(text: string | null | undefined): string {
 
 // Helper to format not_found status message
 function formatNotFoundStatus(comment: string, checkerName: string, checkinDateTime: string): string {
-  return comment 
-    ? `Gick ej att dokumentera. "${comment}" (${checkerName}, ${checkinDateTime})` 
-    : `Gick ej att dokumentera. (${checkerName}, ${checkinDateTime})`;
+  if (comment) {
+    return `Gick ej att dokumentera.\nKommentar: "${comment}"\n(${checkerName}, ${checkinDateTime})`;
+  } else {
+    return `Gick ej att dokumentera.\n(${checkerName}, ${checkinDateTime})`;
+  }
 }
 
 function getFirstNameFromEmail(email: string): string {
@@ -1655,6 +1657,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const dateB = new Date(b.rawTimestamp);
       return dateB.getTime() - dateA.getTime();
     });
+    
+    // Sort damages by date (newest first)
+    damageRecords.sort((a, b) => {
+      const dateA = a.datum ? new Date(a.datum) : new Date(0);
+      const dateB = b.datum ? new Date(b.datum) : new Date(0);
+      return dateB.getTime() - dateA.getTime();
+    });
 
     // Update the vehicle's damage count to reflect the actual list
     vehicle.antalSkador = damageRecords.length;
@@ -2621,6 +2630,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   historyRecords.sort((a, b) => {
     const dateA = new Date(a.rawTimestamp);
     const dateB = new Date(b.rawTimestamp);
+    return dateB.getTime() - dateA.getTime();
+  });
+  
+  // Sort damages by date (newest first)
+  damageRecords.sort((a, b) => {
+    const dateA = a.datum ? new Date(a.datum) : new Date(0);
+    const dateB = b.datum ? new Date(b.datum) : new Date(0);
     return dateB.getTime() - dateA.getTime();
   });
 
