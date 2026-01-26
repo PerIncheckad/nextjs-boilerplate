@@ -29,7 +29,7 @@ export const SWEDISH_DAMAGE_TYPE_MAP: Record<string, string> = {
  * @param damageType - Damage type in UPPERCASE_UNDERSCORE format
  * @returns Formatted damage type with Swedish characters
  */
-export function formatDamageTypeSwedish(damageType: string): string {
+export function formatDamageTypeSwedish(damageType: string | null | undefined): string {
   if (!damageType) return 'Okänd';
   
   // First check if we have an exact mapping
