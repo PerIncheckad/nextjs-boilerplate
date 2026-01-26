@@ -570,6 +570,55 @@ En BUHS-skada markeras som `is_inventoried = true` (och visas INTE i "Befintliga
 
 **Detaljerad dokumentation:** [csv-import-dubbel-rad.md](./csv-import-dubbel-rad.md)
 
+### Normalisering av skadetexter för matchning
+
+För att matcha skador mellan olika källor (BUHS och checkin_damages) normaliseras texterna via två funktioner:
+
+#### `normalizeTextForMatching()`
+
+Används för att jämföra beskrivningar och skadetyper mellan källor. Hanterar:
+
+- **Svenska tecken:** Konverterar ä→a, ö→o, å→a
+- **Underscore:** Konverterar underscore till mellanslag (FALGSKADA_SOMMARHJUL → falgskada sommarhjul)
+- **Whitespace:** Normaliserar mellanslag
+- **Gemener:** Konverterar till lowercase
+- **Varianter:** Repor → Repa
+
+**Exempel:**
+- BUHS-format: "Fälgskada sommarhjul" → "falgskada sommarhjul"
+- checkin_damages-format: "FALGSKADA_SOMMARHJUL" → "falgskada sommarhjul"
+- Dessa matchar nu korrekt!
+
+#### `normalizeDamageTypeForKey()`
+
+Används för looser nyckelbaserad matchning. Tar bort alla mellanslag och underscores för kompakt jämförelse:
+
+- **Svenska tecken:** ä→a, ö→o, å→a
+- **Underscore:** Tas bort helt
+- **Whitespace:** Tas bort helt
+- **Synonymer:** skrapmärke→skrap, stenskott→sten, repa→rep
+
+**Exempel:**
+- "Övrig skada" → "ovrigskada"
+- "OVRIGT" → "ovrigt"
+
+**Varför behövs detta?**
+
+BUHS-systemet lagrar skador med:
+- Svenska tecken (ä, ö, å)
+- Mellanslag mellan ord
+- Mixade versaler/gemener
+
+checkin_damages-tabellen lagrar skador med:
+- Inga svenska tecken (ä→A, ö→O, å→A)
+- Underscores istället för mellanslag
+- VERSALER
+
+Utan denna normalisering skulle "Fälgskada sommarhjul" och "FALGSKADA_SOMMARHJUL" aldrig matcha, vilket leder till:
+- Dubbletter i HISTORIK-sektionen
+- Fel hanteringsstatus
+- Saknade skador
+
 ---
 
 ## Matchningslogik för BUHS-/CHECK-skador (dedup + historik)
