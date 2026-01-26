@@ -104,11 +104,11 @@ function normalizeTextForMatching(text: string | null | undefined): string {
   return text
     .toLowerCase()
     .replace(/_/g, ' ')        // FALGSKADA_SOMMARHJUL → falgskada sommarhjul
-    .replace(/\s+/g, ' ')
-    .replace(/repor/g, 'repa') // Normalize Repor → Repa
     .replace(/ä/g, 'a')        // fälgskada → falgskada
     .replace(/ö/g, 'o')        // övrig → ovrig
     .replace(/å/g, 'a')        // å → a
+    .replace(/\s+/g, ' ')
+    .replace(/repor/g, 'repa') // Normalize Repor → Repa
     .trim();
 }
 
@@ -140,14 +140,14 @@ function normalizeDamageTypeForKey(damageType: string | null | undefined): strin
   return damageType
     .toLowerCase()
     .replace(/_/g, '')         // underscore → removed
+    .replace(/ä/g, 'a')        // ä → a
+    .replace(/ö/g, 'o')        // ö → o
+    .replace(/å/g, 'a')        // å → a
     .replace(/\s+/g, '')
     .replace(/repor/g, 'repa')
     .replace(/repa/g, 'rep') // Further normalize to just "rep"
     .replace(/skrapmärke/g, 'skrap')
     .replace(/stenskott/g, 'sten')
-    .replace(/ä/g, 'a')        // ä → a
-    .replace(/ö/g, 'o')        // ö → o
-    .replace(/å/g, 'a')        // å → a
     .trim();
 }
 
