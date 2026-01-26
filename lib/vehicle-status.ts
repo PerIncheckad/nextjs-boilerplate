@@ -118,6 +118,10 @@ export type HistoryRecord = {
       originalDamageDate?: string; // Original damage date for documented older damages
       isNotFoundOlder?: boolean; // True if this is a not_found older BUHS damage (Kommentar 1)
       handledStatus?: string; // Full handled status text (e.g., "Gick ej att dokumentera ...")
+      damageType?: string; // Damage type for not_found damages (e.g., "Fälgskada sommarhjul")
+      comment?: string; // Comment for not_found damages
+      handledBy?: string; // Name of person who handled the damage
+      handledDate?: string; // Date when damage was handled
     }>;
   };
   
@@ -1245,7 +1249,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const cdType = matchedCheckinDamage.type;
         
         if (cdType === 'documented' || cdType === 'existing') {
-          const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          const damageType = formatDamageType(damageTypeRaw);
           
           if (entry.userPositions && entry.userPositions.length > 0) {
             const positionsStr = formatDamagePositions(entry.userPositions);
@@ -1282,8 +1287,27 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           sourceInfo = 'Källa: BUHS';
           
         } else if (cdType === 'not_found') {
-          // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-          skadetyp = legacyText || 'Okänd skada';
+          // Fix 3: not_found damages should show formatted damage type like documented damages
+          const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          const damageType = formatDamageType(damageTypeRaw);
+          
+          if (entry.userPositions && entry.userPositions.length > 0) {
+            const positionsStr = formatDamagePositions(entry.userPositions);
+            skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
+          } else if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
+                     matchedCheckinDamage.positions.length > 0) {
+            const pos = matchedCheckinDamage.positions[0];
+            const parts: string[] = [];
+            if (pos.carPart) parts.push(pos.carPart);
+            if (pos.position) parts.push(pos.position);
+            const posStr = parts.join(' - ');
+            skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
+          } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
+            const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
+            skadetyp = `${damageType} - ${parts.join(' - ')}`;
+          } else {
+            skadetyp = damageType;
+          }
           
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -1413,16 +1437,25 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
       
       // Match BUHS damages that were handled in this checkin
-      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        // Find the corresponding BUHS damage in damageRecords by matching damage_type
-        // The BUHS damage should already be in damageRecords with the right skadetyp and status
-        return damageRecords.find(damage => 
+      // Track which damage IDs have been matched to avoid duplicates
+      const matchedDamageIds = new Set<number | string>();
+      const matchedBuhsDamages: typeof damageRecords = [];
+      
+      for (const cd of checkinDamagesForThisCheckin) {
+        // Find the corresponding BUHS damage in damageRecords
+        const matchingDamage = damageRecords.find(damage => 
           damage.source === 'legacy' && 
           damage.checkinWhereDocumented === checkin.id &&
+          !matchedDamageIds.has(damage.id) && // Ensure each damage is matched only once
           (damage.skadetyp.includes(cd.damage_type || '') || 
            damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
         );
-      }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+        
+        if (matchingDamage) {
+          matchedBuhsDamages.push(matchingDamage);
+          matchedDamageIds.add(matchingDamage.id);
+        }
+      }
       
       // Also match damages documented via CHECK merge on this checkin's date
       // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -1432,6 +1465,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         : null;
       
       const matchedCheckDamages = checkinYMD ? damageRecords.filter(d => {
+        if (matchedDamageIds.has(d.id)) return false; // Skip already matched
         if (d.source === 'legacy' && d.folder) {
           if (d.checkinWhereDocumented === checkin.id) return true; // Allow
           if (d.documentedDate === checkinYMD) return true; // Date match
@@ -1441,6 +1475,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Also match damages by date (for new damages created during this checkin)
       const matchedDateDamages = checkinYMD ? damageRecords.filter(damage => {
+        if (matchedDamageIds.has(damage.id)) return false; // Skip already matched
         // Skip damages already matched in matchedCheckDamages
         if (damage.source === 'legacy' && damage.folder) {
           if (damage.checkinWhereDocumented === checkin.id) return false;
@@ -1458,15 +1493,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Combine all types of matches
       const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
-      // Dedup by damage.id (Fix 2.1)
-      const seenDamageIds = new Set<number | string>();
-      const dedupedMatchedDamages = matchedDamages.filter(damage => {
-        if (seenDamageIds.has(damage.id)) {
-          return false; // Skip duplicate
-        }
-        seenDamageIds.add(damage.id);
-        return true;
-      });
+      // No need to dedup since we're tracking matchedDamageIds
+      const dedupedMatchedDamages = matchedDamages;
       
       // Track which damages are shown in this checkin
       dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -1488,9 +1516,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           }
         }
         
+        // Extract comment and handler info for not_found damages
+        let extractedComment: string | undefined;
+        let extractedHandler: string | undefined;
+        let extractedDate: string | undefined;
+        if (isNotFound && damage.status) {
+          // Format: Gick ej att dokumentera. "comment" (name, date) or Gick ej att dokumentera. (name, date)
+          const commentMatch = damage.status.match(/"([^"]+)"/);
+          if (commentMatch) {
+            extractedComment = commentMatch[1];
+          }
+          const handlerMatch = damage.status.match(/\(([^,]+),\s*([^)]+)\)/);
+          if (handlerMatch) {
+            extractedHandler = handlerMatch[1].trim();
+            extractedDate = handlerMatch[2].trim();
+          }
+        }
+        
         return {
-          // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
-          typ: isNotFound ? damage.status : damage.skadetyp,
+          // For all damage types, show the damage type from skadetyp
+          typ: damage.skadetyp,
           beskrivning: '', // Kept for compatibility with display logic
           // Fix 2.2: For not_found, NO media link
           mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
@@ -1499,8 +1544,34 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           isNotFoundOlder: isNotFound, // Kommentar 1
           // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
           handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
+          damageType: isNotFound ? damage.skadetyp : undefined,
+          comment: extractedComment,
+          handledBy: extractedHandler || damage.documentedBy || undefined,
+          handledDate: extractedDate || damage.documentedDate || damage.datum || undefined,
         };
       });
+      
+      // DEBUG logging for LRA75R
+      if (cleanedRegnr === 'LRA75R' && checkin.completed_at?.startsWith('2026-01-19')) {
+        console.log('[LRA75R DEBUG] Checkin 2026-01-19 matched damages:', {
+          checkinId: checkin.id,
+          totalMatched: dedupedMatchedDamages.length,
+          damages: dedupedMatchedDamages.map(d => ({
+            id: d.id,
+            skadetyp: d.skadetyp,
+            status: d.status,
+            source: d.source,
+            folder: d.folder
+          })),
+          skador: skador.map(s => ({
+            typ: s.typ,
+            isDocumentedOlder: s.isDocumentedOlder,
+            isNotFoundOlder: s.isNotFoundOlder,
+            mediaUrl: s.mediaUrl,
+            comment: s.comment
+          }))
+        });
+      }
       
       historyRecords.push({
         id: `checkin-${checkin.id}`,
@@ -1604,6 +1675,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Update the vehicle's damage count to reflect the actual list
     vehicle.antalSkador = damageRecords.length;
+
+    // Sort damages by date (newest first)
+    damageRecords.sort((a, b) => {
+      const dateA = new Date(a.datum || '');
+      const dateB = new Date(b.datum || '');
+      return dateB.getTime() - dateA.getTime(); // DESC order = newest first
+    });
 
     return {
       found: true,
@@ -2083,7 +2161,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       if (cdType === 'documented' || cdType === 'existing') {
         // Build structured title: prefer CHECK data if available (merged), else use checkin_damage data
-        const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageType = formatDamageType(damageTypeRaw);
         
         // Priority: userPositions from CHECK > positions from checkin_damage > car_part/position from checkin_damage
         if (entry.userPositions && entry.userPositions.length > 0) {
@@ -2123,8 +2202,27 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         sourceInfo = 'Källa: BUHS';
         
       } else if (cdType === 'not_found') {
-        // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-        skadetyp = legacyText || 'Okänd skada';
+        // Fix 3: not_found damages should show formatted damage type like documented damages
+        const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageType = formatDamageType(damageTypeRaw);
+        
+        if (entry.userPositions && entry.userPositions.length > 0) {
+          const positionsStr = formatDamagePositions(entry.userPositions);
+          skadetyp = positionsStr ? `${damageType} - ${positionsStr}` : damageType;
+        } else if (matchedCheckinDamage.positions && Array.isArray(matchedCheckinDamage.positions) && 
+                   matchedCheckinDamage.positions.length > 0) {
+          const pos = matchedCheckinDamage.positions[0];
+          const parts: string[] = [];
+          if (pos.carPart) parts.push(pos.carPart);
+          if (pos.position) parts.push(pos.position);
+          const posStr = parts.join(' - ');
+          skadetyp = posStr ? `${damageType} - ${posStr}` : damageType;
+        } else if (matchedCheckinDamage.car_part || matchedCheckinDamage.position) {
+          const parts = [matchedCheckinDamage.car_part, matchedCheckinDamage.position].filter(Boolean);
+          skadetyp = `${damageType} - ${parts.join(' - ')}`;
+        } else {
+          skadetyp = damageType;
+        }
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -2287,16 +2385,25 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
     
     // Match BUHS damages that were handled in this checkin
-    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      // Find the corresponding BUHS damage in damageRecords by matching damage_type
-      // The BUHS damage should already be in damageRecords with the right skadetyp and status
-      return damageRecords.find(damage => 
+    // Track which damage IDs have been matched to avoid duplicates
+    const matchedDamageIds = new Set<number | string>();
+    const matchedBuhsDamages: typeof damageRecords = [];
+    
+    for (const cd of checkinDamagesForThisCheckin) {
+      // Find the corresponding BUHS damage in damageRecords
+      const matchingDamage = damageRecords.find(damage => 
         damage.source === 'legacy' && 
         damage.checkinWhereDocumented === checkin.id &&
+        !matchedDamageIds.has(damage.id) && // Ensure each damage is matched only once
         (damage.skadetyp.includes(cd.damage_type || '') || 
          damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
       );
-    }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+      
+      if (matchingDamage) {
+        matchedBuhsDamages.push(matchingDamage);
+        matchedDamageIds.add(matchingDamage.id);
+      }
+    }
     
     // Also match damages documented via CHECK merge on this checkin's date
     // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -2306,6 +2413,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : null;
     
     const matchedCheckDamages = checkinYMD ? damageRecords.filter(d => {
+      if (matchedDamageIds.has(d.id)) return false; // Skip already matched
       if (d.source === 'legacy' && d.folder) {
         if (d.checkinWhereDocumented === checkin.id) return true; // Allow
         if (d.documentedDate === checkinYMD) return true; // Date match
@@ -2315,6 +2423,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Also match damages by date (for new damages created during this checkin)
     const matchedDateDamages = checkinYMD ? damageRecords.filter(damage => {
+      if (matchedDamageIds.has(damage.id)) return false; // Skip already matched
       // Skip damages already matched in matchedCheckDamages
       if (damage.source === 'legacy' && damage.folder) {
         if (damage.checkinWhereDocumented === checkin.id) return false;
@@ -2334,7 +2443,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // DEBUG: Log matched damages for LRA75R
     if (cleanedRegnr === 'LRA75R') {
-      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages BEFORE dedup:`, matchedDamages.map(d => ({
+      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages (no dedup needed):`, matchedDamages.map(d => ({
         id: d.id,
         status: d.status,
         folder: d.folder,
@@ -2342,25 +2451,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       })));
     }
     
-    // Dedup by damage.id (Fix 2.1)
-    const seenDamageIds = new Set<number | string>();
-    const dedupedMatchedDamages = matchedDamages.filter(damage => {
-      if (seenDamageIds.has(damage.id)) {
-        return false; // Skip duplicate
-      }
-      seenDamageIds.add(damage.id);
-      return true;
-    });
-    
-    // DEBUG: Log matched damages for LRA75R after dedup
-    if (cleanedRegnr === 'LRA75R') {
-      console.log(`[DEBUG LRA75R] Checkin ${checkin.id} matched damages AFTER dedup:`, dedupedMatchedDamages.map(d => ({
-        id: d.id,
-        status: d.status,
-        folder: d.folder,
-        skadetyp: d.skadetyp,
-      })));
-    }
+    // No need to dedup since we're tracking matchedDamageIds
+    const dedupedMatchedDamages = matchedDamages;
     
     // Track which damages are shown in this checkin
     dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
@@ -2383,9 +2475,26 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
+      // Extract comment and handler info for not_found damages
+      let extractedComment: string | undefined;
+      let extractedHandler: string | undefined;
+      let extractedDate: string | undefined;
+      if (isNotFound && damage.status) {
+        // Format: Gick ej att dokumentera. "comment" (name, date) or Gick ej att dokumentera. (name, date)
+        const commentMatch = damage.status.match(/"([^"]+)"/);
+        if (commentMatch) {
+          extractedComment = commentMatch[1];
+        }
+        const handlerMatch = damage.status.match(/\(([^,]+),\s*([^)]+)\)/);
+        if (handlerMatch) {
+          extractedHandler = handlerMatch[1].trim();
+          extractedDate = handlerMatch[2].trim();
+        }
+      }
+      
       return {
-        // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
-        typ: isNotFound ? damage.status : damage.skadetyp,
+        // For all damage types, show the damage type from skadetyp
+        typ: damage.skadetyp,
         beskrivning: '', // Kept for compatibility with display logic
         // Fix 2.2: For not_found, NO media link
         mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
@@ -2394,6 +2503,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         isNotFoundOlder: isNotFound, // Kommentar 1
         // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
         handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
+        damageType: isNotFound ? damage.skadetyp : undefined,
+        comment: extractedComment,
+        handledBy: extractedHandler || damage.documentedBy || undefined,
+        handledDate: extractedDate || damage.documentedDate || damage.datum || undefined,
       };
     });
     
@@ -2628,6 +2741,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     klarForUthyrning: nybilData.klar_for_uthyrning === true ? 'Ja' : nybilData.klar_for_uthyrning === false ? 'Nej' : '---',
     anteckningar: nybilData.anteckningar || '---',
   } : undefined;
+
+  // Sort damages by date (newest first)
+  damageRecords.sort((a, b) => {
+    const dateA = new Date(a.datum || '');
+    const dateB = new Date(b.datum || '');
+    return dateB.getTime() - dateA.getTime(); // DESC order = newest first
+  });
 
   return {
     found: true,
