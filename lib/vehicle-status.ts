@@ -622,7 +622,48 @@ type LegacyDamage = {
   damage_date: string | null;
 };
 
+// Mapping for Swedish damage type names
+const SWEDISH_DAMAGE_TYPE_MAP: Record<string, string> = {
+  'FALGSKADA_SOMMARHJUL': 'Fälgskada sommarhjul',
+  'FALGSKADA_VINTERHJUL': 'Fälgskada vinterhjul',
+  'OVRIGT': 'Övrigt',
+  'OVRIG_SKADA': 'Övrig skada',
+  'DACKSKADA': 'Däckskada',
+  'DACKSKADA_SOMMAR': 'Däckskada sommarhjul',
+  'DACKSKADA_VINTER': 'Däckskada vinterhjul',
+  'SKRAPAD_FALG': 'Skrapad fälg',
+  'INVANDIG_SKADA': 'Invändig skada',
+  'HOJDLEDSSKADA': 'Höjdledsskada',
+  'SKRAPAD_OCH_BUCKLA': 'Skrapad och buckla',
+  'JACK': 'Jack',
+  'REPA': 'Repa',
+  'REPOR': 'Repor',
+  'BUCKLA': 'Buckla',
+  'STENSKOTT': 'Stenskott',
+  'SPRICKA': 'Spricka',
+  'LACK': 'Lack',
+  'SKRAPAD': 'Skrapad',
+};
+
+// Helper to format damage type with Swedish characters
+function formatDamageTypeSwedish(damageType: string): string {
+  if (!damageType) return 'Okänd';
+  
+  // First check if we have an exact mapping
+  const upperType = damageType.toUpperCase();
+  if (SWEDISH_DAMAGE_TYPE_MAP[upperType]) {
+    return SWEDISH_DAMAGE_TYPE_MAP[upperType];
+  }
+  
+  // Fallback: convert UPPERCASE_UNDERSCORE → Title Case
+  return damageType
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 // Helper to format damage type from UPPERCASE_WITH_UNDERSCORES to Title Case
+// DEPRECATED: Use formatDamageTypeSwedish instead
 function formatDamageType(damageType: string): string {
   return damageType
     .split('_')
@@ -1118,6 +1159,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         source: 'BUHS',
         buhsText: legacyText,
         buhsId: d.id,
+        damageTypeRaw: d.damage_type_raw || null, // Store BUHS damage_type_raw for Swedish display
         matchedCheckinDamage,
         checkin,
       };
@@ -1253,7 +1295,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const cdType = matchedCheckinDamage.type;
         
         if (cdType === 'documented' || cdType === 'existing') {
-          const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          // Use damage_type_raw from BUHS (Swedish chars) or fall back to formatted damage_type from checkin_damages
+          const damageType = entry.damageTypeRaw 
+            ? entry.damageTypeRaw  // Use BUHS damage_type_raw directly (has Swedish chars)
+            : formatDamageTypeSwedish(matchedCheckinDamage.damage_type || 'Okänd');
           
           if (entry.userPositions && entry.userPositions.length > 0) {
             const positionsStr = formatDamagePositions(entry.userPositions);
@@ -1291,7 +1336,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           
         } else if (cdType === 'not_found') {
           // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-          skadetyp = legacyText || 'Okänd skada';
+          // Use damage_type_raw from BUHS (Swedish chars) or fall back to legacyText
+          skadetyp = entry.damageTypeRaw || legacyText || 'Okänd skada';
           
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -1895,6 +1941,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       source: 'BUHS',
       buhsText: legacyText,
       buhsId: d.id,
+      damageTypeRaw: d.damage_type_raw || null, // Store BUHS damage_type_raw for Swedish display
       matchedCheckinDamage,
       checkin,
     };
@@ -2091,7 +2138,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       if (cdType === 'documented' || cdType === 'existing') {
         // Build structured title: prefer CHECK data if available (merged), else use checkin_damage data
-        const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        // Use damage_type_raw from BUHS (Swedish chars) or fall back to formatted damage_type from checkin_damages
+        const damageType = entry.damageTypeRaw 
+          ? entry.damageTypeRaw  // Use BUHS damage_type_raw directly (has Swedish chars)
+          : formatDamageTypeSwedish(matchedCheckinDamage.damage_type || 'Okänd');
         
         // Priority: userPositions from CHECK > positions from checkin_damage > car_part/position from checkin_damage
         if (entry.userPositions && entry.userPositions.length > 0) {
@@ -2132,7 +2182,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
       } else if (cdType === 'not_found') {
         // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-        skadetyp = legacyText || 'Okänd skada';
+        // Use damage_type_raw from BUHS (Swedish chars) or fall back to legacyText
+        skadetyp = entry.damageTypeRaw || legacyText || 'Okänd skada';
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -2467,7 +2518,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Build skador array for nybil
     const nybilSkador = nybilDamages.map(d => {
-      let typ = d.damage_type_raw || d.damage_type ? formatDamageType(d.damage_type) : 'Okänd';
+      let typ = d.damage_type_raw || d.damage_type ? formatDamageTypeSwedish(d.damage_type) : 'Okänd';
       
       // Add positions if available
       if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {

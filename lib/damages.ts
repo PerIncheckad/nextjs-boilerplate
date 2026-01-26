@@ -69,6 +69,46 @@ export type VehicleInfo = {
 // 2. HELPER FUNCTIONS
 // =================================================================
 
+// Mapping for Swedish damage type names
+const SWEDISH_DAMAGE_TYPE_MAP: Record<string, string> = {
+  'FALGSKADA_SOMMARHJUL': 'Fälgskada sommarhjul',
+  'FALGSKADA_VINTERHJUL': 'Fälgskada vinterhjul',
+  'OVRIGT': 'Övrigt',
+  'OVRIG_SKADA': 'Övrig skada',
+  'DACKSKADA': 'Däckskada',
+  'DACKSKADA_SOMMAR': 'Däckskada sommarhjul',
+  'DACKSKADA_VINTER': 'Däckskada vinterhjul',
+  'SKRAPAD_FALG': 'Skrapad fälg',
+  'INVANDIG_SKADA': 'Invändig skada',
+  'HOJDLEDSSKADA': 'Höjdledsskada',
+  'SKRAPAD_OCH_BUCKLA': 'Skrapad och buckla',
+  'JACK': 'Jack',
+  'REPA': 'Repa',
+  'REPOR': 'Repor',
+  'BUCKLA': 'Buckla',
+  'STENSKOTT': 'Stenskott',
+  'SPRICKA': 'Spricka',
+  'LACK': 'Lack',
+  'SKRAPAD': 'Skrapad',
+};
+
+// Helper to format damage type with Swedish characters
+function formatDamageTypeSwedish(damageType: string): string {
+  if (!damageType) return 'Okänd';
+  
+  // First check if we have an exact mapping
+  const upperType = damageType.toUpperCase();
+  if (SWEDISH_DAMAGE_TYPE_MAP[upperType]) {
+    return SWEDISH_DAMAGE_TYPE_MAP[upperType];
+  }
+  
+  // Fallback: convert UPPERCASE_UNDERSCORE → Title Case
+  return damageType
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 function formatModel(brand: string | null, model: string | null): string {
     const cleanBrand = brand?.trim();
     const cleanModel = model?.trim();
@@ -425,7 +465,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         // This prevents the damage from showing in "Befintliga skador att hantera"
         is_inventoried: finalIsInventoried || (handledInfo !== null) || isHandledByDateLogic,  // USE finalIsInventoried
         handled_type: handledInfo?.type || null,
-        handled_damage_type: handledInfo?.damage_type || null,
+        // Store BUHS damage_type_raw (Swedish chars) instead of checkin_damages damage_type
+        handled_damage_type: handledInfo ? (leg.damage_type_raw || handledInfo?.damage_type) : null,
         handled_car_part: handledInfo?.car_part || null,
         handled_position: handledInfo?.position || null,
         handled_comment: handledInfo?.description || null,
