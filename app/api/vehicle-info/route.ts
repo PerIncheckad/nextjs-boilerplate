@@ -473,6 +473,21 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     completed_at: lastCheckinData.completed_at || '',
   } : null;
 
+  // DEBUG logging for LRA75R
+  if (cleanedRegnr === 'LRA75R') {
+    console.log('[LRA75R DEBUG] /api/vehicle-info consolidatedDamages:', {
+      count: consolidatedDamages.length,
+      damages: consolidatedDamages.map(d => ({
+        id: d.id,
+        text: d.text,
+        is_inventoried: d.is_inventoried,
+        handled_type: d.handled_type,
+        handled_damage_type: d.handled_damage_type,
+        folder: d.folder
+      }))
+    });
+  }
+
   if (vehicleData) {
     return {
       regnr: cleanedRegnr,

@@ -1249,7 +1249,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const cdType = matchedCheckinDamage.type;
         
         if (cdType === 'documented' || cdType === 'existing') {
-          const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          const damageType = formatDamageType(damageTypeRaw);
           
           if (entry.userPositions && entry.userPositions.length > 0) {
             const positionsStr = formatDamagePositions(entry.userPositions);
@@ -1287,7 +1288,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           
         } else if (cdType === 'not_found') {
           // Fix 3: not_found damages should show formatted damage type like documented damages
-          const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          const damageType = formatDamageType(damageTypeRaw);
           
           if (entry.userPositions && entry.userPositions.length > 0) {
             const positionsStr = formatDamagePositions(entry.userPositions);
@@ -1548,6 +1550,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           handledDate: extractedDate || damage.documentedDate || damage.datum || undefined,
         };
       });
+      
+      // DEBUG logging for LRA75R
+      if (cleanedRegnr === 'LRA75R' && checkin.completed_at?.startsWith('2026-01-19')) {
+        console.log('[LRA75R DEBUG] Checkin 2026-01-19 matched damages:', {
+          checkinId: checkin.id,
+          totalMatched: dedupedMatchedDamages.length,
+          damages: dedupedMatchedDamages.map(d => ({
+            id: d.id,
+            skadetyp: d.skadetyp,
+            status: d.status,
+            source: d.source,
+            folder: d.folder
+          })),
+          skador: skador.map(s => ({
+            typ: s.typ,
+            isDocumentedOlder: s.isDocumentedOlder,
+            isNotFoundOlder: s.isNotFoundOlder,
+            mediaUrl: s.mediaUrl,
+            comment: s.comment
+          }))
+        });
+      }
       
       historyRecords.push({
         id: `checkin-${checkin.id}`,
@@ -2137,7 +2161,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       if (cdType === 'documented' || cdType === 'existing') {
         // Build structured title: prefer CHECK data if available (merged), else use checkin_damage data
-        const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageType = formatDamageType(damageTypeRaw);
         
         // Priority: userPositions from CHECK > positions from checkin_damage > car_part/position from checkin_damage
         if (entry.userPositions && entry.userPositions.length > 0) {
@@ -2178,7 +2203,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
       } else if (cdType === 'not_found') {
         // Fix 3: not_found damages should show formatted damage type like documented damages
-        const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageTypeRaw = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        const damageType = formatDamageType(damageTypeRaw);
         
         if (entry.userPositions && entry.userPositions.length > 0) {
           const positionsStr = formatDamagePositions(entry.userPositions);
