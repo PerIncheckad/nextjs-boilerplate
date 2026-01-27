@@ -7,6 +7,7 @@ import { notifyCheckin } from '@/lib/notify';
 import { DAMAGE_OPTIONS } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
 import { compressImage } from '@/lib/image-utils';
+import { formatDamageTypeSwedish } from '@/lib/damage-type-mapping';
 
 // =================================================================
 // 1. DATA, TYPES & HELPERS
@@ -1399,16 +1400,17 @@ export default function CheckInForm() {
                     if (d.handledType === 'existing' || d.handledType === 'documented') {
                       // Dokumenterade skador (type='existing' or type='documented')
                       // Use structured data from checkin_damages
-                      // Format: {damage_type} - {car_part} - {position} ({description if exists})
+                      // Format: {damage_type} - {car_part} - {position} (NO comment in parentheses)
                       const parts: string[] = [];
-                      if (d.handledDamageType) parts.push(d.handledDamageType);
+                      if (d.handledDamageType) {
+                        // Convert UPPERCASE damage type to Swedish characters
+                        parts.push(formatDamageTypeSwedish(d.handledDamageType));
+                      }
                       if (d.handledCarPart) parts.push(d.handledCarPart);
                       if (d.handledPosition) parts.push(d.handledPosition);
                       
                       displayText = parts.length > 0 ? parts.join(' - ') : (d.fullText || 'Dokumenterad skada');
-                      if (d.handledComment) {
-                        displayText += ` (${d.handledComment})`;
-                      }
+                      // Do NOT add handledComment in parentheses for documented damages
                       
                       // Check for media from checkin_damages
                       if (d.handledPhotoUrls && d.handledPhotoUrls.length > 0) {
@@ -1417,15 +1419,17 @@ export default function CheckInForm() {
                       }
                     } else if (d.handledType === 'not_found') {
                       // Handled as "not_found" (Gick ej att dokumentera)
-                      // Format: {damage_type} (BUHS). Gick ej att dokumentera "{description}" ({checker_name}, YYYY-MM-DD kl HH:MM)
+                      // Format: {damage_type} (BUHS). Gick ej att dokumentera. "{description}" ({checker_name}, YYYY-MM-DD kl HH:MM)
                       let damageTypeName = d.handledDamageType;
                       if (!damageTypeName && d.fullText) {
                         const parts = d.fullText.split(' - ');
                         damageTypeName = parts.length > 0 ? parts[0] : d.fullText;
                       }
-                      displayText = (damageTypeName || 'Skada') + ' (BUHS). Gick ej att dokumentera';
+                      // Convert UPPERCASE damage type to Swedish characters
+                      const swedishDamageType = formatDamageTypeSwedish(damageTypeName || 'Skada');
+                      displayText = swedishDamageType + ' (BUHS). Gick ej att dokumentera';
                       if (d.handledComment) {
-                        displayText += ` "${d.handledComment}"`;
+                        displayText += `. "${d.handledComment}"`;
                       }
                       if (d.handledBy) {
                         const firstName = d.handledBy.split(' ')[0] || d.handledBy;

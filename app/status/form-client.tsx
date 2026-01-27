@@ -1030,7 +1030,7 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage,
         <span className="damage-type">{damage.skadetyp}</span>
         <span className="damage-date">{damage.datum}</span>
         {damage.status && (
-          <span className="damage-status">{damage.status}</span>
+          <span className="damage-status" style={{ whiteSpace: 'pre-line' }}>{damage.status}</span>
         )}
         {damage.sourceInfo && (
           <span className="damage-source" style={{ whiteSpace: 'pre-line' }}>

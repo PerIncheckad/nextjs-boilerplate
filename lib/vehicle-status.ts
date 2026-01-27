@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { formatDamageTypeSwedish } from './damage-type-mapping';
 
 // =================================================================
 // 1. TYPE DEFINITIONS
@@ -463,9 +464,11 @@ function formatBuhsDamageText(text: string | null | undefined): string {
 
 // Helper to format not_found status message
 function formatNotFoundStatus(comment: string, checkerName: string, checkinDateTime: string): string {
-  return comment 
-    ? `Gick ej att dokumentera. "${comment}" (${checkerName}, ${checkinDateTime})` 
-    : `Gick ej att dokumentera. (${checkerName}, ${checkinDateTime})`;
+  if (comment) {
+    return `Gick ej att dokumentera.\nKommentar: "${comment}"\n(${checkerName}, ${checkinDateTime})`;
+  } else {
+    return `Gick ej att dokumentera.\n(${checkerName}, ${checkinDateTime})`;
+  }
 }
 
 function getFirstNameFromEmail(email: string): string {
@@ -623,6 +626,8 @@ type LegacyDamage = {
 };
 
 // Helper to format damage type from UPPERCASE_WITH_UNDERSCORES to Title Case
+// DEPRECATED: Use formatDamageTypeSwedish from lib/damage-type-mapping.ts instead
+// This function is kept for backward compatibility only
 function formatDamageType(damageType: string): string {
   return damageType
     .split('_')
@@ -1118,6 +1123,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         source: 'BUHS',
         buhsText: legacyText,
         buhsId: d.id,
+        damageTypeRaw: d.damage_type_raw || null, // Store BUHS damage_type_raw for Swedish display
         matchedCheckinDamage,
         checkin,
       };
@@ -1253,7 +1259,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const cdType = matchedCheckinDamage.type;
         
         if (cdType === 'documented' || cdType === 'existing') {
-          const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+          // Use damage_type_raw from BUHS (Swedish chars) or fall back to formatted damage_type from checkin_damages
+          const damageType = entry.damageTypeRaw 
+            ? entry.damageTypeRaw  // Use BUHS damage_type_raw directly (has Swedish chars)
+            : formatDamageTypeSwedish(matchedCheckinDamage.damage_type || 'Okänd');
           
           if (entry.userPositions && entry.userPositions.length > 0) {
             const positionsStr = formatDamagePositions(entry.userPositions);
@@ -1291,7 +1300,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           
         } else if (cdType === 'not_found') {
           // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-          skadetyp = legacyText || 'Okänd skada';
+          // Use damage_type_raw from BUHS (Swedish chars) or fall back to legacyText
+          skadetyp = entry.damageTypeRaw || legacyText || 'Okänd skada';
           
           const checkerName = checkin?.checker_name || 'Okänd';
           const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -1421,16 +1431,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
       
       // Match BUHS damages that were handled in this checkin
+      // The matching needs to be flexible since damage types are in different formats
       const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        // Find the corresponding BUHS damage in damageRecords by matching damage_type
-        // The BUHS damage should already be in damageRecords with the right skadetyp and status
+        // Find the corresponding BUHS damage in damageRecords
+        // Match by checkinWhereDocumented first (most reliable)
         return damageRecords.find(damage => 
           damage.source === 'legacy' && 
-          damage.checkinWhereDocumented === checkin.id &&
-          (damage.skadetyp.includes(cd.damage_type || '') || 
-           damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
+          damage.checkinWhereDocumented === checkin.id
         );
       }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+      
+      // Dedup in case multiple checkin_damages point to same damage
+      const uniqueBuhsDamages = Array.from(
+        new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
+      );
       
       // Also match damages documented via CHECK merge on this checkin's date
       // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -1464,7 +1478,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }) : [];
       
       // Combine all types of matches
-      const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+      const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
       // Dedup by damage.id (Fix 2.1)
       const seenDamageIds = new Set<number | string>();
@@ -1607,6 +1621,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     historyRecords.sort((a, b) => {
       const dateA = new Date(a.rawTimestamp);
       const dateB = new Date(b.rawTimestamp);
+      return dateB.getTime() - dateA.getTime();
+    });
+    
+    // Sort damages by date (newest first)
+    damageRecords.sort((a, b) => {
+      const dateA = a.datum ? new Date(a.datum) : new Date(0);
+      const dateB = b.datum ? new Date(b.datum) : new Date(0);
       return dateB.getTime() - dateA.getTime();
     });
 
@@ -1895,6 +1916,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       source: 'BUHS',
       buhsText: legacyText,
       buhsId: d.id,
+      damageTypeRaw: d.damage_type_raw || null, // Store BUHS damage_type_raw for Swedish display
       matchedCheckinDamage,
       checkin,
     };
@@ -2091,7 +2113,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       if (cdType === 'documented' || cdType === 'existing') {
         // Build structured title: prefer CHECK data if available (merged), else use checkin_damage data
-        const damageType = entry.damageTypeRaw || matchedCheckinDamage.damage_type || 'Okänd';
+        // Use damage_type_raw from BUHS (Swedish chars) or fall back to formatted damage_type from checkin_damages
+        const damageType = entry.damageTypeRaw 
+          ? entry.damageTypeRaw  // Use BUHS damage_type_raw directly (has Swedish chars)
+          : formatDamageTypeSwedish(matchedCheckinDamage.damage_type || 'Okänd');
         
         // Priority: userPositions from CHECK > positions from checkin_damage > car_part/position from checkin_damage
         if (entry.userPositions && entry.userPositions.length > 0) {
@@ -2132,7 +2157,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         
       } else if (cdType === 'not_found') {
         // Fix 3: not_found damages don't need (BUHS) suffix since status text clarifies
-        skadetyp = legacyText || 'Okänd skada';
+        // Use damage_type_raw from BUHS (Swedish chars) or fall back to legacyText
+        skadetyp = entry.damageTypeRaw || legacyText || 'Okänd skada';
         
         const checkerName = checkin?.checker_name || 'Okänd';
         const checkinDateTime = checkin ? formatDateTime(checkin.completed_at || checkin.created_at) : damageDate;
@@ -2295,16 +2321,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
     
     // Match BUHS damages that were handled in this checkin
+    // The matching needs to be flexible since damage types are in different formats
     const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      // Find the corresponding BUHS damage in damageRecords by matching damage_type
-      // The BUHS damage should already be in damageRecords with the right skadetyp and status
+      // Find the corresponding BUHS damage in damageRecords
+      // Match by checkinWhereDocumented first (most reliable)
       return damageRecords.find(damage => 
         damage.source === 'legacy' && 
-        damage.checkinWhereDocumented === checkin.id &&
-        (damage.skadetyp.includes(cd.damage_type || '') || 
-         damage.legacy_damage_source_text?.includes(cd.damage_type || ''))
+        damage.checkinWhereDocumented === checkin.id
       );
     }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+    
+    // Dedup in case multiple checkin_damages point to same damage
+    const uniqueBuhsDamages = Array.from(
+      new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
+    );
     
     // Also match damages documented via CHECK merge on this checkin's date
     // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -2338,7 +2368,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }) : [];
     
     // Combine all types of matches
-    const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+    const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
     
     // DEBUG: Log matched damages for LRA75R
     if (cleanedRegnr === 'LRA75R') {
@@ -2467,7 +2497,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Build skador array for nybil
     const nybilSkador = nybilDamages.map(d => {
-      let typ = d.damage_type_raw || d.damage_type ? formatDamageType(d.damage_type) : 'Okänd';
+      let typ = d.damage_type_raw || d.damage_type ? formatDamageTypeSwedish(d.damage_type) : 'Okänd';
       
       // Add positions if available
       if (d.user_positions && Array.isArray(d.user_positions) && d.user_positions.length > 0) {
@@ -2570,6 +2600,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   historyRecords.sort((a, b) => {
     const dateA = new Date(a.rawTimestamp);
     const dateB = new Date(b.rawTimestamp);
+    return dateB.getTime() - dateA.getTime();
+  });
+  
+  // Sort damages by date (newest first)
+  damageRecords.sort((a, b) => {
+    const dateA = a.datum ? new Date(a.datum) : new Date(0);
+    const dateB = b.datum ? new Date(b.datum) : new Date(0);
     return dateB.getTime() - dateA.getTime();
   });
 

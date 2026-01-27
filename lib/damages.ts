@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { normalizeDamageType } from '@/app/api/notify/normalizeDamageType';
+import { formatDamageTypeSwedish } from './damage-type-mapping';
 
 // =================================================================
 // 1. TYPE DEFINITIONS
@@ -425,7 +426,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
         // This prevents the damage from showing in "Befintliga skador att hantera"
         is_inventoried: finalIsInventoried || (handledInfo !== null) || isHandledByDateLogic,  // USE finalIsInventoried
         handled_type: handledInfo?.type || null,
-        handled_damage_type: handledInfo?.damage_type || null,
+        // Store BUHS damage_type_raw (Swedish chars) instead of checkin_damages damage_type
+        handled_damage_type: handledInfo ? (leg.damage_type_raw || handledInfo?.damage_type) : null,
         handled_car_part: handledInfo?.car_part || null,
         handled_position: handledInfo?.position || null,
         handled_comment: handledInfo?.description || null,
