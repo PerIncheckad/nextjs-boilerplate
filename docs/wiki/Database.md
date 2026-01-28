@@ -602,6 +602,11 @@ Används för looser nyckelbaserad matchning. Tar bort alla mellanslag och under
 - "Övrig skada" → "ovrigskada"
 - "OVRIGT" → "ovrigt"
 
+**OBS:** Matchning kräver att grundordet är samma. Exempel på **icke-matchning:**
+- "Övrig skada" → "ovrigskada" 
+- "OVRIGT" → "ovrigt"
+- ❌ Dessa matchar INTE (olika ord: "ovrig" vs "ovrigt"). Koden faller tillbaka på textmatchning via `description`.
+
 **Varför behövs detta?**
 
 BUHS-systemet lagrar skador med:
@@ -655,11 +660,33 @@ Utan denna normalisering skulle "Fälgskada sommarhjul" och "FALGSKADA_SOMMARHJU
   - Media-länk om folder finns.  
 - Incheckningshändelse visar “Skador hanterade” för skador som matchar incheckningen (documented/not_found/existing) via stableKey/date-match.
 
+
+### HISTORIK-matchning (skador under INCHECKNING-händelser)
+
+När en INCHECKNING visas i HISTORIK-sektionen matchas hanterade BUHS-skador via:
+
+1. **PASS 1:** Varje BUHS-skada matchas mot `checkin_damages` via text/typ-matchning
+2. **`checkinWhereDocumented`:** Sätts till `checkin.id` för matchade skador
+3. **HISTORIK-rendering:** Hämta alla `damageRecords` där `checkinWhereDocumented === checkin.id`
+4. **Visning:** Dessa skador listas under incheckningen som "Befintliga skador hanterade"
+
+**Viktigt:** Använd `.filter()` (inte `.map().find()`) för att hitta ALLA skador med samma `checkinWhereDocumented`.
+
 **Datumformat**  
 - All matching använder date-only (YYYY-MM-DD) utan tidsdel för att undvika drift (t.ex. “2025-04-16” vs “2025-04-16T00:00:00Z”).
 
 **Speciella fall**  
 - GEU29F: särskild hantering i koden (kan noteras separat); annars gäller reglerna ovan.
+
+
+### Kända matchningsproblem
+
+| BUHS `damage_type_raw` | checkin_damages `damage_type` | Matchar via normalisering? |
+|------------------------|-------------------------------|---------------------------|
+| `Fälgskada sommarhjul` | `FALGSKADA_SOMMARHJUL` | ✅ Ja |
+| `Övrig skada` | `OVRIGT` | ❌ Nej (faller tillbaka på `textsMatch` via `description`) |
+
+**Varför:** "Övrig skada" och "OVRIGT" är olika grundord och kan inte normaliseras till samma sträng. Matchningen sker istället via `textsMatch()` som jämför `damage_type_raw` mot `checkin_damages.description`.
 
 ---
 

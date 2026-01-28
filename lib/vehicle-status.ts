@@ -1432,14 +1432,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Match BUHS damages that were handled in this checkin
       // The matching needs to be flexible since damage types are in different formats
-      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        // Find the corresponding BUHS damage in damageRecords
-        // Match by checkinWhereDocumented first (most reliable)
-        return damageRecords.find(damage => 
-          damage.source === 'legacy' && 
-          damage.checkinWhereDocumented === checkin.id
-        );
-      }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+      // Use .filter() to find ALL damage records (not .map().find() which returns duplicates)
+      const matchedBuhsDamages = damageRecords.filter(damage => 
+        damage.source === 'legacy' && 
+        damage.checkinWhereDocumented === checkin.id
+      );
       
       // Dedup in case multiple checkin_damages point to same damage
       const uniqueBuhsDamages = Array.from(
@@ -2322,14 +2319,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Match BUHS damages that were handled in this checkin
     // The matching needs to be flexible since damage types are in different formats
-    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      // Find the corresponding BUHS damage in damageRecords
-      // Match by checkinWhereDocumented first (most reliable)
-      return damageRecords.find(damage => 
-        damage.source === 'legacy' && 
-        damage.checkinWhereDocumented === checkin.id
-      );
-    }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+    // Use .filter() to find ALL damage records (not .map().find() which returns duplicates)
+    const matchedBuhsDamages = damageRecords.filter(damage => 
+      damage.source === 'legacy' && 
+      damage.checkinWhereDocumented === checkin.id
+    );
     
     // Dedup in case multiple checkin_damages point to same damage
     const uniqueBuhsDamages = Array.from(
