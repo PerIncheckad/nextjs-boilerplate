@@ -603,8 +603,7 @@ Används för looser nyckelbaserad matchning. Tar bort alla mellanslag och under
 - "OVRIGT" → "ovrigt"
 
 **OBS:** Matchning kräver att grundordet är samma. Exempel på **icke-matchning:**
-- "Övrig skada" → "ovrigskada" 
-- "OVRIGT" → "ovrigt"
+- "ovrigskada" ≠ "ovrigt"
 - ❌ Dessa matchar INTE (olika ord: "ovrig" vs "ovrigt"). Koden faller tillbaka på textmatchning via `description`.
 
 **Varför behövs detta?**
@@ -684,7 +683,7 @@ När en INCHECKNING visas i HISTORIK-sektionen matchas hanterade BUHS-skador via
 | BUHS `damage_type_raw` | checkin_damages `damage_type` | Matchar via normalisering? |
 |------------------------|-------------------------------|---------------------------|
 | `Fälgskada sommarhjul` | `FALGSKADA_SOMMARHJUL` | ✅ Ja |
-| `Övrig skada` | `OVRIGT` | ❌ Nej (faller tillbaka på `textsMatch` via `description`) |
+| `Övrig skada` | `OVRIGT` | ❌ Nej (faller tillbaka på `textsMatch()` via `description`) |
 
 **Varför:** "Övrig skada" och "OVRIGT" är olika grundord och kan inte normaliseras till samma sträng. Matchningen sker istället via `textsMatch()` som jämför `damage_type_raw` mot `checkin_damages.description`.
 
