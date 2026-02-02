@@ -663,6 +663,45 @@ Utan denna normalisering skulle "Fälgskada sommarhjul" och "FALGSKADA_SOMMARHJU
 
 ---
 
+## Om `checkinWhereDocumented` och korrekt damage matchning
+
+Vid visning av incheckningshistorik används **fältet** `checkinWhereDocumented` i damageRecords (byggt i JavaScript/TypeScript ��� **ej samma som något fysiskt fält i Supabase**) för att visa vilka BUHS-skador som “hanterades” vid en viss incheckning. Det är denna logik som avgör vilka befintliga skador som visas under t.ex.:
+
+```
+Befintliga skador hanterade:
+3. Övrig skada - Bagagelucka - Utsida [...datum...]
+...osv...
+```
+
+### Kritisk logik & vanligt fel
+
+- Om endast exempelvis **1 av 3** BUHS-skador får denna flagg (`checkinWhereDocumented = checkin.id`), kommer endast en att synas vid rendering, även om flera i praktiken “hanterats”.
+- Det är **vid byggandet av damageRecords i “PASS 1”** i `lib/vehicle-status.ts` detta kopplas ihop mot checkin_damages (ex. via textmatch, typmatch, mm). Om loopen på något sätt endast “ger bort” samma checkin_damage till en skada (via t.ex. set-mekanism eller flagga som förhindrar multipla matchningar) blir UI:t ofullständigt.
+
+### Vanlig felslut
+
+Att ersätta `.map().find()` med `.filter()` löser inga fel om inte det finns rätt antal damageRecords som fått rätt `checkinWhereDocumented` först. Det är alltså **kopplingen/matchningen mellan checkin_damages och BUHS-damages i minnet** som är själva flaskhalsen, och det är här felsökning/loggning måste börja.
+
+**Tips för felsökning:** Lägg konsolloggar efter varje damageRecord-bygg för att visualisera exakt vilka “damage” som får rätt flagga.
+
+---
+
+#### Exempel på konsekvens:
+
+Om UI:t endast visar en skada fast tre är förväntat, undersök:
+
+- Hur många damageRecords har `damage.source === 'legacy' && damage.checkinWhereDocumented === checkin.id`?
+- Hur många “får” egentligen flaggan i, t.ex., LRA75R vid incheckning 2026-01-19?
+- Är det t.ex. en unik “not_found”/“existing” checkin_damage per BUHS-skada, eller återanvänds samma objekt?
+
+### Sammantaget
+
+Att felsöka rätt antal BUHS-skador per incheckning måste ALLTID börja i den **interna JS/TS-modellen** – se till att bygget av damageRecords ger verkliga, 1:1-kopplingar för vad du vill visa.
+
+
+
+---
+
 ## Vanliga SQL-frågor för felsökning
 
 ### Visa alla incheckningar för ett fordon
