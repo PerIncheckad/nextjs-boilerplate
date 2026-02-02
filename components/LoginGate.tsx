@@ -6,6 +6,7 @@ type Props = { children: React.ReactNode };
 
 const EMAIL_WHITELIST = new Set<string>([
   'per.andersson@mabi.se',
+  'per.enskede@gmail.com',
   'ingemar.carqueija@mabi.se',
   'latif.mutlu@mabi.se',
   'hugo.carqueija@gmail.com',
