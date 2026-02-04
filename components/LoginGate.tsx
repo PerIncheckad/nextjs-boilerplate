@@ -32,6 +32,7 @@ const EMAIL_WHITELIST = new Set<string>([
   'dan.hermodsson@mabi.se',
   'elvir.poricanin@mabi.se',
   'asa.andersson@mabi.se',
+  'dilot_85@hotmail.com',
   'alicia.carqueija@mabi.se',
 ]);
 
