@@ -1462,6 +1462,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             }
           }
           
+          // Extra fallback: match damage_type_raw against cd.description
+          if (damage.damageTypeRaw && cdDesc) {
+            if (textsMatch(damage.damageTypeRaw, cdDesc)) {
+              return true;
+            }
+          }
+          
           return false;
         });
         
@@ -2372,6 +2379,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const cdDesc = cd.description || '';
         if (damage.legacy_damage_source_text && cdDesc.length >= 10) {
           if (textsMatch(damage.legacy_damage_source_text, cdDesc)) {
+            return true;
+          }
+        }
+        
+        // Extra fallback: match damage_type_raw against cd.description
+        if (damage.damageTypeRaw && cdDesc) {
+          if (textsMatch(damage.damageTypeRaw, cdDesc)) {
             return true;
           }
         }
