@@ -1439,6 +1439,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
       for (const cd of checkinDamagesForThisCheckin) {
         let bestMatch: DamageRecord | null = null;
+        let bestMatchPriority = 5; // Lower number = higher priority (1-4)
         
         // Try each matching strategy in priority order
         for (const damage of damageRecords) {
@@ -1450,37 +1451,35 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           // Priority 1: Match by checkinWhereDocumented (most reliable)
           if (damage.checkinWhereDocumented === checkin.id) {
             bestMatch = damage;
-            break; // Found highest priority match
+            bestMatchPriority = 1;
+            break; // Found highest priority match, no need to continue
           }
           
           // Priority 2: Match by normalized damage type
-          if (cd.damage_type && damage.damageTypeRaw) {
+          if (bestMatchPriority > 2 && cd.damage_type && damage.damageTypeRaw) {
             const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
             const normalizedDamageType = normalizeDamageTypeForKey(damage.damageTypeRaw);
             if (normalizedCdType && normalizedDamageType && normalizedCdType === normalizedDamageType) {
-              if (!bestMatch) {
-                bestMatch = damage;
-              }
-              continue; // Continue to see if there's a better match
+              bestMatch = damage;
+              bestMatchPriority = 2;
+              continue; // Continue to see if there's a Priority 1 match
             }
           }
           
           // Priority 3: Text matching - legacy_damage_source_text vs description
-          if (cd.description && damage.legacy_damage_source_text) {
+          if (bestMatchPriority > 3 && cd.description && damage.legacy_damage_source_text) {
             if (textsMatch(damage.legacy_damage_source_text, cd.description)) {
-              if (!bestMatch) {
-                bestMatch = damage;
-              }
+              bestMatch = damage;
+              bestMatchPriority = 3;
               continue;
             }
           }
           
           // Priority 4: Text matching (Fallback) - damageTypeRaw vs description
-          if (cd.description && damage.damageTypeRaw) {
+          if (bestMatchPriority > 4 && cd.description && damage.damageTypeRaw) {
             if (textsMatch(damage.damageTypeRaw, cd.description)) {
-              if (!bestMatch) {
-                bestMatch = damage;
-              }
+              bestMatch = damage;
+              bestMatchPriority = 4;
             }
           }
         }
@@ -1491,9 +1490,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           usedDamageIds.add(bestMatch.id);
         }
       }
-      
-      // uniqueBuhsDamages is no longer needed as we handle deduplication above
-      const uniqueBuhsDamages = matchedBuhsDamages;
       
       // Also match damages documented via CHECK merge on this checkin's date
       // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -1527,7 +1523,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }) : [];
       
       // Combine all types of matches
-      const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+      const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
       // Dedup by damage.id (Fix 2.1)
       const seenDamageIds = new Set<number | string>();
@@ -2377,6 +2373,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     for (const cd of checkinDamagesForThisCheckin) {
       let bestMatch: DamageRecord | null = null;
+      let bestMatchPriority = 5; // Lower number = higher priority (1-4)
       
       // Try each matching strategy in priority order
       for (const damage of damageRecords) {
@@ -2388,37 +2385,35 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         // Priority 1: Match by checkinWhereDocumented (most reliable)
         if (damage.checkinWhereDocumented === checkin.id) {
           bestMatch = damage;
-          break; // Found highest priority match
+          bestMatchPriority = 1;
+          break; // Found highest priority match, no need to continue
         }
         
         // Priority 2: Match by normalized damage type
-        if (cd.damage_type && damage.damageTypeRaw) {
+        if (bestMatchPriority > 2 && cd.damage_type && damage.damageTypeRaw) {
           const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
           const normalizedDamageType = normalizeDamageTypeForKey(damage.damageTypeRaw);
           if (normalizedCdType && normalizedDamageType && normalizedCdType === normalizedDamageType) {
-            if (!bestMatch) {
-              bestMatch = damage;
-            }
-            continue; // Continue to see if there's a better match
+            bestMatch = damage;
+            bestMatchPriority = 2;
+            continue; // Continue to see if there's a Priority 1 match
           }
         }
         
         // Priority 3: Text matching - legacy_damage_source_text vs description
-        if (cd.description && damage.legacy_damage_source_text) {
+        if (bestMatchPriority > 3 && cd.description && damage.legacy_damage_source_text) {
           if (textsMatch(damage.legacy_damage_source_text, cd.description)) {
-            if (!bestMatch) {
-              bestMatch = damage;
-            }
+            bestMatch = damage;
+            bestMatchPriority = 3;
             continue;
           }
         }
         
         // Priority 4: Text matching (Fallback) - damageTypeRaw vs description
-        if (cd.description && damage.damageTypeRaw) {
+        if (bestMatchPriority > 4 && cd.description && damage.damageTypeRaw) {
           if (textsMatch(damage.damageTypeRaw, cd.description)) {
-            if (!bestMatch) {
-              bestMatch = damage;
-            }
+            bestMatch = damage;
+            bestMatchPriority = 4;
           }
         }
       }
@@ -2429,9 +2424,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         usedDamageIds.add(bestMatch.id);
       }
     }
-    
-    // uniqueBuhsDamages is no longer needed as we handle deduplication above
-    const uniqueBuhsDamages = matchedBuhsDamages;
     
     // Also match damages documented via CHECK merge on this checkin's date
     // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -2465,7 +2457,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }) : [];
     
     // Combine all types of matches
-    const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+    const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
     
     // DEBUG: Log matched damages for LRA75R
     if (cleanedRegnr === 'LRA75R') {
