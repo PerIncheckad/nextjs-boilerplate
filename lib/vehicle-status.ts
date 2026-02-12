@@ -1430,15 +1430,46 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Get checkin_damages for this specific checkin
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
       
+      // DEBUG: Log data before matching
+      console.log('[DEBUG-HISTORIK] Processing checkin for', checkin.regnr);
+      console.log('[DEBUG-HISTORIK] DamageRecords:', damageRecords.map(d => ({
+        id: d.id,
+        source: d.source,
+        damageTypeRaw: (d as any).damageTypeRaw,
+        legacy_damage_source_text: d.legacy_damage_source_text,
+        checkinWhereDocumented: d.checkinWhereDocumented,
+      })));
+      console.log('[DEBUG-HISTORIK] CheckinDamages:', checkinDamagesForThisCheckin.map(cd => ({
+        id: cd.id,
+        checkin_id: cd.checkin_id,
+        damage_type: cd.damage_type,
+        description: cd.description,
+      })));
+      
       // Match BUHS damages that were handled in this checkin
       // The matching needs to be flexible since damage types are in different formats
       const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+        console.log(`[DEBUG-HISTORIK] Checking CD ${cd.id}:`);
+        
         // Find the corresponding BUHS damage in damageRecords
         // Match by checkinWhereDocumented first (most reliable)
-        return damageRecords.find(damage => 
-          damage.source === 'legacy' && 
-          damage.checkinWhereDocumented === checkin.id
-        );
+        const matched = damageRecords.find(damage => {
+          const isLegacy = damage.source === 'legacy';
+          const checkinMatch = damage.checkinWhereDocumented === checkin.id;
+          
+          console.log(`[DEBUG-HISTORIK]   - Comparing vs Damage ${damage.id}: source=${damage.source}, checkinWhereDocumented=${damage.checkinWhereDocumented}, checkin.id=${checkin.id}`);
+          console.log(`[DEBUG-HISTORIK]     Strategy 1 (checkinWhereDocumented): isLegacy=${isLegacy}, checkinMatch=${checkinMatch}, result=${isLegacy && checkinMatch}`);
+          
+          return isLegacy && checkinMatch;
+        });
+        
+        if (matched) {
+          console.log(`[DEBUG-HISTORIK]   ✓ Match found: Damage ${matched.id} (Priority: checkinWhereDocumented)`);
+        } else {
+          console.log(`[DEBUG-HISTORIK]   ✗ No match found for CD ${cd.id}`);
+        }
+        
+        return matched;
       }).filter((d): d is typeof damageRecords[0] => d !== undefined);
       
       // Dedup in case multiple checkin_damages point to same damage
@@ -2320,15 +2351,46 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Get checkin_damages for this specific checkin
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
     
+    // DEBUG: Log data before matching
+    console.log('[DEBUG-HISTORIK] Processing checkin for', checkin.regnr);
+    console.log('[DEBUG-HISTORIK] DamageRecords:', damageRecords.map(d => ({
+      id: d.id,
+      source: d.source,
+      damageTypeRaw: (d as any).damageTypeRaw,
+      legacy_damage_source_text: d.legacy_damage_source_text,
+      checkinWhereDocumented: d.checkinWhereDocumented,
+    })));
+    console.log('[DEBUG-HISTORIK] CheckinDamages:', checkinDamagesForThisCheckin.map(cd => ({
+      id: cd.id,
+      checkin_id: cd.checkin_id,
+      damage_type: cd.damage_type,
+      description: cd.description,
+    })));
+    
     // Match BUHS damages that were handled in this checkin
     // The matching needs to be flexible since damage types are in different formats
     const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+      console.log(`[DEBUG-HISTORIK] Checking CD ${cd.id}:`);
+      
       // Find the corresponding BUHS damage in damageRecords
       // Match by checkinWhereDocumented first (most reliable)
-      return damageRecords.find(damage => 
-        damage.source === 'legacy' && 
-        damage.checkinWhereDocumented === checkin.id
-      );
+      const matched = damageRecords.find(damage => {
+        const isLegacy = damage.source === 'legacy';
+        const checkinMatch = damage.checkinWhereDocumented === checkin.id;
+        
+        console.log(`[DEBUG-HISTORIK]   - Comparing vs Damage ${damage.id}: source=${damage.source}, checkinWhereDocumented=${damage.checkinWhereDocumented}, checkin.id=${checkin.id}`);
+        console.log(`[DEBUG-HISTORIK]     Strategy 1 (checkinWhereDocumented): isLegacy=${isLegacy}, checkinMatch=${checkinMatch}, result=${isLegacy && checkinMatch}`);
+        
+        return isLegacy && checkinMatch;
+      });
+      
+      if (matched) {
+        console.log(`[DEBUG-HISTORIK]   ✓ Match found: Damage ${matched.id} (Priority: checkinWhereDocumented)`);
+      } else {
+        console.log(`[DEBUG-HISTORIK]   ✗ No match found for CD ${cd.id}`);
+      }
+      
+      return matched;
     }).filter((d): d is typeof damageRecords[0] => d !== undefined);
     
     // Dedup in case multiple checkin_damages point to same damage
