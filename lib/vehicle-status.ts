@@ -74,6 +74,7 @@ export type DamageRecord = {
   legacy_damage_source_text?: string | null;
   legacy_buhs_text?: string | null; // Original BUHS description (combined from damage_type_raw, notes, etc.)
   original_damage_date?: string | null;
+  damageTypeRaw?: string | null; // Raw BUHS damage_type_raw for matching in HISTORIK
   // For documented BUHS damages - track where they were documented
   checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
   documentedBy?: string | null; // checker_name who documented it
@@ -1349,6 +1350,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         legacy_damage_source_text: legacyText,
         legacy_buhs_text: legacyText,
         original_damage_date: damageDate,
+        damageTypeRaw: entry.damageTypeRaw || null,
         checkinWhereDocumented: checkin?.id || null,
         documentedBy: entry.documentedBy || checkin?.checker_name || null,
         documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
@@ -1432,19 +1434,58 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Match BUHS damages that were handled in this checkin
       // The matching needs to be flexible since damage types are in different formats
-      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        // Find the corresponding BUHS damage in damageRecords
-        // Match by checkinWhereDocumented first (most reliable)
-        return damageRecords.find(damage => 
-          damage.source === 'legacy' && 
-          damage.checkinWhereDocumented === checkin.id
-        );
-      }).filter((d): d is typeof damageRecords[0] => d !== undefined);
-      
-      // Dedup in case multiple checkin_damages point to same damage
-      const uniqueBuhsDamages = Array.from(
-        new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
-      );
+      // Build matched BUHS damages directly from checkin_damages,
+      // without relying on checkinWhereDocumented
+      const matchedBuhsDamages: typeof damageRecords = [];
+      const usedDamageIds = new Set<string | number>();
+
+      for (const cd of checkinDamagesForThisCheckin) {
+        if (cd.type === 'new') continue; // New damages handled separately
+
+        const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
+        const cdDesc = cd.description || '';
+
+        const matchedDamage = damageRecords.find(damage => {
+          if (damage.source !== 'legacy') return false;
+          if (usedDamageIds.has(damage.id)) return false;
+
+          // Primary: normalized damage_type matching
+          const normalizedDamageType = normalizeDamageTypeForKey(damage.damageTypeRaw || damage.skadetyp);
+          if (normalizedDamageType && normalizedCdType && normalizedDamageType === normalizedCdType) {
+            return true;
+          }
+
+          // Fallback 1: text matching via legacy_damage_source_text
+          if (damage.legacy_damage_source_text && cdDesc) {
+            if (textsMatch(damage.legacy_damage_source_text, cdDesc)) {
+              return true;
+            }
+          }
+
+          // Fallback 2: match damageTypeRaw against cd.description
+          // Handles "Övrig skada" ↔ "OVRIGT" where normalized types differ
+          // but "ovrig skada" IS a substring of "ovrig skada - ovrig skada - vindrutetorkaren knackt"
+          if (damage.damageTypeRaw && cdDesc) {
+            if (textsMatch(damage.damageTypeRaw, cdDesc)) {
+              return true;
+            }
+          }
+
+          // Fallback 3: match damageTypeRaw against cd.damage_type
+          if (damage.damageTypeRaw && cd.damage_type) {
+            if (textsMatch(damage.damageTypeRaw, cd.damage_type)) {
+              return true;
+            }
+          }
+
+          return false;
+        });
+
+        if (matchedDamage) {
+          usedDamageIds.add(matchedDamage.id);
+          matchedBuhsDamages.push(matchedDamage);
+        }
+      }
       
       // Also match damages documented via CHECK merge on this checkin's date
       // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -1478,7 +1519,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }) : [];
       
       // Combine all types of matches
-      const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+      const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
       // Dedup by damage.id (Fix 2.1)
       const seenDamageIds = new Set<number | string>();
@@ -2210,6 +2251,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       legacy_damage_source_text: legacyText,
       legacy_buhs_text: legacyText,
       original_damage_date: damageDate,
+      damageTypeRaw: entry.damageTypeRaw || null,
       checkinWhereDocumented: checkin?.id || null,
       documentedBy: entry.documentedBy || checkin?.checker_name || null,
       documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
@@ -2322,19 +2364,58 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Match BUHS damages that were handled in this checkin
     // The matching needs to be flexible since damage types are in different formats
-    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      // Find the corresponding BUHS damage in damageRecords
-      // Match by checkinWhereDocumented first (most reliable)
-      return damageRecords.find(damage => 
-        damage.source === 'legacy' && 
-        damage.checkinWhereDocumented === checkin.id
-      );
-    }).filter((d): d is typeof damageRecords[0] => d !== undefined);
-    
-    // Dedup in case multiple checkin_damages point to same damage
-    const uniqueBuhsDamages = Array.from(
-      new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
-    );
+    // Build matched BUHS damages directly from checkin_damages,
+    // without relying on checkinWhereDocumented
+    const matchedBuhsDamages: typeof damageRecords = [];
+    const usedDamageIds = new Set<string | number>();
+
+    for (const cd of checkinDamagesForThisCheckin) {
+      if (cd.type === 'new') continue; // New damages handled separately
+
+      const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
+      const cdDesc = cd.description || '';
+
+      const matchedDamage = damageRecords.find(damage => {
+        if (damage.source !== 'legacy') return false;
+        if (usedDamageIds.has(damage.id)) return false;
+
+        // Primary: normalized damage_type matching
+        const normalizedDamageType = normalizeDamageTypeForKey(damage.damageTypeRaw || damage.skadetyp);
+        if (normalizedDamageType && normalizedCdType && normalizedDamageType === normalizedCdType) {
+          return true;
+        }
+
+        // Fallback 1: text matching via legacy_damage_source_text
+        if (damage.legacy_damage_source_text && cdDesc) {
+          if (textsMatch(damage.legacy_damage_source_text, cdDesc)) {
+            return true;
+          }
+        }
+
+        // Fallback 2: match damageTypeRaw against cd.description
+        // Handles "Övrig skada" ↔ "OVRIGT" where normalized types differ
+        // but "ovrig skada" IS a substring of "ovrig skada - ovrig skada - vindrutetorkaren knackt"
+        if (damage.damageTypeRaw && cdDesc) {
+          if (textsMatch(damage.damageTypeRaw, cdDesc)) {
+            return true;
+          }
+        }
+
+        // Fallback 3: match damageTypeRaw against cd.damage_type
+        if (damage.damageTypeRaw && cd.damage_type) {
+          if (textsMatch(damage.damageTypeRaw, cd.damage_type)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      if (matchedDamage) {
+        usedDamageIds.add(matchedDamage.id);
+        matchedBuhsDamages.push(matchedDamage);
+      }
+    }
     
     // Also match damages documented via CHECK merge on this checkin's date
     // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -2368,7 +2449,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }) : [];
     
     // Combine all types of matches
-    const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+    const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
     
     // DEBUG: Log matched damages for LRA75R
     if (cleanedRegnr === 'LRA75R') {
