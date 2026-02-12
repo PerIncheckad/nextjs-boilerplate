@@ -1439,7 +1439,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
       for (const cd of checkinDamagesForThisCheckin) {
         let bestMatch: DamageRecord | null = null;
-        let bestMatchPriority = 5; // Lower number = higher priority (1-4)
+        let bestMatchPriority = 5; // 5 = no match yet; valid priorities are 1-4 (lower = better)
         
         // Try each matching strategy in priority order
         for (const damage of damageRecords) {
@@ -2373,7 +2373,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     for (const cd of checkinDamagesForThisCheckin) {
       let bestMatch: DamageRecord | null = null;
-      let bestMatchPriority = 5; // Lower number = higher priority (1-4)
+      let bestMatchPriority = 5; // 5 = no match yet; valid priorities are 1-4 (lower = better)
       
       // Try each matching strategy in priority order
       for (const damage of damageRecords) {
