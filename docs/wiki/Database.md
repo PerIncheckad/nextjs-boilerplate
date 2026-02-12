@@ -676,7 +676,7 @@ När en INCHECKNING visas i HISTORIK-sektionen matchas hanterade BUHS-skador via
 3. **`usedDamageIds`:** Spårar redan matchade skador för att undvika dubbletter (1:1-matchning)
 4. **Visning:** Matchade skador listas under incheckningen
 
-**Viktigt:** Använd `.filter()` loop med individuell matchning per `cd` (inte `.map().find()` som ignorerar `cd`).
+**Viktigt:** Använd `for...of` loop med individuell matchning per `cd` (inte `.map().find()` som ignorerar `cd`).
 
 ### Kända matchningsproblem
 
