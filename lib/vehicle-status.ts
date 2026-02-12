@@ -74,6 +74,7 @@ export type DamageRecord = {
   legacy_damage_source_text?: string | null;
   legacy_buhs_text?: string | null; // Original BUHS description (combined from damage_type_raw, notes, etc.)
   original_damage_date?: string | null;
+  damageTypeRaw?: string | null; // Raw damage type from damages table (e.g., "Fälgskada sommarhjul")
   // For documented BUHS damages - track where they were documented
   checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
   documentedBy?: string | null; // checker_name who documented it
@@ -1349,6 +1350,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         legacy_damage_source_text: legacyText,
         legacy_buhs_text: legacyText,
         original_damage_date: damageDate,
+        damageTypeRaw: entry.damageTypeRaw || null, // Add damageTypeRaw for matching
         checkinWhereDocumented: checkin?.id || null,
         documentedBy: entry.documentedBy || checkin?.checker_name || null,
         documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
@@ -1431,20 +1433,67 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
       
       // Match BUHS damages that were handled in this checkin
-      // The matching needs to be flexible since damage types are in different formats
-      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-        // Find the corresponding BUHS damage in damageRecords
-        // Match by checkinWhereDocumented first (most reliable)
-        return damageRecords.find(damage => 
-          damage.source === 'legacy' && 
-          damage.checkinWhereDocumented === checkin.id
-        );
-      }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+      // Use priority-based matching with usedDamageIds to avoid duplicates
+      const matchedBuhsDamages: DamageRecord[] = [];
+      const usedDamageIds = new Set<number | string>();
+
+      for (const cd of checkinDamagesForThisCheckin) {
+        let bestMatch: DamageRecord | null = null;
+        
+        // Try each matching strategy in priority order
+        for (const damage of damageRecords) {
+          // Skip if already used or not a legacy damage
+          if (usedDamageIds.has(damage.id) || damage.source !== 'legacy') {
+            continue;
+          }
+          
+          // Priority 1: Match by checkinWhereDocumented (most reliable)
+          if (damage.checkinWhereDocumented === checkin.id) {
+            bestMatch = damage;
+            break; // Found highest priority match
+          }
+          
+          // Priority 2: Match by normalized damage type
+          if (cd.damage_type && damage.damageTypeRaw) {
+            const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
+            const normalizedDamageType = normalizeDamageTypeForKey(damage.damageTypeRaw);
+            if (normalizedCdType && normalizedDamageType && normalizedCdType === normalizedDamageType) {
+              if (!bestMatch) {
+                bestMatch = damage;
+              }
+              continue; // Continue to see if there's a better match
+            }
+          }
+          
+          // Priority 3: Text matching - legacy_damage_source_text vs description
+          if (cd.description && damage.legacy_damage_source_text) {
+            if (textsMatch(damage.legacy_damage_source_text, cd.description)) {
+              if (!bestMatch) {
+                bestMatch = damage;
+              }
+              continue;
+            }
+          }
+          
+          // Priority 4: Text matching (Fallback) - damageTypeRaw vs description
+          if (cd.description && damage.damageTypeRaw) {
+            if (textsMatch(damage.damageTypeRaw, cd.description)) {
+              if (!bestMatch) {
+                bestMatch = damage;
+              }
+            }
+          }
+        }
+        
+        // If we found a match, add it and mark as used
+        if (bestMatch) {
+          matchedBuhsDamages.push(bestMatch);
+          usedDamageIds.add(bestMatch.id);
+        }
+      }
       
-      // Dedup in case multiple checkin_damages point to same damage
-      const uniqueBuhsDamages = Array.from(
-        new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
-      );
+      // uniqueBuhsDamages is no longer needed as we handle deduplication above
+      const uniqueBuhsDamages = matchedBuhsDamages;
       
       // Also match damages documented via CHECK merge on this checkin's date
       // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
@@ -2210,6 +2259,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       legacy_damage_source_text: legacyText,
       legacy_buhs_text: legacyText,
       original_damage_date: damageDate,
+      damageTypeRaw: entry.damageTypeRaw || null, // Add damageTypeRaw for matching
       checkinWhereDocumented: checkin?.id || null,
       documentedBy: entry.documentedBy || checkin?.checker_name || null,
       documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
@@ -2321,20 +2371,67 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
     
     // Match BUHS damages that were handled in this checkin
-    // The matching needs to be flexible since damage types are in different formats
-    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
-      // Find the corresponding BUHS damage in damageRecords
-      // Match by checkinWhereDocumented first (most reliable)
-      return damageRecords.find(damage => 
-        damage.source === 'legacy' && 
-        damage.checkinWhereDocumented === checkin.id
-      );
-    }).filter((d): d is typeof damageRecords[0] => d !== undefined);
+    // Use priority-based matching with usedDamageIds to avoid duplicates
+    const matchedBuhsDamages: DamageRecord[] = [];
+    const usedDamageIds = new Set<number | string>();
+
+    for (const cd of checkinDamagesForThisCheckin) {
+      let bestMatch: DamageRecord | null = null;
+      
+      // Try each matching strategy in priority order
+      for (const damage of damageRecords) {
+        // Skip if already used or not a legacy damage
+        if (usedDamageIds.has(damage.id) || damage.source !== 'legacy') {
+          continue;
+        }
+        
+        // Priority 1: Match by checkinWhereDocumented (most reliable)
+        if (damage.checkinWhereDocumented === checkin.id) {
+          bestMatch = damage;
+          break; // Found highest priority match
+        }
+        
+        // Priority 2: Match by normalized damage type
+        if (cd.damage_type && damage.damageTypeRaw) {
+          const normalizedCdType = normalizeDamageTypeForKey(cd.damage_type);
+          const normalizedDamageType = normalizeDamageTypeForKey(damage.damageTypeRaw);
+          if (normalizedCdType && normalizedDamageType && normalizedCdType === normalizedDamageType) {
+            if (!bestMatch) {
+              bestMatch = damage;
+            }
+            continue; // Continue to see if there's a better match
+          }
+        }
+        
+        // Priority 3: Text matching - legacy_damage_source_text vs description
+        if (cd.description && damage.legacy_damage_source_text) {
+          if (textsMatch(damage.legacy_damage_source_text, cd.description)) {
+            if (!bestMatch) {
+              bestMatch = damage;
+            }
+            continue;
+          }
+        }
+        
+        // Priority 4: Text matching (Fallback) - damageTypeRaw vs description
+        if (cd.description && damage.damageTypeRaw) {
+          if (textsMatch(damage.damageTypeRaw, cd.description)) {
+            if (!bestMatch) {
+              bestMatch = damage;
+            }
+          }
+        }
+      }
+      
+      // If we found a match, add it and mark as used
+      if (bestMatch) {
+        matchedBuhsDamages.push(bestMatch);
+        usedDamageIds.add(bestMatch.id);
+      }
+    }
     
-    // Dedup in case multiple checkin_damages point to same damage
-    const uniqueBuhsDamages = Array.from(
-      new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
-    );
+    // uniqueBuhsDamages is no longer needed as we handle deduplication above
+    const uniqueBuhsDamages = matchedBuhsDamages;
     
     // Also match damages documented via CHECK merge on this checkin's date
     // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
