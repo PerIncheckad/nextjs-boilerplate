@@ -1506,9 +1506,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
       }
       
-      // uniqueBuhsDamages is now just matchedBuhsDamages (already deduplicated via usedDamageIds)
-      const uniqueBuhsDamages = matchedBuhsDamages;
-      
       // Also match damages documented via CHECK merge on this checkin's date
       // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
       const checkinDate = checkinDateStr ? new Date(checkinDateStr) : null;
@@ -1541,7 +1538,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }) : [];
       
       // Combine all types of matches
-      const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+      const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
       // Dedup by damage.id (Fix 2.1)
       const seenDamageIds = new Set<number | string>();
@@ -2457,9 +2454,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
     }
     
-    // uniqueBuhsDamages is now just matchedBuhsDamages (already deduplicated via usedDamageIds)
-    const uniqueBuhsDamages = matchedBuhsDamages;
-    
     // Also match damages documented via CHECK merge on this checkin's date
     // This handles cases where checkin_damages is empty but CHECK data exists with documentation date
     const checkinDate = checkinDateStr ? new Date(checkinDateStr) : null;
@@ -2492,7 +2486,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }) : [];
     
     // Combine all types of matches
-    const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
+    const matchedDamages = [...matchedBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
     
     // DEBUG: Log matched damages for LRA75R
     if (cleanedRegnr === 'LRA75R') {
