@@ -1531,7 +1531,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: isNotFound,
-          notFoundStatus: isNotFound ? damage.status : undefined, // Full "Gick ej att dokumentera..." text
+          notFoundStatus: isNotFound ? (damage.status || '').split('\n').filter(l => !l.startsWith('(')).join('\n') : undefined,
           handledStatus: undefined,
         };
       });
@@ -2455,7 +2455,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
         isNotFoundOlder: isNotFound,
-        notFoundStatus: isNotFound ? damage.status : undefined, // Full "Gick ej att dokumentera..." text
+        notFoundStatus: isNotFound ? (damage.status || '').split('\n').filter(l => !l.startsWith('(')).join('\n') : undefined,
         handledStatus: undefined,
       };
     });
