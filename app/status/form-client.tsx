@@ -1316,7 +1316,9 @@ const HistoryItem: React.FC<{
             <div style={{ marginTop: '1rem' }}>
               <strong style={{ color: '#B30E0E' }}>Hanterade befintliga skador:</strong>
               <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {record.checkinDetaljer.skador.map((skada, idx) => (
+                {[...record.checkinDetaljer.skador]
+                  .sort((a, b) => (b.originalDamageDate || '').localeCompare(a.originalDamageDate || ''))
+                  .map((skada, idx) => (
                   <div key={idx} style={{ 
                     backgroundColor: '#f9f9f9', 
                     border: '1px solid #e0e0e0', 
