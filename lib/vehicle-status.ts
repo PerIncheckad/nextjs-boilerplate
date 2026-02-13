@@ -1525,16 +1525,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
         
         return {
-          // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
-          typ: isNotFound ? damage.status : damage.skadetyp,
-          beskrivning: '', // Kept for compatibility with display logic
-          // Fix 2.2: For not_found, NO media link
+          typ: damage.skadetyp, // Always the damage type name (e.g. "Fälgskada sommarhjul")
+          beskrivning: '',
           mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
-          isNotFoundOlder: isNotFound, // Kommentar 1
-          // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
-          handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
+          isNotFoundOlder: isNotFound,
+          notFoundStatus: isNotFound ? damage.status : undefined, // Full "Gick ej att dokumentera..." text
+          handledStatus: undefined,
         };
       });
       
@@ -2451,16 +2449,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       return {
-        // Fix 2.2 & 2.3: For not_found, show full status text; for documented/existing, show only skadetyp
-        typ: isNotFound ? damage.status : damage.skadetyp,
-        beskrivning: '', // Kept for compatibility with display logic
-        // Fix 2.2: For not_found, NO media link
+        typ: damage.skadetyp, // Always the damage type name (e.g. "Fälgskada sommarhjul")
+        beskrivning: '',
         mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
-        isNotFoundOlder: isNotFound, // Kommentar 1
-        // Fix 2.3: For documented/existing, don't show "Dokumenterad..." status row
-        handledStatus: undefined, // Don't show status for checkin events (already in typ or apparent from context)
+        isNotFoundOlder: isNotFound,
+        notFoundStatus: isNotFound ? damage.status : undefined, // Full "Gick ej att dokumentera..." text
+        handledStatus: undefined,
       };
     });
     
