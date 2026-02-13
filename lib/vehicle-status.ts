@@ -1431,15 +1431,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
       
       // Match BUHS damages that were handled in this checkin
-      // The matching needs to be flexible since damage types are in different formats
-      const matchedBuhsDamages = damageRecords.filter(damage =>
-        damage.source === 'legacy' &&
-        damage.checkinWhereDocumented === checkin.id
-      );
+      // Primary: match by checkinWhereDocumented
+      // Fallback: if damage is_handled, check if any checkin_damage for this checkin matches by text/type
+      const matchedBuhsDamages = damageRecords.filter(damage => {
+        if (damage.source !== 'legacy') return false;
+        if (damage.checkinWhereDocumented === checkin.id) return true;
+        // Fallback: match handled damages via checkin_damages text/type matching
+        if (damage.is_handled && checkinDamagesForThisCheckin.length > 0) {
+          const legacyText = damage.legacy_damage_source_text || '';
+          return checkinDamagesForThisCheckin.some(cd => {
+            const cdDesc = cd.description || '';
+            if (legacyText && cdDesc && textsMatch(legacyText, cdDesc)) return true;
+            const nCd = normalizeDamageTypeForKey(cd.damage_type);
+            const nDmg = normalizeDamageTypeForKey(damage.skadetyp);
+            return nCd && nDmg && nCd === nDmg;
+          });
+        }
+        return false;
+      });
       
       // Dedup in case multiple checkin_damages point to same damage
       const uniqueBuhsDamages = Array.from(
-        new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
+        new Map(matchedBuhsDamages.map(d => [(d as any)._stableKey || d.id, d])).values()
       );
       
       // Also match damages documented via CHECK merge on this checkin's date
@@ -2323,15 +2336,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const checkinDamagesForThisCheckin = allCheckinDamages.filter(cd => cd.checkin_id === checkin.id);
     
     // Match BUHS damages that were handled in this checkin
-    // The matching needs to be flexible since damage types are in different formats
-    const matchedBuhsDamages = damageRecords.filter(damage =>
-      damage.source === 'legacy' &&
-      damage.checkinWhereDocumented === checkin.id
-    );
+    // Primary: match by checkinWhereDocumented
+    // Fallback: if damage is_handled, check if any checkin_damage for this checkin matches by text/type
+    const matchedBuhsDamages = damageRecords.filter(damage => {
+      if (damage.source !== 'legacy') return false;
+      if (damage.checkinWhereDocumented === checkin.id) return true;
+      // Fallback: match handled damages via checkin_damages text/type matching
+      if (damage.is_handled && checkinDamagesForThisCheckin.length > 0) {
+        const legacyText = damage.legacy_damage_source_text || '';
+        return checkinDamagesForThisCheckin.some(cd => {
+          const cdDesc = cd.description || '';
+          if (legacyText && cdDesc && textsMatch(legacyText, cdDesc)) return true;
+          const nCd = normalizeDamageTypeForKey(cd.damage_type);
+          const nDmg = normalizeDamageTypeForKey(damage.skadetyp);
+          return nCd && nDmg && nCd === nDmg;
+        });
+      }
+      return false;
+    });
     
     // Dedup in case multiple checkin_damages point to same damage
     const uniqueBuhsDamages = Array.from(
-      new Map(matchedBuhsDamages.map(d => [d.id, d])).values()
+      new Map(matchedBuhsDamages.map(d => [(d as any)._stableKey || d.id, d])).values()
     );
     
     // Also match damages documented via CHECK merge on this checkin's date
