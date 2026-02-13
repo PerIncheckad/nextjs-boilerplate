@@ -1349,7 +1349,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         legacy_damage_source_text: legacyText,
         legacy_buhs_text: legacyText,
         original_damage_date: damageDate,
-        checkinWhereDocumented: checkin?.id || null,
+        checkinWhereDocumented: checkin?.id || matchedCheckinDamage?.checkin_id || null,
         documentedBy: entry.documentedBy || checkin?.checker_name || null,
         documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
         is_handled: matchedCheckinDamage !== null,
@@ -1476,18 +1476,23 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Combine all types of matches
       const matchedDamages = [...uniqueBuhsDamages, ...matchedCheckDamages, ...matchedDateDamages];
       
-      // Dedup by damage.id (Fix 2.1)
-      const seenDamageIds = new Set<number | string>();
+      // Dedup by damage.id (Fix 2.1) - use _stableKey as fallback when id is undefined
+      const seenDamageKeys = new Set<number | string>();
       const dedupedMatchedDamages = matchedDamages.filter(damage => {
-        if (seenDamageIds.has(damage.id)) {
+        const key = damage.id != null ? damage.id : (damage as any)._stableKey;
+        if (key != null && seenDamageKeys.has(key)) {
           return false; // Skip duplicate
         }
-        seenDamageIds.add(damage.id);
+        if (key != null) seenDamageKeys.add(key);
         return true;
       });
       
       // Track which damages are shown in this checkin
-      dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+      dedupedMatchedDamages.forEach(damage => {
+        if (damage.id != null) damagesShownInCheckins.add(damage.id);
+        const sk = (damage as any)._stableKey;
+        if (sk) damagesShownInCheckins.add(sk);
+      });
       
       // Build skador array from matched damageRecords
       const skador = dedupedMatchedDamages.map(damage => {
@@ -1568,7 +1573,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
         // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
         // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
-        const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
+        const shownInCheckin = damagesShownInCheckins.has(damage.id) || damagesShownInCheckins.has((damage as any)._stableKey);
+        const shouldCreateEvent = isGEU29F || isHandled || !shownInCheckin;
         
         if (shouldCreateEvent) {
           // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
@@ -2206,7 +2212,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       legacy_damage_source_text: legacyText,
       legacy_buhs_text: legacyText,
       original_damage_date: damageDate,
-      checkinWhereDocumented: checkin?.id || null,
+      checkinWhereDocumented: checkin?.id || matchedCheckinDamage?.checkin_id || null,
       documentedBy: entry.documentedBy || checkin?.checker_name || null,
       documentedDate: entry.documentedDate || (checkin ? formatDate(checkin.completed_at || checkin.created_at) : null),
       is_handled: matchedCheckinDamage !== null,
@@ -2372,13 +2378,14 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       })));
     }
     
-    // Dedup by damage.id (Fix 2.1)
-    const seenDamageIds = new Set<number | string>();
+    // Dedup by damage.id (Fix 2.1) - use _stableKey as fallback when id is undefined
+    const seenDamageKeys = new Set<number | string>();
     const dedupedMatchedDamages = matchedDamages.filter(damage => {
-      if (seenDamageIds.has(damage.id)) {
+      const key = damage.id != null ? damage.id : (damage as any)._stableKey;
+      if (key != null && seenDamageKeys.has(key)) {
         return false; // Skip duplicate
       }
-      seenDamageIds.add(damage.id);
+      if (key != null) seenDamageKeys.add(key);
       return true;
     });
     
@@ -2393,7 +2400,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     // Track which damages are shown in this checkin
-    dedupedMatchedDamages.forEach(damage => damagesShownInCheckins.add(damage.id));
+    dedupedMatchedDamages.forEach(damage => {
+      if (damage.id != null) damagesShownInCheckins.add(damage.id);
+      const sk = (damage as any)._stableKey;
+      if (sk) damagesShownInCheckins.add(sk);
+    });
     
     // Build skador array from matched damageRecords
     const skador = dedupedMatchedDamages.map(damage => {
@@ -2543,7 +2554,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const isUnmatchedBuhs = damage.is_unmatched_buhs === true;
       // For GEU29F, ALWAYS create SKADA events for ALL legacy damages (bypass all dedupe logic)
       // For other vehicles, create events for: handled damages OR unmatched BUHS not shown in checkin
-      const shouldCreateEvent = isGEU29F || isHandled || !damagesShownInCheckins.has(damage.id);
+      const shownInCheckin = damagesShownInCheckins.has(damage.id) || damagesShownInCheckins.has((damage as any)._stableKey);
+      const shouldCreateEvent = isGEU29F || isHandled || !shownInCheckin;
       
       if (shouldCreateEvent) {
         // Use the damage's actual status instead of hardcoded "Ej dokumenterad"
