@@ -1314,53 +1314,46 @@ const HistoryItem: React.FC<{
           {/* Damages registered at this checkin - shown after avvikelser */}
           {record.typ === 'incheckning' && record.checkinDetaljer?.skador && record.checkinDetaljer.skador.length > 0 && (
             <div style={{ marginTop: '1rem' }}>
-              {(() => {
-                // Determine heading based on damage types
-                const hasLegacyDamages = record.checkinDetaljer.skador.some(s => s.handledStatus || s.isDocumentedOlder);
-                const hasNewDamages = record.checkinDetaljer.skador.some(s => !s.handledStatus && !s.isDocumentedOlder);
-                
-                let heading = 'Skador hanterade:';
-                if (hasNewDamages && !hasLegacyDamages) {
-                  heading = 'Nya skador dokumenterade:';
-                } else if (hasLegacyDamages && !hasNewDamages) {
-                  heading = 'Befintliga skador hanterade:';
-                }
-                
-                return <strong style={{ color: '#B30E0E' }}>{heading}</strong>;
-              })()}
-              <ul style={{ margin: '0.5rem 0', paddingLeft: '1.5rem' }}>
-                {(() => {
-                  // Show all damages without deduplication
-                  return record.checkinDetaljer.skador.map((skada, idx) => (
-                    <li key={idx}>
-                      {skada.handledStatus ? (
-                        <>
-                          {skada.typ}
-                          <br />
-                          {skada.handledStatus}
-                        </>
-                      ) : skada.isDocumentedOlder && skada.originalDamageDate ? (
-                        <>Dokumenterad äldre skada [{skada.originalDamageDate}]: {skada.typ}{skada.beskrivning && ` - ${skada.beskrivning}`}</>
-                      ) : (
-                        <>{skada.typ}{skada.beskrivning && `: ${skada.beskrivning}`}</>
+              <strong style={{ color: '#B30E0E' }}>Hanterade befintliga skador:</strong>
+              <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {record.checkinDetaljer.skador.map((skada, idx) => (
+                  <div key={idx} style={{ 
+                    backgroundColor: '#f9f9f9', 
+                    border: '1px solid #e0e0e0', 
+                    borderRadius: '6px', 
+                    padding: '0.75rem 1rem' 
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.25rem' }}>
+                      <span>
+                        <strong style={{ color: '#B30E0E' }}>SKADA</strong>
+                        {' '}{skada.typ}
+                      </span>
+                      {skada.originalDamageDate && (
+                        <span style={{ color: '#666', fontSize: '0.9em', whiteSpace: 'nowrap', marginLeft: '1rem' }}>{skada.originalDamageDate}</span>
                       )}
-                      {skada.mediaUrl && (
-                        <>
-                          <br />
-                          <a 
-                            href={skada.mediaUrl} 
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ color: '#1a73e8' }}
-                          >
-                            📁 Visa media
-                          </a>
-                        </>
-                      )}
-                    </li>
-                  ));
-                })()}
-              </ul>
+                    </div>
+                    {skada.isNotFoundOlder && skada.notFoundStatus && (
+                      <div style={{ marginTop: '0.25rem', color: '#555' }}>
+                        {skada.notFoundStatus.split('\n').map((line: string, lineIdx: number) => (
+                          <div key={lineIdx}>{line}</div>
+                        ))}
+                      </div>
+                    )}
+                    {skada.mediaUrl && (
+                      <div style={{ marginTop: '0.25rem' }}>
+                        <a 
+                          href={skada.mediaUrl} 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: '#1a73e8' }}
+                        >
+                          📁 Visa media
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
