@@ -1432,7 +1432,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Match BUHS damages that were handled in this checkin
       // The matching needs to be flexible since damage types are in different formats
-      const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+      const matchedBuhsDamages = const matchedBuhsDamages = damageRecords.filter(damage =>         damage.source === 'legacy' &&         damage.checkinWhereDocumented === checkin.id       );
         // Find the corresponding BUHS damage in damageRecords
         // Match by checkinWhereDocumented first (most reliable)
         return damageRecords.find(damage => 
@@ -2322,7 +2322,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Match BUHS damages that were handled in this checkin
     // The matching needs to be flexible since damage types are in different formats
-    const matchedBuhsDamages = checkinDamagesForThisCheckin.map(cd => {
+    const matchedBuhsDamages = const matchedBuhsDamages = damageRecords.filter(damage =>       damage.source === 'legacy' &&       damage.checkinWhereDocumented === checkin.id     );
       // Find the corresponding BUHS damage in damageRecords
       // Match by checkinWhereDocumented first (most reliable)
       return damageRecords.find(damage => 
