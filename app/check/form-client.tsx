@@ -300,7 +300,9 @@ const processFiles = async (files: FileList): Promise<MediaFile[]> => {
       return { file, type, thumbnail };
     }
     // Compress images before creating preview
+console.log('[processFiles] About to compress:', file.name, (file.size/1024/1024).toFixed(1)+'MB', file.type);
     const compressedFile = await compressImage(file);
+    console.log('[processFiles] After compress:', compressedFile?.name, compressedFile ? (compressedFile.size/1024/1024).toFixed(1)+'MB' : 'NULL');
     // If compression returned null (file too large), skip this file
     if (!compressedFile) {
       return null;
