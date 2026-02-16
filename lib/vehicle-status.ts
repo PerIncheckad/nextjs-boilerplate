@@ -115,9 +115,11 @@ export type HistoryRecord = {
       typ: string;
       beskrivning: string;
       mediaUrl?: string;
+      mediaFolder?: string; // Raw folder name for building media URL in frontend
       isDocumentedOlder?: boolean; // True if this is a documented older BUHS damage
       originalDamageDate?: string; // Original damage date for documented older damages
       isNotFoundOlder?: boolean; // True if this is a not_found older BUHS damage (Kommentar 1)
+      notFoundStatus?: string; // "Gick ej att dokumentera..." text without name/date suffix
       handledStatus?: string; // Full handled status text (e.g., "Gick ej att dokumentera ...")
     }>;
   };
@@ -1527,7 +1529,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         return {
           typ: damage.skadetyp, // Always the damage type name (e.g. "Fälgskada sommarhjul")
           beskrivning: '',
-          mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
+          mediaUrl: undefined,
+          mediaFolder: shouldShowMedia ? damage.folder : undefined, // Raw folder name for URL building in frontend
           isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
           originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
           isNotFoundOlder: isNotFound,
@@ -2451,7 +2454,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       return {
         typ: damage.skadetyp, // Always the damage type name (e.g. "Fälgskada sommarhjul")
         beskrivning: '',
-        mediaUrl: shouldShowMedia ? `/media/${damage.folder}` : undefined,
+        mediaUrl: undefined,
+        mediaFolder: shouldShowMedia ? damage.folder : undefined, // Raw folder name for URL building in frontend
         isDocumentedOlder: damage.source === 'legacy' && damage.legacy_damage_source_text != null && damage.status?.startsWith('Dokumenterad'),
         originalDamageDate: damage.source === 'legacy' ? damage.datum : undefined,
         isNotFoundOlder: isNotFound,
