@@ -154,7 +154,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .from('damages')
       .select('legacy_damage_source_text, user_type, user_positions')
       .eq('regnr', cleanedRegnr)
-      .not('legacy_damage_source_text', 'is', null),
+      .not('legacy_damage_source_text', 'is', null)
+      .not('user_type', 'is', null),
     supabaseAdmin
       .from('damages')
       .select('id, regnr, source, user_type, damage_type_raw, user_positions, damage_date, created_at, legacy_damage_source_text, uploads')
