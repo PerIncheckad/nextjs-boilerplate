@@ -154,7 +154,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .from('damages')
       .select('legacy_damage_source_text, user_type, user_positions')
       .eq('regnr', cleanedRegnr)
-      .not('legacy_damage_source_text', 'is', null),
+      .not('legacy_damage_source_text', 'is', null)
+      .not('user_type', 'is', null),
     supabaseAdmin
       .from('damages')
       .select('id, regnr, source, user_type, damage_type_raw, user_positions, damage_date, created_at, legacy_damage_source_text, uploads')
@@ -385,24 +386,10 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
         finalFolder = folderMap.get(normalizedKey) || null;
       }
       
-      // Backup logic: If lastCheckinDate > damage_date, and there exists ANY checkin_damage
-      // for this regnr with type in ('documented', 'not_found', 'existing'),
-      // then the damage is considered handled regardless of text/index matching.
-      // This prevents already-seen damages from reappearing when index-based matching
-      // runs out of entries (e.g., 3 checkin_damages but 6 BUHS damages).
-      const hasAnyHandledDamages = handledDamagesList.length > 0;
-      const damageDate = leg.damage_date ? new Date(leg.damage_date) : null;
-      const isValidDamageDate = damageDate !== null && !isNaN(damageDate.getTime());
-      const isHandledByDateLogic = hasAnyHandledDamages && 
-                                    lastCheckinDate !== null && 
-                                    isValidDamageDate && 
-                                    lastCheckinDate > damageDate;
-      
       // Apply force-undocumented override for special vehicles (e.g., GEU29F)
       // For normal vehicles: is_inventoried=true if damage is in nybil_inventering (isInventoried)
       // OR if it has been handled in a checkin (handledInfo !== null)
-      // OR if handled by date-based backup logic (checkin is newer than damage)
-      const finalIsInventoried = isForceUndocumented ? false : (isInventoried || (handledInfo !== null) || isHandledByDateLogic);
+      const finalIsInventoried = isForceUndocumented ? false : (isInventoried || (handledInfo !== null));
       const finalHandledType = isForceUndocumented ? null : (handledInfo?.type || null);
       const finalHandledDamageType = isForceUndocumented ? null : (handledInfo?.damage_type || null);
       const finalHandledCarPart = isForceUndocumented ? null : (handledInfo?.car_part || null);

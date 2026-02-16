@@ -188,7 +188,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .from('damages')
       .select('legacy_damage_source_text, user_type, user_positions, original_damage_date')
       .eq('regnr', cleanedRegnr)
-      .not('legacy_damage_source_text', 'is', null),
+      .not('legacy_damage_source_text', 'is', null)
+      .not('user_type', 'is', null),
     supabase
       .from('damages')
       .select('id, regnr, source, user_type, damage_type_raw, user_positions, damage_date, created_at, legacy_damage_source_text, uploads')
@@ -406,25 +407,13 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       const dedupeKey = `${cleanedRegnr}|${leg.damage_date}|${normalized.typeCode}`;
       dbDamageKeys.add(dedupeKey);
       
-      // Backup logic: If lastCheckinDate > damage_date, and there exists ANY checkin_damage
-      // for this regnr with type in ('documented', 'not_found', 'existing'),
-      // then the damage is considered handled regardless of text matching
-      const hasAnyHandledDamages = handledDamagesList.length > 0;
-      const damageDate = leg.damage_date ? new Date(leg.damage_date) : null;
-      const isValidDamageDate = damageDate !== null && !isNaN(damageDate.getTime());
-      const isHandledByDateLogic = hasAnyHandledDamages && 
-                                    lastCheckinDate !== null && 
-                                    isValidDamageDate && 
-                                    lastCheckinDate > damageDate;
-      
       consolidatedDamages.push({
         id: leg.id,
         text: displayText,
         damage_date: leg.damage_date,
         // Mark as inventoried if already documented OR if handled in last check-in
-        // OR if handled by date-based backup logic
         // This prevents the damage from showing in "Befintliga skador att hantera"
-        is_inventoried: finalIsInventoried || (handledInfo !== null) || isHandledByDateLogic,  // USE finalIsInventoried
+        is_inventoried: finalIsInventoried || (handledInfo !== null),  // USE finalIsInventoried
         handled_type: handledInfo?.type || null,
         // Store BUHS damage_type_raw (Swedish chars) instead of checkin_damages damage_type
         handled_damage_type: handledInfo ? (leg.damage_type_raw || handledInfo?.damage_type) : null,
