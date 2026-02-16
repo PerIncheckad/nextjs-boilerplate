@@ -715,6 +715,7 @@ export default function StatusForm() {
                         record={record}
                         isExpanded={expandedEvents.has(record.id)}
                         onToggle={() => toggleEvent(record.id)}
+                        regnr={regnr}
                       />
                     ))}
                   </div>
@@ -1056,7 +1057,8 @@ const HistoryItem: React.FC<{
   record: HistoryRecord; 
   isExpanded: boolean; 
   onToggle: () => void;
-}> = ({ record, isExpanded, onToggle }) => {
+  regnr: string;
+}> = ({ record, isExpanded, onToggle, regnr }) => {
   const getTypeLabel = (typ: string) => {
     switch (typ) {
       case 'incheckning': return 'INCHECKNING';
@@ -1117,7 +1119,7 @@ const HistoryItem: React.FC<{
           {/* Left-align "Visa media" link without indent */}
           {isBuhsSkada && record.buhsSkadaDetaljer?.mediaFolder && (
             <a 
-              href={`/media/${record.buhsSkadaDetaljer.mediaFolder}`}
+              href={buildDamageMediaUrl(regnr, record.datum, record.buhsSkadaDetaljer.mediaFolder) || '#'}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: '#1a73e8', fontWeight: 'normal' }}
@@ -1341,18 +1343,23 @@ const HistoryItem: React.FC<{
                         ))}
                       </div>
                     )}
-                    {skada.mediaUrl && (
-                      <div style={{ marginTop: '0.25rem' }}>
-                        <a 
-                          href={skada.mediaUrl} 
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ color: '#1a73e8' }}
-                        >
-                          📁 Visa media
-                        </a>
-                      </div>
-                    )}
+                    {(() => {
+                      const mediaUrl = skada.mediaFolder 
+                        ? buildDamageMediaUrl(regnr, skada.originalDamageDate, skada.mediaFolder)
+                        : skada.mediaUrl || null;
+                      return mediaUrl ? (
+                        <div style={{ marginTop: '0.25rem' }}>
+                          <a 
+                            href={mediaUrl} 
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: '#1a73e8' }}
+                          >
+                            📁 Visa media
+                          </a>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 ))}
               </div>
