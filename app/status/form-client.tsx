@@ -715,7 +715,7 @@ export default function StatusForm() {
                         record={record}
                         isExpanded={expandedEvents.has(record.id)}
                         onToggle={() => toggleEvent(record.id)}
-                        regnr={regnr}
+                        regnr={vehicleStatus?.vehicle?.regnr || normalizedReg}
                       />
                     ))}
                   </div>
