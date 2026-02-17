@@ -526,10 +526,15 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const befintligaSkadorWithMedia = [...existingDamages, ...resolvedDamages].find((d: any) => hasAnyFiles(d));
   
   // Warning banners for Bilkontroll
+  const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
+    ? createPurpleBanner(true, `Saludatum: ${payload.saludatum}.<br>UNDVIK LÅNGA HYROR!`)
+    : '';
+  
   const banners = `
     ${createAdminBanner(payload.regnrSaknas, 'Reg.nr saknas!')}
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', nyaSkadorWithMedia?.uploads?.folder, siteUrl, nyaSkadorCount)}
     ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', befintligaSkadorWithMedia?.uploads?.folder, siteUrl, befintligaSkadorHanteradeCount)}
+    ${saludatumBanner}
   `;
   
   const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
@@ -578,6 +583,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
             ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
+            ${payload.hjultyp ? `<tr><td style="padding:4px 0;"><strong>Däck som sitter på:</strong> ${payload.hjultyp}</td></tr>` : ''}
           </tbody>
         </table>
       </div>
@@ -682,39 +688,19 @@ export async function POST(request: Request) {
       payload.husdjur?.sanerad ||
       payload.rokning?.sanerad;
 
-    // Build emoji marker for Huvudstation: ⚡ for low charge, ⚠️ for saludatum or other warnings
-    // Priority order: low charge takes precedence, then saludatum, then other warnings
-    let huvudstationEmojiMarker = '';
-    if (showChargeWarning && (hasSaludatumRisk || hasOtherWarnings)) {
-      // Low charge + saludatum/other warnings: show both emojis
-      huvudstationEmojiMarker = ' - ⚡ ⚠️ - ';
-    } else if (hasSaludatumRisk && hasOtherWarnings) {
-      // Saludatum + other warnings (no low charge): show warning emoji only
-      huvudstationEmojiMarker = ' - ⚠️ - ';
-    } else if (showChargeWarning) {
-      // Only low charge emoji
-      huvudstationEmojiMarker = ' - ⚡ - ';
-    } else if (hasSaludatumRisk) {
-      // Only saludatum warning emoji
-      huvudstationEmojiMarker = ' - ⚠️ - ';
-    } else if (hasOtherWarnings) {
-      // Only other warnings emoji
-      huvudstationEmojiMarker = ' - ⚠️ - ';
-    } else {
-      // No warnings
-      huvudstationEmojiMarker = ' - ';
-    }
+    // Build emoji marker for Huvudstation: ⚡ for low charge, 🛑 for saludatum, ⚠️ for other warnings
+    // Multiple emojis can appear together
+    let huvudstationEmojis = '';
+    if (showChargeWarning) huvudstationEmojis += '⚡';
+    if (hasSaludatumRisk) huvudstationEmojis += '🛑';
+    if (hasOtherWarnings) huvudstationEmojis += '⚠️';
+    const huvudstationEmojiMarker = huvudstationEmojis ? ` - ${huvudstationEmojis} - ` : ' - ';
 
-    // Build emoji marker for Bilkontroll: ⚠️ for saludatum or other warnings (NO ⚡ for low battery)
-    // Bilkontroll is not interested in charge level
-    let bilkontrollEmojiMarker = '';
-    if (hasSaludatumRisk || hasOtherWarnings) {
-      // Saludatum or other warnings: show warning emoji
-      bilkontrollEmojiMarker = ' - ⚠️ - ';
-    } else {
-      // No warnings (or only low charge which Bilkontroll doesn't care about)
-      bilkontrollEmojiMarker = ' - ';
-    }
+    // Build emoji marker for Bilkontroll: 🛑 for saludatum, ⚠️ for other warnings (NO ⚡ for low battery)
+    let bilkontrollEmojis = '';
+    if (hasSaludatumRisk) bilkontrollEmojis += '🛑';
+    if (hasOtherWarnings) bilkontrollEmojis += '⚠️';
+    const bilkontrollEmojiMarker = bilkontrollEmojis ? ` - ${bilkontrollEmojis} - ` : ' - ';
 
     // Add "!!!" for severe warnings, with exceptions:
     // - No "!!!" if ONLY low charge warning
