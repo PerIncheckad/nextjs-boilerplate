@@ -317,6 +317,8 @@ export default function NybilForm() {
   // Photo state
   const [photoFront, setPhotoFront] = useState<PhotoFile | null>(null);
   const [photoBack, setPhotoBack] = useState<PhotoFile | null>(null);
+  const [photoLeft, setPhotoLeft] = useState<PhotoFile | null>(null);
+  const [photoRight, setPhotoRight] = useState<PhotoFile | null>(null);
   const [additionalPhotos, setAdditionalPhotos] = useState<PhotoFile[]>([]);
   
   // Damage state
@@ -430,6 +432,30 @@ export default function NybilForm() {
     e.target.value = '';
   };
   
+  const handlePhotoLeftChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (photoLeft?.preview) URL.revokeObjectURL(photoLeft.preview);
+      const compressedFile = await compressImage(file);
+      if (compressedFile) {
+        setPhotoLeft({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      }
+    }
+    e.target.value = '';
+  };
+  
+  const handlePhotoRightChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (photoRight?.preview) URL.revokeObjectURL(photoRight.preview);
+      const compressedFile = await compressImage(file);
+      if (compressedFile) {
+        setPhotoRight({ file: compressedFile, preview: URL.createObjectURL(compressedFile) });
+      }
+    }
+    e.target.value = '';
+  };
+  
   const handleAdditionalPhotosChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
@@ -472,12 +498,22 @@ export default function NybilForm() {
     setPhotoBack(null);
   };
   
+  const retakePhotoLeft = () => {
+    if (photoLeft?.preview) URL.revokeObjectURL(photoLeft.preview);
+    setPhotoLeft(null);
+  };
+  
+  const retakePhotoRight = () => {
+    if (photoRight?.preview) URL.revokeObjectURL(photoRight.preview);
+    setPhotoRight(null);
+  };
+  
   const equipmentMissing = useMemo(() => {
     if (antalInsynsskydd === null) return true;
     if (instruktionsbok === null) return true;
-    if (instruktionsbok === true && (!instruktionsbokForvaringOrt || !instruktionsbokForvaringSpec.trim())) return true;
+    if (instruktionsbok === true && (!instruktionsbokForvaringOrt || (instruktionsbokForvaringOrt !== 'I bilen' && !instruktionsbokForvaringSpec.trim()))) return true;
     if (coc === null) return true;
-    if (coc === true && (!cocForvaringOrt || !cocForvaringSpec.trim())) return true;
+    if (coc === true && (!cocForvaringOrt || (cocForvaringOrt !== 'I bilen' && !cocForvaringSpec.trim()))) return true;
     if (antalNycklar === null) return true;
     if (antalNycklar === 2 && (!extranyckelForvaringOrt || !extranyckelForvaringSpec.trim())) return true;
     if (needsLaddkablar && antalLaddkablar === null) return true;
@@ -514,10 +550,10 @@ export default function NybilForm() {
     return false;
   }, [klarForUthyrning, ejUthyrningsbarAnledning]);
   
-  // Photo validation - front and back photos are required
+  // Photo validation - front, back, left and right photos are required
   const photosMissing = useMemo(() => {
-    return !photoFront || !photoBack;
-  }, [photoFront, photoBack]);
+    return !photoFront || !photoBack || !photoLeft || !photoRight;
+  }, [photoFront, photoBack, photoLeft, photoRight]);
   
   // Damage validation
   const damagesMissing = useMemo(() => {
@@ -587,9 +623,11 @@ export default function NybilForm() {
     return () => {
       if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
       if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
+      if (photoLeft?.preview) URL.revokeObjectURL(photoLeft.preview);
+      if (photoRight?.preview) URL.revokeObjectURL(photoRight.preview);
       additionalPhotos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
     };
-  }, [photoFront, photoBack, additionalPhotos]);
+  }, [photoFront, photoBack, photoLeft, photoRight, additionalPhotos]);
   
   // Prevent background scroll when confirm modal is open
   useEffect(() => {
@@ -680,9 +718,13 @@ export default function NybilForm() {
     // Reset photos
     if (photoFront?.preview) URL.revokeObjectURL(photoFront.preview);
     if (photoBack?.preview) URL.revokeObjectURL(photoBack.preview);
+    if (photoLeft?.preview) URL.revokeObjectURL(photoLeft.preview);
+    if (photoRight?.preview) URL.revokeObjectURL(photoRight.preview);
     additionalPhotos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
     setPhotoFront(null);
     setPhotoBack(null);
+    setPhotoLeft(null);
+    setPhotoRight(null);
     setAdditionalPhotos([]);
     // Reset damages - cleanup photo previews
     cleanupDamagePhotoPreviews(damages);
@@ -1087,6 +1129,20 @@ export default function NybilForm() {
         const backExt = getFileExtension(photoBack.file);
         const backUrl = await uploadNybilPhoto(photoBack.file, `${referensFolder}/bakifran.${backExt}`);
         photoUrls.push(backUrl);
+      }
+      
+      // Upload left side photo to NYBIL-REFERENS subfolder
+      if (photoLeft) {
+        const leftExt = getFileExtension(photoLeft.file);
+        const leftUrl = await uploadNybilPhoto(photoLeft.file, `${referensFolder}/vanster-sida.${leftExt}`);
+        photoUrls.push(leftUrl);
+      }
+      
+      // Upload right side photo to NYBIL-REFERENS subfolder
+      if (photoRight) {
+        const rightExt = getFileExtension(photoRight.file);
+        const rightUrl = await uploadNybilPhoto(photoRight.file, `${referensFolder}/hoger-sida.${rightExt}`);
+        photoUrls.push(rightUrl);
       }
       
       // Upload additional photos to NYBIL-REFERENS/ovriga subfolder
@@ -1495,6 +1551,8 @@ export default function NybilForm() {
       photos: {
         hasFront: !!photoFront,
         hasBack: !!photoBack,
+        hasLeft: !!photoLeft,
+        hasRight: !!photoRight,
         additionalCount: additionalPhotos.length
       },
       // Damages summary
@@ -1827,13 +1885,14 @@ export default function NybilForm() {
         {instruktionsbok === true && (
           <>
             <Field label="Förvaringsort *">
-              <select value={instruktionsbokForvaringOrt} onChange={e => setInstruktionsbokForvaringOrt(e.target.value)}>
+              <select value={instruktionsbokForvaringOrt} onChange={e => { setInstruktionsbokForvaringOrt(e.target.value); if (e.target.value === 'I bilen') setInstruktionsbokForvaringSpec(''); }}>
                 <option value="">Välj förvaringsort</option>
+                <option value="I bilen">I bilen</option>
                 {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </Field>
-            <Field label="Specificera förvaring av instruktionsbok *">
-              <input type="text" value={instruktionsbokForvaringSpec} onChange={e => setInstruktionsbokForvaringSpec(e.target.value)} placeholder="t.ex. Hyllplats 18F" />
+            <Field label={instruktionsbokForvaringOrt === 'I bilen' ? "Kommentar (frivilligt)" : "Specificera förvaring av instruktionsbok *"}>
+              <input type="text" value={instruktionsbokForvaringSpec} onChange={e => setInstruktionsbokForvaringSpec(e.target.value)} placeholder={instruktionsbokForvaringOrt === 'I bilen' ? "t.ex. Handskfacket" : "t.ex. Hyllplats 18F"} />
             </Field>
           </>
         )}
@@ -1847,13 +1906,14 @@ export default function NybilForm() {
         {coc === true && (
           <>
             <Field label="Förvaringsort *">
-              <select value={cocForvaringOrt} onChange={e => setCocForvaringOrt(e.target.value)}>
+              <select value={cocForvaringOrt} onChange={e => { setCocForvaringOrt(e.target.value); if (e.target.value === 'I bilen') setCocForvaringSpec(''); }}>
                 <option value="">Välj förvaringsort</option>
+                <option value="I bilen">I bilen</option>
                 {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </Field>
-            <Field label="Specificera förvaring av COC *">
-              <input type="text" value={cocForvaringSpec} onChange={e => setCocForvaringSpec(e.target.value)} placeholder="t.ex. Kontoret" />
+            <Field label={cocForvaringOrt === 'I bilen' ? "Kommentar (frivilligt)" : "Specificera förvaring av COC *"}>
+              <input type="text" value={cocForvaringSpec} onChange={e => setCocForvaringSpec(e.target.value)} placeholder={cocForvaringOrt === 'I bilen' ? "t.ex. Handskfacket" : "t.ex. Kontoret"} />
             </Field>
           </>
         )}
@@ -1973,7 +2033,7 @@ export default function NybilForm() {
       {/* FOTON Section */}
       <Card data-error={showFieldErrors && photosMissing}>
         <SectionHeader title="Foton" />
-        <p className="section-note">Ta bilder av bilen framifrån och bakifrån. Du kan även lägga till fler bilder.</p>
+        <p className="section-note">Ta bilder av bilen framifrån, bakifrån, vänster sida och höger sida. Du kan även lägga till fler bilder.</p>
         
         <div className="photo-grid">
           {/* Front photo */}
@@ -2013,6 +2073,50 @@ export default function NybilForm() {
                     type="file" 
                     accept="image/*" 
                     onChange={handlePhotoBackChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              )}
+            </Field>
+          </div>
+          
+          {/* Left side photo */}
+          <div className="photo-item">
+            <Field label="Ta bild vänster sida *">
+              {photoLeft ? (
+                <div className="photo-preview-container">
+                  <img src={photoLeft.preview} alt="Vänster sida" className="photo-preview" />
+                  <button type="button" onClick={retakePhotoLeft} className="retake-btn">Ta om</button>
+                </div>
+              ) : (
+                <label className="photo-upload-label mandatory">
+                  <span>📷 Ta bild vänster sida</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handlePhotoLeftChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              )}
+            </Field>
+          </div>
+          
+          {/* Right side photo */}
+          <div className="photo-item">
+            <Field label="Ta bild höger sida *">
+              {photoRight ? (
+                <div className="photo-preview-container">
+                  <img src={photoRight.preview} alt="Höger sida" className="photo-preview" />
+                  <button type="button" onClick={retakePhotoRight} className="retake-btn">Ta om</button>
+                </div>
+              ) : (
+                <label className="photo-upload-label mandatory">
+                  <span>📷 Ta bild höger sida</span>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handlePhotoRightChange}
                     style={{ display: 'none' }}
                   />
                 </label>
@@ -2414,7 +2518,7 @@ type FormSummary = {
   hjulForvaringOrt: string;
   hjulForvaringSpec: string;
   // Photo summary
-  photos: { hasFront: boolean; hasBack: boolean; additionalCount: number };
+  photos: { hasFront: boolean; hasBack: boolean; hasLeft: boolean; hasRight: boolean; additionalCount: number };
   // Damages summary
   damages: DamageSummary[];
   harSkadorVidLeverans: boolean | null;
@@ -2503,6 +2607,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ summary, onCancel
         <h4>Foton</h4>
         <p><strong>Bild framifrån:</strong> {summary.photos.hasFront ? '✅ Ja' : '❌ Nej'}</p>
         <p><strong>Bild bakifrån:</strong> {summary.photos.hasBack ? '✅ Ja' : '❌ Nej'}</p>
+        <p><strong>Bild vänster sida:</strong> {summary.photos.hasLeft ? '✅ Ja' : '❌ Nej'}</p>
+        <p><strong>Bild höger sida:</strong> {summary.photos.hasRight ? '✅ Ja' : '❌ Nej'}</p>
         {summary.photos.additionalCount > 0 && (
           <p><strong>Övriga bilder:</strong> {summary.photos.additionalCount} st</p>
         )}
