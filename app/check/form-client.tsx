@@ -1273,14 +1273,18 @@ export default function CheckInForm() {
   };
 
   // Handle annotator save
-  const handleAnnotatorSave = async (annotatedFile: File) => {
+ const handleAnnotatorSave = async (annotatedFile: File) => {
     if (!annotatorContext) return;
 
-    // Create MediaFile directly from the annotated file
+    // Compress the annotated image before storing
+    const compressedFile = await compressImage(annotatedFile);
+    if (!compressedFile) return;
+
+    // Create MediaFile from the compressed file
     const annotatedMediaFile: MediaFile = {
-      file: annotatedFile,
+      file: compressedFile,
       type: 'image',
-      preview: URL.createObjectURL(annotatedFile)
+      preview: URL.createObjectURL(compressedFile)
     };
 
     if (annotatorContext.type === 'damage' && annotatorContext.damageId) {

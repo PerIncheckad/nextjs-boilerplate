@@ -2,44 +2,32 @@
  * Image compression utilities using Canvas API
  * 
  * BUHS (MABI's central system) has a 10 MB limit per image.
- * Modern mobile cameras often produce 12-20 MB images.
+ * Modern mobile cameras often produce 12-20 MB images (including HEIC from iPhones).
  * This utility compresses images client-side before upload.
+ * 
+ * Strategy:
+ * - Target: ≤4 MB (safe margin under BUHS 10 MB limit)
+ * - Max dimension: 1600px (plenty for damage documentation)
+ * - Iterative quality reduction if first pass isn't enough
+ * - HEIC/HEIF: handled via createImageBitmap (works in modern browsers)
+ *   with canvas fallback for older browsers
  */
 
-// Constants for different compression levels
-const MAX_FILE_SIZE = 6 * 1024 * 1024; // 6 MB (better margin under 10 MB)
-const MAX_FILE_SIZE_ABSOLUTE = 25 * 1024 * 1024; // 25 MB absolute max
-const RECOMPRESS_THRESHOLD = 8 * 1024 * 1024; // 8 MB - if still above this, recompress
-
-// Standard compression (for files ≤10 MB)
-const STANDARD_MAX_DIMENSION = 2048; // pixels (longest side)
-const STANDARD_JPEG_QUALITY = 0.80; // 0.0 to 1.0
-
-// Aggressive compression (for files >10 MB)
-const AGGRESSIVE_MAX_DIMENSION = 1600; // pixels (longest side)
-const AGGRESSIVE_JPEG_QUALITY = 0.65; // lower quality for bigger files
-
-// Very aggressive compression (second pass if needed)
-const VERY_AGGRESSIVE_MAX_DIMENSION = 1200; // pixels (longest side)
-const VERY_AGGRESSIVE_JPEG_QUALITY = 0.50; // very low quality for stubborn files
+const TARGET_SIZE = 8 * 1024 * 1024;       // 4 MB target (safe margin)
+const MAX_FILE_SIZE_ABSOLUTE = 50 * 1024 * 1024; // 50 MB absolute reject
+const MAX_DIMENSION = 4032;                  // px longest side (enough for damage photos)
+const INITIAL_QUALITY = 0.92;                // Starting JPEG quality
+const MIN_QUALITY = 0.50;                    // Floor — don't go below this
+const QUALITY_STEP = 0.10;                   // Reduce by this each iteration
 
 /**
- * Compress an image file if needed
+ * Compress an image file to ≤4 MB, 1600px max dimension.
  * 
  * @param file - The image file to compress
- * @returns Promise<File | null> - Compressed file, original if no compression needed, or null if file is too large
+ * @returns Compressed file, or null if rejected (too large / unsupported)
  * 
- * Logic:
- * - If image is >25 MB → reject with alert and return null
- * - If image is ≤6 MB AND dimensions ≤2048px → return original
- * - If image is >10 MB → use aggressive compression (0.65 quality, 1600px max)
- * - Otherwise → use standard compression (0.80 quality, 2048px max)
- * - If result still >8 MB → compress again with very aggressive settings (0.50 quality, 1200px max)
- * - If compression fails → return original (no blocking)
- * 
- * Note: This function may take a few seconds for large images. 
- * Consider adding UI feedback (spinner/loading state) when calling this function
- * to provide better user experience, especially for images >5 MB.
+ * If compression fails for any reason, returns the original file
+ * so the user is never blocked from submitting.
  */
 export async function compressImage(file: File): Promise<File | null> {
   // Only process image files
@@ -48,211 +36,178 @@ export async function compressImage(file: File): Promise<File | null> {
   }
 
   try {
-    // Reject files that are too large (>25 MB)
+    // Reject absurdly large files
     if (file.size > MAX_FILE_SIZE_ABSOLUTE) {
       const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
-      alert(`Bilden är för stor (${sizeMB} MB, max 25 MB). Ta ett nytt foto eller välj en mindre bild.`);
-      console.error(`File too large: ${file.name} (${formatBytes(file.size)})`);
+      alert(`Bilden är för stor (${sizeMB} MB, max 50 MB). Ta ett nytt foto eller välj en mindre bild.`);
+      console.error(`[compress] Rejected: ${file.name} (${formatBytes(file.size)})`);
       return null;
     }
 
-    // Check if file is already small enough
-    const needsSizeCompression = file.size > MAX_FILE_SIZE;
-    
-    // Load image to check dimensions
-    const img = await loadImage(file);
-    const isLargeFile = file.size > 10 * 1024 * 1024; // >10 MB
-    
-    // Determine max dimension based on file size
-    const maxDimension = isLargeFile ? AGGRESSIVE_MAX_DIMENSION : STANDARD_MAX_DIMENSION;
-    const needsDimensionCompression = Math.max(img.width, img.height) > maxDimension;
-    
-    // If file is already good, return original with preserved extension
-    if (!needsSizeCompression && !needsDimensionCompression) {
-      console.log(`Image ${file.name} is already optimized (${formatBytes(file.size)}, ${img.width}x${img.height})`);
-      return file; // Return original - no compression needed
+    // If already under target AND is JPEG/PNG (not HEIC), check dimensions
+    if (file.size <= TARGET_SIZE && !isHeic(file)) {
+      const img = await loadImageSafe(file);
+      if (img && Math.max(img.width, img.height) <= MAX_DIMENSION) {
+        console.log(`[compress] Already optimized: ${file.name} (${formatBytes(file.size)}, ${img.width}×${img.height})`);
+        return file;
+      }
+      // Dimensions too large — fall through to compress
     }
 
-    // File needs compression - determine compression level
-    const quality = isLargeFile ? AGGRESSIVE_JPEG_QUALITY : STANDARD_JPEG_QUALITY;
-    console.log(`Compressing image ${file.name} (${formatBytes(file.size)}, ${img.width}x${img.height}) with ${isLargeFile ? 'aggressive' : 'standard'} settings...`);
-
-    // First compression attempt
-    let compressedFile = await compressImageWithSettings(img, file, maxDimension, quality);
-    
-    if (!compressedFile) {
-      console.error('Failed to create compressed file');
+    // Load the image (handles HEIC via createImageBitmap)
+    const img = await loadImageSafe(file);
+    if (!img) {
+      console.warn(`[compress] Could not load image: ${file.name} — returning original`);
       return file;
     }
 
-    // If still too large (>8 MB), try very aggressive compression
-    if (compressedFile.size > RECOMPRESS_THRESHOLD) {
-      console.warn(
-        `First compression insufficient (${formatBytes(compressedFile.size)}). ` +
-        `Applying very aggressive compression...`
-      );
-      
-      const veryAggressiveFile = await compressImageWithSettings(
-        img, 
-        file, 
-        VERY_AGGRESSIVE_MAX_DIMENSION, 
-        VERY_AGGRESSIVE_JPEG_QUALITY
-      );
-      
-      if (veryAggressiveFile) {
-        compressedFile = veryAggressiveFile;
-      }
-    }
+    // Calculate target dimensions
+    const { width, height } = scaleDimensions(img.width, img.height, MAX_DIMENSION);
 
-    const compressionRatio = ((1 - compressedFile.size / file.size) * 100).toFixed(1);
-    console.log(
-      `Final compressed ${file.name}: ${formatBytes(file.size)} → ${formatBytes(compressedFile.size)} ` +
-      `(${compressionRatio}% reduction)`
-    );
-
-    // Final size check
-    if (compressedFile.size > MAX_FILE_SIZE) {
-      console.warn(
-        `Compressed file still exceeds ${formatBytes(MAX_FILE_SIZE)}: ${formatBytes(compressedFile.size)}`
-      );
-    }
-
-    return compressedFile;
-
-  } catch (error) {
-    console.error('Image compression failed, using original:', error);
-    return file; // Return original on any error - don't block user
-  }
-}
-
-/**
- * Compress image with specific settings
- */
-async function compressImageWithSettings(
-  img: HTMLImageElement,
-  originalFile: File,
-  maxDimension: number,
-  quality: number
-): Promise<File | null> {
-  try {
-    // Calculate new dimensions maintaining aspect ratio
-    const { width, height } = calculateNewDimensions(img.width, img.height, maxDimension);
-
-    // Create canvas and draw resized image
+    // Draw onto canvas
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      console.error('Failed to get canvas context');
-      return null;
+      console.error('[compress] No canvas context');
+      return file;
     }
-
-    // Enable image smoothing for better quality
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    
-    // Draw the image at the new size
     ctx.drawImage(img, 0, 0, width, height);
 
-    // Convert canvas to blob
-    const compressedBlob = await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(
-        (blob) => resolve(blob),
-        'image/jpeg',
-        quality
-      );
-    });
+    // Iteratively reduce quality until under target
+    let quality = INITIAL_QUALITY;
+    let blob: Blob | null = null;
 
-    if (!compressedBlob) {
-      console.error('Failed to create compressed blob');
-      return null;
+    while (quality >= MIN_QUALITY) {
+      blob = await canvasToBlob(canvas, quality);
+      if (!blob) {
+        console.error('[compress] toBlob returned null');
+        return file;
+      }
+      if (blob.size <= TARGET_SIZE) {
+        break; // Success
+      }
+      console.log(`[compress] ${formatBytes(blob.size)} at quality ${quality.toFixed(2)} — reducing...`);
+      quality -= QUALITY_STEP;
     }
 
-    // Create new File object from blob
-    // Note: Extension changed to .jpg since we're converting to JPEG format
+    if (!blob) {
+      return file;
+    }
+
+    // Build compressed File object
     const compressedFile = new File(
-      [compressedBlob],
-      originalFile.name.replace(/\.[^.]+$/, '.jpg'),
+      [blob],
+      file.name.replace(/\.[^.]+$/, '.jpg'),
       { type: 'image/jpeg', lastModified: Date.now() }
     );
 
+    const ratio = ((1 - compressedFile.size / file.size) * 100).toFixed(0);
+    console.log(
+      `[compress] ${file.name}: ${formatBytes(file.size)} → ${formatBytes(compressedFile.size)} ` +
+      `(−${ratio}%, quality=${quality.toFixed(2)}, ${width}×${height})`
+    );
+
+    if (compressedFile.size > TARGET_SIZE) {
+      console.warn(`[compress] Still above target after max compression: ${formatBytes(compressedFile.size)}`);
+    }
+
     return compressedFile;
+
   } catch (error) {
-    console.error('Compression with settings failed:', error);
-    return null;
+    console.error('[compress] Unexpected error, returning original:', error);
+    return file;
   }
 }
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Check if file is HEIC/HEIF (common on iPhones) */
+function isHeic(file: File): boolean {
+  const type = file.type.toLowerCase();
+  const name = file.name.toLowerCase();
+  return (
+    type === 'image/heic' ||
+    type === 'image/heif' ||
+    type === '' || // iOS sometimes sends empty MIME for HEIC
+    name.endsWith('.heic') ||
+    name.endsWith('.heif')
+  );
+}
+
 /**
- * Load an image file and return an HTMLImageElement
+ * Load image safely — tries createImageBitmap first (handles HEIC in
+ * Safari/Chrome), falls back to HTMLImageElement via object URL.
+ * Returns the drawable source, or null on failure.
  */
-function loadImage(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
+async function loadImageSafe(file: File): Promise<HTMLImageElement | ImageBitmap | null> {
+  // Try createImageBitmap first (better HEIC support)
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      return bitmap;
+    } catch {
+      // Fall through to <img> method
+      console.log('[compress] createImageBitmap failed, trying <img> fallback');
+    }
+  }
+
+  // Fallback: load via <img> + object URL
+  return new Promise<HTMLImageElement | null>((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    
-    // Set a timeout to prevent memory leaks from abandoned URLs
-    const timeoutId = setTimeout(() => {
+    const timeout = setTimeout(() => {
       URL.revokeObjectURL(url);
-      reject(new Error(`Image loading timeout for: ${file.name}`));
-    }, 30000); // 30 second timeout
+      console.warn('[compress] Image load timeout');
+      resolve(null);
+    }, 30_000);
 
     img.onload = () => {
-      clearTimeout(timeoutId);
+      clearTimeout(timeout);
       URL.revokeObjectURL(url);
       resolve(img);
     };
-
     img.onerror = () => {
-      clearTimeout(timeoutId);
+      clearTimeout(timeout);
       URL.revokeObjectURL(url);
-      reject(new Error(`Failed to load image: ${file.name}`));
+      console.warn(`[compress] <img> failed to load: ${file.name}`);
+      resolve(null);
     };
-
     img.src = url;
   });
 }
 
-/**
- * Calculate new dimensions while maintaining aspect ratio
- */
-function calculateNewDimensions(
-  width: number,
-  height: number,
-  maxDimension: number
-): { width: number; height: number } {
-  if (width <= maxDimension && height <= maxDimension) {
-    return { width, height };
-  }
-
-  const aspectRatio = width / height;
-
-  if (width > height) {
-    // Landscape or square
-    return {
-      width: maxDimension,
-      height: Math.round(maxDimension / aspectRatio)
-    };
-  } else {
-    // Portrait
-    return {
-      width: Math.round(maxDimension * aspectRatio),
-      height: maxDimension
-    };
-  }
+/** Promisified canvas.toBlob */
+function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
+  });
 }
 
-/**
- * Format bytes to human-readable string
- */
+/** Scale dimensions to fit within maxDimension, preserving aspect ratio */
+function scaleDimensions(
+  w: number,
+  h: number,
+  maxDim: number
+): { width: number; height: number } {
+  if (w <= maxDim && h <= maxDim) return { width: w, height: h };
+  const ratio = w / h;
+  if (w > h) {
+    return { width: maxDim, height: Math.round(maxDim / ratio) };
+  }
+  return { width: Math.round(maxDim * ratio), height: maxDim };
+}
+
+/** Format bytes as human-readable string */
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
-  
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
