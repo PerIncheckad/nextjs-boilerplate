@@ -469,7 +469,7 @@ const buildNybilHuvudstationEmail = (payload: NybilPayload, date: string, time: 
   const banners = `
     ${createSuccessBanner(klarForUthyrning, 'KLAR FÖR UTHYRNING!')}
     ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
-    ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
+    ${createAlertBanner(ejKlarForUthyrning, 'INTE KLAR FÖR UTHYRNING', payload.ej_uthyrningsbar_anledning)}
     ${createAdminBanner(needsFueling, 'KOLLA OM BILEN ÄR TANKAD!')}
     ${createChargeLevelBanner(needsCharging, payload.laddniva_procent)}
   `;
@@ -613,7 +613,7 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
   // Warning banners (NO blue banners for BILKONTROLL, NO green banner for BILKONTROLL)
   const banners = `
     ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
-    ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
+    ${createAlertBanner(ejKlarForUthyrning, 'INTE KLAR FÖR UTHYRNING', payload.ej_uthyrningsbar_anledning)}
   `;
   
   // Contract terms section
@@ -666,11 +666,10 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     </td></tr>
   `;
   
-  // Status link placeholder
+// Status link
   const statusLinkSection = `
     <tr><td style="padding-top:20px;text-align:center;">
-      <a href="https://incheckad.se/status/${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
-      <p style="font-size:12px;color:#6b7280;margin-top:8px;">(Funktionen kommer snart)</p>
+      <a href="https://incheckad.se/status?reg=${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
     </td></tr>
   `;
   
@@ -837,7 +836,7 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
   // Warning banners
   const alertBanners = `
     ${createAlertBanner(hasSkador, `SKADOR VID LEVERANS (${skadorCount})`, undefined, skadorFolderPath, siteUrl)}
-    ${createAlertBanner(ejKlarForUthyrning, 'GÅR INTE ATT HYRA UT', payload.ej_uthyrningsbar_anledning)}
+    ${createAlertBanner(ejKlarForUthyrning, 'INTE KLAR FÖR UTHYRNING', payload.ej_uthyrningsbar_anledning)}
   `;
   
   // Previous registration info (specific to duplicate)
@@ -986,11 +985,10 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     `;
   }
   
-  // Status link placeholder
+// Status link
   const statusLinkSection = `
     <tr><td style="padding-top:20px;text-align:center;">
-      <a href="https://incheckad.se/status/${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
-      <p style="font-size:12px;color:#6b7280;margin-top:8px;">(Funktionen kommer snart)</p>
+      <a href="https://incheckad.se/status?reg=${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
     </td></tr>
   `;
   
