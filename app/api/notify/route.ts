@@ -387,7 +387,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   
   // Saludatum purple banner (vehicle-level, not damage-specific)
   const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
-    ? createPurpleBanner(true, `Kontakta Bilkontroll! Saludatum: ${payload.saludatum}.<br>UNDVIK LÅNGA HYROR!`)
+    ? createPurpleBanner(true, `UNDVIK LÅNGA HYROR!<br>Kontakta Bilkontroll!<br>Saludatum: ${payload.saludatum}.`)
     : '';
   
   // Warning banners
@@ -527,7 +527,7 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   
   // Warning banners for Bilkontroll
   const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
-    ? createPurpleBanner(true, `Saludatum: ${payload.saludatum}.<br>UNDVIK LÅNGA HYROR!`)
+    ? createPurpleBanner(true, `Förbered för försäljning!<br>Saludatum: ${payload.saludatum}.`)
     : '';
   
   const banners = `
