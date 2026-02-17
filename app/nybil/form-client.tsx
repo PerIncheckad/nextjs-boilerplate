@@ -1232,7 +1232,7 @@ export default function NybilForm() {
         notering_forsaljning: noteringForsaljning || null,
         anteckningar: anteckningar || null,
         klar_for_uthyrning: klarForUthyrning,
-        ej_uthyrningsbar_anledning: klarForUthyrning === false ? ejUthyrningsbarAnledning : null,
+        klar_for_uthyrning_notering: klarForUthyrning === false ? ejUthyrningsbarAnledning : null,
         har_skador_vid_leverans: harSkadorVidLeverans === true && damages.length > 0,
         photo_urls: photoUrls,
         video_urls: [],
