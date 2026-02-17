@@ -666,11 +666,10 @@ const buildNybilBilkontrollEmail = (payload: NybilPayload, date: string, time: s
     </td></tr>
   `;
   
-  // Status link placeholder
+ // Status link
   const statusLinkSection = `
     <tr><td style="padding-top:20px;text-align:center;">
-      <a href="https://incheckad.se/status/${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
-      <p style="font-size:12px;color:#6b7280;margin-top:8px;">(Funktionen kommer snart)</p>
+      <a href="https://incheckad.se/status?reg=${regNr}" ...>Visa i Status →</a>
     </td></tr>
   `;
   
@@ -986,11 +985,10 @@ const buildNybilDuplicateEmail = (payload: NybilPayload, date: string, time: str
     `;
   }
   
-  // Status link placeholder
+  // Status link
   const statusLinkSection = `
     <tr><td style="padding-top:20px;text-align:center;">
-      <a href="https://incheckad.se/status/${regNr}" style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff!important;text-decoration:none;border-radius:6px;font-weight:bold;">Visa i Status →</a>
-      <p style="font-size:12px;color:#6b7280;margin-top:8px;">(Funktionen kommer snart)</p>
+      <a href="https://incheckad.se/status?reg=${regNr}" ...>Visa i Status →</a>
     </td></tr>
   `;
   
