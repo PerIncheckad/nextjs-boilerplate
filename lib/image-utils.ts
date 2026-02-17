@@ -15,9 +15,9 @@
 
 const TARGET_SIZE = 8 * 1024 * 1024;       // 4 MB target (safe margin)
 const MAX_FILE_SIZE_ABSOLUTE = 50 * 1024 * 1024; // 50 MB absolute reject
-const MAX_DIMENSION = 2560;                  // px longest side (enough for damage photos)
-const INITIAL_QUALITY = 0.85;                // Starting JPEG quality
-const MIN_QUALITY = 0.35;                    // Floor — don't go below this
+const MAX_DIMENSION = 4032;                  // px longest side (enough for damage photos)
+const INITIAL_QUALITY = 0.92;                // Starting JPEG quality
+const MIN_QUALITY = 0.50;                    // Floor — don't go below this
 const QUALITY_STEP = 0.10;                   // Reduce by this each iteration
 
 /**
