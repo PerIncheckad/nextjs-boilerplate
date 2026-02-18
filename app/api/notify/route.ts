@@ -826,13 +826,13 @@ export async function POST(request: Request) {
           checkinId = checkinRecord.id;
         }
 
-        // Save bransletyp to vehicles if provided (first-time save or update)
+// Save bransletyp to vehicles if provided (first-time save or update)
         if (payload.detailedBransletyp && regNr) {
           const dbBransletyp = payload.detailedBransletyp === '100% el' ? 'El (full)' : payload.detailedBransletyp;
           // Try UPDATE first (vehicle exists in Bilkontroll file)
           const { data: updateResult, error: vehicleUpdateError } = await supabaseAdmin
             .from('vehicles')
-            .update({ bransletyp: dbBransletyp, updated_at: new Date().toISOString() })
+            .update({ bransletyp: dbBransletyp })
             .eq('regnr', regNr)
             .select('regnr');
           
@@ -844,7 +844,7 @@ export async function POST(request: Request) {
             // Vehicle doesn't exist in vehicles table - INSERT minimal row
             const { error: vehicleInsertError } = await supabaseAdmin
               .from('vehicles')
-              .insert({ regnr: regNr, bransletyp: dbBransletyp, updated_at: new Date().toISOString() });
+              .insert({ regnr: regNr, bransletyp: dbBransletyp });
             if (vehicleInsertError) {
               console.error('Error inserting bransletyp to vehicles:', vehicleInsertError);
             } else {
