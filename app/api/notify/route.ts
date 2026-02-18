@@ -371,12 +371,15 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
     const tankningText = formatTankning(payload.tankning);
     fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
   }
-  // Charge info (elbil or hybrid)
-  if (payload.drivmedel === 'elbil' || isHybridType) {
+  // Charge level (only pure electric, not hybrid)
+  if (payload.drivmedel === 'elbil' && !isHybridType) {
     const laddniva = payload.laddning?.laddniva || '---';
+    fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Laddnivå:</strong> ${laddniva}%</td></tr>`;
+  }
+  // Cable count (electric + hybrid)
+  if (payload.drivmedel === 'elbil' || isHybridType) {
     const antalKablar = payload.laddning?.antal_laddkablar || 0;
-    fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Laddnivå:</strong> ${laddniva}%</td></tr>` +
-                       `<tr><td style="padding:4px 0;"><strong>Laddkablar:</strong> ${antalKablar} st</td></tr>`;
+    fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Laddkablar:</strong> ${antalKablar} st</td></tr>`;
   }
   
   // Location info
@@ -397,7 +400,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   // Warning banners
   const existingDamages = payload.dokumenterade_skador || [];
   const resolvedDamages = payload.åtgärdade_skador || [];
-  const showChargeWarning = (payload.drivmedel === 'elbil' || payload.detailedBransletyp?.startsWith('Hybrid')) && parseInt(payload.laddning?.laddniva, 10) < 95;
+  const showChargeWarning = payload.drivmedel === 'elbil' && !payload.detailedBransletyp?.startsWith('Hybrid') && parseInt(payload.laddning?.laddniva, 10) < 95;
   const notRefueled = (payload.drivmedel === 'bensin_diesel' || payload.detailedBransletyp?.startsWith('Hybrid')) && payload.tankning?.tankniva === 'ej_upptankad';
   
   const nyaSkadorCount = (payload.nya_skador || []).length;
@@ -675,7 +678,7 @@ export async function POST(request: Request) {
       ? stationForSubject.split(' / ').pop()?.trim()
       : stationForSubject;
 
-    const showChargeWarning = (payload.drivmedel === 'elbil' || payload.detailedBransletyp?.startsWith('Hybrid')) && parseInt(payload.laddning?.laddniva, 10) < 95;
+    const showChargeWarning = payload.drivmedel === 'elbil' && !payload.detailedBransletyp?.startsWith('Hybrid') && parseInt(payload.laddning?.laddniva, 10) < 95;
     const notRefueled = (payload.drivmedel === 'bensin_diesel' || payload.detailedBransletyp?.startsWith('Hybrid')) && payload.tankning?.tankniva === 'ej_upptankad';
     const hasSaludatumRisk = payload.hasRiskSaludatum === true;
     
@@ -826,16 +829,27 @@ export async function POST(request: Request) {
         // Save bransletyp to vehicles if provided (first-time save or update)
         if (payload.detailedBransletyp && regNr) {
           const dbBransletyp = payload.detailedBransletyp === '100% el' ? 'El (full)' : payload.detailedBransletyp;
-          const { error: vehicleUpdateError } = await supabaseAdmin
+          // Try UPDATE first (vehicle exists in Bilkontroll file)
+          const { data: updateResult, error: vehicleUpdateError } = await supabaseAdmin
             .from('vehicles')
-            .upsert(
-              { regnr: regNr, bransletyp: dbBransletyp, updated_at: new Date().toISOString() },
-              { onConflict: 'regnr' }
-            );
+            .update({ bransletyp: dbBransletyp, updated_at: new Date().toISOString() })
+            .eq('regnr', regNr)
+            .select('regnr');
+          
           if (vehicleUpdateError) {
-            console.error('Error saving bransletyp to vehicles:', vehicleUpdateError);
+            console.error('Error updating bransletyp in vehicles:', vehicleUpdateError);
+          } else if (updateResult && updateResult.length > 0) {
+            console.log(`Updated bransletyp '${dbBransletyp}' for existing vehicle ${regNr}`);
           } else {
-            console.log(`Saved bransletyp '${dbBransletyp}' for ${regNr}`);
+            // Vehicle doesn't exist in vehicles table - INSERT minimal row
+            const { error: vehicleInsertError } = await supabaseAdmin
+              .from('vehicles')
+              .insert({ regnr: regNr, bransletyp: dbBransletyp, updated_at: new Date().toISOString() });
+            if (vehicleInsertError) {
+              console.error('Error inserting bransletyp to vehicles:', vehicleInsertError);
+            } else {
+              console.log(`Inserted new vehicle ${regNr} with bransletyp '${dbBransletyp}'`);
+            }
           }
         }
 
