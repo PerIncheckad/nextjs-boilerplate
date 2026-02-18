@@ -532,7 +532,8 @@ export default function CheckInForm() {
   const isHybrid = detailedBransletyp === 'Hybrid (bensin)' || detailedBransletyp === 'Hybrid (diesel)';
   const isDieselType = detailedBransletyp === 'Diesel' || detailedBransletyp === 'Hybrid (diesel)';
   const needsTank = detailedBransletyp !== null && !isElectric;
-  const needsCharge = isElectric || isHybrid;
+  const needsChargeLevel = isElectric; // Only pure electric needs charge level %
+  const needsChargeCables = isElectric || isHybrid; // Both electric and hybrid need cable count
 
   // Handler for changing detailed fuel type — sets backward-compat states too
   const handleDetailedFuelTypeChange = (type: 'Bensin' | 'Diesel' | 'Hybrid (bensin)' | 'Hybrid (diesel)' | 'El (full)') => {
@@ -576,7 +577,8 @@ export default function CheckInForm() {
     // Tank validation (Bensin, Diesel, Hybrid bensin, Hybrid diesel)
     if (needsTank && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !literpris)))) return false;
     // Charge validation (El full, Hybrid bensin, Hybrid diesel)
-    if (needsCharge && (!laddniva || antalLaddkablar === null)) return false;
+    if (needsChargeLevel && !laddniva) return false;
+    if (needsChargeCables && antalLaddkablar === null) return false;
     
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
@@ -596,7 +598,7 @@ export default function CheckInForm() {
 
     return isChecklistComplete;
   }, [
-    regInput, ort, station, matarstallning, hjultyp, detailedBransletyp, needsTank, needsCharge, tankniva, liters, literpris, laddniva, antalLaddkablar,
+    regInput, ort, station, matarstallning, hjultyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, literpris, laddniva, antalLaddkablar,
     skadekontroll, newDamages, existingDamages, isChecklistComplete, garInteAttHyraUt, garInteAttHyraUtKommentar, varningslampaLyser, varningslampaBeskrivning,
     behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, locationDiffers, matarstallningAvlamning, unhandledLegacyDamages
   ]);
@@ -643,7 +645,7 @@ export default function CheckInForm() {
       drivmedel: drivmedelstyp,
       detailedBransletyp: detailedBransletyp,
       tankning: { tankniva, liters, bransletyp: needsTank ? bransletyp : null, literpris },
-      laddning: { laddniva: needsCharge ? laddniva : null, antal_laddkablar: needsCharge ? antalLaddkablar : null },
+      laddning: { laddniva: needsChargeLevel ? laddniva : null, antal_laddkablar: needsChargeCables ? antalLaddkablar : null },
       ort,
       station,
       bilen_star_nu: { 
@@ -670,7 +672,7 @@ export default function CheckInForm() {
     rokningSanerad, rokningText, rokningMedia, rokningFolder,
     varningslampaLyser, varningslampaBeskrivning,
     insynsskyddSaknas,
-    drivmedelstyp, detailedBransletyp, needsTank, needsCharge, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
+    drivmedelstyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, locationDiffers, matarstallningAvlamning,
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering,
     showUnknownRegHelper
@@ -1559,13 +1561,13 @@ export default function CheckInForm() {
           </div>
         </Card>
 
-        <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !detailedBransletyp || (needsTank && !tankniva) || (needsTank && tankniva === 'tankad_nu' && (!liters || !literpris)) || (needsCharge && (!laddniva || antalLaddkablar === null)))}>
+        <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !detailedBransletyp || (needsTank && !tankniva) || (needsTank && tankniva === 'tankad_nu' && (!liters || !literpris)) || (needsChargeLevel && !laddniva) || (needsChargeCables && antalLaddkablar === null))}>
           <SectionHeader title="Fordonsstatus" />
           <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning vid incheckning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
           <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
           <SubSectionHeader title="Tankning/Laddning" />
           {knownBransletyp ? (
-            <Field label="Drivmedel"><div className="known-fuel-info">✅ {detailedBransletyp === 'El (full)' ? '100% el' : detailedBransletyp}</div></Field>
+            <Field label="Drivmedel"><div className="known-fuel-info">✅ {detailedBransletyp === 'El (full)' ? '100% el' : detailedBransletyp === 'Hybrid (diesel)' ? 'Diesel (hybrid)' : detailedBransletyp === 'Hybrid (bensin)' ? 'Bensin (hybrid)' : detailedBransletyp}</div></Field>
           ) : (
             <Field label="Drivmedel *">
               <div className="grid-2-col"><ChoiceButton onClick={() => handleDetailedFuelTypeChange('Bensin')} isActive={detailedBransletyp === 'Bensin'} isSet={detailedBransletyp !== null}>Bensin</ChoiceButton><ChoiceButton onClick={() => handleDetailedFuelTypeChange('Diesel')} isActive={detailedBransletyp === 'Diesel'} isSet={detailedBransletyp !== null}>Diesel</ChoiceButton></div>
@@ -1582,14 +1584,16 @@ export default function CheckInForm() {
             <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
             <Field label={`Literpris (${bransletyp || 'kr'}) *`}><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
           </div>}</Fragment>)}
-          {needsCharge && (<Fragment>
+          {needsChargeLevel && (
             <Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>
+          )}
+          {needsChargeCables && (
             <Field label="Antal laddkablar *"><div className="grid-3-col">
               <ChoiceButton onClick={() => setAntalLaddkablar(0)} isActive={antalLaddkablar === 0} isSet={antalLaddkablar !== null}>0</ChoiceButton>
               <ChoiceButton onClick={() => setAntalLaddkablar(1)} isActive={antalLaddkablar === 1} isSet={antalLaddkablar !== null}>1</ChoiceButton>
               <ChoiceButton onClick={() => setAntalLaddkablar(2)} isActive={antalLaddkablar === 2} isSet={antalLaddkablar !== null}>2</ChoiceButton>
             </div></Field>
-          </Fragment>)}
+          )}
         </Card>
 
         <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
@@ -1852,14 +1856,17 @@ const ConfirmModal: React.FC<{ payload: any; onConfirm: () => void; onCancel: ()
             else if (payload.tankning.tankniva === 'ej_upptankad') parts.push(<p key="tank">⛽ <strong>Tankning:</strong> <span style={{color: '#d97706', fontWeight: 'bold'}}>Ej upptankad</span></p>);
             else parts.push(<p key="tank">⛽ <strong>Tankning:</strong> Återlämnades fulltankad</p>);
         }
-        // Charge info (Elbil, Hybrids)
-        if (payload.drivmedel === 'elbil' || payload.detailedBransletyp?.startsWith('Hybrid')) {
+        // Charge level (only pure electric)
+        if (payload.drivmedel === 'elbil' && !payload.detailedBransletyp?.startsWith('Hybrid')) {
             parts.push(<p key="charge"><strong>⚡ Laddning: {payload.laddning.laddniva}%</strong></p>);
+        }
+        // Cable count (electric + hybrid)
+        if (payload.drivmedel === 'elbil' || payload.detailedBransletyp?.startsWith('Hybrid')) {
             parts.push(<p key="cables"><strong>Antal laddkablar: {payload.laddning.antal_laddkablar}</strong></p>);
         }
         return parts.length > 0 ? <Fragment>{parts}</Fragment> : null;
     };
-    const showChargeWarning = (payload.drivmedel === 'elbil' || payload.detailedBransletyp?.startsWith('Hybrid')) && parseInt(payload.laddning.laddniva, 10) < 95;
+    const showChargeWarning = payload.drivmedel === 'elbil' && !payload.detailedBransletyp?.startsWith('Hybrid') && parseInt(payload.laddning.laddniva, 10) < 95;
     const showNotRefueled = (payload.drivmedel === 'bensin_diesel' || payload.detailedBransletyp?.startsWith('Hybrid')) && payload.tankning.tankniva === 'ej_upptankad';
 
     return (<Fragment><div className="modal-overlay" onClick={onCancel} /><div 
