@@ -59,6 +59,7 @@ export type VehicleInfo = {
   saludatum: string;
   existing_damages: ConsolidatedDamage[];
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
+  bransletyp?: string | null;
   last_checkin?: {
     station: string;
     checker_name: string;
@@ -179,7 +180,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const lastCheckinId = lastCheckinData?.id || null;
 
   // Step 2: Fetch all other data in parallel
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
+ const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, vehicleFuelResponse] = await Promise.all([
     supabase
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabase
@@ -202,6 +203,11 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('vehicles')
+      .select('bransletyp')
+      .eq('regnr', cleanedRegnr)
       .maybeSingle()
   ]);
   
@@ -251,6 +257,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Step 3: Process the fetched data
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
+  const vehicleBransletyp = vehicleFuelResponse.data?.bransletyp || null;
+  const finalBransletyp = nybilData?.bransletyp || vehicleBransletyp || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
   // handledDamages is now defined earlier
@@ -497,6 +505,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       saludatum: finalSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
+      bransletyp: finalBransletyp,
       last_checkin: lastCheckin,
     };
   }
@@ -516,6 +525,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       saludatum: nybilSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
+      bransletyp: finalBransletyp,
       last_checkin: lastCheckin,
     };
   }
@@ -528,6 +538,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       saludatum: finalSaludatum,
       existing_damages: consolidatedDamages,
       status: 'PARTIAL_MATCH_DAMAGE_ONLY',
+      bransletyp: finalBransletyp,
       last_checkin: lastCheckin,
     };
   }
@@ -538,7 +549,8 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
     wheel_storage_location: 'Ingen information',
     saludatum: 'Ingen information',
     existing_damages: [],
-    status: 'NO_MATCH',
+      status: 'NO_MATCH',
+      bransletyp: finalBransletyp,
     last_checkin: lastCheckin,
   };
 }
