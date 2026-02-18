@@ -364,15 +364,19 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const bilModel = payload.bilmodel || payload.brand_model || '---';
   
   // Fuel or charge info
+  const isHybridType = payload.detailedBransletyp?.startsWith('Hybrid');
   let fuelOrChargeInfo = '';
-  if (payload.drivmedel === 'elbil') {
+  // Tank info (bensin_diesel or hybrid)
+  if (payload.drivmedel === 'bensin_diesel' || isHybridType) {
+    const tankningText = formatTankning(payload.tankning);
+    fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
+  }
+  // Charge info (elbil or hybrid)
+  if (payload.drivmedel === 'elbil' || isHybridType) {
     const laddniva = payload.laddning?.laddniva || '---';
     const antalKablar = payload.laddning?.antal_laddkablar || 0;
-    fuelOrChargeInfo = `<tr><td style="padding:4px 0;"><strong>Laddnivå:</strong> ${laddniva}%</td></tr>` +
+    fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Laddnivå:</strong> ${laddniva}%</td></tr>` +
                        `<tr><td style="padding:4px 0;"><strong>Laddkablar:</strong> ${antalKablar} st</td></tr>`;
-  } else if (payload.drivmedel === 'bensin_diesel') {
-    const tankningText = formatTankning(payload.tankning);
-    fuelOrChargeInfo = `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
   }
   
   // Location info
@@ -393,8 +397,8 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   // Warning banners
   const existingDamages = payload.dokumenterade_skador || [];
   const resolvedDamages = payload.åtgärdade_skador || [];
-  const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
-  const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
+  const showChargeWarning = (payload.drivmedel === 'elbil' || payload.detailedBransletyp?.startsWith('Hybrid')) && parseInt(payload.laddning?.laddniva, 10) < 95;
+  const notRefueled = (payload.drivmedel === 'bensin_diesel' || payload.detailedBransletyp?.startsWith('Hybrid')) && payload.tankning?.tankniva === 'ej_upptankad';
   
   const nyaSkadorCount = (payload.nya_skador || []).length;
   const befintligaSkadorHanteradeCount = existingDamages.length + resolvedDamages.length;
@@ -671,8 +675,8 @@ export async function POST(request: Request) {
       ? stationForSubject.split(' / ').pop()?.trim()
       : stationForSubject;
 
-    const showChargeWarning = payload.drivmedel === 'elbil' && parseInt(payload.laddning?.laddniva, 10) < 95;
-    const notRefueled = payload.drivmedel === 'bensin_diesel' && payload.tankning?.tankniva === 'ej_upptankad';
+    const showChargeWarning = (payload.drivmedel === 'elbil' || payload.detailedBransletyp?.startsWith('Hybrid')) && parseInt(payload.laddning?.laddniva, 10) < 95;
+    const notRefueled = (payload.drivmedel === 'bensin_diesel' || payload.detailedBransletyp?.startsWith('Hybrid')) && payload.tankning?.tankniva === 'ej_upptankad';
     const hasSaludatumRisk = payload.hasRiskSaludatum === true;
     
     // "Other warnings" excludes low charge and saludatum risk
@@ -742,8 +746,10 @@ export async function POST(request: Request) {
           // Hjultyp (wheel type)
           hjultyp: payload.hjultyp || null,
           
-          // Drivmedel/bränsle (fuel type)
-          fuel_type: payload.drivmedel === 'elbil' ? 'El' 
+          // Drivmedel/bränsle (fuel type) - use detailed type if available
+          fuel_type: payload.detailedBransletyp 
+            ? (payload.detailedBransletyp === 'El (full)' ? 'El' : payload.detailedBransletyp)
+            : payload.drivmedel === 'elbil' ? 'El' 
             : payload.drivmedel === 'bensin_diesel' 
               ? (payload.tankning?.bransletyp || 'Bensin/Diesel') 
               : null,
@@ -815,6 +821,22 @@ export async function POST(request: Request) {
           // Continue without checkinId - damages won't be linked but emails will still be sent
         } else if (checkinRecord?.id) {
           checkinId = checkinRecord.id;
+        }
+
+        // Save bransletyp to vehicles if provided (first-time save or update)
+        if (payload.detailedBransletyp && regNr) {
+          const dbBransletyp = payload.detailedBransletyp === '100% el' ? 'El (full)' : payload.detailedBransletyp;
+          const { error: vehicleUpdateError } = await supabaseAdmin
+            .from('vehicles')
+            .upsert(
+              { regnr: regNr, bransletyp: dbBransletyp, updated_at: new Date().toISOString() },
+              { onConflict: 'regnr' }
+            );
+          if (vehicleUpdateError) {
+            console.error('Error saving bransletyp to vehicles:', vehicleUpdateError);
+          } else {
+            console.log(`Saved bransletyp '${dbBransletyp}' for ${regNr}`);
+          }
         }
 
         // Only attempt damage inserts if we have a valid checkinId
