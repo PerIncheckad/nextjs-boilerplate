@@ -65,6 +65,7 @@ export type VehicleInfo = {
   saludatum: string;
   existing_damages: ConsolidatedDamage[];
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
+  bransletyp?: string | null;
   last_checkin?: {
     station: string;
     checker_name: string;
@@ -145,7 +146,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const isForceUndocumented = SPECIAL_FORCE_UNDOCUMENTED.includes(cleanedRegnr);
 
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse] = await Promise.all([
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, vehicleFuelResponse] = await Promise.all([
     supabaseAdmin
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabaseAdmin
@@ -164,15 +165,22 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('nybil_inventering')
-      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum')
+      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum, bransletyp')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('vehicles')
+      .select('bransletyp')
+      .eq('regnr', cleanedRegnr)
       .maybeSingle()
   ]);
   
   const vehicleData = vehicleResponse.data?.[0] || null;
-  const nybilData = nybilResponse.data || null;
+ const nybilData = nybilResponse.data || null;
+  const vehicleBransletyp = vehicleFuelResponse.data?.bransletyp || null;
+  const finalBransletyp = nybilData?.bransletyp || vehicleBransletyp || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
   const L = legacyDamages.length; // Number of BUHS damages
@@ -474,7 +482,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     completed_at: lastCheckinData.completed_at || '',
   } : null;
 
-  if (vehicleData) {
+if (vehicleData) {
     return {
       regnr: cleanedRegnr,
       model: formatModel(vehicleData.brand, vehicleData.model),
@@ -482,6 +490,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       saludatum: finalSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
+      bransletyp: finalBransletyp,
       last_checkin: lastCheckin,
     };
   }
@@ -500,6 +509,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       saludatum: nybilSaludatum,
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
+      bransletyp: finalBransletyp,
       last_checkin: lastCheckin,
     };
   }
@@ -512,6 +522,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       saludatum: finalSaludatum,
       existing_damages: consolidatedDamages,
       status: 'PARTIAL_MATCH_DAMAGE_ONLY',
+      bransletyp: finalBransletyp,
       last_checkin: lastCheckin,
     };
   }
@@ -523,7 +534,8 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     saludatum: 'Ingen information',
     existing_damages: [],
     status: 'NO_MATCH',
-    last_checkin: lastCheckin,
+      bransletyp: finalBransletyp,
+      last_checkin: lastCheckin,
   };
 }
 
