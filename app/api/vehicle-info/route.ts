@@ -263,8 +263,11 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     });
   }
   
+  // Winning checkin = for damage matching (may not be the most recent)
   const lastCheckinData = winningCheckinData;
   const lastCheckinId = winningCheckinId;
+  // Actual latest checkin = for display in fact box (always the most recent)
+  const actualLatestCheckin = checkins.length > 0 ? checkins[0] : null;
   
   const lastCheckinDate = lastCheckinData?.completed_at ? new Date(lastCheckinData.completed_at) : null;
   
@@ -476,10 +479,10 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const latestSaludatum = legacyDamages.length > 0 ? legacyDamages[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
-  const lastCheckin = lastCheckinData ? {
-    station: lastCheckinData.current_station || 'Okänd station',
-    checker_name: lastCheckinData.checker_name || 'Okänd',
-    completed_at: lastCheckinData.completed_at || '',
+  const lastCheckin = actualLatestCheckin ? {
+    station: actualLatestCheckin.current_station || 'Okänd station',
+    checker_name: actualLatestCheckin.checker_name || 'Okänd',
+    completed_at: actualLatestCheckin.completed_at || '',
   } : null;
 
 if (vehicleData) {
