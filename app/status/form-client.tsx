@@ -1163,6 +1163,11 @@ const HistoryItem: React.FC<{
                   <strong>Hjultyp:</strong> {record.checkinDetaljer.hjultyp}
                 </div>
               )}
+              {record.checkinDetaljer.drivmedel && (
+                <div className="history-detail-row">
+                  <strong>Drivmedel:</strong> {record.checkinDetaljer.drivmedel}
+                </div>
+              )}
               {record.checkinDetaljer.tankningInfo && (
                 <div className="history-detail-row">
                   <strong>Tankning:</strong> {record.checkinDetaljer.tankningInfo}
