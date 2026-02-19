@@ -768,7 +768,8 @@ export async function POST(request: Request) {
             const parsed = parseFloat(payload.tankning.literpris);
             return isNaN(parsed) ? null : parsed;
           })(),
-          
+fuel_level: payload.tankning?.tankniva || null,
+        
           // Laddning (charging) - for electric vehicles
           charge_level_percent: (() => {
             if (!payload.laddning?.laddniva) return null;
