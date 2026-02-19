@@ -815,7 +815,7 @@ export default function CheckInForm() {
 
   useEffect(() => {
     async function fetchAllRegistrations() {
-      const { data, error } = await supabase.rpc('get_all_allowed_plates');
+      const { data, error } = await supabase.rpc('get_all_allowed_plates').range(0, 4999);
       if (error) console.error("Could not fetch registrations via RPC:", error);
       else if (data) setAllRegistrations(data.map((item: any) => item.regnr));
     }
