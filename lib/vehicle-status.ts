@@ -100,7 +100,6 @@ export type HistoryRecord = {
     parkeringsinfo?: string;
     matarstallning?: string;
     hjultyp?: string;
-    drivmedel?: string;            // "Bensin", "Diesel", "Hybrid (diesel)", etc.
     tankningInfo?: string;         // "Tankad nu av MABI (11L Bensin @ 19 kr/L)" eller "Fulltankad"
     laddningInfo?: string;         // "85% (2 laddkablar)"
     
@@ -1558,7 +1557,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           parkeringsinfo: checkin.current_location_note || undefined,
           matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
           hjultyp: checkin.hjultyp || undefined,
-          drivmedel: checkin.fuel_type || undefined,
           tankningInfo: buildTankningInfo(checkin),
           laddningInfo: buildLaddningInfo(checkin),
           mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
@@ -2484,7 +2482,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         parkeringsinfo: checkin.current_location_note || undefined,
         matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
         hjultyp: checkin.hjultyp || undefined,
-        drivmedel: checkin.fuel_type || undefined,
         tankningInfo: buildTankningInfo(checkin),
         laddningInfo: buildLaddningInfo(checkin),
         mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
