@@ -100,6 +100,7 @@ export type HistoryRecord = {
     parkeringsinfo?: string;
     matarstallning?: string;
     hjultyp?: string;
+    drivmedel?: string;            // "Bensin", "Diesel", "Hybrid (diesel)", etc.
     tankningInfo?: string;         // "Tankad nu av MABI (11L Bensin @ 19 kr/L)" eller "Fulltankad"
     laddningInfo?: string;         // "85% (2 laddkablar)"
     
@@ -968,8 +969,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Hjulförvaring: not available from checkins
       hjulforvaring: '---',
       
-      // Drivmedel: not available from checkins
-      drivmedel: '---',
+      // Drivmedel: from latest checkin fuel_type
+      drivmedel: latestCheckin?.fuel_type || '---',
       
       // Växellåda: not available from checkins
       vaxel: '---',
@@ -1553,6 +1554,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           parkeringsinfo: checkin.current_location_note || undefined,
           matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
           hjultyp: checkin.hjultyp || undefined,
+          drivmedel: checkin.fuel_type || undefined,
           tankningInfo: buildTankningInfo(checkin),
           laddningInfo: buildLaddningInfo(checkin),
           mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
@@ -1700,8 +1702,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
       : vehicleData?.wheel_storage_location || '---',
     
-    // Drivmedel: nybil_inventering.bransletyp
-    drivmedel: nybilData?.bransletyp || '---',
+    // Drivmedel: nybil_inventering.bransletyp → vehicles.bransletyp
+    drivmedel: nybilData?.bransletyp || vehicleData?.bransletyp || '---',
     
     // Växellåda: nybil_inventering.vaxel
     vaxel: nybilData?.vaxel || '---',
@@ -2478,6 +2480,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         parkeringsinfo: checkin.current_location_note || undefined,
         matarstallning: checkin.odometer_km ? `${checkin.odometer_km} km` : undefined,
         hjultyp: checkin.hjultyp || undefined,
+        drivmedel: checkin.fuel_type || undefined,
         tankningInfo: buildTankningInfo(checkin),
         laddningInfo: buildLaddningInfo(checkin),
         mediaLankar: Object.keys(mediaLankar).length > 0 ? mediaLankar : undefined,
