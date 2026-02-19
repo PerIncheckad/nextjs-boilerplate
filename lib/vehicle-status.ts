@@ -668,7 +668,11 @@ function detectRekondTypes(folder: string | null): { invandig: boolean; utvandig
     utvandig: folderUpper.includes('UTVANDIG') || folderUpper.includes('UTVÄNDIG'),
   };
 }
-
+function displayBransletyp(value: string | null | undefined): string {
+  if (!value) return '---';
+  if (value === 'El (full)') return '100% el';
+  return value;
+}
 /**
  * Build tankning info string from checkin data
  * Format: "Tankad nu av MABI (11L Bensin @ 19 kr/L)" eller "Fulltankad"
@@ -970,7 +974,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       hjulforvaring: '---',
       
       // Drivmedel: from latest checkin fuel_type
-      drivmedel: latestCheckin?.fuel_type || '---',
+      drivmedel: displayBransletyp(latestCheckin?.fuel_type),
       
       // Växellåda: not available from checkins
       vaxel: '---',
@@ -1703,7 +1707,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : vehicleData?.wheel_storage_location || '---',
     
     // Drivmedel: nybil_inventering.bransletyp → vehicles.bransletyp
-    drivmedel: nybilData?.bransletyp || vehicleData?.bransletyp || '---',
+    drivmedel: displayBransletyp(nybilData?.bransletyp || vehicleData?.bransletyp),
     
     // Växellåda: nybil_inventering.vaxel
     vaxel: nybilData?.vaxel || '---',
@@ -2673,7 +2677,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     hjulTillForvaring: (nybilData.hjul_forvaring_ort || nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring)
       ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
       : '---',
-    drivmedel: nybilData.bransletyp || '---',
+    drivmedel: displayBransletyp(nybilData.bransletyp),
     vaxellada: nybilData.vaxel || '---',
     tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
     // Avtalsvillkor
