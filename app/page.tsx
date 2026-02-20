@@ -13,25 +13,31 @@ export default function HomePage() {
         <p className="opacity-80">
           Välj ett alternativ nedan.
         </p>
-        <a
-          href="/ankomst"
-          className="inline-block rounded-md border px-4 py-2 font-semibold"
-          style={{ backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#dc2626' }}
-        >
-          Inkommen
-        </a>
-        <a
-          href="/check"
-          className="inline-block rounded-md border px-4 py-2"
-        >
-          Ny incheckning
-        </a>
-        <a
-          href="/nybil"
-          className="inline-block rounded-md border px-4 py-2"
-        >
-          Registrera ny bil
-        </a>
+        <div>
+          <a
+            href="/ankomst"
+            className="inline-block rounded-md border px-4 py-2 font-semibold"
+            style={{ backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#dc2626' }}
+          >
+            Inkommen
+          </a>
+        </div>
+        <div>
+          <a
+            href="/check"
+            className="inline-block rounded-md border px-4 py-2"
+          >
+            Ny incheckning
+          </a>
+        </div>
+        <div>
+          <a
+            href="/nybil"
+            className="inline-block rounded-md border px-4 py-2"
+          >
+            Registrera ny bil
+          </a>
+        </div>
       </div>
     </main>
   );
