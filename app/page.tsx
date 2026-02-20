@@ -1,44 +1,38 @@
 import type { Metadata } from 'next';
+import LoginGate from '@/components/LoginGate';
+
+const currentYear = new Date().getFullYear();
 
 export const metadata: Metadata = {
   title: 'Incheckad',
   description: 'Startsida',
 };
 
+const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
+
 export default function HomePage() {
   return (
-    <main className="min-h-screen grid place-items-center p-8">
-      <div className="max-w-xl w-full text-center space-y-6">
-        <h1 className="text-3xl font-semibold">Välkommen</h1>
-        <p className="opacity-80">
-          Välj ett alternativ nedan.
-        </p>
-        <div>
-          <a
-            href="/ankomst"
-            className="inline-block rounded-md border px-4 py-2 font-semibold"
-            style={{ backgroundColor: '#dc2626', color: '#ffffff', borderColor: '#dc2626' }}
-          >
-            Inkommen
-          </a>
+    <LoginGate>
+      <main className="welcome-main">
+        <div className="background-img" />
+        
+        <div className="welcome-card">
+          <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
+          
+          <h1 className="welcome-title">Välkommen!</h1>
+          
+          <div className="btn-group">
+            <a href="/check" className="btn incheckning">Ny incheckning</a>
+            <a href="/nybil" className="btn registrera">Registrera ny bil</a>
+          </div>
+          
+
         </div>
-        <div>
-          <a
-            href="/check"
-            className="inline-block rounded-md border px-4 py-2"
-          >
-            Ny incheckning
-          </a>
-        </div>
-        <div>
-          <a
-            href="/nybil"
-            className="inline-block rounded-md border px-4 py-2"
-          >
-            Registrera ny bil
-          </a>
-        </div>
-      </div>
-    </main>
+        
+        <footer className="homepage-footer">
+          &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
+        </footer>
+      </main>
+    </LoginGate>
   );
 }
