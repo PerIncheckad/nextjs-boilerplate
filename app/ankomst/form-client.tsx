@@ -94,6 +94,7 @@ export default function ArrivalForm() {
 
   // Fuel/charge
   const [drivmedelstyp, setDrivmedelstyp] = useState<'bensin_diesel' | 'elbil' | null>(null);
+  const [detailedBransletyp, setDetailedBransletyp] = useState<string | null>(null);
   const [tankniva, setTankniva] = useState<'återlämnades_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null>(null);
   const [liters, setLiters] = useState('');
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
@@ -133,15 +134,15 @@ export default function ArrivalForm() {
   // --- Build payload ---
   const buildPayload = useCallback(() => {
     const normalizedReg = regInput.toUpperCase().replace(/\s/g, '');
+    // Determine the fuel_type to save to vehicles.bransletyp
+    const effectiveBransletyp = knownBransletyp || detailedBransletyp;
     return {
       regnr: normalizedReg,
       current_city: ort,
       current_station: station,
       odometer_km: matarstallning,
       fuel_level: drivmedelstyp === 'elbil' ? 'elbil' : tankniva,
-      fuel_type: drivmedelstyp === 'elbil'
-        ? (knownBransletyp || 'El')
-        : (tankniva === 'tankad_nu' ? bransletyp : (knownBransletyp || bransletyp || null)),
+      fuel_type: effectiveBransletyp || (drivmedelstyp === 'elbil' ? 'El' : bransletyp),
       fuel_liters: tankniva === 'tankad_nu' ? liters : null,
       fuel_price_per_liter: tankniva === 'tankad_nu' ? literpris : null,
       charge_level: drivmedelstyp === 'elbil' ? laddniva : null,
@@ -149,7 +150,7 @@ export default function ArrivalForm() {
       checker_name: fullName,
       car_model: vehicleModel || '---',
     };
-  }, [regInput, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, userEmail, fullName, vehicleModel, knownBransletyp]);
+  }, [regInput, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, userEmail, fullName, vehicleModel, knownBransletyp, detailedBransletyp]);
 
   // --- Vehicle lookup ---
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -212,6 +213,27 @@ export default function ArrivalForm() {
         const specificType = inferBransletyp(bt);
         if (specificType) setBransletyp(specificType);
       }
+    }
+  };
+
+  // Handle user selecting from 5-option bränsletyp picker
+  const selectDetailedBransletyp = (type: string) => {
+    setDetailedBransletyp(type);
+    // Reset downstream state
+    setTankniva(null);
+    setLiters('');
+    setLiterpris('');
+    setLaddniva('');
+    if (type === '100% el') {
+      setDrivmedelstyp('elbil');
+      setBransletyp(null);
+    } else if (type === 'Diesel' || type === 'Hybrid (diesel)') {
+      setDrivmedelstyp('bensin_diesel');
+      setBransletyp('Diesel');
+    } else {
+      // Bensin or Hybrid (bensin)
+      setDrivmedelstyp('bensin_diesel');
+      setBransletyp('Bensin');
     }
   };
 
@@ -310,6 +332,7 @@ export default function ArrivalForm() {
     setStation('');
     setMatarstallning('');
     setDrivmedelstyp(null);
+    setDetailedBransletyp(null);
     setTankniva(null);
     setLiters('');
     setBransletyp(null);
@@ -441,7 +464,6 @@ export default function ArrivalForm() {
             <div className="info-box">
               <div className="info-grid">
                 <InfoRow label="Bilmodell" value={vehicleModel || '---'} />
-                {knownBransletyp && <InfoRow label="Drivmedel" value={knownBransletyp} />}
               </div>
             </div>
           )}
@@ -475,19 +497,28 @@ export default function ArrivalForm() {
             <input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" />
           </Field>
 
-          <SubSectionHeader title="Tankning/Laddning" />
-          {/* Show drivmedelstyp selector only if not auto-detected */}
-          {!knownBransletyp && (
-            <Field label="Drivmedelstyp *">
-              <div className="grid-2-col">
-                <ChoiceButton onClick={() => setDrivmedelstyp('bensin_diesel')} isActive={drivmedelstyp === 'bensin_diesel'} isSet={drivmedelstyp !== null}>Bensin/Diesel</ChoiceButton>
-                <ChoiceButton onClick={() => setDrivmedelstyp('elbil')} isActive={drivmedelstyp === 'elbil'} isSet={drivmedelstyp !== null}>Elbil</ChoiceButton>
+          <SubSectionHeader title={
+            drivmedelstyp === 'elbil' ? 'Laddstatus' :
+            drivmedelstyp === 'bensin_diesel' ? 'Tankstatus' :
+            'Tankning/Laddning'
+          } />
+          {/* Show 5-option bränsletyp selector only if not auto-detected */}
+          {!knownBransletyp && !detailedBransletyp && (
+            <Field label="Vilken drivmedelstyp? *">
+              <div className="grid-fuel-5">
+                <ChoiceButton onClick={() => selectDetailedBransletyp('Bensin')} isActive={false} isSet={false}>Bensin</ChoiceButton>
+                <ChoiceButton onClick={() => selectDetailedBransletyp('Diesel')} isActive={false} isSet={false}>Diesel</ChoiceButton>
+                <ChoiceButton onClick={() => selectDetailedBransletyp('Hybrid (bensin)')} isActive={false} isSet={false}>Bensinhybrid</ChoiceButton>
+                <ChoiceButton onClick={() => selectDetailedBransletyp('Hybrid (diesel)')} isActive={false} isSet={false}>Dieselhybrid</ChoiceButton>
+                <ChoiceButton onClick={() => selectDetailedBransletyp('100% el')} isActive={false} isSet={false}>100% el</ChoiceButton>
               </div>
             </Field>
           )}
-          {knownBransletyp && drivmedelstyp && (
+          {/* Show selected type with option to change */}
+          {!knownBransletyp && detailedBransletyp && (
             <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Drivmedel: <strong>{knownBransletyp}</strong> (från fordonsdata)
+              Drivmedel: <strong>{detailedBransletyp}</strong>{' '}
+              <button type="button" onClick={() => { setDetailedBransletyp(null); setDrivmedelstyp(null); setTankniva(null); setLiters(''); setBransletyp(null); setLiterpris(''); setLaddniva(''); }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.875rem' }}>Ändra</button>
             </p>
           )}
 
@@ -506,8 +537,8 @@ export default function ArrivalForm() {
                   <Field label="Antal liter *">
                     <input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" />
                   </Field>
-                  {/* Show bränsletyp selector only if not known */}
-                  {!inferBransletyp(knownBransletyp) && (
+                  {/* Show bränsletyp selector only if not known from DB or user selection */}
+                  {!inferBransletyp(knownBransletyp) && !detailedBransletyp && (
                     <Field label="Bränsletyp *">
                       <div className="fuel-type-buttons">
                         <ChoiceButton onClick={() => setBransletyp('Bensin')} isActive={bransletyp === 'Bensin'} isSet={bransletyp !== null}>Bensin</ChoiceButton>
@@ -630,6 +661,7 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .info-grid > span { font-size: 0.875rem; align-self: center; }
     .grid-2-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
     .grid-3-col { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+    .grid-fuel-5 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
     .fuel-type-buttons { display: flex; flex-wrap: wrap; gap: 1rem; }
     .fuel-type-buttons .choice-btn { flex-grow: 1; }
     .form-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--color-border); display: flex; gap: 1rem; justify-content: flex-end; padding-bottom: 120px; }
@@ -684,5 +716,6 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .grid-3-col .choice-btn { min-height: 48px; }
     @media (max-width: 480px) {
       .grid-3-col { grid-template-columns: 1fr; }
+      .grid-fuel-5 { grid-template-columns: 1fr 1fr; }
     }
 `}</style>);
