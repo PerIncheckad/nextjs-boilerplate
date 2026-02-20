@@ -312,6 +312,7 @@ export default function ArrivalForm() {
         throw new Error(result.error || 'Något gick fel.');
       }
       setShowSuccessModal(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       setTimeout(() => {
         setShowSuccessModal(false);
         resetForm();
@@ -383,7 +384,7 @@ export default function ArrivalForm() {
           <div className="modal-content success-modal">
             <div className="success-icon">✅</div>
             <h2>Ankomst registrerad!</h2>
-            <p>Mejl skickat till huvudstation.</p>
+            <p>Mejl skickat till biluthyrarna.</p>
           </div>
         </Fragment>
       )}
@@ -591,7 +592,7 @@ export default function ArrivalForm() {
 
         {/* SUBMIT BUTTON */}
         <div className="form-actions">
-          <Button onClick={handleSubmit} variant="primary" disabled={isSaving}>
+          <Button onClick={handleSubmit} variant={isFormValid ? 'success' : 'primary'} disabled={isSaving}>
             {isSaving ? 'Skickar...' : 'Registrera ankomst'}
           </Button>
         </div>
