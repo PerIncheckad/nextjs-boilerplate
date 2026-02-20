@@ -1,38 +1,57 @@
 import type { Metadata } from 'next';
-import LoginGate from '@/components/LoginGate';
-
-const currentYear = new Date().getFullYear();
 
 export const metadata: Metadata = {
   title: 'Incheckad',
   description: 'Startsida',
 };
 
-const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
-
 export default function HomePage() {
   return (
-    <LoginGate>
-      <main className="welcome-main">
-        <div className="background-img" />
-        
-        <div className="welcome-card">
-          <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
-          
-          <h1 className="welcome-title">Välkommen!</h1>
-          
-          <div className="btn-group">
-            <a href="/check" className="btn incheckning">Ny incheckning</a>
-            <a href="/nybil" className="btn registrera">Registrera ny bil</a>
-          </div>
-          
-
+    <main className="min-h-screen grid place-items-center p-8">
+      <div className="max-w-xl w-full text-center space-y-6">
+        <h1 className="text-3xl font-semibold">Välkommen</h1>
+        <p className="opacity-80">
+          Välj ett alternativ nedan.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+          <a
+            href="/ankomst"
+            style={{
+              display: 'inline-block',
+              padding: '12px 24px',
+              backgroundColor: '#dc2626',
+              color: '#ffffff',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              fontWeight: '600',
+              fontSize: '16px',
+              minWidth: '220px',
+            }}
+          >
+            Inkommen
+          </a>
+          <a
+            href="/check"
+            className="inline-block rounded-md border px-4 py-2"
+          >
+            Ny incheckning
+          </a>
         </div>
-        
-        <footer className="homepage-footer">
-          &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
-        </footer>
-      </main>
-    </LoginGate>
+        <a
+          href="/check/drafts"
+          style={{
+            display: 'inline-block',
+            marginTop: 12,
+            padding: '8px 14px',
+            border: '1px solid #d1d5db',
+            borderRadius: 6,
+            textDecoration: 'none',
+            color: '#e5e7eb'
+          }}
+        >
+          Fortsätt påbörjad incheckning
+        </a>
+      </div>
+    </main>
   );
 }
