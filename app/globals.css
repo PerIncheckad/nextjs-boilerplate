@@ -15,24 +15,23 @@ body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
   position: relative;
-  /* Ta bort global padding-bottom som orsakade onödig scroll */
   background: var(--background);
 }
 
 /* Utility / layout */
 .welcome-main {
   position: relative;
-  height: 100dvh; /* force exact viewport height */
-  overflow: hidden; /* prevent scrolling */
+  height: 100dvh;
+  overflow: hidden;
   box-sizing: border-box;
   display: grid;
   place-items: center;
   padding: 24px;
-  padding-top: 0; /* remove top padding to prevent scroll */
-  padding-bottom: 0; /* remove bottom padding to prevent scroll */
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
-/* Background layer (endast på startsidan via app/page.tsx) */
+/* Background layer */
 .background-img {
   position: fixed;
   inset: 0;
@@ -40,8 +39,8 @@ body {
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
-  z-index: 0; /* card över */
-  pointer-events: none; /* låt klick gå igenom */
+  z-index: 0;
+  pointer-events: none;
 }
 
 /* Card med 90% vitt */
@@ -57,7 +56,6 @@ body {
   text-align: center;
 }
 
-/* Move card up on desktop without scroll */
 @media (min-width: 641px) {
   .welcome-card {
     transform: translateY(-3vh);
@@ -87,10 +85,10 @@ body {
   margin-bottom: 12px;
 }
 
-/* Knappar: begränsa bredd, centrera */
+/* Knappar */
 .btn {
-  display: block;       /* för centrering via margin */
-  margin: 0 auto;       /* centrera */
+  display: block;
+  margin: 0 auto;
   padding: 12px 24px;
   border-radius: 8px;
   text-decoration: none;
@@ -101,7 +99,10 @@ body {
 }
 .btn:hover { opacity: 0.9; }
 
-/* Force narrow buttons on desktop with high specificity */
+.btn.inkommen {
+  background: #dc2626;
+}
+
 .btn.incheckning {
   background: var(--main-green);
 }
@@ -116,6 +117,7 @@ body {
 
 /* Desktop: force 120px width */
 @media (min-width: 641px) {
+  .welcome-card .btn.inkommen,
   .welcome-card .btn.incheckning,
   .welcome-card .btn.registrera,
   .welcome-card .report-btn {
@@ -126,6 +128,7 @@ body {
 
 /* Mobile: narrower buttons, centered */
 @media (max-width: 640px) {
+  .welcome-card .btn.inkommen,
   .welcome-card .btn.incheckning,
   .welcome-card .btn.registrera,
   .welcome-card .report-btn {
@@ -135,7 +138,7 @@ body {
   }
 }
 
-/* Divider med samma bredd som knapparna */
+/* Divider */
 .divider-wrap { 
   display: flex; 
   justify-content: center; 
@@ -150,12 +153,11 @@ body {
   max-width: 120px;
 }
 
-/* report-section spacing to center divider */
 .report-section {
   margin-top: 12px;
 }
 
-/* Sticky footer (endast startsidan använder denna klass) */
+/* Sticky footer */
 .homepage-footer {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -169,7 +171,6 @@ body {
   font-size: 0.9rem;
 }
 
-/* Generisk copyright-text (används bl.a. i formulärsidor) */
 .copyright-footer {
   text-align: center;
   margin-top: 24px;
