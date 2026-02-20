@@ -1,15 +1,11 @@
 import type { Metadata } from 'next';
 import LoginGate from '@/components/LoginGate';
-
 const currentYear = new Date().getFullYear();
-
 export const metadata: Metadata = {
   title: 'Incheckad',
   description: 'Startsida',
 };
-
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
-
 export default function HomePage() {
   return (
     <LoginGate>
@@ -22,11 +18,11 @@ export default function HomePage() {
           <h1 className="welcome-title">Välkommen!</h1>
           
           <div className="btn-group">
+            <a href="/ankomst" className="btn inkommen">Inkommen</a>
             <a href="/check" className="btn incheckning">Ny incheckning</a>
             <a href="/nybil" className="btn registrera">Registrera ny bil</a>
           </div>
           
-
         </div>
         
         <footer className="homepage-footer">
