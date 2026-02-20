@@ -47,7 +47,14 @@ const escapeHtml = (text: string): string => {
 const formatTankning = (payload: any): string => {
   if (!payload.fuel_level) return '---';
   if (payload.fuel_level === 'elbil') {
-    return payload.charge_level ? `Laddningsnivå: ${payload.charge_level}%` : 'Elbil';
+    if (payload.charge_level) {
+      const level = parseInt(payload.charge_level, 10);
+      if (!isNaN(level) && level < 95) {
+        return `<span style="font-weight:bold;color:#b91c1c;">Laddningsnivå: ${payload.charge_level}%</span>`;
+      }
+      return `Laddningsnivå: ${payload.charge_level}%`;
+    }
+    return 'Elbil';
   }
   if (payload.fuel_level === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
   if (payload.fuel_level === 'tankad_nu') {
@@ -81,22 +88,13 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
   const tankningLabel = isElbil ? 'Laddning' : 'Tankning';
   const notesText = payload.notes ? escapeHtml(payload.notes) : null;
 
-  const notRefueled = payload.fuel_level === 'ej_upptankad';
-  const warningBanner = notRefueled
-    ? `<tr><td style="background-color:#b91c1c;color:white;font-weight:700;padding:12px 16px;border-radius:6px;text-align:center;margin-bottom:16px;">
-         EJ UPPTANKAD
-       </td></tr>`
-    : '';
-
   const content = `
     <tr><td style="text-align:center;padding-bottom:20px;">
       <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">
-        <span style="display:inline-block;background:#2563eb;color:white;padding:4px 12px;border-radius:6px;font-size:14px;letter-spacing:0.05em;vertical-align:middle;margin-right:8px;">ANKOMST</span>
         ${escapeHtml(regNr)}
       </h1>
       <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">Bilen har anlänt och inväntar fullständig incheckning</p>
     </td></tr>
-    ${warningBanner}
     <tr><td style="padding-top:12px;">
       <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
         <table width="100%" style="font-size:14px;">
@@ -240,9 +238,7 @@ export async function POST(request: Request) {
 
     // --- 4. Build subject ---
     const cleanStation = payload.current_station || finalOrt || '---';
-    const notRefueled = payload.fuel_level === 'ej_upptankad';
-    const emojiMarker = notRefueled ? ' - ⚠️' : '';
-    const subject = `ANKOMST: ${regNr} - ${cleanStation}${emojiMarker}`;
+    const subject = `PRELLA: ${regNr} ${cleanStation}`;
 
     // --- 5. Send email ---
     const html = buildArrivalEmail(payload, date, time);
