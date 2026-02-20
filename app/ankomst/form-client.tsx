@@ -513,8 +513,8 @@ export default function ArrivalForm() {
               <div className="grid-fuel-5">
                 <ChoiceButton onClick={() => selectDetailedBransletyp('Bensin')} isActive={false} isSet={false}>Bensin</ChoiceButton>
                 <ChoiceButton onClick={() => selectDetailedBransletyp('Diesel')} isActive={false} isSet={false}>Diesel</ChoiceButton>
-                <ChoiceButton onClick={() => selectDetailedBransletyp('Hybrid (bensin)')} isActive={false} isSet={false}>Bensinhybrid</ChoiceButton>
-                <ChoiceButton onClick={() => selectDetailedBransletyp('Hybrid (diesel)')} isActive={false} isSet={false}>Dieselhybrid</ChoiceButton>
+                <ChoiceButton onClick={() => selectDetailedBransletyp('Hybrid (bensin)')} isActive={false} isSet={false}>Hybrid (bensin)</ChoiceButton>
+                <ChoiceButton onClick={() => selectDetailedBransletyp('Hybrid (diesel)')} isActive={false} isSet={false}>Hybrid (diesel)</ChoiceButton>
                 <ChoiceButton onClick={() => selectDetailedBransletyp('100% el')} isActive={false} isSet={false}>100% el</ChoiceButton>
               </div>
             </Field>
