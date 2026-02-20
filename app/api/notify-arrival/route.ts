@@ -46,6 +46,9 @@ const escapeHtml = (text: string): string => {
 
 const formatTankning = (payload: any): string => {
   if (!payload.fuel_level) return '---';
+  if (payload.fuel_level === 'elbil') {
+    return payload.charge_level ? `Laddningsnivå: ${payload.charge_level}%` : 'Elbil';
+  }
   if (payload.fuel_level === 'återlämnades_fulltankad') return 'Återlämnades fulltankad';
   if (payload.fuel_level === 'tankad_nu') {
     const parts = [
@@ -74,6 +77,9 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
   const station = payload.current_station || '---';
   const odometer = payload.odometer_km || '---';
   const tankningText = formatTankning(payload);
+  const isElbil = payload.fuel_level === 'elbil';
+  const tankningLabel = isElbil ? 'Laddning' : 'Tankning';
+  const notesText = payload.notes ? escapeHtml(payload.notes) : null;
 
   const notRefueled = payload.fuel_level === 'ej_upptankad';
   const warningBanner = notRefueled
@@ -98,7 +104,8 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
             <tr><td style="padding:4px 0;"><strong>Bilmodell:</strong> ${escapeHtml(carModel)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Plats:</strong> ${escapeHtml(ort)} / ${escapeHtml(station)}</td></tr>
             <tr><td style="padding:4px 0;"><strong>Mätarställning:</strong> ${odometer} km</td></tr>
-            <tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>${tankningLabel}:</strong> ${tankningText}</td></tr>
+            ${notesText ? `<tr><td style="padding:4px 0;"><strong>Kommentar:</strong> ${notesText}</td></tr>` : ''}
           </tbody>
         </table>
       </div>
@@ -193,6 +200,12 @@ export async function POST(request: Request) {
       checker_email: payload.checker_email || null,
       checker_name: payload.checker_name || null,
       car_model: payload.car_model || null,
+      charge_level: (() => {
+        if (!payload.charge_level) return null;
+        const parsed = parseInt(payload.charge_level, 10);
+        return isNaN(parsed) ? null : parsed;
+      })(),
+      notes: payload.notes || null,
     };
 
     const { error: insertError } = await supabaseAdmin
