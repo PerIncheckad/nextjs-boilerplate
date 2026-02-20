@@ -7,17 +7,41 @@ export const metadata: Metadata = {
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen grid place-items-center p-8">
-      <div className="max-w-xl w-full text-center space-y-6">
-        <h1 className="text-3xl font-semibold">Välkommen</h1>
-        <p className="opacity-80">
+    <main style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '32px',
+      backgroundColor: '#f8fafc',
+    }}>
+      <div style={{
+        maxWidth: '400px',
+        width: '100%',
+        textAlign: 'center',
+      }}>
+        <h1 style={{
+          fontSize: '1.875rem',
+          fontWeight: '600',
+          marginBottom: '8px',
+        }}>
+          Välkommen
+        </h1>
+        <p style={{ opacity: 0.8, marginBottom: '24px' }}>
           Välj ett alternativ nedan.
         </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '12px',
+        }}>
           <a
             href="/ankomst"
             style={{
-              display: 'inline-block',
+              display: 'block',
+              width: '220px',
               padding: '12px 24px',
               backgroundColor: '#dc2626',
               color: '#ffffff',
@@ -25,28 +49,41 @@ export default function HomePage() {
               textDecoration: 'none',
               fontWeight: '600',
               fontSize: '16px',
-              minWidth: '220px',
+              textAlign: 'center',
             }}
           >
             Inkommen
           </a>
           <a
             href="/check"
-            className="inline-block rounded-md border px-4 py-2"
+            style={{
+              display: 'block',
+              width: '220px',
+              padding: '12px 24px',
+              border: '1px solid #d1d5db',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              fontWeight: '500',
+              fontSize: '16px',
+              color: '#111827',
+              textAlign: 'center',
+            }}
           >
             Ny incheckning
           </a>
         </div>
+
         <a
           href="/check/drafts"
           style={{
             display: 'inline-block',
-            marginTop: 12,
+            marginTop: '24px',
             padding: '8px 14px',
             border: '1px solid #d1d5db',
-            borderRadius: 6,
+            borderRadius: '6px',
             textDecoration: 'none',
-            color: '#e5e7eb'
+            color: '#9ca3af',
+            fontSize: '14px',
           }}
         >
           Fortsätt påbörjad incheckning
