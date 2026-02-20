@@ -100,6 +100,7 @@ export default function ArrivalForm() {
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
   const [literpris, setLiterpris] = useState('');
   const [laddniva, setLaddniva] = useState('');
+  const [notes, setNotes] = useState('');
 
   // UI state
   const [showFieldErrors, setShowFieldErrors] = useState(false);
@@ -146,11 +147,12 @@ export default function ArrivalForm() {
       fuel_liters: tankniva === 'tankad_nu' ? liters : null,
       fuel_price_per_liter: tankniva === 'tankad_nu' ? literpris : null,
       charge_level: drivmedelstyp === 'elbil' ? laddniva : null,
+      notes: notes.trim() || null,
       checker_email: userEmail,
       checker_name: fullName,
       car_model: vehicleModel || '---',
     };
-  }, [regInput, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, userEmail, fullName, vehicleModel, knownBransletyp, detailedBransletyp]);
+  }, [regInput, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, notes, userEmail, fullName, vehicleModel, knownBransletyp, detailedBransletyp]);
 
   // --- Vehicle lookup ---
   const fetchVehicleData = useCallback(async (reg: string) => {
@@ -338,6 +340,7 @@ export default function ArrivalForm() {
     setBransletyp(null);
     setLiterpris('');
     setLaddniva('');
+    setNotes('');
     setShowFieldErrors(false);
   };
 
@@ -417,6 +420,7 @@ export default function ArrivalForm() {
                 <p>📍 <strong>Plats:</strong> {ort} / {station}</p>
                 <p>🛣️ <strong>Mätarställning:</strong> {matarstallning} km</p>
                 <p>{drivmedelstyp === 'elbil' ? '⚡' : '⛽'} <strong>{drivmedelstyp === 'elbil' ? 'Laddning' : 'Tankning'}:</strong> {getTankningDisplayText()}</p>
+                {notes.trim() && <p>📝 <strong>Kommentar:</strong> {notes.trim()}</p>}
               </div>
             </div>
             <div className="modal-actions">
@@ -570,6 +574,19 @@ export default function ArrivalForm() {
               />
             </Field>
           )}
+        </Card>
+
+        {/* KOMMENTAR */}
+        <Card>
+          <SectionHeader title="Kommentar" />
+          <Field label="Övrig kommentar (frivilligt)">
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="T.ex. nycklar i handskfacket, behöver laddas omgående..."
+            />
+          </Field>
         </Card>
 
         {/* SUBMIT BUTTON */}
