@@ -750,7 +750,7 @@ function addNewDamagesToRecords(
     
     // Build damage type with positions
     let skadetyp: string;
-    const damageType = cd.damage_type || 'Okänd';
+    const damageType = formatDamageTypeSwedish(cd.damage_type);
     
     if (cd.positions && Array.isArray(cd.positions) && cd.positions.length > 0) {
       const positionsStr = formatDamagePositions(cd.positions);
