@@ -93,7 +93,7 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
       <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">
         ${escapeHtml(regNr)}
       </h1>
-      <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">Bilen har anlänt</p>
+      <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">Bilen har anlänt men är inte incheckad</p>
     </td></tr>
     <tr><td style="padding-top:12px;">
       <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
