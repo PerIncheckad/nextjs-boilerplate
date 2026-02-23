@@ -93,7 +93,7 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
       <h1 style="font-size:24px;font-weight:700;margin:0 0 4px;">
         ${escapeHtml(regNr)}
       </h1>
-      <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">Bilen har anlänt och inväntar fullständig incheckning</p>
+      <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">Bilen har anlänt men är inte incheckad</p>
     </td></tr>
     <tr><td style="padding-top:12px;">
       <div style="background:#f9fafb!important;border:1px solid #e5e7eb;padding:15px;border-radius:6px;margin-bottom:20px;">
@@ -112,9 +112,15 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
       <p style="margin-top:12px;font-size:14px;color:#6b7280;">
         Registrerad av ${escapeHtml(checkerName)} kl ${time}, ${date}
       </p>
-      <p style="margin-top:8px;font-size:13px;color:#9ca3af;font-style:italic;">
-        Fullständig incheckning sker inom kort.
-      </p>
+      <div style="margin-top:12px;padding:12px 16px;background:#fff5f5;border:1px solid #fecaca;border-radius:6px;">
+        <p style="margin:0 0 8px 0;font-weight:bold;color:#b91c1c;font-size:14px;">Obs! Bilen är inte incheckad!</p>
+        <p style="margin:0 0 4px 0;font-weight:bold;color:#b91c1c;font-size:13px;">Det innebär bland annat:</p>
+        <ul style="margin:0 0 8px 0;padding-left:20px;color:#b91c1c;font-size:13px;font-weight:bold;">
+          <li>Bilen är inte tvättad</li>
+          <li>Bilen är inte skadekontrollerad</li>
+        </ul>
+        <p style="margin:0;font-weight:bold;color:#b91c1c;font-size:13px;">Separat mejl skickas när bilen är incheckad.</p>
+      </div>
     </td></tr>
   `;
 
@@ -238,7 +244,7 @@ export async function POST(request: Request) {
 
     // --- 4. Build subject ---
     const cleanStation = payload.current_station || finalOrt || '---';
-    const subject = `PRELLA: ${regNr} ${cleanStation}`;
+    const subject = `🔵 PRELLA: ${regNr} - ${cleanStation}`;
 
     // --- 5. Send email ---
     const html = buildArrivalEmail(payload, date, time);

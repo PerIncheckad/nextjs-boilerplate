@@ -171,7 +171,7 @@ export default function StatusForm() {
   
   // History section state
   const [historyExpanded, setHistoryExpanded] = useState(false);
-  const [historyFilter, setHistoryFilter] = useState<'all' | 'incheckning' | 'nybil' | 'manual'>('all');
+  const [historyFilter, setHistoryFilter] = useState<Set<string>>(new Set(['all']));
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set());
   
   // Nybil modal state
@@ -276,9 +276,35 @@ export default function StatusForm() {
   // Filter history based on selected filter
   const filteredHistory = useMemo(() => {
     if (!vehicleStatus?.history) return [];
-    if (historyFilter === 'all') return vehicleStatus.history;
-    return vehicleStatus.history.filter(h => h.typ === historyFilter);
+    if (historyFilter.has('all')) return vehicleStatus.history;
+    return vehicleStatus.history.filter(h => historyFilter.has(h.typ));
   }, [vehicleStatus?.history, historyFilter]);
+
+  // Toggle history filter (multi-select)
+  const toggleHistoryFilter = useCallback((typ: string) => {
+    if (typ === 'all') {
+      setHistoryFilter(new Set(['all']));
+      return;
+    }
+    setHistoryFilter(prev => {
+      const next = new Set(prev);
+      // If 'all' is currently active, switch to only this type
+      if (next.has('all')) {
+        return new Set([typ]);
+      }
+      // Toggle the clicked type
+      if (next.has(typ)) {
+        next.delete(typ);
+      } else {
+        next.add(typ);
+      }
+      // If nothing selected, revert to 'all'
+      if (next.size === 0) {
+        return new Set(['all']);
+      }
+      return next;
+    });
+  }, []);
 
   // Toggle functions for expandable history
   const toggleEvent = useCallback((eventId: string) => {
@@ -491,9 +517,11 @@ export default function StatusForm() {
                   <div style={{ fontWeight: 'normal', fontSize: '1rem' }}>
                     {event.typ === 'incheckning' 
                       ? `Incheckad av ${event.utfordAv}${event.plats ? ` på ${event.plats}` : ''}`
-                      : event.typ === 'buhs_skada' && event.buhsSkadaDetaljer?.skadetyp
-                        ? event.buhsSkadaDetaljer.skadetyp
-                        : `Nybilsregistrering av ${event.utfordAv}`
+                      : event.typ === 'ankomst'
+                        ? `Inkommen${event.plats ? ` till ${event.plats}` : ''}. Registrerad av ${event.utfordAv}`
+                        : event.typ === 'buhs_skada' && event.buhsSkadaDetaljer?.skadetyp
+                          ? event.buhsSkadaDetaljer.skadetyp
+                          : `Nybilsregistrering av ${event.utfordAv}`
                     }
                     {hasAvvikelser && ' ⚠️'}
                   </div>
@@ -679,26 +707,32 @@ export default function StatusForm() {
                   
                   <div className="history-filter">
                     <FilterButton
-                      active={historyFilter === 'all'}
-                      onClick={() => setHistoryFilter('all')}
+                      active={historyFilter.has('all')}
+                      onClick={() => toggleHistoryFilter('all')}
                     >
                       Alla
                     </FilterButton>
                     <FilterButton
-                      active={historyFilter === 'incheckning'}
-                      onClick={() => setHistoryFilter('incheckning')}
+                      active={historyFilter.has('incheckning')}
+                      onClick={() => toggleHistoryFilter('incheckning')}
                     >
                       Incheckningar
                     </FilterButton>
                     <FilterButton
-                      active={historyFilter === 'nybil'}
-                      onClick={() => setHistoryFilter('nybil')}
+                      active={historyFilter.has('ankomst')}
+                      onClick={() => toggleHistoryFilter('ankomst')}
+                    >
+                      Inkommen
+                    </FilterButton>
+                    <FilterButton
+                      active={historyFilter.has('nybil')}
+                      onClick={() => toggleHistoryFilter('nybil')}
                     >
                       Nybil
                     </FilterButton>
                     <FilterButton
-                      active={historyFilter === 'manual'}
-                      onClick={() => setHistoryFilter('manual')}
+                      active={historyFilter.has('manual')}
+                      onClick={() => toggleHistoryFilter('manual')}
                     >
                       Manuella ändringar
                     </FilterButton>
@@ -1062,6 +1096,7 @@ const HistoryItem: React.FC<{
   const getTypeLabel = (typ: string) => {
     switch (typ) {
       case 'incheckning': return 'INCHECKNING';
+      case 'ankomst': return 'INKOMMEN';
       case 'nybil': return 'NYBILSREGISTRERING';
       case 'manual': return 'MANUELL ÄNDRING';
       case 'buhs_skada': return 'SKADA';
@@ -1456,6 +1491,45 @@ const HistoryItem: React.FC<{
                 ))}
               </ul>
             </div>
+          )}
+          
+          {/* For ankomst */}
+          {record.typ === 'ankomst' && record.ankomstDetaljer && (
+            <>
+              {record.ankomstDetaljer.station && (
+                <div className="history-detail-row">
+                  <strong>Station:</strong> {record.ankomstDetaljer.station}
+                </div>
+              )}
+              {record.ankomstDetaljer.matarstallning && (
+                <div className="history-detail-row">
+                  <strong>Mätarställning:</strong> {record.ankomstDetaljer.matarstallning}
+                </div>
+              )}
+              {record.ankomstDetaljer.drivmedel && (
+                <div className="history-detail-row">
+                  <strong>Drivmedel:</strong> {record.ankomstDetaljer.drivmedel}
+                </div>
+              )}
+              {record.ankomstDetaljer.tankningInfo && (
+                <div className="history-detail-row">
+                  <strong>Tankning:</strong> {record.ankomstDetaljer.tankningInfo}
+                </div>
+              )}
+              {record.ankomstDetaljer.laddningInfo && (
+                <div className="history-detail-row">
+                  <strong>Laddning:</strong> {record.ankomstDetaljer.laddningInfo}
+                </div>
+              )}
+              {record.ankomstDetaljer.notes && (
+                <div className="history-detail-row">
+                  <strong>Kommentar:</strong> {record.ankomstDetaljer.notes}
+                </div>
+              )}
+              <div className="history-detail-row">
+                <strong>Registrerad av:</strong> {record.utfordAv}
+              </div>
+            </>
           )}
         </div>
       )}

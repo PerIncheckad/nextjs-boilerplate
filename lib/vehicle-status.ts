@@ -88,7 +88,7 @@ export type HistoryRecord = {
   id: string;
   datum: string;
   rawTimestamp: string; // ISO string for sorting
-  typ: 'incheckning' | 'nybil' | 'manual' | 'buhs_skada';
+  typ: 'incheckning' | 'nybil' | 'manual' | 'buhs_skada' | 'ankomst';
   sammanfattning: string;
   utfordAv: string;
   plats?: string; // t.ex. "Halmstad / FORD Halmstad"
@@ -176,6 +176,16 @@ export type HistoryRecord = {
     checkinWhereDocumented?: number | null; // checkin_id where this BUHS damage was documented
     documentedBy?: string | null; // checker_name who documented it
     mediaFolder?: string | null; // media folder for linking to damage photos (Kommentar 2)
+  };
+  
+  // Detaljerad info för ankomst (typ='ankomst')
+  ankomstDetaljer?: {
+    station?: string;
+    matarstallning?: string;
+    tankningInfo?: string;
+    laddningInfo?: string;
+    drivmedel?: string;
+    notes?: string;
   };
 };
 
@@ -813,7 +823,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
 
   // Fetch data from all sources concurrently
-  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse] = await Promise.all([
+  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse, arrivalsResponse] = await Promise.all([
     // nybil_inventering - newest first
     supabase
       .from('nybil_inventering')
@@ -846,6 +856,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       .select('*')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false }),
+    
+    // arrivals (from /ankomst form)
+    supabase
+      .from('arrivals')
+      .select('*')
+      .eq('regnr', cleanedRegnr)
+      .order('created_at', { ascending: false }),
   ]);
 
   const nybilData = nybilResponse.data;
@@ -853,6 +870,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const damages = damagesResponse.data || [];
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
+  const arrivals = arrivalsResponse.data || [];
   
   // DEBUG: Log raw data for LRA75R
   if (cleanedRegnr === 'LRA75R') {
@@ -1635,6 +1653,49 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           });
         }
       }
+    }
+    
+    // Add arrivals (from /ankomst) to history
+    for (const arrival of arrivals) {
+      const arrivalTime = arrival.created_at || '';
+      const station = arrival.current_station || '';
+      const city = arrival.current_city || '';
+      const plats = city && station ? `${city} / ${station}` : city || station || undefined;
+      
+      // Build tank/ladd info
+      let tankningInfo: string | undefined;
+      let laddningInfo: string | undefined;
+      const isElectric = arrival.fuel_type === '100% el';
+      
+      if (isElectric) {
+        if (arrival.charge_level != null) {
+          laddningInfo = `${arrival.charge_level}%`;
+        }
+      } else if (arrival.fuel_level) {
+        tankningInfo = arrival.fuel_level === 'fulltankad' ? 'Fulltankad'
+          : arrival.fuel_level === 'ej_full' ? 'Ej upptankad'
+          : arrival.fuel_level;
+      }
+      
+      const checkerName = arrival.checker_name || getFullNameFromEmail(arrival.checker_email || '');
+      
+      historyRecords.push({
+        id: `ankomst-${arrival.id}`,
+        datum: formatDateTime(arrivalTime),
+        rawTimestamp: arrivalTime,
+        typ: 'ankomst',
+        sammanfattning: `Inkommen till ${station || '?'}. Registrerad av ${checkerName}`,
+        utfordAv: checkerName,
+        plats,
+        ankomstDetaljer: {
+          station: plats,
+          matarstallning: arrival.odometer_km ? `${arrival.odometer_km} km` : undefined,
+          tankningInfo,
+          laddningInfo,
+          drivmedel: arrival.fuel_type || undefined,
+          notes: arrival.notes || undefined,
+        },
+      });
     }
     
     // Sort history by rawTimestamp (newest first)
@@ -2628,6 +2689,49 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
       }
     }
+  }
+
+  // Add arrivals (from /ankomst) to history
+  for (const arrival of arrivals) {
+    const arrivalTime = arrival.created_at || '';
+    const station = arrival.current_station || '';
+    const city = arrival.current_city || '';
+    const plats = city && station ? `${city} / ${station}` : city || station || undefined;
+    
+    // Build tank/ladd info
+    let tankningInfo: string | undefined;
+    let laddningInfo: string | undefined;
+    const isElectric = arrival.fuel_type === '100% el';
+    
+    if (isElectric) {
+      if (arrival.charge_level != null) {
+        laddningInfo = `${arrival.charge_level}%`;
+      }
+    } else if (arrival.fuel_level) {
+      tankningInfo = arrival.fuel_level === 'fulltankad' ? 'Fulltankad'
+        : arrival.fuel_level === 'ej_full' ? 'Ej upptankad'
+        : arrival.fuel_level;
+    }
+    
+    const checkerName = arrival.checker_name || getFullNameFromEmail(arrival.checker_email || '');
+    
+    historyRecords.push({
+      id: `ankomst-${arrival.id}`,
+      datum: formatDateTime(arrivalTime),
+      rawTimestamp: arrivalTime,
+      typ: 'ankomst',
+      sammanfattning: `Inkommen till ${station || '?'}. Registrerad av ${checkerName}`,
+      utfordAv: checkerName,
+      plats,
+      ankomstDetaljer: {
+        station: plats,
+        matarstallning: arrival.odometer_km ? `${arrival.odometer_km} km` : undefined,
+        tankningInfo,
+        laddningInfo,
+        drivmedel: arrival.fuel_type || undefined,
+        notes: arrival.notes || undefined,
+      },
+    });
   }
 
   // Sort history by rawTimestamp (newest first)
