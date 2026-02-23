@@ -722,7 +722,7 @@ export default function StatusForm() {
                       active={historyFilter.has('ankomst')}
                       onClick={() => toggleHistoryFilter('ankomst')}
                     >
-                      Inkomna
+                      Inkommen
                     </FilterButton>
                     <FilterButton
                       active={historyFilter.has('nybil')}
