@@ -2637,7 +2637,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         mottagenVid,
         matarstallningVidLeverans: nybilData.matarstallning_inkop ? `${nybilData.matarstallning_inkop} km` : undefined,
         hjultyp: nybilData.hjultyp || undefined,
-        drivmedel: nybilData.bransletyp || undefined,
+        drivmedel: nybilData.bransletyp ? displayBransletyp(nybilData.bransletyp) : undefined,
         planeradStation: nybilData.planerad_station || undefined,
         skador: nybilSkador.length > 0 ? nybilSkador : undefined,
       },
