@@ -711,11 +711,13 @@ function buildTankningInfo(checkin: any): string | undefined {
   // If tankad_nu or we have liters and price, build full string
   if (checkin.fuel_liters && checkin.fuel_price_per_liter && checkin.fuel_type) {
     return `Tankad nu av MABI (${checkin.fuel_liters}L ${displayBransletyp(checkin.fuel_type)} @ ${checkin.fuel_price_per_liter} kr/L)`;
-  
+  }
+
   // If we have liters but no price
   if (checkin.fuel_liters && checkin.fuel_type) {
     return `Tankad nu av MABI (${checkin.fuel_liters}L ${displayBransletyp(checkin.fuel_type)})`;
-  
+  }
+
   // Otherwise just indicate fuel type if available
   if (checkin.fuel_type) {
       return `${displayBransletyp(checkin.fuel_type)}`;
