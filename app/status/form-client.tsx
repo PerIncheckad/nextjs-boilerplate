@@ -544,7 +544,7 @@ export default function StatusForm() {
               <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
               <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
-              <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning} />
+              <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} />
               <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
               <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />

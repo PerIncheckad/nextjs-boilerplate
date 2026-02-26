@@ -11,6 +11,7 @@ export type VehicleStatusData = {
   bilmarkeModell: string;
   bilenStarNu: string; // ort + station (with datetime if from checkin)
   matarstallning: string;
+  matarstallningKalla: string;
   hjultyp: string;
   hjulforvaring: string;
   drivmedel: string;
@@ -993,6 +994,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       matarstallning: latestCheckin?.odometer_km
         ? `${latestCheckin.odometer_km} km`
         : '---',
+      matarstallningKalla: latestCheckin?.odometer_km && (latestCheckin?.completed_at || latestCheckin?.created_at)
+        ? `incheckning ${formatDate(latestCheckin.completed_at || latestCheckin.created_at)}`
+        : '',
       
       // Däck som sitter på: from latest checkin
       hjultyp: latestCheckin?.hjultyp || '---',
@@ -1768,6 +1772,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         : nybilData?.matarstallning_inkop
           ? `${nybilData.matarstallning_inkop} km`
           : '---',
+    matarstallningKalla: latestCheckin?.odometer_km && (latestCheckin?.completed_at || latestCheckin?.created_at)
+      ? `incheckning ${formatDate(latestCheckin.completed_at || latestCheckin.created_at)}`
+      : (nybilData?.matarstallning_aktuell || nybilData?.matarstallning_inkop) && (nybilData?.created_at || nybilData?.registreringsdatum)
+        ? `nybil ${formatDate(nybilData.created_at || nybilData.registreringsdatum)}`
+        : '',
     
     // Däck som sitter på: checkins.hjultyp (senaste) → nybil_inventering.hjultyp
     hjultyp: latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
