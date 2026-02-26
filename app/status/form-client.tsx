@@ -633,6 +633,22 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Uppkoppling Section — visas bara för MB och VW med data */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.mbmeAktiverad !== '---' || vehicleStatus.vehicle.vwConnectAktiverad !== '---'
+        ) && (
+          <Card>
+            <SectionHeader title="Uppkoppling" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.mbmeAktiverad !== '---' && (
+                <InfoRow label="MBme aktiverad" value={vehicleStatus.vehicle.mbmeAktiverad} />
+              )}
+              {vehicleStatus.vehicle.vwConnectAktiverad !== '---' && (
+                <InfoRow label="VW Connect aktiverad" value={vehicleStatus.vehicle.vwConnectAktiverad} />
+              )}
+            </div>
+          </Card>
+        )}
         {/* Övrig info vid leverans till MABI Section - Consolidated */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
