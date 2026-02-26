@@ -550,9 +550,6 @@ export default function StatusForm() {
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               {vehicleStatus.vehicle.vaxel !== '---' && <InfoRow label="Växellåda" value={vehicleStatus.vehicle.vaxel} />}
               {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
-              <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
-              <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
-              <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
               <InfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum || '---'} />
               <InfoRow 
@@ -569,6 +566,21 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Avtalsvillkor Section — döljs om alla är --- */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.serviceintervall !== '---' ||
+          vehicleStatus.vehicle.maxKmManad !== '---' ||
+          vehicleStatus.vehicle.avgiftOverKm !== '---'
+        ) && (
+          <Card>
+            <SectionHeader title="Avtalsvillkor" />
+            <div className="info-grid">
+              <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
+              <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
+              <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
+            </div>
+          </Card>
+        )}
         {/* Equipment Storage Section */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
