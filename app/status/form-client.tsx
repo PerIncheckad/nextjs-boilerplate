@@ -633,6 +633,22 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Uppkoppling Section — visas bara för MB och VW med data */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          vehicleStatus.vehicle.mbmeAktiverad !== '---' || vehicleStatus.vehicle.vwConnectAktiverad !== '---'
+        ) && (
+          <Card>
+            <SectionHeader title="Uppkoppling" />
+            <div className="info-grid">
+              {vehicleStatus.vehicle.mbmeAktiverad !== '---' && (
+                <InfoRow label="MBme aktiverad" value={vehicleStatus.vehicle.mbmeAktiverad} />
+              )}
+              {vehicleStatus.vehicle.vwConnectAktiverad !== '---' && (
+                <InfoRow label="VW Connect aktiverad" value={vehicleStatus.vehicle.vwConnectAktiverad} />
+              )}
+            </div>
+          </Card>
+        )}
         {/* Övrig info vid leverans till MABI Section - Consolidated */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
@@ -893,7 +909,13 @@ export default function StatusForm() {
               )}
               <p style={{ margin: '0.25rem 0' }}><strong>Insynsskydd:</strong> {vehicleStatus.nybilFullData.antalInsynsskydd}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.harInstruktionsbok}</p>
+              {vehicleStatus.nybilFullData.harInstruktionsbok === 'Ja' && vehicleStatus.nybilFullData.instruktionsbokForvaring !== '---' && (
+                <p style={{ margin: '0.25rem 0', paddingLeft: '1rem', color: '#4b5563', fontSize: '0.9rem' }}>Förvaring: {vehicleStatus.nybilFullData.instruktionsbokForvaring}</p>
+              )}
               <p style={{ margin: '0.25rem 0' }}><strong>COC:</strong> {vehicleStatus.nybilFullData.harCoc}</p>
+              {vehicleStatus.nybilFullData.harCoc === 'Ja' && vehicleStatus.nybilFullData.cocForvaring !== '---' && (
+                <p style={{ margin: '0.25rem 0', paddingLeft: '1rem', color: '#4b5563', fontSize: '0.9rem' }}>Förvaring: {vehicleStatus.nybilFullData.cocForvaring}</p>
+              )}
               <p style={{ margin: '0.25rem 0' }}><strong>Låsbultar:</strong> {vehicleStatus.nybilFullData.harLasbultar}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Dragkrok:</strong> {vehicleStatus.nybilFullData.harDragkrok}</p>
               <p style={{ margin: '0.25rem 0' }}><strong>Gummimattor:</strong> {vehicleStatus.nybilFullData.harGummimattor}</p>
@@ -907,8 +929,27 @@ export default function StatusForm() {
               {vehicleStatus.nybilFullData.drivmedel !== 'Bensin' && vehicleStatus.nybilFullData.drivmedel !== 'Diesel' && (
                 <p style={{ margin: '0.25rem 0' }}><strong>Laddkablar:</strong> {vehicleStatus.nybilFullData.laddkablarForvaring}</p>
               )}
+              {vehicleStatus.nybilFullData.instruktionsbokForvaring !== '---' && (
+                <p style={{ margin: '0.25rem 0' }}><strong>Instruktionsbok:</strong> {vehicleStatus.nybilFullData.instruktionsbokForvaring}</p>
+              )}
+              {vehicleStatus.nybilFullData.cocForvaring !== '---' && (
+                <p style={{ margin: '0.25rem 0' }}><strong>COC-dokument:</strong> {vehicleStatus.nybilFullData.cocForvaring}</p>
+              )}
             </div>
-            
+
+            {/* UPPKOPPLING — visas bara för MB och VW */}
+            {(vehicleStatus.nybilFullData.bilmarke === 'MB' || vehicleStatus.nybilFullData.bilmarke === 'VW') && (
+              <div className="print-section">
+                <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>UPPKOPPLING</h2>
+                {vehicleStatus.nybilFullData.bilmarke === 'MB' && (
+                  <p style={{ margin: '0.25rem 0' }}><strong>MBme aktiverad:</strong> {vehicleStatus.nybilFullData.mbmeAktiverad}</p>
+                )}
+                {vehicleStatus.nybilFullData.bilmarke === 'VW' && (
+                  <p style={{ margin: '0.25rem 0' }}><strong>VW Connect aktiverad:</strong> {vehicleStatus.nybilFullData.vwConnectAktiverad}</p>
+                )}
+              </div>
+            )}
+
             <div className="print-section">
               <h2 style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '1.5rem', marginBottom: '0.75rem' }}>LEVERANSSTATUS</h2>
               <p style={{ margin: '0.25rem 0' }}><strong>Skador vid leverans:</strong> {vehicleStatus.nybilFullData.skadorVidLeverans}</p>

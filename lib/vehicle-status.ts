@@ -21,6 +21,8 @@ export type VehicleStatusData = {
   saludatum: string;
   antalSkador: number;
   stoldGps: string;
+  mbmeAktiverad: string;
+  vwConnectAktiverad: string;
   klarForUthyrning: string;
   // Additional detailed fields from nybil_inventering
   planeradStation: string;
@@ -237,6 +239,12 @@ export type VehicleStatusResult = {
     hjulforvaring: string;
     reservnyckelForvaring: string;
     laddkablarForvaring: string;
+    instruktionsbokForvaring: string;
+    cocForvaring: string;
+    // Uppkoppling
+    mbmeAktiverad: string;
+    vwConnectAktiverad: string;
+    bilmarke: string;
     // Leveransstatus
     skadorVidLeverans: string;
     klarForUthyrning: string;
@@ -276,6 +284,8 @@ type NybilInventeringData = {
   dragkrok?: boolean;
   gummimattor?: boolean;
   dackkompressor?: boolean;
+  mbme_aktiverad?: boolean | null;
+  vw_connect_aktiverad?: boolean | null;
   salu_station?: string;
   kopare_foretag?: string;
   returort?: string;
@@ -700,17 +710,17 @@ function buildTankningInfo(checkin: any): string | undefined {
   
   // If tankad_nu or we have liters and price, build full string
   if (checkin.fuel_liters && checkin.fuel_price_per_liter && checkin.fuel_type) {
-    return `Tankad nu av MABI (${checkin.fuel_liters}L ${checkin.fuel_type} @ ${checkin.fuel_price_per_liter} kr/L)`;
+    return `Tankad nu av MABI (${checkin.fuel_liters}L ${displayBransletyp(checkin.fuel_type)} @ ${checkin.fuel_price_per_liter} kr/L)`;
   }
-  
+
   // If we have liters but no price
   if (checkin.fuel_liters && checkin.fuel_type) {
-    return `Tankad nu av MABI (${checkin.fuel_liters}L ${checkin.fuel_type})`;
+    return `Tankad nu av MABI (${checkin.fuel_liters}L ${displayBransletyp(checkin.fuel_type)})`;
   }
-  
+
   // Otherwise just indicate fuel type if available
   if (checkin.fuel_type) {
-    return `${checkin.fuel_type}`;
+      return `${displayBransletyp(checkin.fuel_type)}`;
   }
   
   return undefined;
@@ -1015,6 +1025,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       // Stöld-GPS monterad: not available from checkins
       stoldGps: '---',
+      mbmeAktiverad: '---',
+      vwConnectAktiverad: '---',
       
       // Klar för uthyrning: not available from checkins
       klarForUthyrning: '---',
@@ -1692,7 +1704,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           matarstallning: arrival.odometer_km ? `${arrival.odometer_km} km` : undefined,
           tankningInfo,
           laddningInfo,
-          drivmedel: arrival.fuel_type || undefined,
+          drivmedel: arrival.fuel_type ? displayBransletyp(arrival.fuel_type) : undefined,
           notes: arrival.notes || undefined,
         },
       });
@@ -1802,6 +1814,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : nybilData?.stold_gps === false
         ? 'Nej'
         : '---',
+    
+    // MBme / VW Connect: from nybil_inventering (only relevant for MB/VW)
+    mbmeAktiverad: nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---',
+    vwConnectAktiverad: nybilData?.vw_connect_aktiverad === true ? 'Ja' : nybilData?.vw_connect_aktiverad === false ? 'Nej' : '---',
     
     // Klar för uthyrning: Check both nybil and if explicitly marked as false
     klarForUthyrning: nybilData?.klar_for_uthyrning === false
@@ -2621,7 +2637,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         mottagenVid,
         matarstallningVidLeverans: nybilData.matarstallning_inkop ? `${nybilData.matarstallning_inkop} km` : undefined,
         hjultyp: nybilData.hjultyp || undefined,
-        drivmedel: nybilData.bransletyp || undefined,
+        drivmedel: nybilData.bransletyp ? displayBransletyp(nybilData.bransletyp) : undefined,
         planeradStation: nybilData.planerad_station || undefined,
         skador: nybilSkador.length > 0 ? nybilSkador : undefined,
       },
@@ -2728,7 +2744,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         matarstallning: arrival.odometer_km ? `${arrival.odometer_km} km` : undefined,
         tankningInfo,
         laddningInfo,
-        drivmedel: arrival.fuel_type || undefined,
+        drivmedel: arrival.fuel_type ? displayBransletyp(arrival.fuel_type) : undefined,
         notes: arrival.notes || undefined,
       },
     });
@@ -2803,9 +2819,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     reservnyckelForvaring: (nybilData.extranyckel_forvaring_ort || nybilData.extranyckel_forvaring_spec)
       ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
       : '---',
-    laddkablarForvaring: (nybilData.laddkablar_forvaring_ort || nybilData.laddkablar_forvaring_spec)
+    laddkablarForvaring: (nybilData?.laddkablar_forvaring_ort || nybilData?.laddkablar_forvaring_spec)
       ? [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ')
       : '---',
+    instruktionsbokForvaring: (nybilData?.instruktionsbok_forvaring_ort || nybilData?.instruktionsbok_forvaring_spec)
+      ? [nybilData.instruktionsbok_forvaring_ort, nybilData.instruktionsbok_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    cocForvaring: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
+      ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    mbmeAktiverad: nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---',
+    vwConnectAktiverad: nybilData?.vw_connect_aktiverad === true ? 'Ja' : nybilData?.vw_connect_aktiverad === false ? 'Nej' : '---',
+    bilmarke: nybilData?.bilmarke || '',
     // Leveransstatus
     skadorVidLeverans: nybilData.har_skador_vid_leverans === true ? 'Ja' : nybilData.har_skador_vid_leverans === false ? 'Inga' : '---',
     klarForUthyrning: nybilData.klar_for_uthyrning === true ? 'Ja' : nybilData.klar_for_uthyrning === false ? 'Nej' : '---',
