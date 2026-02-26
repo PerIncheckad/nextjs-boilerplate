@@ -237,6 +237,12 @@ export type VehicleStatusResult = {
     hjulforvaring: string;
     reservnyckelForvaring: string;
     laddkablarForvaring: string;
+    instruktionsbokForvaring: string;
+    cocForvaring: string;
+    // Uppkoppling
+    mbmeAktiverad: string;
+    vwConnectAktiverad: string;
+    bilmarke: string;
     // Leveransstatus
     skadorVidLeverans: string;
     klarForUthyrning: string;
@@ -276,6 +282,8 @@ type NybilInventeringData = {
   dragkrok?: boolean;
   gummimattor?: boolean;
   dackkompressor?: boolean;
+  mbme_aktiverad?: boolean | null;
+  vw_connect_aktiverad?: boolean | null;
   salu_station?: string;
   kopare_foretag?: string;
   returort?: string;
@@ -2803,9 +2811,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     reservnyckelForvaring: (nybilData.extranyckel_forvaring_ort || nybilData.extranyckel_forvaring_spec)
       ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
       : '---',
-    laddkablarForvaring: (nybilData.laddkablar_forvaring_ort || nybilData.laddkablar_forvaring_spec)
+    laddkablarForvaring: (nybilData?.laddkablar_forvaring_ort || nybilData?.laddkablar_forvaring_spec)
       ? [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ')
       : '---',
+    instruktionsbokForvaring: (nybilData?.instruktionsbok_forvaring_ort || nybilData?.instruktionsbok_forvaring_spec)
+      ? [nybilData.instruktionsbok_forvaring_ort, nybilData.instruktionsbok_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    cocForvaring: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
+      ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')
+      : '---',
+    mbmeAktiverad: nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---',
+    vwConnectAktiverad: nybilData?.vw_connect_aktiverad === true ? 'Ja' : nybilData?.vw_connect_aktiverad === false ? 'Nej' : '---',
+    bilmarke: nybilData?.bilmarke || '',
     // Leveransstatus
     skadorVidLeverans: nybilData.har_skador_vid_leverans === true ? 'Ja' : nybilData.har_skador_vid_leverans === false ? 'Inga' : '---',
     klarForUthyrning: nybilData.klar_for_uthyrning === true ? 'Ja' : nybilData.klar_for_uthyrning === false ? 'Nej' : '---',
