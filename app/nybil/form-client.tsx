@@ -306,6 +306,7 @@ export default function NybilForm() {
   
   // Duplicate detection state
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [duplicateInfo, setDuplicateInfo] = useState<{
     existsInBilkontroll: boolean;
     existsInNybil: boolean;
@@ -1472,9 +1473,7 @@ export default function NybilForm() {
   };
   
   const handleCancel = () => {
-    if (confirm('Är du säker? Alla ifyllda data kommer att raderas.')) {
-      resetForm();
-    }
+    setShowCancelModal(true);
   };
   
   // Get formatted summary for confirmation modal
@@ -1590,6 +1589,19 @@ export default function NybilForm() {
           onRemovePosition={(positionId) => removeDamagePosition(currentDamageId, positionId)}
           onPhotoChange={(e) => handleDamagePhotoChange(currentDamageId, e)}
           onRemovePhoto={(index) => removeDamagePhoto(currentDamageId, index)}
+        />
+      )}
+      {showCancelModal && (
+        <WarningModal
+          title="Avbryt registrering"
+          message="Är du säker? Alla ifyllda data kommer att raderas."
+          onCancel={() => setShowCancelModal(false)}
+          onConfirm={() => {
+            setShowCancelModal(false);
+            resetForm();
+          }}
+          cancelText="Fortsätt fylla i"
+          confirmText="Ja, radera"
         />
       )}
       {showRegWarningModal && (
