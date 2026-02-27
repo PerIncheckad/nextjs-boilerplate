@@ -48,8 +48,9 @@ const getFullNameFromEmail = (email: string): string => {
 const inferDrivmedelstyp = (bransletyp: string | null | undefined): 'bensin_diesel' | 'elbil' | null => {
   if (!bransletyp) return null;
   const lower = bransletyp.toLowerCase();
-  if (lower.includes('el') || lower.includes('electric') || lower.includes('bev') || lower.includes('phev')) return 'elbil';
+  // Check bensin/diesel/gas FIRST — 'diesel' contains 'el' so must be matched before electric check
   if (lower.includes('bensin') || lower.includes('diesel') || lower.includes('gas')) return 'bensin_diesel';
+  if (lower.includes('el') || lower.includes('electric') || lower.includes('bev') || lower.includes('phev')) return 'elbil';
   return null;
 };
 
