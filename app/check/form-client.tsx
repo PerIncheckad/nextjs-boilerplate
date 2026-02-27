@@ -816,8 +816,27 @@ export default function CheckInForm() {
   useEffect(() => {
     async function fetchAllRegistrations() {
       const { data, error } = await supabase.rpc('get_all_allowed_plates').range(0, 4999);
-      if (error) console.error("Could not fetch registrations via RPC:", error);
-      else if (data) setAllRegistrations(data.map((item: any) => item.regnr));
+      if (error) {
+        console.error("Could not fetch registrations via RPC:", error);
+        return;
+      }
+      if (!data) return;
+      
+      // Fetch sold vehicles to exclude from autocomplete
+      const { data: soldData } = await supabase
+        .from('nybil_inventering')
+        .select('regnr')
+        .eq('is_sold', true);
+      
+      const soldSet = new Set(
+        (soldData || []).map((item: any) => item.regnr?.toUpperCase().replace(/\s/g, ''))
+      );
+      
+      const filtered = data
+        .map((item: any) => item.regnr)
+        .filter((regnr: string) => !soldSet.has(regnr));
+      
+      setAllRegistrations(filtered);
     }
     fetchAllRegistrations();
   }, []);
