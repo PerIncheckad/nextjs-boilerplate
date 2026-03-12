@@ -834,7 +834,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
 
   // Fetch data from all sources concurrently
-  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse, arrivalsResponse] = await Promise.all([
+  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse, arrivalsResponse, vehicleEditsResponse] = await Promise.all([
     // nybil_inventering - newest first
     supabase
       .from('nybil_inventering')
@@ -874,9 +874,47 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       .select('*')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false }),
+
+    // vehicle_edits — manuella ändringar (senaste first)
+    supabase
+      .from('vehicle_edits')
+      .select('*')
+      .eq('regnr', cleanedRegnr)
+      .order('edited_at', { ascending: false }),
   ]);
 
+  const vehicleEditsData = vehicleEditsResponse.data || [];
   const nybilData = nybilResponse.data;
+
+  // Bygg Map med senaste edit per fält (data sorterad desc på edited_at)
+  const latestEdits = new Map<string, { value: string | null; date: string; editedBy: string }>();
+  for (const edit of vehicleEditsData) {
+    if (!latestEdits.has(edit.field_name)) {
+      latestEdits.set(edit.field_name, {
+        value: edit.new_value,
+        date: edit.edited_at,
+        editedBy: edit.edited_by,
+      });
+    }
+  }
+
+  // Visningsnamn för fält i HistoryRecord
+  const fieldDisplayNames: Record<string, string> = {
+    hjultyp: 'Däck som sitter på',
+    matarstallning: 'Mätarställning',
+    drivmedel: 'Drivmedel',
+    bilmarke_modell: 'Bilmärke & Modell',
+    serviceintervall: 'Serviceintervall',
+    max_km_manad: 'Max km/månad',
+    avgift_over_km: 'Avgift över-km',
+    planerad_station: 'Planerad station',
+    is_sold: 'Såld',
+    saludatum: 'Saludatum',
+    salu_kommentar: 'Kommentar (försäljning)',
+    anteckningar: 'Anteckningar',
+    stold_gps: 'Stöld-GPS',
+    klar_for_uthyrning: 'Klar för uthyrning',
+  };
   const vehicleData = vehicleResponse.data?.[0] || null;
   const damages = damagesResponse.data || [];
   const legacyDamages = legacyDamagesResponse.data || [];
@@ -979,8 +1017,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const vehicle: VehicleStatusData = {
       regnr: cleanedRegnr,
       
-      // Bilmärke & Modell: from checkins.car_model if available
-      bilmarkeModell: latestCheckin?.car_model || '---',
+      // Bilmärke & Modell: vehicle_edits → checkins.car_model
+      bilmarkeModell: latestEdits.get('bilmarke_modell')?.value || latestCheckin?.car_model || '---',
       
       // Senast incheckad vid: from latest checkin with datetime and checker
       // Show datetime even if city/station is missing
@@ -990,22 +1028,28 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           : `${formatDateTime(latestCheckin.completed_at || latestCheckin.created_at)} av ${latestCheckin.checker_name || 'Okänd'}`
         : '---',
       
-      // Mätarställning: from latest checkin
-      matarstallning: latestCheckin?.odometer_km
-        ? `${latestCheckin.odometer_km} km`
-        : '---',
-      matarstallningKalla: latestCheckin?.odometer_km && (latestCheckin?.completed_at || latestCheckin?.created_at)
-        ? `incheckning ${formatDate(latestCheckin.completed_at || latestCheckin.created_at)}`
-        : '',
+      // Mätarställning: vehicle_edits → latest checkin
+      matarstallning: latestEdits.get('matarstallning')?.value
+        ? `${latestEdits.get('matarstallning')!.value} km`
+        : latestCheckin?.odometer_km
+          ? `${latestCheckin.odometer_km} km`
+          : '---',
+      matarstallningKalla: latestEdits.has('matarstallning')
+        ? `redigerad ${formatDate(latestEdits.get('matarstallning')!.date)}`
+        : latestCheckin?.odometer_km && (latestCheckin?.completed_at || latestCheckin?.created_at)
+          ? `incheckning ${formatDate(latestCheckin.completed_at || latestCheckin.created_at)}`
+          : '',
       
-      // Däck som sitter på: from latest checkin
-      hjultyp: latestCheckin?.hjultyp || '---',
+      // Däck som sitter på: vehicle_edits → latest checkin
+      hjultyp: latestEdits.get('hjultyp')?.value || latestCheckin?.hjultyp || '---',
       
       // Hjulförvaring: not available from checkins
       hjulforvaring: '---',
       
-      // Drivmedel: from latest checkin fuel_type
-      drivmedel: displayBransletyp(latestCheckin?.fuel_type),
+      // Drivmedel: vehicle_edits → latest checkin fuel_type
+      drivmedel: latestEdits.get('drivmedel')?.value
+        ? displayBransletyp(latestEdits.get('drivmedel')!.value)
+        : displayBransletyp(latestCheckin?.fuel_type),
       
       // Växellåda: not available from checkins
       vaxel: '---',
@@ -1728,6 +1772,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       return dateB.getTime() - dateA.getTime();
     });
 
+    // Lägg till HistoryRecord för varje manuell ändring (vehicle_edits)
+    for (const edit of vehicleEditsData) {
+      const displayName = fieldDisplayNames[edit.field_name] || edit.field_name;
+      historyRecords.push({
+        id: `edit-${edit.id}`,
+        datum: formatDateTime(edit.edited_at),
+        rawTimestamp: edit.edited_at,
+        typ: 'manual',
+        sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
+        utfordAv: getFullNameFromEmail(edit.edited_by),
+      });
+    }
+
     // Update the vehicle's damage count to reflect the actual list
     vehicle.antalSkador = damageRecords.length;
 
@@ -1745,14 +1802,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const vehicle: VehicleStatusData = {
     regnr: cleanedRegnr,
     
-    // Bilmärke & Modell: nybil_inventering → vehicles (using formatModel for consistent display)
-    bilmarkeModell: nybilData?.bilmarke || nybilData?.modell
-      ? formatModel(nybilData?.bilmarke ?? null, nybilData?.modell ?? null)
-      : nybilData?.bilmodell
-        ? nybilData.bilmodell
-        : vehicleData
-          ? formatModel(vehicleData.brand, vehicleData.model)
-          : '---',
+    // Bilmärke & Modell: vehicle_edits → nybil_inventering → vehicles
+    bilmarkeModell: latestEdits.get('bilmarke_modell')?.value
+      || (nybilData?.bilmarke || nybilData?.modell
+        ? formatModel(nybilData?.bilmarke ?? null, nybilData?.modell ?? null)
+        : nybilData?.bilmodell
+          ? nybilData.bilmodell
+          : vehicleData
+            ? formatModel(vehicleData.brand, vehicleData.model)
+            : '---'),
     
     // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
     // Show datetime even if city/station is missing
@@ -1764,48 +1822,51 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? `${nybilData.plats_aktuell_ort} / ${nybilData.plats_aktuell_station}`
         : '---',
     
-    // Mätarställning: checkins.odometer_km (senaste) → nybil_inventering.matarstallning_aktuell
-    matarstallning: latestCheckin?.odometer_km
-      ? `${latestCheckin.odometer_km} km`
-      : nybilData?.matarstallning_aktuell
-        ? `${nybilData.matarstallning_aktuell} km`
-        : nybilData?.matarstallning_inkop
-          ? `${nybilData.matarstallning_inkop} km`
-          : '---',
-    matarstallningKalla: latestCheckin?.odometer_km && (latestCheckin?.completed_at || latestCheckin?.created_at)
-      ? `incheckning ${formatDate(latestCheckin.completed_at || latestCheckin.created_at)}`
-      : (nybilData?.matarstallning_aktuell || nybilData?.matarstallning_inkop) && (nybilData?.created_at || nybilData?.registreringsdatum)
-        ? `nybil ${formatDate(nybilData.created_at || nybilData.registreringsdatum)}`
-        : '',
+    // Mätarställning: vehicle_edits → checkins.odometer_km → nybil_inventering
+    matarstallning: latestEdits.get('matarstallning')?.value
+      ? `${latestEdits.get('matarstallning')!.value} km`
+      : latestCheckin?.odometer_km
+        ? `${latestCheckin.odometer_km} km`
+        : nybilData?.matarstallning_aktuell
+          ? `${nybilData.matarstallning_aktuell} km`
+          : nybilData?.matarstallning_inkop
+            ? `${nybilData.matarstallning_inkop} km`
+            : '---',
+    matarstallningKalla: latestEdits.has('matarstallning')
+      ? `redigerad ${formatDate(latestEdits.get('matarstallning')!.date)}`
+      : latestCheckin?.odometer_km && (latestCheckin?.completed_at || latestCheckin?.created_at)
+        ? `incheckning ${formatDate(latestCheckin.completed_at || latestCheckin.created_at)}`
+        : (nybilData?.matarstallning_aktuell || nybilData?.matarstallning_inkop) && (nybilData?.created_at || nybilData?.registreringsdatum)
+          ? `nybil ${formatDate(nybilData.created_at || nybilData.registreringsdatum)}`
+          : '',
     
-    // Däck som sitter på: checkins.hjultyp (senaste) → nybil_inventering.hjultyp
-    hjultyp: latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
+    // Däck som sitter på: vehicle_edits → checkins.hjultyp → nybil_inventering.hjultyp
+    hjultyp: latestEdits.get('hjultyp')?.value || latestCheckin?.hjultyp || nybilData?.hjultyp || '---',
     
     // Hjulförvaring: nybil_inventering.hjul_forvaring_ort/spec → vehicles.wheel_storage_location
     hjulforvaring: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec || nybilData?.hjul_forvaring)
       ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
       : vehicleData?.wheel_storage_location || '---',
     
-    // Drivmedel: nybil_inventering.bransletyp → vehicles.bransletyp
-    drivmedel: displayBransletyp(nybilData?.bransletyp || vehicleData?.bransletyp),
+    // Drivmedel: vehicle_edits → nybil_inventering.bransletyp → vehicles.bransletyp
+    drivmedel: latestEdits.get('drivmedel')?.value
+      ? displayBransletyp(latestEdits.get('drivmedel')!.value)
+      : displayBransletyp(nybilData?.bransletyp || vehicleData?.bransletyp),
     
     // Växellåda: nybil_inventering.vaxel
     vaxel: nybilData?.vaxel || '---',
     
-    // Serviceintervall: nybil_inventering.serviceintervall
-    serviceintervall: nybilData?.serviceintervall
-      ? `${nybilData.serviceintervall} km`
-      : '---',
+    // Serviceintervall: vehicle_edits → nybil_inventering.serviceintervall
+    serviceintervall: latestEdits.get('serviceintervall')?.value
+      || (nybilData?.serviceintervall ? `${nybilData.serviceintervall} km` : '---'),
     
-    // Max km/månad: nybil_inventering.max_km_manad
-    maxKmManad: nybilData?.max_km_manad
-      ? `${nybilData.max_km_manad} km`
-      : '---',
+    // Max km/månad: vehicle_edits → nybil_inventering.max_km_manad
+    maxKmManad: latestEdits.get('max_km_manad')?.value
+      || (nybilData?.max_km_manad ? `${nybilData.max_km_manad} km` : '---'),
     
-    // Avgift över-km: nybil_inventering.avgift_over_km
-    avgiftOverKm: nybilData?.avgift_over_km
-      ? `${nybilData.avgift_over_km} kr`
-      : '---',
+    // Avgift över-km: vehicle_edits → nybil_inventering.avgift_over_km
+    avgiftOverKm: latestEdits.get('avgift_over_km')?.value
+      || (nybilData?.avgift_over_km ? `${nybilData.avgift_over_km} kr` : '---'),
     
     // Saludatum: nybil_inventering.saludatum → legacy damages.saludatum (senaste)
     saludatum: nybilData?.saludatum
@@ -2845,6 +2906,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     klarForUthyrning: nybilData.klar_for_uthyrning === true ? 'Ja' : nybilData.klar_for_uthyrning === false ? 'Nej' : '---',
     anteckningar: nybilData.anteckningar || '---',
   } : undefined;
+
+  // Lägg till HistoryRecord för varje manuell ändring (vehicle_edits)
+  for (const edit of vehicleEditsData) {
+    const displayName = fieldDisplayNames[edit.field_name] || edit.field_name;
+    historyRecords.push({
+      id: `edit-${edit.id}`,
+      datum: formatDateTime(edit.edited_at),
+      rawTimestamp: edit.edited_at,
+      typ: 'manual',
+      sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
+      utfordAv: getFullNameFromEmail(edit.edited_by),
+    });
+  }
 
   return {
     found: true,

@@ -1267,6 +1267,22 @@ const HistoryItem: React.FC<{
             </>
           )}
 
+          {/* For manual changes */}
+          {record.typ === 'manual' && (
+            <>
+              {record.sammanfattning && (
+                <div className="history-detail-row">
+                  {record.sammanfattning}
+                </div>
+              )}
+              {record.utfordAv && (
+                <div className="history-detail-row">
+                  <strong>Utförd av:</strong> {record.utfordAv}
+                </div>
+              )}
+            </>
+          )}
+
           {/* For nybil */}
           {record.typ === 'nybil' && record.nybilDetaljer && (
             <>
