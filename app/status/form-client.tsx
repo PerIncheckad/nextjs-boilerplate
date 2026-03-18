@@ -1459,7 +1459,9 @@ const HistoryItem: React.FC<{
             <>
               {record.sammanfattning && (
                 <div className="history-detail-row">
-                  {record.sammanfattning}
+                  {record.sammanfattning.split('\n').map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
                 </div>
               )}
               {record.utfordAv && (
