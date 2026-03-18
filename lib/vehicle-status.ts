@@ -914,6 +914,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     anteckningar: 'Anteckningar',
     stold_gps: 'Stöld-GPS',
     klar_for_uthyrning: 'Klar för uthyrning',
+    stold_gps_spec: 'Stöld-GPS spec',
   };
   // Gruppera edits per batch_id för historikvisning
   const batchMap = new Map<string, typeof vehicleEditsData>();
