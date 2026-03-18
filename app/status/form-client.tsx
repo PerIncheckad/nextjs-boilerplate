@@ -157,6 +157,7 @@ export default function StatusForm() {
   // User state
   const [firstName, setFirstName] = useState('');
   const [fullName, setFullName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
   
   // Search state
   const [regInput, setRegInput] = useState('');
@@ -164,6 +165,10 @@ export default function StatusForm() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [isSavingEdits, setIsSavingEdits] = useState(false);
   
   // Vehicle data state
   const [vehicleStatus, setVehicleStatus] = useState<VehicleStatusResult | null>(null);
@@ -185,6 +190,49 @@ export default function StatusForm() {
   const currentYear = useMemo(() => new Date().getFullYear(), []);
 
   // Fetch vehicle data
+  const handleSaveEdits = async () => {
+    if (!vehicleStatus?.vehicle || Object.keys(pendingEdits).length === 0) return;
+    setIsSavingEdits(true);
+    const regnr = vehicleStatus.vehicle.regnr;
+    const currentValues: Record<string, string> = {
+      bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
+      matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').trim(),
+      hjultyp: vehicleStatus.vehicle.hjultyp,
+      planerad_station: vehicleStatus.vehicle.planeradStation,
+      serviceintervall: vehicleStatus.vehicle.serviceintervall,
+      max_km_manad: vehicleStatus.vehicle.maxKmManad,
+      avgift_over_km: vehicleStatus.vehicle.avgiftOverKm,
+      anteckningar: vehicleStatus.vehicle.anteckningar,
+      stold_gps: vehicleStatus.vehicle.stoldGps,
+      klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
+      stold_gps_spec: '',
+    };
+    const edits = Object.entries(pendingEdits).map(([field_name, new_value]) => ({
+      regnr,
+      field_name,
+      new_value: new_value || null,
+      old_value: currentValues[field_name] === '---' ? null : (currentValues[field_name] || null),
+      edited_by: userEmail,
+    }));
+    try {
+      const res = await fetch('/api/vehicle-edits', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ edits }),
+      });
+      if (res.ok) {
+        setShowEditConfirm(false);
+        setIsEditing(false);
+        setPendingEdits({});
+        window.location.reload();
+      } else {
+        alert('Fel vid sparande. Försök igen.');
+      }
+    } catch {
+      alert('Nätverksfel. Försök igen.');
+    }
+    setIsSavingEdits(false);
+  };
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
     setVehicleStatus(null);
@@ -220,6 +268,7 @@ export default function StatusForm() {
       const email = user?.email || '';
       setFirstName(getFirstNameFromEmail(email));
       setFullName(getFullNameFromEmail(email));
+      setUserEmail(email);
     };
     getUser();
   }, []);
@@ -535,21 +584,96 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* Edit Confirm Modal */}
+        {showEditConfirm && vehicleStatus?.vehicle && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', maxWidth: '480px', width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+              <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Bekräfta ändringar</h2>
+              <div style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
+                {Object.entries(pendingEdits).map(([field, value]) => {
+                  const labels: Record<string, string> = {
+                    bilmarke_modell: 'Bilmärke & Modell', matarstallning: 'Mätarställning',
+                    hjultyp: 'Däck som sitter på', planerad_station: 'Planerad station',
+                    serviceintervall: 'Serviceintervall', max_km_manad: 'Max km/månad',
+                    avgift_over_km: 'Avgift över-km', anteckningar: 'Anteckningar',
+                    stold_gps: 'Stöld-GPS', klar_for_uthyrning: 'Klar för uthyrning',
+                    stold_gps_spec: 'Stöld-GPS spec',
+                  };
+                  const oldValues: Record<string, string> = {
+                    bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
+                    matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
+                    hjultyp: vehicleStatus.vehicle.hjultyp,
+                    planerad_station: vehicleStatus.vehicle.planeradStation,
+                    serviceintervall: vehicleStatus.vehicle.serviceintervall,
+                    max_km_manad: vehicleStatus.vehicle.maxKmManad,
+                    avgift_over_km: vehicleStatus.vehicle.avgiftOverKm,
+                    anteckningar: vehicleStatus.vehicle.anteckningar,
+                    stold_gps: vehicleStatus.vehicle.stoldGps,
+                    klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
+                    stold_gps_spec: '',
+                  };
+                  const oldVal = oldValues[field] === '---' ? '(tomt)' : (oldValues[field] || '(tomt)');
+                  const newVal = value || '(tomt)';
+                  return (
+                    <div key={field} style={{ padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
+                      <strong>{labels[field] || field}:</strong> {oldVal} → {newVal}
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setShowEditConfirm(false)} disabled={isSavingEdits}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.875rem' }}>
+                  Avbryt
+                </button>
+                <button type="button" onClick={handleSaveEdits} disabled={isSavingEdits}
+                  style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', background: '#1a73e8', color: 'white', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>
+                  {isSavingEdits ? 'Sparar…' : 'Spara ändringar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
-            <SectionHeader title="Fordonsinformation" />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <SectionHeader title="Fordonsinformation" />
+              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                {isEditing ? (
+                  <>
+                    <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
+                      style={{ padding: '0.25rem 0.75rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>
+                      Avbryt
+                    </button>
+                    <button type="button" onClick={() => Object.keys(pendingEdits).length > 0 && setShowEditConfirm(true)}
+                      disabled={Object.keys(pendingEdits).length === 0}
+                      style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: Object.keys(pendingEdits).length > 0 ? '#1a73e8' : '#ccc', color: 'white', cursor: Object.keys(pendingEdits).length > 0 ? 'pointer' : 'default', fontSize: '0.8rem', fontWeight: 600 }}>
+                      Spara ändringar {Object.keys(pendingEdits).length > 0 ? `(${Object.keys(pendingEdits).length})` : ''}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setIsEditing(true)}
+                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    ✏️ Redigera
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="info-grid">
               <span className="info-label hide-in-print">Reg.nr</span>
               <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
-              <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
+              <EditableInfoRow label="Bilmärke & Modell" fieldName="bilmarke_modell" displayValue={vehicleStatus.vehicle.bilmarkeModell} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
-              <InfoRow label="Mätarställning" value={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} />
-              <InfoRow label="Däck som sitter på" value={vehicleStatus.vehicle.hjultyp} />
-              <InfoRow label="Planerad station" value={vehicleStatus.vehicle.planeradStation} />
+              <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Däck som sitter på" fieldName="hjultyp" displayValue={vehicleStatus.vehicle.hjultyp} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Planerad station" fieldName="planerad_station" displayValue={vehicleStatus.vehicle.planeradStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               {vehicleStatus.vehicle.vaxel !== '---' && <InfoRow label="Växellåda" value={vehicleStatus.vehicle.vaxel} />}
-              {vehicleStatus.vehicle.stoldGps !== '---' && <InfoRow label="Stöld-GPS monterad" value={vehicleStatus.vehicle.stoldGps} />}
+              <EditableSelectRow label="Stöld-GPS monterad" fieldName="stold_gps" displayValue={vehicleStatus.vehicle.stoldGps} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              {isEditing && (pendingEdits['stold_gps'] === 'Ja' || (!pendingEdits['stold_gps'] && vehicleStatus.vehicle.stoldGps === 'Ja')) && (
+                <EditableInfoRow label="Stöld-GPS spec" fieldName="stold_gps_spec" displayValue="---" isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              )}
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
               <InfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum || '---'} />
               <InfoRow 
@@ -575,9 +699,9 @@ export default function StatusForm() {
           <Card>
             <SectionHeader title="Avtalsvillkor" />
             <div className="info-grid">
-              <InfoRow label="Serviceintervall" value={vehicleStatus.vehicle.serviceintervall} />
-              <InfoRow label="Max km/månad" value={vehicleStatus.vehicle.maxKmManad} />
-              <InfoRow label="Avgift över-km" value={vehicleStatus.vehicle.avgiftOverKm} />
+              <EditableInfoRow label="Serviceintervall" fieldName="serviceintervall" displayValue={vehicleStatus.vehicle.serviceintervall} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Max km/månad" fieldName="max_km_manad" displayValue={vehicleStatus.vehicle.maxKmManad} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Avgift över-km" fieldName="avgift_over_km" displayValue={vehicleStatus.vehicle.avgiftOverKm} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
             </div>
           </Card>
         )}
@@ -679,7 +803,7 @@ export default function StatusForm() {
                       : '---'}
                 </span>
               </Fragment>
-              <InfoRow label="Kommentarer" value={vehicleStatus.vehicle.anteckningar} />
+              <EditableInfoRow label="Kommentarer" fieldName="anteckningar" displayValue={vehicleStatus.vehicle.anteckningar} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} multiline />
             </div>
           </Card>
         )}
@@ -1095,6 +1219,69 @@ const SaludatumInfoRow: React.FC<{ label: string, value: string }> = ({ label, v
   );
 };
 
+const EditableInfoRow: React.FC<{
+  label: string;
+  fieldName: string;
+  displayValue: string;
+  rawValue?: string;
+  isEditing: boolean;
+  pendingEdits: Record<string, string>;
+  onEdit: (field: string, value: string) => void;
+  multiline?: boolean;
+}> = ({ label, fieldName, displayValue, rawValue, isEditing, pendingEdits, onEdit, multiline }) => {
+  const initialValue = rawValue !== undefined ? rawValue : (displayValue === '---' ? '' : displayValue);
+  const currentInput = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : initialValue;
+  const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== initialValue;
+  if (!isEditing) return <InfoRow label={label} value={displayValue} />;
+  return (
+    <>
+      <span className="info-label" style={{ alignSelf: multiline ? 'flex-start' : undefined }}>{label}</span>
+      {multiline ? (
+        <textarea
+          value={currentInput}
+          onChange={e => onEdit(fieldName, e.target.value)}
+          rows={3}
+          style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
+        />
+      ) : (
+        <input
+          type="text"
+          value={currentInput}
+          onChange={e => onEdit(fieldName, e.target.value)}
+          style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
+        />
+      )}
+    </>
+  );
+};
+
+const EditableSelectRow: React.FC<{
+  label: string;
+  fieldName: string;
+  displayValue: string;
+  options: string[];
+  isEditing: boolean;
+  pendingEdits: Record<string, string>;
+  onEdit: (field: string, value: string) => void;
+}> = ({ label, fieldName, displayValue, options, isEditing, pendingEdits, onEdit }) => {
+  const initialValue = displayValue === '---' ? '' : displayValue;
+  const currentInput = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : initialValue;
+  const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== initialValue;
+  if (!isEditing) return <InfoRow label={label} value={displayValue} />;
+  return (
+    <>
+      <span className="info-label">{label}</span>
+      <select
+        value={currentInput}
+        onChange={e => onEdit(fieldName, e.target.value)}
+        style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
+      >
+        <option value="">---</option>
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </>
+  );
+};
 const FilterButton: React.FC<React.PropsWithChildren<{ active: boolean; onClick: () => void }>> = ({ 
   active, 
   onClick, 
@@ -1272,7 +1459,9 @@ const HistoryItem: React.FC<{
             <>
               {record.sammanfattning && (
                 <div className="history-detail-row">
-                  {record.sammanfattning}
+                  {record.sammanfattning.split('\n').map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
                 </div>
               )}
               {record.utfordAv && (
