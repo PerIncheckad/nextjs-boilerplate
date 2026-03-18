@@ -205,6 +205,7 @@ export default function StatusForm() {
       anteckningar: vehicleStatus.vehicle.anteckningar,
       stold_gps: vehicleStatus.vehicle.stoldGps,
       klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
+      stold_gps_spec: '',
     };
     const edits = Object.entries(pendingEdits).map(([field_name, new_value]) => ({
       regnr,
@@ -596,10 +597,26 @@ export default function StatusForm() {
                     serviceintervall: 'Serviceintervall', max_km_manad: 'Max km/månad',
                     avgift_over_km: 'Avgift över-km', anteckningar: 'Anteckningar',
                     stold_gps: 'Stöld-GPS', klar_for_uthyrning: 'Klar för uthyrning',
+                    stold_gps_spec: 'Stöld-GPS spec',
                   };
+                  const oldValues: Record<string, string> = {
+                    bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
+                    matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
+                    hjultyp: vehicleStatus.vehicle.hjultyp,
+                    planerad_station: vehicleStatus.vehicle.planeradStation,
+                    serviceintervall: vehicleStatus.vehicle.serviceintervall,
+                    max_km_manad: vehicleStatus.vehicle.maxKmManad,
+                    avgift_over_km: vehicleStatus.vehicle.avgiftOverKm,
+                    anteckningar: vehicleStatus.vehicle.anteckningar,
+                    stold_gps: vehicleStatus.vehicle.stoldGps,
+                    klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
+                    stold_gps_spec: '',
+                  };
+                  const oldVal = oldValues[field] === '---' ? '(tomt)' : (oldValues[field] || '(tomt)');
+                  const newVal = value || '(tomt)';
                   return (
                     <div key={field} style={{ padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
-                      <strong>{labels[field] || field}:</strong> {value || '(tomt)'}
+                      <strong>{labels[field] || field}:</strong> {oldVal} → {newVal}
                     </div>
                   );
                 })}
@@ -654,6 +671,9 @@ export default function StatusForm() {
               <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
               {vehicleStatus.vehicle.vaxel !== '---' && <InfoRow label="Växellåda" value={vehicleStatus.vehicle.vaxel} />}
               <EditableSelectRow label="Stöld-GPS monterad" fieldName="stold_gps" displayValue={vehicleStatus.vehicle.stoldGps} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              {isEditing && (pendingEdits['stold_gps'] === 'Ja' || (!pendingEdits['stold_gps'] && vehicleStatus.vehicle.stoldGps === 'Ja')) && (
+                <EditableInfoRow label="Stöld-GPS spec" fieldName="stold_gps_spec" displayValue="---" isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              )}
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
               <InfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum || '---'} />
               <InfoRow 
