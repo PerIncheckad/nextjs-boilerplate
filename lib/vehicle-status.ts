@@ -915,6 +915,18 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     stold_gps: 'Stöld-GPS',
     klar_for_uthyrning: 'Klar för uthyrning',
   };
+  // Gruppera edits per batch_id för historikvisning
+  const batchMap = new Map<string, typeof vehicleEditsData>();
+  const noBatchEdits: typeof vehicleEditsData = [];
+  for (const edit of vehicleEditsData) {
+    if (edit.batch_id) {
+      if (!batchMap.has(edit.batch_id)) batchMap.set(edit.batch_id, []);
+      batchMap.get(edit.batch_id)!.push(edit);
+    } else {
+      noBatchEdits.push(edit);
+    }
+  }
+
   const vehicleData = vehicleResponse.data?.[0] || null;
   const damages = damagesResponse.data || [];
   const legacyDamages = legacyDamagesResponse.data || [];
@@ -1758,6 +1770,31 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
     }
     
+    // Lägg till HistoryRecord per batch (eller enskild edit utan batch_id)
+    for (const [batchId, edits] of batchMap) {
+      const first = edits[0];
+      const lines = edits.map(e => `${fieldDisplayNames[e.field_name] || e.field_name}: ${e.old_value || '---'} → ${e.new_value || '---'}`).join('\n');
+      historyRecords.push({
+        id: `edit-batch-${batchId}`,
+        datum: formatDateTime(first.edited_at),
+        rawTimestamp: first.edited_at,
+        typ: 'manual',
+        sammanfattning: lines,
+        utfordAv: getFullNameFromEmail(first.edited_by),
+      });
+    }
+    for (const edit of noBatchEdits) {
+      const displayName = fieldDisplayNames[edit.field_name] || edit.field_name;
+      historyRecords.push({
+        id: `edit-${edit.id}`,
+        datum: formatDateTime(edit.edited_at),
+        rawTimestamp: edit.edited_at,
+        typ: 'manual',
+        sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
+        utfordAv: getFullNameFromEmail(edit.edited_by),
+      });
+    }
+
     // Sort history by rawTimestamp (newest first)
     historyRecords.sort((a, b) => {
       const dateA = new Date(a.rawTimestamp);
@@ -1771,19 +1808,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       const dateB = b.datum ? new Date(b.datum) : new Date(0);
       return dateB.getTime() - dateA.getTime();
     });
-
-    // Lägg till HistoryRecord för varje manuell ändring (vehicle_edits)
-    for (const edit of vehicleEditsData) {
-      const displayName = fieldDisplayNames[edit.field_name] || edit.field_name;
-      historyRecords.push({
-        id: `edit-${edit.id}`,
-        datum: formatDateTime(edit.edited_at),
-        rawTimestamp: edit.edited_at,
-        typ: 'manual',
-        sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
-        utfordAv: getFullNameFromEmail(edit.edited_by),
-      });
-    }
 
     // Update the vehicle's damage count to reflect the actual list
     vehicle.antalSkador = damageRecords.length;
@@ -2907,8 +2931,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     anteckningar: nybilData.anteckningar || '---',
   } : undefined;
 
-  // Lägg till HistoryRecord för varje manuell ändring (vehicle_edits)
-  for (const edit of vehicleEditsData) {
+  // Lägg till HistoryRecord per batch (eller enskild edit utan batch_id)
+  for (const [batchId, edits] of batchMap) {
+    const first = edits[0];
+    const lines = edits.map(e => `${fieldDisplayNames[e.field_name] || e.field_name}: ${e.old_value || '---'} → ${e.new_value || '---'}`).join('\n');
+    historyRecords.push({
+      id: `edit-batch-${batchId}`,
+      datum: formatDateTime(first.edited_at),
+      rawTimestamp: first.edited_at,
+      typ: 'manual',
+      sammanfattning: lines,
+      utfordAv: getFullNameFromEmail(first.edited_by),
+    });
+  }
+  for (const edit of noBatchEdits) {
     const displayName = fieldDisplayNames[edit.field_name] || edit.field_name;
     historyRecords.push({
       id: `edit-${edit.id}`,
@@ -2919,6 +2955,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       utfordAv: getFullNameFromEmail(edit.edited_by),
     });
   }
+
+  // Sort history by rawTimestamp (newest first)
+  historyRecords.sort((a, b) => {
+    const dateA = new Date(a.rawTimestamp);
+    const dateB = new Date(b.rawTimestamp);
+    return dateB.getTime() - dateA.getTime();
+  });
 
   return {
     found: true,
