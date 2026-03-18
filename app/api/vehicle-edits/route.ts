@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 
 // =================================================================
 // 1. INITIALIZATION
@@ -50,10 +51,17 @@ export async function POST(request: Request) {
       }
     }
 
+    // Generate a shared batch_id for all edits in this save
+    const batchId = randomUUID();
+    const editsWithBatch = edits.map((edit: EditPayload) => ({
+      ...edit,
+      batch_id: batchId,
+    }));
+
     // Insert all edits (edited_at defaults to NOW() in DB)
     const { data, error } = await supabaseAdmin
       .from('vehicle_edits')
-      .insert(edits)
+      .insert(editsWithBatch)
       .select();
 
     if (error) {
