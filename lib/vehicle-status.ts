@@ -57,6 +57,12 @@ export type VehicleStatusData = {
   tankstatusVidLeverans: string;
   // General comment
   anteckningar: string;
+// Ej uthyrningsbar info (källa + kommentar + namn + tid)
+  ejUthyrningsbarInfo: string | null;
+  // Ej uthyrningsbar anledning (fritext)
+  ejUthyrningsbarAnledning: string;
+  // Laddnivå vid leverans (elbilar)
+  laddnivaVidLeverans: string;
   // Damages at delivery
   harSkadorVidLeverans: boolean | null;
   // Sale status
@@ -315,6 +321,11 @@ type NybilInventeringData = {
   upptankning_liter?: number | null;
   upptankning_literpris?: number | null;
   tankstatus?: string | null;
+  // Rental readiness note
+  klar_for_uthyrning_notering?: string | null;
+  ej_uthyrningsbar_anledning?: string | null;
+  // Charge level at delivery
+  laddniva_procent?: number | null;
   // General comment
   anteckningar?: string | null;
   // Damages at delivery
@@ -915,6 +926,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     stold_gps: 'Stöld-GPS',
     klar_for_uthyrning: 'Klar för uthyrning',
     stold_gps_spec: 'Stöld-GPS spec',
+    ej_uthyrningsbar_anledning: 'Ej uthyrningsbar anledning',
+    laddniva_vid_leverans: 'Laddnivå vid leverans',
+    saludatum: 'Saludatum',
+    salu_station: 'Salustation',
+    salu_kopare: 'Köpare (företag)',
+    salu_returadress: 'Returadress',
+    salu_retur: 'Returort',
+    salu_attention: 'Attention',
+    salu_notering: 'Notering försäljning',
   };
   // Gruppera edits per batch_id för historikvisning
   const batchMap = new Map<string, typeof vehicleEditsData>();
@@ -1119,6 +1139,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
       anteckningar: '---',
+      ejUthyrningsbarInfo: null,
+      ejUthyrningsbarAnledning: '---',
+      laddnivaVidLeverans: '---',
       harSkadorVidLeverans: null,
       isSold: null,
     };
@@ -1973,6 +1996,53 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // General comment
     anteckningar: nybilData?.anteckningar || '---',
     
+    // Ej uthyrningsbar info — bygg sammansatt sträng med källa + kommentar + namn + tid
+    ejUthyrningsbarInfo: (() => {
+      // Prioritet 1: manuell edit i /status
+      const editVal = latestEdits.get('klar_for_uthyrning')?.value;
+      if (editVal === 'Nej') {
+        const editEntry = latestEdits.get('klar_for_uthyrning')!;
+        const kommentar = latestEdits.get('ej_uthyrningsbar_anledning')?.value || '';
+        const namn = getFullNameFromEmail(editEntry.editedBy);
+        const tid = formatDateTime(editEntry.date);
+        return `Ej uthyrningsbar (via manuell redigering).${kommentar ? ` ${kommentar}.` : ''} ${namn}, ${tid}`;
+      }
+      if (editVal === 'Ja') return null; // Manuellt markerad som uthyrningsbar — override allt
+
+      // Prioritet 2: senaste incheckning med rental_unavailable
+      const latestUnavailableCheckin = checkins.find(c => {
+        const cl = c.checklist || {};
+        return cl.rental_unavailable === true;
+      });
+      if (latestUnavailableCheckin) {
+        const cl = latestUnavailableCheckin.checklist || {};
+        const kommentar = cl.rental_unavailable_comment || '';
+        const namn = latestUnavailableCheckin.checker_name || getFullNameFromEmail(latestUnavailableCheckin.checker_email || '');
+        const tid = formatDateTime(latestUnavailableCheckin.completed_at || latestUnavailableCheckin.created_at);
+        return `Ej uthyrningsbar (via incheckning).${kommentar ? ` ${kommentar}.` : ''} ${namn}, ${tid}`;
+      }
+
+      // Prioritet 3: nybil_inventering.klar_for_uthyrning = false
+      if (nybilData?.klar_for_uthyrning === false) {
+        const kommentar = nybilData.klar_for_uthyrning_notering || nybilData.ej_uthyrningsbar_anledning || '';
+        const namn = nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || '');
+        const tid = formatDateTime(nybilData.created_at);
+        return `Ej uthyrningsbar (via nybilsregistrering).${kommentar ? ` ${kommentar}.` : ''} ${namn}, ${tid}`;
+      }
+
+      return null;
+    })(),
+
+    // Ej uthyrningsbar anledning (fritext för editering)
+    ejUthyrningsbarAnledning: latestEdits.get('ej_uthyrningsbar_anledning')?.value
+      || nybilData?.klar_for_uthyrning_notering
+      || nybilData?.ej_uthyrningsbar_anledning
+      || '---',
+
+    // Laddnivå vid leverans
+    laddnivaVidLeverans: latestEdits.get('laddniva_vid_leverans')?.value
+      || (nybilData?.laddniva_procent != null ? `${nybilData.laddniva_procent}%` : '---'),
+
     // Damages at delivery
     harSkadorVidLeverans: typeof nybilData?.har_skador_vid_leverans === 'boolean'
       ? nybilData.har_skador_vid_leverans
