@@ -11,6 +11,19 @@ import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } fr
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MB%20300%20SL%20Roadster%201962/MB%20300-SL-Roadster_1962.jpg";
 
+const ORTER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];
+
+const STATIONER: Record<string, string[]> = {
+  'Falkenberg': ['Falkenberg'],
+  'Halmstad': ['BVH (Hedin multi)', 'Flyget Halmstad', 'FORD Halmstad', 'KIA Halmstad', 'MB Halmstad'],
+  'Helsingborg': ['B/S Klippan', 'BMW Helsingborg', 'Euromaster Helsingborg', 'FORD Helsingborg', 'HBSC Helsingborg', 'KIA Helsingborg', 'MB Helsingborg', 'S. Jönsson', 'Transport Helsingborg'],
+  'Lund': ['B/S Lund', 'FORD Lund', 'Hedin Lund', 'P7 Revinge'],
+  'Malmö': ['FORD Malmö', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Malmö Automera', 'MB Malmö', 'Mechanum', 'Sturup', 'Werksta Malmö Hamn', 'Werksta St Bernstorp'],
+  'Trelleborg': ['Trelleborg'],
+  'Varberg': ['Autoklinik (Sällstorp)', 'Finnveden plåt', 'FORD Varberg', 'MB Varberg', 'Varberg multi (Hedin)'],
+  'Ängelholm': ['Flyget Ängelholm', 'FORD Ängelholm', 'Mekonomen Ängelholm'],
+};
+
 // Warning banner styles for avvikelser
 const WARNING_BANNER_STYLE: React.CSSProperties = {
   backgroundColor: '#B30E0E',
@@ -900,7 +913,7 @@ export default function StatusForm() {
             </div>
             <div className="info-grid">
               <EditableInfoRow label="Saludatum" fieldName="saludatum" displayValue={vehicleStatus.vehicle.saludatum} rawValue={vehicleStatus.vehicle.saludatum === '---' ? '' : vehicleStatus.vehicle.saludatum} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="date" />
-              <EditableInfoRow label="Station" fieldName="salu_station" displayValue={vehicleStatus.vehicle.saluStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableOrtStationRow label="Station" fieldName="salu_station" displayValue={vehicleStatus.vehicle.saluStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               {(vehicleStatus.vehicle.saluKopare !== '---' || isEditing) && <EditableInfoRow label="Köpare (företag)" fieldName="salu_kopare" displayValue={vehicleStatus.vehicle.saluKopare} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
               {(vehicleStatus.vehicle.saluReturadress !== '---' || isEditing) && <EditableInfoRow label="Returadress" fieldName="salu_returadress" displayValue={vehicleStatus.vehicle.saluReturadress} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
               {(vehicleStatus.vehicle.saluRetur !== '---' || isEditing) && <EditableInfoRow label="Returort" fieldName="salu_retur" displayValue={vehicleStatus.vehicle.saluRetur} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
@@ -1365,6 +1378,45 @@ const EditableSelectRow: React.FC<{
       >
         <option value="">---</option>
         {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </>
+  );
+};
+const EditableOrtStationRow: React.FC<{
+  label: string;
+  fieldName: string;
+  displayValue: string;
+  isEditing: boolean;
+  pendingEdits: Record<string, string>;
+  onEdit: (field: string, value: string) => void;
+}> = ({ label, fieldName, displayValue, isEditing, pendingEdits, onEdit }) => {
+  const currentValue = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : (displayValue === '---' ? '' : displayValue);
+  // Try to find ort from current value by matching against known stations
+  const currentOrt = ORTER.find(o => STATIONER[o]?.includes(currentValue)) || (ORTER.includes(currentValue) ? currentValue : '');
+  const [selectedOrt, setSelectedOrt] = React.useState(currentOrt);
+  const availableStations = selectedOrt ? STATIONER[selectedOrt] || [] : [];
+  const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== (displayValue === '---' ? '' : displayValue);
+  if (!isEditing) return <InfoRow label={label} value={displayValue} />;
+  return (
+    <>
+      <span className="info-label">{label} — Ort</span>
+      <select
+        value={selectedOrt}
+        onChange={e => { setSelectedOrt(e.target.value); onEdit(fieldName, ''); }}
+        style={{ border: '1px solid #ccc', borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
+      >
+        <option value="">Välj ort</option>
+        {ORTER.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <span className="info-label">{label} — Station</span>
+      <select
+        value={currentValue}
+        onChange={e => onEdit(fieldName, e.target.value)}
+        disabled={!selectedOrt}
+        style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
+      >
+        <option value="">Välj station</option>
+        {availableStations.map(s => <option key={s} value={s}>{s}</option>)}
       </select>
     </>
   );
