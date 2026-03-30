@@ -899,7 +899,7 @@ export default function StatusForm() {
               </div>
             </div>
             <div className="info-grid">
-              <EditableInfoRow label="Saludatum" fieldName="saludatum" displayValue={vehicleStatus.vehicle.saludatum} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Saludatum" fieldName="saludatum" displayValue={vehicleStatus.vehicle.saludatum} rawValue={vehicleStatus.vehicle.saludatum === '---' ? '' : vehicleStatus.vehicle.saludatum} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="date" />
               <EditableInfoRow label="Station" fieldName="salu_station" displayValue={vehicleStatus.vehicle.saluStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               {(vehicleStatus.vehicle.saluKopare !== '---' || isEditing) && <EditableInfoRow label="Köpare (företag)" fieldName="salu_kopare" displayValue={vehicleStatus.vehicle.saluKopare} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
               {(vehicleStatus.vehicle.saluReturadress !== '---' || isEditing) && <EditableInfoRow label="Returadress" fieldName="salu_returadress" displayValue={vehicleStatus.vehicle.saluReturadress} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
@@ -1314,7 +1314,8 @@ const EditableInfoRow: React.FC<{
   pendingEdits: Record<string, string>;
   onEdit: (field: string, value: string) => void;
   multiline?: boolean;
-}> = ({ label, fieldName, displayValue, rawValue, isEditing, pendingEdits, onEdit, multiline }) => {
+  inputType?: string;
+}> = ({ label, fieldName, displayValue, rawValue, isEditing, pendingEdits, onEdit, multiline, inputType }) => {
   const initialValue = rawValue !== undefined ? rawValue : (displayValue === '---' ? '' : displayValue);
   const currentInput = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : initialValue;
   const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== initialValue;
@@ -1331,7 +1332,7 @@ const EditableInfoRow: React.FC<{
         />
       ) : (
         <input
-          type="text"
+          type={inputType || 'text'}
           value={currentInput}
           onChange={e => onEdit(fieldName, e.target.value)}
           style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
