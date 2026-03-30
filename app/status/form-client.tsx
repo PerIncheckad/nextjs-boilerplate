@@ -206,6 +206,15 @@ export default function StatusForm() {
       stold_gps: vehicleStatus.vehicle.stoldGps,
       klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
       stold_gps_spec: '',
+      ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
+      laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
+      saludatum: vehicleStatus.vehicle.saludatum,
+      salu_station: vehicleStatus.vehicle.saluStation,
+      salu_kopare: vehicleStatus.vehicle.saluKopare,
+      salu_returadress: vehicleStatus.vehicle.saluReturadress,
+      salu_retur: vehicleStatus.vehicle.saluRetur,
+      salu_attention: vehicleStatus.vehicle.saluAttention,
+      salu_notering: vehicleStatus.vehicle.saluNotering,
     };
     const edits = Object.entries(pendingEdits).map(([field_name, new_value]) => ({
       regnr,
@@ -583,7 +592,21 @@ export default function StatusForm() {
             </p>
           </Card>
         )}
-
+{/* Ej uthyrningsbar banner */}
+        {vehicleStatus?.found && vehicleStatus.vehicle?.ejUthyrningsbarInfo && (
+          <div style={{ background: '#C45400', color: 'white', borderRadius: '8px', padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
+              🔶 EJ UTHYRNINGSBAR — {vehicleStatus.vehicle.ejUthyrningsbarInfo}
+            </span>
+            {isEditing && (
+              <button type="button"
+                onClick={() => setPendingEdits(p => ({ ...p, klar_for_uthyrning: 'Ja', ej_uthyrningsbar_anledning: '' }))}
+                style={{ background: 'white', color: '#C45400', border: 'none', borderRadius: '4px', padding: '0.4rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                Markera som uthyrningsbar
+              </button>
+            )}
+          </div>
+        )}
         {/* Edit Confirm Modal */}
         {showEditConfirm && vehicleStatus?.vehicle && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -611,6 +634,15 @@ export default function StatusForm() {
                     stold_gps: vehicleStatus.vehicle.stoldGps,
                     klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
                     stold_gps_spec: '',
+                    ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
+                    laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
+                    saludatum: vehicleStatus.vehicle.saludatum,
+                    salu_station: vehicleStatus.vehicle.saluStation,
+                    salu_kopare: vehicleStatus.vehicle.saluKopare,
+                    salu_returadress: vehicleStatus.vehicle.saluReturadress,
+                    salu_retur: vehicleStatus.vehicle.saluRetur,
+                    salu_attention: vehicleStatus.vehicle.saluAttention,
+                    salu_notering: vehicleStatus.vehicle.saluNotering,
                   };
                   const oldVal = oldValues[field] === '---' ? '(tomt)' : (oldValues[field] || '(tomt)');
                   const newVal = value || '(tomt)';
@@ -793,6 +825,9 @@ export default function StatusForm() {
               {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && (
                 <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
               )}
+              {(vehicleStatus.vehicle.laddnivaVidLeverans !== '---' || isEditing) && (
+                <EditableInfoRow label="Laddnivå vid leverans" fieldName="laddniva_vid_leverans" displayValue={vehicleStatus.vehicle.laddnivaVidLeverans} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              )}
               <Fragment>
                 <span className="info-label">Skador vid leverans</span>
                 <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans === true ? 'at-risk' : ''}`}>
@@ -803,23 +838,30 @@ export default function StatusForm() {
                       : '---'}
                 </span>
               </Fragment>
+              <EditableSelectRow label="Klar för uthyrning" fieldName="klar_for_uthyrning" displayValue={vehicleStatus.vehicle.klarForUthyrning} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              {(isEditing && (pendingEdits['klar_for_uthyrning'] === 'Nej' || (!pendingEdits['klar_for_uthyrning'] && vehicleStatus.vehicle.klarForUthyrning === 'Nej'))) && (
+                <EditableInfoRow label="Anledning" fieldName="ej_uthyrningsbar_anledning" displayValue={vehicleStatus.vehicle.ejUthyrningsbarAnledning} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              )}
+              {(!isEditing && vehicleStatus.vehicle.ejUthyrningsbarAnledning !== '---') && (
+                <InfoRow label="Anledning (ej uthyrningsbar)" value={vehicleStatus.vehicle.ejUthyrningsbarAnledning} />
+              )}
               <EditableInfoRow label="Kommentarer" fieldName="anteckningar" displayValue={vehicleStatus.vehicle.anteckningar} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} multiline />
             </div>
           </Card>
         )}
 
         {/* Sale Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && vehicleStatus.vehicle.saludatum !== '---' && (
+        {vehicleStatus?.found && vehicleStatus.vehicle && (vehicleStatus.vehicle.saludatum !== '---' || isEditing) && (
           <Card>
             <SectionHeader title="Salu" />
             <div className="info-grid">
-              <SaludatumInfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum} />
-              <InfoRow label="Station" value={vehicleStatus.vehicle.saluStation} />
-              {vehicleStatus.vehicle.saluKopare !== '---' && <InfoRow label="Köpare (företag)" value={vehicleStatus.vehicle.saluKopare} />}
-              {vehicleStatus.vehicle.saluReturadress !== '---' && <InfoRow label="Returadress" value={vehicleStatus.vehicle.saluReturadress} />}
-              {vehicleStatus.vehicle.saluRetur !== '---' && <InfoRow label="Returort" value={vehicleStatus.vehicle.saluRetur} />}
-              {vehicleStatus.vehicle.saluAttention !== '---' && <InfoRow label="Attention" value={vehicleStatus.vehicle.saluAttention} />}
-              {vehicleStatus.vehicle.saluNotering !== '---' && <InfoRow label="Notering försäljning" value={vehicleStatus.vehicle.saluNotering} />}
+              <EditableInfoRow label="Saludatum" fieldName="saludatum" displayValue={vehicleStatus.vehicle.saludatum} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Station" fieldName="salu_station" displayValue={vehicleStatus.vehicle.saluStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              {(vehicleStatus.vehicle.saluKopare !== '---' || isEditing) && <EditableInfoRow label="Köpare (företag)" fieldName="salu_kopare" displayValue={vehicleStatus.vehicle.saluKopare} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
+              {(vehicleStatus.vehicle.saluReturadress !== '---' || isEditing) && <EditableInfoRow label="Returadress" fieldName="salu_returadress" displayValue={vehicleStatus.vehicle.saluReturadress} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
+              {(vehicleStatus.vehicle.saluRetur !== '---' || isEditing) && <EditableInfoRow label="Returort" fieldName="salu_retur" displayValue={vehicleStatus.vehicle.saluRetur} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
+              {(vehicleStatus.vehicle.saluAttention !== '---' || isEditing) && <EditableInfoRow label="Attention" fieldName="salu_attention" displayValue={vehicleStatus.vehicle.saluAttention} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
+              {(vehicleStatus.vehicle.saluNotering !== '---' || isEditing) && <EditableInfoRow label="Notering försäljning" fieldName="salu_notering" displayValue={vehicleStatus.vehicle.saluNotering} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} multiline />}
             </div>
           </Card>
         )}
