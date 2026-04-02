@@ -182,6 +182,11 @@ export default function StatusForm() {
   const [pendingEdits, setPendingEdits] = useState<Record<string, string>>({});
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [isSavingEdits, setIsSavingEdits] = useState(false);
+  const [showEjUthyrningsbarModal, setShowEjUthyrningsbarModal] = useState(false);
+  const [showUthyrningsbarModal, setShowUthyrningsbarModal] = useState(false);
+  const [uthyrningsbarKommentarInput, setUthyrningsbarKommentarInput] = useState('');
+  const [uthyrningsbarKommentarError, setUthyrningsbarKommentarError] = useState('');
+  const [isSavingUthyrningsbar, setIsSavingUthyrningsbar] = useState(false);
   
   // Vehicle data state
   const [vehicleStatus, setVehicleStatus] = useState<VehicleStatusResult | null>(null);
@@ -254,6 +259,45 @@ export default function StatusForm() {
       alert('Nätverksfel. Försök igen.');
     }
     setIsSavingEdits(false);
+  };
+  const handleMarkEjUthyrningsbar = async () => {
+    if (!vehicleStatus?.vehicle) return;
+    if (!uthyrningsbarKommentarInput.trim()) {
+      setUthyrningsbarKommentarError('Anledning är obligatorisk.');
+      return;
+    }
+    setIsSavingUthyrningsbar(true);
+    const regnr = vehicleStatus.vehicle.regnr;
+    const edits = [
+      { regnr, field_name: 'klar_for_uthyrning', new_value: 'Nej', old_value: vehicleStatus.vehicle.klarForUthyrning === '---' ? null : vehicleStatus.vehicle.klarForUthyrning, edited_by: userEmail },
+      { regnr, field_name: 'ej_uthyrningsbar_anledning', new_value: uthyrningsbarKommentarInput.trim(), old_value: null, edited_by: userEmail },
+    ];
+    try {
+      const res = await fetch('/api/vehicle-edits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits }) });
+      if (res.ok) { setShowEjUthyrningsbarModal(false); setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); window.location.reload(); }
+      else alert('Fel vid sparande. Försök igen.');
+    } catch { alert('Nätverksfel. Försök igen.'); }
+    setIsSavingUthyrningsbar(false);
+  };
+
+  const handleMarkUthyrningsbar = async () => {
+    if (!vehicleStatus?.vehicle) return;
+    if (!uthyrningsbarKommentarInput.trim()) {
+      setUthyrningsbarKommentarError('Kommentar är obligatorisk.');
+      return;
+    }
+    setIsSavingUthyrningsbar(true);
+    const regnr = vehicleStatus.vehicle.regnr;
+    const edits = [
+      { regnr, field_name: 'klar_for_uthyrning', new_value: 'Ja', old_value: 'Nej', edited_by: userEmail },
+      { regnr, field_name: 'ej_uthyrningsbar_anledning', new_value: uthyrningsbarKommentarInput.trim(), old_value: null, edited_by: userEmail },
+    ];
+    try {
+      const res = await fetch('/api/vehicle-edits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits }) });
+      if (res.ok) { setShowUthyrningsbarModal(false); setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); window.location.reload(); }
+      else alert('Fel vid sparande. Försök igen.');
+    } catch { alert('Nätverksfel. Försök igen.'); }
+    setIsSavingUthyrningsbar(false);
   };
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
@@ -605,21 +649,70 @@ export default function StatusForm() {
             </p>
           </Card>
         )}
-{/* Ej uthyrningsbar banner */}
-        {vehicleStatus?.found && vehicleStatus.vehicle?.ejUthyrningsbarInfo && (
-          <div style={{ background: '#C45400', color: 'white', borderRadius: '8px', padding: '1rem 1.25rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-            <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>
-              🔶 EJ UTHYRNINGSBAR — {vehicleStatus.vehicle.ejUthyrningsbarInfo}
-            </span>
-            {isEditing && (
-              <button type="button"
-                onClick={() => setPendingEdits(p => ({ ...p, klar_for_uthyrning: 'Ja', ej_uthyrningsbar_anledning: '' }))}
-                style={{ background: 'white', color: '#C45400', border: 'none', borderRadius: '4px', padding: '0.4rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                Markera som uthyrningsbar
-              </button>
+
+        {/* Ej uthyrningsbar banner */}
+        {vehicleStatus?.found && vehicleStatus.vehicle?.ejUthyrningsbarKalla && vehicleStatus.vehicle.isSold !== true && (
+          <div style={{ background: '#C45400', color: 'white', borderRadius: '8px', padding: '1rem 1.25rem', marginBottom: '1rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: vehicleStatus.vehicle.ejUthyrningsbarKommentar ? '0.4rem' : '0.6rem' }}>
+              EJ UTHYRNINGSBAR
+            </div>
+            {vehicleStatus.vehicle.ejUthyrningsbarKommentar && (
+              <div style={{ fontStyle: 'italic', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
+                {vehicleStatus.vehicle.ejUthyrningsbarKommentar}
+              </div>
             )}
+            <div style={{ fontSize: '0.85rem', marginBottom: '0.75rem', opacity: 0.9 }}>
+              {vehicleStatus.vehicle.ejUthyrningsbarKalla} — {vehicleStatus.vehicle.ejUthyrningsbarNamnDatum}
+            </div>
+            <button type="button"
+              onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowUthyrningsbarModal(true); }}
+              style={{ background: 'white', color: '#C45400', border: 'none', borderRadius: '4px', padding: '0.4rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+              Markera som uthyrningsbar
+            </button>
           </div>
         )}
+{/* Ej uthyrningsbar modal */}
+        {showEjUthyrningsbarModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', maxWidth: '420px', width: '100%' }}>
+              <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Markera som ej uthyrningsbar</h2>
+              <p style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', color: '#555' }}>Ange anledning (obligatorisk):</p>
+              <textarea value={uthyrningsbarKommentarInput} onChange={e => { setUthyrningsbarKommentarInput(e.target.value); setUthyrningsbarKommentarError(''); }} rows={3}
+                style={{ width: '100%', border: `1px solid ${uthyrningsbarKommentarError ? '#B30E0E' : '#ccc'}`, borderRadius: '4px', padding: '8px', fontSize: '0.875rem', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              {uthyrningsbarKommentarError && <p style={{ color: '#B30E0E', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>{uthyrningsbarKommentarError}</p>}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button type="button" onClick={() => { setShowEjUthyrningsbarModal(false); setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); }} disabled={isSavingUthyrningsbar}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.875rem' }}>Avbryt</button>
+                <button type="button" onClick={handleMarkEjUthyrningsbar} disabled={isSavingUthyrningsbar}
+                  style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', background: '#C45400', color: 'white', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>
+                  {isSavingUthyrningsbar ? 'Sparar…' : 'Bekräfta'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Uthyrningsbar modal */}
+        {showUthyrningsbarModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', maxWidth: '420px', width: '100%' }}>
+              <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Markera som uthyrningsbar</h2>
+              <p style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', color: '#555' }}>Ange kommentar (obligatorisk):</p>
+              <textarea value={uthyrningsbarKommentarInput} onChange={e => { setUthyrningsbarKommentarInput(e.target.value); setUthyrningsbarKommentarError(''); }} rows={3}
+                style={{ width: '100%', border: `1px solid ${uthyrningsbarKommentarError ? '#B30E0E' : '#ccc'}`, borderRadius: '4px', padding: '8px', fontSize: '0.875rem', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              {uthyrningsbarKommentarError && <p style={{ color: '#B30E0E', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>{uthyrningsbarKommentarError}</p>}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button type="button" onClick={() => { setShowUthyrningsbarModal(false); setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); }} disabled={isSavingUthyrningsbar}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.875rem' }}>Avbryt</button>
+                <button type="button" onClick={handleMarkUthyrningsbar} disabled={isSavingUthyrningsbar}
+                  style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', background: '#1a73e8', color: 'white', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>
+                  {isSavingUthyrningsbar ? 'Sparar…' : 'Bekräfta'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Edit Confirm Modal */}
         {showEditConfirm && vehicleStatus?.vehicle && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -835,7 +928,14 @@ export default function StatusForm() {
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <SectionHeader title="Övrig info vid leverans till MABI" />
-              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
+                {vehicleStatus.vehicle.isSold !== true && !vehicleStatus.vehicle.ejUthyrningsbarKalla && !isEditing && (
+                  <button type="button"
+                    onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
+                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #C45400', borderRadius: '4px', background: 'white', color: '#C45400', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                    🔶 Markera som ej uthyrningsbar
+                  </button>
+                )}
                 {isEditing ? (
                   <>
                     <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
@@ -873,12 +973,16 @@ export default function StatusForm() {
                       : '---'}
                 </span>
               </Fragment>
-              <EditableSelectRow label="Klar för uthyrning" fieldName="klar_for_uthyrning" displayValue={vehicleStatus.vehicle.klarForUthyrning} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              {(isEditing && (pendingEdits['klar_for_uthyrning'] === 'Nej' || (!pendingEdits['klar_for_uthyrning'] && vehicleStatus.vehicle.klarForUthyrning === 'Nej'))) && (
-                <EditableInfoRow label="Anledning" fieldName="ej_uthyrningsbar_anledning" displayValue={vehicleStatus.vehicle.ejUthyrningsbarAnledning} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              )}
-              {(!isEditing && vehicleStatus.vehicle.ejUthyrningsbarAnledning !== '---') && (
-                <InfoRow label="Anledning (ej uthyrningsbar)" value={vehicleStatus.vehicle.ejUthyrningsbarAnledning} />
+              {vehicleStatus.vehicle.isSold !== true && (
+                <>
+                  <EditableSelectRow label="Klar för uthyrning" fieldName="klar_for_uthyrning" displayValue={vehicleStatus.vehicle.klarForUthyrning} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  {(isEditing && (pendingEdits['klar_for_uthyrning'] === 'Nej' || (!pendingEdits['klar_for_uthyrning'] && vehicleStatus.vehicle.klarForUthyrning === 'Nej'))) && (
+                    <EditableInfoRow label="Anledning" fieldName="ej_uthyrningsbar_anledning" displayValue={vehicleStatus.vehicle.ejUthyrningsbarAnledning} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  )}
+                  {(!isEditing && vehicleStatus.vehicle.ejUthyrningsbarAnledning !== '---') && (
+                    <InfoRow label="Anledning (ej uthyrningsbar)" value={vehicleStatus.vehicle.ejUthyrningsbarAnledning} />
+                  )}
+                </>
               )}
               <EditableInfoRow label="Kommentarer" fieldName="anteckningar" displayValue={vehicleStatus.vehicle.anteckningar} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} multiline />
             </div>
