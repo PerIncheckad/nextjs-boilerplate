@@ -836,7 +836,7 @@ export default function StatusForm() {
                 <>
                   <span className="info-label">Uthyrningsbar</span>
                   <span className="info-value" style={{ color: vehicleStatus.vehicle.ejUthyrningsbarKalla ? '#B30E0E' : undefined, fontWeight: vehicleStatus.vehicle.ejUthyrningsbarKalla ? 600 : undefined }}>
-                    {vehicleStatus.vehicle.ejUthyrningsbarKalla ? 'Nej' : (vehicleStatus.vehicle.klarForUthyrning === 'Ja' ? 'Ja' : '---')}
+                    {vehicleStatus.vehicle.ejUthyrningsbarKalla ? 'Nej' : 'Ja'}
                   </span>
                 </>
               )}
