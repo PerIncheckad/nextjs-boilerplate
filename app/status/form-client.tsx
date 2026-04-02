@@ -664,7 +664,9 @@ export default function StatusForm() {
                         ? `Inkommen${event.plats ? ` till ${event.plats}` : ''}. Registrerad av ${event.utfordAv}`
                         : event.typ === 'buhs_skada' && event.buhsSkadaDetaljer?.skadetyp
                           ? event.buhsSkadaDetaljer.skadetyp
-                          : `Nybilsregistrering av ${event.utfordAv}`
+                          : event.typ === 'manual'
+                            ? `Manuell ändring av ${event.utfordAv}`
+                            : `Nybilsregistrering av ${event.utfordAv}`
                     }
                     {hasAvvikelser && ' ⚠️'}
                   </div>
@@ -803,7 +805,7 @@ export default function StatusForm() {
                       <button type="button"
                         onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
                         style={{ padding: '0.25rem 0.75rem', border: '1px solid #C45400', borderRadius: '4px', background: 'white', color: '#C45400', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                        🔶 Ej uthyrningsbar
+                        Markera som EJ UTHYRNINGSBAR
                       </button>
                     )}
                     <button type="button" onClick={() => setIsEditing(true)}
