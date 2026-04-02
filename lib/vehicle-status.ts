@@ -57,9 +57,11 @@ export type VehicleStatusData = {
   tankstatusVidLeverans: string;
   // General comment
   anteckningar: string;
-// Ej uthyrningsbar info (källa + kommentar + namn + tid)
-  ejUthyrningsbarInfo: string | null;
-  // Ej uthyrningsbar anledning (fritext)
+// Ej uthyrningsbar — uppdelat i tre fält
+  ejUthyrningsbarKommentar: string | null;
+  ejUthyrningsbarKalla: string | null;
+  ejUthyrningsbarNamnDatum: string | null;
+  // Ej uthyrningsbar anledning (fritext för editering)
   ejUthyrningsbarAnledning: string;
   // Laddnivå vid leverans (elbilar)
   laddnivaVidLeverans: string;
@@ -1139,7 +1141,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
       anteckningar: '---',
-      ejUthyrningsbarInfo: null,
+      ejUthyrningsbarKommentar: null,
+      ejUthyrningsbarKalla: null,
+      ejUthyrningsbarNamnDatum: null,
       ejUthyrningsbarAnledning: '---',
       laddnivaVidLeverans: '---',
       harSkadorVidLeverans: null,
@@ -1996,41 +2000,45 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // General comment
     anteckningar: nybilData?.anteckningar || '---',
     
-    // Ej uthyrningsbar info — bygg sammansatt sträng med källa + kommentar + namn + tid
-    ejUthyrningsbarInfo: (() => {
+    // Ej uthyrningsbar — bygg tre separata fält med prioriteringskedja
+    ...(() => {
       // Prioritet 1: manuell edit i /status
       const editVal = latestEdits.get('klar_for_uthyrning')?.value;
       if (editVal === 'Nej') {
         const editEntry = latestEdits.get('klar_for_uthyrning')!;
-        const kommentar = latestEdits.get('ej_uthyrningsbar_anledning')?.value || '';
-        const namn = getFullNameFromEmail(editEntry.editedBy);
-        const tid = formatDateTime(editEntry.date);
-        return `Ej uthyrningsbar (via manuell redigering).${kommentar ? ` ${kommentar}.` : ''} ${namn}, ${tid}`;
+        return {
+          ejUthyrningsbarKommentar: latestEdits.get('ej_uthyrningsbar_anledning')?.value || null,
+          ejUthyrningsbarKalla: 'via manuell redigering',
+          ejUthyrningsbarNamnDatum: `${getFullNameFromEmail(editEntry.editedBy)}, ${formatDateTime(editEntry.date)}`,
+        };
       }
-      if (editVal === 'Ja') return null; // Manuellt markerad som uthyrningsbar — override allt
+      if (editVal === 'Ja') {
+        return { ejUthyrningsbarKommentar: null, ejUthyrningsbarKalla: null, ejUthyrningsbarNamnDatum: null };
+      }
 
       // Prioritet 2: senaste incheckning med rental_unavailable
-      const latestUnavailableCheckin = checkins.find(c => {
-        const cl = c.checklist || {};
-        return cl.rental_unavailable === true;
-      });
+      const latestUnavailableCheckin = checkins.find(c => (c.checklist || {}).rental_unavailable === true);
       if (latestUnavailableCheckin) {
         const cl = latestUnavailableCheckin.checklist || {};
-        const kommentar = cl.rental_unavailable_comment || '';
         const namn = latestUnavailableCheckin.checker_name || getFullNameFromEmail(latestUnavailableCheckin.checker_email || '');
-        const tid = formatDateTime(latestUnavailableCheckin.completed_at || latestUnavailableCheckin.created_at);
-        return `Ej uthyrningsbar (via incheckning).${kommentar ? ` ${kommentar}.` : ''} ${namn}, ${tid}`;
+        return {
+          ejUthyrningsbarKommentar: cl.rental_unavailable_comment || null,
+          ejUthyrningsbarKalla: 'via incheckning',
+          ejUthyrningsbarNamnDatum: `${namn}, ${formatDateTime(latestUnavailableCheckin.completed_at || latestUnavailableCheckin.created_at)}`,
+        };
       }
 
       // Prioritet 3: nybil_inventering.klar_for_uthyrning = false
       if (nybilData?.klar_for_uthyrning === false) {
-        const kommentar = nybilData.klar_for_uthyrning_notering || nybilData.ej_uthyrningsbar_anledning || '';
         const namn = nybilData.fullstandigt_namn || getFullNameFromEmail(nybilData.registrerad_av || '');
-        const tid = formatDateTime(nybilData.created_at);
-        return `Ej uthyrningsbar (via nybilsregistrering).${kommentar ? ` ${kommentar}.` : ''} ${namn}, ${tid}`;
+        return {
+          ejUthyrningsbarKommentar: nybilData.klar_for_uthyrning_notering || nybilData.ej_uthyrningsbar_anledning || null,
+          ejUthyrningsbarKalla: 'via nybilsregistrering',
+          ejUthyrningsbarNamnDatum: `${namn}, ${formatDateTime(nybilData.created_at)}`,
+        };
       }
 
-      return null;
+      return { ejUthyrningsbarKommentar: null, ejUthyrningsbarKalla: null, ejUthyrningsbarNamnDatum: null };
     })(),
 
     // Ej uthyrningsbar anledning (fritext för editering)
