@@ -606,6 +606,34 @@ export default function StatusForm() {
           </Card>
         )}
 
+        {/* SÅLD banner */}
+        {vehicleStatus?.found && vehicleStatus.vehicle?.isSold === true && (
+          <div style={{ background: '#B30E0E', color: 'white', borderRadius: '8px', padding: '1rem 1.25rem', marginBottom: '1rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.25rem' }}>SÅLD</div>
+          </div>
+        )}
+
+        {/* Ej uthyrningsbar banner */}
+        {vehicleStatus?.found && vehicleStatus.vehicle?.ejUthyrningsbarKalla && vehicleStatus.vehicle.isSold !== true && (
+          <div style={{ background: '#C45400', color: 'white', borderRadius: '8px', padding: '1rem 1.25rem', marginBottom: '1rem' }}>
+            <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: vehicleStatus.vehicle.ejUthyrningsbarKommentar ? '0.4rem' : '0.6rem' }}>
+              EJ UTHYRNINGSBAR
+            </div>
+            {vehicleStatus.vehicle.ejUthyrningsbarKommentar && (
+              <div style={{ fontStyle: 'italic', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
+                {vehicleStatus.vehicle.ejUthyrningsbarKommentar}
+              </div>
+            )}
+            <div style={{ fontSize: '0.85rem', marginBottom: '0.75rem', opacity: 0.9 }}>
+              {vehicleStatus.vehicle.ejUthyrningsbarKalla} — {vehicleStatus.vehicle.ejUthyrningsbarNamnDatum}
+            </div>
+            <button type="button"
+              onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowUthyrningsbarModal(true); }}
+              style={{ background: 'white', color: '#C45400', border: 'none', borderRadius: '4px', padding: '0.4rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+              Markera som uthyrningsbar
+            </button>
+          </div>
+        )}
         {/* Recent Events Section - Senaste händelser */}
         {vehicleStatus?.found && vehicleStatus.history && vehicleStatus.history.length > 0 && (
           <Card className="recent-events-card">
@@ -650,28 +678,7 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Ej uthyrningsbar banner */}
-        {vehicleStatus?.found && vehicleStatus.vehicle?.ejUthyrningsbarKalla && vehicleStatus.vehicle.isSold !== true && (
-          <div style={{ background: '#C45400', color: 'white', borderRadius: '8px', padding: '1rem 1.25rem', marginBottom: '1rem' }}>
-            <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: vehicleStatus.vehicle.ejUthyrningsbarKommentar ? '0.4rem' : '0.6rem' }}>
-              EJ UTHYRNINGSBAR
-            </div>
-            {vehicleStatus.vehicle.ejUthyrningsbarKommentar && (
-              <div style={{ fontStyle: 'italic', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
-                {vehicleStatus.vehicle.ejUthyrningsbarKommentar}
-              </div>
-            )}
-            <div style={{ fontSize: '0.85rem', marginBottom: '0.75rem', opacity: 0.9 }}>
-              {vehicleStatus.vehicle.ejUthyrningsbarKalla} — {vehicleStatus.vehicle.ejUthyrningsbarNamnDatum}
-            </div>
-            <button type="button"
-              onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowUthyrningsbarModal(true); }}
-              style={{ background: 'white', color: '#C45400', border: 'none', borderRadius: '4px', padding: '0.4rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
-              Markera som uthyrningsbar
-            </button>
-          </div>
-        )}
-{/* Ej uthyrningsbar modal */}
+        {/* Ej uthyrningsbar modal */}
         {showEjUthyrningsbarModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
             <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', maxWidth: '420px', width: '100%' }}>
@@ -791,10 +798,19 @@ export default function StatusForm() {
                     </button>
                   </>
                 ) : (
-                  <button type="button" onClick={() => setIsEditing(true)}
-                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
-                    ✏️ Redigera
-                  </button>
+                  <>
+                    {vehicleStatus.vehicle.isSold !== true && !vehicleStatus.vehicle.ejUthyrningsbarKalla && (
+                      <button type="button"
+                        onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
+                        style={{ padding: '0.25rem 0.75rem', border: '1px solid #C45400', borderRadius: '4px', background: 'white', color: '#C45400', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                        🔶 Ej uthyrningsbar
+                      </button>
+                    )}
+                    <button type="button" onClick={() => setIsEditing(true)}
+                      style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
+                      ✏️ Redigera
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -814,6 +830,14 @@ export default function StatusForm() {
               )}
               <InfoRow label="Antal registrerade skador" value={vehicleStatus.vehicle.antalSkador.toString()} />
               <InfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum || '---'} />
+              {vehicleStatus.vehicle.isSold !== true && (
+                <>
+                  <span className="info-label">Uthyrningsbar</span>
+                  <span className="info-value" style={{ color: vehicleStatus.vehicle.ejUthyrningsbarKalla ? '#B30E0E' : undefined, fontWeight: vehicleStatus.vehicle.ejUthyrningsbarKalla ? 600 : undefined }}>
+                    {vehicleStatus.vehicle.ejUthyrningsbarKalla ? 'Nej' : (vehicleStatus.vehicle.klarForUthyrning === 'Ja' ? 'Ja' : '---')}
+                  </span>
+                </>
+              )}
               <InfoRow 
                 label="Såld" 
                 value={
@@ -973,17 +997,7 @@ export default function StatusForm() {
                       : '---'}
                 </span>
               </Fragment>
-              {vehicleStatus.vehicle.isSold !== true && (
-                <>
-                  <EditableSelectRow label="Klar för uthyrning" fieldName="klar_for_uthyrning" displayValue={vehicleStatus.vehicle.klarForUthyrning} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-                  {(isEditing && (pendingEdits['klar_for_uthyrning'] === 'Nej' || (!pendingEdits['klar_for_uthyrning'] && vehicleStatus.vehicle.klarForUthyrning === 'Nej'))) && (
-                    <EditableInfoRow label="Anledning" fieldName="ej_uthyrningsbar_anledning" displayValue={vehicleStatus.vehicle.ejUthyrningsbarAnledning} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-                  )}
-                  {(!isEditing && vehicleStatus.vehicle.ejUthyrningsbarAnledning !== '---') && (
-                    <InfoRow label="Anledning (ej uthyrningsbar)" value={vehicleStatus.vehicle.ejUthyrningsbarAnledning} />
-                  )}
-                </>
-              )}
+              
               <EditableInfoRow label="Kommentarer" fieldName="anteckningar" displayValue={vehicleStatus.vehicle.anteckningar} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} multiline />
             </div>
           </Card>
