@@ -955,13 +955,6 @@ export default function StatusForm() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <SectionHeader title="Övrig info vid leverans till MABI" />
               <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                {vehicleStatus.vehicle.isSold !== true && !vehicleStatus.vehicle.ejUthyrningsbarKalla && !isEditing && (
-                  <button type="button"
-                    onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
-                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #C45400', borderRadius: '4px', background: 'white', color: '#C45400', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                    🔶 Markera som ej uthyrningsbar
-                  </button>
-                )}
                 {isEditing ? (
                   <>
                     <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
