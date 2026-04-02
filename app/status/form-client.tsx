@@ -734,7 +734,7 @@ export default function StatusForm() {
                     hjultyp: 'Däck som sitter på', planerad_station: 'Planerad station',
                     serviceintervall: 'Serviceintervall', max_km_manad: 'Max km/månad',
                     avgift_over_km: 'Avgift över-km', anteckningar: 'Anteckningar',
-                    stold_gps: 'Stöld-GPS', klar_for_uthyrning: 'Klar för uthyrning',
+                    stold_gps: 'Stöld-GPS', klar_for_uthyrning: 'Uthyrningsbar',
                     stold_gps_spec: 'Stöld-GPS spec',
                   };
                   const oldValues: Record<string, string> = {
