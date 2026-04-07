@@ -481,6 +481,13 @@ export default function CheckInForm() {
   // Unknown reg.nr helper
   const [showUnknownRegHelper, setShowUnknownRegHelper] = useState(false);
 
+  // Ej uthyrningsbar-varning (visas direkt när reg.nr matchas)
+  const [ejUthyrningsbarWarning, setEjUthyrningsbarWarning] = useState<{
+    kommentar: string | null;
+    kalla: string | null;
+    namnDatum: string | null;
+  } | null>(null);
+
   // Skador State
   const [existingDamages, setExistingDamages] = useState<ExistingDamage[]>([]);
   const [skadekontroll, setSkadekontroll] = useState<'inga_nya_skador' | 'nya_skador' | null>(null);
@@ -752,6 +759,17 @@ export default function CheckInForm() {
       }
       
       setVehicleData(info);
+
+      // Visa varning om fordonet är markerat som ej uthyrningsbart
+      if (info.ejUthyrningsbarKalla) {
+        setEjUthyrningsbarWarning({
+          kommentar: info.ejUthyrningsbarKommentar || null,
+          kalla: info.ejUthyrningsbarKalla,
+          namnDatum: info.ejUthyrningsbarNamnDatum || null,
+        });
+      } else {
+        setEjUthyrningsbarWarning(null);
+      }
 
       // Auto-set fuel type from API if available
       if (info.bransletyp) {
@@ -1430,6 +1448,33 @@ export default function CheckInForm() {
       {showSuccessModal && <SuccessModal firstName={firstName} />}
       {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
       <ActionConfirmDialog state={confirmDialog} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
+      {ejUthyrningsbarWarning && (
+        <Fragment>
+          <div className="modal-overlay" />
+          <div className="modal-content" style={{ borderTop: '6px solid #C45400', maxWidth: '500px' }}>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#C45400', marginBottom: '0.75rem', letterSpacing: '0.03em' }}>
+              EJ UTHYRNINGSBAR
+            </div>
+            {ejUthyrningsbarWarning.kommentar && (
+              <div style={{ fontStyle: 'italic', marginBottom: '0.5rem', color: '#333' }}>
+                {ejUthyrningsbarWarning.kommentar}
+              </div>
+            )}
+            <div style={{ fontSize: '0.875rem', color: '#555', marginBottom: '1.5rem' }}>
+              {ejUthyrningsbarWarning.kalla} — {ejUthyrningsbarWarning.namnDatum}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setEjUthyrningsbarWarning(null)}
+                style={{ padding: '0.6rem 1.25rem', background: '#C45400', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
+              >
+                Jag förstår, fortsätt
+              </button>
+            </div>
+          </div>
+        </Fragment>
+      )}
       {showAnnotator && annotatorImage && (
         <ImageAnnotator
           imageFile={annotatorImage}
