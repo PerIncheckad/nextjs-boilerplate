@@ -748,6 +748,7 @@ export default function StatusForm() {
               <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Markera {vehicleStatus?.vehicle?.regnr} som såld</h2>
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Sålddatum (valfritt)</label>
               <input type="date" value={soldDatumInput} onChange={e => setSoldDatumInput(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
                 style={{ width: '100%', border: '1px solid #ccc', borderRadius: '4px', padding: '8px', fontSize: '0.875rem', boxSizing: 'border-box', marginBottom: '1rem' }} />
               <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Kommentar (obligatorisk)</label>
               <textarea value={soldKommentarInput} onChange={e => { setSoldKommentarInput(e.target.value); setSoldKommentarError(''); }} rows={3}
