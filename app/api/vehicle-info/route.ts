@@ -66,6 +66,9 @@ export type VehicleInfo = {
   existing_damages: ConsolidatedDamage[];
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
   bransletyp?: string | null;
+  ejUthyrningsbarKommentar?: string | null;
+  ejUthyrningsbarKalla?: string | null;
+  ejUthyrningsbarNamnDatum?: string | null;
   last_checkin?: {
     station: string;
     checker_name: string;
@@ -85,7 +88,31 @@ function formatModel(brand: string | null, model: string | null): string {
   if (cleanModel) return `- ${cleanModel}`;
   return "Modell saknas";
 }
+function getFullNameFromEmail(email: string): string {
+  if (!email) return 'Okänd';
+  const namePart = email.split('@')[0];
+  const parts = namePart.split('.');
+  if (parts.length >= 2) {
+    const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    const lastName = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+    return `${firstName} ${lastName}`;
+  }
+  return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+}
 
+function formatDateTimeLocal(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    const datePart = date.toISOString().split('T')[0];
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${datePart} kl ${hours}:${minutes}`;
+  } catch {
+    return '';
+  }
+}
 function formatSaludatum(dateStr: string | null | undefined): string {
   if (!dateStr) return 'Ingen information';
   const cleaned = dateStr.replace(/-/g, '').trim();
@@ -146,7 +173,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const isForceUndocumented = SPECIAL_FORCE_UNDOCUMENTED.includes(cleanedRegnr);
 
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, vehicleFuelResponse] = await Promise.all([
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, vehicleFuelResponse, vehicleEditsResponse] = await Promise.all([
     supabaseAdmin
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabaseAdmin
@@ -165,7 +192,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('nybil_inventering')
-      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum, bransletyp')
+      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum, bransletyp, klar_for_uthyrning, klar_for_uthyrning_notering, ej_uthyrningsbar_anledning, registrerad_av, fullstandigt_namn, created_at')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -174,7 +201,13 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .from('vehicles')
       .select('bransletyp')
       .eq('regnr', cleanedRegnr)
-      .maybeSingle()
+      .maybeSingle(),
+    supabaseAdmin
+      .from('vehicle_edits')
+      .select('field_name, new_value, edited_by, edited_at')
+      .eq('regnr', cleanedRegnr)
+      .in('field_name', ['klar_for_uthyrning', 'ej_uthyrningsbar_anledning'])
+      .order('edited_at', { ascending: false })
   ]);
   
   const vehicleData = vehicleResponse.data?.[0] || null;
@@ -200,7 +233,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     
     const checkinsResponse = await supabaseAdmin
       .from('checkins')
-      .select('id, current_station, checker_name, completed_at')
+      .select('id, current_station, checker_name, checker_email, completed_at, checklist')
       .eq('regnr', cleanedRegnr)
       .eq('status', 'COMPLETED')
       .order('completed_at', { ascending: false })
@@ -475,7 +508,41 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       handled_video_urls: [],
     });
   }
+// Bygg Map med senaste edit per fält
+  const vehicleEditsData = vehicleEditsResponse.data || [];
+  const latestEdits = new Map<string, { value: string | null; editedBy: string; date: string }>();
+  for (const edit of vehicleEditsData) {
+    if (!latestEdits.has(edit.field_name)) {
+      latestEdits.set(edit.field_name, { value: edit.new_value, editedBy: edit.edited_by, date: edit.edited_at });
+    }
+  }
 
+  // Beräkna ejUthyrningsbar med samma prioriteringskedja som vehicle-status.ts
+  let ejUthyrningsbarKommentar: string | null = null;
+  let ejUthyrningsbarKalla: string | null = null;
+  let ejUthyrningsbarNamnDatum: string | null = null;
+
+  const editVal = latestEdits.get('klar_for_uthyrning')?.value;
+  if (editVal === 'Nej') {
+    const editEntry = latestEdits.get('klar_for_uthyrning')!;
+    ejUthyrningsbarKommentar = latestEdits.get('ej_uthyrningsbar_anledning')?.value || null;
+    ejUthyrningsbarKalla = 'via manuell redigering';
+    ejUthyrningsbarNamnDatum = `${getFullNameFromEmail(editEntry.editedBy)}, ${formatDateTimeLocal(editEntry.date)}`;
+  } else if (editVal !== 'Ja') {
+    const unavailableCheckin = checkins.find(c => (c.checklist || {}).rental_unavailable === true);
+    if (unavailableCheckin) {
+      const cl = unavailableCheckin.checklist || {};
+      const namn = unavailableCheckin.checker_name || getFullNameFromEmail(unavailableCheckin.checker_email || '');
+      ejUthyrningsbarKommentar = cl.rental_unavailable_comment || null;
+      ejUthyrningsbarKalla = 'via incheckning';
+      ejUthyrningsbarNamnDatum = `${namn}, ${formatDateTimeLocal(unavailableCheckin.completed_at)}`;
+    } else if (nybilData?.klar_for_uthyrning === false) {
+      const namn = (nybilData as any).fullstandigt_namn || getFullNameFromEmail((nybilData as any).registrerad_av || '');
+      ejUthyrningsbarKommentar = (nybilData as any).klar_for_uthyrning_notering || (nybilData as any).ej_uthyrningsbar_anledning || null;
+      ejUthyrningsbarKalla = 'via nybilsregistrering';
+      ejUthyrningsbarNamnDatum = `${namn}, ${formatDateTimeLocal((nybilData as any).created_at)}`;
+    }
+  }
   const latestSaludatum = legacyDamages.length > 0 ? legacyDamages[0].saludatum : null;
   const finalSaludatum = formatSaludatum(latestSaludatum);
 
@@ -494,6 +561,9 @@ if (vehicleData) {
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
       bransletyp: finalBransletyp,
+      ejUthyrningsbarKommentar,
+      ejUthyrningsbarKalla,
+      ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
     };
   }
@@ -513,6 +583,9 @@ if (vehicleData) {
       existing_damages: consolidatedDamages,
       status: 'FULL_MATCH',
       bransletyp: finalBransletyp,
+      ejUthyrningsbarKommentar,
+      ejUthyrningsbarKalla,
+      ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
     };
   }
@@ -526,6 +599,9 @@ if (vehicleData) {
       existing_damages: consolidatedDamages,
       status: 'PARTIAL_MATCH_DAMAGE_ONLY',
       bransletyp: finalBransletyp,
+      ejUthyrningsbarKommentar,
+      ejUthyrningsbarKalla,
+      ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
     };
   }
@@ -538,6 +614,9 @@ if (vehicleData) {
     existing_damages: [],
     status: 'NO_MATCH',
       bransletyp: finalBransletyp,
+      ejUthyrningsbarKommentar,
+      ejUthyrningsbarKalla,
+      ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
   };
 }
