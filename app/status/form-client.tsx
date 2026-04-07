@@ -187,6 +187,12 @@ export default function StatusForm() {
   const [uthyrningsbarKommentarInput, setUthyrningsbarKommentarInput] = useState('');
   const [uthyrningsbarKommentarError, setUthyrningsbarKommentarError] = useState('');
   const [isSavingUthyrningsbar, setIsSavingUthyrningsbar] = useState(false);
+  const [showSoldModal, setShowSoldModal] = useState(false);
+  const [showUnsoldModal, setShowUnsoldModal] = useState(false);
+  const [soldDatumInput, setSoldDatumInput] = useState('');
+  const [soldKommentarInput, setSoldKommentarInput] = useState('');
+  const [soldKommentarError, setSoldKommentarError] = useState('');
+  const [isSavingSold, setIsSavingSold] = useState(false);
   
   // Vehicle data state
   const [vehicleStatus, setVehicleStatus] = useState<VehicleStatusResult | null>(null);
@@ -259,6 +265,40 @@ export default function StatusForm() {
       alert('Nätverksfel. Försök igen.');
     }
     setIsSavingEdits(false);
+  };
+  const handleMarkSold = async () => {
+    if (!vehicleStatus?.vehicle) return;
+    if (!soldKommentarInput.trim()) { setSoldKommentarError('Kommentar är obligatorisk.'); return; }
+    setIsSavingSold(true);
+    const regnr = vehicleStatus.vehicle.regnr;
+    const edits: any[] = [
+      { regnr, field_name: 'is_sold', new_value: 'true', old_value: null, edited_by: userEmail },
+      { regnr, field_name: 'sold_kommentar', new_value: soldKommentarInput.trim(), old_value: null, edited_by: userEmail },
+    ];
+    if (soldDatumInput) edits.push({ regnr, field_name: 'sold_datum', new_value: soldDatumInput, old_value: null, edited_by: userEmail });
+    try {
+      const res = await fetch('/api/vehicle-edits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits }) });
+      if (res.ok) { setShowSoldModal(false); setSoldDatumInput(''); setSoldKommentarInput(''); setSoldKommentarError(''); window.location.reload(); }
+      else alert('Fel vid sparande. Försök igen.');
+    } catch { alert('Nätverksfel. Försök igen.'); }
+    setIsSavingSold(false);
+  };
+
+  const handleUnmarkSold = async () => {
+    if (!vehicleStatus?.vehicle) return;
+    if (!soldKommentarInput.trim()) { setSoldKommentarError('Kommentar är obligatorisk.'); return; }
+    setIsSavingSold(true);
+    const regnr = vehicleStatus.vehicle.regnr;
+    const edits = [
+      { regnr, field_name: 'is_sold', new_value: 'false', old_value: 'true', edited_by: userEmail },
+      { regnr, field_name: 'sold_kommentar', new_value: soldKommentarInput.trim(), old_value: vehicleStatus.vehicle.soldKommentar || null, edited_by: userEmail },
+    ];
+    try {
+      const res = await fetch('/api/vehicle-edits', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ edits }) });
+      if (res.ok) { setShowUnsoldModal(false); setSoldKommentarInput(''); setSoldKommentarError(''); window.location.reload(); }
+      else alert('Fel vid sparande. Försök igen.');
+    } catch { alert('Nätverksfel. Försök igen.'); }
+    setIsSavingSold(false);
   };
   const handleMarkEjUthyrningsbar = async () => {
     if (!vehicleStatus?.vehicle) return;
@@ -609,7 +649,29 @@ export default function StatusForm() {
         {/* SÅLD banner */}
         {vehicleStatus?.found && vehicleStatus.vehicle?.isSold === true && (
           <div style={{ background: '#B30E0E', color: 'white', borderRadius: '8px', padding: '1rem 1.25rem', marginBottom: '1rem' }}>
-            <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '0.25rem' }}>SÅLD</div>
+            <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: vehicleStatus.vehicle.soldKommentar || vehicleStatus.vehicle.soldDatum ? '0.4rem' : '0.6rem' }}>
+              SÅLD
+            </div>
+            {vehicleStatus.vehicle.soldDatum && (
+              <div style={{ fontSize: '0.9rem', marginBottom: '0.25rem', opacity: 0.95 }}>
+                Sålddatum: {vehicleStatus.vehicle.soldDatum}
+              </div>
+            )}
+            {vehicleStatus.vehicle.soldKommentar && (
+              <div style={{ fontStyle: 'italic', fontSize: '0.9rem', marginBottom: '0.4rem' }}>
+                {vehicleStatus.vehicle.soldKommentar}
+              </div>
+            )}
+            {vehicleStatus.vehicle.soldNamnDatum && (
+              <div style={{ fontSize: '0.85rem', marginBottom: '0.75rem', opacity: 0.9 }}>
+                {vehicleStatus.vehicle.soldNamnDatum}
+              </div>
+            )}
+            <button type="button"
+              onClick={() => { setSoldKommentarInput(''); setSoldKommentarError(''); setShowUnsoldModal(true); }}
+              style={{ background: 'white', color: '#B30E0E', border: 'none', borderRadius: '4px', padding: '0.4rem 0.9rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+              Ta bort såld-markering
+            </button>
           </div>
         )}
 
@@ -679,7 +741,51 @@ export default function StatusForm() {
             </p>
           </Card>
         )}
+{/* Markera som såld-modal */}
+        {showSoldModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', maxWidth: '420px', width: '100%' }}>
+              <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Markera {vehicleStatus?.vehicle?.regnr} som såld</h2>
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Sålddatum (valfritt)</label>
+              <input type="date" value={soldDatumInput} onChange={e => setSoldDatumInput(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                style={{ width: '100%', border: '1px solid #ccc', borderRadius: '4px', padding: '8px', fontSize: '0.875rem', boxSizing: 'border-box', marginBottom: '1rem' }} />
+              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.25rem' }}>Kommentar (obligatorisk)</label>
+              <textarea value={soldKommentarInput} onChange={e => { setSoldKommentarInput(e.target.value); setSoldKommentarError(''); }} rows={3}
+                style={{ width: '100%', border: `1px solid ${soldKommentarError ? '#B30E0E' : '#ccc'}`, borderRadius: '4px', padding: '8px', fontSize: '0.875rem', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              {soldKommentarError && <p style={{ color: '#B30E0E', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>{soldKommentarError}</p>}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button type="button" onClick={() => { setShowSoldModal(false); setSoldDatumInput(''); setSoldKommentarInput(''); setSoldKommentarError(''); }} disabled={isSavingSold}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.875rem' }}>Avbryt</button>
+                <button type="button" onClick={handleMarkSold} disabled={isSavingSold}
+                  style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', background: '#B30E0E', color: 'white', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>
+                  {isSavingSold ? 'Sparar…' : 'Markera som såld'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
+        {/* Ta bort såld-markering-modal */}
+        {showUnsoldModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1.5rem', maxWidth: '420px', width: '100%' }}>
+              <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Ta bort såld-markering för {vehicleStatus?.vehicle?.regnr}</h2>
+              <p style={{ margin: '0 0 0.75rem', fontSize: '0.875rem', color: '#555' }}>Ange anledning (obligatorisk):</p>
+              <textarea value={soldKommentarInput} onChange={e => { setSoldKommentarInput(e.target.value); setSoldKommentarError(''); }} rows={3}
+                style={{ width: '100%', border: `1px solid ${soldKommentarError ? '#B30E0E' : '#ccc'}`, borderRadius: '4px', padding: '8px', fontSize: '0.875rem', boxSizing: 'border-box', fontFamily: 'inherit' }} />
+              {soldKommentarError && <p style={{ color: '#B30E0E', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>{soldKommentarError}</p>}
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1rem' }}>
+                <button type="button" onClick={() => { setShowUnsoldModal(false); setSoldKommentarInput(''); setSoldKommentarError(''); }} disabled={isSavingSold}
+                  style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.875rem' }}>Avbryt</button>
+                <button type="button" onClick={handleUnmarkSold} disabled={isSavingSold}
+                  style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', background: '#1a73e8', color: 'white', cursor: 'pointer', fontSize: '0.875rem', fontWeight: 600 }}>
+                  {isSavingSold ? 'Sparar…' : 'Bekräfta'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Ej uthyrningsbar modal */}
         {showEjUthyrningsbarModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
@@ -784,9 +890,27 @@ export default function StatusForm() {
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <SectionHeader title="Fordonsinformation" />
-              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <SectionHeader title="Fordonsinformation" />
+            <div className="hide-in-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                {!isEditing && vehicleStatus.vehicle.isSold !== true && (
+                  <>
+                    {!vehicleStatus.vehicle.ejUthyrningsbarKalla && (
+                      <button type="button"
+                        onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
+                        style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: '#C45400', color: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                        Markera som EJ UTHYRNINGSBAR
+                      </button>
+                    )}
+                    <button type="button"
+                      onClick={() => { setSoldDatumInput(''); setSoldKommentarInput(''); setSoldKommentarError(''); setShowSoldModal(true); }}
+                      style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: '#B30E0E', color: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                      Markera som SÅLD
+                    </button>
+                  </>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {isEditing ? (
                   <>
                     <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
@@ -800,19 +924,10 @@ export default function StatusForm() {
                     </button>
                   </>
                 ) : (
-                  <>
-                    {vehicleStatus.vehicle.isSold !== true && !vehicleStatus.vehicle.ejUthyrningsbarKalla && (
-                      <button type="button"
-                        onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
-                        style={{ padding: '0.25rem 0.75rem', border: '1px solid #C45400', borderRadius: '4px', background: 'white', color: '#C45400', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                        Markera som EJ UTHYRNINGSBAR
-                      </button>
-                    )}
-                    <button type="button" onClick={() => setIsEditing(true)}
-                      style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
-                      ✏️ Redigera
-                    </button>
-                  </>
+                  <button type="button" onClick={() => setIsEditing(true)}
+                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    ✏️ Redigera
+                  </button>
                 )}
               </div>
             </div>

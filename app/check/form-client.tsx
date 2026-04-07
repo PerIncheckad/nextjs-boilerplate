@@ -845,10 +845,26 @@ export default function CheckInForm() {
         .from('nybil_inventering')
         .select('regnr')
         .eq('is_sold', true);
-      
-      const soldSet = new Set(
-        (soldData || []).map((item: any) => item.regnr?.toUpperCase().replace(/\s/g, ''))
-      );
+
+      const { data: soldEditsData } = await supabase
+        .from('vehicle_edits')
+        .select('regnr, new_value, edited_at')
+        .eq('field_name', 'is_sold')
+        .order('edited_at', { ascending: false });
+
+      // Bygg Map med senaste is_sold per regnr från vehicle_edits
+      const soldEditsMap = new Map<string, string>();
+      for (const edit of (soldEditsData || [])) {
+        const normalized = edit.regnr?.toUpperCase().replace(/\s/g, '');
+        if (normalized && !soldEditsMap.has(normalized)) {
+          soldEditsMap.set(normalized, edit.new_value);
+        }
+      }
+
+      const soldSet = new Set([
+        ...(soldData || []).map((item: any) => item.regnr?.toUpperCase().replace(/\s/g, '')),
+        ...[...soldEditsMap.entries()].filter(([_, v]) => v === 'true').map(([k]) => k),
+      ]);
       
       const filtered = data
         .map((item: any) => item.regnr)

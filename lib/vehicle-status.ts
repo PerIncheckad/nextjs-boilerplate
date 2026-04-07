@@ -69,6 +69,9 @@ export type VehicleStatusData = {
   harSkadorVidLeverans: boolean | null;
   // Sale status
   isSold: boolean | null;
+  soldDatum: string | null;
+  soldKommentar: string | null;
+  soldNamnDatum: string | null;
 };
 
 export type DamageRecord = {
@@ -910,7 +913,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
     }
   }
+// Formatera edit-värden för visning i historik
+  const formatEditValue = (fieldName: string, value: string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '(tomt)';
+    if (fieldName === 'is_sold') return value === 'true' ? 'JA' : value === 'false' ? 'NEJ' : value;
+    return value;
+  };
 
+  const formatEditSammanfattning = (fieldName: string, oldValue: string | null, newValue: string | null): string => {
+    const displayName = fieldDisplayNames[fieldName] || fieldName;
+    const formattedNew = formatEditValue(fieldName, newValue);
+    if (oldValue === null || oldValue === undefined || oldValue === '') {
+      return `${displayName}: ${formattedNew}`;
+    }
+    return `${displayName}: ${formatEditValue(fieldName, oldValue)} → ${formattedNew}`;
+  };
   // Visningsnamn för fält i HistoryRecord
   const fieldDisplayNames: Record<string, string> = {
     hjultyp: 'Däck som sitter på',
@@ -922,6 +939,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     avgift_over_km: 'Avgift över-km',
     planerad_station: 'Planerad station',
     is_sold: 'Såld',
+    sold_datum: 'Sålddatum',
+    sold_kommentar: 'Kommentar (försäljning)',
     saludatum: 'Saludatum',
     salu_kommentar: 'Kommentar (försäljning)',
     anteckningar: 'Anteckningar',
@@ -1147,7 +1166,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ejUthyrningsbarAnledning: '---',
       laddnivaVidLeverans: '---',
       harSkadorVidLeverans: null,
-      isSold: null,
+      isSold: (() => {
+        const editVal = latestEdits.get('is_sold')?.value;
+        if (editVal === 'true') return true;
+        if (editVal === 'false') return false;
+        return null;
+      })(),
+      soldDatum: latestEdits.get('sold_datum')?.value || null,
+      soldKommentar: latestEdits.get('sold_kommentar')?.value || null,
+      soldNamnDatum: (() => {
+        const soldEdit = latestEdits.get('is_sold');
+        if (!soldEdit) return null;
+        return `${getFullNameFromEmail(soldEdit.editedBy)}, ${formatDateTime(soldEdit.date)}`;
+      })(),
     };
 
     // ====================================================================================
@@ -1801,7 +1832,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Lägg till HistoryRecord per batch (eller enskild edit utan batch_id)
     for (const [batchId, edits] of batchMap) {
       const first = edits[0];
-      const lines = edits.map(e => `${fieldDisplayNames[e.field_name] || e.field_name}: ${e.old_value || '---'} → ${e.new_value || '---'}`).join('\n');
+      const lines = edits.map(e => formatEditSammanfattning(e.field_name, e.old_value, e.new_value)).join('\n');
       historyRecords.push({
         id: `edit-batch-${batchId}`,
         datum: formatDateTime(first.edited_at),
@@ -1818,7 +1849,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         datum: formatDateTime(edit.edited_at),
         rawTimestamp: edit.edited_at,
         typ: 'manual',
-        sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
+        sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
         utfordAv: getFullNameFromEmail(edit.edited_by),
       });
     }
@@ -2056,13 +2087,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? nybilData.har_skador_vid_leverans
       : null,
     
-    // Sale status: nybil_inventering.is_sold → vehicles.is_sold
-    // Only use actual boolean values (true/false), not null/undefined
-    isSold: typeof nybilData?.is_sold === 'boolean'
-      ? nybilData.is_sold 
-      : typeof vehicleData?.is_sold === 'boolean'
-        ? vehicleData.is_sold 
-        : null,
+    // Sale status: vehicle_edits → nybil_inventering.is_sold → vehicles.is_sold
+    isSold: (() => {
+      const editVal = latestEdits.get('is_sold')?.value;
+      if (editVal === 'true') return true;
+      if (editVal === 'false') return false;
+      if (typeof nybilData?.is_sold === 'boolean') return nybilData.is_sold;
+      if (typeof vehicleData?.is_sold === 'boolean') return vehicleData.is_sold;
+      return null;
+    })(),
+ soldDatum: latestEdits.get('sold_datum')?.value || null,
+    soldKommentar: latestEdits.get('sold_kommentar')?.value || null,
+    soldNamnDatum: (() => {
+      const soldEdit = latestEdits.get('is_sold');
+      if (!soldEdit) return null;
+      return `${getFullNameFromEmail(soldEdit.editedBy)}, ${formatDateTime(soldEdit.date)}`;
+    })(),
   };
 
   // Determine if vehicle has ever been checked in
@@ -3013,7 +3053,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Lägg till HistoryRecord per batch (eller enskild edit utan batch_id)
   for (const [batchId, edits] of batchMap) {
     const first = edits[0];
-    const lines = edits.map(e => `${fieldDisplayNames[e.field_name] || e.field_name}: ${e.old_value || '---'} → ${e.new_value || '---'}`).join('\n');
+    const lines = edits.map(e => formatEditSammanfattning(e.field_name, e.old_value, e.new_value)).join('\n');
     historyRecords.push({
       id: `edit-batch-${batchId}`,
       datum: formatDateTime(first.edited_at),
@@ -3030,7 +3070,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDateTime(edit.edited_at),
       rawTimestamp: edit.edited_at,
       typ: 'manual',
-      sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
+      sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
       utfordAv: getFullNameFromEmail(edit.edited_by),
     });
   }
