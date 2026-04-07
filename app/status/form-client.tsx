@@ -890,9 +890,27 @@ export default function StatusForm() {
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <SectionHeader title="Fordonsinformation" />
-              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <SectionHeader title="Fordonsinformation" />
+                {!isEditing && vehicleStatus.vehicle.isSold !== true && (
+                  <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {!vehicleStatus.vehicle.ejUthyrningsbarKalla && (
+                      <button type="button"
+                        onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
+                        style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: '#C45400', color: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                        Ej uthyrningsbar
+                      </button>
+                    )}
+                    <button type="button"
+                      onClick={() => { setSoldDatumInput(''); setSoldKommentarInput(''); setSoldKommentarError(''); setShowSoldModal(true); }}
+                      style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: '#B30E0E', color: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
+                      Markera som såld
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem' }}>
                 {isEditing ? (
                   <>
                     <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
@@ -906,26 +924,10 @@ export default function StatusForm() {
                     </button>
                   </>
                 ) : (
-                  <>
-                    {vehicleStatus.vehicle.isSold !== true && !vehicleStatus.vehicle.ejUthyrningsbarKalla && (
-                      <button type="button"
-                        onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
-                        style={{ padding: '0.25rem 0.75rem', border: '1px solid #C45400', borderRadius: '4px', background: 'white', color: '#C45400', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                        Markera som EJ UTHYRNINGSBAR
-                      </button>
-                    )}
-                    {vehicleStatus.vehicle.isSold !== true && (
-                      <button type="button"
-                        onClick={() => { setSoldDatumInput(''); setSoldKommentarInput(''); setSoldKommentarError(''); setShowSoldModal(true); }}
-                        style={{ padding: '0.25rem 0.75rem', border: '1px solid #B30E0E', borderRadius: '4px', background: 'white', color: '#B30E0E', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                        Markera som SÅLD
-                      </button>
-                    )}
-                    <button type="button" onClick={() => setIsEditing(true)}
-                      style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
-                      ✏️ Redigera
-                    </button>
-                  </>
+                  <button type="button" onClick={() => setIsEditing(true)}
+                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
+                    ✏️ Redigera
+                  </button>
                 )}
               </div>
             </div>
