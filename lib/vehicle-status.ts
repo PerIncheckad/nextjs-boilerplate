@@ -69,6 +69,9 @@ export type VehicleStatusData = {
   harSkadorVidLeverans: boolean | null;
   // Sale status
   isSold: boolean | null;
+  soldDatum: string | null;
+  soldKommentar: string | null;
+  soldNamnDatum: string | null;
 };
 
 export type DamageRecord = {
@@ -922,6 +925,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     avgift_over_km: 'Avgift över-km',
     planerad_station: 'Planerad station',
     is_sold: 'Såld',
+    sold_datum: 'Sålddatum',
+    sold_kommentar: 'Kommentar (försäljning)',
     saludatum: 'Saludatum',
     salu_kommentar: 'Kommentar (försäljning)',
     anteckningar: 'Anteckningar',
@@ -1147,7 +1152,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ejUthyrningsbarAnledning: '---',
       laddnivaVidLeverans: '---',
       harSkadorVidLeverans: null,
-      isSold: null,
+      isSold: (() => {
+        const editVal = latestEdits.get('is_sold')?.value;
+        if (editVal === 'true') return true;
+        if (editVal === 'false') return false;
+        return null;
+      })(),
+      soldDatum: latestEdits.get('sold_datum')?.value || null,
+      soldKommentar: latestEdits.get('sold_kommentar')?.value || null,
+      soldNamnDatum: (() => {
+        const soldEdit = latestEdits.get('is_sold');
+        if (!soldEdit) return null;
+        return `${getFullNameFromEmail(soldEdit.editedBy)}, ${formatDateTime(soldEdit.date)}`;
+      })(),
     };
 
     // ====================================================================================
@@ -2056,13 +2073,22 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? nybilData.har_skador_vid_leverans
       : null,
     
-    // Sale status: nybil_inventering.is_sold → vehicles.is_sold
-    // Only use actual boolean values (true/false), not null/undefined
-    isSold: typeof nybilData?.is_sold === 'boolean'
-      ? nybilData.is_sold 
-      : typeof vehicleData?.is_sold === 'boolean'
-        ? vehicleData.is_sold 
-        : null,
+    // Sale status: vehicle_edits → nybil_inventering.is_sold → vehicles.is_sold
+    isSold: (() => {
+      const editVal = latestEdits.get('is_sold')?.value;
+      if (editVal === 'true') return true;
+      if (editVal === 'false') return false;
+      if (typeof nybilData?.is_sold === 'boolean') return nybilData.is_sold;
+      if (typeof vehicleData?.is_sold === 'boolean') return vehicleData.is_sold;
+      return null;
+    })(),
+ soldDatum: latestEdits.get('sold_datum')?.value || null,
+    soldKommentar: latestEdits.get('sold_kommentar')?.value || null,
+    soldNamnDatum: (() => {
+      const soldEdit = latestEdits.get('is_sold');
+      if (!soldEdit) return null;
+      return `${getFullNameFromEmail(soldEdit.editedBy)}, ${formatDateTime(soldEdit.date)}`;
+    })(),
   };
 
   // Determine if vehicle has ever been checked in
