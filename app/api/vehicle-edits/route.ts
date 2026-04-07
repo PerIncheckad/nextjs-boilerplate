@@ -98,11 +98,7 @@ function buildUthyrningsbarEmail(
     <tr><td style="text-align:center;padding-bottom:20px;">
       <h1 style="font-size:24px;font-weight:700;margin:0 0 10px;">🟢 ${esc(regnr)} är nu uthyrningsbar</h1>
     </td></tr>
-    <tr><td style="padding:6px 0;">
-      <div style="background-color:#C45400;border:1px solid #C45400;padding:12px;text-align:center;font-weight:bold;color:#FFFFFF!important;border-radius:6px;">
-        NU UTHYRNINGSBAR
-      </div>
-    </td></tr>
+    
     ${kommentar ? `<tr><td style="padding:6px 0;">
       <div style="background:#f9fafb;border:1px solid #e5e7eb;padding:12px;border-radius:6px;font-size:14px;">
         <strong>Kommentar:</strong> ${esc(kommentar)}
@@ -242,11 +238,10 @@ export async function POST(request: Request) {
           kommentar,
         );
 
-        // Mottagare — TESTLÄGE: endast per@incheckad.se
-        // TODO: inför go-live, avkommentera stationsroutingen nedan
+        // Mottagare: per@incheckad.se alltid + ortspecifik adress
         const recipients = [defaultHuvudstationAddress];
-        // const stationEmail = stationEmailMapping[ort];
-        // if (stationEmail && !recipients.includes(stationEmail)) recipients.push(stationEmail);
+        const stationEmail = stationEmailMapping[ort];
+        if (stationEmail && !recipients.includes(stationEmail)) recipients.push(stationEmail);
 
         await resend.emails.send({
           from: 'incheckning@incheckad.se',
