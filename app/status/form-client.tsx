@@ -890,27 +890,27 @@ export default function StatusForm() {
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <SectionHeader title="Fordonsinformation" />
+            <SectionHeader title="Fordonsinformation" />
+            <div className="hide-in-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {!isEditing && vehicleStatus.vehicle.isSold !== true && (
-                  <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <>
                     {!vehicleStatus.vehicle.ejUthyrningsbarKalla && (
                       <button type="button"
                         onClick={() => { setUthyrningsbarKommentarInput(''); setUthyrningsbarKommentarError(''); setShowEjUthyrningsbarModal(true); }}
                         style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: '#C45400', color: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                        Ej uthyrningsbar
+                        Markera som EJ UTHYRNINGSBAR
                       </button>
                     )}
                     <button type="button"
                       onClick={() => { setSoldDatumInput(''); setSoldKommentarInput(''); setSoldKommentarError(''); setShowSoldModal(true); }}
                       style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: '#B30E0E', color: 'white', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}>
-                      Markera som såld
+                      Markera som SÅLD
                     </button>
-                  </div>
+                  </>
                 )}
               </div>
-              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {isEditing ? (
                   <>
                     <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
