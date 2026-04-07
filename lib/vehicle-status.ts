@@ -913,7 +913,21 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       });
     }
   }
+// Formatera edit-värden för visning i historik
+  const formatEditValue = (fieldName: string, value: string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '(tomt)';
+    if (fieldName === 'is_sold') return value === 'true' ? 'JA' : value === 'false' ? 'NEJ' : value;
+    return value;
+  };
 
+  const formatEditSammanfattning = (fieldName: string, oldValue: string | null, newValue: string | null): string => {
+    const displayName = fieldDisplayNames[fieldName] || fieldName;
+    const formattedNew = formatEditValue(fieldName, newValue);
+    if (oldValue === null || oldValue === undefined || oldValue === '') {
+      return `${displayName}: ${formattedNew}`;
+    }
+    return `${displayName}: ${formatEditValue(fieldName, oldValue)} → ${formattedNew}`;
+  };
   // Visningsnamn för fält i HistoryRecord
   const fieldDisplayNames: Record<string, string> = {
     hjultyp: 'Däck som sitter på',
@@ -1818,7 +1832,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Lägg till HistoryRecord per batch (eller enskild edit utan batch_id)
     for (const [batchId, edits] of batchMap) {
       const first = edits[0];
-      const lines = edits.map(e => `${fieldDisplayNames[e.field_name] || e.field_name}: ${e.old_value || '---'} → ${e.new_value || '---'}`).join('\n');
+      const lines = edits.map(e => formatEditSammanfattning(e.field_name, e.old_value, e.new_value)).join('\n');
       historyRecords.push({
         id: `edit-batch-${batchId}`,
         datum: formatDateTime(first.edited_at),
@@ -1835,7 +1849,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         datum: formatDateTime(edit.edited_at),
         rawTimestamp: edit.edited_at,
         typ: 'manual',
-        sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
+        sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
         utfordAv: getFullNameFromEmail(edit.edited_by),
       });
     }
@@ -3039,7 +3053,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // Lägg till HistoryRecord per batch (eller enskild edit utan batch_id)
   for (const [batchId, edits] of batchMap) {
     const first = edits[0];
-    const lines = edits.map(e => `${fieldDisplayNames[e.field_name] || e.field_name}: ${e.old_value || '---'} → ${e.new_value || '---'}`).join('\n');
+    const lines = edits.map(e => formatEditSammanfattning(e.field_name, e.old_value, e.new_value)).join('\n');
     historyRecords.push({
       id: `edit-batch-${batchId}`,
       datum: formatDateTime(first.edited_at),
@@ -3056,7 +3070,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       datum: formatDateTime(edit.edited_at),
       rawTimestamp: edit.edited_at,
       typ: 'manual',
-      sammanfattning: `${displayName}: ${edit.old_value || '---'} → ${edit.new_value || '---'}`,
+      sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
       utfordAv: getFullNameFromEmail(edit.edited_by),
     });
   }
