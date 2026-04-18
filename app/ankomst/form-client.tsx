@@ -63,6 +63,18 @@ const inferBransletyp = (bransletyp: string | null | undefined): 'Bensin' | 'Die
   return null;
 };
 
+const formatDateTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    const datePart = date.toISOString().split('T')[0];
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${datePart} kl ${hours}:${minutes}`;
+  } catch { return ''; }
+};
+
 // =================================================================
 // 2. COMPONENT
 // =================================================================
@@ -103,6 +115,9 @@ export default function ArrivalForm() {
   const [laddniva, setLaddniva] = useState('');
   const [notes, setNotes] = useState('');
 
+  // Previous odometer (for low-value warning)
+  const [prevOdometer, setPrevOdometer] = useState<{ value: number; checker_name: string; timestamp: string; source: string } | null>(null);
+
   // UI state
   const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -112,6 +127,7 @@ export default function ArrivalForm() {
   const [confirmDialogText, setConfirmDialogText] = useState('');
   const [confirmDialogOnConfirm, setConfirmDialogOnConfirm] = useState<(() => void) | null>(null);
   const [confirmDialogOnCancel, setConfirmDialogOnCancel] = useState<(() => void) | null>(null);
+  const [confirmDialogTitle, setConfirmDialogTitle] = useState('⚠️ Reg.nr saknas!');
 
   // Derived
   const availableStations = useMemo(() => STATIONER[ort] || [], [ort]);
@@ -162,6 +178,7 @@ export default function ArrivalForm() {
     setVehicleRegConfirmed(false);
     setKnownBransletyp(null);
     setShowUnknownRegHelper(false);
+    setPrevOdometer(null);
     try {
       const normalized = reg.toUpperCase().replace(/\s/g, '');
       const response = await fetch(`/api/vehicle-info?reg=${encodeURIComponent(normalized)}`);
@@ -194,6 +211,7 @@ export default function ArrivalForm() {
       setVehicleRegConfirmed(true);
       setVehicleModel(info.model || null);
       applyKnownBransletyp(info.bransletyp);
+      setPrevOdometer((info as any).prev_odometer || null);
     } catch (error: any) {
       console.error('Fetch vehicle data error:', error);
       setVehicleRegConfirmed(false);
@@ -216,6 +234,25 @@ export default function ArrivalForm() {
         const specificType = inferBransletyp(bt);
         if (specificType) setBransletyp(specificType);
       }
+    }
+  };
+
+  const handleOdometerBlur = () => {
+    const currentVal = parseInt(matarstallning, 10);
+    if (!prevOdometer || isNaN(currentVal)) return;
+    if (currentVal < prevOdometer.value) {
+      setConfirmDialogTitle('⚠️ Dubbelkolla mätarställningen');
+      setConfirmDialogText(`Angivet värde (${currentVal.toLocaleString('sv-SE')} km) verkar lågt. Senaste registrerade: ${prevOdometer.value.toLocaleString('sv-SE')} km — ${prevOdometer.checker_name} (${prevOdometer.source}), ${formatDateTime(prevOdometer.timestamp)}.`);
+      setConfirmDialogOnConfirm(() => () => {
+        setConfirmDialogOpen(false);
+        setConfirmDialogTitle('⚠️ Reg.nr saknas!');
+      });
+      setConfirmDialogOnCancel(() => () => {
+        setMatarstallning('');
+        setConfirmDialogOpen(false);
+        setConfirmDialogTitle('⚠️ Reg.nr saknas!');
+      });
+      setConfirmDialogOpen(true);
     }
   };
 
@@ -344,6 +381,8 @@ export default function ArrivalForm() {
     setLaddniva('');
     setNotes('');
     setShowFieldErrors(false);
+    setPrevOdometer(null);
+    setConfirmDialogTitle('⚠️ Reg.nr saknas!');
   };
 
   // --- Tank status display text ---
@@ -395,7 +434,7 @@ export default function ArrivalForm() {
         <Fragment>
           <div className="modal-overlay" onClick={() => confirmDialogOnCancel && confirmDialogOnCancel()} />
           <div className="modal-content confirm-modal">
-            <h3 style={{ textAlign: 'center' }}>⚠️ Reg.nr saknas!</h3>
+            <h3 style={{ textAlign: 'center' }}>{confirmDialogTitle}</h3>
             <p style={{ textAlign: 'center', marginBottom: '1.5rem' }}>{confirmDialogText}</p>
             <div className="modal-actions">
               <Button onClick={() => confirmDialogOnCancel && confirmDialogOnCancel()} variant="secondary">Avbryt</Button>
@@ -500,7 +539,7 @@ export default function ArrivalForm() {
 
           <SubSectionHeader title="Mätarställning" />
           <Field label="Mätarställning (km) *">
-            <input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" />
+            <input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} onBlur={handleOdometerBlur} placeholder="12345" />
           </Field>
 
           <SubSectionHeader title={
