@@ -76,6 +76,18 @@ export type VehicleInfo = {
     source: 'incheckning' | 'inkommen' | 'redigering';
   } | null;
   serviceintervall?: number | null;
+  latest_arrival?: {
+    checker_name: string;
+    current_city: string;
+    current_station: string;
+    fuel_level: string | null;
+    fuel_type: string | null;
+    fuel_liters: number | null;
+    fuel_price_per_liter: number | null;
+    charge_level: number | null;
+    odometer_km: number | null;
+    created_at: string;
+  } | null;
 };
 
 // =================================================================
