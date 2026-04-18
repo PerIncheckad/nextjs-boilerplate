@@ -82,6 +82,18 @@ export type VehicleInfo = {
     source: 'incheckning' | 'inkommen' | 'redigering';
   } | null;
   serviceintervall?: number | null;
+  latest_arrival?: {
+    checker_name: string;
+    current_city: string;
+    current_station: string;
+    fuel_level: string | null;
+    fuel_type: string | null;
+    fuel_liters: number | null;
+    fuel_price_per_liter: number | null;
+    charge_level: number | null;
+    odometer_km: number | null;
+    created_at: string;
+  } | null;
 };
 
 // =================================================================
@@ -581,6 +593,27 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const rawServiceintervall = nybilData?.serviceintervall ? parseInt(String(nybilData.serviceintervall), 10) : null;
   const serviceintervall = rawServiceintervall && rawServiceintervall >= 1000 ? rawServiceintervall : null;
 
+  // latest_arrival: only if arrival is newer than latest checkin
+  const latestCheckinTimestamp = actualLatestCheckin?.completed_at ? new Date(actualLatestCheckin.completed_at) : null;
+  const latestArrivalTimestamp = latestArrivalData?.created_at ? new Date(latestArrivalData.created_at) : null;
+
+  const latestArrivalForModal = (
+    latestArrivalData &&
+    latestArrivalTimestamp &&
+    (!latestCheckinTimestamp || latestArrivalTimestamp > latestCheckinTimestamp)
+  ) ? {
+    checker_name: latestArrivalData.checker_name || 'Okänd',
+    current_city: latestArrivalData.current_city || '',
+    current_station: latestArrivalData.current_station || '',
+    fuel_level: latestArrivalData.fuel_level || null,
+    fuel_type: latestArrivalData.fuel_type || null,
+    fuel_liters: latestArrivalData.fuel_liters || null,
+    fuel_price_per_liter: latestArrivalData.fuel_price_per_liter || null,
+    charge_level: latestArrivalData.charge_level || null,
+    odometer_km: latestArrivalData.odometer_km || null,
+    created_at: latestArrivalData.created_at,
+  } : null;
+
   // Beräkna ejUthyrningsbar med samma prioriteringskedja som vehicle-status.ts
   let ejUthyrningsbarKommentar: string | null = null;
   let ejUthyrningsbarKalla: string | null = null;
@@ -632,6 +665,7 @@ if (vehicleData) {
       last_checkin: lastCheckin,
       prev_odometer: prevOdometer,
       serviceintervall,
+      latest_arrival: latestArrivalForModal,
     };
   }
 
@@ -656,6 +690,7 @@ if (vehicleData) {
       last_checkin: lastCheckin,
       prev_odometer: prevOdometer,
       serviceintervall,
+      latest_arrival: latestArrivalForModal,
     };
   }
 
@@ -674,6 +709,7 @@ if (vehicleData) {
       last_checkin: lastCheckin,
       prev_odometer: prevOdometer,
       serviceintervall,
+      latest_arrival: latestArrivalForModal,
     };
   }
 
@@ -691,6 +727,7 @@ if (vehicleData) {
       last_checkin: lastCheckin,
       prev_odometer: prevOdometer,
       serviceintervall,
+      latest_arrival: latestArrivalForModal,
   };
 }
 

@@ -488,7 +488,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
             <tr><td style="padding:4px 0;"><strong>Plats för incheckning:</strong> ${platsOrt} / ${platsStation}</td></tr>
             ${odometerHtml.vidIncheckning}
             ${fuelOrChargeInfo}
-            <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+             ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
             ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
           </tbody>
@@ -611,6 +611,17 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
             ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
+            ${(() => {
+              const at = payload.arrival_tankning;
+              if (!at || at.fuel_level !== 'tankad_nu') return '';
+              const parts = ['Tankad av MABI vid ankomst'];
+              if (at.current_station || at.current_city) parts.push(`(${escapeHtml(at.current_station || at.current_city)})`);
+              if (at.checker_name) parts.push(`— ${escapeHtml(at.checker_name)}`);
+              if (at.fuel_liters) parts.push(`· ${at.fuel_liters}L`);
+              if (at.fuel_type) parts.push(escapeHtml(at.fuel_type));
+              if (at.fuel_price_per_liter) parts.push(`@ ${at.fuel_price_per_liter} kr/L`);
+              return `<tr><td style="padding:4px 0;"><strong>Tankning vid ankomst:</strong> ${parts.join(' ')}</td></tr>`;
+            })()}
             ${payload.hjultyp ? `<tr><td style="padding:4px 0;"><strong>Däck som sitter på:</strong> ${payload.hjultyp}</td></tr>` : ''}
           </tbody>
         </table>
