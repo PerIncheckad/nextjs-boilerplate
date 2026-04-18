@@ -73,7 +73,15 @@ export type VehicleInfo = {
     station: string;
     checker_name: string;
     completed_at: string;
+    hjultyp?: string | null;
   } | null;
+  prev_odometer?: {
+    value: number;
+    checker_name: string;
+    timestamp: string;
+    source: 'incheckning' | 'inkommen' | 'redigering';
+  } | null;
+  serviceintervall?: number | null;
 };
 
 // =================================================================
@@ -173,7 +181,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
   const isForceUndocumented = SPECIAL_FORCE_UNDOCUMENTED.includes(cleanedRegnr);
 
   // Step 1: Fetch vehicle data and legacy damages first to know L (number of BUHS damages)
-  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, vehicleFuelResponse, vehicleEditsResponse] = await Promise.all([
+  const [vehicleResponse, legacyDamagesResponse, inventoriedDamagesResponse, dbDamagesResponse, nybilResponse, vehicleFuelResponse, vehicleEditsResponse, latestArrivalResponse] = await Promise.all([
     supabaseAdmin
       .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
     supabaseAdmin
@@ -192,7 +200,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('nybil_inventering')
-      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum, bransletyp, klar_for_uthyrning, klar_for_uthyrning_notering, ej_uthyrningsbar_anledning, registrerad_av, fullstandigt_namn, created_at')
+      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum, bransletyp, klar_for_uthyrning, klar_for_uthyrning_notering, ej_uthyrningsbar_anledning, registrerad_av, fullstandigt_namn, created_at, serviceintervall')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -206,8 +214,15 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
       .from('vehicle_edits')
       .select('field_name, new_value, edited_by, edited_at')
       .eq('regnr', cleanedRegnr)
-      .in('field_name', ['klar_for_uthyrning', 'ej_uthyrningsbar_anledning'])
-      .order('edited_at', { ascending: false })
+      .in('field_name', ['klar_for_uthyrning', 'ej_uthyrningsbar_anledning', 'matarstallning'])
+      .order('edited_at', { ascending: false }),
+    supabaseAdmin
+      .from('arrivals')
+      .select('odometer_km, checker_name, current_city, current_station, fuel_level, fuel_type, fuel_liters, fuel_price_per_liter, charge_level, created_at')
+      .eq('regnr', cleanedRegnr)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
   ]);
   
   const vehicleData = vehicleResponse.data?.[0] || null;
@@ -233,7 +248,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     
     const checkinsResponse = await supabaseAdmin
       .from('checkins')
-      .select('id, current_station, checker_name, checker_email, completed_at, checklist')
+      .select('id, current_station, checker_name, checker_email, completed_at, checklist, odometer_km, hjultyp')
       .eq('regnr', cleanedRegnr)
       .eq('status', 'COMPLETED')
       .order('completed_at', { ascending: false })
@@ -517,6 +532,55 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     }
   }
 
+  // Compute prev_odometer from the most recent of: checkin, arrival, vehicle_edit
+  const latestArrivalData = latestArrivalResponse.data || null;
+
+  type PrevOdometer = {
+    value: number;
+    checker_name: string;
+    timestamp: string;
+    source: 'incheckning' | 'inkommen' | 'redigering';
+  };
+
+  let prevOdometer: PrevOdometer | null = null;
+
+  if (actualLatestCheckin?.odometer_km && actualLatestCheckin.completed_at) {
+    prevOdometer = {
+      value: actualLatestCheckin.odometer_km,
+      checker_name: actualLatestCheckin.checker_name || 'Okänd',
+      timestamp: actualLatestCheckin.completed_at,
+      source: 'incheckning',
+    };
+  }
+
+  if (latestArrivalData?.odometer_km && latestArrivalData.created_at) {
+    if (!prevOdometer || new Date(latestArrivalData.created_at) > new Date(prevOdometer.timestamp)) {
+      prevOdometer = {
+        value: latestArrivalData.odometer_km,
+        checker_name: latestArrivalData.checker_name || 'Okänd',
+        timestamp: latestArrivalData.created_at,
+        source: 'inkommen',
+      };
+    }
+  }
+
+  const matarstallningEdit = latestEdits.get('matarstallning');
+  if (matarstallningEdit?.value) {
+    const editOdometer = parseInt(matarstallningEdit.value, 10);
+    if (!isNaN(editOdometer) && (!prevOdometer || new Date(matarstallningEdit.date) > new Date(prevOdometer.timestamp))) {
+      prevOdometer = {
+        value: editOdometer,
+        checker_name: getFullNameFromEmail(matarstallningEdit.editedBy),
+        timestamp: matarstallningEdit.date,
+        source: 'redigering',
+      };
+    }
+  }
+
+  // Serviceintervall from nybil_inventering (ignore values < 1000)
+  const rawServiceintervall = nybilData?.serviceintervall ? parseInt(String(nybilData.serviceintervall), 10) : null;
+  const serviceintervall = rawServiceintervall && rawServiceintervall >= 1000 ? rawServiceintervall : null;
+
   // Beräkna ejUthyrningsbar med samma prioriteringskedja som vehicle-status.ts
   let ejUthyrningsbarKommentar: string | null = null;
   let ejUthyrningsbarKalla: string | null = null;
@@ -550,6 +614,7 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     station: actualLatestCheckin.current_station || 'Okänd station',
     checker_name: actualLatestCheckin.checker_name || 'Okänd',
     completed_at: actualLatestCheckin.completed_at || '',
+    hjultyp: actualLatestCheckin.hjultyp || null,
   } : null;
 
 if (vehicleData) {
@@ -565,6 +630,8 @@ if (vehicleData) {
       ejUthyrningsbarKalla,
       ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
+      prev_odometer: prevOdometer,
+      serviceintervall,
     };
   }
 
@@ -587,6 +654,8 @@ if (vehicleData) {
       ejUthyrningsbarKalla,
       ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
+      prev_odometer: prevOdometer,
+      serviceintervall,
     };
   }
 
@@ -603,6 +672,8 @@ if (vehicleData) {
       ejUthyrningsbarKalla,
       ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
+      prev_odometer: prevOdometer,
+      serviceintervall,
     };
   }
 
@@ -618,6 +689,8 @@ if (vehicleData) {
       ejUthyrningsbarKalla,
       ejUthyrningsbarNamnDatum,
       last_checkin: lastCheckin,
+      prev_odometer: prevOdometer,
+      serviceintervall,
   };
 }
 

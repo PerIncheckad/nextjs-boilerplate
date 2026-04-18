@@ -60,11 +60,22 @@ export type VehicleInfo = {
   existing_damages: ConsolidatedDamage[];
   status: 'FULL_MATCH' | 'PARTIAL_MATCH_DAMAGE_ONLY' | 'NO_MATCH';
   bransletyp?: string | null;
+  ejUthyrningsbarKommentar?: string | null;
+  ejUthyrningsbarKalla?: string | null;
+  ejUthyrningsbarNamnDatum?: string | null;
   last_checkin?: {
     station: string;
     checker_name: string;
     completed_at: string;
+    hjultyp?: string | null;
   } | null;
+  prev_odometer?: {
+    value: number;
+    checker_name: string;
+    timestamp: string;
+    source: 'incheckning' | 'inkommen' | 'redigering';
+  } | null;
+  serviceintervall?: number | null;
 };
 
 // =================================================================
