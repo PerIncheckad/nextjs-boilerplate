@@ -616,10 +616,6 @@ async function getVehicleInfoServer(regnr: string): Promise<VehicleInfo> {
     completed_at: actualLatestCheckin.completed_at || '',
     hjultyp: actualLatestCheckin.hjultyp || null,
   } : null;
-    station: actualLatestCheckin.current_station || 'Okänd station',
-    checker_name: actualLatestCheckin.checker_name || 'Okänd',
-    completed_at: actualLatestCheckin.completed_at || '',
-  } : null;
 
 if (vehicleData) {
     return {
