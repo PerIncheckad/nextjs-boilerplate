@@ -1455,6 +1455,38 @@ export default function CheckInForm() {
     setLaddniva(numValue > 100 ? '100' : value);
   };
 
+  const handleOdometerBlur = () => {
+    const currentVal = parseInt(matarstallning, 10);
+    const prevOdo = vehicleData?.prev_odometer;
+    if (!prevOdo || isNaN(currentVal)) return;
+    if (currentVal < prevOdo.value) {
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Dubbelkolla mätarställningen',
+        text: `Angivet värde (${currentVal.toLocaleString('sv-SE')} km) verkar lågt. Senaste registrerade: ${prevOdo.value.toLocaleString('sv-SE')} km — ${prevOdo.checker_name} (${prevOdo.source}), ${formatDateTime(prevOdo.timestamp)}.`,
+        confirmButtonVariant: 'primary',
+        onConfirm: () => {},
+        onCancel: () => setMatarstallning(''),
+      });
+    }
+  };
+
+  const handleHjultypSelect = (newHjultyp: 'Sommardäck' | 'Vinterdäck') => {
+    const prevHjultyp = hjultyp;
+    setHjultyp(newHjultyp);
+    const lastHjultyp = vehicleData?.last_checkin?.hjultyp;
+    if (lastHjultyp && lastHjultyp !== newHjultyp) {
+      setConfirmDialog({
+        isOpen: true,
+        title: '⚠️ Dubbelkolla däcktyp',
+        text: `Senast registrerat: ${lastHjultyp}. Du har valt ${newHjultyp} — stämmer det?`,
+        confirmButtonVariant: 'primary',
+        onConfirm: () => {},
+        onCancel: () => setHjultyp(prevHjultyp),
+      });
+    }
+  };
+
   const activeStatusSections = [garInteAttHyraUt, varningslampaLyser, behoverRekond, husdjurSanerad, rokningSanerad, insynsskyddSaknas].filter(Boolean).length;
 
   return (
@@ -1643,9 +1675,8 @@ export default function CheckInForm() {
 
         <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !detailedBransletyp || (needsTank && !tankniva) || (needsTank && tankniva === 'tankad_nu' && (!liters || !literpris)) || (needsChargeLevel && !laddniva) || (needsChargeCables && antalLaddkablar === null))}>
           <SectionHeader title="Fordonsstatus" />
-          <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning vid incheckning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} placeholder="12345" /></Field>
-          <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => setHjultyp('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => setHjultyp('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
-          <SubSectionHeader title="Tankning/Laddning" />
+          <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning vid incheckning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} onBlur={handleOdometerBlur} placeholder="12345" /></Field>
+<SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => handleHjultypSelect('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => handleHjultypSelect('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field><SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => handleHjultypSelect('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => handleHjultypSelect('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>          <SubSectionHeader title="Tankning/Laddning" />
           {knownBransletyp ? (
             <Field label="Drivmedel"><div className="known-fuel-info">✅ {detailedBransletyp === 'El (full)' ? '100% el' : detailedBransletyp === 'Hybrid (diesel)' ? 'Diesel (hybrid)' : detailedBransletyp === 'Hybrid (bensin)' ? 'Bensin (hybrid)' : detailedBransletyp}</div></Field>
           ) : (
