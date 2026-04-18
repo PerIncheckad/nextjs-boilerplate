@@ -396,6 +396,16 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
     ? createPurpleBanner(true, `UNDVIK LÅNGA HYROR!<br>Kontakta Bilkontroll!<br>Saludatum: ${payload.saludatum}.`)
     : '';
+
+  // Service purple banner
+  const serviceKmKvarHS = payload.serviceintervall
+    ? payload.serviceintervall - parseInt(payload.matarstallning || '0', 10)
+    : null;
+  const serviceBannerHuvudstation = payload.hasServiceWarning && payload.serviceintervall
+    ? createPurpleBanner(true, serviceKmKvarHS !== null && serviceKmKvarHS <= 0
+        ? `🔧 SERVICE PASSERAT (${payload.serviceintervall.toLocaleString('sv-SE')} km)!<br>Undvik långa hyror!<br>Kontakta Bilkontroll!`
+        : `🔧 SERVICE SNART: ${serviceKmKvarHS?.toLocaleString('sv-SE')} km kvar (intervall: ${payload.serviceintervall.toLocaleString('sv-SE')} km).<br>Undvik långa hyror!<br>Kontakta Bilkontroll!`)
+    : '';
   
   // Warning banners
   const existingDamages = payload.dokumenterade_skador || [];
@@ -414,6 +424,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', nyaSkadorWithMedia?.uploads?.folder, siteUrl, nyaSkadorCount)}
     ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', befintligaSkadorWithMedia?.uploads?.folder, siteUrl, befintligaSkadorHanteradeCount)}
     ${saludatumBanner}
+    ${serviceBannerHuvudstation}
     ${createAlertBanner(payload.rental?.unavailable, 'GÅR INTE ATT HYRA UT', payload.rental?.comment || '')}
     ${createAlertBanner(payload.varningslampa?.lyser, 'VARNINGSLAMPA EJ SLÄCKT', payload.varningslampa?.beskrivning || '')}
     ${createAlertBanner(showChargeWarning, 'LÅG LADDNIVÅ', `Laddnivå: ${payload.laddning?.laddniva}%`, undefined, undefined, undefined, '⚡')}
@@ -536,12 +547,22 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
   const saludatumBanner = payload.hasRiskSaludatum && payload.saludatum
     ? createPurpleBanner(true, `Förbered för försäljning!<br>Saludatum: ${payload.saludatum}.`)
     : '';
+
+  const serviceKmKvarBK = payload.serviceintervall
+    ? payload.serviceintervall - parseInt(payload.matarstallning || '0', 10)
+    : null;
+  const serviceBannerBilkontroll = payload.hasServiceWarning && payload.serviceintervall
+    ? createPurpleBanner(true, serviceKmKvarBK !== null && serviceKmKvarBK <= 0
+        ? `🔧 SERVICE PASSERAT (${payload.serviceintervall.toLocaleString('sv-SE')} km)!<br>Undvik långa hyror!`
+        : `🔧 SERVICE SNART: ${serviceKmKvarBK?.toLocaleString('sv-SE')} km kvar (intervall: ${payload.serviceintervall.toLocaleString('sv-SE')} km).<br>Undvik långa hyror!`)
+    : '';
   
   const banners = `
     ${createAdminBanner(payload.regnrSaknas, 'Reg.nr saknas!')}
     ${createAlertBanner(nyaSkadorCount > 0, 'NYA SKADOR DOKUMENTERADE', '', nyaSkadorWithMedia?.uploads?.folder, siteUrl, nyaSkadorCount)}
     ${createAlertBanner(befintligaSkadorHanteradeCount > 0, 'BEFINTLIGA SKADOR HAR HANTERATS', '', befintligaSkadorWithMedia?.uploads?.folder, siteUrl, befintligaSkadorHanteradeCount)}
     ${saludatumBanner}
+    ${serviceBannerBilkontroll}
   `;
   
   const nyaSkadorHtml = formatDamagesToHtml(payload.nya_skador || [], 'NYA SKADOR', siteUrl, 'Inga nya skador', false);
@@ -681,6 +702,10 @@ export async function POST(request: Request) {
     const showChargeWarning = payload.drivmedel === 'elbil' && !payload.detailedBransletyp?.startsWith('Hybrid') && parseInt(payload.laddning?.laddniva, 10) < 95;
     const notRefueled = (payload.drivmedel === 'bensin_diesel' || payload.detailedBransletyp?.startsWith('Hybrid')) && payload.tankning?.tankniva === 'ej_upptankad';
     const hasSaludatumRisk = payload.hasRiskSaludatum === true;
+    const hasServiceWarning = payload.hasServiceWarning === true;
+    const serviceKmKvar = hasServiceWarning && payload.serviceintervall
+      ? payload.serviceintervall - parseInt(payload.matarstallning || '0', 10)
+      : null;
     
     // "Other warnings" excludes low charge and saludatum risk
     const hasOtherWarnings =
@@ -700,12 +725,14 @@ export async function POST(request: Request) {
     let huvudstationEmojis = '';
     if (showChargeWarning) huvudstationEmojis += '⚡';
     if (hasSaludatumRisk) huvudstationEmojis += '🛑';
+    if (hasServiceWarning) huvudstationEmojis += '🔧';
     if (hasOtherWarnings) huvudstationEmojis += '⚠️';
     const huvudstationEmojiMarker = huvudstationEmojis ? ` - ${huvudstationEmojis} - ` : ' - ';
 
     // Build emoji marker for Bilkontroll: 🛑 for saludatum, ⚠️ for other warnings (NO ⚡ for low battery)
     let bilkontrollEmojis = '';
     if (hasSaludatumRisk) bilkontrollEmojis += '🛑';
+    if (hasServiceWarning) bilkontrollEmojis += '🔧';
     if (hasOtherWarnings) bilkontrollEmojis += '⚠️';
     const bilkontrollEmojiMarker = bilkontrollEmojis ? ` - ${bilkontrollEmojis} - ` : ' - ';
 
