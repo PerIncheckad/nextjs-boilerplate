@@ -481,6 +481,20 @@ export default function CheckInForm() {
   // Unknown reg.nr helper
   const [showUnknownRegHelper, setShowUnknownRegHelper] = useState(false);
 
+// Ankomst-info (från /ankomst-registrering nyare än senaste incheckning)
+  const [latestArrival, setLatestArrival] = useState<{
+    checker_name: string;
+    current_city: string;
+    current_station: string;
+    fuel_level: string | null;
+    fuel_type: string | null;
+    fuel_liters: number | null;
+    fuel_price_per_liter: number | null;
+    charge_level: number | null;
+    odometer_km: number | null;
+    created_at: string;
+  } | null>(null);
+
   // Ej uthyrningsbar-varning (visas direkt när reg.nr matchas)
   const [ejUthyrningsbarWarning, setEjUthyrningsbarWarning] = useState<{
     kommentar: string | null;
@@ -678,6 +692,16 @@ export default function CheckInForm() {
         const current = parseInt(matarstallning, 10);
         return !isNaN(current) && current >= si - 500;
       })(),
+      arrival_tankning: latestArrival ? {
+        fuel_level: latestArrival.fuel_level,
+        fuel_type: latestArrival.fuel_type,
+        fuel_liters: latestArrival.fuel_liters,
+        fuel_price_per_liter: latestArrival.fuel_price_per_liter,
+        checker_name: latestArrival.checker_name,
+        current_station: latestArrival.current_station,
+        current_city: latestArrival.current_city,
+        created_at: latestArrival.created_at,
+      } : null,
   }), [
     normalizedReg, firstName, fullName, vehicleData, matarstallning, hjultyp, 
     garInteAttHyraUt, garInteAttHyraUtKommentar,
@@ -689,7 +713,7 @@ export default function CheckInForm() {
     drivmedelstyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, locationDiffers, matarstallningAvlamning,
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering,
-    showUnknownRegHelper, matarstallning
+    showUnknownRegHelper, matarstallning, latestArrival
   ]);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -700,6 +724,7 @@ export default function CheckInForm() {
     setShowUnknownRegHelper(false);
     setVehicleData(null);
     setExistingDamages([]);
+    setLatestArrival(null);
     try {
       const normalized = reg.toUpperCase().replace(/\s/g, '');
       // Fetch vehicle info from server-side API (bypasses RLS issues)
@@ -767,15 +792,45 @@ export default function CheckInForm() {
       
       setVehicleData(info);
 
-      // Visa varning om fordonet är markerat som ej uthyrningsbart
+// Hantera ankomst-info
+      const arrival = (info as any).latest_arrival || null;
+      setLatestArrival(arrival);
+
+      // Förifylla mätarställning från ankomst
+      if (arrival?.odometer_km) {
+        setMatarstallning(String(arrival.odometer_km));
+      }
+
+      // Auto-sätt tankniva från ankomst om bensin/diesel och fulltankad/tankad
+      if (arrival?.fuel_level === 'tankad_nu') {
+        setTankniva('tankad_nu');
+        if (arrival.fuel_liters) setLiters(String(arrival.fuel_liters));
+        if (arrival.fuel_price_per_liter) setLiterpris(String(arrival.fuel_price_per_liter));
+      } else if (arrival?.fuel_level === 'återlämnades_fulltankad') {
+        setTankniva('återlämnades_fulltankad');
+      }
+
+// Visa varning om fordonet är markerat som ej uthyrningsbart
       if (info.ejUthyrningsbarKalla) {
         setEjUthyrningsbarWarning({
           kommentar: info.ejUthyrningsbarKommentar || null,
           kalla: info.ejUthyrningsbarKalla,
           namnDatum: info.ejUthyrningsbarNamnDatum || null,
         });
+        // Ankomst-modal visas efter att ejUthyrningsbar-modalen stängs (se knappen nedan)
       } else {
         setEjUthyrningsbarWarning(null);
+        // Visa ankomst-modal direkt om ingen ejUthyrningsbar-varning
+        if (arrival) {
+          const arrDate = formatDateTime(arrival.created_at);
+          setConfirmDialog({
+            isOpen: true,
+            title: '🔵 Fordonet är registrerat som inkommet',
+            text: `Registrerat av ${arrival.checker_name} (${arrival.current_station || arrival.current_city}), ${arrDate}. Mätarställning har fyllts i — korrigera vid behov.`,
+            confirmButtonVariant: 'primary',
+            onConfirm: () => {},
+          });
+        }
       }
 
       // Auto-set fuel type from API if available
@@ -974,6 +1029,7 @@ export default function CheckInForm() {
     setSkadekontroll(null);
     setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
     setBilenStarNuOrt(''); setBilenStarNuStation(''); setBilenStarNuKommentar(''); setMatarstallningAvlamning('');
+    setLatestArrival(null);
     window.history.pushState({}, '', window.location.pathname); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1538,9 +1594,21 @@ export default function CheckInForm() {
               {ejUthyrningsbarWarning.kalla} — {ejUthyrningsbarWarning.namnDatum}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button
+             <button
                 type="button"
-                onClick={() => setEjUthyrningsbarWarning(null)}
+                onClick={() => {
+                  setEjUthyrningsbarWarning(null);
+                  if (latestArrival) {
+                    const arrDate = formatDateTime(latestArrival.created_at);
+                    setConfirmDialog({
+                      isOpen: true,
+                      title: '🔵 Fordonet är registrerat som inkommet',
+                      text: `Registrerat av ${latestArrival.checker_name} (${latestArrival.current_station || latestArrival.current_city}), ${arrDate}. Mätarställning har fyllts i — korrigera vid behov.`,
+                      confirmButtonVariant: 'primary',
+                      onConfirm: () => {},
+                    });
+                  }
+                }}
                 style={{ padding: '0.6rem 1.25rem', background: '#C45400', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
               >
                 Jag förstår, fortsätt
@@ -1712,15 +1780,40 @@ export default function CheckInForm() {
               <div style={{marginTop: '0.5rem'}}><ChoiceButton onClick={() => handleDetailedFuelTypeChange('El (full)')} isActive={detailedBransletyp === 'El (full)'} isSet={detailedBransletyp !== null} className="full-width-choice">100% el</ChoiceButton></div>
             </Field>
           )}
-          {needsTank && (<Fragment><Field label="Tankstatus *"><div className="grid-3-col">
-            <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
-            <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
-            <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
-          </div></Field>
-          {tankniva === 'tankad_nu' && <div className="grid-2-col">
-            <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
-            <Field label={`Literpris (${bransletyp || 'kr'}) *`}><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
-          </div>}</Fragment>)}
+          {needsTank && (() => {
+            const arrFuel = latestArrival?.fuel_level;
+            const arrivalHandledTank = arrFuel === 'tankad_nu' || arrFuel === 'återlämnades_fulltankad';
+            const arrivalEjUppankad = arrFuel === 'ej_upptankad';
+            if (arrivalHandledTank) {
+              const arrDate = formatDateTime(latestArrival!.created_at);
+              const tankText = arrFuel === 'tankad_nu'
+                ? `Tankad nu av MABI (${latestArrival!.fuel_liters ?? '?'}L ${latestArrival!.fuel_type ?? ''} @ ${latestArrival!.fuel_price_per_liter ?? '?'} kr/L)`
+                : 'Återlämnades fulltankad';
+              return (
+                <div style={{ padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem' }}>
+                  ✅ <strong>Tankning vid ankomst:</strong> {tankText} — {latestArrival!.checker_name}, {latestArrival!.current_station || latestArrival!.current_city}, {arrDate}
+                </div>
+              );
+            }
+            return (
+              <Fragment>
+                {arrivalEjUppankad && (
+                  <div style={{ padding: '0.75rem 1rem', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '0.875rem', color: '#92400e', marginBottom: '0.75rem' }}>
+                    ⚠️ <strong>Bilen var ej upptankad vid ankomst</strong> ({latestArrival!.checker_name}, {formatDateTime(latestArrival!.created_at)}). Har bilen tankats sedan dess?
+                  </div>
+                )}
+                <Field label="Tankstatus *"><div className="grid-3-col">
+                  <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
+                  <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
+                  <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
+                </div></Field>
+                {tankniva === 'tankad_nu' && <div className="grid-2-col">
+                  <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
+                  <Field label={`Literpris (${bransletyp || 'kr'}) *`}><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
+                </div>}
+              </Fragment>
+            );
+          })()}
           {needsChargeLevel && (
             <Field label="Laddningsnivå vid återlämning (%) *"><input type="number" value={laddniva} onChange={handleLaddningChange} placeholder="0-100" /></Field>
           )}
