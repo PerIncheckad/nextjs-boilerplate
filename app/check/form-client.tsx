@@ -670,7 +670,14 @@ export default function CheckInForm() {
       vehicleStatus: vehicleData?.status,
       regnrSaknas: showUnknownRegHelper, // Flag to indicate registration number is missing from Bilkontroll
       saludatum: vehicleData?.saludatum || null,
-      hasRiskSaludatum: isSaludatumAtRisk(vehicleData?.saludatum)
+      hasRiskSaludatum: isSaludatumAtRisk(vehicleData?.saludatum),
+      serviceintervall: vehicleData?.serviceintervall || null,
+      hasServiceWarning: (() => {
+        const si = vehicleData?.serviceintervall;
+        if (!si || !matarstallning) return false;
+        const current = parseInt(matarstallning, 10);
+        return !isNaN(current) && current >= si - 500;
+      })(),
   }), [
     normalizedReg, firstName, fullName, vehicleData, matarstallning, hjultyp, 
     garInteAttHyraUt, garInteAttHyraUtKommentar,
@@ -682,7 +689,7 @@ export default function CheckInForm() {
     drivmedelstyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, locationDiffers, matarstallningAvlamning,
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering,
-    showUnknownRegHelper
+    showUnknownRegHelper, matarstallning
   ]);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -1457,9 +1464,11 @@ export default function CheckInForm() {
 
   const handleOdometerBlur = () => {
     const currentVal = parseInt(matarstallning, 10);
+    if (isNaN(currentVal)) return;
+
+    // Mätarvarning: lägre än senast registrerade
     const prevOdo = vehicleData?.prev_odometer;
-    if (!prevOdo || isNaN(currentVal)) return;
-    if (currentVal < prevOdo.value) {
+    if (prevOdo && currentVal < prevOdo.value) {
       setConfirmDialog({
         isOpen: true,
         title: '⚠️ Dubbelkolla mätarställningen',
@@ -1467,6 +1476,23 @@ export default function CheckInForm() {
         confirmButtonVariant: 'primary',
         onConfirm: () => {},
         onCancel: () => setMatarstallning(''),
+      });
+      return;
+    }
+
+    // Servicevarning: inom 500 km från serviceintervall
+    const si = vehicleData?.serviceintervall;
+    if (si && currentVal >= si - 500) {
+      const kmKvar = si - currentVal;
+      const kmKvarText = kmKvar <= 0
+        ? `Serviceintervallet (${si.toLocaleString('sv-SE')} km) är passerat!`
+        : `${kmKvar.toLocaleString('sv-SE')} km kvar till service (intervall: ${si.toLocaleString('sv-SE')} km).`;
+      setConfirmDialog({
+        isOpen: true,
+        title: '🔧 Service snart',
+        text: `${kmKvarText} Undvik långa hyror — kontakta Bilkontroll.`,
+        confirmButtonVariant: 'primary',
+        onConfirm: () => {},
       });
     }
   };
@@ -1676,7 +1702,7 @@ export default function CheckInForm() {
         <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !detailedBransletyp || (needsTank && !tankniva) || (needsTank && tankniva === 'tankad_nu' && (!liters || !literpris)) || (needsChargeLevel && !laddniva) || (needsChargeCables && antalLaddkablar === null))}>
           <SectionHeader title="Fordonsstatus" />
           <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning vid incheckning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} onBlur={handleOdometerBlur} placeholder="12345" /></Field>
-<SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => handleHjultypSelect('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => handleHjultypSelect('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field><SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => handleHjultypSelect('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => handleHjultypSelect('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>          <SubSectionHeader title="Tankning/Laddning" />
+<SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => handleHjultypSelect('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => handleHjultypSelect('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
           {knownBransletyp ? (
             <Field label="Drivmedel"><div className="known-fuel-info">✅ {detailedBransletyp === 'El (full)' ? '100% el' : detailedBransletyp === 'Hybrid (diesel)' ? 'Diesel (hybrid)' : detailedBransletyp === 'Hybrid (bensin)' ? 'Bensin (hybrid)' : detailedBransletyp}</div></Field>
           ) : (
