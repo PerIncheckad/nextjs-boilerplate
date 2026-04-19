@@ -622,8 +622,6 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
             ${(() => {
               const at = payload.arrival_tankning;
               if (!at || at.fuel_level !== 'tankad_nu') return '';
-              // PR 2a: Om användaren valde "Fortfarande aktuell" skriver Tankning-raden redan detta, skip denna extra rad
-              if (payload.tankstatusChoice === 'inherit') return '';
               const parts = ['Tankad av MABI vid ankomst'];
               if (at.current_station || at.current_city) parts.push(`(${escapeHtml(at.current_station || at.current_city)})`);
               if (at.checker_name) parts.push(`— ${escapeHtml(at.checker_name)}`);
