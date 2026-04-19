@@ -368,8 +368,16 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   let fuelOrChargeInfo = '';
   // Tank info (bensin_diesel or hybrid)
   if (payload.drivmedel === 'bensin_diesel' || isHybridType) {
-    const tankningText = formatTankning(payload.tankning);
-    fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
+    // PR 2a: Om användaren valde "Fortfarande aktuell" i Alt 3-dialogen, skriv inherit-text
+    if (payload.tankstatusChoice === 'inherit' && payload.previous_arrival_created_at) {
+      const prevDate = new Date(payload.previous_arrival_created_at).toLocaleDateString('sv-SE', {
+        timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit'
+      });
+      fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> Ingen ny tankstatus (tidigare registrerad ${prevDate} är fortfarande aktuell)</td></tr>`;
+    } else {
+      const tankningText = formatTankning(payload.tankning);
+      fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
+    }
   }
   // Charge level (only pure electric, not hybrid)
   if (payload.drivmedel === 'elbil' && !isHybridType) {
@@ -614,6 +622,8 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
             ${(() => {
               const at = payload.arrival_tankning;
               if (!at || at.fuel_level !== 'tankad_nu') return '';
+              // PR 2a: Om användaren valde "Fortfarande aktuell" skriver Tankning-raden redan detta, skip denna extra rad
+              if (payload.tankstatusChoice === 'inherit') return '';
               const parts = ['Tankad av MABI vid ankomst'];
               if (at.current_station || at.current_city) parts.push(`(${escapeHtml(at.current_station || at.current_city)})`);
               if (at.checker_name) parts.push(`— ${escapeHtml(at.checker_name)}`);
