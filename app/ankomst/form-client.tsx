@@ -466,7 +466,7 @@ export default function ArrivalForm() {
                 : 'Återlämnades fulltankad'}
             </div>
             <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: '1.5rem' }}>
-              Är det fortfarande aktuellt för denna registrering, eller har något hänt sedan dess?
+              Har tankstatus förändrats sedan dess?
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button
@@ -477,7 +477,7 @@ export default function ArrivalForm() {
                 }}
                 style={{ padding: '0.6rem 1.25rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
               >
-                Fortfarande aktuell
+                Nej, oförändrad
               </button>
               <button
                 type="button"
@@ -663,7 +663,10 @@ export default function ArrivalForm() {
           {/* Bensin/Diesel fuel status */}
           {drivmedelstyp === 'bensin_diesel' && tankstatusChoice === 'inherit' && latestArrival && (
             <div style={{ padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem' }}>
-              ✅ <strong>Tankning vid ankomst:</strong> {latestArrival.fuel_level === 'tankad_nu' ? `Tankad nu av MABI (${latestArrival.fuel_liters ?? '?'}L ${latestArrival.fuel_type ?? ''} @ ${latestArrival.fuel_price_per_liter ?? '?'} kr/L)` : 'Återlämnades fulltankad'} — {latestArrival.checker_name}, {latestArrival.current_station || latestArrival.current_city}, {formatDateTime(latestArrival.created_at)}
+              ✅ <strong>Tankning vid Ankomst:</strong> {latestArrival.fuel_level === 'tankad_nu' ? `Tankad nu av MABI (${latestArrival.fuel_liters ?? '?'}L ${latestArrival.fuel_type ?? ''} @ ${latestArrival.fuel_price_per_liter ?? '?'} kr/L)` : 'Återlämnades fulltankad'}
+              <div style={{ marginTop: '0.25rem' }}>
+                Registrerad av {latestArrival.checker_name}, {latestArrival.current_station || latestArrival.current_city}, {formatDateTime(latestArrival.created_at)}
+              </div>
             </div>
           )}
           {drivmedelstyp === 'bensin_diesel' && tankstatusChoice !== 'inherit' && (
