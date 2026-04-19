@@ -695,8 +695,9 @@ export default function CheckInForm() {
         const current = parseInt(matarstallning, 10);
         return !isNaN(current) && current >= si - 500;
       })(),
-    tankstatusChoice: tankstatusChoice,  
-    arrival_tankning: latestArrival ? {
+    tankstatusChoice: tankstatusChoice,
+      previous_arrival_created_at: latestArrival?.created_at || null,
+      arrival_tankning: latestArrival ? {
         fuel_level: latestArrival.fuel_level,
         fuel_type: latestArrival.fuel_type,
         fuel_liters: latestArrival.fuel_liters,
