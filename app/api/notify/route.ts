@@ -368,12 +368,28 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
   let fuelOrChargeInfo = '';
   // Tank info (bensin_diesel or hybrid)
   if (payload.drivmedel === 'bensin_diesel' || isHybridType) {
-    // PR 2a: Om användaren valde "Fortfarande aktuell" i Alt 3-dialogen, skriv inherit-text
+    // PR 2a: Om användaren valde "Fortfarande aktuell" i Alt 3-dialogen, skriv inherit-text inkl. vad som registrerades
     if (payload.tankstatusChoice === 'inherit' && payload.previous_arrival_created_at) {
       const prevDate = new Date(payload.previous_arrival_created_at).toLocaleDateString('sv-SE', {
         timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit'
       });
-      fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> Ingen ny tankstatus (tidigare registrerad ${prevDate} är fortfarande aktuell)</td></tr>`;
+      const at = payload.arrival_tankning;
+      let prevTankText = '';
+      if (at?.fuel_level === 'tankad_nu') {
+        const parts = ['Tankad nu av MABI'];
+        const details: string[] = [];
+        if (at.fuel_liters) details.push(`${at.fuel_liters}L`);
+        if (at.fuel_type) details.push(at.fuel_type);
+        if (at.fuel_price_per_liter) details.push(`@ ${at.fuel_price_per_liter} kr/L`);
+        if (details.length > 0) parts.push(`(${details.join(' ')})`);
+        prevTankText = parts.join(' ');
+      } else if (at?.fuel_level === 'återlämnades_fulltankad') {
+        prevTankText = 'Återlämnades fulltankad';
+      }
+      const inheritText = prevTankText
+        ? `Ingen ny tankstatus - fortfarande gäller det som registrerades ${prevDate}: ${prevTankText}`
+        : `Ingen ny tankstatus (tidigare registrerad ${prevDate} är fortfarande aktuell)`;
+      fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${inheritText}</td></tr>`;
     } else {
       const tankningText = formatTankning(payload.tankning);
       fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
