@@ -635,17 +635,6 @@ const buildBilkontrollEmail = (payload: any, date: string, time: string, siteUrl
             <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
             ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
-            ${(() => {
-              const at = payload.arrival_tankning;
-              if (!at || at.fuel_level !== 'tankad_nu') return '';
-              const parts = ['Tankad av MABI vid ankomst'];
-              if (at.current_station || at.current_city) parts.push(`(${escapeHtml(at.current_station || at.current_city)})`);
-              if (at.checker_name) parts.push(`— ${escapeHtml(at.checker_name)}`);
-              if (at.fuel_liters) parts.push(`· ${at.fuel_liters}L`);
-              if (at.fuel_type) parts.push(escapeHtml(at.fuel_type));
-              if (at.fuel_price_per_liter) parts.push(`@ ${at.fuel_price_per_liter} kr/L`);
-              return `<tr><td style="padding:4px 0;"><strong>Tankning vid ankomst:</strong> ${parts.join(' ')}</td></tr>`;
-            })()}
             ${payload.hjultyp ? `<tr><td style="padding:4px 0;"><strong>Däck som sitter på:</strong> ${payload.hjultyp}</td></tr>` : ''}
           </tbody>
         </table>
@@ -750,6 +739,18 @@ export async function POST(request: Request) {
       payload.husdjur?.sanerad ||
       payload.rokning?.sanerad;
 
+    // PR 2a: Bilkontroll ska inte få varningar om tankstatus (ej upptankad är tillfälligt fel för stationen)
+    const hasOtherWarningsBilkontroll =
+      payload.rental?.unavailable ||
+      payload.varningslampa?.lyser ||
+      payload.rekond?.behoverRekond ||
+      payload.status?.insynsskyddSaknas ||
+      (payload.nya_skador && payload.nya_skador.length > 0) ||
+      (payload.dokumenterade_skador && payload.dokumenterade_skador.length > 0) ||
+      (payload.åtgärdade_skador && payload.åtgärdade_skador.length > 0) ||
+      payload.husdjur?.sanerad ||
+      payload.rokning?.sanerad;
+
     // Build emoji marker for Huvudstation: ⚡ for low charge, 🛑 for saludatum, ⚠️ for other warnings
     // Multiple emojis can appear together
     let huvudstationEmojis = '';
@@ -759,11 +760,11 @@ export async function POST(request: Request) {
     if (hasOtherWarnings) huvudstationEmojis += '⚠️';
     const huvudstationEmojiMarker = huvudstationEmojis ? ` - ${huvudstationEmojis} - ` : ' - ';
 
-    // Build emoji marker for Bilkontroll: 🛑 for saludatum, ⚠️ for other warnings (NO ⚡ for low battery)
+    // Build emoji marker for Bilkontroll: 🛑 for saludatum, ⚠️ for other warnings (NO ⚡ for low battery, NO tank warnings)
     let bilkontrollEmojis = '';
     if (hasSaludatumRisk) bilkontrollEmojis += '🛑';
     if (hasServiceWarning) bilkontrollEmojis += '🔧';
-    if (hasOtherWarnings) bilkontrollEmojis += '⚠️';
+    if (hasOtherWarningsBilkontroll) bilkontrollEmojis += '⚠️';
     const bilkontrollEmojiMarker = bilkontrollEmojis ? ` - ${bilkontrollEmojis} - ` : ' - ';
 
     // Add "!!!" for severe warnings, with exceptions:
