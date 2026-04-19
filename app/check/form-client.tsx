@@ -599,7 +599,8 @@ export default function CheckInForm() {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !detailedBransletyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (locationDiffers && !matarstallningAvlamning) return false;
     // Tank validation (Bensin, Diesel, Hybrid bensin, Hybrid diesel)
-    if (needsTank && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !literpris)))) return false;
+    // PR 2a: Ärvd tankstatus ('inherit') kräver inget val
+    if (needsTank && tankstatusChoice !== 'inherit' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !literpris)))) return false;
     // Charge validation (El full, Hybrid bensin, Hybrid diesel)
     if (needsChargeLevel && !laddniva) return false;
     if (needsChargeCables && antalLaddkablar === null) return false;
@@ -624,7 +625,7 @@ export default function CheckInForm() {
   }, [
     regInput, ort, station, matarstallning, hjultyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, literpris, laddniva, antalLaddkablar,
     skadekontroll, newDamages, existingDamages, isChecklistComplete, garInteAttHyraUt, garInteAttHyraUtKommentar, varningslampaLyser, varningslampaBeskrivning,
-    behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, locationDiffers, matarstallningAvlamning, unhandledLegacyDamages
+    behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, locationDiffers, matarstallningAvlamning, unhandledLegacyDamages, tankstatusChoice
   ]);
 
   const finalPayloadForUI = useMemo(() => ({
@@ -838,7 +839,7 @@ export default function CheckInForm() {
           setConfirmDialog({
             isOpen: true,
             title: '🔵 Fordonet är registrerat som inkommet',
-            text: `Registrerat av ${arrival.checker_name} (${arrival.current_station || arrival.current_city}), ${arrDate}. Mätarställning har fyllts i — korrigera vid behov.`,
+            text: `Registrerat av ${arrival.checker_name} (${arrival.current_station || arrival.current_city}), ${arrDate}.\n\nMätarställning har fyllts i - korrigera vid behov.`,
             confirmButtonVariant: 'primary',
             onConfirm: () => {
               if (shouldShowTankstatusDialog) setShowTankstatusChoiceDialog(true);
@@ -1609,7 +1610,7 @@ export default function CheckInForm() {
                 : 'Återlämnades fulltankad'}
             </div>
             <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: '1.5rem' }}>
-              Är det fortfarande aktuellt för denna incheckning, eller har något hänt sedan dess?
+              Har tanken förändrats sedan dess?
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button
@@ -1620,7 +1621,7 @@ export default function CheckInForm() {
                 }}
                 style={{ padding: '0.6rem 1.25rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
               >
-                Fortfarande aktuell
+                Nej, oförändrad
               </button>
               <button
                 type="button"
@@ -1665,7 +1666,7 @@ export default function CheckInForm() {
                     setConfirmDialog({
                       isOpen: true,
                       title: '🔵 Fordonet är registrerat som inkommet',
-                      text: `Registrerat av ${latestArrival.checker_name} (${latestArrival.current_station || latestArrival.current_city}), ${arrDate}. Mätarställning har fyllts i — korrigera vid behov.`,
+                      text: `Registrerat av ${latestArrival.checker_name} (${latestArrival.current_station || latestArrival.current_city}), ${arrDate}.\n\nMätarställning har fyllts i - korrigera vid behov.`,
                       confirmButtonVariant: 'primary',
                       onConfirm: () => {
                         if (shouldShowTankstatusDialog) setShowTankstatusChoiceDialog(true);
@@ -1856,7 +1857,10 @@ export default function CheckInForm() {
                 : 'Återlämnades fulltankad';
               return (
                 <div style={{ padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem' }}>
-                  ✅ <strong>Tankning vid ankomst:</strong> {tankText} — {latestArrival!.checker_name}, {latestArrival!.current_station || latestArrival!.current_city}, {arrDate}
+                  ✅ <strong>Tankning vid Ankomst:</strong> {tankText}
+                  <div style={{ marginTop: '0.25rem' }}>
+                    Registrerad av {latestArrival!.checker_name}, {latestArrival!.current_station || latestArrival!.current_city}, {arrDate}
+                  </div>
                 </div>
               );
             }
