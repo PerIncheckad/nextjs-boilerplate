@@ -83,14 +83,30 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
   const ort = payload.current_city || '---';
   const station = payload.current_station || '---';
   const odometer = payload.odometer_km || '---';
-  // PR 2a: Om användaren valde "Fortfarande aktuell" i /ankomst Alt 3-dialogen, skriv inherit-text istället
+  // PR 2a: Om användaren valde "Fortfarande aktuell" i /ankomst Alt 3-dialogen, skriv inherit-text inkl. vad som registrerades
   const isInheritedTank = payload.tankstatusChoice === 'inherit' && payload.previous_arrival_created_at;
   let tankningText: string;
   if (isInheritedTank) {
     const prevDate = new Date(payload.previous_arrival_created_at).toLocaleDateString('sv-SE', {
       timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit'
     });
-    tankningText = `Ingen ny tankstatus (tidigare registrerad ${prevDate} är fortfarande aktuell)`;
+    // OBS: I /ankomst finns inte arrival_tankning-objektet (till skillnad från /check).
+    // Vi måste hämta detaljerna från payload-fälten direkt om de finns, annars fallback.
+    let prevTankText = '';
+    if (payload.previous_fuel_level === 'tankad_nu') {
+      const parts = ['Tankad nu av MABI'];
+      const details: string[] = [];
+      if (payload.previous_fuel_liters) details.push(`${payload.previous_fuel_liters}L`);
+      if (payload.previous_fuel_type) details.push(payload.previous_fuel_type);
+      if (payload.previous_fuel_price_per_liter) details.push(`@ ${payload.previous_fuel_price_per_liter} kr/L`);
+      if (details.length > 0) parts.push(`(${details.join(' ')})`);
+      prevTankText = parts.join(' ');
+    } else if (payload.previous_fuel_level === 'återlämnades_fulltankad') {
+      prevTankText = 'Återlämnades fulltankad';
+    }
+    tankningText = prevTankText
+      ? `Ingen ny tankstatus - fortfarande gäller det som registrerades ${prevDate}: ${prevTankText}`
+      : `Ingen ny tankstatus (tidigare registrerad ${prevDate} är fortfarande aktuell)`;
   } else {
     tankningText = formatTankning(payload);
   }
