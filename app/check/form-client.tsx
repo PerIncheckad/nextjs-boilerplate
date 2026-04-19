@@ -483,8 +483,6 @@ export default function CheckInForm() {
 
 // Ankomst-info (från /ankomst-registrering nyare än senaste incheckning)
   const [latestArrival, setLatestArrival] = useState<{
-  const [tankstatusChoice, setTankstatusChoice] = useState<'inherit' | 'new' | null>(null);
-  const [showTankstatusChoiceDialog, setShowTankstatusChoiceDialog] = useState(false);
     checker_name: string;
     current_city: string;
     current_station: string;
@@ -496,6 +494,9 @@ export default function CheckInForm() {
     odometer_km: number | null;
     created_at: string;
   } | null>(null);
+
+  const [tankstatusChoice, setTankstatusChoice] = useState<'inherit' | 'new' | null>(null);
+  const [showTankstatusChoiceDialog, setShowTankstatusChoiceDialog] = useState(false);
 
   // Ej uthyrningsbar-varning (visas direkt när reg.nr matchas)
   const [ejUthyrningsbarWarning, setEjUthyrningsbarWarning] = useState<{
