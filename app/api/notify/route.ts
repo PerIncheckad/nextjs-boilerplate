@@ -704,14 +704,9 @@ export async function POST(request: Request) {
 
     // Mottagare/ämnen
     const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
+    // TEMP TEST PR 2a: Alla mejl går bara till per@incheckad.se under testning
     const huvudstationTo = [defaultHuvudstationAddress];
-    const stationSpecificEmail = stationEmailMapping[finalOrt];
-    if (stationSpecificEmail && !huvudstationTo.includes(stationSpecificEmail)) {
-      huvudstationTo.push(stationSpecificEmail);
-    }
-
-    // Bilkontroll recipients: Per always, Latif always (alla orter)
-    const bilkontrollTo = ['per@incheckad.se', 'latif@incheckad.se'];
+    const bilkontrollTo = [defaultHuvudstationAddress];
 
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
     const cleanStation = stationForSubject?.includes(' / ')
