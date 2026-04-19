@@ -83,7 +83,17 @@ const buildArrivalEmail = (payload: any, date: string, time: string): string => 
   const ort = payload.current_city || '---';
   const station = payload.current_station || '---';
   const odometer = payload.odometer_km || '---';
-  const tankningText = formatTankning(payload);
+  // PR 2a: Om användaren valde "Fortfarande aktuell" i /ankomst Alt 3-dialogen, skriv inherit-text istället
+  const isInheritedTank = payload.tankstatusChoice === 'inherit' && payload.previous_arrival_created_at;
+  let tankningText: string;
+  if (isInheritedTank) {
+    const prevDate = new Date(payload.previous_arrival_created_at).toLocaleDateString('sv-SE', {
+      timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+    tankningText = `Ingen ny tankstatus (tidigare registrerad ${prevDate} är fortfarande aktuell)`;
+  } else {
+    tankningText = formatTankning(payload);
+  }
   const isElbil = payload.fuel_level === 'elbil';
   const tankningLabel = isElbil ? 'Laddning' : 'Tankning';
   const notesText = payload.notes ? escapeHtml(payload.notes) : null;
