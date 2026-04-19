@@ -512,7 +512,7 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
             <tr><td style="padding:4px 0;"><strong>Plats för incheckning:</strong> ${platsOrt} / ${platsStation}</td></tr>
             ${odometerHtml.vidIncheckning}
             ${fuelOrChargeInfo}
-             ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
+            <tr><td style="padding:4px 0;"><strong>Bilen står nu:</strong> ${bilenStarNuOrt} / ${bilenStarNuStation}</td></tr>
             ${odometerHtml.nu}
             ${parkeringsInfo ? `<tr><td style="padding:4px 0;"><strong>Parkeringsinfo:</strong> ${parkeringsInfo}</td></tr>` : ''}
           </tbody>
