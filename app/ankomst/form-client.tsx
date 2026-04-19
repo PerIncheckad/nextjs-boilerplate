@@ -197,6 +197,10 @@ export default function ArrivalForm() {
       car_model: vehicleModel || '---',
       tankstatusChoice: tankstatusChoice,
       previous_arrival_created_at: latestArrival?.created_at || null,
+      previous_fuel_level: latestArrival?.fuel_level || null,
+      previous_fuel_type: latestArrival?.fuel_type || null,
+      previous_fuel_liters: latestArrival?.fuel_liters || null,
+      previous_fuel_price_per_liter: latestArrival?.fuel_price_per_liter || null,
     };
   }, [regInput, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, notes, userEmail, fullName, vehicleModel, knownBransletyp, detailedBransletyp, tankstatusChoice, latestArrival]);
   // --- Vehicle lookup ---
