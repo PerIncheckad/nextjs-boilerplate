@@ -1610,7 +1610,7 @@ export default function CheckInForm() {
                 : 'Återlämnades fulltankad'}
             </div>
             <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: '1.5rem' }}>
-              Har tanken förändrats sedan dess?
+              Har tankstatus förändrats sedan dess?
             </div>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button
