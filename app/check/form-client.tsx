@@ -495,6 +495,9 @@ export default function CheckInForm() {
     created_at: string;
   } | null>(null);
 
+  const [tankstatusChoice, setTankstatusChoice] = useState<'inherit' | 'new' | null>(null);
+  const [showTankstatusChoiceDialog, setShowTankstatusChoiceDialog] = useState(false);
+
   // Ej uthyrningsbar-varning (visas direkt när reg.nr matchas)
   const [ejUthyrningsbarWarning, setEjUthyrningsbarWarning] = useState<{
     kommentar: string | null;
@@ -596,7 +599,8 @@ export default function CheckInForm() {
     if (!regInput || !ort || !station || !matarstallning || !hjultyp || !detailedBransletyp || skadekontroll === null || !bilenStarNuOrt || !bilenStarNuStation) return false;
     if (locationDiffers && !matarstallningAvlamning) return false;
     // Tank validation (Bensin, Diesel, Hybrid bensin, Hybrid diesel)
-    if (needsTank && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !literpris)))) return false;
+    // PR 2a: Ärvd tankstatus ('inherit') kräver inget val
+    if (needsTank && tankstatusChoice !== 'inherit' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !literpris)))) return false;
     // Charge validation (El full, Hybrid bensin, Hybrid diesel)
     if (needsChargeLevel && !laddniva) return false;
     if (needsChargeCables && antalLaddkablar === null) return false;
@@ -621,7 +625,7 @@ export default function CheckInForm() {
   }, [
     regInput, ort, station, matarstallning, hjultyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, literpris, laddniva, antalLaddkablar,
     skadekontroll, newDamages, existingDamages, isChecklistComplete, garInteAttHyraUt, garInteAttHyraUtKommentar, varningslampaLyser, varningslampaBeskrivning,
-    behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, locationDiffers, matarstallningAvlamning, unhandledLegacyDamages
+    behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, locationDiffers, matarstallningAvlamning, unhandledLegacyDamages, tankstatusChoice
   ]);
 
   const finalPayloadForUI = useMemo(() => ({
@@ -692,6 +696,8 @@ export default function CheckInForm() {
         const current = parseInt(matarstallning, 10);
         return !isNaN(current) && current >= si - 500;
       })(),
+    tankstatusChoice: tankstatusChoice,
+      previous_arrival_created_at: latestArrival?.created_at || null,
       arrival_tankning: latestArrival ? {
         fuel_level: latestArrival.fuel_level,
         fuel_type: latestArrival.fuel_type,
@@ -713,7 +719,7 @@ export default function CheckInForm() {
     drivmedelstyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, bransletyp, literpris, laddniva, antalLaddkablar,
     ort, station, bilenStarNuOrt, bilenStarNuStation, bilenStarNuKommentar, locationDiffers, matarstallningAvlamning,
     newDamages, existingDamages, washed, otherChecklistItemsOK, preliminarAvslutNotering,
-    showUnknownRegHelper, matarstallning, latestArrival
+    showUnknownRegHelper, matarstallning, latestArrival, tankstatusChoice
   ]);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
@@ -725,6 +731,7 @@ export default function CheckInForm() {
     setVehicleData(null);
     setExistingDamages([]);
     setLatestArrival(null);
+    setTankstatusChoice(null);
     try {
       const normalized = reg.toUpperCase().replace(/\s/g, '');
       // Fetch vehicle info from server-side API (bypasses RLS issues)
@@ -810,6 +817,11 @@ export default function CheckInForm() {
         setTankniva('återlämnades_fulltankad');
       }
 
+      // PR 2a: Default 'inherit' när arrival hade hanterad tankstatus (Alt 3-dialog ändrar detta)
+      if (arrival?.fuel_level === 'tankad_nu' || arrival?.fuel_level === 'återlämnades_fulltankad') {
+        setTankstatusChoice('inherit');
+      }
+
 // Visa varning om fordonet är markerat som ej uthyrningsbart
       if (info.ejUthyrningsbarKalla) {
         setEjUthyrningsbarWarning({
@@ -823,12 +835,15 @@ export default function CheckInForm() {
         // Visa ankomst-modal direkt om ingen ejUthyrningsbar-varning
         if (arrival) {
           const arrDate = formatDateTime(arrival.created_at);
+          const shouldShowTankstatusDialog = arrival.fuel_level === 'tankad_nu' || arrival.fuel_level === 'återlämnades_fulltankad';
           setConfirmDialog({
             isOpen: true,
             title: '🔵 Fordonet är registrerat som inkommet',
-            text: `Registrerat av ${arrival.checker_name} (${arrival.current_station || arrival.current_city}), ${arrDate}. Mätarställning har fyllts i — korrigera vid behov.`,
+            text: `Registrerat av ${arrival.checker_name} (${arrival.current_station || arrival.current_city}), ${arrDate}.\n\nMätarställning har fyllts i - korrigera vid behov.`,
             confirmButtonVariant: 'primary',
-            onConfirm: () => {},
+            onConfirm: () => {
+              if (shouldShowTankstatusDialog) setShowTankstatusChoiceDialog(true);
+            },
           });
         }
       }
@@ -1030,6 +1045,7 @@ export default function CheckInForm() {
     setNewDamages([]); setPreliminarAvslutNotering(''); setShowFieldErrors(false);
     setBilenStarNuOrt(''); setBilenStarNuStation(''); setBilenStarNuKommentar(''); setMatarstallningAvlamning('');
     setLatestArrival(null);
+    setTankstatusChoice(null);
     window.history.pushState({}, '', window.location.pathname); 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1578,6 +1594,52 @@ export default function CheckInForm() {
       {showSuccessModal && <SuccessModal firstName={firstName} />}
       {showConfirmModal && <ConfirmModal payload={finalPayloadForUI} onConfirm={confirmAndSubmit} onCancel={() => setShowConfirmModal(false)} />}
       <ActionConfirmDialog state={confirmDialog} onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })} />
+      {showTankstatusChoiceDialog && latestArrival && (
+        <Fragment>
+          <div className="modal-overlay" />
+          <div className="modal-content" style={{ borderTop: '6px solid #2563eb', maxWidth: '500px' }}>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#2563eb', marginBottom: '0.75rem', letterSpacing: '0.03em' }}>
+              ⛽ TANKSTATUS
+            </div>
+            <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: '1rem' }}>
+              Denna bil prellades {formatDateTime(latestArrival.created_at)} med tankstatus:
+            </div>
+            <div style={{ fontStyle: 'italic', marginBottom: '1rem', color: '#555', padding: '0.5rem 0.75rem', background: '#f9fafb', borderRadius: '4px' }}>
+              {latestArrival.fuel_level === 'tankad_nu'
+                ? `Tankad nu av MABI (${latestArrival.fuel_liters ?? '?'}L ${latestArrival.fuel_type ?? ''} @ ${latestArrival.fuel_price_per_liter ?? '?'} kr/L)`
+                : 'Återlämnades fulltankad'}
+            </div>
+            <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: '1.5rem' }}>
+              Har tankstatus förändrats sedan dess?
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setTankstatusChoice('inherit');
+                  setShowTankstatusChoiceDialog(false);
+                }}
+                style={{ padding: '0.6rem 1.25rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
+              >
+                Nej, oförändrad
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTankstatusChoice('new');
+                  setTankniva(null);
+                  setLiters('');
+                  setLiterpris('');
+                  setShowTankstatusChoiceDialog(false);
+                }}
+                style={{ padding: '0.6rem 1.25rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
+              >
+                Registrera ny tankstatus
+              </button>
+            </div>
+          </div>
+        </Fragment>
+      )}
       {ejUthyrningsbarWarning && (
         <Fragment>
           <div className="modal-overlay" />
@@ -1600,12 +1662,15 @@ export default function CheckInForm() {
                   setEjUthyrningsbarWarning(null);
                   if (latestArrival) {
                     const arrDate = formatDateTime(latestArrival.created_at);
+                    const shouldShowTankstatusDialog = latestArrival.fuel_level === 'tankad_nu' || latestArrival.fuel_level === 'återlämnades_fulltankad';
                     setConfirmDialog({
                       isOpen: true,
                       title: '🔵 Fordonet är registrerat som inkommet',
-                      text: `Registrerat av ${latestArrival.checker_name} (${latestArrival.current_station || latestArrival.current_city}), ${arrDate}. Mätarställning har fyllts i — korrigera vid behov.`,
+                      text: `Registrerat av ${latestArrival.checker_name} (${latestArrival.current_station || latestArrival.current_city}), ${arrDate}.\n\nMätarställning har fyllts i - korrigera vid behov.`,
                       confirmButtonVariant: 'primary',
-                      onConfirm: () => {},
+                      onConfirm: () => {
+                        if (shouldShowTankstatusDialog) setShowTankstatusChoiceDialog(true);
+                      },
                     });
                   }
                 }}
@@ -1784,14 +1849,18 @@ export default function CheckInForm() {
             const arrFuel = latestArrival?.fuel_level;
             const arrivalHandledTank = arrFuel === 'tankad_nu' || arrFuel === 'återlämnades_fulltankad';
             const arrivalEjUppankad = arrFuel === 'ej_upptankad';
-            if (arrivalHandledTank) {
+            // PR 2a: arvd tankstatus visas endast om användaren valt 'inherit' i Alt 3-dialogen
+            if (arrivalHandledTank && tankstatusChoice === 'inherit') {
               const arrDate = formatDateTime(latestArrival!.created_at);
               const tankText = arrFuel === 'tankad_nu'
                 ? `Tankad nu av MABI (${latestArrival!.fuel_liters ?? '?'}L ${latestArrival!.fuel_type ?? ''} @ ${latestArrival!.fuel_price_per_liter ?? '?'} kr/L)`
                 : 'Återlämnades fulltankad';
               return (
                 <div style={{ padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem' }}>
-                  ✅ <strong>Tankning vid ankomst:</strong> {tankText} — {latestArrival!.checker_name}, {latestArrival!.current_station || latestArrival!.current_city}, {arrDate}
+                  ✅ <strong>Tankning vid Ankomst:</strong> {tankText}
+                  <div style={{ marginTop: '0.25rem' }}>
+                    Registrerad av {latestArrival!.checker_name}, {latestArrival!.current_station || latestArrival!.current_city}, {arrDate}
+                  </div>
                 </div>
               );
             }
@@ -1800,6 +1869,11 @@ export default function CheckInForm() {
                 {arrivalEjUppankad && (
                   <div style={{ padding: '0.75rem 1rem', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '0.875rem', color: '#92400e', marginBottom: '0.75rem' }}>
                     ⚠️ <strong>Bilen var ej upptankad vid ankomst</strong> ({latestArrival!.checker_name}, {formatDateTime(latestArrival!.created_at)}). Har bilen tankats sedan dess?
+                  </div>
+                )}
+                {arrivalHandledTank && tankstatusChoice === 'new' && (
+                  <div style={{ padding: '0.75rem 1rem', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '8px', fontSize: '0.875rem', color: '#1e40af', marginBottom: '0.75rem' }}>
+                    ℹ️ <strong>Tidigare ankomsts tankstatus ersätts av ny registrering.</strong> Tidigare: {formatDateTime(latestArrival!.created_at)} — {latestArrival!.fuel_level === 'tankad_nu' ? `Tankad nu av MABI (${latestArrival!.fuel_liters ?? '?'}L ${latestArrival!.fuel_type ?? ''} @ ${latestArrival!.fuel_price_per_liter ?? '?'} kr/L)` : 'Återlämnades fulltankad'}
                   </div>
                 )}
                 <Field label="Tankstatus *"><div className="grid-3-col">

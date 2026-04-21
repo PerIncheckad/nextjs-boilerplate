@@ -116,7 +116,29 @@ export default function ArrivalForm() {
   const [notes, setNotes] = useState('');
 
   // Previous odometer (for low-value warning)
-  const [prevOdometer, setPrevOdometer] = useState<{ value: number; checker_name: string; timestamp: string; source: string } | null>(null);
+  const [prevOdometer, setPrevOdometer] = useState<{
+    value: number;
+    checker_name: string;
+    timestamp: string;
+    source: string;
+  } | null>(null);
+
+  // PR 2a: Ankomst-info från tidigare /ankomst (nyare än senaste /check)
+  const [latestArrival, setLatestArrival] = useState<{
+    checker_name: string;
+    current_city: string;
+    current_station: string;
+    fuel_level: string | null;
+    fuel_type: string | null;
+    fuel_liters: number | null;
+    fuel_price_per_liter: number | null;
+    charge_level: number | null;
+    odometer_km: number | null;
+    created_at: string;
+  } | null>(null);
+
+  const [tankstatusChoice, setTankstatusChoice] = useState<'inherit' | 'new' | null>(null);
+  const [showTankstatusChoiceDialog, setShowTankstatusChoiceDialog] = useState(false);
 
   // UI state
   const [showFieldErrors, setShowFieldErrors] = useState(false);
@@ -140,37 +162,47 @@ export default function ArrivalForm() {
     if (!matarstallning) return false;
     if (!drivmedelstyp) return false;
     if (drivmedelstyp === 'bensin_diesel') {
-      if (!tankniva) return false;
-      if (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) return false;
+      // PR 2a: Ärvd tankstatus ('inherit') kräver inget val — tanken är redan registrerad i tidigare prella
+      if (tankstatusChoice !== 'inherit') {
+        if (!tankniva) return false;
+        if (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) return false;
+      }
     }
     if (drivmedelstyp === 'elbil') {
       if (!laddniva) return false;
     }
     return true;
-  }, [regInput, vehicleRegConfirmed, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva]);
+  }, [regInput, vehicleRegConfirmed, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, tankstatusChoice]);
 
   // --- Build payload ---
   const buildPayload = useCallback(() => {
     const normalizedReg = regInput.toUpperCase().replace(/\s/g, '');
     // Determine the fuel_type to save to vehicles.bransletyp
     const effectiveBransletyp = knownBransletyp || detailedBransletyp;
+    // PR 2a: När tankstatus ärvs från tidigare prella, sätts tankfält till null
+    const inheritTank = tankstatusChoice === 'inherit';
     return {
       regnr: normalizedReg,
       current_city: ort,
       current_station: station,
       odometer_km: matarstallning,
-      fuel_level: drivmedelstyp === 'elbil' ? 'elbil' : tankniva,
-      fuel_type: effectiveBransletyp || (drivmedelstyp === 'elbil' ? 'El' : bransletyp),
-      fuel_liters: tankniva === 'tankad_nu' ? liters : null,
-      fuel_price_per_liter: tankniva === 'tankad_nu' ? literpris : null,
+      fuel_level: inheritTank ? null : (drivmedelstyp === 'elbil' ? 'elbil' : tankniva),
+      fuel_type: inheritTank ? null : (effectiveBransletyp || (drivmedelstyp === 'elbil' ? 'El' : bransletyp)),
+      fuel_liters: inheritTank ? null : (tankniva === 'tankad_nu' ? liters : null),
+      fuel_price_per_liter: inheritTank ? null : (tankniva === 'tankad_nu' ? literpris : null),
       charge_level: drivmedelstyp === 'elbil' ? laddniva : null,
       notes: notes.trim() || null,
       checker_email: userEmail,
       checker_name: fullName,
       car_model: vehicleModel || '---',
+      tankstatusChoice: tankstatusChoice,
+      previous_arrival_created_at: latestArrival?.created_at || null,
+      previous_fuel_level: latestArrival?.fuel_level || null,
+      previous_fuel_type: latestArrival?.fuel_type || null,
+      previous_fuel_liters: latestArrival?.fuel_liters || null,
+      previous_fuel_price_per_liter: latestArrival?.fuel_price_per_liter || null,
     };
-  }, [regInput, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, notes, userEmail, fullName, vehicleModel, knownBransletyp, detailedBransletyp]);
-
+  }, [regInput, ort, station, matarstallning, drivmedelstyp, tankniva, liters, bransletyp, literpris, laddniva, notes, userEmail, fullName, vehicleModel, knownBransletyp, detailedBransletyp, tankstatusChoice, latestArrival]);
   // --- Vehicle lookup ---
   const fetchVehicleData = useCallback(async (reg: string) => {
     setLoading(true);
@@ -179,6 +211,9 @@ export default function ArrivalForm() {
     setKnownBransletyp(null);
     setShowUnknownRegHelper(false);
     setPrevOdometer(null);
+    setLatestArrival(null);
+    setTankstatusChoice(null);
+    setShowTankstatusChoiceDialog(false);
     try {
       const normalized = reg.toUpperCase().replace(/\s/g, '');
       const response = await fetch(`/api/vehicle-info?reg=${encodeURIComponent(normalized)}`);
@@ -212,6 +247,16 @@ export default function ArrivalForm() {
       setVehicleModel(info.model || null);
       applyKnownBransletyp(info.bransletyp);
       setPrevOdometer((info as any).prev_odometer || null);
+
+      // PR 2a: Hämta latest_arrival och hantera tankstatus-dialog
+      const arrival = (info as any).latest_arrival || null;
+      setLatestArrival(arrival);
+      if (arrival?.fuel_level === 'tankad_nu' || arrival?.fuel_level === 'återlämnades_fulltankad') {
+        setTankstatusChoice('inherit');
+        setShowTankstatusChoiceDialog(true);
+      } else {
+        setTankstatusChoice(null);
+      }
     } catch (error: any) {
       console.error('Fetch vehicle data error:', error);
       setVehicleRegConfirmed(false);
@@ -382,6 +427,12 @@ export default function ArrivalForm() {
     setNotes('');
     setShowFieldErrors(false);
     setPrevOdometer(null);
+    setLatestArrival(null);
+    setTankstatusChoice(null);
+    setShowTankstatusChoiceDialog(false);
+    setLatestArrival(null);
+    setTankstatusChoice(null);
+    setShowTankstatusChoiceDialog(false);
     setConfirmDialogTitle('⚠️ Reg.nr saknas!');
   };
 
@@ -403,6 +454,52 @@ export default function ArrivalForm() {
   return (
     <Fragment>
       <GlobalStyles backgroundUrl={BACKGROUND_IMAGE_URL} />
+      {showTankstatusChoiceDialog && latestArrival && (
+        <Fragment>
+          <div className="modal-overlay" />
+          <div className="modal-content" style={{ borderTop: '6px solid #2563eb', maxWidth: '500px' }}>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#2563eb', marginBottom: '0.75rem', letterSpacing: '0.03em' }}>
+              ⛽ TANKSTATUS
+            </div>
+            <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: '1rem' }}>
+              Denna bil prellades {formatDateTime(latestArrival.created_at)} med tankstatus:
+            </div>
+            <div style={{ fontStyle: 'italic', marginBottom: '1rem', color: '#555', padding: '0.5rem 0.75rem', background: '#f9fafb', borderRadius: '4px' }}>
+              {latestArrival.fuel_level === 'tankad_nu'
+                ? `Tankad nu av MABI (${latestArrival.fuel_liters ?? '?'}L ${latestArrival.fuel_type ?? ''} @ ${latestArrival.fuel_price_per_liter ?? '?'} kr/L)`
+                : 'Återlämnades fulltankad'}
+            </div>
+            <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: '1.5rem' }}>
+              Har tankstatus förändrats sedan dess?
+            </div>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setTankstatusChoice('inherit');
+                  setShowTankstatusChoiceDialog(false);
+                }}
+                style={{ padding: '0.6rem 1.25rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
+              >
+                Nej, oförändrad
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTankstatusChoice('new');
+                  setTankniva(null);
+                  setLiters('');
+                  setLiterpris('');
+                  setShowTankstatusChoiceDialog(false);
+                }}
+                style={{ padding: '0.6rem 1.25rem', background: '#2563eb', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.95rem' }}
+              >
+                Registrera ny tankstatus
+              </button>
+            </div>
+          </div>
+        </Fragment>
+      )}
 
       {/* Saving overlay */}
       {isSaving && (
@@ -534,7 +631,7 @@ export default function ArrivalForm() {
         </Card>
 
         {/* MÄTARSTÄLLNING + TANKNING */}
-        <Card data-error={showFieldErrors && (!matarstallning || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && !laddniva))}>
+        <Card data-error={showFieldErrors && (!matarstallning || !drivmedelstyp || (drivmedelstyp === 'bensin_diesel' && tankstatusChoice !== 'inherit' && !tankniva) || (tankniva === 'tankad_nu' && (!liters || !bransletyp || !literpris)) || (drivmedelstyp === 'elbil' && !laddniva))}>
           <SectionHeader title="Fordonsstatus" />
 
           <SubSectionHeader title="Mätarställning" />
@@ -568,8 +665,21 @@ export default function ArrivalForm() {
           )}
 
           {/* Bensin/Diesel fuel status */}
-          {drivmedelstyp === 'bensin_diesel' && (
+          {drivmedelstyp === 'bensin_diesel' && tankstatusChoice === 'inherit' && latestArrival && (
+            <div style={{ padding: '0.75rem 1rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '0.875rem', color: '#166534', marginBottom: '0.5rem' }}>
+              ✅ <strong>Tankning vid Ankomst:</strong> {latestArrival.fuel_level === 'tankad_nu' ? `Tankad nu av MABI (${latestArrival.fuel_liters ?? '?'}L ${latestArrival.fuel_type ?? ''} @ ${latestArrival.fuel_price_per_liter ?? '?'} kr/L)` : 'Återlämnades fulltankad'}
+              <div style={{ marginTop: '0.25rem' }}>
+                Registrerad av {latestArrival.checker_name}, {latestArrival.current_station || latestArrival.current_city}, {formatDateTime(latestArrival.created_at)}
+              </div>
+            </div>
+          )}
+          {drivmedelstyp === 'bensin_diesel' && tankstatusChoice !== 'inherit' && (
             <Fragment>
+              {tankstatusChoice === 'new' && latestArrival && (
+                <div style={{ padding: '0.75rem 1rem', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: '8px', fontSize: '0.875rem', color: '#1e40af', marginBottom: '0.75rem' }}>
+                  ℹ️ <strong>Tidigare ankomsts tankstatus ersätts av ny registrering.</strong> Tidigare: {formatDateTime(latestArrival.created_at)} — {latestArrival.fuel_level === 'tankad_nu' ? `Tankad nu av MABI (${latestArrival.fuel_liters ?? '?'}L ${latestArrival.fuel_type ?? ''} @ ${latestArrival.fuel_price_per_liter ?? '?'} kr/L)` : 'Återlämnades fulltankad'}
+                </div>
+              )}
               <Field label="Tankstatus *">
                 <div className="grid-3-col">
                   <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
