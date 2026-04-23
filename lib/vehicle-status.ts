@@ -6,9 +6,10 @@ import { formatDamageTypeSwedish } from './damage-type-mapping';
 // =================================================================
 
 export type VehicleStatusData = {
-  // Basic vehicle info
   regnr: string;
   bilmarkeModell: string;
+  bilmarke: string;
+  modell: string;
   bilenStarNu: string; // ort + station (with datetime if from checkin)
   matarstallning: string;
   matarstallningKalla: string;
@@ -934,6 +935,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     matarstallning: 'Mätarställning',
     drivmedel: 'Drivmedel',
     bilmarke_modell: 'Bilmärke & Modell',
+    bilmarke: 'Bilmärke',
+    modell: 'Modell',
     serviceintervall: 'Serviceintervall',
     max_km_manad: 'Max km/månad',
     avgift_over_km: 'Avgift över-km',
@@ -1072,7 +1075,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       regnr: cleanedRegnr,
       
       // Bilmärke & Modell: vehicle_edits → checkins.car_model
-      bilmarkeModell: latestEdits.get('bilmarke_modell')?.value || latestCheckin?.car_model || '---',
+      bilmarkeModell: (() => {
+        const editedBilmarke = latestEdits.get('bilmarke')?.value;
+        const editedModell = latestEdits.get('modell')?.value;
+        if (editedBilmarke !== undefined || editedModell !== undefined) {
+          return formatModel(editedBilmarke ?? null, editedModell ?? null);
+        }
+        return latestEdits.get('bilmarke_modell')?.value || latestCheckin?.car_model || '---';
+      })(),
+      bilmarke: latestEdits.get('bilmarke')?.value ?? '',
+      modell: latestEdits.get('modell')?.value ?? '',
       
       // Senast incheckad vid: from latest checkin with datetime and checker
       // Show datetime even if city/station is missing
@@ -1893,15 +1905,37 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const vehicle: VehicleStatusData = {
     regnr: cleanedRegnr,
     
-    // Bilmärke & Modell: vehicle_edits → nybil_inventering → vehicles
-    bilmarkeModell: latestEdits.get('bilmarke_modell')?.value
-      || (nybilData?.bilmarke || nybilData?.modell
-        ? formatModel(nybilData?.bilmarke ?? null, nybilData?.modell ?? null)
-        : nybilData?.bilmodell
-          ? nybilData.bilmodell
-          : vehicleData
-            ? formatModel(vehicleData.brand, vehicleData.model)
-            : '---'),
+    // Bilmärke & Modell: vehicle_edits(bilmarke+modell) → vehicle_edits(bilmarke_modell legacy) → nybil_inventering → vehicles
+    bilmarkeModell: (() => {
+      const editedBilmarke = latestEdits.get('bilmarke')?.value;
+      const editedModell = latestEdits.get('modell')?.value;
+      if (editedBilmarke !== undefined || editedModell !== undefined) {
+        const finalBilmarke = editedBilmarke !== undefined
+          ? editedBilmarke
+          : (nybilData?.bilmarke ?? vehicleData?.brand ?? null);
+        const finalModell = editedModell !== undefined
+          ? editedModell
+          : (nybilData?.modell ?? vehicleData?.model ?? null);
+        return formatModel(finalBilmarke, finalModell);
+      }
+      if (latestEdits.get('bilmarke_modell')?.value) {
+        return latestEdits.get('bilmarke_modell')!.value!;
+      }
+      if (nybilData?.bilmarke || nybilData?.modell) {
+        return formatModel(nybilData?.bilmarke ?? null, nybilData?.modell ?? null);
+      }
+      if (nybilData?.bilmodell) return nybilData.bilmodell;
+      if (vehicleData) return formatModel(vehicleData.brand, vehicleData.model);
+      return '---';
+    })(),
+    bilmarke: latestEdits.get('bilmarke')?.value
+      ?? nybilData?.bilmarke
+      ?? vehicleData?.brand
+      ?? '',
+    modell: latestEdits.get('modell')?.value
+      ?? nybilData?.modell
+      ?? vehicleData?.model
+      ?? '',
     
     // Senast incheckad: checkins with datetime and user → nybil_inventering.plats_aktuell_station
     // Show datetime even if city/station is missing

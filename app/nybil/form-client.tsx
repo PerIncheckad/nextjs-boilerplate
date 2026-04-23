@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
+import { BILMARKEN } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
@@ -23,9 +24,6 @@ const HUVUDSTATIONER = [
   { name: 'Varberg', id: 290 },
   { name: 'Ängelholm', id: 171 }
 ];
-
-// Car brands for dropdown
-const BILMARKEN = ['BMW', 'Citroen', 'Ford', 'KIA', 'MB', 'MG', 'Opel', 'Peugeot', 'Renault', 'SEAT', 'VW', 'Annat'];
 
 const STATIONER: Record<string, string[]> = {
   'Falkenberg': ['Falkenberg'],

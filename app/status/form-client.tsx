@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
+import { BILMARKEN } from '@/lib/constants';
 
 // =================================================================
 // 1. CONSTANTS
@@ -220,6 +221,8 @@ export default function StatusForm() {
     const regnr = vehicleStatus.vehicle.regnr;
     const currentValues: Record<string, string> = {
       bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
+      bilmarke: vehicleStatus.vehicle.bilmarke,
+      modell: vehicleStatus.vehicle.modell,
       matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').trim(),
       hjultyp: vehicleStatus.vehicle.hjultyp,
       planerad_station: vehicleStatus.vehicle.planeradStation,
@@ -837,6 +840,7 @@ export default function StatusForm() {
                 {Object.entries(pendingEdits).map(([field, value]) => {
                   const labels: Record<string, string> = {
                     bilmarke_modell: 'Bilmärke & Modell', matarstallning: 'Mätarställning',
+                    bilmarke: 'Bilmärke', modell: 'Modell',
                     hjultyp: 'Däck som sitter på', planerad_station: 'Planerad station',
                     serviceintervall: 'Serviceintervall', max_km_manad: 'Max km/månad',
                     avgift_over_km: 'Avgift över-km', anteckningar: 'Anteckningar',
@@ -845,6 +849,8 @@ export default function StatusForm() {
                   };
                   const oldValues: Record<string, string> = {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
+                    bilmarke: vehicleStatus.vehicle.bilmarke,
+                    modell: vehicleStatus.vehicle.modell,
                     matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
                     hjultyp: vehicleStatus.vehicle.hjultyp,
                     planerad_station: vehicleStatus.vehicle.planeradStation,
@@ -934,7 +940,28 @@ export default function StatusForm() {
             <div className="info-grid">
               <span className="info-label hide-in-print">Reg.nr</span>
               <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
-              <EditableInfoRow label="Bilmärke & Modell" fieldName="bilmarke_modell" displayValue={vehicleStatus.vehicle.bilmarkeModell} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              {isEditing ? (
+                <>
+                  <EditableBilmarkeRow
+                    fieldName="bilmarke"
+                    currentBilmarke={vehicleStatus.vehicle.bilmarke}
+                    isEditing={isEditing}
+                    pendingEdits={pendingEdits}
+                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                  />
+                  <EditableInfoRow
+                    label="Modell"
+                    fieldName="modell"
+                    displayValue={vehicleStatus.vehicle.modell || '---'}
+                    rawValue={vehicleStatus.vehicle.modell || ''}
+                    isEditing={isEditing}
+                    pendingEdits={pendingEdits}
+                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                  />
+                </>
+              ) : (
+                <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
+              )}
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
               <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableInfoRow label="Däck som sitter på" fieldName="hjultyp" displayValue={vehicleStatus.vehicle.hjultyp} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
@@ -1578,6 +1605,78 @@ const EditableInfoRow: React.FC<{
           onChange={e => onEdit(fieldName, e.target.value)}
           style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
         />
+      )}
+    </>
+  );
+};
+
+const EditableBilmarkeRow: React.FC<{
+  fieldName: string;
+  currentBilmarke: string;
+  isEditing: boolean;
+  pendingEdits: Record<string, string>;
+  onEdit: (field: string, value: string) => void;
+}> = ({ fieldName, currentBilmarke, isEditing, pendingEdits, onEdit }) => {
+  const savedValue = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : currentBilmarke;
+  const isInList = !!savedValue && BILMARKEN.includes(savedValue) && savedValue !== 'Annat';
+  const initialMode: 'list' | 'annat' | 'empty' = !savedValue
+    ? 'empty'
+    : isInList
+      ? 'list'
+      : 'annat';
+  const [mode, setMode] = React.useState<'list' | 'annat' | 'empty'>(initialMode);
+  // Synka mode när savedValue byter karaktär (t.ex. efter att användaren skriver i Annat-fältet)
+  React.useEffect(() => {
+    if (savedValue && BILMARKEN.includes(savedValue) && savedValue !== 'Annat') {
+      setMode('list');
+    } else if (savedValue) {
+      setMode('annat');
+    }
+    // Om savedValue blir tomt behåller vi nuvarande mode (undviker att rycka bort fältet)
+  }, [savedValue]);
+  const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== currentBilmarke;
+  const dropdownValue = mode === 'annat' ? 'Annat' : (mode === 'list' ? savedValue : '');
+  const annatValue = mode === 'annat' ? savedValue : '';
+
+  const handleDropdownChange = (v: string) => {
+    if (v === 'Annat') {
+      setMode('annat');
+      onEdit(fieldName, '');
+    } else if (v === '') {
+      setMode('empty');
+      onEdit(fieldName, '');
+    } else {
+      setMode('list');
+      onEdit(fieldName, v);
+    }
+  };
+
+  const handleAnnatChange = (v: string) => {
+    onEdit(fieldName, v);
+  };
+
+  return (
+    <>
+      <span className="info-label">Bilmärke</span>
+      <select
+        value={dropdownValue}
+        onChange={e => handleDropdownChange(e.target.value)}
+        style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
+      >
+        <option value="">Välj bilmärke</option>
+        {BILMARKEN.map(b => <option key={b} value={b}>{b}</option>)}
+      </select>
+      {mode === 'annat' && (
+        <>
+          <span className="info-label">Specificera bilmärke</span>
+          <input
+            type="text"
+            value={annatValue}
+            onChange={e => handleAnnatChange(e.target.value)}
+            placeholder="Ange bilmärke"
+            style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
+          />
+        </>
       )}
     </>
   );
