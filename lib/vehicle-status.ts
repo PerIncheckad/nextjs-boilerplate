@@ -1117,24 +1117,32 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       // Avgift över-km: not available from checkins
       avgiftOverKm: '---',
       
-      // Saludatum: from legacy damages if available
-      saludatum: legacySaludatum
-        ? formatDate(legacySaludatum)
-        : '---',
+      // Saludatum: vehicle_edits → legacy damages
+      saludatum: latestEdits.get('saludatum')?.value
+        ? formatDate(latestEdits.get('saludatum')!.value)
+        : legacySaludatum
+          ? formatDate(legacySaludatum)
+          : '---',
       
       // Antal registrerade skador: will be updated after building damageRecords
       antalSkador: 0,
       
-      // Stöld-GPS monterad: not available from checkins
-      stoldGps: '---',
+      // Stöld-GPS monterad: vehicle_edits only (not available from checkins)
+      stoldGps: (() => {
+        const editVal = latestEdits.get('stold_gps')?.value;
+        const editSpec = latestEdits.get('stold_gps_spec')?.value;
+        if (editVal === 'Ja') return editSpec ? `Ja (${editSpec})` : 'Ja';
+        if (editVal === 'Nej') return 'Nej';
+        return '---';
+      })(),
       mbmeAktiverad: '---',
       vwConnectAktiverad: '---',
       
       // Klar för uthyrning: not available from checkins
       klarForUthyrning: '---',
       
-      // Additional detailed fields: not available from checkins
-      planeradStation: '---',
+      // Additional detailed fields
+      planeradStation: latestEdits.get('planerad_station')?.value || '---',
       utrustning: '---',
       saluinfo: '---',
       hjulForvaringInfo: '---',
@@ -1151,15 +1159,15 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       harDragkrok: '---',
       harGummimattor: '---',
       harDackkompressor: '---',
-      saluStation: '---',
-      saluKopare: '---',
-      saluRetur: '---',
-      saluReturadress: '---',
-      saluAttention: '---',
-      saluNotering: '---',
+      saluStation: latestEdits.get('salu_station')?.value || '---',
+      saluKopare: latestEdits.get('salu_kopare')?.value || '---',
+      saluRetur: latestEdits.get('salu_retur')?.value || '---',
+      saluReturadress: latestEdits.get('salu_returadress')?.value || '---',
+      saluAttention: latestEdits.get('salu_attention')?.value || '---',
+      saluNotering: latestEdits.get('salu_notering')?.value || '---',
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
-      anteckningar: '---',
+      anteckningar: latestEdits.get('anteckningar')?.value || '---',
       ejUthyrningsbarKommentar: null,
       ejUthyrningsbarKalla: null,
       ejUthyrningsbarNamnDatum: null,
@@ -1951,22 +1959,31 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     avgiftOverKm: latestEdits.get('avgift_over_km')?.value
       || (nybilData?.avgift_over_km ? `${nybilData.avgift_over_km} kr` : '---'),
     
-    // Saludatum: nybil_inventering.saludatum → legacy damages.saludatum (senaste)
-    saludatum: nybilData?.saludatum
-      ? formatDate(nybilData.saludatum)
-      : legacySaludatum
-        ? formatDate(legacySaludatum)
-        : '---',
+    // Saludatum: vehicle_edits → nybil_inventering.saludatum → legacy damages.saludatum (senaste)
+    saludatum: latestEdits.get('saludatum')?.value
+      ? formatDate(latestEdits.get('saludatum')!.value)
+      : nybilData?.saludatum
+        ? formatDate(nybilData.saludatum)
+        : legacySaludatum
+          ? formatDate(legacySaludatum)
+          : '---',
     
     // Antal registrerade skador: count legacy damages (BUHS) + nybil delivery damages
     antalSkador: legacyDamages.length + damages.length,
     
-    // Stöld-GPS monterad: nybil_inventering.stold_gps with spec
-    stoldGps: nybilData?.stold_gps === true
-      ? (nybilData.stold_gps_spec ? `Ja (${nybilData.stold_gps_spec})` : 'Ja')
-      : nybilData?.stold_gps === false
-        ? 'Nej'
-        : '---',
+    // Stöld-GPS monterad: vehicle_edits → nybil_inventering.stold_gps with spec
+    stoldGps: (() => {
+      const editVal = latestEdits.get('stold_gps')?.value;
+      const editSpec = latestEdits.get('stold_gps_spec')?.value;
+      if (editVal === 'Ja') return editSpec ? `Ja (${editSpec})` : 'Ja';
+      if (editVal === 'Nej') return 'Nej';
+      if (nybilData?.stold_gps === true) {
+        const spec = editSpec || nybilData.stold_gps_spec;
+        return spec ? `Ja (${spec})` : 'Ja';
+      }
+      if (nybilData?.stold_gps === false) return 'Nej';
+      return '---';
+    })(),
     
     // MBme / VW Connect: from nybil_inventering (only relevant for MB/VW)
     mbmeAktiverad: nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---',
@@ -1979,8 +1996,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? 'Ja'
         : '---',
     
-    // Planerad station: from nybil_inventering
-    planeradStation: nybilData?.planerad_station || '---',
+    // Planerad station: vehicle_edits → nybil_inventering
+    planeradStation: latestEdits.get('planerad_station')?.value
+      || nybilData?.planerad_station
+      || '---',
     
     // Utrustning: summarized from nybil_inventering equipment fields
     utrustning: buildEquipmentSummary(nybilData),
@@ -2016,20 +2035,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     harGummimattor: nybilData?.gummimattor === true ? 'Ja' : nybilData?.gummimattor === false ? 'Nej' : '---',
     harDackkompressor: nybilData?.dackkompressor === true ? 'Ja' : nybilData?.dackkompressor === false ? 'Nej' : '---',
     
-    // Detailed sale info fields
-    saluStation: nybilData?.salu_station || '---',
-    saluKopare: nybilData?.kopare_foretag || '---',
-    saluRetur: nybilData?.returort || '---',
-    saluReturadress: nybilData?.returadress || '---',
-    saluAttention: nybilData?.attention || '---',
-    saluNotering: nybilData?.notering_forsaljning || '---',
+    // Detailed sale info fields: vehicle_edits → nybil_inventering
+    saluStation: latestEdits.get('salu_station')?.value || nybilData?.salu_station || '---',
+    saluKopare: latestEdits.get('salu_kopare')?.value || nybilData?.kopare_foretag || '---',
+    saluRetur: latestEdits.get('salu_retur')?.value || nybilData?.returort || '---',
+    saluReturadress: latestEdits.get('salu_returadress')?.value || nybilData?.returadress || '---',
+    saluAttention: latestEdits.get('salu_attention')?.value || nybilData?.attention || '---',
+    saluNotering: latestEdits.get('salu_notering')?.value || nybilData?.notering_forsaljning || '---',
     
     // Fuel filling info
     tankningInfo: buildFuelFillingInfo(nybilData),
     tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
     
-    // General comment
-    anteckningar: nybilData?.anteckningar || '---',
+    // General comment: vehicle_edits → nybil_inventering
+    anteckningar: latestEdits.get('anteckningar')?.value || nybilData?.anteckningar || '---',
     
     // Ej uthyrningsbar — bygg tre separata fält med prioriteringskedja
     ...(() => {
