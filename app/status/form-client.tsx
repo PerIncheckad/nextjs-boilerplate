@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
-import { BILMARKEN } from '@/lib/constants';
+import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS } from '@/lib/constants';
 
 // =================================================================
 // 1. CONSTANTS
@@ -223,6 +223,8 @@ export default function StatusForm() {
       bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
       bilmarke: vehicleStatus.vehicle.bilmarke,
       modell: vehicleStatus.vehicle.modell,
+      drivmedel: vehicleStatus.vehicle.drivmedel,
+      vaxel: vehicleStatus.vehicle.vaxel,
       matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').trim(),
       hjultyp: vehicleStatus.vehicle.hjultyp,
       planerad_station: vehicleStatus.vehicle.planeradStation,
@@ -841,6 +843,7 @@ export default function StatusForm() {
                   const labels: Record<string, string> = {
                     bilmarke_modell: 'Bilmärke & Modell', matarstallning: 'Mätarställning',
                     bilmarke: 'Bilmärke', modell: 'Modell',
+                    drivmedel: 'Drivmedel', vaxel: 'Växellåda',
                     hjultyp: 'Däck som sitter på', planerad_station: 'Planerad station',
                     serviceintervall: 'Serviceintervall', max_km_manad: 'Max km/månad',
                     avgift_over_km: 'Avgift över-km', anteckningar: 'Anteckningar',
@@ -851,6 +854,8 @@ export default function StatusForm() {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
                     bilmarke: vehicleStatus.vehicle.bilmarke,
                     modell: vehicleStatus.vehicle.modell,
+                    drivmedel: vehicleStatus.vehicle.drivmedel,
+                    vaxel: vehicleStatus.vehicle.vaxel,
                     matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
                     hjultyp: vehicleStatus.vehicle.hjultyp,
                     planerad_station: vehicleStatus.vehicle.planeradStation,
@@ -966,8 +971,8 @@ export default function StatusForm() {
               <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableInfoRow label="Däck som sitter på" fieldName="hjultyp" displayValue={vehicleStatus.vehicle.hjultyp} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableInfoRow label="Planerad station" fieldName="planerad_station" displayValue={vehicleStatus.vehicle.planeradStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              <InfoRow label="Drivmedel" value={vehicleStatus.vehicle.drivmedel} />
-              {vehicleStatus.vehicle.vaxel !== '---' && <InfoRow label="Växellåda" value={vehicleStatus.vehicle.vaxel} />}
+             <EditableSelectRow label="Drivmedel" fieldName="drivmedel" displayValue={vehicleStatus.vehicle.drivmedel} options={FUEL_TYPE_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableSelectRow label="Växellåda" fieldName="vaxel" displayValue={vehicleStatus.vehicle.vaxel} options={VAXEL_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableSelectRow label="Stöld-GPS monterad" fieldName="stold_gps" displayValue={vehicleStatus.vehicle.stoldGps} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               {isEditing && (pendingEdits['stold_gps'] === 'Ja' || (!pendingEdits['stold_gps'] && vehicleStatus.vehicle.stoldGps === 'Ja')) && (
                 <EditableInfoRow label="Stöld-GPS spec" fieldName="stold_gps_spec" displayValue="---" isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />

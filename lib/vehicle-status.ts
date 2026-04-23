@@ -941,6 +941,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     max_km_manad: 'Max km/månad',
     avgift_over_km: 'Avgift över-km',
     planerad_station: 'Planerad station',
+    vaxel: 'Växellåda',
     is_sold: 'Såld',
     sold_datum: 'Sålddatum',
     sold_kommentar: 'Kommentar (försäljning)',
@@ -1117,8 +1118,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         ? displayBransletyp(latestEdits.get('drivmedel')!.value)
         : displayBransletyp(latestCheckin?.fuel_type),
       
-      // Växellåda: not available from checkins
-      vaxel: '---',
+      // Växellåda: vehicle_edits only (not available from checkins)
+      vaxel: latestEdits.get('vaxel')?.value || '---',
       
       // Serviceintervall: not available from checkins
       serviceintervall: '---',
@@ -1978,8 +1979,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? displayBransletyp(latestEdits.get('drivmedel')!.value)
       : displayBransletyp(nybilData?.bransletyp || vehicleData?.bransletyp),
     
-    // Växellåda: nybil_inventering.vaxel
-    vaxel: nybilData?.vaxel || '---',
+    // Växellåda: vehicle_edits → nybil_inventering.vaxel
+    vaxel: latestEdits.get('vaxel')?.value || nybilData?.vaxel || '---',
     
     // Serviceintervall: vehicle_edits → nybil_inventering.serviceintervall
     serviceintervall: latestEdits.get('serviceintervall')?.value

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { BILMARKEN } from '@/lib/constants';
+import { BILMARKEN, FUEL_TYPES } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
@@ -96,14 +96,6 @@ const getFullNameFromEmail = (email: string): string => {
   return capitalizeFirstLetter(parts[0]);
 };
 
-// Fuel type constants
-const FUEL_TYPES = {
-  BENSIN: 'Bensin',
-  DIESEL: 'Diesel',
-  HYBRID_BENSIN: 'Hybrid (bensin)',
-  HYBRID_DIESEL: 'Hybrid (diesel)',
-  EL_FULL: '100% el'
-} as const;
 
 // Regex for Swedish license plate validation
 const REG_NR_REGEX = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
