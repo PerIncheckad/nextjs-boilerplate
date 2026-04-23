@@ -221,6 +221,8 @@ export default function StatusForm() {
     const regnr = vehicleStatus.vehicle.regnr;
     const currentValues: Record<string, string> = {
       bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
+      bilmarke: vehicleStatus.vehicle.bilmarke,
+      modell: vehicleStatus.vehicle.modell,
       matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').trim(),
       hjultyp: vehicleStatus.vehicle.hjultyp,
       planerad_station: vehicleStatus.vehicle.planeradStation,
