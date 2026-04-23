@@ -1617,20 +1617,36 @@ const EditableBilmarkeRow: React.FC<{
   pendingEdits: Record<string, string>;
   onEdit: (field: string, value: string) => void;
 }> = ({ fieldName, currentBilmarke, isEditing, pendingEdits, onEdit }) => {
-  // Bestäm om aktuellt bilmärke finns i listan eller är "Annat"
   const savedValue = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : currentBilmarke;
-  const isInList = BILMARKEN.includes(savedValue) && savedValue !== 'Annat';
-  const isEmpty = !savedValue;
-  // Om värdet finns i listan → dropdown visar det. Om värdet INTE finns (t.ex. "Lamborghini") → dropdown visar "Annat" och fritextfält visar värdet.
-  const dropdownValue = isEmpty ? '' : (isInList ? savedValue : 'Annat');
-  const annatValue = isInList || isEmpty ? '' : savedValue;
+  const isInList = !!savedValue && BILMARKEN.includes(savedValue) && savedValue !== 'Annat';
+  const initialMode: 'list' | 'annat' | 'empty' = !savedValue
+    ? 'empty'
+    : isInList
+      ? 'list'
+      : 'annat';
+  const [mode, setMode] = React.useState<'list' | 'annat' | 'empty'>(initialMode);
+  // Synka mode när savedValue byter karaktär (t.ex. efter att användaren skriver i Annat-fältet)
+  React.useEffect(() => {
+    if (savedValue && BILMARKEN.includes(savedValue) && savedValue !== 'Annat') {
+      setMode('list');
+    } else if (savedValue) {
+      setMode('annat');
+    }
+    // Om savedValue blir tomt behåller vi nuvarande mode (undviker att rycka bort fältet)
+  }, [savedValue]);
   const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== currentBilmarke;
+  const dropdownValue = mode === 'annat' ? 'Annat' : (mode === 'list' ? savedValue : '');
+  const annatValue = mode === 'annat' ? savedValue : '';
 
   const handleDropdownChange = (v: string) => {
     if (v === 'Annat') {
-      // Lämna fältet tomt tills användaren skriver något i fritextfältet
+      setMode('annat');
+      onEdit(fieldName, '');
+    } else if (v === '') {
+      setMode('empty');
       onEdit(fieldName, '');
     } else {
+      setMode('list');
       onEdit(fieldName, v);
     }
   };
@@ -1650,7 +1666,77 @@ const EditableBilmarkeRow: React.FC<{
         <option value="">Välj bilmärke</option>
         {BILMARKEN.map(b => <option key={b} value={b}>{b}</option>)}
       </select>
-      {dropdownValue === 'Annat' && (
+      {mode === 'annat' && (
+        <>
+          <span className="info-label">Specificera bilmärke</span>
+          <input
+            type="text"
+            value={annatValue}
+            onChange={e => handleAnnatChange(e.target.value)}
+            placeholder="Ange bilmärke"
+            style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
+          />
+        </>
+      )}
+    </>
+  );
+};const EditableBilmarkeRow: React.FC<{
+  fieldName: string;
+  currentBilmarke: string;
+  isEditing: boolean;
+  pendingEdits: Record<string, string>;
+  onEdit: (field: string, value: string) => void;
+}> = ({ fieldName, currentBilmarke, isEditing, pendingEdits, onEdit }) => {
+  const savedValue = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : currentBilmarke;
+  const isInList = !!savedValue && BILMARKEN.includes(savedValue) && savedValue !== 'Annat';
+  const initialMode: 'list' | 'annat' | 'empty' = !savedValue
+    ? 'empty'
+    : isInList
+      ? 'list'
+      : 'annat';
+  const [mode, setMode] = React.useState<'list' | 'annat' | 'empty'>(initialMode);
+  // Synka mode när savedValue byter karaktär (t.ex. efter att användaren skriver i Annat-fältet)
+  React.useEffect(() => {
+    if (savedValue && BILMARKEN.includes(savedValue) && savedValue !== 'Annat') {
+      setMode('list');
+    } else if (savedValue) {
+      setMode('annat');
+    }
+    // Om savedValue blir tomt behåller vi nuvarande mode (undviker att rycka bort fältet)
+  }, [savedValue]);
+  const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== currentBilmarke;
+  const dropdownValue = mode === 'annat' ? 'Annat' : (mode === 'list' ? savedValue : '');
+  const annatValue = mode === 'annat' ? savedValue : '';
+
+  const handleDropdownChange = (v: string) => {
+    if (v === 'Annat') {
+      setMode('annat');
+      onEdit(fieldName, '');
+    } else if (v === '') {
+      setMode('empty');
+      onEdit(fieldName, '');
+    } else {
+      setMode('list');
+      onEdit(fieldName, v);
+    }
+  };
+
+  const handleAnnatChange = (v: string) => {
+    onEdit(fieldName, v);
+  };
+
+  return (
+    <>
+      <span className="info-label">Bilmärke</span>
+      <select
+        value={dropdownValue}
+        onChange={e => handleDropdownChange(e.target.value)}
+        style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
+      >
+        <option value="">Välj bilmärke</option>
+        {BILMARKEN.map(b => <option key={b} value={b}>{b}</option>)}
+      </select>
+      {mode === 'annat' && (
         <>
           <span className="info-label">Specificera bilmärke</span>
           <input
