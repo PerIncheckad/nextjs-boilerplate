@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
+import { BILMARKEN } from '@/lib/constants';
 
 // =================================================================
 // 1. CONSTANTS
@@ -934,7 +935,28 @@ export default function StatusForm() {
             <div className="info-grid">
               <span className="info-label hide-in-print">Reg.nr</span>
               <span className="info-value hide-in-print">{vehicleStatus.vehicle.regnr}</span>
-              <EditableInfoRow label="Bilmärke & Modell" fieldName="bilmarke_modell" displayValue={vehicleStatus.vehicle.bilmarkeModell} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              {isEditing ? (
+                <>
+                  <EditableBilmarkeRow
+                    fieldName="bilmarke"
+                    currentBilmarke={vehicleStatus.vehicle.bilmarke}
+                    isEditing={isEditing}
+                    pendingEdits={pendingEdits}
+                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                  />
+                  <EditableInfoRow
+                    label="Modell"
+                    fieldName="modell"
+                    displayValue={vehicleStatus.vehicle.modell || '---'}
+                    rawValue={vehicleStatus.vehicle.modell || ''}
+                    isEditing={isEditing}
+                    pendingEdits={pendingEdits}
+                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                  />
+                </>
+              ) : (
+                <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
+              )}
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
               <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableInfoRow label="Däck som sitter på" fieldName="hjultyp" displayValue={vehicleStatus.vehicle.hjultyp} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
@@ -1578,6 +1600,62 @@ const EditableInfoRow: React.FC<{
           onChange={e => onEdit(fieldName, e.target.value)}
           style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
         />
+      )}
+    </>
+  );
+};
+
+const EditableBilmarkeRow: React.FC<{
+  fieldName: string;
+  currentBilmarke: string;
+  isEditing: boolean;
+  pendingEdits: Record<string, string>;
+  onEdit: (field: string, value: string) => void;
+}> = ({ fieldName, currentBilmarke, isEditing, pendingEdits, onEdit }) => {
+  // Bestäm om aktuellt bilmärke finns i listan eller är "Annat"
+  const savedValue = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : currentBilmarke;
+  const isInList = BILMARKEN.includes(savedValue) && savedValue !== 'Annat';
+  const isEmpty = !savedValue;
+  // Om värdet finns i listan → dropdown visar det. Om värdet INTE finns (t.ex. "Lamborghini") → dropdown visar "Annat" och fritextfält visar värdet.
+  const dropdownValue = isEmpty ? '' : (isInList ? savedValue : 'Annat');
+  const annatValue = isInList || isEmpty ? '' : savedValue;
+  const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== currentBilmarke;
+
+  const handleDropdownChange = (v: string) => {
+    if (v === 'Annat') {
+      // Lämna fältet tomt tills användaren skriver något i fritextfältet
+      onEdit(fieldName, '');
+    } else {
+      onEdit(fieldName, v);
+    }
+  };
+
+  const handleAnnatChange = (v: string) => {
+    onEdit(fieldName, v);
+  };
+
+  return (
+    <>
+      <span className="info-label">Bilmärke</span>
+      <select
+        value={dropdownValue}
+        onChange={e => handleDropdownChange(e.target.value)}
+        style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
+      >
+        <option value="">Välj bilmärke</option>
+        {BILMARKEN.map(b => <option key={b} value={b}>{b}</option>)}
+      </select>
+      {dropdownValue === 'Annat' && (
+        <>
+          <span className="info-label">Specificera bilmärke</span>
+          <input
+            type="text"
+            value={annatValue}
+            onChange={e => handleAnnatChange(e.target.value)}
+            placeholder="Ange bilmärke"
+            style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
+          />
+        </>
       )}
     </>
   );
