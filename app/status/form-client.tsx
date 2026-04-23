@@ -840,6 +840,7 @@ export default function StatusForm() {
                 {Object.entries(pendingEdits).map(([field, value]) => {
                   const labels: Record<string, string> = {
                     bilmarke_modell: 'Bilmärke & Modell', matarstallning: 'Mätarställning',
+                    bilmarke: 'Bilmärke', modell: 'Modell',
                     hjultyp: 'Däck som sitter på', planerad_station: 'Planerad station',
                     serviceintervall: 'Serviceintervall', max_km_manad: 'Max km/månad',
                     avgift_over_km: 'Avgift över-km', anteckningar: 'Anteckningar',
@@ -848,6 +849,8 @@ export default function StatusForm() {
                   };
                   const oldValues: Record<string, string> = {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
+                    bilmarke: vehicleStatus.vehicle.bilmarke,
+                    modell: vehicleStatus.vehicle.modell,
                     matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
                     hjultyp: vehicleStatus.vehicle.hjultyp,
                     planerad_station: vehicleStatus.vehicle.planeradStation,
