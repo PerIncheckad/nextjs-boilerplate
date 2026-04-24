@@ -951,6 +951,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     stold_gps: 'Stöld-GPS',
     klar_for_uthyrning: 'Klar för uthyrning',
     stold_gps_spec: 'Stöld-GPS spec',
+    mbme_aktiverad: 'MBme aktiverad',
+    vw_connect_aktiverad: 'VW Connect aktiverad',
     ej_uthyrningsbar_anledning: 'Ej uthyrningsbar anledning',
     laddniva_vid_leverans: 'Laddnivå vid leverans',
     saludatum: 'Saludatum',
@@ -1148,8 +1150,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         if (editVal === 'Nej') return 'Nej';
         return '---';
       })(),
-      mbmeAktiverad: '---',
-      vwConnectAktiverad: '---',
+      // MBme / VW Connect: vehicle_edits only (not available from checkins)
+      mbmeAktiverad: latestEdits.get('mbme_aktiverad')?.value || '---',
+      vwConnectAktiverad: latestEdits.get('vw_connect_aktiverad')?.value || '---',
       
       // Klar för uthyrning: not available from checkins
       klarForUthyrning: '---',
@@ -2020,9 +2023,11 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       return '---';
     })(),
     
-    // MBme / VW Connect: from nybil_inventering (only relevant for MB/VW)
-    mbmeAktiverad: nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---',
-    vwConnectAktiverad: nybilData?.vw_connect_aktiverad === true ? 'Ja' : nybilData?.vw_connect_aktiverad === false ? 'Nej' : '---',
+    // MBme / VW Connect: vehicle_edits → nybil_inventering (only relevant for MB/VW)
+    mbmeAktiverad: latestEdits.get('mbme_aktiverad')?.value
+      || (nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---'),
+    vwConnectAktiverad: latestEdits.get('vw_connect_aktiverad')?.value
+      || (nybilData?.vw_connect_aktiverad === true ? 'Ja' : nybilData?.vw_connect_aktiverad === false ? 'Nej' : '---'),
     
     // Klar för uthyrning: Check both nybil and if explicitly marked as false
     klarForUthyrning: nybilData?.klar_for_uthyrning === false
