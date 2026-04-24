@@ -898,6 +898,30 @@ export default function StatusForm() {
             </div>
           </div>
         )}
+        {/* Unified Edit Toolbar — replaces three section-level edit buttons */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          <div className="hide-in-print" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+            {isEditing ? (
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
+                  style={{ padding: '0.35rem 1rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.875rem' }}>
+                  Avbryt
+                </button>
+                <button type="button" onClick={() => Object.keys(pendingEdits).length > 0 && setShowEditConfirm(true)}
+                  disabled={Object.keys(pendingEdits).length === 0}
+                  style={{ padding: '0.35rem 1rem', border: 'none', borderRadius: '4px', background: Object.keys(pendingEdits).length > 0 ? '#1a73e8' : '#ccc', color: 'white', cursor: Object.keys(pendingEdits).length > 0 ? 'pointer' : 'default', fontSize: '0.875rem', fontWeight: 600 }}>
+                  Spara ändringar {Object.keys(pendingEdits).length > 0 ? `(${Object.keys(pendingEdits).length})` : ''}
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setIsEditing(true)}
+                style={{ padding: '0.35rem 1rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.875rem' }}>
+                ✏️ Redigera
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Vehicle Info Section (Executive Summary) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
@@ -921,26 +945,7 @@ export default function StatusForm() {
                   </>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {isEditing ? (
-                  <>
-                    <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
-                      style={{ padding: '0.25rem 0.75rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>
-                      Avbryt
-                    </button>
-                    <button type="button" onClick={() => Object.keys(pendingEdits).length > 0 && setShowEditConfirm(true)}
-                      disabled={Object.keys(pendingEdits).length === 0}
-                      style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: Object.keys(pendingEdits).length > 0 ? '#1a73e8' : '#ccc', color: 'white', cursor: Object.keys(pendingEdits).length > 0 ? 'pointer' : 'default', fontSize: '0.8rem', fontWeight: 600 }}>
-                      Spara ändringar {Object.keys(pendingEdits).length > 0 ? `(${Object.keys(pendingEdits).length})` : ''}
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => setIsEditing(true)}
-                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
-                    ✏️ Redigera
-                  </button>
-                )}
-              </div>
+              
             </div>
             <div className="info-grid">
               <span className="info-label hide-in-print">Reg.nr</span>
@@ -1099,29 +1104,7 @@ export default function StatusForm() {
         {/* Övrig info vid leverans till MABI Section - Consolidated */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <SectionHeader title="Övrig info vid leverans till MABI" />
-              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', flexWrap: 'wrap' }}>
-                {isEditing ? (
-                  <>
-                    <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
-                      style={{ padding: '0.25rem 0.75rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>
-                      Avbryt
-                    </button>
-                    <button type="button" onClick={() => Object.keys(pendingEdits).length > 0 && setShowEditConfirm(true)}
-                      disabled={Object.keys(pendingEdits).length === 0}
-                      style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: Object.keys(pendingEdits).length > 0 ? '#1a73e8' : '#ccc', color: 'white', cursor: Object.keys(pendingEdits).length > 0 ? 'pointer' : 'default', fontSize: '0.8rem', fontWeight: 600 }}>
-                      Spara ändringar {Object.keys(pendingEdits).length > 0 ? `(${Object.keys(pendingEdits).length})` : ''}
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => setIsEditing(true)}
-                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
-                    ✏️ Redigera
-                  </button>
-                )}
-              </div>
-            </div>
+           <SectionHeader title="Övrig info vid leverans till MABI" />
             <div className="info-grid">
               {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && (
                 <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
@@ -1148,29 +1131,7 @@ export default function StatusForm() {
         {/* Sale Section */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (vehicleStatus.vehicle.saludatum !== '---' || isEditing) && (
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <SectionHeader title="Salu" />
-              <div className="hide-in-print" style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                {isEditing ? (
-                  <>
-                    <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
-                      style={{ padding: '0.25rem 0.75rem', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer', fontSize: '0.8rem' }}>
-                      Avbryt
-                    </button>
-                    <button type="button" onClick={() => Object.keys(pendingEdits).length > 0 && setShowEditConfirm(true)}
-                      disabled={Object.keys(pendingEdits).length === 0}
-                      style={{ padding: '0.25rem 0.75rem', border: 'none', borderRadius: '4px', background: Object.keys(pendingEdits).length > 0 ? '#1a73e8' : '#ccc', color: 'white', cursor: Object.keys(pendingEdits).length > 0 ? 'pointer' : 'default', fontSize: '0.8rem', fontWeight: 600 }}>
-                      Spara ändringar {Object.keys(pendingEdits).length > 0 ? `(${Object.keys(pendingEdits).length})` : ''}
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" onClick={() => setIsEditing(true)}
-                    style={{ padding: '0.25rem 0.75rem', border: '1px solid #1a73e8', borderRadius: '4px', background: 'white', color: '#1a73e8', cursor: 'pointer', fontSize: '0.8rem' }}>
-                    ✏️ Redigera
-                  </button>
-                )}
-              </div>
-            </div>
+           <SectionHeader title="Salu" />
             <div className="info-grid">
               <EditableInfoRow label="Saludatum" fieldName="saludatum" displayValue={vehicleStatus.vehicle.saludatum} rawValue={vehicleStatus.vehicle.saludatum === '---' ? '' : vehicleStatus.vehicle.saludatum} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="date" />
               <EditableOrtStationRow label="Station" fieldName="salu_station" displayValue={vehicleStatus.vehicle.saluStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
