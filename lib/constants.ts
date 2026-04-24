@@ -25,3 +25,7 @@ export const FUEL_TYPE_OPTIONS = [
 
 // Växellåda-alternativ.
 export const VAXEL_OPTIONS = ['Automat', 'Manuell'];
+
+// Hjultyp-alternativ (däck som sitter på bilen).
+// Verifierat i produktion (2026-04-24): endast dessa två värden finns i checkins.hjultyp + nybil_inventering.hjultyp.
+export const HJULTYP_OPTIONS = ['Sommardäck', 'Vinterdäck'];
