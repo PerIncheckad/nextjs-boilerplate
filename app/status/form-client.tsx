@@ -900,7 +900,7 @@ export default function StatusForm() {
         )}
         {/* Unified Edit Toolbar — replaces three section-level edit buttons */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
-          <div className="hide-in-print" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+          <div className="hide-in-print" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem', position: isEditing ? 'sticky' : 'static', top: 0, zIndex: 10, background: isEditing ? 'rgba(255, 255, 255, 0.95)' : 'transparent', backdropFilter: isEditing ? 'blur(4px)' : 'none', padding: isEditing ? '0.5rem 0' : '0', borderBottom: isEditing ? '1px solid #e5e7eb' : 'none' }}>
             {isEditing ? (
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button type="button" onClick={() => { setIsEditing(false); setPendingEdits({}); }}
