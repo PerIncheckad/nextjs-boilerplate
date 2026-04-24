@@ -973,7 +973,7 @@ export default function StatusForm() {
                 <InfoRow label="Bilmärke & Modell" value={vehicleStatus.vehicle.bilmarkeModell} />
               )}
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
-              <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
               <EditableSelectRow label="Däck som sitter på" fieldName="hjultyp" displayValue={vehicleStatus.vehicle.hjultyp} options={HJULTYP_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableInfoRow label="Planerad station" fieldName="planerad_station" displayValue={vehicleStatus.vehicle.planeradStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
              <EditableSelectRow label="Drivmedel" fieldName="drivmedel" displayValue={vehicleStatus.vehicle.drivmedel} options={FUEL_TYPE_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
@@ -1565,10 +1565,12 @@ const EditableInfoRow: React.FC<{
           style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
         />
       ) : (
-        <input
+       <input
           type={inputType || 'text'}
           value={currentInput}
           onChange={e => onEdit(fieldName, e.target.value)}
+          min={inputType === 'number' ? '0' : undefined}
+          step={inputType === 'number' ? '1' : undefined}
           style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
         />
       )}
