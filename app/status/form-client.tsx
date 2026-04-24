@@ -235,6 +235,8 @@ export default function StatusForm() {
       stold_gps: vehicleStatus.vehicle.stoldGps,
       klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
       stold_gps_spec: '',
+      mbme_aktiverad: vehicleStatus.vehicle.mbmeAktiverad,
+      vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
       ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
       laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
       saludatum: vehicleStatus.vehicle.saludatum,
@@ -849,6 +851,7 @@ export default function StatusForm() {
                     avgift_over_km: 'Avgift över-km', anteckningar: 'Anteckningar',
                     stold_gps: 'Stöld-GPS', klar_for_uthyrning: 'Uthyrningsbar',
                     stold_gps_spec: 'Stöld-GPS spec',
+                    mbme_aktiverad: 'MBme aktiverad', vw_connect_aktiverad: 'VW Connect aktiverad',
                   };
                   const oldValues: Record<string, string> = {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
@@ -866,6 +869,8 @@ export default function StatusForm() {
                     stold_gps: vehicleStatus.vehicle.stoldGps,
                     klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
                     stold_gps_spec: '',
+                    mbme_aktiverad: vehicleStatus.vehicle.mbmeAktiverad,
+                    vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
                     ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
                     laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
                     saludatum: vehicleStatus.vehicle.saludatum,
@@ -1085,18 +1090,19 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Uppkoppling Section — visas bara för MB och VW med data */}
+        {/* Uppkoppling Section — visas för MB/VW-bilar eller om värden redan finns (säkerhetsnät) */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
-          vehicleStatus.vehicle.mbmeAktiverad !== '---' || vehicleStatus.vehicle.vwConnectAktiverad !== '---'
+          (vehicleStatus.vehicle.bilmarke === 'MB' || vehicleStatus.vehicle.mbmeAktiverad !== '---')
+          || (vehicleStatus.vehicle.bilmarke === 'VW' || vehicleStatus.vehicle.vwConnectAktiverad !== '---')
         ) && (
           <Card>
             <SectionHeader title="Uppkoppling" />
             <div className="info-grid">
-              {vehicleStatus.vehicle.mbmeAktiverad !== '---' && (
-                <InfoRow label="MBme aktiverad" value={vehicleStatus.vehicle.mbmeAktiverad} />
+              {(vehicleStatus.vehicle.bilmarke === 'MB' || vehicleStatus.vehicle.mbmeAktiverad !== '---') && (
+                <EditableSelectRow label="MBme aktiverad" fieldName="mbme_aktiverad" displayValue={vehicleStatus.vehicle.mbmeAktiverad} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               )}
-              {vehicleStatus.vehicle.vwConnectAktiverad !== '---' && (
-                <InfoRow label="VW Connect aktiverad" value={vehicleStatus.vehicle.vwConnectAktiverad} />
+              {(vehicleStatus.vehicle.bilmarke === 'VW' || vehicleStatus.vehicle.vwConnectAktiverad !== '---') && (
+                <EditableSelectRow label="VW Connect aktiverad" fieldName="vw_connect_aktiverad" displayValue={vehicleStatus.vehicle.vwConnectAktiverad} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               )}
             </div>
           </Card>
