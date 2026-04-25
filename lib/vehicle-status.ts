@@ -1060,6 +1060,32 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
   const arrivals = arrivalsResponse.data || [];
+
+  // Lookup-Map för damages.id baserat på matchningsnycklar.
+  // legacyDamages från RPC saknar id-fältet, men damages-tabellen har UUID:er.
+  // Data är sorterad created_at DESC i Promise.all, så första-match = senaste imported_at.
+  const buildDamageMatchKey = (
+    regnr: string,
+    damage_date: any,
+    damage_type_raw: any,
+    note_customer: any,
+    note_internal: any,
+  ): string => `${regnr}|${damage_date || ''}|${damage_type_raw || ''}|${note_customer || ''}|${note_internal || ''}`;
+
+  const damageIdByMatchKey = new Map<string, string>();
+  for (const dRow of damages) {
+    if (!dRow.id) continue;
+    const key = buildDamageMatchKey(
+      cleanedRegnr,
+      dRow.damage_date,
+      dRow.damage_type_raw,
+      dRow.note_customer,
+      dRow.note_internal,
+    );
+    if (!damageIdByMatchKey.has(key)) {
+      damageIdByMatchKey.set(key, dRow.id);
+    }
+  }
   
   // DEBUG: Log raw data for LRA75R
   if (cleanedRegnr === 'LRA75R') {
@@ -1385,10 +1411,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       const checkin = matchedCheckinDamage 
         ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
-        : null;
+       : null;
       
       const newEntry: DamageEntry = {
-        id: d.id,
+        id: damageIdByMatchKey.get(buildDamageMatchKey(cleanedRegnr, d.damage_date, d.damage_type_raw, d.note_customer, d.note_internal)) || d.id,
         stableKey,
         legacyDamageSourceText: legacyText,
         date: formatDate(date),
@@ -2423,7 +2449,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : null;
     
     const newEntry: DamageEntry = {
-      id: d.id,
+      id: damageIdByMatchKey.get(buildDamageMatchKey(cleanedRegnr, d.damage_date, d.damage_type_raw, d.note_customer, d.note_internal)) || d.id,
       stableKey,
       legacyDamageSourceText: legacyText,
       date: formatDate(date),
