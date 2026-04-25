@@ -56,6 +56,7 @@ export type VehicleStatusData = {
   // Fuel filling info
   tankningInfo: string;
   tankstatusVidLeverans: string;
+  tankstatusVidLeveransRaw: string;
   // General comment
   anteckningar: string;
 // Ej uthyrningsbar — uppdelat i tre fält
@@ -233,6 +234,7 @@ export type VehicleStatusResult = {
     drivmedel: string;
     vaxellada: string;
     tankstatusVidLeverans: string;
+    tankstatusVidLeveransRaw: string;
     // Avtalsvillkor
     serviceintervall: string;
     maxKmManad: string;
@@ -953,6 +955,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     stold_gps_spec: 'Stöld-GPS spec',
     mbme_aktiverad: 'MBme aktiverad',
     vw_connect_aktiverad: 'VW Connect aktiverad',
+    tankstatus: 'Tankstatus vid leverans',
     ej_uthyrningsbar_anledning: 'Ej uthyrningsbar anledning',
     laddniva_vid_leverans: 'Laddnivå vid leverans',
     saludatum: 'Saludatum',
@@ -1183,6 +1186,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       saluNotering: latestEdits.get('salu_notering')?.value || '---',
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
+      tankstatusVidLeveransRaw: latestEdits.get('tankstatus')?.value || '---',
       anteckningar: latestEdits.get('anteckningar')?.value || '---',
       ejUthyrningsbarKommentar: null,
       ejUthyrningsbarKalla: null,
@@ -2085,7 +2089,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Fuel filling info
     tankningInfo: buildFuelFillingInfo(nybilData),
-    tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
+    tankstatusVidLeverans: latestEdits.get('tankstatus')?.value
+      ? buildTankstatusDisplay({ ...nybilData, tankstatus: latestEdits.get('tankstatus')!.value } as NybilInventeringData)
+      : buildTankstatusDisplay(nybilData),
+    tankstatusVidLeveransRaw: latestEdits.get('tankstatus')?.value ?? nybilData?.tankstatus ?? '---',
     
     // General comment: vehicle_edits → nybil_inventering
     anteckningar: latestEdits.get('anteckningar')?.value || nybilData?.anteckningar || '---',
@@ -3069,6 +3076,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     drivmedel: displayBransletyp(nybilData.bransletyp),
     vaxellada: nybilData.vaxel || '---',
     tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
+    tankstatusVidLeveransRaw: nybilData.tankstatus || '---',
     // Avtalsvillkor
     serviceintervall: nybilData.serviceintervall ? `${nybilData.serviceintervall} km` : '---',
     maxKmManad: nybilData.max_km_manad ? `${nybilData.max_km_manad} km` : '---',
