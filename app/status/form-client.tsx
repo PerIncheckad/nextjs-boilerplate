@@ -244,6 +244,8 @@ export default function StatusForm() {
       ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
       laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
       tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
+      upptankning_liter: vehicleStatus.vehicle.upptankningLiter === '---' ? '---' : vehicleStatus.vehicle.upptankningLiter,
+      upptankning_literpris: vehicleStatus.vehicle.upptankningLiterpris === '---' ? '---' : vehicleStatus.vehicle.upptankningLiterpris,
       saludatum: vehicleStatus.vehicle.saludatum,
       salu_station: vehicleStatus.vehicle.saluStation,
       salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -858,6 +860,8 @@ export default function StatusForm() {
                     stold_gps_spec: 'Stöld-GPS spec',
                     mbme_aktiverad: 'MBme aktiverad', vw_connect_aktiverad: 'VW Connect aktiverad',
                     tankstatus: 'Tankstatus vid leverans',
+                    upptankning_liter: 'Upptankning antal liter',
+                    upptankning_literpris: 'Upptankning literpris (kr/l)',
                   };
                   const oldValues: Record<string, string> = {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
@@ -880,6 +884,8 @@ export default function StatusForm() {
                     ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
                     laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
                     tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
+                    upptankning_liter: vehicleStatus.vehicle.upptankningLiter === '---' ? '---' : vehicleStatus.vehicle.upptankningLiter,
+                    upptankning_literpris: vehicleStatus.vehicle.upptankningLiterpris === '---' ? '---' : vehicleStatus.vehicle.upptankningLiterpris,
                     saludatum: vehicleStatus.vehicle.saludatum,
                     salu_station: vehicleStatus.vehicle.saluStation,
                     salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -888,8 +894,21 @@ export default function StatusForm() {
                     salu_attention: vehicleStatus.vehicle.saluAttention,
                     salu_notering: vehicleStatus.vehicle.saluNotering,
                   };
-                  const oldVal = oldValues[field] === '---' ? '(tomt)' : (oldValues[field] || '(tomt)');
-                  const newVal = value || '(tomt)';
+                  // Översätt enum-värden till svensk text för visning i modalen.
+                  // Lägg till fler fält här om de har samma enum/text-separation.
+                  const enumLabels: Record<string, Record<string, string>> = {
+                    tankstatus: {
+                      mottogs_fulltankad: 'Mottogs fulltankad',
+                      tankad_nu: 'Tankades upp av MABI',
+                      ej_upptankad: 'Levererades ej fulltankad',
+                    },
+                  };
+                  const formatVal = (fieldName: string, val: string | undefined): string => {
+                    if (!val || val === '---') return '(tomt)';
+                    return enumLabels[fieldName]?.[val] || val;
+                  };
+                  const oldVal = formatVal(field, oldValues[field]);
+                  const newVal = formatVal(field, value);
                   return (
                     <div key={field} style={{ padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
                       <strong>{labels[field] || field}:</strong> {oldVal} → {newVal}
@@ -1128,21 +1147,54 @@ export default function StatusForm() {
                 const showInEdit = isEditing && isFuelType;
                 const showInReadOnly = !isEditing && vehicleStatus.vehicle.tankstatusVidLeverans !== '---';
                 if (!showInEdit && !showInReadOnly) return null;
+                // Aktuellt tankstatus-värde: pendingEdits → rawValue. Avgör om liter/literpris ska visas.
+                const currentTankstatus = pendingEdits['tankstatus'] !== undefined
+                  ? pendingEdits['tankstatus']
+                  : (vehicleStatus.vehicle.tankstatusVidLeveransRaw === '---' ? '' : vehicleStatus.vehicle.tankstatusVidLeveransRaw);
+                const showUpptankningFields = isEditing && isFuelType && currentTankstatus === 'tankad_nu';
                 return (
-                  <EditableSelectRow
-                    label="Tankstatus vid leverans"
-                    fieldName="tankstatus"
-                    displayValue={vehicleStatus.vehicle.tankstatusVidLeverans}
-                    options={[
-                      { value: 'mottogs_fulltankad', label: 'Mottogs fulltankad' },
-                      { value: 'tankad_nu', label: 'Tankad nu' },
-                      { value: 'ej_upptankad', label: 'Levererades ej fulltankad' },
-                    ]}
-                    rawValue={vehicleStatus.vehicle.tankstatusVidLeveransRaw === '---' ? '' : vehicleStatus.vehicle.tankstatusVidLeveransRaw}
-                    isEditing={isEditing}
-                    pendingEdits={pendingEdits}
-                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
-                  />
+                  <>
+                    <EditableSelectRow
+                      label="Tankstatus vid leverans"
+                      fieldName="tankstatus"
+                      displayValue={vehicleStatus.vehicle.tankstatusVidLeverans}
+                      options={[
+                        { value: 'mottogs_fulltankad', label: 'Mottogs fulltankad' },
+                        { value: 'tankad_nu', label: 'Tankades upp av MABI' },
+                        { value: 'ej_upptankad', label: 'Levererades ej fulltankad' },
+                      ]}
+                      rawValue={vehicleStatus.vehicle.tankstatusVidLeveransRaw === '---' ? '' : vehicleStatus.vehicle.tankstatusVidLeveransRaw}
+                      isEditing={isEditing}
+                      pendingEdits={pendingEdits}
+                      onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                    />
+                    {showUpptankningFields && (
+                      <>
+                        <EditableInfoRow
+                          label="Upptankning antal liter (frivilligt)"
+                          fieldName="upptankning_liter"
+                          displayValue={vehicleStatus.vehicle.upptankningLiter}
+                          rawValue={vehicleStatus.vehicle.upptankningLiter === '---' ? '' : vehicleStatus.vehicle.upptankningLiter}
+                          isEditing={isEditing}
+                          pendingEdits={pendingEdits}
+                          onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v.replace(',', '.')}))}
+                          inputType="number"
+                          step="0.01"
+                        />
+                        <EditableInfoRow
+                          label="Upptankning literpris kr/l (frivilligt)"
+                          fieldName="upptankning_literpris"
+                          displayValue={vehicleStatus.vehicle.upptankningLiterpris}
+                          rawValue={vehicleStatus.vehicle.upptankningLiterpris === '---' ? '' : vehicleStatus.vehicle.upptankningLiterpris}
+                          isEditing={isEditing}
+                          pendingEdits={pendingEdits}
+                          onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v.replace(',', '.')}))}
+                          inputType="number"
+                          step="0.01"
+                        />
+                      </>
+                    )}
+                  </>
                 );
               })()}
               {/* Laddnivå: visas för 100% el (editerbar) eller om värde finns (read-only) */}
