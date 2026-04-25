@@ -201,8 +201,8 @@ const createCommentFile = (content: string): File => {
 };
 
 // Improved uploadOne with retry logic: handles already existing resources, returns publicUrl or throws when unavailable
-async function uploadOne(file: File, path: string): Promise<string> {
-  const BUCKET = 'damage-photos';
+async function uploadOne(file: File, path: string, bucket: string = 'damage-photos'): Promise<string> {
+  const BUCKET = bucket;
   const MAX_RETRIES = 3;
   const RETRY_DELAY_MS = 1000; // Start with 1 second
   
@@ -445,6 +445,7 @@ export default function CheckInForm() {
   const [bransletyp, setBransletyp] = useState<'Bensin' | 'Diesel' | null>(null);
   // Tank/charge fields
   const [tankniva, setTankniva] = useState<'återlämnades_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null>(null);
+  const [receiptMedia, setReceiptMedia] = useState<MediaFile | null>(null);
   const [liters, setLiters] = useState('');
   const [literpris, setLiterpris] = useState('');
   const [laddniva, setLaddniva] = useState('');
@@ -1008,6 +1009,13 @@ export default function CheckInForm() {
     }
   }, [locationDiffers, matarstallningAvlamning, matarstallning, ort, station]);
 
+  // Auto-rensa kvitto när tankniva inte längre är 'tankad_nu' (regel #25-mönstret)
+  useEffect(() => {
+    if (tankniva !== 'tankad_nu') {
+      setReceiptMedia(null);
+    }
+  }, [tankniva]);
+
   // Handlers
   const handleShowErrors = () => {
     setShowFieldErrors(true);
@@ -1114,6 +1122,11 @@ export default function CheckInForm() {
         let tempRekondFolder = '';
         let tempHusdjurFolder = '';
         let tempRokningFolder = '';
+        // Receipt upload (frivilligt — fylls bara om uppladdning lyckas)
+        let tempReceiptUrl = '';
+        let tempReceiptPath = '';
+        let tempReceiptName = '';
+        let tempReceiptMime = '';
 
         const processSaneringEvent = async (
             isEnabled: boolean,
@@ -1159,6 +1172,26 @@ export default function CheckInForm() {
             const damagePath = `${reg}/${dateEventFolderName}/${eventFolderName}`;
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
+
+        // --- Handle Receipt Upload (frivilligt, icke-blockerande) ---
+        if (receiptMedia && tankniva === 'tankad_nu') {
+            try {
+                const pad = (n: number) => n.toString().padStart(2, '0');
+                const tankningTid = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+                const namePart = slugify(fullName) || 'okand';
+                const ext = receiptMedia.file.name.split('.').pop()?.toLowerCase() || 'bin';
+                const fileName = `${reg}_${incheckningsdatum}-${tankningTid}_${namePart}.${ext}`;
+                const path = `${reg}/${fileName}`;
+                const url = await uploadOne(receiptMedia.file, path, 'receipts');
+                tempReceiptUrl = url;
+                tempReceiptPath = path;
+                tempReceiptName = fileName;
+                tempReceiptMime = receiptMedia.file.type;
+            } catch (e) {
+                console.error('Receipt upload failed (non-blocking):', e);
+                alert('Tankkvittot kunde inte laddas upp, men incheckningen sparas.');
+            }
+        }
       
         const finalPayloadForNotification = {
             ...finalPayloadForUI,
@@ -1169,6 +1202,14 @@ export default function CheckInForm() {
             rokning: { ...finalPayloadForUI.rokning, folder: tempRokningFolder },
             dokumenterade_skador: legacyDamagesForUpload,
             nya_skador: newDamagesForUpload,
+            tankning_receipt: tempReceiptUrl ? {
+                file_url: tempReceiptUrl,
+                file_path: tempReceiptPath,
+                file_name: tempReceiptName,
+                mime_type: tempReceiptMime,
+                uploaded_by_email: userEmail,
+                uploaded_by_name: fullName,
+            } : null,
         };
 
         const notifyResult = await notifyCheckin({ region: 'Syd', subjectBase: `${reg} - ${ort} / ${station}`, meta: finalPayloadForNotification });
@@ -1885,6 +1926,34 @@ export default function CheckInForm() {
                   <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
                   <Field label={`Literpris (${bransletyp || 'kr'}) *`}><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
                 </div>}
+                {tankniva === 'tankad_nu' && (
+                  <Field label="Tankkvitto (frivilligt)">
+                    {receiptMedia ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', fontSize: '0.9rem' }}>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{receiptMedia.file.name}</span>
+                        <button type="button" onClick={() => setReceiptMedia(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#dc2626', padding: '0 0.25rem', lineHeight: 1 }} aria-label="Ta bort kvitto">×</button>
+                      </div>
+                    ) : (
+                      <>
+                        <label htmlFor="receipt-upload-input" className="media-label optional">Ladda upp tankkvitto</label>
+                        <input
+                          id="receipt-upload-input"
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const type = file.type.startsWith('video') ? 'video' : 'image';
+                              setReceiptMedia({ file, type });
+                            }
+                            e.target.value = '';
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                      </>
+                    )}
+                  </Field>
+                )}
               </Fragment>
             );
           })()}
