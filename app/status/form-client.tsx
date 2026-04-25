@@ -1593,12 +1593,29 @@ const EditableInfoRow: React.FC<{
           type={inputType || 'text'}
           value={currentInput}
           onChange={e => {
-            const val = e.target.value;
-            if (inputType === 'number' && max !== undefined && val !== '') {
-              const numVal = Number(val);
-              if (!isNaN(numVal) && numVal > max) {
-                onEdit(fieldName, String(max));
-                return;
+            let val = e.target.value;
+            if (inputType === 'number') {
+              // Tillåt decimaler bara om step indikerar det
+              const allowDecimals = step !== undefined && step !== '1';
+              if (allowDecimals) {
+                // Strippa allt utom siffror, punkt och komma; normalisera komma till punkt
+                val = val.replace(/[^0-9.,]/g, '').replace(',', '.');
+                // Tillåt bara EN punkt (om användaren skriver "1.2.3" → "1.2")
+                const firstDot = val.indexOf('.');
+                if (firstDot !== -1) {
+                  val = val.substring(0, firstDot + 1) + val.substring(firstDot + 1).replace(/\./g, '');
+                }
+              } else {
+                // Heltal: strippa allt utom siffror
+                val = val.replace(/[^0-9]/g, '');
+              }
+              // Auto-rätta max-spärr
+              if (max !== undefined && val !== '') {
+                const numVal = Number(val);
+                if (!isNaN(numVal) && numVal > max) {
+                  onEdit(fieldName, String(max));
+                  return;
+                }
               }
             }
             onEdit(fieldName, val);
