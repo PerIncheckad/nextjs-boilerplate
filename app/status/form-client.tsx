@@ -2000,7 +2000,7 @@ const DamageItem: React.FC<{ damage: DamageRecord; regnr: string; isEditing: boo
             </span>
           )}
           {mediaUrl && (
-            
+            <a
               href={mediaUrl}
               target="_blank"
               rel="noopener noreferrer"
