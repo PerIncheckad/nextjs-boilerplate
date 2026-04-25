@@ -16,7 +16,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 // =================================================================
 
 type CommentPayload = {
-  damage_id: number;
+  damage_id: string;
   comment: string;
   created_by: string;
 };
@@ -30,10 +30,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { damage_id, comment, created_by } = body as CommentPayload;
 
-    // Validate damage_id
-    if (typeof damage_id !== 'number' || !Number.isInteger(damage_id) || damage_id <= 0) {
+    // Validate damage_id (UUID format from damages.id)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (typeof damage_id !== 'string' || !uuidRegex.test(damage_id)) {
       return NextResponse.json(
-        { error: 'damage_id must be a positive integer' },
+        { error: 'damage_id must be a valid UUID' },
         { status: 400 }
       );
     }
