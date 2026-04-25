@@ -233,8 +233,8 @@ export default function StatusForm() {
       hjultyp: vehicleStatus.vehicle.hjultyp,
       planerad_station: vehicleStatus.vehicle.planeradStation,
       serviceintervall: vehicleStatus.vehicle.serviceintervall === '---' ? '---' : vehicleStatus.vehicle.serviceintervall.replace(' km', '').trim(),
-      max_km_manad: vehicleStatus.vehicle.maxKmManad,
-      avgift_over_km: vehicleStatus.vehicle.avgiftOverKm,
+      max_km_manad: vehicleStatus.vehicle.maxKmManad === '---' ? '---' : vehicleStatus.vehicle.maxKmManad.replace(' km', '').trim(),
+      avgift_over_km: vehicleStatus.vehicle.avgiftOverKm === '---' ? '---' : vehicleStatus.vehicle.avgiftOverKm.replace(' kr', '').replace(',', '.').trim(),
       anteckningar: vehicleStatus.vehicle.anteckningar,
       stold_gps: vehicleStatus.vehicle.stoldGps,
       klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
@@ -242,7 +242,7 @@ export default function StatusForm() {
       mbme_aktiverad: vehicleStatus.vehicle.mbmeAktiverad,
       vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
       ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
-      laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
+      laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
       saludatum: vehicleStatus.vehicle.saludatum,
       salu_station: vehicleStatus.vehicle.saluStation,
       salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -876,7 +876,7 @@ export default function StatusForm() {
                     mbme_aktiverad: vehicleStatus.vehicle.mbmeAktiverad,
                     vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
                     ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
-                    laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
+                    laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
                     saludatum: vehicleStatus.vehicle.saludatum,
                     salu_station: vehicleStatus.vehicle.saluStation,
                     salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -1027,7 +1027,7 @@ export default function StatusForm() {
             <div className="info-grid">
               <EditableInfoRow label="Serviceintervall (km)" fieldName="serviceintervall" displayValue={vehicleStatus.vehicle.serviceintervall} rawValue={vehicleStatus.vehicle.serviceintervall === '---' ? '' : vehicleStatus.vehicle.serviceintervall.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
               <EditableInfoRow label="Max km/månad" fieldName="max_km_manad" displayValue={vehicleStatus.vehicle.maxKmManad} rawValue={vehicleStatus.vehicle.maxKmManad === '---' ? '' : vehicleStatus.vehicle.maxKmManad.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
-              <EditableInfoRow label="Avgift över-km" fieldName="avgift_over_km" displayValue={vehicleStatus.vehicle.avgiftOverKm} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Avgift över-km (kr)" fieldName="avgift_over_km" displayValue={vehicleStatus.vehicle.avgiftOverKm} rawValue={vehicleStatus.vehicle.avgiftOverKm === '---' ? '' : vehicleStatus.vehicle.avgiftOverKm.replace(' kr', '').replace(',', '.').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v.replace(',', '.')}))} inputType="number" step="0.01" />
             </div>
           </Card>
         )}
@@ -1122,7 +1122,7 @@ export default function StatusForm() {
                 <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
               )}
               {(vehicleStatus.vehicle.laddnivaVidLeverans !== '---' || isEditing) && (
-                <EditableInfoRow label="Laddnivå vid leverans (%)" fieldName="laddniva_vid_leverans" displayValue={vehicleStatus.vehicle.laddnivaVidLeverans} rawValue={vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
+                <EditableInfoRow label="Laddnivå vid leverans (%)" fieldName="laddniva_vid_leverans" displayValue={vehicleStatus.vehicle.laddnivaVidLeverans} rawValue={vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" min={0} max={100} />
               )}
               <Fragment>
                 <span className="info-label">Skador vid leverans</span>
@@ -1570,7 +1570,10 @@ const EditableInfoRow: React.FC<{
   onEdit: (field: string, value: string) => void;
   multiline?: boolean;
   inputType?: string;
-}> = ({ label, fieldName, displayValue, rawValue, isEditing, pendingEdits, onEdit, multiline, inputType }) => {
+  min?: number;
+  max?: number;
+  step?: string;
+}> = ({ label, fieldName, displayValue, rawValue, isEditing, pendingEdits, onEdit, multiline, inputType, min, max, step }) => {
   const initialValue = rawValue !== undefined ? rawValue : (displayValue === '---' ? '' : displayValue);
   const currentInput = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : initialValue;
   const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== initialValue;
@@ -1589,9 +1592,20 @@ const EditableInfoRow: React.FC<{
        <input
           type={inputType || 'text'}
           value={currentInput}
-          onChange={e => onEdit(fieldName, e.target.value)}
-          min={inputType === 'number' ? '0' : undefined}
-          step={inputType === 'number' ? '1' : undefined}
+          onChange={e => {
+            const val = e.target.value;
+            if (inputType === 'number' && max !== undefined && val !== '') {
+              const numVal = Number(val);
+              if (!isNaN(numVal) && numVal > max) {
+                onEdit(fieldName, String(max));
+                return;
+              }
+            }
+            onEdit(fieldName, val);
+          }}
+          min={inputType === 'number' ? (min !== undefined ? String(min) : '0') : undefined}
+          max={inputType === 'number' && max !== undefined ? String(max) : undefined}
+          step={inputType === 'number' ? (step || '1') : undefined}
           style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
         />
       )}
