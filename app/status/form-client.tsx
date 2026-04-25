@@ -246,6 +246,16 @@ export default function StatusForm() {
       tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
       upptankning_liter: vehicleStatus.vehicle.upptankningLiter === '---' ? '---' : vehicleStatus.vehicle.upptankningLiter,
       upptankning_literpris: vehicleStatus.vehicle.upptankningLiterpris === '---' ? '---' : vehicleStatus.vehicle.upptankningLiterpris,
+      hjul_forvaring_ort: vehicleStatus.vehicle.hjulForvaringOrt,
+      hjul_forvaring_spec: vehicleStatus.vehicle.hjulForvaringSpec,
+      extranyckel_forvaring_ort: vehicleStatus.vehicle.extranyckelForvaringOrt,
+      extranyckel_forvaring_spec: vehicleStatus.vehicle.extranyckelForvaringSpec,
+      laddkablar_forvaring_ort: vehicleStatus.vehicle.laddkablarForvaringOrt,
+      laddkablar_forvaring_spec: vehicleStatus.vehicle.laddkablarForvaringSpec,
+      instruktionsbok_forvaring_ort: vehicleStatus.vehicle.instruktionsbokForvaringOrt,
+      instruktionsbok_forvaring_spec: vehicleStatus.vehicle.instruktionsbokForvaringSpec,
+      coc_forvaring_ort: vehicleStatus.vehicle.cocForvaringOrt,
+      coc_forvaring_spec: vehicleStatus.vehicle.cocForvaringSpec,
       saludatum: vehicleStatus.vehicle.saludatum,
       salu_station: vehicleStatus.vehicle.saluStation,
       salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -862,6 +872,16 @@ export default function StatusForm() {
                     tankstatus: 'Tankstatus vid leverans',
                     upptankning_liter: 'Upptankning antal liter',
                     upptankning_literpris: 'Upptankning literpris (kr/l)',
+                    hjul_forvaring_ort: 'Hjulförvaring — Ort',
+                    hjul_forvaring_spec: 'Hjulförvaring — Specificera',
+                    extranyckel_forvaring_ort: 'Reservnyckel — Ort',
+                    extranyckel_forvaring_spec: 'Reservnyckel — Specificera',
+                    laddkablar_forvaring_ort: 'Laddkablar — Ort',
+                    laddkablar_forvaring_spec: 'Laddkablar — Specificera',
+                    instruktionsbok_forvaring_ort: 'Instruktionsbok — Ort',
+                    instruktionsbok_forvaring_spec: 'Instruktionsbok — Specificera',
+                    coc_forvaring_ort: 'COC-dokument — Ort',
+                    coc_forvaring_spec: 'COC-dokument — Specificera',
                   };
                   const oldValues: Record<string, string> = {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
@@ -886,6 +906,16 @@ export default function StatusForm() {
                     tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
                     upptankning_liter: vehicleStatus.vehicle.upptankningLiter === '---' ? '---' : vehicleStatus.vehicle.upptankningLiter,
                     upptankning_literpris: vehicleStatus.vehicle.upptankningLiterpris === '---' ? '---' : vehicleStatus.vehicle.upptankningLiterpris,
+                    hjul_forvaring_ort: vehicleStatus.vehicle.hjulForvaringOrt,
+                    hjul_forvaring_spec: vehicleStatus.vehicle.hjulForvaringSpec,
+                    extranyckel_forvaring_ort: vehicleStatus.vehicle.extranyckelForvaringOrt,
+                    extranyckel_forvaring_spec: vehicleStatus.vehicle.extranyckelForvaringSpec,
+                    laddkablar_forvaring_ort: vehicleStatus.vehicle.laddkablarForvaringOrt,
+                    laddkablar_forvaring_spec: vehicleStatus.vehicle.laddkablarForvaringSpec,
+                    instruktionsbok_forvaring_ort: vehicleStatus.vehicle.instruktionsbokForvaringOrt,
+                    instruktionsbok_forvaring_spec: vehicleStatus.vehicle.instruktionsbokForvaringSpec,
+                    coc_forvaring_ort: vehicleStatus.vehicle.cocForvaringOrt,
+                    coc_forvaring_spec: vehicleStatus.vehicle.cocForvaringSpec,
                     saludatum: vehicleStatus.vehicle.saludatum,
                     salu_station: vehicleStatus.vehicle.saluStation,
                     salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -1065,11 +1095,29 @@ export default function StatusForm() {
           <Card>
             <SectionHeader title="Förvaring" />
             <div className="info-grid">
-              {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
-              {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
-              {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
-              {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
-              {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
+              {/* Read-only: visa 5 rader med sammansatt sträng (oförändrat). Edit: visa 10 rader (ort + spec per fält). */}
+              {!isEditing ? (
+                <>
+                  {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
+                  {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
+                  {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
+                  {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
+                  {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
+                </>
+              ) : (
+                <>
+                  <EditableSelectRow label="Hjulförvaring — Ort" fieldName="hjul_forvaring_ort" displayValue={vehicleStatus.vehicle.hjulForvaringOrt} options={ORTER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Hjulförvaring — Specificera" fieldName="hjul_forvaring_spec" displayValue={vehicleStatus.vehicle.hjulForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="Reservnyckel — Ort" fieldName="extranyckel_forvaring_ort" displayValue={vehicleStatus.vehicle.extranyckelForvaringOrt} options={ORTER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Reservnyckel — Specificera" fieldName="extranyckel_forvaring_spec" displayValue={vehicleStatus.vehicle.extranyckelForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="Laddkablar — Ort" fieldName="laddkablar_forvaring_ort" displayValue={vehicleStatus.vehicle.laddkablarForvaringOrt} options={ORTER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Laddkablar — Specificera" fieldName="laddkablar_forvaring_spec" displayValue={vehicleStatus.vehicle.laddkablarForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="Instruktionsbok — Ort" fieldName="instruktionsbok_forvaring_ort" displayValue={vehicleStatus.vehicle.instruktionsbokForvaringOrt} options={['I bilen', ...ORTER]} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Instruktionsbok — Specificera" fieldName="instruktionsbok_forvaring_spec" displayValue={vehicleStatus.vehicle.instruktionsbokForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="COC-dokument — Ort" fieldName="coc_forvaring_ort" displayValue={vehicleStatus.vehicle.cocForvaringOrt} options={['I bilen', ...ORTER]} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="COC-dokument — Specificera" fieldName="coc_forvaring_spec" displayValue={vehicleStatus.vehicle.cocForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                </>
+              )}
             </div>
           </Card>
         )}
