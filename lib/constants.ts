@@ -29,3 +29,8 @@ export const VAXEL_OPTIONS = ['Automat', 'Manuell'];
 // Hjultyp-alternativ (däck som sitter på bilen).
 // Verifierat i produktion (2026-04-24): endast dessa två värden finns i checkins.hjultyp + nybil_inventering.hjultyp.
 export const HJULTYP_OPTIONS = ['Sommardäck', 'Vinterdäck'];
+
+// Förvaringsorter — används i /nybil och /status-editering för Hjulförvaring, Reservnyckel,
+// Laddkablar, Instruktionsbok och COC. För Instruktionsbok och COC kan även 'I bilen' väljas;
+// det hanteras lokalt i respektive UI-komponent (är inte en ort i geografisk mening).
+export const ORTER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];

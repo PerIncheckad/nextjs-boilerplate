@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
-import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS } from '@/lib/constants';
+import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS, ORTER } from '@/lib/constants';
 
 // =================================================================
 // 1. CONSTANTS
@@ -12,7 +12,11 @@ import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS } from '@/
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MB%20300%20SL%20Roadster%201962/MB%20300-SL-Roadster_1962.jpg";
 
-const ORTER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];
+// ORTER importeras nu från lib/constants.ts (delas med /nybil).
+
+// HUVUDSTATIONER används som dropdown-värden för "Planerad station".
+// Identisk lista som i /nybil — håll i synk.
+const HUVUDSTATIONER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];
 
 const STATIONER: Record<string, string[]> = {
   'Falkenberg': ['Falkenberg'],
@@ -228,9 +232,9 @@ export default function StatusForm() {
       matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').trim(),
       hjultyp: vehicleStatus.vehicle.hjultyp,
       planerad_station: vehicleStatus.vehicle.planeradStation,
-      serviceintervall: vehicleStatus.vehicle.serviceintervall,
-      max_km_manad: vehicleStatus.vehicle.maxKmManad,
-      avgift_over_km: vehicleStatus.vehicle.avgiftOverKm,
+      serviceintervall: vehicleStatus.vehicle.serviceintervall === '---' ? '---' : vehicleStatus.vehicle.serviceintervall.replace(' km', '').trim(),
+      max_km_manad: vehicleStatus.vehicle.maxKmManad === '---' ? '---' : vehicleStatus.vehicle.maxKmManad.replace(' km', '').trim(),
+      avgift_over_km: vehicleStatus.vehicle.avgiftOverKm === '---' ? '---' : vehicleStatus.vehicle.avgiftOverKm.replace(' kr', '').replace(',', '.').trim(),
       anteckningar: vehicleStatus.vehicle.anteckningar,
       stold_gps: vehicleStatus.vehicle.stoldGps,
       klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
@@ -238,7 +242,20 @@ export default function StatusForm() {
       mbme_aktiverad: vehicleStatus.vehicle.mbmeAktiverad,
       vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
       ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
-      laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
+      laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
+      tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
+      upptankning_liter: vehicleStatus.vehicle.upptankningLiter === '---' ? '---' : vehicleStatus.vehicle.upptankningLiter,
+      upptankning_literpris: vehicleStatus.vehicle.upptankningLiterpris === '---' ? '---' : vehicleStatus.vehicle.upptankningLiterpris,
+      hjul_forvaring_ort: vehicleStatus.vehicle.hjulForvaringOrt,
+      hjul_forvaring_spec: vehicleStatus.vehicle.hjulForvaringSpec,
+      extranyckel_forvaring_ort: vehicleStatus.vehicle.extranyckelForvaringOrt,
+      extranyckel_forvaring_spec: vehicleStatus.vehicle.extranyckelForvaringSpec,
+      laddkablar_forvaring_ort: vehicleStatus.vehicle.laddkablarForvaringOrt,
+      laddkablar_forvaring_spec: vehicleStatus.vehicle.laddkablarForvaringSpec,
+      instruktionsbok_forvaring_ort: vehicleStatus.vehicle.instruktionsbokForvaringOrt,
+      instruktionsbok_forvaring_spec: vehicleStatus.vehicle.instruktionsbokForvaringSpec,
+      coc_forvaring_ort: vehicleStatus.vehicle.cocForvaringOrt,
+      coc_forvaring_spec: vehicleStatus.vehicle.cocForvaringSpec,
       saludatum: vehicleStatus.vehicle.saludatum,
       salu_station: vehicleStatus.vehicle.saluStation,
       salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -852,6 +869,19 @@ export default function StatusForm() {
                     stold_gps: 'Stöld-GPS', klar_for_uthyrning: 'Uthyrningsbar',
                     stold_gps_spec: 'Stöld-GPS spec',
                     mbme_aktiverad: 'MBme aktiverad', vw_connect_aktiverad: 'VW Connect aktiverad',
+                    tankstatus: 'Tankstatus vid leverans',
+                    upptankning_liter: 'Upptankning antal liter',
+                    upptankning_literpris: 'Upptankning literpris (kr/l)',
+                    hjul_forvaring_ort: 'Hjulförvaring — Ort',
+                    hjul_forvaring_spec: 'Hjulförvaring — Specificera',
+                    extranyckel_forvaring_ort: 'Reservnyckel — Ort',
+                    extranyckel_forvaring_spec: 'Reservnyckel — Specificera',
+                    laddkablar_forvaring_ort: 'Laddkablar — Ort',
+                    laddkablar_forvaring_spec: 'Laddkablar — Specificera',
+                    instruktionsbok_forvaring_ort: 'Instruktionsbok — Ort',
+                    instruktionsbok_forvaring_spec: 'Instruktionsbok — Specificera',
+                    coc_forvaring_ort: 'COC-dokument — Ort',
+                    coc_forvaring_spec: 'COC-dokument — Specificera',
                   };
                   const oldValues: Record<string, string> = {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
@@ -862,9 +892,9 @@ export default function StatusForm() {
                     matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
                     hjultyp: vehicleStatus.vehicle.hjultyp,
                     planerad_station: vehicleStatus.vehicle.planeradStation,
-                    serviceintervall: vehicleStatus.vehicle.serviceintervall,
-                    max_km_manad: vehicleStatus.vehicle.maxKmManad,
-                    avgift_over_km: vehicleStatus.vehicle.avgiftOverKm,
+                    serviceintervall: vehicleStatus.vehicle.serviceintervall === '---' ? '---' : vehicleStatus.vehicle.serviceintervall.replace(' km', '').trim(),
+                    max_km_manad: vehicleStatus.vehicle.maxKmManad === '---' ? '---' : vehicleStatus.vehicle.maxKmManad.replace(' km', '').trim(),
+                    avgift_over_km: vehicleStatus.vehicle.avgiftOverKm === '---' ? '---' : vehicleStatus.vehicle.avgiftOverKm.replace(' kr', '').replace(',', '.').trim(),
                     anteckningar: vehicleStatus.vehicle.anteckningar,
                     stold_gps: vehicleStatus.vehicle.stoldGps,
                     klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
@@ -872,7 +902,20 @@ export default function StatusForm() {
                     mbme_aktiverad: vehicleStatus.vehicle.mbmeAktiverad,
                     vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
                     ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
-                    laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans,
+                    laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
+                    tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
+                    upptankning_liter: vehicleStatus.vehicle.upptankningLiter === '---' ? '---' : vehicleStatus.vehicle.upptankningLiter,
+                    upptankning_literpris: vehicleStatus.vehicle.upptankningLiterpris === '---' ? '---' : vehicleStatus.vehicle.upptankningLiterpris,
+                    hjul_forvaring_ort: vehicleStatus.vehicle.hjulForvaringOrt,
+                    hjul_forvaring_spec: vehicleStatus.vehicle.hjulForvaringSpec,
+                    extranyckel_forvaring_ort: vehicleStatus.vehicle.extranyckelForvaringOrt,
+                    extranyckel_forvaring_spec: vehicleStatus.vehicle.extranyckelForvaringSpec,
+                    laddkablar_forvaring_ort: vehicleStatus.vehicle.laddkablarForvaringOrt,
+                    laddkablar_forvaring_spec: vehicleStatus.vehicle.laddkablarForvaringSpec,
+                    instruktionsbok_forvaring_ort: vehicleStatus.vehicle.instruktionsbokForvaringOrt,
+                    instruktionsbok_forvaring_spec: vehicleStatus.vehicle.instruktionsbokForvaringSpec,
+                    coc_forvaring_ort: vehicleStatus.vehicle.cocForvaringOrt,
+                    coc_forvaring_spec: vehicleStatus.vehicle.cocForvaringSpec,
                     saludatum: vehicleStatus.vehicle.saludatum,
                     salu_station: vehicleStatus.vehicle.saluStation,
                     salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -881,8 +924,21 @@ export default function StatusForm() {
                     salu_attention: vehicleStatus.vehicle.saluAttention,
                     salu_notering: vehicleStatus.vehicle.saluNotering,
                   };
-                  const oldVal = oldValues[field] === '---' ? '(tomt)' : (oldValues[field] || '(tomt)');
-                  const newVal = value || '(tomt)';
+                  // Översätt enum-värden till svensk text för visning i modalen.
+                  // Lägg till fler fält här om de har samma enum/text-separation.
+                  const enumLabels: Record<string, Record<string, string>> = {
+                    tankstatus: {
+                      mottogs_fulltankad: 'Mottogs fulltankad',
+                      tankad_nu: 'Tankades upp av MABI',
+                      ej_upptankad: 'Levererades ej fulltankad',
+                    },
+                  };
+                  const formatVal = (fieldName: string, val: string | undefined): string => {
+                    if (!val || val === '---') return '(tomt)';
+                    return enumLabels[fieldName]?.[val] || val;
+                  };
+                  const oldVal = formatVal(field, oldValues[field]);
+                  const newVal = formatVal(field, value);
                   return (
                     <div key={field} style={{ padding: '0.5rem 0', borderBottom: '1px solid #eee' }}>
                       <strong>{labels[field] || field}:</strong> {oldVal} → {newVal}
@@ -980,7 +1036,7 @@ export default function StatusForm() {
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
               <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
               <EditableSelectRow label="Däck som sitter på" fieldName="hjultyp" displayValue={vehicleStatus.vehicle.hjultyp} options={HJULTYP_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              <EditableInfoRow label="Planerad station" fieldName="planerad_station" displayValue={vehicleStatus.vehicle.planeradStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableSelectRow label="Planerad station" fieldName="planerad_station" displayValue={vehicleStatus.vehicle.planeradStation} options={HUVUDSTATIONER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
              <EditableSelectRow label="Drivmedel" fieldName="drivmedel" displayValue={vehicleStatus.vehicle.drivmedel} options={FUEL_TYPE_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableSelectRow label="Växellåda" fieldName="vaxel" displayValue={vehicleStatus.vehicle.vaxel} options={VAXEL_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableSelectRow label="Stöld-GPS monterad" fieldName="stold_gps" displayValue={vehicleStatus.vehicle.stoldGps} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
@@ -1011,8 +1067,9 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Avtalsvillkor Section — döljs om alla är --- */}
+        {/* Avtalsvillkor Section — döljs i read-only om alla är ---, alltid synlig i edit-läge */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
+          isEditing ||
           vehicleStatus.vehicle.serviceintervall !== '---' ||
           vehicleStatus.vehicle.maxKmManad !== '---' ||
           vehicleStatus.vehicle.avgiftOverKm !== '---'
@@ -1020,14 +1077,15 @@ export default function StatusForm() {
           <Card>
             <SectionHeader title="Avtalsvillkor" />
             <div className="info-grid">
-              <EditableInfoRow label="Serviceintervall" fieldName="serviceintervall" displayValue={vehicleStatus.vehicle.serviceintervall} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              <EditableInfoRow label="Max km/månad" fieldName="max_km_manad" displayValue={vehicleStatus.vehicle.maxKmManad} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              <EditableInfoRow label="Avgift över-km" fieldName="avgift_over_km" displayValue={vehicleStatus.vehicle.avgiftOverKm} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Serviceintervall (km)" fieldName="serviceintervall" displayValue={vehicleStatus.vehicle.serviceintervall} rawValue={vehicleStatus.vehicle.serviceintervall === '---' ? '' : vehicleStatus.vehicle.serviceintervall.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
+              <EditableInfoRow label="Max km/månad" fieldName="max_km_manad" displayValue={vehicleStatus.vehicle.maxKmManad} rawValue={vehicleStatus.vehicle.maxKmManad === '---' ? '' : vehicleStatus.vehicle.maxKmManad.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
+              <EditableInfoRow label="Avgift över-km (kr)" fieldName="avgift_over_km" displayValue={vehicleStatus.vehicle.avgiftOverKm} rawValue={vehicleStatus.vehicle.avgiftOverKm === '---' ? '' : vehicleStatus.vehicle.avgiftOverKm.replace(' kr', '').replace(',', '.').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v.replace(',', '.')}))} inputType="number" step="0.01" />
             </div>
           </Card>
         )}
-        {/* Equipment Storage Section */}
+        {/* Equipment Storage Section — döljs i read-only om alla är ---, alltid synlig i edit-läge */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
+          isEditing ||
           vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
           vehicleStatus.vehicle.reservnyckelInfo !== '---' ||
           vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' ||
@@ -1037,11 +1095,29 @@ export default function StatusForm() {
           <Card>
             <SectionHeader title="Förvaring" />
             <div className="info-grid">
-              {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
-              {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
-              {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
-              {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
-              {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
+              {/* Read-only: visa 5 rader med sammansatt sträng (oförändrat). Edit: visa 10 rader (ort + spec per fält). */}
+              {!isEditing ? (
+                <>
+                  {vehicleStatus.vehicle.hjulForvaringInfo !== '---' && <InfoRow label="Hjulförvaring" value={vehicleStatus.vehicle.hjulForvaringInfo} />}
+                  {vehicleStatus.vehicle.reservnyckelInfo !== '---' && <InfoRow label="Reservnyckel" value={vehicleStatus.vehicle.reservnyckelInfo} />}
+                  {vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' && <InfoRow label="Laddkablar" value={vehicleStatus.vehicle.laddkablarForvaringInfo} />}
+                  {vehicleStatus.vehicle.instruktionsbokForvaringInfo !== '---' && <InfoRow label="Instruktionsbok" value={vehicleStatus.vehicle.instruktionsbokForvaringInfo} />}
+                  {vehicleStatus.vehicle.cocForvaringInfo !== '---' && <InfoRow label="COC-dokument" value={vehicleStatus.vehicle.cocForvaringInfo} />}
+                </>
+              ) : (
+                <>
+                  <EditableSelectRow label="Hjulförvaring — Ort" fieldName="hjul_forvaring_ort" displayValue={vehicleStatus.vehicle.hjulForvaringOrt} options={ORTER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Hjulförvaring — Specificera" fieldName="hjul_forvaring_spec" displayValue={vehicleStatus.vehicle.hjulForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="Reservnyckel — Ort" fieldName="extranyckel_forvaring_ort" displayValue={vehicleStatus.vehicle.extranyckelForvaringOrt} options={ORTER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Reservnyckel — Specificera" fieldName="extranyckel_forvaring_spec" displayValue={vehicleStatus.vehicle.extranyckelForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="Laddkablar — Ort" fieldName="laddkablar_forvaring_ort" displayValue={vehicleStatus.vehicle.laddkablarForvaringOrt} options={ORTER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Laddkablar — Specificera" fieldName="laddkablar_forvaring_spec" displayValue={vehicleStatus.vehicle.laddkablarForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="Instruktionsbok — Ort" fieldName="instruktionsbok_forvaring_ort" displayValue={vehicleStatus.vehicle.instruktionsbokForvaringOrt} options={['I bilen', ...ORTER]} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="Instruktionsbok — Specificera" fieldName="instruktionsbok_forvaring_spec" displayValue={vehicleStatus.vehicle.instruktionsbokForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableSelectRow label="COC-dokument — Ort" fieldName="coc_forvaring_ort" displayValue={vehicleStatus.vehicle.cocForvaringOrt} options={['I bilen', ...ORTER]} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                  <EditableInfoRow label="COC-dokument — Specificera" fieldName="coc_forvaring_spec" displayValue={vehicleStatus.vehicle.cocForvaringSpec} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                </>
+              )}
             </div>
           </Card>
         )}
@@ -1112,12 +1188,96 @@ export default function StatusForm() {
           <Card>
            <SectionHeader title="Övrig info vid leverans till MABI" />
             <div className="info-grid">
-              {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && (
-                <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
-              )}
-              {(vehicleStatus.vehicle.laddnivaVidLeverans !== '---' || isEditing) && (
-                <EditableInfoRow label="Laddnivå vid leverans" fieldName="laddniva_vid_leverans" displayValue={vehicleStatus.vehicle.laddnivaVidLeverans} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              )}
+              {/* Tankstatus: visas för bensin/diesel/hybrid (editerbar) eller om värde finns (read-only) */}
+              {(() => {
+                const drivmedel = vehicleStatus.vehicle.drivmedel;
+                const isFuelType = drivmedel === 'Bensin' || drivmedel === 'Diesel' || drivmedel === 'Hybrid (bensin)' || drivmedel === 'Hybrid (diesel)';
+                const showInEdit = isEditing && isFuelType;
+                const showInReadOnly = !isEditing && vehicleStatus.vehicle.tankstatusVidLeverans !== '---';
+                if (!showInEdit && !showInReadOnly) return null;
+                // Aktuellt tankstatus-värde: pendingEdits → rawValue. Avgör om liter/literpris ska visas.
+                const currentTankstatus = pendingEdits['tankstatus'] !== undefined
+                  ? pendingEdits['tankstatus']
+                  : (vehicleStatus.vehicle.tankstatusVidLeveransRaw === '---' ? '' : vehicleStatus.vehicle.tankstatusVidLeveransRaw);
+                const showUpptankningFields = isEditing && isFuelType && currentTankstatus === 'tankad_nu';
+                return (
+                  <>
+                    <EditableSelectRow
+                      label="Tankstatus vid leverans"
+                      fieldName="tankstatus"
+                      displayValue={vehicleStatus.vehicle.tankstatusVidLeverans}
+                      options={[
+                        { value: 'mottogs_fulltankad', label: 'Mottogs fulltankad' },
+                        { value: 'tankad_nu', label: 'Tankades upp av MABI' },
+                        { value: 'ej_upptankad', label: 'Levererades ej fulltankad' },
+                      ]}
+                      rawValue={vehicleStatus.vehicle.tankstatusVidLeveransRaw === '---' ? '' : vehicleStatus.vehicle.tankstatusVidLeveransRaw}
+                      isEditing={isEditing}
+                      pendingEdits={pendingEdits}
+                      onEdit={(f, v) => {
+                        setPendingEdits(p => {
+                          const next = { ...p, [f]: v };
+                          // Rensa liter/literpris om tankstatus byts till något annat än 'tankad_nu'.
+                          // delete (inte = '') så att fälten återgår till DB-värden om användaren byter tillbaka.
+                          if (v !== 'tankad_nu') {
+                            delete next['upptankning_liter'];
+                            delete next['upptankning_literpris'];
+                          }
+                          return next;
+                        });
+                      }}
+                    />
+                    {showUpptankningFields && (
+                      <>
+                        <EditableInfoRow
+                          label="Upptankning antal liter (frivilligt)"
+                          fieldName="upptankning_liter"
+                          displayValue={vehicleStatus.vehicle.upptankningLiter}
+                          rawValue={vehicleStatus.vehicle.upptankningLiter === '---' ? '' : vehicleStatus.vehicle.upptankningLiter}
+                          isEditing={isEditing}
+                          pendingEdits={pendingEdits}
+                          onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v.replace(',', '.')}))}
+                          inputType="number"
+                          step="0.01"
+                        />
+                        <EditableInfoRow
+                          label="Upptankning literpris kr/l (frivilligt)"
+                          fieldName="upptankning_literpris"
+                          displayValue={vehicleStatus.vehicle.upptankningLiterpris}
+                          rawValue={vehicleStatus.vehicle.upptankningLiterpris === '---' ? '' : vehicleStatus.vehicle.upptankningLiterpris}
+                          isEditing={isEditing}
+                          pendingEdits={pendingEdits}
+                          onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v.replace(',', '.')}))}
+                          inputType="number"
+                          step="0.01"
+                        />
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+              {/* Laddnivå: visas för 100% el (editerbar) eller om värde finns (read-only) */}
+              {(() => {
+                const drivmedel = vehicleStatus.vehicle.drivmedel;
+                const isElectric = drivmedel === '100% el';
+                const showInEdit = isEditing && isElectric;
+                const showInReadOnly = !isEditing && vehicleStatus.vehicle.laddnivaVidLeverans !== '---';
+                if (!showInEdit && !showInReadOnly) return null;
+                return (
+                  <EditableInfoRow
+                    label="Laddnivå vid leverans (%)"
+                    fieldName="laddniva_vid_leverans"
+                    displayValue={vehicleStatus.vehicle.laddnivaVidLeverans}
+                    rawValue={vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim()}
+                    isEditing={isEditing}
+                    pendingEdits={pendingEdits}
+                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                    inputType="number"
+                    min={0}
+                    max={100}
+                  />
+                );
+              })()}
               <Fragment>
                 <span className="info-label">Skador vid leverans</span>
                 <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans === true ? 'at-risk' : ''}`}>
@@ -1134,8 +1294,17 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Sale Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && (vehicleStatus.vehicle.saludatum !== '---' || isEditing) && (
+        {/* Sale Section — döljs i read-only om alla är ---, alltid synlig i edit-läge */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          isEditing ||
+          vehicleStatus.vehicle.saludatum !== '---' ||
+          vehicleStatus.vehicle.saluStation !== '---' ||
+          vehicleStatus.vehicle.saluKopare !== '---' ||
+          vehicleStatus.vehicle.saluReturadress !== '---' ||
+          vehicleStatus.vehicle.saluRetur !== '---' ||
+          vehicleStatus.vehicle.saluAttention !== '---' ||
+          vehicleStatus.vehicle.saluNotering !== '---'
+        ) && (
           <Card>
            <SectionHeader title="Salu" />
             <div className="info-grid">
@@ -1555,7 +1724,10 @@ const EditableInfoRow: React.FC<{
   onEdit: (field: string, value: string) => void;
   multiline?: boolean;
   inputType?: string;
-}> = ({ label, fieldName, displayValue, rawValue, isEditing, pendingEdits, onEdit, multiline, inputType }) => {
+  min?: number;
+  max?: number;
+  step?: string;
+}> = ({ label, fieldName, displayValue, rawValue, isEditing, pendingEdits, onEdit, multiline, inputType, min, max, step }) => {
   const initialValue = rawValue !== undefined ? rawValue : (displayValue === '---' ? '' : displayValue);
   const currentInput = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : initialValue;
   const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== initialValue;
@@ -1574,9 +1746,37 @@ const EditableInfoRow: React.FC<{
        <input
           type={inputType || 'text'}
           value={currentInput}
-          onChange={e => onEdit(fieldName, e.target.value)}
-          min={inputType === 'number' ? '0' : undefined}
-          step={inputType === 'number' ? '1' : undefined}
+          onChange={e => {
+            let val = e.target.value;
+            if (inputType === 'number') {
+              // Tillåt decimaler bara om step indikerar det
+              const allowDecimals = step !== undefined && step !== '1';
+              if (allowDecimals) {
+                // Strippa allt utom siffror, punkt och komma; normalisera komma till punkt
+                val = val.replace(/[^0-9.,]/g, '').replace(',', '.');
+                // Tillåt bara EN punkt (om användaren skriver "1.2.3" → "1.2")
+                const firstDot = val.indexOf('.');
+                if (firstDot !== -1) {
+                  val = val.substring(0, firstDot + 1) + val.substring(firstDot + 1).replace(/\./g, '');
+                }
+              } else {
+                // Heltal: strippa allt utom siffror
+                val = val.replace(/[^0-9]/g, '');
+              }
+              // Auto-rätta max-spärr
+              if (max !== undefined && val !== '') {
+                const numVal = Number(val);
+                if (!isNaN(numVal) && numVal > max) {
+                  onEdit(fieldName, String(max));
+                  return;
+                }
+              }
+            }
+            onEdit(fieldName, val);
+          }}
+          min={inputType === 'number' ? (min !== undefined ? String(min) : '0') : undefined}
+          max={inputType === 'number' && max !== undefined ? String(max) : undefined}
+          step={inputType === 'number' ? (step || '1') : undefined}
           style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%' }}
         />
       )}
@@ -1660,15 +1860,18 @@ const EditableSelectRow: React.FC<{
   label: string;
   fieldName: string;
   displayValue: string;
-  options: string[];
+  options: string[] | { value: string; label: string }[];
+  rawValue?: string;
   isEditing: boolean;
   pendingEdits: Record<string, string>;
   onEdit: (field: string, value: string) => void;
-}> = ({ label, fieldName, displayValue, options, isEditing, pendingEdits, onEdit }) => {
-  const initialValue = displayValue === '---' ? '' : displayValue;
+}> = ({ label, fieldName, displayValue, options, rawValue, isEditing, pendingEdits, onEdit }) => {
+  const initialValue = rawValue !== undefined ? rawValue : (displayValue === '---' ? '' : displayValue);
   const currentInput = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : initialValue;
   const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== initialValue;
   if (!isEditing) return <InfoRow label={label} value={displayValue} />;
+  // Normalisera options till { value, label }-format
+  const normalizedOptions = options.map(o => typeof o === 'string' ? { value: o, label: o } : o);
   return (
     <>
       <span className="info-label">{label}</span>
@@ -1678,7 +1881,7 @@ const EditableSelectRow: React.FC<{
         style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
       >
         <option value="">---</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        {normalizedOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </>
   );

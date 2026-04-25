@@ -30,12 +30,22 @@ export type VehicleStatusData = {
   planeradStation: string;
   utrustning: string;
   saluinfo: string;
-  // Detailed storage info (individual fields)
+  // Detailed storage info (individual fields — composite display + raw ort/spec for editing)
   hjulForvaringInfo: string;
+  hjulForvaringOrt: string;
+  hjulForvaringSpec: string;
   reservnyckelInfo: string;
+  extranyckelForvaringOrt: string;
+  extranyckelForvaringSpec: string;
   laddkablarForvaringInfo: string;
+  laddkablarForvaringOrt: string;
+  laddkablarForvaringSpec: string;
   instruktionsbokForvaringInfo: string;
+  instruktionsbokForvaringOrt: string;
+  instruktionsbokForvaringSpec: string;
   cocForvaringInfo: string;
+  cocForvaringOrt: string;
+  cocForvaringSpec: string;
   // Equipment details (individual fields)
   antalNycklar: string;
   antalLaddkablar: string;
@@ -56,6 +66,9 @@ export type VehicleStatusData = {
   // Fuel filling info
   tankningInfo: string;
   tankstatusVidLeverans: string;
+  tankstatusVidLeveransRaw: string;
+  upptankningLiter: string;
+  upptankningLiterpris: string;
   // General comment
   anteckningar: string;
 // Ej uthyrningsbar — uppdelat i tre fält
@@ -233,6 +246,9 @@ export type VehicleStatusResult = {
     drivmedel: string;
     vaxellada: string;
     tankstatusVidLeverans: string;
+    tankstatusVidLeveransRaw: string;
+    upptankningLiter: string;
+    upptankningLiterpris: string;
     // Avtalsvillkor
     serviceintervall: string;
     maxKmManad: string;
@@ -248,12 +264,22 @@ export type VehicleStatusResult = {
     harDragkrok: string;
     harGummimattor: string;
     harDackkompressor: string;
-    // Förvaring
+    // Förvaring (composite display + raw ort/spec for editing)
     hjulforvaring: string;
+    hjulForvaringOrt: string;
+    hjulForvaringSpec: string;
     reservnyckelForvaring: string;
+    extranyckelForvaringOrt: string;
+    extranyckelForvaringSpec: string;
     laddkablarForvaring: string;
+    laddkablarForvaringOrt: string;
+    laddkablarForvaringSpec: string;
     instruktionsbokForvaring: string;
+    instruktionsbokForvaringOrt: string;
+    instruktionsbokForvaringSpec: string;
     cocForvaring: string;
+    cocForvaringOrt: string;
+    cocForvaringSpec: string;
     // Uppkoppling
     mbmeAktiverad: string;
     vwConnectAktiverad: string;
@@ -953,6 +979,19 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     stold_gps_spec: 'Stöld-GPS spec',
     mbme_aktiverad: 'MBme aktiverad',
     vw_connect_aktiverad: 'VW Connect aktiverad',
+    tankstatus: 'Tankstatus vid leverans',
+    upptankning_liter: 'Upptankning antal liter',
+    upptankning_literpris: 'Upptankning literpris (kr/l)',
+    hjul_forvaring_ort: 'Hjulförvaring — Ort',
+    hjul_forvaring_spec: 'Hjulförvaring — Specificera',
+    extranyckel_forvaring_ort: 'Reservnyckel — Ort',
+    extranyckel_forvaring_spec: 'Reservnyckel — Specificera',
+    laddkablar_forvaring_ort: 'Laddkablar — Ort',
+    laddkablar_forvaring_spec: 'Laddkablar — Specificera',
+    instruktionsbok_forvaring_ort: 'Instruktionsbok — Ort',
+    instruktionsbok_forvaring_spec: 'Instruktionsbok — Specificera',
+    coc_forvaring_ort: 'COC-dokument — Ort',
+    coc_forvaring_spec: 'COC-dokument — Specificera',
     ej_uthyrningsbar_anledning: 'Ej uthyrningsbar anledning',
     laddniva_vid_leverans: 'Laddnivå vid leverans',
     saludatum: 'Saludatum',
@@ -1162,10 +1201,20 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       utrustning: '---',
       saluinfo: '---',
       hjulForvaringInfo: '---',
+      hjulForvaringOrt: latestEdits.get('hjul_forvaring_ort')?.value || '---',
+      hjulForvaringSpec: latestEdits.get('hjul_forvaring_spec')?.value || '---',
       reservnyckelInfo: '---',
+      extranyckelForvaringOrt: latestEdits.get('extranyckel_forvaring_ort')?.value || '---',
+      extranyckelForvaringSpec: latestEdits.get('extranyckel_forvaring_spec')?.value || '---',
       laddkablarForvaringInfo: '---',
+      laddkablarForvaringOrt: latestEdits.get('laddkablar_forvaring_ort')?.value || '---',
+      laddkablarForvaringSpec: latestEdits.get('laddkablar_forvaring_spec')?.value || '---',
       instruktionsbokForvaringInfo: '---',
+      instruktionsbokForvaringOrt: latestEdits.get('instruktionsbok_forvaring_ort')?.value || '---',
+      instruktionsbokForvaringSpec: latestEdits.get('instruktionsbok_forvaring_spec')?.value || '---',
       cocForvaringInfo: '---',
+      cocForvaringOrt: latestEdits.get('coc_forvaring_ort')?.value || '---',
+      cocForvaringSpec: latestEdits.get('coc_forvaring_spec')?.value || '---',
       antalNycklar: '---',
       antalLaddkablar: '---',
       antalInsynsskydd: '---',
@@ -1183,6 +1232,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       saluNotering: latestEdits.get('salu_notering')?.value || '---',
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
+      tankstatusVidLeveransRaw: latestEdits.get('tankstatus')?.value || '---',
+      upptankningLiter: latestEdits.get('upptankning_liter')?.value || '---',
+      upptankningLiterpris: latestEdits.get('upptankning_literpris')?.value || '---',
       anteckningar: latestEdits.get('anteckningar')?.value || '---',
       ejUthyrningsbarKommentar: null,
       ejUthyrningsbarKalla: null,
@@ -2047,22 +2099,45 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Saluinfo: summarized from nybil_inventering sale fields
     saluinfo: buildSaleInfo(nybilData),
     
-    // Equipment storage info (individual fields for separate rows)
-    hjulForvaringInfo: (nybilData?.hjul_forvaring_ort || nybilData?.hjul_forvaring_spec || nybilData?.hjul_forvaring)
-      ? [nybilData.hjul_forvaring_ort, nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring].filter(Boolean).join(' - ')
-      : '---',
-    reservnyckelInfo: (nybilData?.extranyckel_forvaring_ort || nybilData?.extranyckel_forvaring_spec)
-      ? [nybilData.extranyckel_forvaring_ort, nybilData.extranyckel_forvaring_spec].filter(Boolean).join(' - ')
-      : '---',
-    laddkablarForvaringInfo: (nybilData?.laddkablar_forvaring_ort || nybilData?.laddkablar_forvaring_spec)
-      ? [nybilData.laddkablar_forvaring_ort, nybilData.laddkablar_forvaring_spec].filter(Boolean).join(' - ')
-      : '---',
-    instruktionsbokForvaringInfo: (nybilData?.instruktionsbok_forvaring_ort || nybilData?.instruktionsbok_forvaring_spec)
-      ? [nybilData.instruktionsbok_forvaring_ort, nybilData.instruktionsbok_forvaring_spec].filter(Boolean).join(' - ')
-      : '---',
-    cocForvaringInfo: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
-      ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')
-      : '---',
+    // Equipment storage — read individual ort + spec via edits → modern column → legacy.
+    // Hjulförvaring-spec har två källor: modern hjul_forvaring_spec och legacy hjul_forvaring (som /nybil skriver till).
+    // Edits skrivs alltid till hjul_forvaring_spec, men vi läser legacy som fallback för befintliga rader.
+    hjulForvaringOrt: latestEdits.get('hjul_forvaring_ort')?.value ?? nybilData?.hjul_forvaring_ort ?? '---',
+    hjulForvaringSpec: latestEdits.get('hjul_forvaring_spec')?.value ?? nybilData?.hjul_forvaring_spec ?? nybilData?.hjul_forvaring ?? '---',
+    extranyckelForvaringOrt: latestEdits.get('extranyckel_forvaring_ort')?.value ?? nybilData?.extranyckel_forvaring_ort ?? '---',
+    extranyckelForvaringSpec: latestEdits.get('extranyckel_forvaring_spec')?.value ?? nybilData?.extranyckel_forvaring_spec ?? '---',
+    laddkablarForvaringOrt: latestEdits.get('laddkablar_forvaring_ort')?.value ?? nybilData?.laddkablar_forvaring_ort ?? '---',
+    laddkablarForvaringSpec: latestEdits.get('laddkablar_forvaring_spec')?.value ?? nybilData?.laddkablar_forvaring_spec ?? '---',
+    instruktionsbokForvaringOrt: latestEdits.get('instruktionsbok_forvaring_ort')?.value ?? nybilData?.instruktionsbok_forvaring_ort ?? '---',
+    instruktionsbokForvaringSpec: latestEdits.get('instruktionsbok_forvaring_spec')?.value ?? nybilData?.instruktionsbok_forvaring_spec ?? '---',
+    cocForvaringOrt: latestEdits.get('coc_forvaring_ort')?.value ?? nybilData?.coc_forvaring_ort ?? '---',
+    cocForvaringSpec: latestEdits.get('coc_forvaring_spec')?.value ?? nybilData?.coc_forvaring_spec ?? '---',
+    // Equipment storage composite read-only strings — backward compatible with edit-overlay
+    hjulForvaringInfo: (() => {
+      const ort = latestEdits.get('hjul_forvaring_ort')?.value ?? nybilData?.hjul_forvaring_ort;
+      const spec = latestEdits.get('hjul_forvaring_spec')?.value ?? nybilData?.hjul_forvaring_spec ?? nybilData?.hjul_forvaring;
+      return (ort || spec) ? [ort, spec].filter(Boolean).join(' - ') : '---';
+    })(),
+    reservnyckelInfo: (() => {
+      const ort = latestEdits.get('extranyckel_forvaring_ort')?.value ?? nybilData?.extranyckel_forvaring_ort;
+      const spec = latestEdits.get('extranyckel_forvaring_spec')?.value ?? nybilData?.extranyckel_forvaring_spec;
+      return (ort || spec) ? [ort, spec].filter(Boolean).join(' - ') : '---';
+    })(),
+    laddkablarForvaringInfo: (() => {
+      const ort = latestEdits.get('laddkablar_forvaring_ort')?.value ?? nybilData?.laddkablar_forvaring_ort;
+      const spec = latestEdits.get('laddkablar_forvaring_spec')?.value ?? nybilData?.laddkablar_forvaring_spec;
+      return (ort || spec) ? [ort, spec].filter(Boolean).join(' - ') : '---';
+    })(),
+    instruktionsbokForvaringInfo: (() => {
+      const ort = latestEdits.get('instruktionsbok_forvaring_ort')?.value ?? nybilData?.instruktionsbok_forvaring_ort;
+      const spec = latestEdits.get('instruktionsbok_forvaring_spec')?.value ?? nybilData?.instruktionsbok_forvaring_spec;
+      return (ort || spec) ? [ort, spec].filter(Boolean).join(' - ') : '---';
+    })(),
+    cocForvaringInfo: (() => {
+      const ort = latestEdits.get('coc_forvaring_ort')?.value ?? nybilData?.coc_forvaring_ort;
+      const spec = latestEdits.get('coc_forvaring_spec')?.value ?? nybilData?.coc_forvaring_spec;
+      return (ort || spec) ? [ort, spec].filter(Boolean).join(' - ') : '---';
+    })(),
     
     // Equipment details (individual fields for separate section)
     antalNycklar: nybilData?.antal_nycklar != null ? `${nybilData.antal_nycklar} st` : '---',
@@ -2085,7 +2160,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     
     // Fuel filling info
     tankningInfo: buildFuelFillingInfo(nybilData),
-    tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
+    tankstatusVidLeverans: latestEdits.get('tankstatus')?.value
+      ? buildTankstatusDisplay({ ...nybilData, tankstatus: latestEdits.get('tankstatus')!.value } as NybilInventeringData)
+      : buildTankstatusDisplay(nybilData),
+    tankstatusVidLeveransRaw: latestEdits.get('tankstatus')?.value ?? nybilData?.tankstatus ?? '---',
+    upptankningLiter: latestEdits.get('upptankning_liter')?.value ?? (nybilData?.upptankning_liter != null ? String(nybilData.upptankning_liter) : '---'),
+    upptankningLiterpris: latestEdits.get('upptankning_literpris')?.value ?? (nybilData?.upptankning_literpris != null ? String(nybilData.upptankning_literpris) : '---'),
     
     // General comment: vehicle_edits → nybil_inventering
     anteckningar: latestEdits.get('anteckningar')?.value || nybilData?.anteckningar || '---',
@@ -3069,6 +3149,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     drivmedel: displayBransletyp(nybilData.bransletyp),
     vaxellada: nybilData.vaxel || '---',
     tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
+    tankstatusVidLeveransRaw: nybilData.tankstatus || '---',
+    upptankningLiter: nybilData.upptankning_liter != null ? String(nybilData.upptankning_liter) : '---',
+    upptankningLiterpris: nybilData.upptankning_literpris != null ? String(nybilData.upptankning_literpris) : '---',
     // Avtalsvillkor
     serviceintervall: nybilData.serviceintervall ? `${nybilData.serviceintervall} km` : '---',
     maxKmManad: nybilData.max_km_manad ? `${nybilData.max_km_manad} km` : '---',

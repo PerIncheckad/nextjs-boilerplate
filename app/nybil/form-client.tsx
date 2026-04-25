@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { BILMARKEN, FUEL_TYPES } from '@/lib/constants';
+import { BILMARKEN, FUEL_TYPES, ORTER } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
@@ -11,7 +11,7 @@ import { compressImage } from '@/lib/image-utils';
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Silver%20logo%20white%20bkgrd/MB-logo-white-logo.jpg";
 
-const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
+// ORTER importeras nu från lib/constants.ts (delas med /status-editering).
 
 // Huvudstationer for Planerad Station and Saluinfo
 const HUVUDSTATIONER = [
@@ -1836,7 +1836,7 @@ export default function NybilForm() {
         </Field>
         {serviceintervall === 'Annat' && (
           <Field label="Specificera serviceintervall">
-            <input type="number" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange serviceintervall" />
+            <input type="number" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Ange serviceintervall" min="0" step="1" />
           </Field>
         )}
         <Field label="Max km/månad *">
@@ -1849,7 +1849,7 @@ export default function NybilForm() {
         </Field>
         {maxKmManad === 'Annat' && (
           <Field label="Specificera max km/månad">
-            <input type="number" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange max km/månad" />
+            <input type="number" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value.replace(/[^0-9]/g, ''))} placeholder="Ange max km/månad" min="0" step="1" />
           </Field>
         )}
         <Field label="Avgift över-km *">
@@ -1862,7 +1862,7 @@ export default function NybilForm() {
         </Field>
         {avgiftOverKm === 'Annat' && (
           <Field label="Specificera avgift över-km">
-            <input type="number" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value)} placeholder="Ange avgift" />
+            <input type="number" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.'))} placeholder="Ange avgift" min="0" step="0.01" />
           </Field>
         )}
       </Card>
