@@ -1011,8 +1011,9 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Avtalsvillkor Section — döljs om alla är --- */}
+        {/* Avtalsvillkor Section — döljs i read-only om alla är ---, alltid synlig i edit-läge */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
+          isEditing ||
           vehicleStatus.vehicle.serviceintervall !== '---' ||
           vehicleStatus.vehicle.maxKmManad !== '---' ||
           vehicleStatus.vehicle.avgiftOverKm !== '---'
@@ -1026,8 +1027,9 @@ export default function StatusForm() {
             </div>
           </Card>
         )}
-        {/* Equipment Storage Section */}
+        {/* Equipment Storage Section — döljs i read-only om alla är ---, alltid synlig i edit-läge */}
         {vehicleStatus?.found && vehicleStatus.vehicle && (
+          isEditing ||
           vehicleStatus.vehicle.hjulForvaringInfo !== '---' ||
           vehicleStatus.vehicle.reservnyckelInfo !== '---' ||
           vehicleStatus.vehicle.laddkablarForvaringInfo !== '---' ||
@@ -1134,8 +1136,17 @@ export default function StatusForm() {
           </Card>
         )}
 
-        {/* Sale Section */}
-        {vehicleStatus?.found && vehicleStatus.vehicle && (vehicleStatus.vehicle.saludatum !== '---' || isEditing) && (
+        {/* Sale Section — döljs i read-only om alla är ---, alltid synlig i edit-läge */}
+        {vehicleStatus?.found && vehicleStatus.vehicle && (
+          isEditing ||
+          vehicleStatus.vehicle.saludatum !== '---' ||
+          vehicleStatus.vehicle.saluStation !== '---' ||
+          vehicleStatus.vehicle.saluKopare !== '---' ||
+          vehicleStatus.vehicle.saluReturadress !== '---' ||
+          vehicleStatus.vehicle.saluRetur !== '---' ||
+          vehicleStatus.vehicle.saluAttention !== '---' ||
+          vehicleStatus.vehicle.saluNotering !== '---'
+        ) && (
           <Card>
            <SectionHeader title="Salu" />
             <div className="info-grid">
