@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { BILMARKEN, FUEL_TYPES } from '@/lib/constants';
+import { BILMARKEN, FUEL_TYPES, ORTER } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
@@ -11,7 +11,7 @@ import { compressImage } from '@/lib/image-utils';
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Silver%20logo%20white%20bkgrd/MB-logo-white-logo.jpg";
 
-const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
+// ORTER importeras nu från lib/constants.ts (delas med /status-editering).
 
 // Huvudstationer for Planerad Station and Saluinfo
 const HUVUDSTATIONER = [
