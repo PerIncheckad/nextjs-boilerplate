@@ -711,8 +711,13 @@ export async function POST(request: Request) {
 
     const regNr = payload.regnr || '';
 
-    // Mottagare/ämnen
+   // Mottagare/ämnen
     const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
+    // TEMP (rulla tillbaka innan merge): routa båda mejlen till per@incheckad.se under test
+    const huvudstationTo = ['per@incheckad.se'];
+    const bilkontrollTo = ['per@incheckad.se'];
+    // TEMP-END
+    /* ORIGINAL (återställ vid merge):
     const huvudstationTo = [defaultHuvudstationAddress];
     const stationSpecificEmail = stationEmailMapping[finalOrt];
     if (stationSpecificEmail && !huvudstationTo.includes(stationSpecificEmail)) {
@@ -721,6 +726,7 @@ export async function POST(request: Request) {
 
     // Bilkontroll recipients: Per always, Latif always (alla orter)
     const bilkontrollTo = ['per@incheckad.se', 'latif@incheckad.se'];
+    */
 
     const stationForSubject = payload.bilen_star_nu?.station || payload.station;
     const cleanStation = stationForSubject?.includes(' / ')
