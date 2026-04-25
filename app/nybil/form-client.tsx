@@ -1836,7 +1836,7 @@ export default function NybilForm() {
         </Field>
         {serviceintervall === 'Annat' && (
           <Field label="Specificera serviceintervall">
-            <input type="number" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange serviceintervall" />
+            <input type="number" value={serviceintervallAnnat} onChange={e => setServiceintervallAnnat(e.target.value)} placeholder="Ange serviceintervall" min="0" step="1" />
           </Field>
         )}
         <Field label="Max km/månad *">
@@ -1849,7 +1849,7 @@ export default function NybilForm() {
         </Field>
         {maxKmManad === 'Annat' && (
           <Field label="Specificera max km/månad">
-            <input type="number" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange max km/månad" />
+            <input type="number" value={maxKmManadAnnat} onChange={e => setMaxKmManadAnnat(e.target.value)} placeholder="Ange max km/månad" min="0" step="1" />
           </Field>
         )}
         <Field label="Avgift över-km *">
@@ -1862,7 +1862,7 @@ export default function NybilForm() {
         </Field>
         {avgiftOverKm === 'Annat' && (
           <Field label="Specificera avgift över-km">
-            <input type="number" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value)} placeholder="Ange avgift" />
+            <input type="number" value={avgiftOverKmAnnat} onChange={e => setAvgiftOverKmAnnat(e.target.value.replace(',', '.'))} placeholder="Ange avgift" min="0" step="0.01" />
           </Field>
         )}
       </Card>
