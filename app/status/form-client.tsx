@@ -14,6 +14,10 @@ const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v
 
 // ORTER importeras nu från lib/constants.ts (delas med /nybil).
 
+// HUVUDSTATIONER används som dropdown-värden för "Planerad station".
+// Identisk lista som i /nybil — håll i synk.
+const HUVUDSTATIONER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];
+
 const STATIONER: Record<string, string[]> = {
   'Falkenberg': ['Falkenberg'],
   'Halmstad': ['BVH (Hedin multi)', 'Flyget Halmstad', 'FORD Halmstad', 'KIA Halmstad', 'MB Halmstad'],
@@ -980,7 +984,7 @@ export default function StatusForm() {
               <InfoRow label="Senast incheckad" value={vehicleStatus.vehicle.bilenStarNu} />
               <EditableInfoRow label="Mätarställning" fieldName="matarstallning" displayValue={vehicleStatus.vehicle.matarstallning !== '---' && vehicleStatus.vehicle.matarstallningKalla ? `${vehicleStatus.vehicle.matarstallning} (${vehicleStatus.vehicle.matarstallningKalla})` : vehicleStatus.vehicle.matarstallning} rawValue={vehicleStatus.vehicle.matarstallning === '---' ? '' : vehicleStatus.vehicle.matarstallning.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
               <EditableSelectRow label="Däck som sitter på" fieldName="hjultyp" displayValue={vehicleStatus.vehicle.hjultyp} options={HJULTYP_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              <EditableInfoRow label="Planerad station" fieldName="planerad_station" displayValue={vehicleStatus.vehicle.planeradStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableSelectRow label="Planerad station" fieldName="planerad_station" displayValue={vehicleStatus.vehicle.planeradStation} options={HUVUDSTATIONER} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
              <EditableSelectRow label="Drivmedel" fieldName="drivmedel" displayValue={vehicleStatus.vehicle.drivmedel} options={FUEL_TYPE_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableSelectRow label="Växellåda" fieldName="vaxel" displayValue={vehicleStatus.vehicle.vaxel} options={VAXEL_OPTIONS} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               <EditableSelectRow label="Stöld-GPS monterad" fieldName="stold_gps" displayValue={vehicleStatus.vehicle.stoldGps} options={['Ja', 'Nej']} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
@@ -1021,8 +1025,8 @@ export default function StatusForm() {
           <Card>
             <SectionHeader title="Avtalsvillkor" />
             <div className="info-grid">
-              <EditableInfoRow label="Serviceintervall" fieldName="serviceintervall" displayValue={vehicleStatus.vehicle.serviceintervall} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
-              <EditableInfoRow label="Max km/månad" fieldName="max_km_manad" displayValue={vehicleStatus.vehicle.maxKmManad} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+              <EditableInfoRow label="Serviceintervall (km)" fieldName="serviceintervall" displayValue={vehicleStatus.vehicle.serviceintervall} rawValue={vehicleStatus.vehicle.serviceintervall === '---' ? '' : vehicleStatus.vehicle.serviceintervall.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
+              <EditableInfoRow label="Max km/månad" fieldName="max_km_manad" displayValue={vehicleStatus.vehicle.maxKmManad} rawValue={vehicleStatus.vehicle.maxKmManad === '---' ? '' : vehicleStatus.vehicle.maxKmManad.replace(' km', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
               <EditableInfoRow label="Avgift över-km" fieldName="avgift_over_km" displayValue={vehicleStatus.vehicle.avgiftOverKm} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
             </div>
           </Card>
@@ -1118,7 +1122,7 @@ export default function StatusForm() {
                 <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
               )}
               {(vehicleStatus.vehicle.laddnivaVidLeverans !== '---' || isEditing) && (
-                <EditableInfoRow label="Laddnivå vid leverans" fieldName="laddniva_vid_leverans" displayValue={vehicleStatus.vehicle.laddnivaVidLeverans} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
+                <EditableInfoRow label="Laddnivå vid leverans (%)" fieldName="laddniva_vid_leverans" displayValue={vehicleStatus.vehicle.laddnivaVidLeverans} rawValue={vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" />
               )}
               <Fragment>
                 <span className="info-label">Skador vid leverans</span>
