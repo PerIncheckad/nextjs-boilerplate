@@ -407,7 +407,7 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-function formatDateTime(dateStr: string | null | undefined): string {
+export function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '---';
   try {
     const date = new Date(dateStr);
