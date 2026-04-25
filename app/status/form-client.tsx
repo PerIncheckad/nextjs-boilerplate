@@ -1169,10 +1169,11 @@ export default function StatusForm() {
                       onEdit={(f, v) => {
                         setPendingEdits(p => {
                           const next = { ...p, [f]: v };
-                          // Rensa liter/literpris om tankstatus byts till något annat än 'tankad_nu'
+                          // Rensa liter/literpris om tankstatus byts till något annat än 'tankad_nu'.
+                          // delete (inte = '') så att fälten återgår till DB-värden om användaren byter tillbaka.
                           if (v !== 'tankad_nu') {
-                            next['upptankning_liter'] = '';
-                            next['upptankning_literpris'] = '';
+                            delete next['upptankning_liter'];
+                            delete next['upptankning_literpris'];
                           }
                           return next;
                         });
