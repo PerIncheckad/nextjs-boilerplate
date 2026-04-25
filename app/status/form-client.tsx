@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
-import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS } from '@/lib/constants';
+import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS, ORTER } from '@/lib/constants';
 
 // =================================================================
 // 1. CONSTANTS
@@ -12,7 +12,7 @@ import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS } from '@/
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MB%20300%20SL%20Roadster%201962/MB%20300-SL-Roadster_1962.jpg";
 
-const ORTER = ['Falkenberg', 'Halmstad', 'Helsingborg', 'Lund', 'Malmö', 'Trelleborg', 'Varberg', 'Ängelholm'];
+// ORTER importeras nu från lib/constants.ts (delas med /nybil).
 
 const STATIONER: Record<string, string[]> = {
   'Falkenberg': ['Falkenberg'],
