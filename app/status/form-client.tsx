@@ -1166,7 +1166,17 @@ export default function StatusForm() {
                       rawValue={vehicleStatus.vehicle.tankstatusVidLeveransRaw === '---' ? '' : vehicleStatus.vehicle.tankstatusVidLeveransRaw}
                       isEditing={isEditing}
                       pendingEdits={pendingEdits}
-                      onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                      onEdit={(f, v) => {
+                        setPendingEdits(p => {
+                          const next = { ...p, [f]: v };
+                          // Rensa liter/literpris om tankstatus byts till något annat än 'tankad_nu'
+                          if (v !== 'tankad_nu') {
+                            next['upptankning_liter'] = '';
+                            next['upptankning_literpris'] = '';
+                          }
+                          return next;
+                        });
+                      }}
                     />
                     {showUpptankningFields && (
                       <>
