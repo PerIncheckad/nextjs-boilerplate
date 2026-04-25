@@ -89,7 +89,7 @@ export type VehicleStatusData = {
 };
 
 export type DamageRecord = {
-  id: number;
+  id: string;
   regnr: string;
   skadetyp: string;
   datum: string;
@@ -110,6 +110,16 @@ export type DamageRecord = {
   is_handled?: boolean; // True if damage was handled (documented/not_found/existing)
   is_inventoried?: boolean; // True if damage was inventoried during checkin
   is_unmatched_buhs?: boolean; // True if this is an unmatched BUHS damage
+  // Skadekommentar(er), nyast först
+  comments?: DamageComment[];
+};
+
+export type DamageComment = {
+  id: number;
+  damage_id: string;
+  comment: string;
+  created_by: string;
+  created_at: string;
 };
 
 export type HistoryRecord = {
@@ -397,7 +407,7 @@ function formatDate(dateStr: string | null | undefined): string {
   }
 }
 
-function formatDateTime(dateStr: string | null | undefined): string {
+export function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '---';
   try {
     const date = new Date(dateStr);
@@ -929,6 +939,37 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const vehicleEditsData = vehicleEditsResponse.data || [];
   const nybilData = nybilResponse.data;
 
+  // Hämta skadekommentarer för alla damages.id för denna regnr.
+  // Görs sekventiellt efter Promise.all eftersom vi behöver damage IDs
+  // (medvetet ingen FK i damage_comments → Supabase-join inte tillgänglig).
+  const damageIdsForComments = (damagesResponse.data || [])
+    .map((d: any) => d.id)
+    .filter((id: any): id is string => typeof id === 'string');
+
+  let damageCommentsData: DamageComment[] = [];
+  if (damageIdsForComments.length > 0) {
+    const { data: commentsRaw } = await supabase
+      .from('damage_comments')
+      .select('*')
+      .in('damage_id', damageIdsForComments)
+      .order('created_at', { ascending: false });
+    damageCommentsData = (commentsRaw || []).map((dc: any) => ({
+      id: dc.id,
+      damage_id: dc.damage_id,
+      comment: dc.comment,
+      created_by: dc.created_by,
+      created_at: dc.created_at,
+    }));
+  }
+
+  // Bygg Map<damage_id, DamageComment[]> — newest-first (data sorterad desc ovan)
+  const commentsByDamageId = new Map<string, DamageComment[]>();
+  for (const dc of damageCommentsData) {
+    const arr = commentsByDamageId.get(dc.damage_id) || [];
+    arr.push(dc);
+    commentsByDamageId.set(dc.damage_id, arr);
+  }
+
   // Bygg Map med senaste edit per fält (data sorterad desc på edited_at)
   const latestEdits = new Map<string, { value: string | null; date: string; editedBy: string }>();
   for (const edit of vehicleEditsData) {
@@ -1019,6 +1060,32 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const legacyDamages = legacyDamagesResponse.data || [];
   const checkins = checkinsResponse.data || [];
   const arrivals = arrivalsResponse.data || [];
+
+  // Lookup-Map för damages.id baserat på matchningsnycklar.
+  // legacyDamages från RPC saknar id-fältet, men damages-tabellen har UUID:er.
+  // Data är sorterad created_at DESC i Promise.all, så första-match = senaste imported_at.
+  const buildDamageMatchKey = (
+    regnr: string,
+    damage_date: any,
+    damage_type_raw: any,
+    note_customer: any,
+    note_internal: any,
+  ): string => `${regnr}|${damage_date || ''}|${damage_type_raw || ''}|${note_customer || ''}|${note_internal || ''}`;
+
+  const damageIdByMatchKey = new Map<string, string>();
+  for (const dRow of damages) {
+    if (!dRow.id) continue;
+    const key = buildDamageMatchKey(
+      cleanedRegnr,
+      dRow.damage_date,
+      dRow.damage_type_raw,
+      dRow.note_customer,
+      dRow.note_internal,
+    );
+    if (!damageIdByMatchKey.has(key)) {
+      damageIdByMatchKey.set(key, dRow.id);
+    }
+  }
   
   // DEBUG: Log raw data for LRA75R
   if (cleanedRegnr === 'LRA75R') {
@@ -1344,10 +1411,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       
       const checkin = matchedCheckinDamage 
         ? checkins.find(c => c.id === matchedCheckinDamage.checkin_id)
-        : null;
+       : null;
       
       const newEntry: DamageEntry = {
-        id: d.id,
+        id: damageIdByMatchKey.get(buildDamageMatchKey(cleanedRegnr, d.damage_date, d.damage_type_raw, d.note_customer, d.note_internal)) || d.id,
         stableKey,
         legacyDamageSourceText: legacyText,
         date: formatDate(date),
@@ -1598,7 +1665,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
-    const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
+    const damagesShownInCheckins = new Set<string>(); // Track damage IDs shown in checkins
     
     // Fetch damage counts for checkins (for avvikelser count)
     // Note: checkinIds is already declared above
@@ -1927,6 +1994,30 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         typ: 'manual',
         sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
         utfordAv: getFullNameFromEmail(edit.edited_by),
+      });
+    }
+
+    // Koppla skadekommentarer till respektive DamageRecord
+    for (const damage of damageRecords) {
+      if (damage.id != null && commentsByDamageId.has(damage.id)) {
+        damage.comments = commentsByDamageId.get(damage.id);
+      }
+    }
+
+    // HistoryRecord per skadekommentar (skadetyp + trunkering vid 80 tecken)
+    for (const dc of damageCommentsData) {
+      const damage = damageRecords.find(d => d.id === dc.damage_id);
+      const skadetyp = damage?.skadetyp || 'okänd skada';
+      const trimmedComment = dc.comment.length > 80
+        ? dc.comment.substring(0, 80) + '...'
+        : dc.comment;
+      historyRecords.push({
+        id: `damage-comment-${dc.id}`,
+        datum: formatDateTime(dc.created_at),
+        rawTimestamp: dc.created_at,
+        typ: 'manual',
+        sammanfattning: `Kommentar på ${skadetyp}: "${trimmedComment}"`,
+        utfordAv: getFullNameFromEmail(dc.created_by),
       });
     }
 
@@ -2358,7 +2449,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       : null;
     
     const newEntry: DamageEntry = {
-      id: d.id,
+      id: damageIdByMatchKey.get(buildDamageMatchKey(cleanedRegnr, d.damage_date, d.damage_type_raw, d.note_customer, d.note_internal)) || d.id,
       stableKey,
       legacyDamageSourceText: legacyText,
       date: formatDate(date),
@@ -2705,7 +2796,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Build history records
   const historyRecords: HistoryRecord[] = [];
-  const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
+  const damagesShownInCheckins = new Set<string>(); // Track damage IDs shown in checkins
 
   // Fetch damage counts for checkins (for avvikelser count)
   // Note: checkinIds is already declared above (reuse it)
@@ -3214,6 +3305,30 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       typ: 'manual',
       sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
       utfordAv: getFullNameFromEmail(edit.edited_by),
+    });
+  }
+
+  // Koppla skadekommentarer till respektive DamageRecord
+  for (const damage of damageRecords) {
+    if (damage.id != null && commentsByDamageId.has(damage.id)) {
+      damage.comments = commentsByDamageId.get(damage.id);
+    }
+  }
+
+  // HistoryRecord per skadekommentar (skadetyp + trunkering vid 80 tecken)
+  for (const dc of damageCommentsData) {
+    const damage = damageRecords.find(d => d.id === dc.damage_id);
+    const skadetyp = damage?.skadetyp || 'okänd skada';
+    const trimmedComment = dc.comment.length > 80
+      ? dc.comment.substring(0, 80) + '...'
+      : dc.comment;
+    historyRecords.push({
+      id: `damage-comment-${dc.id}`,
+      datum: formatDateTime(dc.created_at),
+      rawTimestamp: dc.created_at,
+      typ: 'manual',
+      sammanfattning: `Kommentar på ${skadetyp}: "${trimmedComment}"`,
+      utfordAv: getFullNameFromEmail(dc.created_by),
     });
   }
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord } from '@/lib/vehicle-status';
+import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord, DamageComment, formatDateTime } from '@/lib/vehicle-status';
 import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS, ORTER } from '@/lib/constants';
 
 // =================================================================
@@ -1131,7 +1131,7 @@ export default function StatusForm() {
             ) : (
               <div className="damage-list">
                 {vehicleStatus.damages.map((damage) => (
-                  <DamageItem key={damage.id} damage={damage} regnr={vehicleStatus.vehicle?.regnr || normalizedReg} />
+                  <DamageItem key={damage.id} damage={damage} regnr={vehicleStatus.vehicle?.regnr || normalizedReg} isEditing={isEditing} userEmail={userEmail} />
                 ))}
               </div>
             )}
@@ -1939,33 +1939,133 @@ const FilterButton: React.FC<React.PropsWithChildren<{ active: boolean; onClick:
   </button>
 );
 
-const DamageItem: React.FC<{ damage: DamageRecord; regnr: string }> = ({ damage, regnr }) => {
+const DamageItem: React.FC<{ damage: DamageRecord; regnr: string; isEditing: boolean; userEmail: string }> = ({ damage, regnr, isEditing, userEmail }) => {
   const mediaUrl = damage.folder ? buildDamageMediaUrl(regnr, damage.datum, damage.folder) : null;
-  
+  const [isFormExpanded, setIsFormExpanded] = useState(false);
+  const [commentInput, setCommentInput] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // "Lägg till kommentar"-knappen visas endast i edit-läge och endast om damage.id finns (defensivt)
+  const canShowAddButton = isEditing && damage.id != null;
+
+  // Sortera kommentarer nyast överst (server skickar redan i den ordningen, men vi gör det robust)
+  const sortedComments = (damage.comments || []).slice().sort((a, b) => {
+    const dateA = new Date(a.created_at).getTime();
+    const dateB = new Date(b.created_at).getTime();
+    return dateB - dateA;
+  });
+
+  const handleSave = async () => {
+    if (!commentInput.trim()) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/damage-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          damage_id: damage.id,
+          comment: commentInput.trim(),
+          created_by: userEmail,
+        }),
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert('Fel vid sparande. Försök igen.');
+        setIsSaving(false);
+      }
+    } catch {
+      alert('Nätverksfel. Försök igen.');
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setCommentInput('');
+    setIsFormExpanded(false);
+  };
+
   return (
-    <div className="damage-item">
-      <div className="damage-info">
-        <span className="damage-type">{damage.skadetyp}</span>
-        <span className="damage-date">{damage.datum}</span>
-        {damage.status && (
-          <span className="damage-status" style={{ whiteSpace: 'pre-line' }}>{damage.status}</span>
-        )}
-        {damage.sourceInfo && (
-          <span className="damage-source" style={{ whiteSpace: 'pre-line' }}>
-            {damage.sourceInfo}
-          </span>
-        )}
-        {mediaUrl && (
-          <a
-            href={mediaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="damage-media-link"
+    <div className="damage-item-wrapper">
+      <div className="damage-item">
+        <div className="damage-info">
+          <span className="damage-type">{damage.skadetyp}</span>
+          <span className="damage-date">{damage.datum}</span>
+          {damage.status && (
+            <span className="damage-status" style={{ whiteSpace: 'pre-line' }}>{damage.status}</span>
+          )}
+          {damage.sourceInfo && (
+            <span className="damage-source" style={{ whiteSpace: 'pre-line' }}>
+              {damage.sourceInfo}
+            </span>
+          )}
+          {mediaUrl && (
+            <a
+              href={mediaUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="damage-media-link"
+            >
+              📁 Visa media
+            </a>
+          )}
+        </div>
+        {canShowAddButton && !isFormExpanded && (
+          <button
+            type="button"
+            className="damage-add-comment-btn hide-in-print"
+            onClick={() => setIsFormExpanded(true)}
           >
-            📁 Visa media
-          </a>
+            Lägg till kommentar
+          </button>
         )}
       </div>
+
+      {sortedComments.length > 0 && (
+        <div className="damage-comments-list">
+          {sortedComments.map((c) => (
+            <div key={c.id} className="damage-comment-item">
+              <div className="damage-comment-text" style={{ whiteSpace: 'pre-line' }}>
+                {c.comment}
+              </div>
+              <div className="damage-comment-meta">
+                {getFullNameFromEmail(c.created_by)}, {formatDateTime(c.created_at)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isFormExpanded && (
+        <div className="damage-comment-form hide-in-print">
+          <textarea
+            value={commentInput}
+            onChange={(e) => setCommentInput(e.target.value)}
+            placeholder="Skriv din kommentar..."
+            maxLength={2000}
+            disabled={isSaving}
+            rows={4}
+          />
+          <div className="damage-comment-form-buttons">
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={isSaving}
+              className="cancel-btn"
+            >
+              Avbryt
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isSaving || !commentInput.trim()}
+              className="save-btn"
+            >
+              {isSaving ? 'Sparar...' : 'Spara kommentar'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2740,6 +2840,116 @@ const GlobalStyles: React.FC<{ backgroundUrl: string }> = ({ backgroundUrl }) =>
     .damage-media-link:hover {
       text-decoration: underline;
     }
+
+    /* Damage comments */
+    .damage-item-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .damage-add-comment-btn {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .damage-add-comment-btn:hover {
+      text-decoration: underline;
+    }
+
+    .damage-comments-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-left: 1rem;
+    }
+
+    .damage-comment-item {
+      padding: 0.5rem 0.75rem;
+      background-color: var(--color-card);
+      border-left: 3px solid var(--color-primary);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .damage-comment-text {
+      font-size: 0.875rem;
+      color: var(--color-text);
+    }
+
+    .damage-comment-meta {
+      font-size: 0.75rem;
+      color: var(--color-text-secondary);
+    }
+
+    .damage-comment-form {
+      margin-left: 1rem;
+      padding: 0.75rem;
+      background-color: var(--color-card);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .damage-comment-form textarea {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      font-family: inherit;
+      font-size: 0.875rem;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    .damage-comment-form textarea:focus {
+      outline: none;
+      border-color: var(--color-border-focus);
+    }
+
+    .damage-comment-form-buttons {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .damage-comment-form-buttons button {
+      padding: 0.4rem 0.8rem;
+      border-radius: 4px;
+      border: 1px solid var(--color-border);
+      background: white;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+
+    .damage-comment-form-buttons button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .damage-comment-form-buttons .save-btn {
+      background-color: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+
+    .damage-comment-form-buttons .cancel-btn:hover:not(:disabled) {
+      background-color: var(--color-bg);
+    }
+
+    /* History controls - buttons and filter */
 
     /* History controls - buttons and filter */
     .history-controls {
