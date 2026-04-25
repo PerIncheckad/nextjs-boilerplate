@@ -110,6 +110,16 @@ export type DamageRecord = {
   is_handled?: boolean; // True if damage was handled (documented/not_found/existing)
   is_inventoried?: boolean; // True if damage was inventoried during checkin
   is_unmatched_buhs?: boolean; // True if this is an unmatched BUHS damage
+  // Skadekommentar(er), nyast först
+  comments?: DamageComment[];
+};
+
+export type DamageComment = {
+  id: number;
+  damage_id: number;
+  comment: string;
+  created_by: string;
+  created_at: string;
 };
 
 export type HistoryRecord = {
@@ -928,6 +938,37 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   const vehicleEditsData = vehicleEditsResponse.data || [];
   const nybilData = nybilResponse.data;
+
+  // Hämta skadekommentarer för alla damages.id för denna regnr.
+  // Görs sekventiellt efter Promise.all eftersom vi behöver damage IDs
+  // (medvetet ingen FK i damage_comments → Supabase-join inte tillgänglig).
+  const damageIdsForComments = (damagesResponse.data || [])
+    .map((d: any) => d.id)
+    .filter((id: any): id is number => typeof id === 'number');
+
+  let damageCommentsData: DamageComment[] = [];
+  if (damageIdsForComments.length > 0) {
+    const { data: commentsRaw } = await supabase
+      .from('damage_comments')
+      .select('*')
+      .in('damage_id', damageIdsForComments)
+      .order('created_at', { ascending: false });
+    damageCommentsData = (commentsRaw || []).map((dc: any) => ({
+      id: dc.id,
+      damage_id: dc.damage_id,
+      comment: dc.comment,
+      created_by: dc.created_by,
+      created_at: dc.created_at,
+    }));
+  }
+
+  // Bygg Map<damage_id, DamageComment[]> — newest-first (data sorterad desc ovan)
+  const commentsByDamageId = new Map<number, DamageComment[]>();
+  for (const dc of damageCommentsData) {
+    const arr = commentsByDamageId.get(dc.damage_id) || [];
+    arr.push(dc);
+    commentsByDamageId.set(dc.damage_id, arr);
+  }
 
   // Bygg Map med senaste edit per fält (data sorterad desc på edited_at)
   const latestEdits = new Map<string, { value: string | null; date: string; editedBy: string }>();
@@ -1927,6 +1968,30 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         typ: 'manual',
         sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
         utfordAv: getFullNameFromEmail(edit.edited_by),
+      });
+    }
+
+    // Koppla skadekommentarer till respektive DamageRecord
+    for (const damage of damageRecords) {
+      if (damage.id != null && commentsByDamageId.has(damage.id)) {
+        damage.comments = commentsByDamageId.get(damage.id);
+      }
+    }
+
+    // HistoryRecord per skadekommentar (skadetyp + trunkering vid 80 tecken)
+    for (const dc of damageCommentsData) {
+      const damage = damageRecords.find(d => d.id === dc.damage_id);
+      const skadetyp = damage?.skadetyp || 'okänd skada';
+      const trimmedComment = dc.comment.length > 80
+        ? dc.comment.substring(0, 80) + '...'
+        : dc.comment;
+      historyRecords.push({
+        id: `damage-comment-${dc.id}`,
+        datum: formatDateTime(dc.created_at),
+        rawTimestamp: dc.created_at,
+        typ: 'manual',
+        sammanfattning: `Kommentar på ${skadetyp}: "${trimmedComment}"`,
+        utfordAv: getFullNameFromEmail(dc.created_by),
       });
     }
 
@@ -3214,6 +3279,30 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       typ: 'manual',
       sammanfattning: formatEditSammanfattning(edit.field_name, edit.old_value, edit.new_value),
       utfordAv: getFullNameFromEmail(edit.edited_by),
+    });
+  }
+
+  // Koppla skadekommentarer till respektive DamageRecord
+  for (const damage of damageRecords) {
+    if (damage.id != null && commentsByDamageId.has(damage.id)) {
+      damage.comments = commentsByDamageId.get(damage.id);
+    }
+  }
+
+  // HistoryRecord per skadekommentar (skadetyp + trunkering vid 80 tecken)
+  for (const dc of damageCommentsData) {
+    const damage = damageRecords.find(d => d.id === dc.damage_id);
+    const skadetyp = damage?.skadetyp || 'okänd skada';
+    const trimmedComment = dc.comment.length > 80
+      ? dc.comment.substring(0, 80) + '...'
+      : dc.comment;
+    historyRecords.push({
+      id: `damage-comment-${dc.id}`,
+      datum: formatDateTime(dc.created_at),
+      rawTimestamp: dc.created_at,
+      typ: 'manual',
+      sammanfattning: `Kommentar på ${skadetyp}: "${trimmedComment}"`,
+      utfordAv: getFullNameFromEmail(dc.created_by),
     });
   }
 
