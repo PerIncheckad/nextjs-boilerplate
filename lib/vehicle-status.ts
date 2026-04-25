@@ -89,7 +89,7 @@ export type VehicleStatusData = {
 };
 
 export type DamageRecord = {
-  id: number;
+  id: string;
   regnr: string;
   skadetyp: string;
   datum: string;
@@ -116,7 +116,7 @@ export type DamageRecord = {
 
 export type DamageComment = {
   id: number;
-  damage_id: number;
+  damage_id: string;
   comment: string;
   created_by: string;
   created_at: string;
@@ -944,7 +944,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   // (medvetet ingen FK i damage_comments → Supabase-join inte tillgänglig).
   const damageIdsForComments = (damagesResponse.data || [])
     .map((d: any) => d.id)
-    .filter((id: any): id is number => typeof id === 'number');
+    .filter((id: any): id is string => typeof id === 'string');
 
   let damageCommentsData: DamageComment[] = [];
   if (damageIdsForComments.length > 0) {
@@ -963,7 +963,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   }
 
   // Bygg Map<damage_id, DamageComment[]> — newest-first (data sorterad desc ovan)
-  const commentsByDamageId = new Map<number, DamageComment[]>();
+  const commentsByDamageId = new Map<string, DamageComment[]>();
   for (const dc of damageCommentsData) {
     const arr = commentsByDamageId.get(dc.damage_id) || [];
     arr.push(dc);
@@ -1639,7 +1639,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
-    const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
+    const damagesShownInCheckins = new Set<string>(); // Track damage IDs shown in checkins
     
     // Fetch damage counts for checkins (for avvikelser count)
     // Note: checkinIds is already declared above
@@ -2770,7 +2770,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Build history records
   const historyRecords: HistoryRecord[] = [];
-  const damagesShownInCheckins = new Set<number>(); // Track damage IDs shown in checkins
+  const damagesShownInCheckins = new Set<string>(); // Track damage IDs shown in checkins
 
   // Fetch damage counts for checkins (for avvikelser count)
   // Note: checkinIds is already declared above (reuse it)
