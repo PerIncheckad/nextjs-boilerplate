@@ -243,6 +243,7 @@ export default function StatusForm() {
       vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
       ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
       laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
+      tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
       saludatum: vehicleStatus.vehicle.saludatum,
       salu_station: vehicleStatus.vehicle.saluStation,
       salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -856,6 +857,7 @@ export default function StatusForm() {
                     stold_gps: 'Stöld-GPS', klar_for_uthyrning: 'Uthyrningsbar',
                     stold_gps_spec: 'Stöld-GPS spec',
                     mbme_aktiverad: 'MBme aktiverad', vw_connect_aktiverad: 'VW Connect aktiverad',
+                    tankstatus: 'Tankstatus vid leverans',
                   };
                   const oldValues: Record<string, string> = {
                     bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
@@ -877,6 +879,7 @@ export default function StatusForm() {
                     vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
                     ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
                     laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
+                    tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
                     saludatum: vehicleStatus.vehicle.saludatum,
                     salu_station: vehicleStatus.vehicle.saluStation,
                     salu_kopare: vehicleStatus.vehicle.saluKopare,
@@ -1118,12 +1121,52 @@ export default function StatusForm() {
           <Card>
            <SectionHeader title="Övrig info vid leverans till MABI" />
             <div className="info-grid">
-              {vehicleStatus.vehicle.tankstatusVidLeverans !== '---' && (
-                <InfoRow label="Tankstatus vid leverans" value={vehicleStatus.vehicle.tankstatusVidLeverans} />
-              )}
-              {(vehicleStatus.vehicle.laddnivaVidLeverans !== '---' || isEditing) && (
-                <EditableInfoRow label="Laddnivå vid leverans (%)" fieldName="laddniva_vid_leverans" displayValue={vehicleStatus.vehicle.laddnivaVidLeverans} rawValue={vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim()} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="number" min={0} max={100} />
-              )}
+              {/* Tankstatus: visas för bensin/diesel/hybrid (editerbar) eller om värde finns (read-only) */}
+              {(() => {
+                const drivmedel = vehicleStatus.vehicle.drivmedel;
+                const isFuelType = drivmedel === 'Bensin' || drivmedel === 'Diesel' || drivmedel === 'Hybrid (bensin)' || drivmedel === 'Hybrid (diesel)';
+                const showInEdit = isEditing && isFuelType;
+                const showInReadOnly = !isEditing && vehicleStatus.vehicle.tankstatusVidLeverans !== '---';
+                if (!showInEdit && !showInReadOnly) return null;
+                return (
+                  <EditableSelectRow
+                    label="Tankstatus vid leverans"
+                    fieldName="tankstatus"
+                    displayValue={vehicleStatus.vehicle.tankstatusVidLeverans}
+                    options={[
+                      { value: 'mottogs_fulltankad', label: 'Mottogs fulltankad' },
+                      { value: 'tankad_nu', label: 'Tankad nu' },
+                      { value: 'ej_upptankad', label: 'Levererades ej fulltankad' },
+                    ]}
+                    rawValue={vehicleStatus.vehicle.tankstatusVidLeveransRaw === '---' ? '' : vehicleStatus.vehicle.tankstatusVidLeveransRaw}
+                    isEditing={isEditing}
+                    pendingEdits={pendingEdits}
+                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                  />
+                );
+              })()}
+              {/* Laddnivå: visas för 100% el (editerbar) eller om värde finns (read-only) */}
+              {(() => {
+                const drivmedel = vehicleStatus.vehicle.drivmedel;
+                const isElectric = drivmedel === '100% el';
+                const showInEdit = isEditing && isElectric;
+                const showInReadOnly = !isEditing && vehicleStatus.vehicle.laddnivaVidLeverans !== '---';
+                if (!showInEdit && !showInReadOnly) return null;
+                return (
+                  <EditableInfoRow
+                    label="Laddnivå vid leverans (%)"
+                    fieldName="laddniva_vid_leverans"
+                    displayValue={vehicleStatus.vehicle.laddnivaVidLeverans}
+                    rawValue={vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim()}
+                    isEditing={isEditing}
+                    pendingEdits={pendingEdits}
+                    onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))}
+                    inputType="number"
+                    min={0}
+                    max={100}
+                  />
+                );
+              })()}
               <Fragment>
                 <span className="info-label">Skador vid leverans</span>
                 <span className={`info-value ${vehicleStatus.vehicle.harSkadorVidLeverans === true ? 'at-risk' : ''}`}>
@@ -1706,15 +1749,18 @@ const EditableSelectRow: React.FC<{
   label: string;
   fieldName: string;
   displayValue: string;
-  options: string[];
+  options: string[] | { value: string; label: string }[];
+  rawValue?: string;
   isEditing: boolean;
   pendingEdits: Record<string, string>;
   onEdit: (field: string, value: string) => void;
-}> = ({ label, fieldName, displayValue, options, isEditing, pendingEdits, onEdit }) => {
-  const initialValue = displayValue === '---' ? '' : displayValue;
+}> = ({ label, fieldName, displayValue, options, rawValue, isEditing, pendingEdits, onEdit }) => {
+  const initialValue = rawValue !== undefined ? rawValue : (displayValue === '---' ? '' : displayValue);
   const currentInput = pendingEdits[fieldName] !== undefined ? pendingEdits[fieldName] : initialValue;
   const hasChanged = pendingEdits[fieldName] !== undefined && pendingEdits[fieldName] !== initialValue;
   if (!isEditing) return <InfoRow label={label} value={displayValue} />;
+  // Normalisera options till { value, label }-format
+  const normalizedOptions = options.map(o => typeof o === 'string' ? { value: o, label: o } : o);
   return (
     <>
       <span className="info-label">{label}</span>
@@ -1724,7 +1770,7 @@ const EditableSelectRow: React.FC<{
         style={{ border: `1px solid ${hasChanged ? '#1a73e8' : '#ccc'}`, borderRadius: '4px', padding: '4px 8px', fontSize: '0.875rem', width: '100%', background: 'white' }}
       >
         <option value="">---</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        {normalizedOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
     </>
   );
