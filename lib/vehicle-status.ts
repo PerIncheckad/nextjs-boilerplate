@@ -57,6 +57,8 @@ export type VehicleStatusData = {
   tankningInfo: string;
   tankstatusVidLeverans: string;
   tankstatusVidLeveransRaw: string;
+  upptankningLiter: string;
+  upptankningLiterpris: string;
   // General comment
   anteckningar: string;
 // Ej uthyrningsbar — uppdelat i tre fält
@@ -235,6 +237,8 @@ export type VehicleStatusResult = {
     vaxellada: string;
     tankstatusVidLeverans: string;
     tankstatusVidLeveransRaw: string;
+    upptankningLiter: string;
+    upptankningLiterpris: string;
     // Avtalsvillkor
     serviceintervall: string;
     maxKmManad: string;
@@ -956,6 +960,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     mbme_aktiverad: 'MBme aktiverad',
     vw_connect_aktiverad: 'VW Connect aktiverad',
     tankstatus: 'Tankstatus vid leverans',
+    upptankning_liter: 'Upptankning antal liter',
+    upptankning_literpris: 'Upptankning literpris (kr/l)',
     ej_uthyrningsbar_anledning: 'Ej uthyrningsbar anledning',
     laddniva_vid_leverans: 'Laddnivå vid leverans',
     saludatum: 'Saludatum',
@@ -1187,6 +1193,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       tankningInfo: '---',
       tankstatusVidLeverans: '---',
       tankstatusVidLeveransRaw: latestEdits.get('tankstatus')?.value || '---',
+      upptankningLiter: latestEdits.get('upptankning_liter')?.value || '---',
+      upptankningLiterpris: latestEdits.get('upptankning_literpris')?.value || '---',
       anteckningar: latestEdits.get('anteckningar')?.value || '---',
       ejUthyrningsbarKommentar: null,
       ejUthyrningsbarKalla: null,
@@ -2093,6 +2101,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       ? buildTankstatusDisplay({ ...nybilData, tankstatus: latestEdits.get('tankstatus')!.value } as NybilInventeringData)
       : buildTankstatusDisplay(nybilData),
     tankstatusVidLeveransRaw: latestEdits.get('tankstatus')?.value ?? nybilData?.tankstatus ?? '---',
+    upptankningLiter: latestEdits.get('upptankning_liter')?.value ?? (nybilData?.upptankning_liter != null ? String(nybilData.upptankning_liter) : '---'),
+    upptankningLiterpris: latestEdits.get('upptankning_literpris')?.value ?? (nybilData?.upptankning_literpris != null ? String(nybilData.upptankning_literpris) : '---'),
     
     // General comment: vehicle_edits → nybil_inventering
     anteckningar: latestEdits.get('anteckningar')?.value || nybilData?.anteckningar || '---',
@@ -3077,6 +3087,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     vaxellada: nybilData.vaxel || '---',
     tankstatusVidLeverans: buildTankstatusDisplay(nybilData),
     tankstatusVidLeveransRaw: nybilData.tankstatus || '---',
+    upptankningLiter: nybilData.upptankning_liter != null ? String(nybilData.upptankning_liter) : '---',
+    upptankningLiterpris: nybilData.upptankning_literpris != null ? String(nybilData.upptankning_literpris) : '---',
     // Avtalsvillkor
     serviceintervall: nybilData.serviceintervall ? `${nybilData.serviceintervall} km` : '---',
     maxKmManad: nybilData.max_km_manad ? `${nybilData.max_km_manad} km` : '---',
