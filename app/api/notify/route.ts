@@ -390,9 +390,13 @@ const buildHuvudstationEmail = (payload: any, date: string, time: string, siteUr
         ? `Ingen ny tankstatus - fortfarande gäller det som registrerades ${prevDate}: ${prevTankText}`
         : `Ingen ny tankstatus (tidigare registrerad ${prevDate} är fortfarande aktuell)`;
       fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${inheritText}</td></tr>`;
-    } else {
+   } else {
       const tankningText = formatTankning(payload.tankning);
       fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankning:</strong> ${tankningText}</td></tr>`;
+      // Tankkvitto-länk om kvitto laddats upp
+      if (payload.tankning_receipt?.file_url) {
+        fuelOrChargeInfo += `<tr><td style="padding:4px 0;"><strong>Tankkvitto:</strong> <a href="${payload.tankning_receipt.file_url}" target="_blank" style="text-decoration:none;color:#2563eb!important;font-weight:bold;">Visa kvitto</a></td></tr>`;
+      }
     }
   }
   // Charge level (only pure electric, not hybrid)
@@ -1063,6 +1067,28 @@ fuel_level: payload.tankning?.tankniva || null,
             if (checkinDamagesError) {
               // Resilient: log error but continue to send emails
               console.error('Error inserting checkin_damages:', checkinDamagesError);
+            }
+          }
+
+          // Save tankning_receipt if provided (frivilligt — fil är redan uppladdad till Storage av klienten)
+          if (payload.tankning_receipt) {
+            const r = payload.tankning_receipt;
+            const { error: receiptError } = await supabaseAdmin.from('vehicle_receipts').insert({
+              regnr: regNr,
+              checkin_id: checkinId,
+              receipt_type: 'tankning',
+              file_url: r.file_url,
+              file_path: r.file_path,
+              file_name: r.file_name,
+              mime_type: r.mime_type,
+              uploaded_by_email: r.uploaded_by_email,
+              uploaded_by_name: r.uploaded_by_name,
+            });
+            if (receiptError) {
+              // Resilient: log error but continue to send emails
+              console.error('Error inserting tankning_receipt:', receiptError);
+            } else {
+              console.log('Tankning receipt saved for', regNr);
             }
           }
 
