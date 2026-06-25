@@ -37,6 +37,7 @@ const EMAIL_WHITELIST = new Set<string>([
   'isak.andersson@mabi.se',
   'isakeandersson@gmail.com',
   'lucianoinzunza71@gmail.com',
+  'helsingborg@mabi.se',
 ]);
 
 export default function LoginGate({ children }: Props) {
