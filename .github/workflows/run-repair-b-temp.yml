@@ -1,13 +1,45 @@
-name: Temporary repair runner disabled
+name: Run final damage ID preservation temp
 
 on:
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  disabled:
+  preserve-damage-id:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - run: echo 'Temporary runner disabled after successful repair.'
+      - name: Checkout stabilization branch
+        uses: actions/checkout@v4
+        with:
+          ref: stabilize-build-gates
+
+      - name: Preserve damage ID runtime behavior
+        run: |
+          python3 .github/scripts/preserve-damage-id.py
+          git diff --check
+          git diff --stat
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Strict typecheck
+        run: npm run typecheck
+
+      - name: Commit preservation fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/vehicle-status.ts
+          git commit -m 'Preserve legacy damage ID runtime values'
+          git push origin HEAD:stabilize-build-gates
