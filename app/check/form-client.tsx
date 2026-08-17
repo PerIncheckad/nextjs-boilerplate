@@ -55,7 +55,7 @@ type DamagePosition = {
 };
 
 type ExistingDamage = {
-  db_id: number;
+  db_id: number | string;
   id: string;
   fullText: string; 
   originalDamageDate: string | null; // YYYY-MM-DD
