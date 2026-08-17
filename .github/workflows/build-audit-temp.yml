@@ -1,0 +1,49 @@
+name: Temporary build gate audit
+
+on:
+  push:
+    branches:
+      - audit-build-gates
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Show available quality gates
+        shell: bash
+        run: |
+          echo '--- npm scripts ---'
+          npm run
+          echo '--- eslint package ---'
+          npm ls eslint --depth=0 || true
+
+      - name: Measure TypeScript errors without changing code
+        shell: bash
+        run: |
+          set +e
+          npx tsc --noEmit --pretty false 2>&1 | tee tsc.log
+          TSC_STATUS=${PIPESTATUS[0]}
+          ERROR_COUNT=$(grep -c 'error TS' tsc.log || true)
+          FILE_COUNT=$(grep 'error TS' tsc.log | sed -E 's/^([^(:]+).*/\1/' | sort -u | wc -l | tr -d ' ')
+          echo "TSC_EXIT=$TSC_STATUS"
+          echo "TSC_ERROR_COUNT=$ERROR_COUNT"
+          echo "TSC_FILE_COUNT=$FILE_COUNT"
+          echo '--- files with TypeScript errors ---'
+          grep 'error TS' tsc.log | sed -E 's/^([^(:]+).*/\1/' | sort -u || true
+          exit 0
