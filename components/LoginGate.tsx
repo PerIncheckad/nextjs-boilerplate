@@ -10,6 +10,8 @@ export default function LoginGate({ children }: Props) {
   const [state, setState] =
     useState<'checking' | 'login' | 'denied' | 'ok'>('checking');
   const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
@@ -44,21 +46,44 @@ export default function LoginGate({ children }: Props) {
     return uninstallApiAuthFetch;
   }, []);
 
-  const signIn = async (e: React.FormEvent) => {
+  const sendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg('');
 
-    // Return the magic-link to the exact deployment the user is signing in from.
-    // This keeps Production on www.incheckad.se while allowing Vercel Preview
-    // deployments to test authentication without being redirected to Production.
-    const redirectTo = window.location.origin + '/';
-
+    const normalizedEmail = email.trim().toLowerCase();
     const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo }
+      email: normalizedEmail,
     });
 
-    setMsg(error ? error.message : 'Kolla din mejl för inloggningslänken.');
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+
+    setEmail(normalizedEmail);
+    setOtpSent(true);
+    setMsg('En engångskod har skickats till din mejl.');
+  };
+
+  const verifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg('');
+
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: otp.trim(),
+      type: 'email',
+    });
+
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+
+    // Re-run the existing whitelist / employees authorization check using
+    // the newly established Supabase session. This avoids creating a second
+    // authorization path for OTP sign-in.
+    window.location.reload();
   };
 
   if (state === 'login') {
@@ -66,30 +91,55 @@ export default function LoginGate({ children }: Props) {
       <div className="login-bg">
         <div className="login-card">
           <h1 className="login-title">Logga in</h1>
-          <form onSubmit={signIn} className="login-form">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="E-postadress"
-              className="login-input"
-              autoFocus
-            />
-            <button
-              type="submit"
-              className="login-btn"
-            >
-              Skicka magisk länk
-            </button>
-          </form>
-          {msg && (
-            <div className="login-msg-wrap">
-              <h2 className="login-thanks">Tack!</h2>
-              <p className="login-msg">Kolla din mejl för inloggningslänken.</p>
-              <p className="login-close-tab">Du kan nu stänga denna flik.</p>
-            </div>
+
+          {!otpSent ? (
+            <form onSubmit={sendOtp} className="login-form">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="E-postadress"
+                className="login-input"
+                autoFocus
+              />
+              <button type="submit" className="login-btn">
+                Skicka engångskod
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={verifyOtp} className="login-form">
+              <input
+                type="text"
+                required
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-siffrig kod"
+                className="login-input"
+                autoFocus
+              />
+              <button type="submit" className="login-btn">
+                Verifiera kod
+              </button>
+              <button
+                type="button"
+                className="login-btn"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp('');
+                  setMsg('');
+                }}
+              >
+                Byt e-postadress
+              </button>
+            </form>
           )}
+
+          {msg && <p className="login-msg">{msg}</p>}
         </div>
       </div>
     );
