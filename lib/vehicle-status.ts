@@ -89,7 +89,7 @@ export type VehicleStatusData = {
 };
 
 export type DamageRecord = {
-  id: string;
+  id: string | number;
   regnr: string;
   skadetyp: string;
   datum: string;
@@ -1640,7 +1640,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       damageRecords.push({
-        id: String(entry.id),
+        id: entry.id,
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
@@ -1669,7 +1669,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Build history records from checkins only (with avvikelser)
     const historyRecords: HistoryRecord[] = [];
-    const damagesShownInCheckins = new Set<string>(); // Track damage IDs shown in checkins
+    const damagesShownInCheckins = new Set<string | number>(); // Track damage IDs shown in checkins
     
     // Fetch damage counts for checkins (for avvikelser count)
     // Note: checkinIds is already declared above
@@ -2003,8 +2003,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
     // Koppla skadekommentarer till respektive DamageRecord
     for (const damage of damageRecords) {
-      if (damage.id != null && commentsByDamageId.has(damage.id)) {
-        damage.comments = commentsByDamageId.get(damage.id);
+      if (damage.id != null && commentsByDamageId.has(damage.id as string)) {
+        damage.comments = commentsByDamageId.get(damage.id as string);
       }
     }
 
@@ -2745,7 +2745,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     damageRecords.push({
-      id: String(entry.id),
+      id: entry.id,
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
@@ -2802,7 +2802,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Build history records
   const historyRecords: HistoryRecord[] = [];
-  const damagesShownInCheckins = new Set<string>(); // Track damage IDs shown in checkins
+  const damagesShownInCheckins = new Set<string | number>(); // Track damage IDs shown in checkins
 
   // Fetch damage counts for checkins (for avvikelser count)
   // Note: checkinIds is already declared above (reuse it)
@@ -3316,8 +3316,8 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
 
   // Koppla skadekommentarer till respektive DamageRecord
   for (const damage of damageRecords) {
-    if (damage.id != null && commentsByDamageId.has(damage.id)) {
-      damage.comments = commentsByDamageId.get(damage.id);
+    if (damage.id != null && commentsByDamageId.has(damage.id as string)) {
+      damage.comments = commentsByDamageId.get(damage.id as string);
     }
   }
 
