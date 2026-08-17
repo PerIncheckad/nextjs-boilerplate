@@ -19,15 +19,15 @@ new = """      const { data, error: urlError } = supabase.storage.from(BUCKET).g
       };
       if (urlError) {
         console.error(`Failed to get public url for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, urlError);
-        
+
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
         }
-        
+
         throw new Error('Fel vid uppladdning. Vänligen försök igen.');
       }
-      
+
       if (!data?.publicUrl) {
 """
 text = replace_once(text, old, new, 'check getPublicUrl runtime preservation')
