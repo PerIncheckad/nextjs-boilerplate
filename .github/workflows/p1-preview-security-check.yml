@@ -1,0 +1,29 @@
+name: P1 Preview Security Check
+
+on:
+  push:
+    branches:
+      - security-p1-api-auth
+  workflow_dispatch:
+
+jobs:
+  preview-security-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify public health route
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://nextjs-boilerplate-git-security-p-75bc26-pers-projects-fffbcffe.vercel.app'
+          code="$(curl -sS -o /tmp/health.json -w '%{http_code}' "$BASE/api/health")"
+          cat /tmp/health.json || true
+          test "$code" = '200'
+
+      - name: Verify protected route rejects unauthenticated request
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://nextjs-boilerplate-git-security-p-75bc26-pers-projects-fffbcffe.vercel.app'
+          code="$(curl -sS -o /tmp/protected.json -w '%{http_code}' "$BASE/api/vehicle-info?reg=GEU29F")"
+          cat /tmp/protected.json || true
+          test "$code" = '401' -o "$code" = '403'
