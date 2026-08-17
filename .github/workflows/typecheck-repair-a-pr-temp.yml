@@ -22,7 +22,80 @@ jobs:
         shell: bash
         run: |
           sed -n "/python3 - <<'PY'/,/^          PY$/p" .github/workflows/typecheck-repair-a-temp.yml | sed '1d;$d;s/^          //' > /tmp/repair-a.py
-          python3 /tmp/repair-a.py
+          set +e
+          REPAIR_OUTPUT=$(python3 /tmp/repair-a.py 2>&1)
+          REPAIR_STATUS=$?
+          set -e
+          echo "$REPAIR_OUTPUT"
+          if [ "$REPAIR_STATUS" -ne 0 ] && ! printf '%s' "$REPAIR_OUTPUT" | grep -q "check getPublicUrl block: expected exactly 1 match, found 0"; then
+            exit "$REPAIR_STATUS"
+          fi
+
+          # The first script intentionally stopped before writing app/check because
+          # the source block has different whitespace than the initial snapshot.
+          # Apply the same check-only mechanical edits with structural boundaries.
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/check/form-client.tsx')
+          text = path.read_text()
+
+          def replace_once(old, new, label):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected exactly 1 match, found {count}')
+              text = text.replace(old, new, 1)
+
+          helper = """const getDamagePositions = (damageType: string, carPart: string): readonly string[] => {
+            if (!damageType || !carPart) return [];
+            const typeOptions = DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS] as unknown as Record<string, readonly string[]> | undefined;
+            return typeOptions?.[carPart] ?? [];
+          };
+
+          """
+          marker = "const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort((a, b) => a.localeCompare(b, 'sv'));\n\n"
+          replace_once(marker, marker + helper, 'check damage helper insertion')
+
+          replacements = [
+              ("DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []", 'getDamagePositions(d.type, p.carPart)', 2, 'check new damage positions'),
+              ("DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []", "getDamagePositions(d.userType || '', p.carPart)", 1, 'check existing damage positions'),
+              ("DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []", "getDamagePositions(damageType || '', pos.carPart)", 1, 'check DamageItem positions'),
+          ]
+          for old, new, expected, label in replacements:
+              count = text.count(old)
+              if count != expected:
+                  raise SystemExit(f'{label}: expected {expected} matches, found {count}')
+              text = text.replace(old, new)
+
+          replace_once(
+              'const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);',
+              'const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);',
+              'check getPublicUrl destructure',
+          )
+          error_start = text.index('      if (urlError) {')
+          next_guard = text.index('      if (!data?.publicUrl) {', error_start)
+          text = text[:error_start] + text[next_guard:]
+
+          replace_once(
+              'const processFiles = async (files: FileList): Promise<MediaFile[]> => {\n  const processed = await Promise.all(Array.from(files).map(async file => {',
+              'const processFiles = async (files: FileList): Promise<MediaFile[]> => {\n  const processed: Array<MediaFile | null> = await Promise.all(Array.from(files).map(async (file): Promise<MediaFile | null> => {',
+              'check processFiles typing',
+          )
+          replace_once(
+              'function slugify(str: string): string {',
+              'function slugify(str: string | null | undefined): string {',
+              'check slugify input',
+          )
+          replace_once(
+              '            let typeString = type;',
+              '            let typeString: string = type;',
+              'check sanering typeString',
+          )
+          path.write_text(text)
+          print('check mechanical repairs applied')
+          PY
+
           git diff --check
           git diff --stat
 
