@@ -24,15 +24,26 @@ jobs:
           node-version: '20'
           cache: npm
 
-      - name: Install exact lockfile
+      - name: Install exact baseline lockfile
         run: npm ci
 
-      - name: Capture npm audit
+      - name: Baseline dependency paths
+        run: npm ls brace-expansion editorconfig glob js-cookie minimatch nanoid picomatch ws postcss next --all || true
+
+      - name: Test minimal non-major security candidate
         run: |
-          npm audit --json > audit.json || true
+          npm install --package-lock-only --ignore-scripts --save-exact next@14.2.35
+          npm update --package-lock-only --ignore-scripts postcss
+          npm audit fix --package-lock-only --ignore-scripts || true
+          echo 'CANDIDATE_DIFF_START'
+          git diff -- package.json package-lock.json
+          echo 'CANDIDATE_DIFF_END'
+          npm ci
+          npm run typecheck
+          npm audit --json > candidate-audit.json || true
           node - <<'NODE'
           const fs = require('fs');
-          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          const audit = JSON.parse(fs.readFileSync('candidate-audit.json', 'utf8'));
           const out = {
             metadata: audit.metadata,
             vulnerabilities: Object.fromEntries(Object.entries(audit.vulnerabilities || {}).map(([name, v]) => [name, {
@@ -50,10 +61,7 @@ jobs:
               })
             }]))
           };
-          console.log('AUDIT_SUMMARY_START');
+          console.log('CANDIDATE_AUDIT_START');
           console.log(JSON.stringify(out, null, 2));
-          console.log('AUDIT_SUMMARY_END');
+          console.log('CANDIDATE_AUDIT_END');
           NODE
-
-      - name: Capture outdated direct dependencies
-        run: npm outdated --json || true
