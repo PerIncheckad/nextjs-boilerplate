@@ -1,4 +1,4 @@
-name: Run UUID contract repair temp
+name: Run runtime-preservation cleanup temp
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  repair-contract:
+  preserve-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -18,9 +18,9 @@ jobs:
         with:
           ref: stabilize-build-gates
 
-      - name: Apply UUID contract repair
+      - name: Apply runtime-preservation cleanup
         run: |
-          python3 .github/scripts/repair-id-contract.py
+          python3 .github/scripts/preserve-runtime.py
           git diff --check
           git diff --stat
 
@@ -36,10 +36,10 @@ jobs:
       - name: Strict typecheck
         run: npm run typecheck
 
-      - name: Commit UUID contract repair to stabilization branch
+      - name: Commit cleanup to stabilization branch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/check/form-client.tsx lib/damages.ts
-          git commit -m 'Align damage ID types with UUID schema'
+          git add app/check/form-client.tsx app/nybil/form-client.tsx lib/damages.ts lib/vehicle-status.ts
+          git commit -m 'Preserve runtime behavior while fixing types'
           git push origin HEAD:stabilize-build-gates
