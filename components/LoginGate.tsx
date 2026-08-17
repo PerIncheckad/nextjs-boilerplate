@@ -6,16 +6,21 @@ import { installAuthenticatedApiFetch } from '@/lib/api-auth-client';
 
 type Props = { children: React.ReactNode };
 
+const SECURITY_PREVIEW_ORIGIN =
+  'https://nextjs-boilerplate-git-security-p-75bc26-pers-projects-fffbcffe.vercel.app';
+
 export default function LoginGate({ children }: Props) {
   const [state, setState] =
     useState<'checking' | 'login' | 'denied' | 'ok'>('checking');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [useOtpFlow, setUseOtpFlow] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
     const uninstallApiAuthFetch = installAuthenticatedApiFetch();
+    setUseOtpFlow(window.location.origin === SECURITY_PREVIEW_ORIGIN);
 
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -46,19 +51,19 @@ export default function LoginGate({ children }: Props) {
     return uninstallApiAuthFetch;
   }, []);
 
-  const sendOtp = async (e: React.FormEvent) => {
+  const sendSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg('');
 
     const normalizedEmail = email.trim().toLowerCase();
+    const otpFlow = window.location.origin === SECURITY_PREVIEW_ORIGIN;
+    const redirectTo = otpFlow
+      ? window.location.origin + '/'
+      : (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
+
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
-      options: {
-        // The Supabase email template uses RedirectTo to distinguish the
-        // security preview from Production. Production can keep its current
-        // magic-link email while this preview receives an OTP code only.
-        emailRedirectTo: window.location.origin + '/',
-      },
+      options: { emailRedirectTo: redirectTo },
     });
 
     if (error) {
@@ -67,8 +72,13 @@ export default function LoginGate({ children }: Props) {
     }
 
     setEmail(normalizedEmail);
-    setOtpSent(true);
-    setMsg('En engångskod har skickats till din mejl.');
+    if (otpFlow) {
+      setOtpSent(true);
+      setMsg('En engångskod har skickats till din mejl.');
+    } else {
+      setOtpSent(false);
+      setMsg('Kolla din mejl för inloggningslänken.');
+    }
   };
 
   const verifyOtp = async (e: React.FormEvent) => {
@@ -99,7 +109,7 @@ export default function LoginGate({ children }: Props) {
           <h1 className="login-title">Logga in</h1>
 
           {!otpSent ? (
-            <form onSubmit={sendOtp} className="login-form">
+            <form onSubmit={sendSignIn} className="login-form">
               <input
                 type="email"
                 required
@@ -110,7 +120,7 @@ export default function LoginGate({ children }: Props) {
                 autoFocus
               />
               <button type="submit" className="login-btn">
-                Skicka engångskod
+                {useOtpFlow ? 'Skicka engångskod' : 'Skicka magisk länk'}
               </button>
             </form>
           ) : (
