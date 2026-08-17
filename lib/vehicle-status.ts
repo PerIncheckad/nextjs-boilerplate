@@ -277,20 +277,20 @@ export type VehicleStatusResult = {
     harDackkompressor: string;
     // Förvaring (composite display + raw ort/spec for editing)
     hjulforvaring: string;
-    hjulForvaringOrt: string;
-    hjulForvaringSpec: string;
+    hjulForvaringOrt?: string;
+    hjulForvaringSpec?: string;
     reservnyckelForvaring: string;
-    extranyckelForvaringOrt: string;
-    extranyckelForvaringSpec: string;
+    extranyckelForvaringOrt?: string;
+    extranyckelForvaringSpec?: string;
     laddkablarForvaring: string;
-    laddkablarForvaringOrt: string;
-    laddkablarForvaringSpec: string;
+    laddkablarForvaringOrt?: string;
+    laddkablarForvaringSpec?: string;
     instruktionsbokForvaring: string;
-    instruktionsbokForvaringOrt: string;
-    instruktionsbokForvaringSpec: string;
+    instruktionsbokForvaringOrt?: string;
+    instruktionsbokForvaringSpec?: string;
     cocForvaring: string;
-    cocForvaringOrt: string;
-    cocForvaringSpec: string;
+    cocForvaringOrt?: string;
+    cocForvaringSpec?: string;
     // Uppkoppling
     mbmeAktiverad: string;
     vwConnectAktiverad: string;
@@ -3280,16 +3280,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     cocForvaring: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
       ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')
       : '---',
-    hjulForvaringOrt: nybilData.hjul_forvaring_ort || '---',
-    hjulForvaringSpec: nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring || '---',
-    extranyckelForvaringOrt: nybilData.extranyckel_forvaring_ort || '---',
-    extranyckelForvaringSpec: nybilData.extranyckel_forvaring_spec || '---',
-    laddkablarForvaringOrt: nybilData.laddkablar_forvaring_ort || '---',
-    laddkablarForvaringSpec: nybilData.laddkablar_forvaring_spec || '---',
-    instruktionsbokForvaringOrt: nybilData.instruktionsbok_forvaring_ort || '---',
-    instruktionsbokForvaringSpec: nybilData.instruktionsbok_forvaring_spec || '---',
-    cocForvaringOrt: nybilData.coc_forvaring_ort || '---',
-    cocForvaringSpec: nybilData.coc_forvaring_spec || '---',
     mbmeAktiverad: nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---',
     vwConnectAktiverad: nybilData?.vw_connect_aktiverad === true ? 'Ja' : nybilData?.vw_connect_aktiverad === false ? 'Nej' : '---',
     bilmarke: nybilData?.bilmarke || '',

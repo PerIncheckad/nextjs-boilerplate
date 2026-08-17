@@ -233,7 +233,21 @@ async function uploadOne(file: File, path: string, bucket: string = 'damage-phot
       }
       
       // Upload succeeded or file already exists - get public URL
-      const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path) as {
+        data: { publicUrl: string };
+        error?: unknown;
+      };
+      if (urlError) {
+        console.error(`Failed to get public url for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, urlError);
+
+        if (attempt < MAX_RETRIES) {
+          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+          continue;
+        }
+
+        throw new Error('Fel vid uppladdning. Vänligen försök igen.');
+      }
+
       if (!data?.publicUrl) {
         console.warn(`Public url missing for ${path} (attempt ${attempt}/${MAX_RETRIES})`);
         

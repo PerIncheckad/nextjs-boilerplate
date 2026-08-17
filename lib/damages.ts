@@ -224,7 +224,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false }),
     supabase
       .from('nybil_inventering')
-      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum, bransletyp')
+      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -283,7 +283,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const vehicleBransletyp = vehicleFuelResponse.data?.bransletyp || null;
-  const finalBransletyp = nybilData?.bransletyp || vehicleBransletyp || null;
+  const finalBransletyp = (nybilData as { bransletyp?: string | null } | null)?.bransletyp || vehicleBransletyp || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
   // handledDamages is now defined earlier

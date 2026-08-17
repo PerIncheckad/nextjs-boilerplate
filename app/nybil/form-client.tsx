@@ -167,9 +167,12 @@ async function uploadToStorage(file: File, path: string, bucket: string, upsert:
         throw new Error(`Fel vid uppladdning av foto: ${error.message}`);
       }
       
-      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-      if (!data?.publicUrl) {
-        console.error(`Error getting public URL for ${path}`);
+      const { data, error: urlError } = supabase.storage.from(bucket).getPublicUrl(path) as {
+        data: { publicUrl: string };
+        error?: unknown;
+      };
+      if (urlError || !data?.publicUrl) {
+        console.error(`Error getting public URL for ${path}:`, urlError);
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
@@ -2691,7 +2694,7 @@ const DamageModal: React.FC<DamageModalProps> = ({
         </div>
         
         {damage.positions.map((pos, index) => {
-          const rawPositioner = (damage.damageType && pos.carPart && getDamagePositions(damage.damageType, pos.carPart));
+          const rawPositioner = damage.damageType && pos.carPart ? getDamagePositions(damage.damageType, pos.carPart) : [];
           const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
           const showPositionDropdown = availablePositioner.length > 0;
           
