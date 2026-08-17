@@ -14,6 +14,11 @@ if text.count(old) != 2:
     raise SystemExit(f'entry id conversion: expected 2 matches, found {text.count(old)}')
 text = text.replace(old, 'id: entry.id,')
 
+old = 'const damagesShownInCheckins = new Set<string>(); // Track damage IDs shown in checkins'
+if text.count(old) != 2:
+    raise SystemExit(f'damage tracking sets: expected 2 matches, found {text.count(old)}')
+text = text.replace(old, 'const damagesShownInCheckins = new Set<string | number>(); // Track damage IDs shown in checkins')
+
 old = 'commentsByDamageId.has(damage.id)'
 if text.count(old) != 2:
     raise SystemExit(f'comments map has: expected 2 matches, found {text.count(old)}')
