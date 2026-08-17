@@ -13,26 +13,16 @@ jobs:
   preview-security-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Diagnose public health route
+      - name: Probe production health route
         shell: bash
         run: |
           set -euo pipefail
-          BASE='https://nextjs-boilerplate-git-security-p-75bc26-pers-projects-fffbcffe.vercel.app'
-          curl -sS -L -D /tmp/health.headers -o /tmp/health.body -w 'FINAL_STATUS=%{http_code}\nFINAL_URL=%{url_effective}\n' "$BASE/api/health"
-          echo '--- HEADERS ---'
-          cat /tmp/health.headers
-          echo '--- BODY ---'
-          head -c 1000 /tmp/health.body || true
-          echo
+          BASE='https://incheckad.se'
+          curl -sS -L -o /dev/null -w 'HEALTH_STATUS=%{http_code}\nHEALTH_FINAL_URL=%{url_effective}\n' "$BASE/api/health"
 
-      - name: Diagnose protected route without authentication
+      - name: Probe production protected read route without authentication
         shell: bash
         run: |
           set -euo pipefail
-          BASE='https://nextjs-boilerplate-git-security-p-75bc26-pers-projects-fffbcffe.vercel.app'
-          curl -sS -L -D /tmp/protected.headers -o /tmp/protected.body -w 'FINAL_STATUS=%{http_code}\nFINAL_URL=%{url_effective}\n' "$BASE/api/vehicle-info?reg=GEU29F"
-          echo '--- HEADERS ---'
-          cat /tmp/protected.headers
-          echo '--- BODY ---'
-          head -c 1000 /tmp/protected.body || true
-          echo
+          BASE='https://incheckad.se'
+          curl -sS -L -o /dev/null -w 'PROTECTED_STATUS=%{http_code}\nPROTECTED_FINAL_URL=%{url_effective}\n' "$BASE/api/vehicle-info?reg=GEU29F"
