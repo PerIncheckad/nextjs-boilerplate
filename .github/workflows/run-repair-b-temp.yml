@@ -1,4 +1,4 @@
-name: Run Repair C temp
+name: Run UUID contract repair temp
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  run-repair-c:
+  repair-contract:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -18,9 +18,9 @@ jobs:
         with:
           ref: stabilize-build-gates
 
-      - name: Apply Repair C
+      - name: Apply UUID contract repair
         run: |
-          python3 .github/scripts/repair-c.py
+          python3 .github/scripts/repair-id-contract.py
           git diff --check
           git diff --stat
 
@@ -34,12 +34,12 @@ jobs:
         run: npm ci
 
       - name: Strict typecheck
-        run: npx tsc --noEmit --pretty false
+        run: npm run typecheck
 
-      - name: Commit final type repair to stabilization branch
+      - name: Commit UUID contract repair to stabilization branch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add lib/vehicle-status.ts
-          git commit -m 'Complete strict TypeScript repair'
+          git add app/check/form-client.tsx lib/damages.ts
+          git commit -m 'Align damage ID types with UUID schema'
           git push origin HEAD:stabilize-build-gates
