@@ -1,4 +1,4 @@
-name: Run Repair B temp
+name: Run Repair C temp
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  run-repair-b:
+  run-repair-c:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -18,9 +18,9 @@ jobs:
         with:
           ref: stabilize-build-gates
 
-      - name: Apply Repair B
+      - name: Apply Repair C
         run: |
-          python3 .github/scripts/repair-b.py
+          python3 .github/scripts/repair-c.py
           git diff --check
           git diff --stat
 
@@ -34,23 +34,12 @@ jobs:
         run: npm ci
 
       - name: Strict typecheck
-        shell: bash
-        run: |
-          set +e
-          npx tsc --noEmit --pretty false 2>&1 | tee tsc.log
-          STATUS=${PIPESTATUS[0]}
-          COUNT=$(grep -c 'error TS' tsc.log || true)
-          FILES=$(grep 'error TS' tsc.log | sed -E 's/^([^(:]+).*/\1/' | sort -u | wc -l | tr -d ' ')
-          echo "TSC_EXIT=$STATUS"
-          echo "TSC_ERROR_COUNT=$COUNT"
-          echo "TSC_FILE_COUNT=$FILES"
-          grep 'error TS' tsc.log | sed -E 's/^([^(:]+).*/\1/' | sort | uniq -c | sort -nr || true
-          exit 0
+        run: npx tsc --noEmit --pretty false
 
-      - name: Commit repaired files to stabilization branch
+      - name: Commit final type repair to stabilization branch
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/check/form-client.tsx lib/vehicle-status.ts
-          git commit -m 'Align remaining TypeScript data contracts'
+          git add lib/vehicle-status.ts
+          git commit -m 'Complete strict TypeScript repair'
           git push origin HEAD:stabilize-build-gates
