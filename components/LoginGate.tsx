@@ -48,8 +48,10 @@ export default function LoginGate({ children }: Props) {
     e.preventDefault();
     setMsg('');
 
-    const redirectTo =
-      (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
+    // Return the magic-link to the exact deployment the user is signing in from.
+    // This keeps Production on www.incheckad.se while allowing Vercel Preview
+    // deployments to test authentication without being redirected to Production.
+    const redirectTo = window.location.origin + '/';
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
