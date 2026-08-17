@@ -1,59 +1,34 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isWhitelistedEmail } from '@/lib/access-control';
+import { installAuthenticatedApiFetch } from '@/lib/api-auth-client';
 
 type Props = { children: React.ReactNode };
 
-const EMAIL_WHITELIST = new Set<string>([
-  'per.andersson@mabi.se',
-  'per.enskede@gmail.com',
-  'ingemar.carqueija@mabi.se',
-  'latif.mutlu@mabi.se',
-  'hugo.carqueija@gmail.com',
-  'benjamin.mutlu@outlook.com',
-  'oliwer.fredriksson@mabi.se',
-  'louise.espe@mabi.se',
-  'lucas.nemeth@mabi.se',
-  'isak.brandeby@mabi.se',
-  'noorullah.mohammad.zarif@mabi.se',
-  'maciej.krupa@mabi.se',
-  'nimet.mecaj@mabi.se',
-  'lukas.svensson@mabi.se',
-  'leo.hedenberg@mabi.se',
-  'anders.larsson@mabi.se',
-  'haris.poricanin@mabi.se',
-  'mikael.gronqvist@mabi.se',
-  'ludvig.johansson@mabi.se',
-  'joachim.mellden@mabi.se',
-  'felicia.sarlov@mabi.se',
-  'mohamed.ismael@mabi.se',
-  'linus.croon@mabi.se',
-  'wanda.andersson@mabi.se',
-  'dan.hermodsson@mabi.se',
-  'elvir.poricanin@mabi.se',
-  'asa.andersson@mabi.se',
-  'dilot_85@hotmail.com',
-  'alicia.carqueija@mabi.se',
-  'isak.andersson@mabi.se',
-  'isakeandersson@gmail.com',
-  'lucianoinzunza71@gmail.com',
-  'helsingborg@mabi.se',
-]);
+const SECURITY_PREVIEW_ORIGIN =
+  'https://nextjs-boilerplate-git-security-p-75bc26-pers-projects-fffbcffe.vercel.app';
 
 export default function LoginGate({ children }: Props) {
   const [state, setState] =
     useState<'checking' | 'login' | 'denied' | 'ok'>('checking');
   const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [useOtpFlow, setUseOtpFlow] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
+    const uninstallApiAuthFetch = installAuthenticatedApiFetch();
+    setUseOtpFlow(window.location.origin === SECURITY_PREVIEW_ORIGIN);
+
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setState('login'); return; }
 
       const lower = user.email?.toLowerCase() ?? null;
 
-      if (lower && EMAIL_WHITELIST.has(lower)) {
+      if (isWhitelistedEmail(lower)) {
         setState('ok');
         return;
       }
@@ -72,22 +47,59 @@ export default function LoginGate({ children }: Props) {
 
       setState('ok');
     })();
+
+    return uninstallApiAuthFetch;
   }, []);
 
-  const signIn = async (e: React.FormEvent) => {
+  const sendSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg('');
 
-    // FIX: Flyttade denna logik in i funktionen för att säkerställa att den bara körs på klienten.
-    const redirectTo =
-      (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
+    const normalizedEmail = email.trim().toLowerCase();
+    const otpFlow = window.location.origin === SECURITY_PREVIEW_ORIGIN;
+    const redirectTo = otpFlow
+      ? window.location.origin + '/'
+      : (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
 
     const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo }
+      email: normalizedEmail,
+      options: { emailRedirectTo: redirectTo },
     });
 
-    setMsg(error ? error.message : 'Kolla din mejl för inloggningslänken.');
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+
+    setEmail(normalizedEmail);
+    if (otpFlow) {
+      setOtpSent(true);
+      setMsg('En engångskod har skickats till din mejl.');
+    } else {
+      setOtpSent(false);
+      setMsg('Kolla din mejl för inloggningslänken.');
+    }
+  };
+
+  const verifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg('');
+
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: otp.trim(),
+      type: 'email',
+    });
+
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+
+    // Re-run the existing whitelist / employees authorization check using
+    // the newly established Supabase session. This avoids creating a second
+    // authorization path for OTP sign-in.
+    window.location.reload();
   };
 
   if (state === 'login') {
@@ -95,30 +107,55 @@ export default function LoginGate({ children }: Props) {
       <div className="login-bg">
         <div className="login-card">
           <h1 className="login-title">Logga in</h1>
-          <form onSubmit={signIn} className="login-form">
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="E-postadress"
-              className="login-input"
-              autoFocus
-            />
-            <button
-              type="submit"
-              className="login-btn"
-            >
-              Skicka magisk länk
-            </button>
-          </form>
-          {msg && (
-            <div className="login-msg-wrap">
-              <h2 className="login-thanks">Tack!</h2>
-              <p className="login-msg">Kolla din mejl för inloggningslänken.</p>
-              <p className="login-close-tab">Du kan nu stänga denna flik.</p>
-            </div>
+
+          {!otpSent ? (
+            <form onSubmit={sendSignIn} className="login-form">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="E-postadress"
+                className="login-input"
+                autoFocus
+              />
+              <button type="submit" className="login-btn">
+                {useOtpFlow ? 'Skicka engångskod' : 'Skicka magisk länk'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={verifyOtp} className="login-form">
+              <input
+                type="text"
+                required
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                value={otp}
+                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="6-siffrig kod"
+                className="login-input"
+                autoFocus
+              />
+              <button type="submit" className="login-btn">
+                Verifiera kod
+              </button>
+              <button
+                type="button"
+                className="login-btn"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtp('');
+                  setMsg('');
+                }}
+              >
+                Byt e-postadress
+              </button>
+            </form>
           )}
+
+          {msg && <p className="login-msg">{msg}</p>}
         </div>
       </div>
     );
