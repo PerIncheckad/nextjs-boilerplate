@@ -27,6 +27,7 @@ text = replace_once(
     "const rawPositioner = damageType && pos.carPart ? getDamagePositions(damageType, pos.carPart) : [];",
     'check rawPositioner guard',
 )
+text = text.replace('updater((damages: any[]) => damages.map((d: any) => \n', 'updater((damages: any[]) => damages.map((d: any) =>\n')
 path.write_text(text)
 
 
