@@ -53,6 +53,12 @@ export default function LoginGate({ children }: Props) {
     const normalizedEmail = email.trim().toLowerCase();
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
+      options: {
+        // The Supabase email template uses RedirectTo to distinguish the
+        // security preview from Production. Production can keep its current
+        // magic-link email while this preview receives an OTP code only.
+        emailRedirectTo: window.location.origin + '/',
+      },
     });
 
     if (error) {
