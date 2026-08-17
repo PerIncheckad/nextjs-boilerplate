@@ -1,0 +1,59 @@
+name: Dependency audit temp
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout audit branch
+        uses: actions/checkout@v4
+        with:
+          ref: audit-dependencies-step-2-3
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install exact lockfile
+        run: npm ci
+
+      - name: Capture npm audit
+        run: |
+          npm audit --json > audit.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          const out = {
+            metadata: audit.metadata,
+            vulnerabilities: Object.fromEntries(Object.entries(audit.vulnerabilities || {}).map(([name, v]) => [name, {
+              severity: v.severity,
+              isDirect: v.isDirect,
+              range: v.range,
+              fixAvailable: v.fixAvailable,
+              via: (v.via || []).map(x => typeof x === 'string' ? x : {
+                source: x.source,
+                name: x.name,
+                title: x.title,
+                severity: x.severity,
+                range: x.range,
+                url: x.url
+              })
+            }]))
+          };
+          console.log('AUDIT_SUMMARY_START');
+          console.log(JSON.stringify(out, null, 2));
+          console.log('AUDIT_SUMMARY_END');
+          NODE
+
+      - name: Capture outdated direct dependencies
+        run: npm outdated --json || true
