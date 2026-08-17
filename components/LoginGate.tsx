@@ -1,44 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isWhitelistedEmail } from '@/lib/access-control';
+import { installAuthenticatedApiFetch } from '@/lib/api-auth-client';
 
 type Props = { children: React.ReactNode };
-
-const EMAIL_WHITELIST = new Set<string>([
-  'per.andersson@mabi.se',
-  'per.enskede@gmail.com',
-  'ingemar.carqueija@mabi.se',
-  'latif.mutlu@mabi.se',
-  'hugo.carqueija@gmail.com',
-  'benjamin.mutlu@outlook.com',
-  'oliwer.fredriksson@mabi.se',
-  'louise.espe@mabi.se',
-  'lucas.nemeth@mabi.se',
-  'isak.brandeby@mabi.se',
-  'noorullah.mohammad.zarif@mabi.se',
-  'maciej.krupa@mabi.se',
-  'nimet.mecaj@mabi.se',
-  'lukas.svensson@mabi.se',
-  'leo.hedenberg@mabi.se',
-  'anders.larsson@mabi.se',
-  'haris.poricanin@mabi.se',
-  'mikael.gronqvist@mabi.se',
-  'ludvig.johansson@mabi.se',
-  'joachim.mellden@mabi.se',
-  'felicia.sarlov@mabi.se',
-  'mohamed.ismael@mabi.se',
-  'linus.croon@mabi.se',
-  'wanda.andersson@mabi.se',
-  'dan.hermodsson@mabi.se',
-  'elvir.poricanin@mabi.se',
-  'asa.andersson@mabi.se',
-  'dilot_85@hotmail.com',
-  'alicia.carqueija@mabi.se',
-  'isak.andersson@mabi.se',
-  'isakeandersson@gmail.com',
-  'lucianoinzunza71@gmail.com',
-  'helsingborg@mabi.se',
-]);
 
 export default function LoginGate({ children }: Props) {
   const [state, setState] =
@@ -47,13 +13,15 @@ export default function LoginGate({ children }: Props) {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
+    const uninstallApiAuthFetch = installAuthenticatedApiFetch();
+
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setState('login'); return; }
 
       const lower = user.email?.toLowerCase() ?? null;
 
-      if (lower && EMAIL_WHITELIST.has(lower)) {
+      if (isWhitelistedEmail(lower)) {
         setState('ok');
         return;
       }
@@ -72,13 +40,14 @@ export default function LoginGate({ children }: Props) {
 
       setState('ok');
     })();
+
+    return uninstallApiAuthFetch;
   }, []);
 
   const signIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg('');
 
-    // FIX: Flyttade denna logik in i funktionen för att säkerställa att den bara körs på klienten.
     const redirectTo =
       (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
 
