@@ -47,6 +47,8 @@ jobs:
           echo "TSC_EXIT=$TSC_STATUS"
           echo "TSC_ERROR_COUNT=$ERROR_COUNT"
           echo "TSC_FILE_COUNT=$FILE_COUNT"
-          echo '--- files with TypeScript errors ---'
-          grep 'error TS' tsc.log | sed -E 's/^([^(:]+).*/\1/' | sort -u || true
+          echo '--- TypeScript errors by file ---'
+          grep 'error TS' tsc.log | sed -E 's/^([^(:]+).*/\1/' | sort | uniq -c | sort -nr || true
+          echo '--- TypeScript errors by code ---'
+          grep -oE 'TS[0-9]+' tsc.log | sort | uniq -c | sort -nr || true
           exit 0
