@@ -613,11 +613,11 @@ export default function StatusForm() {
         )}
 
         {/* Nybil Reference Photos Section */}
-        {vehicleStatus?.found && vehicleStatus.nybilPhotos?.photoUrls?.length > 0 && (
+        {vehicleStatus?.found && (vehicleStatus.nybilPhotos?.photoUrls?.length ?? 0) > 0 && (
           <Card className="nybil-photos-card">
             <SectionHeader title={getNybilPhotosTitle()} />
             <div className="nybil-photos-grid">
-              {vehicleStatus.nybilPhotos.photoUrls.map((url, index) => (
+              {vehicleStatus.nybilPhotos?.photoUrls?.map((url, index) => (
                 <a 
                   key={index} 
                   href={url}
@@ -859,6 +859,8 @@ export default function StatusForm() {
               <h2 style={{ margin: '0 0 1rem', fontSize: '1.1rem' }}>Bekräfta ändringar</h2>
               <div style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
                 {Object.entries(pendingEdits).map(([field, value]) => {
+                  const currentVehicle = vehicleStatus.vehicle;
+                  if (!currentVehicle) return null;
                   const labels: Record<string, string> = {
                     bilmarke_modell: 'Bilmärke & Modell', matarstallning: 'Mätarställning',
                     bilmarke: 'Bilmärke', modell: 'Modell',
@@ -884,45 +886,45 @@ export default function StatusForm() {
                     coc_forvaring_spec: 'COC-dokument — Specificera',
                   };
                   const oldValues: Record<string, string> = {
-                    bilmarke_modell: vehicleStatus.vehicle.bilmarkeModell,
-                    bilmarke: vehicleStatus.vehicle.bilmarke,
-                    modell: vehicleStatus.vehicle.modell,
-                    drivmedel: vehicleStatus.vehicle.drivmedel,
-                    vaxel: vehicleStatus.vehicle.vaxel,
-                    matarstallning: vehicleStatus.vehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
-                    hjultyp: vehicleStatus.vehicle.hjultyp,
-                    planerad_station: vehicleStatus.vehicle.planeradStation,
-                    serviceintervall: vehicleStatus.vehicle.serviceintervall === '---' ? '---' : vehicleStatus.vehicle.serviceintervall.replace(' km', '').trim(),
-                    max_km_manad: vehicleStatus.vehicle.maxKmManad === '---' ? '---' : vehicleStatus.vehicle.maxKmManad.replace(' km', '').trim(),
-                    avgift_over_km: vehicleStatus.vehicle.avgiftOverKm === '---' ? '---' : vehicleStatus.vehicle.avgiftOverKm.replace(' kr', '').replace(',', '.').trim(),
-                    anteckningar: vehicleStatus.vehicle.anteckningar,
-                    stold_gps: vehicleStatus.vehicle.stoldGps,
-                    klar_for_uthyrning: vehicleStatus.vehicle.klarForUthyrning,
+                    bilmarke_modell: currentVehicle.bilmarkeModell,
+                    bilmarke: currentVehicle.bilmarke,
+                    modell: currentVehicle.modell,
+                    drivmedel: currentVehicle.drivmedel,
+                    vaxel: currentVehicle.vaxel,
+                    matarstallning: currentVehicle.matarstallning.replace(' km', '').replace(/\s*\(.*\)/, '').trim(),
+                    hjultyp: currentVehicle.hjultyp,
+                    planerad_station: currentVehicle.planeradStation,
+                    serviceintervall: currentVehicle.serviceintervall === '---' ? '---' : currentVehicle.serviceintervall.replace(' km', '').trim(),
+                    max_km_manad: currentVehicle.maxKmManad === '---' ? '---' : currentVehicle.maxKmManad.replace(' km', '').trim(),
+                    avgift_over_km: currentVehicle.avgiftOverKm === '---' ? '---' : currentVehicle.avgiftOverKm.replace(' kr', '').replace(',', '.').trim(),
+                    anteckningar: currentVehicle.anteckningar,
+                    stold_gps: currentVehicle.stoldGps,
+                    klar_for_uthyrning: currentVehicle.klarForUthyrning,
                     stold_gps_spec: '',
-                    mbme_aktiverad: vehicleStatus.vehicle.mbmeAktiverad,
-                    vw_connect_aktiverad: vehicleStatus.vehicle.vwConnectAktiverad,
-                    ej_uthyrningsbar_anledning: vehicleStatus.vehicle.ejUthyrningsbarAnledning,
-                    laddniva_vid_leverans: vehicleStatus.vehicle.laddnivaVidLeverans === '---' ? '---' : vehicleStatus.vehicle.laddnivaVidLeverans.replace('%', '').trim(),
-                    tankstatus: vehicleStatus.vehicle.tankstatusVidLeveransRaw,
-                    upptankning_liter: vehicleStatus.vehicle.upptankningLiter === '---' ? '---' : vehicleStatus.vehicle.upptankningLiter,
-                    upptankning_literpris: vehicleStatus.vehicle.upptankningLiterpris === '---' ? '---' : vehicleStatus.vehicle.upptankningLiterpris,
-                    hjul_forvaring_ort: vehicleStatus.vehicle.hjulForvaringOrt,
-                    hjul_forvaring_spec: vehicleStatus.vehicle.hjulForvaringSpec,
-                    extranyckel_forvaring_ort: vehicleStatus.vehicle.extranyckelForvaringOrt,
-                    extranyckel_forvaring_spec: vehicleStatus.vehicle.extranyckelForvaringSpec,
-                    laddkablar_forvaring_ort: vehicleStatus.vehicle.laddkablarForvaringOrt,
-                    laddkablar_forvaring_spec: vehicleStatus.vehicle.laddkablarForvaringSpec,
-                    instruktionsbok_forvaring_ort: vehicleStatus.vehicle.instruktionsbokForvaringOrt,
-                    instruktionsbok_forvaring_spec: vehicleStatus.vehicle.instruktionsbokForvaringSpec,
-                    coc_forvaring_ort: vehicleStatus.vehicle.cocForvaringOrt,
-                    coc_forvaring_spec: vehicleStatus.vehicle.cocForvaringSpec,
-                    saludatum: vehicleStatus.vehicle.saludatum,
-                    salu_station: vehicleStatus.vehicle.saluStation,
-                    salu_kopare: vehicleStatus.vehicle.saluKopare,
-                    salu_returadress: vehicleStatus.vehicle.saluReturadress,
-                    salu_retur: vehicleStatus.vehicle.saluRetur,
-                    salu_attention: vehicleStatus.vehicle.saluAttention,
-                    salu_notering: vehicleStatus.vehicle.saluNotering,
+                    mbme_aktiverad: currentVehicle.mbmeAktiverad,
+                    vw_connect_aktiverad: currentVehicle.vwConnectAktiverad,
+                    ej_uthyrningsbar_anledning: currentVehicle.ejUthyrningsbarAnledning,
+                    laddniva_vid_leverans: currentVehicle.laddnivaVidLeverans === '---' ? '---' : currentVehicle.laddnivaVidLeverans.replace('%', '').trim(),
+                    tankstatus: currentVehicle.tankstatusVidLeveransRaw,
+                    upptankning_liter: currentVehicle.upptankningLiter === '---' ? '---' : currentVehicle.upptankningLiter,
+                    upptankning_literpris: currentVehicle.upptankningLiterpris === '---' ? '---' : currentVehicle.upptankningLiterpris,
+                    hjul_forvaring_ort: currentVehicle.hjulForvaringOrt,
+                    hjul_forvaring_spec: currentVehicle.hjulForvaringSpec,
+                    extranyckel_forvaring_ort: currentVehicle.extranyckelForvaringOrt,
+                    extranyckel_forvaring_spec: currentVehicle.extranyckelForvaringSpec,
+                    laddkablar_forvaring_ort: currentVehicle.laddkablarForvaringOrt,
+                    laddkablar_forvaring_spec: currentVehicle.laddkablarForvaringSpec,
+                    instruktionsbok_forvaring_ort: currentVehicle.instruktionsbokForvaringOrt,
+                    instruktionsbok_forvaring_spec: currentVehicle.instruktionsbokForvaringSpec,
+                    coc_forvaring_ort: currentVehicle.cocForvaringOrt,
+                    coc_forvaring_spec: currentVehicle.cocForvaringSpec,
+                    saludatum: currentVehicle.saludatum,
+                    salu_station: currentVehicle.saluStation,
+                    salu_kopare: currentVehicle.saluKopare,
+                    salu_returadress: currentVehicle.saluReturadress,
+                    salu_retur: currentVehicle.saluRetur,
+                    salu_attention: currentVehicle.saluAttention,
+                    salu_notering: currentVehicle.saluNotering,
                   };
                   // Översätt enum-värden till svensk text för visning i modalen.
                   // Lägg till fler fält här om de har samma enum/text-separation.

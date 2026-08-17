@@ -32,6 +32,12 @@ const STATIONER: Record<string, string[]> = {
 
 const DAMAGE_TYPES = Object.keys(DAMAGE_OPTIONS).sort((a, b) => a.localeCompare(b, 'sv'));
 
+const getDamagePositions = (damageType: string, carPart: string): readonly string[] => {
+  if (!damageType || !carPart) return [];
+  const typeOptions = DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS] as unknown as Record<string, readonly string[]> | undefined;
+  return typeOptions?.[carPart] ?? [];
+};
+
 type MediaFile = {
   file: File; type: 'image' | 'video'; preview?: string; thumbnail?: string;
 };
@@ -49,7 +55,7 @@ type DamagePosition = {
 };
 
 type ExistingDamage = {
-  db_id: number;
+  db_id: number | string;
   id: string;
   fullText: string; 
   originalDamageDate: string | null; // YYYY-MM-DD
@@ -108,7 +114,7 @@ function formatDateTime(dateStr: string | null | undefined): string {
   }
 }
 
-function slugify(str: string): string {
+function slugify(str: string | null | undefined): string {
     if (!str) return '';
     // preserve main behavior but ensure ascii output
     const replacements: Record<string, string> = {
@@ -227,18 +233,21 @@ async function uploadOne(file: File, path: string, bucket: string = 'damage-phot
       }
       
       // Upload succeeded or file already exists - get public URL
-      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path);
+      const { data, error: urlError } = supabase.storage.from(BUCKET).getPublicUrl(path) as {
+        data: { publicUrl: string };
+        error?: unknown;
+      };
       if (urlError) {
         console.error(`Failed to get public url for ${path} (attempt ${attempt}/${MAX_RETRIES}):`, urlError);
-        
+
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
         }
-        
+
         throw new Error('Fel vid uppladdning. Vänligen försök igen.');
       }
-      
+
       if (!data?.publicUrl) {
         console.warn(`Public url missing for ${path} (attempt ${attempt}/${MAX_RETRIES})`);
         
@@ -293,7 +302,7 @@ const createVideoThumbnail = (file: File): Promise<string> => new Promise(resolv
 });
 
 const processFiles = async (files: FileList): Promise<MediaFile[]> => {
-  const processed = await Promise.all(Array.from(files).map(async file => {
+  const processed: Array<MediaFile | null> = await Promise.all(Array.from(files).map(async (file): Promise<MediaFile | null> => {
     const type = getFileType(file);
     if (type === 'video') {
       const thumbnail = await createVideoThumbnail(file);
@@ -609,12 +618,12 @@ export default function CheckInForm() {
     if (skadekontroll === 'nya_skador') {
         if (newDamages.length === 0) return false;
         for (const d of newDamages) {
-            const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position));
+            const positionsInvalid = d.positions.some(p => !p.carPart || ((getDamagePositions(d.type, p.carPart)).length > 0 && !p.position));
             if (!d.type || !hasAnyMedia(d.media) || positionsInvalid) return false;
         }
     }
     
-    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (DAMAGE_OPTIONS[d.userType as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position))) return false;
+    if (existingDamages.filter(d => d.status === 'documented').some(d => !d.userType || !hasAnyMedia(d.media) || d.userPositions.some(p => !p.carPart || (getDamagePositions(d.userType || '', p.carPart)).length > 0 && !p.position))) return false;
 
     if (garInteAttHyraUt && !garInteAttHyraUtKommentar.trim()) return false;
     if (varningslampaLyser && !varningslampaBeskrivning.trim()) return false;
@@ -1138,7 +1147,7 @@ export default function CheckInForm() {
         ) => {
             if (!isEnabled || media.length === 0) return;
             const dateEventFolderName = `${reg}-${incheckningsdatum}`;
-            let typeString = type;
+            let typeString: string = type;
             if (type === 'REKOND' && rekondTypes) {
                 const types = [];
                 if (rekondTypes.utvandig) types.push('UTVANDIG');
@@ -1397,7 +1406,7 @@ export default function CheckInForm() {
 
   const updateDamageField = (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater(damages => damages.map(d => {
+    updater((damages: any[]) => damages.map((d: any) => {
         if (d.id !== id) return d;
         if (positionId && (field === 'carPart' || field === 'position')) {
             const positionsKey = isExisting ? 'userPositions' : 'positions';
@@ -1437,7 +1446,7 @@ export default function CheckInForm() {
     // For videos, process directly
     const processed = await processFiles(files);
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater(damages => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
+    updater((damages: any[]) => damages.map((d: any) => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
   };
   
   const handleRekondMediaUpdate = async (files: FileList) => {
@@ -1478,7 +1487,7 @@ export default function CheckInForm() {
 
   const handleMediaRemove = (id: string, index: number, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater(damages => damages.map(d => {
+    updater((damages: any[]) => damages.map((d: any) => {
       if (d.id !== id) return d;
       const newMedia = [...(d.media || [])];
       newMedia.splice(index, 1);
@@ -1513,7 +1522,7 @@ export default function CheckInForm() {
 
     if (annotatorContext.type === 'damage' && annotatorContext.damageId) {
       const updater = annotatorContext.isExisting ? setExistingDamages : setNewDamages;
-      updater(damages => damages.map(d => 
+      updater((damages: any[]) => damages.map((d: any) =>
         d.id === annotatorContext.damageId 
           ? { ...d, media: [...(d.media || []), annotatedMediaFile] } 
           : d
@@ -1550,7 +1559,7 @@ export default function CheckInForm() {
   const addDamagePosition = (damageId: string, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
     const positionsKey = isExisting ? 'userPositions' : 'positions';
-    updater(prev => prev.map(d => {
+    updater((prev: any[]) => prev.map((d: any) => {
         if (d.id !== damageId) return d;
         const newPosition: DamagePosition = { id: `pos-${Date.now()}`, carPart: '', position: '' };
         return { ...d, [positionsKey]: [...d[positionsKey], newPosition] };
@@ -1560,7 +1569,7 @@ export default function CheckInForm() {
   const removeDamagePosition = (damageId: string, positionId: string, isExisting: boolean) => {
       const updater = isExisting ? setExistingDamages : setNewDamages;
       const positionsKey = isExisting ? 'userPositions' : 'positions';
-      updater(prev => prev.map(d => {
+      updater((prev: any[]) => prev.map((d: any) => {
           if (d.id !== damageId) return d;
           if (d[positionsKey].length <= 1) return d;
           const updatedPositions = d[positionsKey].filter((p: DamagePosition) => p.id !== positionId);
@@ -1969,7 +1978,7 @@ export default function CheckInForm() {
           )}
         </Card>
 
-        <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((DAMAGE_OPTIONS[d.type as keyof typeof DAMAGE_OPTIONS]?.[p.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
+        <Card data-error={showFieldErrors && (unhandledLegacyDamages || skadekontroll === null || (skadekontroll === 'nya_skador' && (newDamages.length === 0 || newDamages.some(d => { const positionsInvalid = d.positions.some(p => !p.carPart || ((getDamagePositions(d.type, p.carPart)).length > 0 && !p.position)); return !d.type || !hasAnyMedia(d.media) || positionsInvalid; }))))}>
           <SectionHeader title="Skador" />
           {vehicleData && existingDamages.some(d => !d.isInventoried) && (<Fragment>
             <SubSectionHeader title="Befintliga skador att hantera" />
@@ -2307,7 +2316,7 @@ const DamageItem: React.FC<{
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>
         {positions && positions.map((pos, i) => {
-            const rawPositioner = (damageType && pos.carPart && DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof typeof DAMAGE_OPTIONS[keyof typeof DAMAGE_OPTIONS][string]] || []);
+            const rawPositioner = damageType && pos.carPart ? getDamagePositions(damageType, pos.carPart) : [];
             const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
             const showPositionDropdown = availablePositioner.length > 0;
 

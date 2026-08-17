@@ -69,7 +69,6 @@ export default function MediaGallery({ skador, role }: MediaGalleryProps) {
                     ? `${skada.regnr} - Senaste skada: ${skada.damageType} - ${skada.date}`
                     : `${skada.regnr} - ${skada.damageType} - ${skada.date}`
                 }
-                showNoMedia={skada.media.length === 0}
               />
             )}
           </div>

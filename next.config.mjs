@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Låt builden gå igenom även om TypeScript hittar fel i app-koden.
+  // TypeScript-fel ska stoppa build/deploy.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
+  // ESLint etableras som separat kvalitetsspärr i ett senare stabiliseringspass.
   eslint: {
     ignoreDuringBuilds: true,
   },

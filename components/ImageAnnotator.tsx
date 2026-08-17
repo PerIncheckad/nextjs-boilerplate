@@ -33,8 +33,8 @@ interface ImageAnnotatorProps {
 
 export default function ImageAnnotator({ imageFile, onSave, onCancel }: ImageAnnotatorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedColor, setSelectedColor] = useState(NEON_COLORS[0].value);
-  const [selectedLineWidth, setSelectedLineWidth] = useState(LINE_WIDTHS.THIN);
+  const [selectedColor, setSelectedColor] = useState<(typeof NEON_COLORS)[number]['value']>(NEON_COLORS[0].value);
+  const [selectedLineWidth, setSelectedLineWidth] = useState<(typeof LINE_WIDTHS)[keyof typeof LINE_WIDTHS]>(LINE_WIDTHS.THIN);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokes, setStrokes] = useState<DrawingStroke[]>([]);
   const [currentStroke, setCurrentStroke] = useState<DrawingStroke>([]);

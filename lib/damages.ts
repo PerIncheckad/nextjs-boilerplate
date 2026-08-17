@@ -18,6 +18,7 @@ type LegacyDamage = {
 
 // Type for checkin_damages data (without nested join to avoid PostgREST issues)
 type CheckinDamageData = {
+  id?: string;
   type: 'existing' | 'not_found' | 'documented';
   damage_type: string | null;
   car_part: string | null;
@@ -37,7 +38,7 @@ type InventoriedDamage = {
 
 // The final, consolidated damage object sent to the form client
 export type ConsolidatedDamage = {
-  id: number;
+  id: number | string;
   text: string;
   damage_date: string | null;
   is_inventoried: boolean;
@@ -50,6 +51,7 @@ export type ConsolidatedDamage = {
   handled_by?: string | null;  // Who handled the damage
   handled_photo_urls?: string[];  // Photo URLs from checkin_damages
   handled_video_urls?: string[];  // Video URLs from checkin_damages
+  handled_at?: string | null;  // Timestamp when damage was handled
 };
 
 export type VehicleInfo = {
@@ -281,7 +283,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const vehicleData = vehicleResponse.data?.[0] || null;
   const nybilData = nybilResponse.data || null;
   const vehicleBransletyp = vehicleFuelResponse.data?.bransletyp || null;
-  const finalBransletyp = nybilData?.bransletyp || vehicleBransletyp || null;
+  const finalBransletyp = (nybilData as { bransletyp?: string | null } | null)?.bransletyp || vehicleBransletyp || null;
   const legacyDamages: LegacyDamage[] = legacyDamagesResponse.data || [];
   const dbDamages = dbDamagesResponse.data || [];
   // handledDamages is now defined earlier
@@ -292,7 +294,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   // Build a list of handled damages for text-based matching
   // Note: We now match by text instead of index for more accurate matching
   type HandledDamageInfo = {
-    id: number;
+    id: string;
     type: 'existing' | 'not_found' | 'documented';
     damage_type: string;
     car_part: string | null;
@@ -311,7 +313,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   for (const handled of handledDamages) {
     if (handled.type === 'existing' || handled.type === 'not_found' || handled.type === 'documented') {
       handledDamagesList.push({
-        id: handled.id || 0,
+        id: handled.id || '',
         type: handled.type,
         // damage_type can be null/undefined in rare cases (data integrity issues)
         // Use fallback 'Okänd' to ensure display always has a value
@@ -371,7 +373,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
   const dbDamageKeys = new Set<string>();
   
   // Track which checkin_damages we've matched
-  const matchedHandledIds = new Set<number>();
+  const matchedHandledIds = new Set<string>();
   
   // Add BUHS damages (from legacy source)
   // Match with checkin_damages by TEXT (primary) or by loose key (secondary)
