@@ -1,0 +1,60 @@
+name: Temporary TypeScript repair A PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: stabilize-build-gates
+
+      - name: Extract and apply verified repair script
+        shell: bash
+        run: |
+          sed -n "/python3 - <<'PY'/,/^          PY$/p" .github/workflows/typecheck-repair-a-temp.yml | sed '1d;$d;s/^          //' > /tmp/repair-a.py
+          python3 /tmp/repair-a.py
+          git diff --check
+          git diff --stat
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Measure TypeScript after repair A
+        shell: bash
+        run: |
+          set +e
+          npx tsc --noEmit --pretty false 2>&1 | tee tsc-after.log
+          TSC_STATUS=${PIPESTATUS[0]}
+          ERROR_COUNT=$(grep -c 'error TS' tsc-after.log || true)
+          FILE_COUNT=$(grep 'error TS' tsc-after.log | sed -E 's/^([^(:]+).*/\1/' | sort -u | wc -l | tr -d ' ')
+          echo "TSC_EXIT=$TSC_STATUS"
+          echo "TSC_ERROR_COUNT=$ERROR_COUNT"
+          echo "TSC_FILE_COUNT=$FILE_COUNT"
+          echo '--- errors by file ---'
+          grep 'error TS' tsc-after.log | sed -E 's/^([^(:]+).*/\1/' | sort | uniq -c | sort -nr || true
+          exit 0
+
+      - name: Commit repair A to branch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/check/form-client.tsx app/nybil/form-client.tsx app/status/form-client.tsx components/ImageAnnotator.tsx components/MediaGallery.tsx lib/damages.ts
+          git commit -m 'Repair mechanical TypeScript errors' || exit 0
+          git push origin HEAD:stabilize-build-gates
