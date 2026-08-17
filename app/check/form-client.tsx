@@ -1392,7 +1392,7 @@ export default function CheckInForm() {
 
   const updateDamageField = (id: string, field: string, value: any, isExisting: boolean, positionId?: string) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater(damages => damages.map(d => {
+    updater((damages: any[]) => damages.map((d: any) => {
         if (d.id !== id) return d;
         if (positionId && (field === 'carPart' || field === 'position')) {
             const positionsKey = isExisting ? 'userPositions' : 'positions';
@@ -1432,7 +1432,7 @@ export default function CheckInForm() {
     // For videos, process directly
     const processed = await processFiles(files);
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater(damages => damages.map(d => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
+    updater((damages: any[]) => damages.map((d: any) => d.id === id ? { ...d, media: [...(d.media || []), ...processed] } : d));
   };
   
   const handleRekondMediaUpdate = async (files: FileList) => {
@@ -1473,7 +1473,7 @@ export default function CheckInForm() {
 
   const handleMediaRemove = (id: string, index: number, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
-    updater(damages => damages.map(d => {
+    updater((damages: any[]) => damages.map((d: any) => {
       if (d.id !== id) return d;
       const newMedia = [...(d.media || [])];
       newMedia.splice(index, 1);
@@ -1508,7 +1508,7 @@ export default function CheckInForm() {
 
     if (annotatorContext.type === 'damage' && annotatorContext.damageId) {
       const updater = annotatorContext.isExisting ? setExistingDamages : setNewDamages;
-      updater(damages => damages.map(d => 
+      updater((damages: any[]) => damages.map((d: any) =>
         d.id === annotatorContext.damageId 
           ? { ...d, media: [...(d.media || []), annotatedMediaFile] } 
           : d
@@ -1545,7 +1545,7 @@ export default function CheckInForm() {
   const addDamagePosition = (damageId: string, isExisting: boolean) => {
     const updater = isExisting ? setExistingDamages : setNewDamages;
     const positionsKey = isExisting ? 'userPositions' : 'positions';
-    updater(prev => prev.map(d => {
+    updater((prev: any[]) => prev.map((d: any) => {
         if (d.id !== damageId) return d;
         const newPosition: DamagePosition = { id: `pos-${Date.now()}`, carPart: '', position: '' };
         return { ...d, [positionsKey]: [...d[positionsKey], newPosition] };
@@ -1555,7 +1555,7 @@ export default function CheckInForm() {
   const removeDamagePosition = (damageId: string, positionId: string, isExisting: boolean) => {
       const updater = isExisting ? setExistingDamages : setNewDamages;
       const positionsKey = isExisting ? 'userPositions' : 'positions';
-      updater(prev => prev.map(d => {
+      updater((prev: any[]) => prev.map((d: any) => {
           if (d.id !== damageId) return d;
           if (d[positionsKey].length <= 1) return d;
           const updatedPositions = d[positionsKey].filter((p: DamagePosition) => p.id !== positionId);
@@ -2302,7 +2302,7 @@ const DamageItem: React.FC<{
       {(isDocumented || !isExisting) && !resolved && (<div className="damage-details">
         <Field label="Typ av skada *"><select value={damageType || ''} onChange={e => onUpdate(damage.id, 'type', e.target.value, isExisting)}><option value="">Välj typ</option>{DAMAGE_TYPES.map(type => <option key={type} value={type}>{type}</option>)}</select></Field>
         {positions && positions.map((pos, i) => {
-            const rawPositioner = (damageType && pos.carPart && getDamagePositions(damageType || '', pos.carPart));
+            const rawPositioner = damageType && pos.carPart ? getDamagePositions(damageType, pos.carPart) : [];
             const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
             const showPositionDropdown = availablePositioner.length > 0;
 

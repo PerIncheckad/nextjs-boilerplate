@@ -103,7 +103,7 @@ export type DamageRecord = {
   legacy_buhs_text?: string | null; // Original BUHS description (combined from damage_type_raw, notes, etc.)
   original_damage_date?: string | null;
   // For documented BUHS damages - track where they were documented
-  checkinWhereDocumented?: number | null; // checkin_id where this damage was documented
+  checkinWhereDocumented?: string | null; // UUID checkin_id where this damage was documented
   documentedBy?: string | null; // checker_name who documented it
   documentedDate?: string | null; // Date when damage was documented (checkin date)
   // Flags for handled/inventoried status
@@ -208,10 +208,10 @@ export type HistoryRecord = {
   // BUHS skada detaljer (för typ='buhs_skada')
   buhsSkadaDetaljer?: {
     skadetyp: string;
-    legacy_damage_source_text?: string;
+    legacy_damage_source_text?: string | null;
     damageDate?: string; // BUHS damage date for formatting history
     damageStatus?: string; // Full status string (e.g., "Dokumenterad (urspr. BUHS ...)")
-    checkinWhereDocumented?: number | null; // checkin_id where this BUHS damage was documented
+    checkinWhereDocumented?: string | null; // UUID checkin_id where this BUHS damage was documented
     documentedBy?: string | null; // checker_name who documented it
     mediaFolder?: string | null; // media folder for linking to damage photos (Kommentar 2)
   };
@@ -378,7 +378,9 @@ type NybilInventeringData = {
 
 // Type for checkin_damages data
 type CheckinDamageData = {
-  id?: number;
+  id?: string;
+  // Optional legacy compatibility only; current documented checkin_damages schema has no damage_id.
+  damage_id?: string | null;
   checkin_id: string;
   type: 'new' | 'documented' | 'not_found' | 'existing';
   damage_type: string | null;
@@ -1035,7 +1037,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     coc_forvaring_spec: 'COC-dokument — Specificera',
     ej_uthyrningsbar_anledning: 'Ej uthyrningsbar anledning',
     laddniva_vid_leverans: 'Laddnivå vid leverans',
-    saludatum: 'Saludatum',
     salu_station: 'Salustation',
     salu_kopare: 'Köpare (företag)',
     salu_returadress: 'Returadress',
@@ -1099,7 +1100,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       folder: (d.uploads as any)?.folder || d.folder,
       photo_urls: d.photo_urls,
     })));
-    console.log('[DEBUG LRA75R] Legacy damages from RPC:', legacyDamages.map(d => ({
+    console.log('[DEBUG LRA75R] Legacy damages from RPC:', legacyDamages.map((d: LegacyDamage) => ({
       id: d.id,
       damage_type_raw: d.damage_type_raw,
       note_customer: d.note_customer,
@@ -1343,10 +1344,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       photoUrls?: string[] | null;
       matchedCheckinDamage?: CheckinDamageData | null;
       checkin?: any | null;
+      documentedBy?: string | null;
+      documentedDate?: string | null;
     };
     
     const damageMap = new Map<string, DamageEntry>();
-    const matchedCheckinDamageIds = new Set<number>();
+    const matchedCheckinDamageIds = new Set<string>();
     
     // Build BUHS text→date map for robust CHECK date fallback
     const buhsDateByText = new Map<string, string>();
@@ -1580,7 +1583,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
             skadetyp = legacyText || damageType;
           }
           
-          folder = entry.folder;
+          folder = entry.folder || undefined;
           if (!folder && checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
             const firstUrl = matchedCheckinDamage.photo_urls[0];
             const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
@@ -1626,7 +1629,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
           skadetyp = formatBuhsDamageText(legacyText);
         }
         
-        folder = entry.folder;
+        folder = entry.folder || undefined;
         if (isGEU29F) {
           folder = undefined;
         }
@@ -1636,7 +1639,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       }
       
       damageRecords.push({
-        id: entry.id,
+        id: String(entry.id),
         regnr: cleanedRegnr,
         skadetyp: skadetyp,
         datum: damageDate,
@@ -2369,11 +2372,13 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     // Checkin matching data (if applicable)
     matchedCheckinDamage?: CheckinDamageData | null;
     checkin?: any | null;
+    documentedBy?: string | null;
+    documentedDate?: string | null;
   };
   
   // Map for deterministic merge: stableKey -> DamageEntry
   const damageMap = new Map<string, DamageEntry>();
-  const matchedCheckinDamageIds = new Set<number>(); // Track which checkin_damages we've matched
+  const matchedCheckinDamageIds = new Set<string>(); // Track which checkin_damages we've matched
   
   // Build BUHS text→date map for robust CHECK date fallback
   const buhsDateByText = new Map<string, string>();
@@ -2678,7 +2683,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         }
         
         // Media: prefer CHECK folder/photo_urls (from merge), else extract from checkin_damage photo_urls
-        folder = entry.folder; // Already set from CHECK merge if available
+        folder = entry.folder || undefined; // Already set from CHECK merge if available
         if (!folder && checkin && matchedCheckinDamage.photo_urls && matchedCheckinDamage.photo_urls.length > 0) {
           const firstUrl = matchedCheckinDamage.photo_urls[0];
           const match = firstUrl.match(/damage-photos\/[^\/]+\/[^\/]+\/([^\/]+)\//);
@@ -2728,7 +2733,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
         skadetyp = formatBuhsDamageText(legacyText);
       }
       
-      folder = entry.folder; // Use CHECK folder if merged
+      folder = entry.folder || undefined; // Use CHECK folder if merged
       // GEU29F: Override folder to undefined due to data integrity issues
       if (isGEU29F) {
         folder = undefined;
@@ -2739,7 +2744,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
     
     damageRecords.push({
-      id: entry.id,
+      id: String(entry.id),
       regnr: cleanedRegnr,
       skadetyp: skadetyp,
       datum: damageDate,
@@ -3274,6 +3279,16 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     cocForvaring: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
       ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')
       : '---',
+    hjulForvaringOrt: nybilData.hjul_forvaring_ort || '---',
+    hjulForvaringSpec: nybilData.hjul_forvaring_spec || nybilData.hjul_forvaring || '---',
+    extranyckelForvaringOrt: nybilData.extranyckel_forvaring_ort || '---',
+    extranyckelForvaringSpec: nybilData.extranyckel_forvaring_spec || '---',
+    laddkablarForvaringOrt: nybilData.laddkablar_forvaring_ort || '---',
+    laddkablarForvaringSpec: nybilData.laddkablar_forvaring_spec || '---',
+    instruktionsbokForvaringOrt: nybilData.instruktionsbok_forvaring_ort || '---',
+    instruktionsbokForvaringSpec: nybilData.instruktionsbok_forvaring_spec || '---',
+    cocForvaringOrt: nybilData.coc_forvaring_ort || '---',
+    cocForvaringSpec: nybilData.coc_forvaring_spec || '---',
     mbmeAktiverad: nybilData?.mbme_aktiverad === true ? 'Ja' : nybilData?.mbme_aktiverad === false ? 'Nej' : '---',
     vwConnectAktiverad: nybilData?.vw_connect_aktiverad === true ? 'Ja' : nybilData?.vw_connect_aktiverad === false ? 'Nej' : '---',
     bilmarke: nybilData?.bilmarke || '',
