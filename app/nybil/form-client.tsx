@@ -67,6 +67,12 @@ const mapBransletypForDb = (uiValue: string | null): string | null => {
   return uiValue; // 'Bensin', 'Diesel', 'Hybrid (bensin)', 'Hybrid (diesel)' are the same
 };
 
+const getDamagePositions = (damageType: string, carPart: string): readonly string[] => {
+  if (!damageType || !carPart) return [];
+  const typeOptions = DAMAGE_OPTIONS[damageType as keyof typeof DAMAGE_OPTIONS] as unknown as Record<string, readonly string[]> | undefined;
+  return typeOptions?.[carPart] ?? [];
+};
+
 // Build position string for damage folder/file naming
 const buildPositionString = (positions: Array<{ carPart: string; position: string }>): string => {
   const result = slugify(positions.map(p => {
@@ -161,9 +167,9 @@ async function uploadToStorage(file: File, path: string, bucket: string, upsert:
         throw new Error(`Fel vid uppladdning av foto: ${error.message}`);
       }
       
-      const { data, error: urlError } = supabase.storage.from(bucket).getPublicUrl(path);
-      if (urlError || !data?.publicUrl) {
-        console.error(`Error getting public URL for ${path}:`, urlError);
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      if (!data?.publicUrl) {
+        console.error(`Error getting public URL for ${path}`);
         if (attempt < MAX_RETRIES) {
           await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS * attempt));
           continue;
@@ -560,7 +566,7 @@ export default function NybilForm() {
         // Check if position is required based on damage type and car part
         for (const pos of damage.positions) {
           if (pos.carPart) {
-            const availablePositions = DAMAGE_OPTIONS[damage.damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof (typeof DAMAGE_OPTIONS)[keyof typeof DAMAGE_OPTIONS]] || [];
+            const availablePositions = getDamagePositions(damage.damageType, pos.carPart);
             if (availablePositions.length > 0 && !pos.position) return true;
           }
         }
@@ -2685,7 +2691,7 @@ const DamageModal: React.FC<DamageModalProps> = ({
         </div>
         
         {damage.positions.map((pos, index) => {
-          const rawPositioner = (damage.damageType && pos.carPart && DAMAGE_OPTIONS[damage.damageType as keyof typeof DAMAGE_OPTIONS]?.[pos.carPart as keyof (typeof DAMAGE_OPTIONS)[keyof typeof DAMAGE_OPTIONS]] || []);
+          const rawPositioner = (damage.damageType && pos.carPart && getDamagePositions(damage.damageType, pos.carPart));
           const availablePositioner = rawPositioner.length > 0 ? [...rawPositioner].sort((a, b) => a.localeCompare(b, 'sv')) : [];
           const showPositionDropdown = availablePositioner.length > 0;
           

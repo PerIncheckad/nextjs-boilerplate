@@ -18,6 +18,7 @@ type LegacyDamage = {
 
 // Type for checkin_damages data (without nested join to avoid PostgREST issues)
 type CheckinDamageData = {
+  id?: number;
   type: 'existing' | 'not_found' | 'documented';
   damage_type: string | null;
   car_part: string | null;
@@ -50,6 +51,7 @@ export type ConsolidatedDamage = {
   handled_by?: string | null;  // Who handled the damage
   handled_photo_urls?: string[];  // Photo URLs from checkin_damages
   handled_video_urls?: string[];  // Video URLs from checkin_damages
+  handled_at?: string | null;  // Timestamp when damage was handled
 };
 
 export type VehicleInfo = {
@@ -222,7 +224,7 @@ export async function getVehicleInfo(regnr: string): Promise<VehicleInfo> {
       .order('created_at', { ascending: false }),
     supabase
       .from('nybil_inventering')
-      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum')
+      .select('regnr, bilmarke, modell, hjul_forvaring_ort, hjul_forvaring_spec, hjul_forvaring, saludatum, bransletyp')
       .eq('regnr', cleanedRegnr)
       .order('created_at', { ascending: false })
       .limit(1)
