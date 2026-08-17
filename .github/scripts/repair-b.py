@@ -95,10 +95,10 @@ if count != 4:
     raise SystemExit(f'entry.folder assignments: expected 4, found {count}')
 text = text.replace('folder = entry.folder;', 'folder = entry.folder || undefined;')
 
-count = text.count('        id: entry.id,')
+count = text.count('id: entry.id,')
 if count != 2:
     raise SystemExit(f'DamageRecord entry ids: expected 2, found {count}')
-text = text.replace('        id: entry.id,', '        id: String(entry.id),')
+text = text.replace('id: entry.id,', 'id: String(entry.id),')
 
 marker = "    cocForvaring: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)\n      ? [nybilData.coc_forvaring_ort, nybilData.coc_forvaring_spec].filter(Boolean).join(' - ')\n      : '---',\n"
 addition = """    cocForvaring: (nybilData?.coc_forvaring_ort || nybilData?.coc_forvaring_spec)
