@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - security-p1-api-auth
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
