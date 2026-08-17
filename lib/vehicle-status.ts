@@ -110,6 +110,7 @@ export type DamageRecord = {
   is_handled?: boolean; // True if damage was handled (documented/not_found/existing)
   is_inventoried?: boolean; // True if damage was inventoried during checkin
   is_unmatched_buhs?: boolean; // True if this is an unmatched BUHS damage
+  _stableKey?: string; // Internal deterministic merge/debug key already emitted by runtime
   // Skadekommentar(er), nyast först
   comments?: DamageComment[];
 };
