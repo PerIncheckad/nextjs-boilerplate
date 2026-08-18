@@ -3,6 +3,7 @@ import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeDamageType } from './normalizeDamageType';
 import { getHuvudstationRecipients } from '@/lib/constants';
+import { getServerVerifiedCompletedBy } from '@/lib/notify-identity';
 
 // =================================================================
 // 1. INITIALIZATION & CONFIGURATION
@@ -784,6 +785,7 @@ export async function POST(request: Request) {
           current_location_note: payload.bilen_star_nu?.kommentar || null,
           checker_name: payload.fullName || payload.full_name || payload.incheckare || null,
           checker_email: payload.user_email || payload.email || null,
+          completed_by: getServerVerifiedCompletedBy(payload),
           completed_at: now.toISOString(),
           status: 'COMPLETED',
           
