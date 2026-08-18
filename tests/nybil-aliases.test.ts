@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { withNybilLegacyAliases } from '../lib/nybil-aliases';
 
-test('Nybil retained legacy aliases mirror canonical fields without changing other data', () => {
+test('Nybil retains only the separate notifier compatibility field', () => {
   const canonical = {
     regnr: 'ABC123',
     modell: 'T-Cross',
@@ -19,16 +19,14 @@ test('Nybil retained legacy aliases mirror canonical fields without changing oth
 
   assert.deepEqual(result, {
     ...canonical,
-    bilmodell: canonical.modell,
     hjul_till_forvaring: canonical.hjul_ej_monterade,
-    hjul_forvaring_station: canonical.hjul_forvaring_ort,
   });
 
-  assert.equal('bilmodell' in canonical, false);
-  assert.equal('hjul_till_forvaring' in canonical, false);
+  assert.equal('bilmodell' in result, false);
+  assert.equal('hjul_forvaring_station' in result, false);
 });
 
-test('canonical Nybil fields win over stale retained legacy aliases', () => {
+test('canonical Nybil value wins over stale notifier compatibility input', () => {
   const result = withNybilLegacyAliases({
     modell: 'Kanonisk modell',
     registreringsdatum: '2026-08-18',
@@ -36,12 +34,10 @@ test('canonical Nybil fields win over stale retained legacy aliases', () => {
     hjul_ej_monterade: null,
     hjul_forvaring_ort: null,
     dackkompressor: false,
-    bilmodell: 'Gammal modell',
     hjul_till_forvaring: 'Gammalt värde',
-    hjul_forvaring_station: 'Gammal ort',
   });
 
-  assert.equal(result.bilmodell, 'Kanonisk modell');
   assert.equal(result.hjul_till_forvaring, null);
-  assert.equal(result.hjul_forvaring_station, null);
+  assert.equal('bilmodell' in result, false);
+  assert.equal('hjul_forvaring_station' in result, false);
 });
