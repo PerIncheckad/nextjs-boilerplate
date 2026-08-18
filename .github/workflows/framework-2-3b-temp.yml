@@ -86,5 +86,30 @@ jobs:
       - name: Build must not rewrite tracked config
         run: git diff --exit-code
 
+      - name: Verify deployed preview API boundary
+        env:
+          PREVIEW_ORIGIN: https://nextjs-boilerplate-git-framework-ccacc8-pers-projects-fffbcffe.vercel.app
+        run: |
+          set -eu
+          status=$(curl -sS --max-time 20 -o protected.json -w '%{http_code}' "$PREVIEW_ORIGIN/api/vehicle-info?reg=GEU29F")
+          if [ "$status" != "401" ]; then
+            echo "Unexpected protected route status: $status"
+            cat protected.json
+            exit 1
+          fi
+          node - <<'NODE'
+          const fs = require('fs');
+          const body = JSON.parse(fs.readFileSync('protected.json', 'utf8'));
+          if (body.error !== 'Authentication required') throw new Error(`Unexpected body: ${JSON.stringify(body)}`);
+          console.log('PREVIEW_PROTECTED_API_OK', 401, body.error);
+          NODE
+          health_status=$(curl -sS --max-time 20 -o health.json -w '%{http_code}' "$PREVIEW_ORIGIN/api/health")
+          if [ "$health_status" != "200" ]; then
+            echo "Unexpected health status: $health_status"
+            exit 1
+          fi
+          echo "PREVIEW_HEALTH_OK 200"
+          rm protected.json health.json
+
       - name: Show framework versions
         run: npm ls next react react-dom --depth=0
