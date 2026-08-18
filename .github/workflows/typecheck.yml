@@ -12,7 +12,13 @@ permissions:
 jobs:
   typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
+      RESEND_API_KEY: re_dummy
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3127
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,3 +40,9 @@ jobs:
 
       - name: Security regression
         run: npm run test:regression
+
+      - name: Production build
+        run: npm run build
+
+      - name: Built Next security smoke
+        run: npm run test:security-runtime
