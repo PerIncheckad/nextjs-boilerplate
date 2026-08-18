@@ -37,7 +37,7 @@
 1. **Importera CSV** → Supabase Table Editor → `mabi_damage_data_raw_new`
 2. **Kör dedup-SQL** - Ta bort exakta dubbletter
 3. **Kör upsert-SQL** - Importera till `damages` med unik `legacy_damage_source_text`
-4. **Synka `damages_external`** - TRUNCATE + INSERT från `damages WHERE source='BUHS'`
+4. **Verifiera BUHS-RPC** - jämför RPC-resultatet med `damages WHERE source='BUHS'`; skriv inte till `damages_external`
 5. **Verifiera** - Kör verifieringsfrågor (antal, senaste import, inga dubbletter)
 6. **Testa** - Öppna `/check` med ett regnr från CSV: en
 
