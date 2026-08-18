@@ -202,44 +202,29 @@ ORDER BY damage_date DESC;
 
 ---
 
-### Steg 7: Uppdatera damages_external (RPC-källa)
+### Steg 7: Verifiera RPC-läsningen
 
-**OBS! `/check` läser BUHS-skador från `damages_external` via RPC `get_damages_by_trimmed_regnr`**
+Efter Steg 3.2B-1 läser `get_damages_by_trimmed_regnr` BUHS-projektionen direkt från `damages WHERE source = 'BUHS'`.
+
+**Skriv inte till `damages_external`.** Tabellen behålls oförändrad som rollback-snapshot under verifieringsperioden.
 
 ```sql
--- Töm damages_external
-TRUNCATE public.damages_external;
-
--- Kopiera alla BUHS-skador från damages
-INSERT INTO public.damages_external (
-  regnr,
-  saludatum,
-  damage_date,
-  damage_type_raw,
-  note_customer,
-  note_internal,
-  vehiclenote
-)
-SELECT 
-  regnr,
-  saludatum,
-  damage_date,
-  damage_type_raw,
-  note_customer,
-  note_internal,
-  vehiclenote
-FROM public.damages
-WHERE source = 'BUHS';
+-- Kontrollera ett registreringsnummer från importen.
+-- Byt ut SAM31A mot ett registreringsnummer som finns i CSV-filen.
+SELECT
+  (
+    SELECT COUNT(*)
+    FROM public.damages
+    WHERE source = 'BUHS'
+      AND TRIM(UPPER(regnr)) = TRIM(UPPER('SAM31A'))
+  ) AS canonical_count,
+  (
+    SELECT COUNT(*)
+    FROM public.get_damages_by_trimmed_regnr('SAM31A')
+  ) AS rpc_count;
 ```
 
-**Verifiera:**
-```sql
-SELECT COUNT(*) FROM public.damages_external;
--- Ska matcha antalet BUHS-skador i damages
-
-SELECT COUNT(*) FROM public.damages WHERE source = 'BUHS';
--- Dessa två COUNT ska vara samma! 
-```
+**Förväntat:** `canonical_count = rpc_count`.
 
 ---
 
@@ -414,7 +399,7 @@ SELECT source, COUNT(*) FROM public.damages GROUP BY source;
 - [ ] Dubbletter raderade i staging
 - [ ] UPSERT till huvudtabell klar (damages / vehicles)
 - [ ] Verifiering klar (rätt antal rader, rätt source för BUHS, legacy_damage_source_text ifylld)
-- [ ] `damages_external` uppdaterad (endast för Skadefil)
+- [ ] RPC-resultatet verifierat mot `damages WHERE source = 'BUHS'` (endast för Skadefil)
 - [ ] Testregistreringsnummer kontrollerat i `/check` och `/status`
 
 ---

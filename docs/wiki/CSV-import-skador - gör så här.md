@@ -1,6 +1,6 @@
 # CSV-import:  BUHS Skadedata
 
-**Senast uppdaterad:** 2026-01-16  
+**Senast uppdaterad:** 2026-08-18  
 **Författare:** System Documentation  
 **Relaterade filer:** `docs/wiki/Database.md`, `docs/wiki/database-constraints.md`
 
@@ -12,7 +12,7 @@ Denna guide beskriver hur du importerar BUHS skadedata från CSV-fil till produk
 
 **Källa:** MABI BUHS-system (manuell CSV-export)  
 **Frekvens:** Vid behov (när nya skador tillkommit i BUHS)  
-**Målformat:** `public.damages` + `public.damages_external`
+**Målformat:** `public.damages`
 
 ---
 
@@ -119,41 +119,28 @@ DO UPDATE SET
 
 ---
 
-### **STEG 4: Synkronisera damages_external**
+### **STEG 4: Verifiera RPC-läsningen**
 
-Kör denna SQL för att uppdatera externa skador:
+Efter Steg 3.2B-1 läser `get_damages_by_trimmed_regnr` BUHS-projektionen direkt från `damages WHERE source = 'BUHS'`.
+
+**Kör inte `TRUNCATE` eller `INSERT` mot `damages_external`.** Tabellen är endast en oförändrad rollback-snapshot under verifieringsperioden.
 
 ```sql
--- Töm och återskapa damages_external
-TRUNCATE public.damages_external;
-
-INSERT INTO public.damages_external (
-  regnr,
-  saludatum,
-  damage_date,
-  damage_type_raw,
-  note_customer,
-  note_internal,
-  vehiclenote
-)
-SELECT 
-  regnr,
-  saludatum,
-  damage_date,
-  damage_type_raw,
-  note_customer,
-  note_internal,
-  vehiclenote
-FROM public.damages
-WHERE source = 'BUHS';
-
--- Verifiera att antal matchar
-SELECT 
-  (SELECT COUNT(*) FROM public.damages_external) as damages_external_count,
-  (SELECT COUNT(*) FROM public.damages WHERE source = 'BUHS') as damages_buhs_count;
+-- Byt ut ABC123 mot ett registreringsnummer från importen.
+SELECT
+  (
+    SELECT COUNT(*)
+    FROM public.damages
+    WHERE source = 'BUHS'
+      AND TRIM(UPPER(regnr)) = TRIM(UPPER('ABC123'))
+  ) AS canonical_count,
+  (
+    SELECT COUNT(*)
+    FROM public.get_damages_by_trimmed_regnr('ABC123')
+  ) AS rpc_count;
 ```
 
-**Förväntat:** Båda kolumnerna visar samma antal
+**Förväntat:** `canonical_count = rpc_count`.
 
 ---
 
@@ -242,10 +229,10 @@ BUHS CSV-fil
 mabi_damage_data_raw_new (staging)
     ↓ (dedup + upsert)
 damages (legacy_damage_source_text = 'buhs_csv_import|.. .')
-    ↓ (filter WHERE source='BUHS')
-damages_external
+    ↓ (RPC filter WHERE source='BUHS')
+get_damages_by_trimmed_regnr
     ↓
-/check API (lib/damages. ts - loose matching)
+/check och /status
 ```
 
 ---
@@ -277,7 +264,7 @@ damages_external
 - [ ] CSV importerad till `mabi_damage_data_raw_new`
 - [ ] Deduplicering körd
 - [ ] Upsert till `damages` körd
-- [ ] `damages_external` synkroniserad
+- [ ] RPC-resultatet verifierat mot `damages WHERE source = 'BUHS'`
 - [ ] Verifieringsfrågor körda
 - [ ] Testning i `/check` genomförd
 - [ ] Antal skador dokumenterat i changelog
