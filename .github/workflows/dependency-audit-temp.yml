@@ -1,4 +1,4 @@
-name: Dependency audit temp
+name: Dependency repair temp
 
 on:
   pull_request:
@@ -6,17 +6,17 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  audit:
+  repair:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout audit branch
+      - name: Checkout security fix branch
         uses: actions/checkout@v4
         with:
-          ref: audit-dependencies-step-2-3
+          ref: security-dependencies-2-3a
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -24,44 +24,37 @@ jobs:
           node-version: '20'
           cache: npm
 
-      - name: Install exact baseline lockfile
+      - name: Install baseline
         run: npm ci
 
-      - name: Baseline dependency paths
-        run: npm ls brace-expansion editorconfig glob js-cookie minimatch nanoid picomatch ws postcss next --all || true
-
-      - name: Test minimal non-major security candidate
+      - name: Apply non-major security repair
         run: |
           npm install --package-lock-only --ignore-scripts --save-exact next@14.2.35
           npm update --package-lock-only --ignore-scripts postcss
           npm audit fix --package-lock-only --ignore-scripts || true
-          echo 'CANDIDATE_DIFF_START'
-          git diff -- package.json package-lock.json
-          echo 'CANDIDATE_DIFF_END'
+          git diff --check
+
+      - name: Verify repaired dependency set
+        run: |
           npm ci
           npm run typecheck
-          npm audit --json > candidate-audit.json || true
+          npm audit --json > audit-after.json || true
           node - <<'NODE'
           const fs = require('fs');
-          const audit = JSON.parse(fs.readFileSync('candidate-audit.json', 'utf8'));
-          const out = {
-            metadata: audit.metadata,
-            vulnerabilities: Object.fromEntries(Object.entries(audit.vulnerabilities || {}).map(([name, v]) => [name, {
-              severity: v.severity,
-              isDirect: v.isDirect,
-              range: v.range,
-              fixAvailable: v.fixAvailable,
-              via: (v.via || []).map(x => typeof x === 'string' ? x : {
-                source: x.source,
-                name: x.name,
-                title: x.title,
-                severity: x.severity,
-                range: x.range,
-                url: x.url
-              })
-            }]))
-          };
-          console.log('CANDIDATE_AUDIT_START');
-          console.log(JSON.stringify(out, null, 2));
-          console.log('CANDIDATE_AUDIT_END');
+          const audit = JSON.parse(fs.readFileSync('audit-after.json', 'utf8'));
+          console.log('FINAL_AUDIT_COUNTS', JSON.stringify(audit.metadata?.vulnerabilities || {}));
+          for (const [name, v] of Object.entries(audit.vulnerabilities || {})) {
+            console.log('REMAINING', name, v.severity, v.range);
+          }
+          if ((audit.metadata?.vulnerabilities?.critical || 0) > 0) {
+            process.exit(1);
+          }
           NODE
+
+      - name: Commit dependency repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git commit -m 'Patch dependency security baseline'
+          git push origin HEAD:security-dependencies-2-3a
