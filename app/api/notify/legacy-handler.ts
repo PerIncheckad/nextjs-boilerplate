@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 import { normalizeDamageType } from './normalizeDamageType';
+import { getHuvudstationRecipients } from '@/lib/constants';
 
 // =================================================================
 // 1. INITIALIZATION & CONFIGURATION
@@ -11,20 +12,6 @@ const resend = new Resend(process.env.RESEND_API_KEY || 'placeholder');
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-// --- E-postmottagare ---
-const defaultHuvudstationAddress = 'per@incheckad.se';
-
-const stationEmailMapping: { [ort: string]: string } = {
-  Helsingborg: 'helsingborg@incheckad.se',
-  Ängelholm: 'helsingborg@incheckad.se',
-  Varberg: 'varberg@incheckad.se',
-  Malmö: 'malmo@incheckad.se',
-  Trelleborg: 'trelleborg@incheckad.se',
-  Lund: 'lund@incheckad.se',
-  Halmstad: 'halmstad@incheckad.se',
-  Falkenberg: 'falkenberg@incheckad.se',
-};
 
 const getSiteUrl = (request: Request): string => {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
@@ -713,11 +700,7 @@ export async function POST(request: Request) {
 
    // Mottagare/ämnen
     const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
-    const huvudstationTo = [defaultHuvudstationAddress];
-    const stationSpecificEmail = stationEmailMapping[finalOrt];
-    if (stationSpecificEmail && !huvudstationTo.includes(stationSpecificEmail)) {
-      huvudstationTo.push(stationSpecificEmail);
-    }
+    const huvudstationTo = getHuvudstationRecipients(finalOrt);
 
     // Bilkontroll recipients: Per always, Latif always (alla orter)
     const bilkontrollTo = ['per@incheckad.se', 'latif@incheckad.se'];

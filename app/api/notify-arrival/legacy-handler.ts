@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import { getHuvudstationRecipients } from '@/lib/constants';
 
 // =================================================================
 // 1. INITIALIZATION & CONFIGURATION
@@ -11,20 +12,6 @@ const resend = new Resend(process.env.RESEND_API_KEY || 'placeholder');
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder';
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-// --- E-postmottagare ---
-const defaultHuvudstationAddress = 'per@incheckad.se';
-
-const stationEmailMapping: { [ort: string]: string } = {
-  Helsingborg: 'helsingborg@incheckad.se',
-  Ängelholm: 'helsingborg@incheckad.se',
-  Varberg: 'varberg@incheckad.se',
-  Malmö: 'malmo@incheckad.se',
-  Trelleborg: 'trelleborg@incheckad.se',
-  Lund: 'lund@incheckad.se',
-  Halmstad: 'halmstad@incheckad.se',
-  Falkenberg: 'falkenberg@incheckad.se',
-};
 
 const LOGO_URL =
   'https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png';
@@ -262,11 +249,7 @@ export async function POST(request: Request) {
 
     // --- 3. Build email recipients ---
     const finalOrt = payload.current_city || '';
-    const huvudstationTo = [defaultHuvudstationAddress];
-    const stationSpecificEmail = stationEmailMapping[finalOrt];
-    if (stationSpecificEmail && !huvudstationTo.includes(stationSpecificEmail)) {
-      huvudstationTo.push(stationSpecificEmail);
-    }
+    const huvudstationTo = getHuvudstationRecipients(finalOrt);
 
     // --- 4. Build subject ---
     const cleanStation = payload.current_station || finalOrt || '---';

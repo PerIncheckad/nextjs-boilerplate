@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useCallback, useRef, Fragment } from 'react';
+import { ORTER, STATIONER } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 
 // =================================================================
@@ -9,19 +10,6 @@ import { supabase } from '@/lib/supabase';
 
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 const BACKGROUND_IMAGE_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/Svart%20bakgrund%20MB%20grill/MB%20front%20grill%20logo.jpg";
-
-const ORTER = ['Malmö', 'Helsingborg', 'Ängelholm', 'Halmstad', 'Falkenberg', 'Trelleborg', 'Varberg', 'Lund'].sort();
-
-const STATIONER: Record<string, string[]> = {
-  'Falkenberg': ['Falkenberg'],
-  'Halmstad': ['BVH (Hedin multi)', 'Flyget Halmstad', 'FORD Halmstad', 'KIA Halmstad', 'MB Halmstad'],
-  'Helsingborg': ['B/S Klippan', 'BMW Helsingborg', 'Euromaster Helsingborg', 'FORD Helsingborg', 'HBSC Helsingborg', 'KIA Helsingborg', 'MB Helsingborg', 'S. Jönsson', 'Transport Helsingborg'],
-  'Lund': ['B/S Lund', 'FORD Lund', 'Hedin Lund', 'P7 Revinge'],
-  'Malmö': ['FORD Malmö', 'Hedbergs Malmö', 'Hedin Automotive Burlöv', 'Malmö Automera', 'MB Malmö', 'Mechanum', 'Sturup', 'Werksta Malmö Hamn', 'Werksta St Bernstorp'],
-  'Trelleborg': ['Trelleborg'],
-  'Varberg': ['Autoklinik (Sällstorp)', 'Finnveden plåt', 'FORD Varberg', 'MB Varberg', 'Varberg multi (Hedin)'],
-  'Ängelholm': ['Flyget Ängelholm', 'FORD Ängelholm', 'Mekonomen Ängelholm']
-};
 
 const capitalizeFirstLetter = (str: string): string => {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
