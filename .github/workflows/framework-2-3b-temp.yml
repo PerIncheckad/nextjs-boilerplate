@@ -1,0 +1,73 @@
+name: Framework 2.3B temp
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+        with:
+          ref: framework-next15-2-3b
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.20.2'
+          cache: npm
+
+      - name: Install baseline
+        run: npm ci
+
+      - name: Apply Next 15 maintenance LTS candidate
+        run: |
+          npm install --save-exact next@15.5.21 react@19 react-dom@19
+          npm install --save-dev --save-exact @types/react@19 @types/react-dom@19
+          git diff --check
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Security audit
+        run: |
+          npm audit --json > audit.json || true
+          node - <<'NODE'
+          const fs = require('fs');
+          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          const counts = audit.metadata?.vulnerabilities || {};
+          console.log('AUDIT_COUNTS', JSON.stringify(counts));
+          for (const [name, v] of Object.entries(audit.vulnerabilities || {})) {
+            console.log('AUDIT_REMAINING', name, v.severity, v.range);
+          }
+          if ((counts.high || 0) > 0 || (counts.critical || 0) > 0) process.exit(1);
+          NODE
+
+      - name: Production build with isolated dummy env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
+          RESEND_API_KEY: re_dummy
+          NEXT_PUBLIC_SITE_URL: https://example.com
+        run: npm run build
+
+      - name: Show dependency result
+        run: |
+          npm ls next react react-dom --depth=0
+          git diff --name-only
+
+      - name: Commit candidate dependency migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git commit -m 'Upgrade framework baseline to Next 15.5.21' || true
+          git push origin HEAD:framework-next15-2-3b
