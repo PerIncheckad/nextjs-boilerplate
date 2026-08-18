@@ -1,0 +1,118 @@
+{
+  "app/ankomst/form-client.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 6
+    },
+    "react-hooks/immutability": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "app/api/checkin-damages/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "app/api/damage-comments/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "app/api/notify-arrival/legacy-handler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "app/api/notify-arrival/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "app/api/notify/legacy-handler.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 32
+    }
+  },
+  "app/api/notify/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "app/api/vehicle-edits/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "app/api/vehicle-info/route.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 13
+    }
+  },
+  "app/check/form-client.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 28
+    },
+    "react-hooks/immutability": {
+      "count": 1
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 4
+    }
+  },
+  "app/media/[...path]/media-viewer.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "app/nybil/form-client.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    }
+  },
+  "app/rapport/RapportTable.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "app/rapport/page.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "app/status/form-client.tsx": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 3
+    },
+    "react-hooks/preserve-manual-memoization": {
+      "count": 2
+    },
+    "react-hooks/set-state-in-effect": {
+      "count": 3
+    }
+  },
+  "components/LoginGate.tsx": {
+    "react-hooks/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "lib/damages.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "lib/notify.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "lib/vehicle-status.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 38
+    }
+  }
+}

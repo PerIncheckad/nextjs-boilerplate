@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "generate-damage-options": "tsx scripts/generate-damage-options.ts"
+    "generate-damage-options": "tsx scripts/generate-damage-options.ts",
+    "lint": "eslint . --pass-on-unpruned-suppressions",
+    "lint:prune": "eslint . --prune-suppressions"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
@@ -21,6 +23,8 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.10",
     "tsx": "^4.20.6",
