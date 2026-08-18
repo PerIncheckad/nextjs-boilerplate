@@ -31,7 +31,7 @@ Systemet använder Supabase (PostgreSQL) med följande huvudtabeller:
 | `checkins` | Incheckningar av fordon | `/check`-formulär |
 | `checkin_damages` | Skador kopplade till specifik incheckning | `/check`-formulär |
 | `damages` | Konsoliderad skadehistorik per fordon | `/check`, `/nybil`, CSV-import |
-| `damages_external` | BUHS-skador (Skadefilen) - RPC-källa | CSV-import (manuell) |
+| `damages_external` | Rollback-snapshot från före Steg 3.2B-1; inte live-källa | Ingen löpande skrivning |
 | `nybil_inventering` | Nybilsregistreringar vid leverans | `/nybil`-formulär |
 | `vehicles` | Fordonsmaster från Bilkontroll | CSV-import (manuell) |
 
@@ -260,30 +260,21 @@ database-constraints.md - Unique constraint på detta fält
 
 ### damages_external
 
-**Skadefilen från BUHS** - importerad CSV med legacy-skador.  Denna tabell är källan för BUHS-skador som hämtas via RPC-funktionen `get_damages_by_trimmed_regnr`.
+Tabellen innehåller den BUHS-snapshot som fanns när Steg 3.2B-1 förbereddes. Den behålls oförändrad under verifieringsperioden eftersom RPC:ns returtyp fortfarande är `SETOF damages_external`.
+
+Live-data hämtas inte längre från tabellraderna. `get_damages_by_trimmed_regnr` projicerar samma sju kolumner från `damages WHERE source = 'BUHS'`.
 
 | Kolumn | Typ | Nullable | Beskrivning |
 |--------|-----|----------|-------------|
-| `regnr` | text | NO | Registreringsnummer (primärnyckel, UPPERCASE) |
+| `regnr` | text | NO | Registreringsnummer |
 | `saludatum` | date | YES | Saludatum |
 | `damage_date` | date | YES | Skadedatum |
-| `damage_type_raw` | text | YES | Skadetyp (t.ex. "Repa", "Spricka") |
+| `damage_type_raw` | text | YES | Skadetyp |
 | `note_customer` | text | YES | Kundnotering |
 | `note_internal` | text | YES | Intern notering |
 | `vehiclenote` | text | YES | Fordonsnotering |
 
-**Viktigt:** 
-- Denna tabell uppdateras genom manuell CSV-import.   
-- Den innehåller ~566 rader (januari 2026).
-- **MÅSTE** synkroniseras med `damages`-tabellen efter varje BUHS-import!  
-
-**Synkronisering:**
-```sql
-TRUNCATE damages_external;
-INSERT INTO damages_external SELECT ...  FROM damages WHERE source = 'BUHS';
-```
-
-**Se:** [CSV-import. md § 2 Steg 7](./CSV-import.md#steg-7-uppdatera-damages_external-rpc-källa)
+**Driftregel:** skriv inte, töm inte och synkronisera inte `damages_external`. BUHS-importen skriver endast till `damages`.
 
 ---
 
@@ -472,16 +463,15 @@ get_vehicle_by_trimmed_regnr(p_regnr text)
 
 ### get_damages_by_trimmed_regnr
 
-Hämtar BUHS-skador från `damages_external`-tabellen för ett fordon.
+Hämtar BUHS-skador från den kanoniska `damages`-tabellen.
 
 ```sql
 get_damages_by_trimmed_regnr(p_regnr text)
 ```
 
-**Returnerar:** Alla rader från `damages_external` där `TRIM(UPPER(regnr)) = TRIM(UPPER(p_regnr))`
+**Returnerar:** De sju befintliga RPC-fälten för rader där `source = 'BUHS'` och `TRIM(UPPER(regnr)) = TRIM(UPPER(p_regnr))`.
 
-**Viktigt:** Denna RPC hämtar endast från `damages_external`, INTE från `damages`!   
-→ `damages_external` måste uppdateras efter varje BUHS-import! 
+RPC-signaturen är fortsatt `SETOF damages_external` för att bevara browserkontraktet, men tabellraderna i `damages_external` används inte som live-källa.
 
 ---
 
@@ -500,14 +490,14 @@ get_damages_by_trimmed_regnr(p_regnr text)
 
 ### Vid /status-sökning
 
-1. Hämtar data från:  `nybil_inventering`, `vehicles`, `damages`, `checkins`, `checkin_damages`, `damages_external` (via RPC)
+1. Hämtar data från: `nybil_inventering`, `vehicles`, `damages`, `checkins`, `checkin_damages` samt BUHS-projektionen via RPC
 2. Prioritetsordning för fordonsinfo: `checkins` (senaste) → `nybil_inventering` → `vehicles`
-3. Skador hämtas från både `damages` och `damages_external` (BUHS via RPC)
+3. Alla skador hämtas från `damages`; BUHS-delen filtreras via RPC
 
 ### Vid /check-sökning (faktarutan)
 
 1. Hämtar fordonsinfo via `get_vehicle_by_trimmed_regnr` (från `vehicles`)
-2. Hämtar BUHS-skador via `get_damages_by_trimmed_regnr` (från `damages_external`)
+2. Hämtar BUHS-skador via `get_damages_by_trimmed_regnr` (från `damages WHERE source = 'BUHS'`)
 3. Hämtar dokumenterade skador från `damages` (för att avgöra `is_inventoried`)
 4. Hämtar senaste `checkin_damages` för att visa hanteringsstatus
 
@@ -728,18 +718,19 @@ ORDER BY cd.created_at DESC;
 
 ### Kontrollera om BUHS-skador skulle hanteras av datum-logik
 ```sql
-SELECT 
-  de.regnr,
-  de.damage_date as buhs_datum,
-  c.completed_at as senaste_incheckning,
-  CASE 
-    WHEN c.completed_at > de.damage_date THEN 'Datum-backup aktiveras ✅'
+SELECT
+  d.regnr,
+  d.damage_date AS buhs_datum,
+  c.completed_at AS senaste_incheckning,
+  CASE
+    WHEN c.completed_at > d.damage_date THEN 'Datum-backup aktiveras ✅'
     ELSE 'Förlitar sig på textmatchning'
-  END as status
-FROM damages_external de
-JOIN checkins c ON UPPER(TRIM(de.regnr)) = UPPER(TRIM(c.regnr))
-WHERE de.regnr = 'ABC123'
-ORDER BY de.damage_date;
+  END AS status
+FROM damages d
+JOIN checkins c ON UPPER(TRIM(d.regnr)) = UPPER(TRIM(c.regnr))
+WHERE d.source = 'BUHS'
+  AND d.regnr = 'ABC123'
+ORDER BY d.damage_date;
 ```
 
 ### Kontrollera source-distribution i damages
@@ -753,7 +744,7 @@ GROUP BY source;
 ```
 CHECK | ~X antal
 NYBIL | ~Y antal
-BUHS  | ~566 antal (ska matcha damages_external)
+BUHS  | aktuellt antal i den kanoniska källan
 ```
 
 ### Hitta dubbletter (samma skada från flera källor)
