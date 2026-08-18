@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "generate-damage-options": "tsx scripts/generate-damage-options.ts",
     "lint": "eslint . --pass-on-unpruned-suppressions",
-    "lint:prune": "eslint . --prune-suppressions"
+    "lint:prune": "eslint . --prune-suppressions",
+    "test:regression": "tsx --test tests/*.test.ts",
+    "test:security-runtime": "node scripts/security-runtime-smoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
