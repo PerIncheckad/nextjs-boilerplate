@@ -93,7 +93,8 @@ jobs:
           text = rapport.read_text()
           if text.count('// @ts-ignore') != 4:
               raise SystemExit(f'rapport @ts-ignore expected 4 found {text.count("// @ts-ignore")}')
-          text = text.replace('// @ts-ignore', '// @ts-expect-error -- stationer has branch-specific fields narrowed by st.type')
+          lines = text.splitlines(keepends=True)
+          text = ''.join(line for line in lines if line.strip() != '// @ts-ignore')
           rapport.write_text(text)
           PY
 
