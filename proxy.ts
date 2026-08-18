@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyApiUser } from '@/lib/server-auth';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
 
   if (url.searchParams.has('error') || url.searchParams.has('error_description')) {

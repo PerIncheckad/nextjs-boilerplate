@@ -393,7 +393,7 @@ function useModalKeydown(isOpen: boolean, onEscape: () => void): void {
  */
 function useDialogFocus(
   isOpen: boolean, 
-  containerRef: React.RefObject<HTMLDivElement>,
+  containerRef: React.RefObject<HTMLDivElement | null>,
   restoreFocus = true
 ): void {
   const previousFocusRef = useRef<HTMLElement | null>(null);
