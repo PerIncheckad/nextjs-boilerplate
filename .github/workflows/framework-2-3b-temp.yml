@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -24,31 +24,45 @@ jobs:
           node-version: '20.20.2'
           cache: npm
 
-      - name: Install baseline
+      - name: Install exact candidate
         run: npm ci
-
-      - name: Apply Next 16.3.1 security candidate
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const path = 'app/check/form-client.tsx';
-          let s = fs.readFileSync(path, 'utf8');
-          const from = '  containerRef: React.RefObject<HTMLDivElement>,';
-          const to = '  containerRef: React.RefObject<HTMLDivElement | null>,';
-          if (!s.includes(from)) throw new Error('Expected useDialogFocus RefObject signature not found');
-          s = s.replace(from, to);
-          fs.writeFileSync(path, s);
-          NODE
-          npm install --save-exact next@16.3.1 react@19 react-dom@19
-          npm install --save-dev --save-exact @types/react@19 @types/react-dom@19
-          npm audit fix --package-lock-only --ignore-scripts || true
-          npm ci
-          git diff --check
 
       - name: TypeScript
         run: npm run typecheck
 
-      - name: Security audit report
+      - name: Verify proxy auth boundary without external calls
+        run: |
+          cat > proxy-check-temp.ts <<'TS'
+          import { NextRequest } from 'next/server';
+          import { proxy } from './proxy';
+
+          async function main() {
+            const protectedRequest = new NextRequest('https://example.com/api/vehicle-info?reg=GEU29F');
+            const protectedResponse = await proxy(protectedRequest);
+            const protectedBody = await protectedResponse.clone().json();
+            if (protectedResponse.status !== 401 || protectedBody?.error !== 'Authentication required') {
+              throw new Error(`Protected API boundary failed: ${protectedResponse.status} ${JSON.stringify(protectedBody)}`);
+            }
+
+            const healthRequest = new NextRequest('https://example.com/api/health');
+            const healthResponse = await proxy(healthRequest);
+            if (healthResponse.status !== 200) {
+              throw new Error(`Health pass-through failed: ${healthResponse.status}`);
+            }
+
+            console.log('PROXY_AUTH_NEGATIVE_OK', protectedResponse.status, protectedBody.error);
+            console.log('PROXY_HEALTH_PASSTHROUGH_OK', healthResponse.status);
+          }
+
+          main().catch((error) => {
+            console.error(error);
+            process.exit(1);
+          });
+          TS
+          npx tsx proxy-check-temp.ts
+          rm proxy-check-temp.ts
+
+      - name: Security audit must be clean
         run: |
           npm audit --json > audit.json || true
           node - <<'NODE'
@@ -56,10 +70,9 @@ jobs:
           const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
           const counts = audit.metadata?.vulnerabilities || {};
           console.log('AUDIT_COUNTS', JSON.stringify(counts));
-          for (const [name, v] of Object.entries(audit.vulnerabilities || {})) {
-            console.log('AUDIT_REMAINING', name, v.severity, v.range);
-          }
+          if ((counts.total || 0) !== 0) process.exit(1);
           NODE
+          rm audit.json
 
       - name: Production build with isolated dummy env
         env:
@@ -70,29 +83,8 @@ jobs:
           NEXT_PUBLIC_SITE_URL: https://example.com
         run: npm run build
 
-      - name: Final security gate
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
-          const counts = audit.metadata?.vulnerabilities || {};
-          if ((counts.high || 0) > 0 || (counts.critical || 0) > 0) {
-            console.error('High/critical audit findings remain:', counts);
-            process.exit(1);
-          }
-          NODE
+      - name: Build must not rewrite tracked config
+        run: git diff --exit-code
 
-      - name: Show dependency and diff result
-        run: |
-          npm ls next react react-dom --depth=0
-          echo 'DIFF_FILES_START'
-          git diff --name-only
-          echo 'DIFF_FILES_END'
-
-      - name: Commit candidate migration
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json package-lock.json app/check/form-client.tsx
-          git commit -m 'Upgrade framework baseline to Next 16.3.1'
-          git push origin HEAD:framework-next15-2-3b
+      - name: Show framework versions
+        run: npm ls next react react-dom --depth=0
