@@ -6,21 +6,16 @@ import { installAuthenticatedApiFetch } from '@/lib/api-auth-client';
 
 type Props = { children: React.ReactNode };
 
-const SECURITY_PREVIEW_ORIGIN =
-  'https://nextjs-boilerplate-git-security-p-75bc26-pers-projects-fffbcffe.vercel.app';
-
 export default function LoginGate({ children }: Props) {
   const [state, setState] =
     useState<'checking' | 'login' | 'denied' | 'ok'>('checking');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
-  const [useOtpFlow, setUseOtpFlow] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
     const uninstallApiAuthFetch = installAuthenticatedApiFetch();
-    setUseOtpFlow(window.location.origin === SECURITY_PREVIEW_ORIGIN);
 
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -56,14 +51,14 @@ export default function LoginGate({ children }: Props) {
     setMsg('');
 
     const normalizedEmail = email.trim().toLowerCase();
-    const otpFlow = window.location.origin === SECURITY_PREVIEW_ORIGIN;
-    const redirectTo = otpFlow
-      ? window.location.origin + '/'
-      : (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
+    const redirectTo = (process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin) + '/';
 
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
-      options: { emailRedirectTo: redirectTo },
+      options: {
+        emailRedirectTo: redirectTo,
+        shouldCreateUser: false,
+      },
     });
 
     if (error) {
@@ -72,13 +67,8 @@ export default function LoginGate({ children }: Props) {
     }
 
     setEmail(normalizedEmail);
-    if (otpFlow) {
-      setOtpSent(true);
-      setMsg('En engångskod har skickats till din mejl.');
-    } else {
-      setOtpSent(false);
-      setMsg('Kolla din mejl för inloggningslänken.');
-    }
+    setOtpSent(true);
+    setMsg('Kolla din mejl och ange den 6-siffriga engångskoden.');
   };
 
   const verifyOtp = async (e: React.FormEvent) => {
@@ -120,7 +110,7 @@ export default function LoginGate({ children }: Props) {
                 autoFocus
               />
               <button type="submit" className="login-btn">
-                {useOtpFlow ? 'Skicka engångskod' : 'Skicka magisk länk'}
+                Skicka engångskod
               </button>
             </form>
           ) : (
