@@ -1,4 +1,4 @@
-name: ESLint baseline temp
+name: ESLint stabilization temp
 
 on:
   pull_request:
@@ -6,15 +6,24 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  eslint-audit:
+  apply-eslint-stabilization:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
+      RESEND_API_KEY: re_dummy
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
     steps:
-      - name: Checkout
+      - name: Checkout stabilization branch
         uses: actions/checkout@v4
+        with:
+          ref: stabilize-eslint-gate
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -25,11 +34,19 @@ jobs:
       - name: Install baseline dependencies
         run: npm ci
 
-      - name: Install ESLint audit tooling without saving
-        run: npm install --no-save eslint@9 eslint-config-next@16.3.1
+      - name: Add ESLint dependencies
+        run: npm install --save-dev eslint@9 eslint-config-next@16.3.1
 
-      - name: Create temporary Next 16 flat config
+      - name: Add lint scripts and Next 16 flat config
         run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'))
+          pkg.scripts.lint = 'eslint . --pass-on-unpruned-suppressions'
+          pkg.scripts['lint:prune'] = 'eslint . --prune-suppressions'
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n')
+          NODE
+
           cat > eslint.config.mjs <<'EOF'
           import { defineConfig, globalIgnores } from 'eslint/config'
           import nextVitals from 'eslint-config-next/core-web-vitals'
@@ -47,62 +64,116 @@ jobs:
           ])
           EOF
 
-      - name: Measure ESLint findings
+      - name: Repair focused lint blockers without behavioral redesign
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          check = Path('app/check/form-client.tsx')
+          text = check.read_text()
+          old = 'Dekal "Djur/rökning" finns'
+          new = 'Dekal &quot;Djur/rökning&quot; finns'
+          if text.count(old) != 1:
+              raise SystemExit(f'check quote target expected 1 found {text.count(old)}')
+          check.write_text(text.replace(old, new))
+
+          media = Path('components/MediaModal.tsx')
+          text = media.read_text()
+          replacements = {
+              'className="note">"{currentMedia.metadata.note}"</div>': 'className="note">&quot;{currentMedia.metadata.note}&quot;</div>',
+              '<b>Allmän kommentar:</b> "{currentMedia.metadata.generalNote}"</div>': '<b>Allmän kommentar:</b> &quot;{currentMedia.metadata.generalNote}&quot;</div>',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f'MediaModal target expected 1 found {text.count(old)}: {old}')
+              text = text.replace(old, new)
+          media.write_text(text)
+
+          rapport = Path('app/rapport/page.tsx')
+          text = rapport.read_text()
+          if text.count('// @ts-ignore') != 4:
+              raise SystemExit(f'rapport @ts-ignore expected 4 found {text.count("// @ts-ignore")}')
+          text = text.replace('// @ts-ignore', '// @ts-expect-error -- stationer has branch-specific fields narrowed by st.type')
+          rapport.write_text(text)
+          PY
+
+      - name: Extend existing required typecheck job with ESLint
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/typecheck.yml')
+          text = path.read_text()
+          needle = '      - name: TypeScript\n        run: npm run typecheck\n'
+          replacement = needle + '\n      - name: ESLint\n        run: npm run lint\n'
+          if text.count(needle) != 1:
+              raise SystemExit(f'typecheck workflow target expected 1 found {text.count(needle)}')
+          path.write_text(text.replace(needle, replacement))
+          PY
+
+      - name: Verify focused repairs before suppressions
         run: |
           set +e
-          npx eslint . -f json > eslint-results.json
+          npx eslint . -f json > eslint-before-suppressions.json
           lint_exit=$?
           set -e
           LINT_EXIT=$lint_exit node <<'NODE'
           const fs = require('fs')
-          const results = JSON.parse(fs.readFileSync('eslint-results.json', 'utf8'))
-          const summary = {
-            exit: Number(process.env.LINT_EXIT),
-            filesWithMessages: 0,
-            errors: 0,
-            warnings: 0,
-            fixableErrors: 0,
-            fixableWarnings: 0,
-            rules: {},
-            files: [],
+          const results = JSON.parse(fs.readFileSync('eslint-before-suppressions.json', 'utf8'))
+          const errors = []
+          for (const file of results) {
+            for (const msg of file.messages) {
+              if (msg.severity === 2) errors.push({
+                file: file.filePath.replace(process.cwd() + '/', ''),
+                line: msg.line,
+                rule: msg.ruleId,
+                message: msg.message,
+              })
+            }
           }
-          const noisyLegacyRules = new Set([
+          const allowed = new Set([
             '@typescript-eslint/no-explicit-any',
             'react-hooks/set-state-in-effect',
             'react-hooks/immutability',
             'react-hooks/preserve-manual-memoization',
           ])
-          const focusedErrors = []
-          for (const file of results) {
-            const count = file.errorCount + file.warningCount
-            if (!count) continue
-            summary.filesWithMessages++
-            summary.errors += file.errorCount
-            summary.warnings += file.warningCount
-            summary.fixableErrors += file.fixableErrorCount
-            summary.fixableWarnings += file.fixableWarningCount
-            const rel = file.filePath.replace(process.cwd() + '/', '')
-            summary.files.push({ file: rel, errors: file.errorCount, warnings: file.warningCount })
-            for (const msg of file.messages) {
-              const rule = msg.ruleId || '(parser/config)'
-              summary.rules[rule] = (summary.rules[rule] || 0) + 1
-              if (msg.severity === 2 && !noisyLegacyRules.has(rule)) {
-                focusedErrors.push({ file: rel, line: msg.line, column: msg.column, rule, message: msg.message })
-              }
-            }
-          }
-          summary.files.sort((a,b) => (b.errors+b.warnings) - (a.errors+a.warnings))
-          const topRules = Object.entries(summary.rules).sort((a,b) => b[1]-a[1]).slice(0,25)
-          console.log('ESLINT_EXIT=' + summary.exit)
-          console.log('ESLINT_FILES_WITH_MESSAGES=' + summary.filesWithMessages)
-          console.log('ESLINT_ERRORS=' + summary.errors)
-          console.log('ESLINT_WARNINGS=' + summary.warnings)
-          console.log('ESLINT_FIXABLE_ERRORS=' + summary.fixableErrors)
-          console.log('ESLINT_FIXABLE_WARNINGS=' + summary.fixableWarnings)
-          console.log('ESLINT_TOP_RULES=' + JSON.stringify(topRules))
-          console.log('ESLINT_TOP_FILES=' + JSON.stringify(summary.files.slice(0,25)))
-          console.log('ESLINT_FOCUSED_ERRORS=' + JSON.stringify(focusedErrors))
+          const unexpected = errors.filter(e => !allowed.has(e.rule))
+          console.log('PRE_SUPPRESSION_ERROR_COUNT=' + errors.length)
+          console.log('PRE_SUPPRESSION_UNEXPECTED=' + JSON.stringify(unexpected))
+          if (unexpected.length) process.exit(1)
           NODE
 
-      - name: Verify existing typecheck remains green
+      - name: Create ESLint legacy-debt suppressions
+        run: |
+          npx eslint . \
+            --suppress-rule '@typescript-eslint/no-explicit-any' \
+            --suppress-rule 'react-hooks/set-state-in-effect' \
+            --suppress-rule 'react-hooks/immutability' \
+            --suppress-rule 'react-hooks/preserve-manual-memoization'
+
+      - name: Verify lint gate
+        run: npm run lint
+
+      - name: Verify TypeScript
         run: npm run typecheck
+
+      - name: Verify dependency audit
+        run: npm audit
+
+      - name: Verify production build
+        run: npm run build
+
+      - name: Verify clean patch and remove temporary workflow
+        run: |
+          rm .github/workflows/eslint-audit-temp.yml
+          rm -f eslint-before-suppressions.json
+          git diff --check
+          test -f eslint-suppressions.json
+          git status --short
+
+      - name: Commit stabilization result
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json eslint.config.mjs eslint-suppressions.json app/check/form-client.tsx components/MediaModal.tsx app/rapport/page.tsx .github/workflows/typecheck.yml .github/workflows/eslint-audit-temp.yml
+          git commit -m 'Establish ESLint quality gate'
+          git push origin HEAD:stabilize-eslint-gate
