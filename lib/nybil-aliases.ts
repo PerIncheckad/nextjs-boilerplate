@@ -8,12 +8,9 @@ export type NybilCanonicalAliasFields = {
 };
 
 /**
- * Preserve the separate Nybil notifier compatibility field that still shares a
- * legacy database name. Canonical fields remain the source values.
+ * Compatibility shim retained to keep the Nybil form diff narrow while the
+ * legacy database aliases are retired. It must not generate DB alias fields.
  */
 export function withNybilLegacyAliases<T extends NybilCanonicalAliasFields>(data: T) {
-  return {
-    ...data,
-    hjul_till_forvaring: data.hjul_ej_monterade,
-  };
+  return data;
 }
