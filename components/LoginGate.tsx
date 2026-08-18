@@ -55,10 +55,7 @@ export default function LoginGate({ children }: Props) {
 
     const { error } = await supabase.auth.signInWithOtp({
       email: normalizedEmail,
-      options: {
-        emailRedirectTo: redirectTo,
-        shouldCreateUser: false,
-      },
+      options: { emailRedirectTo: redirectTo },
     });
 
     if (error) {
