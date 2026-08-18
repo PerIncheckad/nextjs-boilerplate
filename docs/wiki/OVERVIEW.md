@@ -99,11 +99,11 @@ MABI Syd Incheckningssystem är ett internt verktyg för att hantera:
 **Användare:** Per (endast)
 
 **Funktioner:**
-- 📂 **Skadefilen (BUHS):** Import av skador från Excel → `damages` + `damages_external`
+- 📂 **Skadefilen (BUHS):** Import av skador från Excel → `damages`
 - 📂 **Bilkontrollfilen:** Import av bilinfo från Excel → `vehicles`
 
 **Output:**
-- Rader i: `damages`, `damages_external`, `vehicles`
+- Rader i: `damages`, `vehicles`
 
 **Dokumentation:** [CSV-import. md](./docs/wiki/CSV-import.md)
 
@@ -186,7 +186,7 @@ graph TD
 │                                                              │
 │  📧 BUHS Skadefil (Excel)                                    │
 │  └─> Mejlas till per. andersson@mabi.se varje vardag kl 8    │
-│  └─> Manuell import → damages + damages_external            │
+│  └─> Manuell import → damages                               │
 │                                                              │
 │  📊 Bilkontrollfilen (Excel)                                 │
 │  └─> MABISYD Bilkontroll 2024-2025. xlsx (OneDrive)          │
@@ -194,7 +194,7 @@ graph TD
 │                                                              │
 │  🔌 BUHS API (automatisk vid /check)                         │
 │  └─> Hämtar skador via RPC get_damages_by_trimmed_regnr     │
-│  └─> Källa: damages_external                                │
+│  └─> Källa: damages WHERE source='BUHS'                    │
 │                                                              │
 │  🚗 Vehicle API (planerad, ej implementerad)                 │
 │  └─> Hämta bilinfo från Transportstyrelsen                  │
@@ -210,7 +210,7 @@ graph TD
 │  📦 checkins              (incheckningar)                    │
 │  📦 checkin_damages       (skador vid incheckning)           │
 │  📦 damages               (konsoliderad skadehistorik)       │
-│  📦 damages_external      (BUHS-skador, RPC-källa)           │
+│  📦 damages_external      (rollback-snapshot, ej live-källa)│
 │  📦 nybil_inventering     (nybilsregistreringar)             │
 │  📦 vehicles              (fordonsmaster från Bilkontroll)   │
 │                                                              │
@@ -459,7 +459,7 @@ Innehåller fullständig historik av utvecklingskonversationer med AI-assistent.
 1. Öppna `Skador Albarone[dagens datum].xlsx`
 2. Följ [CSV-import.md § 1-2](./docs/wiki/CSV-import.md)
 3. Verifiera antal rader
-4. Uppdatera `damages_external`
+4. Verifiera BUHS-RPC mot `damages WHERE source='BUHS'`
 
 **Tidsåtgång:** ~10 minuter
 
