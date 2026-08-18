@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import path from 'node:path'
 
 const host = '127.0.0.1'
 const port = 3127
@@ -24,9 +25,10 @@ const publicPagePaths = [
   '/rapport',
 ]
 
+const nextBin = path.resolve('node_modules/next/dist/bin/next')
 const server = spawn(
-  process.platform === 'win32' ? 'npm.cmd' : 'npm',
-  ['run', 'start', '--', '-H', host, '-p', String(port)],
+  process.execPath,
+  [nextBin, 'start', '-H', host, '-p', String(port)],
   {
     env: process.env,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -35,15 +37,18 @@ const server = spawn(
 
 let serverOutput = ''
 let exitCode = null
+const serverExited = new Promise((resolve) => {
+  server.once('exit', (code) => {
+    exitCode = code
+    resolve(code)
+  })
+})
 
 server.stdout.on('data', (chunk) => {
   serverOutput += chunk.toString()
 })
 server.stderr.on('data', (chunk) => {
   serverOutput += chunk.toString()
-})
-server.once('exit', (code) => {
-  exitCode = code
 })
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -73,12 +78,12 @@ async function stopServer() {
   if (exitCode !== null) return
 
   server.kill('SIGTERM')
-  await Promise.race([
-    new Promise((resolve) => server.once('exit', resolve)),
-    delay(5_000),
-  ])
+  await Promise.race([serverExited, delay(5_000)])
 
-  if (exitCode === null) server.kill('SIGKILL')
+  if (exitCode === null) {
+    server.kill('SIGKILL')
+    await Promise.race([serverExited, delay(2_000)])
+  }
 }
 
 try {
