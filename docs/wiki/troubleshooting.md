@@ -230,30 +230,29 @@ SELECT source, COUNT(*) FROM damages GROUP BY source;
 
 ---
 
-### ❌ Antal rader i `damages` ≠ antal rader i `damages_external`
+### ❌ RPC-resultatet saknar BUHS-skador efter import
 
-**Orsak:** Glömt uppdatera `damages_external` efter BUHS-import.
+**Orsak:** BUHS-raderna har inte skrivits korrekt till `damages`, eller så saknar de `source = 'BUHS'`.
 
-**Lösning:**
+Efter Steg 3.2B-1 är `damages` den enda aktiva BUHS-källan. **Kör inte `TRUNCATE` eller `INSERT` mot `damages_external`.**
+
+**Verifiering:**
 ```sql
--- Töm och återskapa damages_external
-TRUNCATE damages_external;
-
-INSERT INTO damages_external (
-  regnr, saludatum, damage_date, damage_type_raw,
-  note_customer, note_internal, vehiclenote
-)
-SELECT 
-  regnr, saludatum, damage_date, damage_type_raw,
-  note_customer, note_internal, vehiclenote
-FROM damages
-WHERE source = 'BUHS';
-
--- Verifiera
-SELECT COUNT(*) FROM damages WHERE source = 'BUHS';
-SELECT COUNT(*) FROM damages_external;
--- Båda ska vara samma! 
+-- Byt ut ABC123 mot ett registreringsnummer från importen.
+SELECT
+  (
+    SELECT COUNT(*)
+    FROM public.damages
+    WHERE source = 'BUHS'
+      AND TRIM(UPPER(regnr)) = TRIM(UPPER('ABC123'))
+  ) AS canonical_count,
+  (
+    SELECT COUNT(*)
+    FROM public.get_damages_by_trimmed_regnr('ABC123')
+  ) AS rpc_count;
 ```
+
+**Förväntat:** `canonical_count = rpc_count`. Om båda är 0 ligger felet i importen till `damages`.
 
 ---
 
