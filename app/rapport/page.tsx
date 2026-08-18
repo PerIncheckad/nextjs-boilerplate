@@ -52,7 +52,6 @@ const periodAlternativ = [
 
 const platsAlternativ = stationer.map(st => {
   if (st.type === "total" || st.type === "region" || st.type === "tot") return st.namn;
-  // @ts-ignore
   if (st.type === "station") return `${st.namn} (${st.station_id})`;
   return st.namn;
 });
@@ -140,11 +139,8 @@ export default function RapportPage() {
     let items = [...allDamages];
     const st = stationer.find(s => plats === s.namn || (s.type === "station" && plats === `${s.namn} (${s.station_id})`));
     if (st && st.type !== 'total') {
-        // @ts-ignore
         if (st.type === "region") items = items.filter(d => d.region === st.namn.split(" ")[1]);
-        // @ts-ignore
         else if (st.type === "tot") items = items.filter(d => d.huvudstation_id === st.huvudstation_id);
-        // @ts-ignore
         else if (st.type === "station") items = items.filter(d => d.station_id === st.station_id);
     }
     if (activeRegnr) items = items.filter(row => row.regnr?.toLowerCase().includes(activeRegnr.toLowerCase()));

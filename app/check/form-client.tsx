@@ -2076,7 +2076,7 @@ export default function CheckInForm() {
           <SectionHeader title="Checklista" />
           <div className="grid-2-col">
             <ChoiceButton onClick={() => setWashed(!washed)} isActive={washed}>Tvättad</ChoiceButton>
-            <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal "Djur/rökning" finns</ChoiceButton>
+            <ChoiceButton onClick={() => setDekalDjurRokningOK(!dekalDjurRokningOK)} isActive={dekalDjurRokningOK}>Dekal &quot;Djur/rökning&quot; finns</ChoiceButton>
             <ChoiceButton onClick={() => setIsskrapaOK(!isskrapaOK)} isActive={isskrapaOK}>Isskrapa finns</ChoiceButton>
             <ChoiceButton onClick={() => setPskivaOK(!pskivaOK)} isActive={pskivaOK}>P-skiva finns</ChoiceButton>
             <ChoiceButton onClick={() => setSkyltRegplatOK(!skyltRegplatOK)} isActive={skyltRegplatOK}>MABI-skylt reg.plåt finns</ChoiceButton>

@@ -99,8 +99,8 @@ export default function MediaModal({
           {currentMedia.metadata.damageDate && <div><b>Skadedatum:</b> {currentMedia.metadata.damageDate}</div>}
           <div><b>Skadetyp:</b> {currentMedia.metadata.damageType}</div>
           <div><b>Station:</b> {currentMedia.metadata.station}</div>
-          {currentMedia.metadata.note && <div className="note">"{currentMedia.metadata.note}"</div>}
-          {currentMedia.metadata.generalNote && <div className="note general-note"><b>Allmän kommentar:</b> "{currentMedia.metadata.generalNote}"</div>}
+          {currentMedia.metadata.note && <div className="note">&quot;{currentMedia.metadata.note}&quot;</div>}
+          {currentMedia.metadata.generalNote && <div className="note general-note"><b>Allmän kommentar:</b> &quot;{currentMedia.metadata.generalNote}&quot;</div>}
           {currentMedia.metadata.inchecker && <div className="inchecker-info"><b>Incheckare:</b> {currentMedia.metadata.inchecker}</div>}
         </div>
       </div>
