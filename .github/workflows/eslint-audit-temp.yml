@@ -1,0 +1,100 @@
+name: ESLint baseline temp
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  eslint-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.20.2'
+          cache: npm
+
+      - name: Install baseline dependencies
+        run: npm ci
+
+      - name: Install ESLint audit tooling without saving
+        run: npm install --no-save eslint@9 eslint-config-next@16.3.1
+
+      - name: Create temporary Next 16 flat config
+        run: |
+          cat > eslint.config.mjs <<'EOF'
+          import { defineConfig, globalIgnores } from 'eslint/config'
+          import nextVitals from 'eslint-config-next/core-web-vitals'
+          import nextTs from 'eslint-config-next/typescript'
+
+          export default defineConfig([
+            ...nextVitals,
+            ...nextTs,
+            globalIgnores([
+              '.next/**',
+              'out/**',
+              'build/**',
+              'next-env.d.ts',
+            ]),
+          ])
+          EOF
+
+      - name: Measure ESLint findings
+        run: |
+          set +e
+          npx eslint . -f json > eslint-results.json
+          lint_exit=$?
+          set -e
+          LINT_EXIT=$lint_exit node <<'NODE'
+          const fs = require('fs')
+          const results = JSON.parse(fs.readFileSync('eslint-results.json', 'utf8'))
+          const summary = {
+            exit: Number(process.env.LINT_EXIT),
+            filesWithMessages: 0,
+            errors: 0,
+            warnings: 0,
+            fixableErrors: 0,
+            fixableWarnings: 0,
+            rules: {},
+            files: [],
+          }
+          for (const file of results) {
+            const count = file.errorCount + file.warningCount
+            if (!count) continue
+            summary.filesWithMessages++
+            summary.errors += file.errorCount
+            summary.warnings += file.warningCount
+            summary.fixableErrors += file.fixableErrorCount
+            summary.fixableWarnings += file.fixableWarningCount
+            summary.files.push({
+              file: file.filePath.replace(process.cwd() + '/', ''),
+              errors: file.errorCount,
+              warnings: file.warningCount,
+            })
+            for (const msg of file.messages) {
+              const rule = msg.ruleId || '(parser/config)'
+              summary.rules[rule] = (summary.rules[rule] || 0) + 1
+            }
+          }
+          summary.files.sort((a,b) => (b.errors+b.warnings) - (a.errors+a.warnings))
+          const topRules = Object.entries(summary.rules).sort((a,b) => b[1]-a[1]).slice(0,25)
+          console.log('ESLINT_EXIT=' + summary.exit)
+          console.log('ESLINT_FILES_WITH_MESSAGES=' + summary.filesWithMessages)
+          console.log('ESLINT_ERRORS=' + summary.errors)
+          console.log('ESLINT_WARNINGS=' + summary.warnings)
+          console.log('ESLINT_FIXABLE_ERRORS=' + summary.fixableErrors)
+          console.log('ESLINT_FIXABLE_WARNINGS=' + summary.fixableWarnings)
+          console.log('ESLINT_TOP_RULES=' + JSON.stringify(topRules))
+          console.log('ESLINT_TOP_FILES=' + JSON.stringify(summary.files.slice(0,25)))
+          NODE
+
+      - name: Verify existing typecheck remains green
+        run: npm run typecheck
