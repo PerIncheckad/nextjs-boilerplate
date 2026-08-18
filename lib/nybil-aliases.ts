@@ -8,14 +8,12 @@ export type NybilCanonicalAliasFields = {
 };
 
 /**
- * Preserve the Nybil legacy database aliases that still have live compatibility
- * dependencies. Canonical fields remain the source values.
+ * Preserve the separate Nybil notifier compatibility field that still shares a
+ * legacy database name. Canonical fields remain the source values.
  */
 export function withNybilLegacyAliases<T extends NybilCanonicalAliasFields>(data: T) {
   return {
     ...data,
-    bilmodell: data.modell,
     hjul_till_forvaring: data.hjul_ej_monterade,
-    hjul_forvaring_station: data.hjul_forvaring_ort,
   };
 }
