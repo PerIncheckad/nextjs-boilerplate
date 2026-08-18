@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verifyApiUser } from '@/lib/server-auth';
+import { withVerifiedNotifyIdentity } from '@/lib/notify-identity';
 import { POST as legacyPOST } from './legacy-handler';
 
 export async function POST(request: Request) {
@@ -18,15 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
   }
 
-  const meta = body?.meta && typeof body.meta === 'object' ? { ...body.meta } : {};
-  meta.user_email = verification.user.email;
-  meta.email = verification.user.email;
-  if (meta.tankning_receipt && typeof meta.tankning_receipt === 'object') {
-    meta.tankning_receipt = {
-      ...meta.tankning_receipt,
-      uploaded_by_email: verification.user.email,
-    };
-  }
+  const meta = withVerifiedNotifyIdentity(body?.meta, verification.user);
 
   const headers = new Headers(request.headers);
   headers.delete('content-length');

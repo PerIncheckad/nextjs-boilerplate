@@ -4,6 +4,10 @@ import { NextRequest } from 'next/server'
 
 import { EMAIL_WHITELIST, isWhitelistedEmail } from '../lib/access-control'
 import { verifyApiUser } from '../lib/server-auth'
+import {
+  getServerVerifiedCompletedBy,
+  withVerifiedNotifyIdentity,
+} from '../lib/notify-identity'
 import { proxy } from '../proxy'
 
 const protectedApiPaths = [
@@ -69,4 +73,44 @@ test('whitelist entries remain normalized to lowercase', () => {
   for (const email of EMAIL_WHITELIST) {
     assert.equal(email, email.toLowerCase())
   }
+})
+
+
+test('notify canonicalizes completed_by from the server-verified Supabase user', () => {
+  const verifiedUser = {
+    id: '4a3b4c2d-1e0f-4a5b-8c6d-7e8f9012a345',
+    email: 'verified@example.com',
+  }
+  const clientMeta = {
+    verified_user_id: '11111111-1111-4111-8111-111111111111',
+    user_email: 'forged@example.com',
+    email: 'forged@example.com',
+    tankning_receipt: {
+      uploaded_by_email: 'forged@example.com',
+      file_url: 'https://example.com/receipt.pdf',
+    },
+  }
+
+  const canonicalMeta = withVerifiedNotifyIdentity(clientMeta, verifiedUser)
+
+  assert.equal(canonicalMeta.verified_user_id, verifiedUser.id)
+  assert.equal(canonicalMeta.user_email, verifiedUser.email)
+  assert.equal(canonicalMeta.email, verifiedUser.email)
+  assert.deepEqual(canonicalMeta.tankning_receipt, {
+    uploaded_by_email: verifiedUser.email,
+    file_url: 'https://example.com/receipt.pdf',
+  })
+  assert.equal(getServerVerifiedCompletedBy(canonicalMeta), verifiedUser.id)
+
+  assert.equal(
+    clientMeta.verified_user_id,
+    '11111111-1111-4111-8111-111111111111',
+    'canonicalization must not mutate the incoming client payload',
+  )
+})
+
+test('completed_by rejects missing or malformed server identity', () => {
+  assert.equal(getServerVerifiedCompletedBy({}), null)
+  assert.equal(getServerVerifiedCompletedBy({ verified_user_id: 'not-a-uuid' }), null)
+  assert.equal(getServerVerifiedCompletedBy(null), null)
 })
