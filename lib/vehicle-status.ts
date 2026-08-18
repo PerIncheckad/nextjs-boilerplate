@@ -308,7 +308,6 @@ type NybilInventeringData = {
   created_at?: string;
   bilmarke?: string;
   modell?: string;
-  bilmodell?: string;
   plats_aktuell_ort?: string;
   plats_aktuell_station?: string;
   plats_mottagning_ort?: string;
@@ -2075,7 +2074,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
       if (nybilData?.bilmarke || nybilData?.modell) {
         return formatModel(nybilData?.bilmarke ?? null, nybilData?.modell ?? null);
       }
-      if (nybilData?.bilmodell) return nybilData.bilmodell;
       if (vehicleData) return formatModel(vehicleData.brand, vehicleData.model);
       return '---';
     })(),
