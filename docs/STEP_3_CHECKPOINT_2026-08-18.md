@@ -1,6 +1,6 @@
 # Steg 3 checkpoint — 2026-08-18
 
-Status efter merge av PR #329.
+Status efter merge av PR #332.
 
 ## Låsta principer
 
@@ -76,41 +76,66 @@ De sista rena legacy DB-writesen stoppades:
 - `bilmodell`
 - `hjul_forvaring_station`
 
-`hjul_till_forvaring` behålls eftersom samma namn fortfarande ingår i ett separat notifierings-/kompatibilitetskontrakt och därför inte får behandlas som en vanlig DB-alias utan separat verifiering.
+`hjul_till_forvaring` lämnades då kvar till separat kontraktsverifiering eftersom samma namn fortfarande används av notifierings-API:t.
+
+#### 3.2D-4D
+
+Read-only retirement-readiness dokumenterades och verifierade:
+
+- samtliga sex historiska alias-kolumner är nullable och saknar defaults,
+- 0 direkta view-/function-dependencies på legacy-kolumnerna,
+- 195 befintliga Nybil-rader,
+- 0 mismatch för samtliga sex canonical/legacy-par i befintlig data.
+
+Ingen fysisk DROP godkändes. Slutbeviset för nya writes är fortsatt event-gated.
+
+#### 3.2D-4E
+
+Den sista legacy DB-writen `hjul_till_forvaring` stoppades.
+
+- `withNybilLegacyAliases(...)` är nu en ren passthrough och genererar inga legacy DB-alias.
+- Nybil-formens notifieringspayload fortsätter separat att skicka `hjul_till_forvaring: hjulTillForvaring` till `/api/notify-nybil`.
+- Därmed är DB-kontraktet och notifieringskontraktet separerade utan att ändra notifierings-API:ts externa payload eller e-postrendering.
+- Ingen DML, backfill, syntetisk write eller DROP gjordes.
 
 ## Nybil retirement-status
 
-De sex historiska alias-kolumnerna i `nybil_inventering` är nullable och saknar defaults. Efter 3.2D-4B har read-only dependency-preflight inte hittat kvarvarande funktion-/view-läsning av de rena legacy DB-kolumnerna.
+Efter 3.2D-4E genererar appens Nybil DB-write-path inte längre något av de sex legacy DB-aliasen:
 
-Det betyder inte att kolumnerna får droppas ännu. Nästa fas är formell retirement-readiness med repo/API/export/notifieringsinventering och verifiering av nya riktiga Nybil-writes.
+- `bilmodell`
+- `ankomstdatum`
+- `monterade_dack`
+- `hjul_till_forvaring`
+- `hjul_forvaring_station`
+- `kompressor`
 
-### 3.2D-4D första read-only kontroll
+Detta är kodmässigt klart men ännu inte slutbevisat mot en ny riktig Production-write efter 4E. Nästa riktiga Nybil-inventering ska verifieras read-only. Ingen syntetisk write får skapas för att forcera verifieringen.
 
-Direkt efter merge av 3.2D-4C (`2026-08-18 21:47:53Z`) kördes en read-only kontroll mot `nybil_inventering`.
+### Event-gated verifiering
 
-Resultat:
+Två slutbevis väntar på riktig verksamhetsdata:
 
-- 0 nya Nybil-rader efter 4C-merge.
-- Därmed finns ännu ingen riktig post-4C write att slutverifiera.
-- Ingen syntetisk write skapades.
-- `bilmodell`, `ankomstdatum`, `monterade_dack`, `hjul_forvaring_station` och `kompressor` hade följaktligen 0 nya icke-null writes efter merge.
+1. Nybil efter 4E: kanoniska fält ska fyllas medan samtliga sex legacy DB-alias förblir tomma.
+2. Check-in efter `completed_by`-fixen: `completed_by` ska vara satt till server-verifierad Supabase user UUID.
 
-Detta är **pending evidence**, inte ett fel. Slutbeviset kräver nästa riktiga Nybil-inventering.
+En read-only condition watch är satt för dessa händelser. Den får inte skriva data, backfilla eller göra schemaändringar.
 
 ## Aktuella mergepunkter
 
 - PR #327 — 3.2D-4A merged.
 - PR #328 — 3.2D-4B merged, merge SHA `4249ae310e4bdcce60eb882b00377e3ba64e893f`.
 - PR #329 — 3.2D-4C merged, merge SHA `83934f193b543a97068ddee4f5098f028320f2ea`.
+- PR #330 — Steg 3 checkpoint merged, merge SHA `0f50288088a405cdfee5619c06dc7b889422190e`.
+- PR #331 — 3.2D-4D retirement-readiness merged, merge SHA `0292addd7785b2ca8c9815d6e8214e00af974697`.
+- PR #332 — 3.2D-4E stoppa `hjul_till_forvaring` DB-write merged, merge SHA `805bdaf87e6c3e9bf8e3f0737c6c71e30f7d57ec`.
 
 ## Nästa säkra ordning
 
-1. Genomför 3.2D-4D som read-only retirement-readiness.
-2. Verifiera nya riktiga Nybil-rader efter 4C: kanoniska fält ska fyllas och legacy DB-alias ska förbli tomma; ingen syntetisk write.
-3. Behandla `hjul_till_forvaring` separat och bevara notifieringskontraktet tills dess konsumenter uttryckligen migrerats.
-4. Låt 3.2B-stabilitetskontrollen avgöra GO/STOP för BUHS-snapshot 2026-08-19 16:33.
-5. Verifiera `completed_by` read-only efter nästa riktiga check-in.
-6. Först därefter kan fysisk retirement/DROP av enskilda legacy-kolumner övervägas, en kolumn i taget och med ny preflight.
+1. Verifiera nästa riktiga Nybil-write read-only efter 4E.
+2. Verifiera `completed_by` read-only efter nästa riktiga check-in.
+3. Låt 3.2B-stabilitetskontrollen avgöra GO/STOP för BUHS-snapshot 2026-08-19 16:33.
+4. Om Nybil-verifieringen är grön: gör ny preflight för fysisk retirement, en legacy-kolumn i taget.
+5. Ingen DROP får ske bara för att repo- och dependency-inventeringen är grön; riktig write-evidens är fortfarande ett krav.
 
 ## Kända kvarvarande tekniska observationer
 
