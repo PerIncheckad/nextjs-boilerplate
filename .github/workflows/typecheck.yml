@@ -31,3 +31,6 @@ jobs:
 
       - name: ESLint
         run: npm run lint
+
+      - name: Security regression
+        run: npm run test:regression
