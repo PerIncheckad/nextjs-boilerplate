@@ -84,6 +84,19 @@ De sex historiska alias-kolumnerna i `nybil_inventering` är nullable och saknar
 
 Det betyder inte att kolumnerna får droppas ännu. Nästa fas är formell retirement-readiness med repo/API/export/notifieringsinventering och verifiering av nya riktiga Nybil-writes.
 
+### 3.2D-4D första read-only kontroll
+
+Direkt efter merge av 3.2D-4C (`2026-08-18 21:47:53Z`) kördes en read-only kontroll mot `nybil_inventering`.
+
+Resultat:
+
+- 0 nya Nybil-rader efter 4C-merge.
+- Därmed finns ännu ingen riktig post-4C write att slutverifiera.
+- Ingen syntetisk write skapades.
+- `bilmodell`, `ankomstdatum`, `monterade_dack`, `hjul_forvaring_station` och `kompressor` hade följaktligen 0 nya icke-null writes efter merge.
+
+Detta är **pending evidence**, inte ett fel. Slutbeviset kräver nästa riktiga Nybil-inventering.
+
 ## Aktuella mergepunkter
 
 - PR #327 — 3.2D-4A merged.
