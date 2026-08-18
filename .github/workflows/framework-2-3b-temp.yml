@@ -29,14 +29,26 @@ jobs:
 
       - name: Apply Next 15 maintenance LTS candidate
         run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'app/check/form-client.tsx';
+          let s = fs.readFileSync(path, 'utf8');
+          const from = '  containerRef: React.RefObject<HTMLDivElement>,';
+          const to = '  containerRef: React.RefObject<HTMLDivElement | null>,';
+          if (!s.includes(from)) throw new Error('Expected useDialogFocus RefObject signature not found');
+          s = s.replace(from, to);
+          fs.writeFileSync(path, s);
+          NODE
           npm install --save-exact next@15.5.21 react@19 react-dom@19
           npm install --save-dev --save-exact @types/react@19 @types/react-dom@19
+          npm audit fix --package-lock-only --ignore-scripts || true
+          npm ci
           git diff --check
 
       - name: TypeScript
         run: npm run typecheck
 
-      - name: Security audit
+      - name: Security audit report
         run: |
           npm audit --json > audit.json || true
           node - <<'NODE'
@@ -47,7 +59,6 @@ jobs:
           for (const [name, v] of Object.entries(audit.vulnerabilities || {})) {
             console.log('AUDIT_REMAINING', name, v.severity, v.range);
           }
-          if ((counts.high || 0) > 0 || (counts.critical || 0) > 0) process.exit(1);
           NODE
 
       - name: Production build with isolated dummy env
@@ -59,15 +70,27 @@ jobs:
           NEXT_PUBLIC_SITE_URL: https://example.com
         run: npm run build
 
+      - name: Final security gate
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const audit = JSON.parse(fs.readFileSync('audit.json', 'utf8'));
+          const counts = audit.metadata?.vulnerabilities || {};
+          if ((counts.high || 0) > 0 || (counts.critical || 0) > 0) {
+            console.error('High/critical audit findings remain:', counts);
+            process.exit(1);
+          }
+          NODE
+
       - name: Show dependency result
         run: |
           npm ls next react react-dom --depth=0
           git diff --name-only
 
-      - name: Commit candidate dependency migration
+      - name: Commit candidate migration
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package.json package-lock.json
-          git commit -m 'Upgrade framework baseline to Next 15.5.21' || true
+          git add package.json package-lock.json app/check/form-client.tsx
+          git commit -m 'Upgrade framework baseline to Next 15.5.21'
           git push origin HEAD:framework-next15-2-3b
