@@ -27,7 +27,7 @@ jobs:
       - name: Install baseline
         run: npm ci
 
-      - name: Apply Next 15 maintenance LTS candidate
+      - name: Apply Next 16.3.1 security candidate
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -39,7 +39,7 @@ jobs:
           s = s.replace(from, to);
           fs.writeFileSync(path, s);
           NODE
-          npm install --save-exact next@15.5.21 react@19 react-dom@19
+          npm install --save-exact next@16.3.1 react@19 react-dom@19
           npm install --save-dev --save-exact @types/react@19 @types/react-dom@19
           npm audit fix --package-lock-only --ignore-scripts || true
           npm ci
@@ -82,15 +82,17 @@ jobs:
           }
           NODE
 
-      - name: Show dependency result
+      - name: Show dependency and diff result
         run: |
           npm ls next react react-dom --depth=0
+          echo 'DIFF_FILES_START'
           git diff --name-only
+          echo 'DIFF_FILES_END'
 
       - name: Commit candidate migration
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add package.json package-lock.json app/check/form-client.tsx
-          git commit -m 'Upgrade framework baseline to Next 15.5.21'
+          git commit -m 'Upgrade framework baseline to Next 16.3.1'
           git push origin HEAD:framework-next15-2-3b
