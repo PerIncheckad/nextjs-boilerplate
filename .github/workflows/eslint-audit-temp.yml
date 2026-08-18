@@ -66,6 +66,13 @@ jobs:
             rules: {},
             files: [],
           }
+          const noisyLegacyRules = new Set([
+            '@typescript-eslint/no-explicit-any',
+            'react-hooks/set-state-in-effect',
+            'react-hooks/immutability',
+            'react-hooks/preserve-manual-memoization',
+          ])
+          const focusedErrors = []
           for (const file of results) {
             const count = file.errorCount + file.warningCount
             if (!count) continue
@@ -74,14 +81,14 @@ jobs:
             summary.warnings += file.warningCount
             summary.fixableErrors += file.fixableErrorCount
             summary.fixableWarnings += file.fixableWarningCount
-            summary.files.push({
-              file: file.filePath.replace(process.cwd() + '/', ''),
-              errors: file.errorCount,
-              warnings: file.warningCount,
-            })
+            const rel = file.filePath.replace(process.cwd() + '/', '')
+            summary.files.push({ file: rel, errors: file.errorCount, warnings: file.warningCount })
             for (const msg of file.messages) {
               const rule = msg.ruleId || '(parser/config)'
               summary.rules[rule] = (summary.rules[rule] || 0) + 1
+              if (msg.severity === 2 && !noisyLegacyRules.has(rule)) {
+                focusedErrors.push({ file: rel, line: msg.line, column: msg.column, rule, message: msg.message })
+              }
             }
           }
           summary.files.sort((a,b) => (b.errors+b.warnings) - (a.errors+a.warnings))
@@ -94,6 +101,7 @@ jobs:
           console.log('ESLINT_FIXABLE_WARNINGS=' + summary.fixableWarnings)
           console.log('ESLINT_TOP_RULES=' + JSON.stringify(topRules))
           console.log('ESLINT_TOP_FILES=' + JSON.stringify(summary.files.slice(0,25)))
+          console.log('ESLINT_FOCUSED_ERRORS=' + JSON.stringify(focusedErrors))
           NODE
 
       - name: Verify existing typecheck remains green
