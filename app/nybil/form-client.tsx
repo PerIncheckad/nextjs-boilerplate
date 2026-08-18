@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
 import { compressImage } from '@/lib/image-utils';
+import { withNybilLegacyAliases } from '@/lib/nybil-aliases';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
@@ -1142,27 +1143,22 @@ export default function NybilForm() {
         previousRegistration: duplicateInfo?.previousRegistration
       });
       
-      const inventoryData = {
+      const inventoryData = withNybilLegacyAliases({
         regnr: normalizedReg,
         bilmarke: effectiveBilmarke,
         bilmarke_annat: bilmarke === 'Annat' ? bilmarkeAnnat : null,
         modell,
-        bilmodell: modell, // Alias for modell column
         registrerad_av: firstName,
         fullstandigt_namn: fullName,
         registreringsdatum: now.toISOString().split('T')[0],
-        ankomstdatum: now.toISOString().split('T')[0], // Alias for registreringsdatum
         plats_mottagning_ort: ort,
         plats_mottagning_station: station,
         planerad_station: planeradStation,
         planerad_station_id: planeradStationObj?.id || null,
         matarstallning_inkop: matarstallning,
         hjultyp,
-        monterade_dack: hjultyp, // Alias for hjultyp (what tires are mounted)
         hjul_ej_monterade: hjulTillForvaring,
-        hjul_till_forvaring: hjulTillForvaring, // Alias for hjul_ej_monterade column
         hjul_forvaring_ort: wheelsNeedStorage ? hjulForvaringOrt : null,
-        hjul_forvaring_station: wheelsNeedStorage ? hjulForvaringOrt : null, // Alias for hjul_forvaring_ort column
         hjul_forvaring: wheelsNeedStorage ? hjulForvaringSpec : null,
         bransletyp: mapBransletypForDb(bransletyp),
         vaxel: effectiveVaxel,
@@ -1190,7 +1186,6 @@ export default function NybilForm() {
         dragkrok,
         gummimattor,
         dackkompressor,
-        kompressor: dackkompressor, // Alias for dackkompressor column
         stold_gps: stoldGps,
         stold_gps_spec: stoldGps ? stoldGpsSpec : null,
         mbme_aktiverad: showMbmeQuestion ? mbmeAktiverad : null,
@@ -1218,7 +1213,7 @@ export default function NybilForm() {
         // Note: original_registration_id is NOT set - use duplicate_group_id instead for tracking duplicates
         // Sale status: explicitly set to null for new cars (unknown status)
         is_sold: null
-      };
+      });
       console.log('Attempting to insert inventoryData:', inventoryData);
       const { data, error } = await supabase
         .from('nybil_inventering')
