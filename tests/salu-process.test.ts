@@ -8,6 +8,7 @@ import {
   closeSaluFlagManually,
   createReopenedSaluFlag,
   moveSaluFlagToFinalAssessment,
+  transitionSaluChildStatus,
   type SaluFlagSnapshot,
 } from '../lib/salu-process';
 
@@ -25,6 +26,32 @@ test('NY flag is acknowledged into HANDLÄGGS without changing ownership identit
   assert.equal(next.status, 'HANDLÄGGS');
   assert.equal(next.flagId, activeFlag.flagId);
   assert.equal(next.regnr, activeFlag.regnr);
+});
+
+test('child process follows CREATED -> ACCEPTED -> IN_PROGRESS -> READY_FOR_VERIFICATION -> VERIFIED', () => {
+  let status = transitionSaluChildStatus('CREATED', 'ACCEPTED');
+  status = transitionSaluChildStatus(status, 'IN_PROGRESS');
+  status = transitionSaluChildStatus(status, 'READY_FOR_VERIFICATION');
+  status = transitionSaluChildStatus(status, 'VERIFIED');
+  assert.equal(status, 'VERIFIED');
+});
+
+test('verification rejection returns the same child process to IN_PROGRESS', () => {
+  assert.equal(
+    transitionSaluChildStatus('READY_FOR_VERIFICATION', 'IN_PROGRESS'),
+    'IN_PROGRESS',
+  );
+});
+
+test('child process cannot skip ACCEPTED and terminal states cannot reopen', () => {
+  assert.throws(
+    () => transitionSaluChildStatus('CREATED', 'IN_PROGRESS'),
+    /Invalid SALU child transition/,
+  );
+  assert.throws(
+    () => transitionSaluChildStatus('VERIFIED', 'IN_PROGRESS'),
+    /Terminal SALU child status/,
+  );
 });
 
 test('close readiness blocks on VÄNTAR checkpoint and non-terminal child process', () => {
@@ -54,6 +81,14 @@ test('manual close requires SLUTBEDÖMNING and ready conditions', () => {
 
   assert.equal(finalAssessment.status, 'SLUTBEDÖMNING');
   assert.equal(closed.status, 'STÄNGD');
+});
+
+test('final assessment cannot be entered directly from NY', () => {
+  const readiness = assessSaluCloseReadiness({ checkpointStatuses: ['GODKÄND'], childStatuses: [] });
+  assert.throws(
+    () => moveSaluFlagToFinalAssessment(activeFlag, readiness),
+    /HANDLÄGGS or VÄNTAR/,
+  );
 });
 
 test('active saludatum change keeps the same flag and recalculates escalation snapshot', () => {
