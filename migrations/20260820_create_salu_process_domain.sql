@@ -7,7 +7,7 @@
 begin;
 
 create table if not exists public.salu_auto_rules (
-  rule_id uuid primary key default gen_random_uuid(),
+  rule_id uuid not null default gen_random_uuid(),
   rule_version integer not null check (rule_version > 0),
   make text not null,
   model_tokens text[] not null default '{}',
@@ -17,7 +17,7 @@ create table if not exists public.salu_auto_rules (
   valid_from date not null default current_date,
   changed_by uuid,
   changed_at timestamptz not null default now(),
-  unique (rule_id, rule_version)
+  primary key (rule_id, rule_version)
 );
 
 create index if not exists salu_auto_rules_match_idx
@@ -54,6 +54,9 @@ create table if not exists public.salu_vehicle_state (
   stillestand_cause_code text references public.salu_stillestand_causes(cause_code),
   updated_by uuid,
   updated_at timestamptz not null default now(),
+  foreign key (auto_rule_id, auto_rule_version)
+    references public.salu_auto_rules(rule_id, rule_version),
+  check ((auto_rule_id is null) = (auto_rule_version is null)),
   check (current_saludatum is null or current_saludatum >= ny_date),
   check (original_saludatum is null or original_saludatum >= ny_date),
   check (final_closed_at is null or final_slutbedomning_at is not null),
@@ -63,7 +66,7 @@ create table if not exists public.salu_vehicle_state (
 
 create table if not exists public.salu_flags (
   flag_id uuid primary key default gen_random_uuid(),
-  regnr text not null,
+  regnr text not null references public.salu_vehicle_state(regnr) on delete restrict,
   previous_flag_id uuid references public.salu_flags(flag_id),
   cycle_saludatum date not null,
   current_saludatum date not null,
@@ -114,7 +117,7 @@ create table if not exists public.salu_checkpoints (
 create table if not exists public.salu_inline_actions (
   inline_action_id uuid primary key default gen_random_uuid(),
   flag_id uuid not null references public.salu_flags(flag_id) on delete restrict,
-  source_checkpoint text,
+  source_checkpoint text check (source_checkpoint is null or source_checkpoint ~ '^S(0[0-9]|1[0-9]|2[0-8])$'),
   description text not null,
   owner_ref text not null,
   deadline_at timestamptz,
@@ -131,7 +134,7 @@ create table if not exists public.salu_child_processes (
   child_process_id uuid primary key default gen_random_uuid(),
   flag_id uuid not null references public.salu_flags(flag_id) on delete restrict,
   process_type text not null,
-  source_checkpoint text,
+  source_checkpoint text check (source_checkpoint is null or source_checkpoint ~ '^S(0[0-9]|1[0-9]|2[0-8])$'),
   source_reason text,
   owner_ref text not null,
   execution_system text not null
@@ -154,7 +157,10 @@ create table if not exists public.salu_child_processes (
   created_at timestamptz not null default now(),
   created_by uuid,
   check (deadline_at is not null or due_event is not null),
-  check (status <> 'ACCEPTED' or (accepted_by is not null and accepted_at is not null)),
+  check (
+    status not in ('ACCEPTED', 'IN_PROGRESS', 'READY_FOR_VERIFICATION', 'VERIFIED')
+    or (accepted_by is not null and accepted_at is not null)
+  ),
   check (status <> 'VERIFIED' or (verified_by is not null and verified_at is not null)),
   check (status <> 'CANCELLED' or cancel_reason is not null)
 );
@@ -166,7 +172,22 @@ create table if not exists public.salu_events (
   event_id uuid primary key default gen_random_uuid(),
   regnr text not null,
   flag_id uuid references public.salu_flags(flag_id) on delete restrict,
-  event_type text not null,
+  event_type text not null check (event_type in (
+    'SALU_FLAG_CREATED',
+    'SALU_FLAG_ACKNOWLEDGED',
+    'SALU_ASSESSMENT_RECORDED',
+    'SALU_CHECKPOINT_CHANGED',
+    'SALU_INLINE_ACTION_CREATED',
+    'SALU_CHILD_PROCESS_CREATED',
+    'SALU_CHILD_STATUS_REPORTED',
+    'SALU_SALUDATUM_CHANGED',
+    'SALU_SOLD_RECORDED',
+    'SALU_HANDOVER_RECORDED',
+    'SALU_T10_ESCALATED',
+    'SALU_T0_PASSED',
+    'SALU_FLAG_READY_FOR_OWNER_DECISION',
+    'SALU_FLAG_CLOSED_MANUALLY'
+  )),
   event_key text,
   occurred_at timestamptz not null default now(),
   actor_id uuid,
@@ -174,7 +195,8 @@ create table if not exists public.salu_events (
   payload jsonb not null default '{}'::jsonb,
   correction_of_event_id uuid references public.salu_events(event_id) on delete restrict,
   created_at timestamptz not null default now(),
-  unique (event_key)
+  unique (event_key),
+  check (correction_of_event_id is null or correction_of_event_id <> event_id)
 );
 
 create index if not exists salu_events_regnr_time_idx
