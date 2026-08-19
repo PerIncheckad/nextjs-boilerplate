@@ -101,6 +101,7 @@ test('T-30 flag date is exactly 30 calendar days before saludatum', () => {
 
 test('escalation is a current snapshot and can move back after a new plan', () => {
   assert.equal(saluEscalationStatus('2026-08-20', '2026-08-19'), 'PASSERAD');
+  assert.equal(saluEscalationStatus('2026-08-20', '2026-08-20'), 'PASSERAD');
   assert.equal(saluEscalationStatus('2026-08-20', '2026-08-30'), 'T10');
   assert.equal(saluEscalationStatus('2026-08-20', '2026-10-19'), 'NORMAL');
 });
