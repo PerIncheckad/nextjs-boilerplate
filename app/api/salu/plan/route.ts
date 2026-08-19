@@ -28,6 +28,7 @@ type SaluAutoRuleRow = {
   months: number;
   priority: number;
   active: boolean;
+  valid_from: string;
 };
 
 type PersistedPlanRow = {
@@ -51,6 +52,10 @@ function isValidIsoDate(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+function currentUtcDate(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function createAdminClient() {
@@ -117,8 +122,9 @@ export async function POST(request: Request) {
   } else {
     const { data: ruleRows, error: ruleError } = await admin
       .from('salu_auto_rules')
-      .select('rule_id,rule_version,make,model_tokens,months,priority,active')
-      .eq('active', true);
+      .select('rule_id,rule_version,make,model_tokens,months,priority,active,valid_from')
+      .eq('active', true)
+      .lte('valid_from', currentUtcDate());
 
     if (ruleError) {
       console.error('[SALU plan] Failed to load AUTO rules:', ruleError);
