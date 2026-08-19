@@ -2,7 +2,13 @@ import { saluEscalationStatus, type SaluEscalationStatus } from './salu-core';
 
 export type SaluFlagStatus = 'NY' | 'HANDLÄGGS' | 'VÄNTAR' | 'SLUTBEDÖMNING' | 'STÄNGD';
 export type SaluCheckpointStatus = 'GODKÄND' | 'AVVIKELSE' | 'EJ RELEVANT' | 'VÄNTAR';
-export type SaluChildStatus = 'CREATED' | 'ACCEPTED' | 'IN_PROGRESS' | 'READY_FOR_VERIFICATION' | 'VERIFIED' | 'CANCELLED';
+export type SaluChildStatus =
+  | 'CREATED'
+  | 'ACCEPTED'
+  | 'IN_PROGRESS'
+  | 'READY_FOR_VERIFICATION'
+  | 'VERIFIED'
+  | 'CANCELLED';
 
 export type SaluFlagSnapshot = {
   flagId: string;
@@ -42,6 +48,36 @@ export function isTerminalChildStatus(status: SaluChildStatus): boolean {
   return status === 'VERIFIED' || status === 'CANCELLED';
 }
 
+export function transitionSaluChildStatus(
+  current: SaluChildStatus,
+  next: SaluChildStatus,
+): SaluChildStatus {
+  if (current === next) {
+    return current;
+  }
+
+  if (isTerminalChildStatus(current)) {
+    throw new Error(`Terminal SALU child status ${current} cannot transition`);
+  }
+
+  if (next === 'CANCELLED') {
+    return next;
+  }
+
+  const allowed: Record<Exclude<SaluChildStatus, 'VERIFIED' | 'CANCELLED'>, SaluChildStatus[]> = {
+    CREATED: ['ACCEPTED'],
+    ACCEPTED: ['IN_PROGRESS'],
+    IN_PROGRESS: ['READY_FOR_VERIFICATION'],
+    READY_FOR_VERIFICATION: ['VERIFIED', 'IN_PROGRESS'],
+  };
+
+  if (!allowed[current].includes(next)) {
+    throw new Error(`Invalid SALU child transition ${current} -> ${next}`);
+  }
+
+  return next;
+}
+
 export function assessSaluCloseReadiness(input: {
   checkpointStatuses: SaluCheckpointStatus[];
   childStatuses: SaluChildStatus[];
@@ -75,8 +111,8 @@ export function moveSaluFlagToFinalAssessment(
     throw new Error('SALU flag is not ready for final assessment');
   }
 
-  if (snapshot.status === 'STÄNGD') {
-    throw new Error('A closed SALU flag cannot move to final assessment');
+  if (snapshot.status !== 'HANDLÄGGS' && snapshot.status !== 'VÄNTAR') {
+    throw new Error('Final assessment requires HANDLÄGGS or VÄNTAR');
   }
 
   return { ...snapshot, status: 'SLUTBEDÖMNING' };
