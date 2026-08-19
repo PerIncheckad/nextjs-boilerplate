@@ -20,6 +20,13 @@ type PlanRequest = {
   manualMonths?: number;
 };
 
+type PersistedPlanRow = {
+  original_saludatum: string;
+  previous_saludatum: string | null;
+  current_saludatum: string;
+  changed: boolean;
+};
+
 function cleanRegnr(value: string): string {
   return value.toUpperCase().replace(/\s+/g, '');
 }
@@ -120,59 +127,26 @@ export async function POST(request: Request) {
     autoMonthsApplied = match.monthsApplied;
   }
 
-  const { data: existing, error: existingError } = await admin
-    .from('salu_vehicle_state')
-    .select('original_saludatum,current_saludatum')
-    .eq('regnr', regnr)
-    .maybeSingle();
-
-  if (existingError) {
-    console.error('[SALU plan] Failed to read vehicle state:', existingError);
-    return NextResponse.json({ error: 'Failed to read SALU vehicle state' }, { status: 500 });
-  }
-
-  const originalSaludatum = existing?.original_saludatum ?? saludatum;
-  const oldSaludatum = existing?.current_saludatum ?? null;
-
-  const { error: stateError } = await admin.from('salu_vehicle_state').upsert({
-    regnr,
-    ny_date: nyDate,
-    original_saludatum: originalSaludatum,
-    current_saludatum: saludatum,
-    control_mode: mode,
-    manual_months: manualMonths,
-    auto_rule_id: autoRuleId,
-    auto_rule_version: autoRuleVersion,
-    auto_months_applied: autoMonthsApplied,
-    updated_by: verification.user.id,
-    updated_at: new Date().toISOString(),
+  const { data: persistedRows, error: persistError } = await admin.rpc('apply_salu_vehicle_plan', {
+    p_regnr: regnr,
+    p_ny_date: nyDate,
+    p_saludatum: saludatum,
+    p_control_mode: mode,
+    p_manual_months: manualMonths,
+    p_auto_rule_id: autoRuleId,
+    p_auto_rule_version: autoRuleVersion,
+    p_auto_months_applied: autoMonthsApplied,
+    p_actor_id: verification.user.id,
   });
 
-  if (stateError) {
-    console.error('[SALU plan] Failed to save vehicle state:', stateError);
-    return NextResponse.json({ error: 'Failed to save SALU vehicle state' }, { status: 500 });
+  if (persistError) {
+    console.error('[SALU plan] Failed to persist vehicle plan:', persistError);
+    return NextResponse.json({ error: 'Failed to persist SALU vehicle plan' }, { status: 500 });
   }
 
-  if (oldSaludatum !== saludatum) {
-    const { error: eventError } = await admin.from('salu_events').insert({
-      regnr,
-      event_type: 'SALU_SALUDATUM_CHANGED',
-      actor_id: verification.user.id,
-      actor_source: 'MANUELL',
-      payload: {
-        old_saludatum: oldSaludatum,
-        new_saludatum: saludatum,
-        source: mode,
-        auto_rule_id: autoRuleId,
-        auto_rule_version: autoRuleVersion,
-        months_applied: autoMonthsApplied ?? manualMonths,
-      },
-    });
-
-    if (eventError) {
-      console.error('[SALU plan] Failed to append plan event:', eventError);
-      return NextResponse.json({ error: 'SALU state saved but audit event failed' }, { status: 500 });
-    }
+  const persisted = (persistedRows?.[0] ?? null) as PersistedPlanRow | null;
+  if (!persisted) {
+    return NextResponse.json({ error: 'SALU plan persistence returned no result' }, { status: 500 });
   }
 
   return NextResponse.json({
@@ -180,8 +154,10 @@ export async function POST(request: Request) {
       regnr,
       mode,
       nyDate,
-      originalSaludatum,
-      saludatum,
+      originalSaludatum: persisted.original_saludatum,
+      previousSaludatum: persisted.previous_saludatum,
+      saludatum: persisted.current_saludatum,
+      changed: persisted.changed,
       autoRuleId,
       autoRuleVersion,
       monthsApplied: autoMonthsApplied ?? manualMonths,
