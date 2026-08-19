@@ -20,6 +20,16 @@ type PlanRequest = {
   manualMonths?: number;
 };
 
+type SaluAutoRuleRow = {
+  rule_id: string;
+  rule_version: number;
+  make: string;
+  model_tokens: string[] | null;
+  months: number;
+  priority: number;
+  active: boolean;
+};
+
 type PersistedPlanRow = {
   original_saludatum: string;
   previous_saludatum: string | null;
@@ -29,6 +39,18 @@ type PersistedPlanRow = {
 
 function cleanRegnr(value: string): string {
   return value.toUpperCase().replace(/\s+/g, '');
+}
+
+function isValidIsoDate(value: string): boolean {
+  if (!ISO_DATE_RE.test(value)) {
+    return false;
+  }
+
+  try {
+    return addCalendarMonths(value, 0) === value;
+  } catch {
+    return false;
+  }
 }
 
 function createAdminClient() {
@@ -72,7 +94,7 @@ export async function POST(request: Request) {
   if (!REGNR_RE.test(regnr)) {
     return NextResponse.json({ error: 'Invalid regnr' }, { status: 400 });
   }
-  if (!ISO_DATE_RE.test(nyDate)) {
+  if (!isValidIsoDate(nyDate)) {
     return NextResponse.json({ error: 'Invalid nyDate' }, { status: 400 });
   }
   if (!make || !model || (mode !== 'AUTO' && mode !== 'MANUELL')) {
@@ -103,7 +125,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to load SALU rules' }, { status: 500 });
     }
 
-    const rules: SaluAutoRule[] = (ruleRows ?? []).map((row: any) => ({
+    const rules: SaluAutoRule[] = ((ruleRows ?? []) as SaluAutoRuleRow[]).map((row) => ({
       id: row.rule_id,
       version: row.rule_version,
       make: row.make,
