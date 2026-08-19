@@ -44,7 +44,9 @@ export const SALU_EVENTS = [
 
 export type SaluEventType = (typeof SALU_EVENTS)[number];
 
-export function isTerminalChildStatus(status: SaluChildStatus): boolean {
+export function isTerminalChildStatus(
+  status: SaluChildStatus,
+): status is Extract<SaluChildStatus, 'VERIFIED' | 'CANCELLED'> {
   return status === 'VERIFIED' || status === 'CANCELLED';
 }
 
