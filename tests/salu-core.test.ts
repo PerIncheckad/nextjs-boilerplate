@@ -94,6 +94,18 @@ test('most specific matching AUTO rule wins before priority', () => {
   assert.equal(selectSaluAutoRule('Ford', 'Transit Custom', localRules)?.id, 'transit-custom');
 });
 
+test('same AUTO rule id selects the highest active version deterministically', () => {
+  const versionedRules: SaluAutoRule[] = [
+    { id: 'vw-default', version: 1, make: 'VW', months: 12 },
+    { id: 'vw-default', version: 3, make: 'VW', months: 18 },
+    { id: 'vw-default', version: 2, make: 'VW', months: 15 },
+  ];
+
+  const selected = selectSaluAutoRule('VW', 'Golf', versionedRules);
+  assert.equal(selected?.version, 3);
+  assert.equal(selected?.months, 18);
+});
+
 test('T-30 flag date is exactly 30 calendar days before saludatum', () => {
   assert.equal(saluFlagDate('2027-01-31'), '2027-01-01');
   assert.equal(saluFlagDate('2026-03-01'), '2026-01-30');
