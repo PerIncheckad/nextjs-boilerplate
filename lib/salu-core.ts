@@ -180,7 +180,7 @@ export function saluEscalationStatus(today: string, saludatum: string): SaluEsca
   const target = parseIsoDate(saludatum).getTime();
   const daysUntil = Math.round((target - current) / DAY_MS);
 
-  if (daysUntil < 0) {
+  if (daysUntil <= 0) {
     return 'PASSERAD';
   }
 
