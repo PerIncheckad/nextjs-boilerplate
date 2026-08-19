@@ -140,7 +140,12 @@ export function selectSaluAutoRule(
       return priorityDifference;
     }
 
-    return left.id.localeCompare(right.id);
+    const ruleIdDifference = left.id.localeCompare(right.id);
+    if (ruleIdDifference !== 0) {
+      return ruleIdDifference;
+    }
+
+    return right.version - left.version;
   })[0];
 }
 
