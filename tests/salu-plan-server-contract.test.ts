@@ -26,6 +26,12 @@ test('SALU plan endpoint keeps human MANUELL precedence and explicit AUTO fallba
   assert.match(route, /No AUTO rule matched; MANUELL is required/);
 });
 
+test('SALU plan endpoint validates a real calendar NY date and does not use explicit any for AUTO rows', () => {
+  assert.match(route, /isValidIsoDate\(nyDate\)/);
+  assert.match(route, /type SaluAutoRuleRow/);
+  assert.doesNotMatch(route, /row:\s*any/);
+});
+
 test('SALU plan persistence uses one atomic RPC instead of separate state and audit writes', () => {
   assert.match(route, /\.rpc\('apply_salu_vehicle_plan'/);
   assert.doesNotMatch(route, /from\('salu_vehicle_state'\)\.upsert/);
@@ -37,6 +43,21 @@ test('atomic plan RPC preserves original saludatum and appends audit on actual c
   assert.match(migration, /original_saludatum = public\.salu_vehicle_state\.original_saludatum/);
   assert.match(migration, /v_existing_current is distinct from p_saludatum/);
   assert.match(migration, /'SALU_SALUDATUM_CHANGED'/);
+});
+
+test('atomic plan RPC keeps NY immutable and synchronizes an active flag without changing cycle identity', () => {
+  assert.match(migration, /NY date cannot be changed through SALU plan update/);
+  assert.match(migration, /where f\.regnr = p_regnr[\s\S]*f\.status <> 'STÄNGD'/);
+  assert.match(migration, /update public\.salu_flags[\s\S]*current_saludatum = p_saludatum/);
+  assert.match(migration, /escalation_status = v_escalation_status/);
+  assert.doesNotMatch(migration, /cycle_saludatum\s*=\s*p_saludatum/);
+});
+
+test('active plan changes can move escalation backwards while history remains append-only', () => {
+  assert.match(migration, /p_saludatum <= current_date[\s\S]*'PASSERAD'/);
+  assert.match(migration, /p_saludatum <= current_date \+ 10[\s\S]*'T10'/);
+  assert.match(migration, /v_escalation_status := 'NORMAL'/);
+  assert.match(migration, /flag_id,[\s\S]*v_active_flag_id,[\s\S]*'SALU_SALUDATUM_CHANGED'/);
 });
 
 test('atomic plan RPC is server-only', () => {
