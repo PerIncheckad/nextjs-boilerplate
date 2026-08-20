@@ -96,9 +96,12 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
       }
     };
 
-    setLoading(true);
-    setError('');
-    void load();
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError('');
+      void load();
+    });
 
     return () => { cancelled = true; };
   }, [regnr, refreshNonce]);
