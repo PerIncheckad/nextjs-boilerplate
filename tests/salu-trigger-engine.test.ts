@@ -42,6 +42,50 @@ test('before T-30 no flag action is due', () => {
   assert.deepEqual(result, { actions: [], requiresCatchUpPolicy: false });
 });
 
+test('active flag starts a ten-day decision clock from flag creation', () => {
+  const before = evaluateSaluTriggers({
+    today: '2026-08-10',
+    saludatum: '2026-09-30',
+    hasActiveFlag: true,
+    activeFlagId: 'flag-1',
+    activeFlagCreatedDate: '2026-08-01',
+    activeFlagEscalation: 'NORMAL',
+  });
+  assert.deepEqual(before.actions, []);
+
+  const due = evaluateSaluTriggers({
+    today: '2026-08-11',
+    saludatum: '2026-09-30',
+    hasActiveFlag: true,
+    activeFlagId: 'flag-1',
+    activeFlagCreatedDate: '2026-08-01',
+    activeFlagEscalation: 'NORMAL',
+  });
+  assert.deepEqual(due.actions, [{
+    type: 'SALU_DECISION_REMINDER_DUE',
+    eventKey: 'SALU_DECISION_REMINDER_DUE:flag-1:1',
+    saludatum: '2026-09-30',
+  }]);
+});
+
+test('decision reminder is emitted once per ten-day cycle while the flag remains active', () => {
+  const result = evaluateSaluTriggers({
+    today: '2026-08-25',
+    saludatum: '2026-09-30',
+    hasActiveFlag: true,
+    activeFlagId: 'flag-1',
+    activeFlagCreatedDate: '2026-08-01',
+    activeFlagEscalation: 'NORMAL',
+    emittedEventKeys: ['SALU_DECISION_REMINDER_DUE:flag-1:1'],
+  });
+
+  assert.deepEqual(result.actions, [{
+    type: 'SALU_DECISION_REMINDER_DUE',
+    eventKey: 'SALU_DECISION_REMINDER_DUE:flag-1:2',
+    saludatum: '2026-09-30',
+  }]);
+});
+
 test('NORMAL active flag reaching T10 emits T10 once for the current saludatum', () => {
   const first = evaluateSaluTriggers({
     today: '2026-08-21',
