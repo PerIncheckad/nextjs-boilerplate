@@ -3,6 +3,7 @@ import type { SaluEscalationStatus } from './salu-core';
 
 export type SaluTriggerEvent =
   | 'SALU_FLAG_CREATED'
+  | 'SALU_DECISION_REMINDER_DUE'
   | 'SALU_T10_ESCALATED'
   | 'SALU_T0_PASSED';
 
@@ -47,14 +48,20 @@ function compareDates(left: string, right: string): number {
   return Math.sign(parseIsoDate(left).getTime() - parseIsoDate(right).getTime());
 }
 
-function eventKey(type: SaluTriggerEvent, saludatum: string): string {
+function eventKey(type: Exclude<SaluTriggerEvent, 'SALU_DECISION_REMINDER_DUE'>, saludatum: string): string {
   return `${type}:${saludatum}`;
+}
+
+function decisionReminderEventKey(flagId: string, cycle: number): string {
+  return `SALU_DECISION_REMINDER_DUE:${flagId}:${cycle}`;
 }
 
 export function evaluateSaluTriggers(input: {
   today: string;
   saludatum: string;
   hasActiveFlag: boolean;
+  activeFlagId?: string;
+  activeFlagCreatedDate?: string;
   activeFlagEscalation?: SaluEscalationStatus;
   emittedEventKeys?: Iterable<string>;
 }): SaluTriggerEvaluation {
@@ -78,23 +85,36 @@ export function evaluateSaluTriggers(input: {
     };
   }
 
-  if (compareDates(input.today, input.saludatum) >= 0) {
-    if (input.activeFlagEscalation === 'PASSERAD') {
-      return { actions, requiresCatchUpPolicy: false };
+  if (input.activeFlagId && input.activeFlagCreatedDate) {
+    const elapsedDays = daysBetween(input.activeFlagCreatedDate, input.today);
+    const cycle = Math.floor(elapsedDays / 10);
+    if (cycle >= 1) {
+      const key = decisionReminderEventKey(input.activeFlagId, cycle);
+      if (!emitted.has(key)) {
+        actions.push({
+          type: 'SALU_DECISION_REMINDER_DUE',
+          eventKey: key,
+          saludatum: input.saludatum,
+        });
+      }
     }
+  }
 
-    const key = eventKey('SALU_T0_PASSED', input.saludatum);
-    if (!emitted.has(key)) {
-      actions.push({ type: 'SALU_T0_PASSED', eventKey: key, saludatum: input.saludatum });
+  if (compareDates(input.today, input.saludatum) >= 0) {
+    if (input.activeFlagEscalation !== 'PASSERAD') {
+      const key = eventKey('SALU_T0_PASSED', input.saludatum);
+      if (!emitted.has(key)) {
+        actions.push({ type: 'SALU_T0_PASSED', eventKey: key, saludatum: input.saludatum });
+      }
     }
     return { actions, requiresCatchUpPolicy: false };
   }
 
-  if (compareDates(input.today, t10) >= 0) {
-    if (input.activeFlagEscalation === 'T10' || input.activeFlagEscalation === 'PASSERAD') {
-      return { actions, requiresCatchUpPolicy: false };
-    }
-
+  if (
+    compareDates(input.today, t10) >= 0 &&
+    input.activeFlagEscalation !== 'T10' &&
+    input.activeFlagEscalation !== 'PASSERAD'
+  ) {
     const key = eventKey('SALU_T10_ESCALATED', input.saludatum);
     if (!emitted.has(key)) {
       actions.push({ type: 'SALU_T10_ESCALATED', eventKey: key, saludatum: input.saludatum });
