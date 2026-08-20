@@ -8,6 +8,8 @@ const client = readFileSync(join(process.cwd(), 'app/vagnkort/vagnkort-client.ts
 const upload = readFileSync(join(process.cwd(), 'app/vagnkort/document-upload.tsx'), 'utf8');
 const uploadApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/route.ts'), 'utf8');
 const documentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/[id]/route.ts'), 'utf8');
+const periodControls = readFileSync(join(process.cwd(), 'app/vagnkort/journey-period-controls.tsx'), 'utf8');
+const periodApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/periods/route.ts'), 'utf8');
 const home = readFileSync(join(process.cwd(), 'app/page.tsx'), 'utf8');
 
 test('Vagnkort page stays behind the existing LoginGate', () => {
@@ -63,6 +65,30 @@ test('document server API verifies identity, keeps private storage server contro
   assert.match(documentApi, /verifyApiUser\(request\)/);
   assert.match(documentApi, /createSignedUrl/);
   assert.match(documentApi, /300/);
+});
+
+test('Vagnkort can start and close vehicle journey periods', () => {
+  assert.match(client, /<JourneyPeriodControls regnr=/);
+  assert.match(periodControls, /Tillgänglig/);
+  assert.match(periodControls, /Uthyrd/);
+  assert.match(periodControls, /Stillestånd/);
+  assert.match(periodControls, /Verkstad/);
+  assert.match(periodControls, /Väntar reservdelar/);
+  assert.match(periodControls, /action:\s*'START'/);
+  assert.match(periodControls, /action:\s*'CLOSE'/);
+  assert.match(periodControls, /\/api\/vehicle-journey\/periods/);
+});
+
+test('journey period API validates vehicle, downtime reason and appends timeline events', () => {
+  assert.match(periodApi, /verifyApiUser\(request\)/);
+  assert.match(periodApi, /vehicleExists/);
+  assert.match(periodApi, /DOWNTIME_REASONS/);
+  assert.match(periodApi, /Downtime requires a valid reason/);
+  assert.match(periodApi, /PERIOD_STARTED/);
+  assert.match(periodApi, /PERIOD_ENDED/);
+  assert.match(periodApi, /vehicle_journey_periods/);
+  assert.match(periodApi, /vehicle_journey_events/);
+  assert.match(periodApi, /created_by:\s*verification\.user\.id/);
 });
 
 test('start page links to Vagnkort', () => {
