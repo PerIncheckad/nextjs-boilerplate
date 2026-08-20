@@ -9,6 +9,7 @@ import {
   createReopenedSaluFlag,
   moveSaluFlagToFinalAssessment,
   transitionSaluChildStatus,
+  validateSaluClosureDecision,
   type SaluFlagSnapshot,
 } from '../lib/salu-process';
 
@@ -73,14 +74,31 @@ test('VERIFIED and CANCELLED are terminal child statuses for close readiness', (
   assert.deepEqual(readiness, { ready: true, reasons: [] });
 });
 
-test('manual close requires SLUTBEDÖMNING and ready conditions', () => {
+test('manual close requires SLUTBEDÖMNING, ready conditions and an explicit decision', () => {
   const acknowledged = acknowledgeSaluFlag(activeFlag);
   const readiness = assessSaluCloseReadiness({ checkpointStatuses: ['GODKÄND'], childStatuses: ['VERIFIED'] });
   const finalAssessment = moveSaluFlagToFinalAssessment(acknowledged, readiness);
-  const closed = closeSaluFlagManually(finalAssessment, readiness);
+  const closed = closeSaluFlagManually(finalAssessment, readiness, { decision: 'SÄLJAS' });
 
   assert.equal(finalAssessment.status, 'SLUTBEDÖMNING');
   assert.equal(closed.status, 'STÄNGD');
+});
+
+test('ANNAT requires comment and FÖRLÄNGA requires a new saludatum', () => {
+  assert.throws(
+    () => validateSaluClosureDecision({ decision: 'ANNAT' }),
+    /requires a closure comment/,
+  );
+  assert.doesNotThrow(() => validateSaluClosureDecision({ decision: 'ANNAT', comment: 'Specialfall' }));
+
+  assert.throws(
+    () => validateSaluClosureDecision({ decision: 'FÖRLÄNGA' }),
+    /requires a new saludatum/,
+  );
+  assert.doesNotThrow(() => validateSaluClosureDecision({
+    decision: 'FÖRLÄNGA',
+    newSaludatum: '2026-10-31',
+  }));
 });
 
 test('final assessment cannot be entered directly from NY', () => {

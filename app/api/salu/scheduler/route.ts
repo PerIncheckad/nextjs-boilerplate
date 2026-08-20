@@ -12,6 +12,7 @@ type ActiveFlagRow = {
   flag_id: string;
   regnr: string;
   escalation_status: SaluEscalationStatus;
+  created_at: string;
 };
 
 type EventKeyRow = {
@@ -22,7 +23,11 @@ type EventKeyRow = {
 type SchedulerAction = {
   regnr: string;
   saludatum: string;
-  type: 'SALU_FLAG_CREATED' | 'SALU_T10_ESCALATED' | 'SALU_T0_PASSED';
+  type:
+    | 'SALU_FLAG_CREATED'
+    | 'SALU_DECISION_REMINDER_DUE'
+    | 'SALU_T10_ESCALATED'
+    | 'SALU_T0_PASSED';
   eventKey: string;
 };
 
@@ -71,7 +76,7 @@ export async function POST(request: Request) {
       .not('current_saludatum', 'is', null),
     admin
       .from('salu_flags')
-      .select('flag_id,regnr,escalation_status')
+      .select('flag_id,regnr,escalation_status,created_at')
       .neq('status', 'STÄNGD'),
     admin
       .from('salu_events')
@@ -111,6 +116,8 @@ export async function POST(request: Request) {
       today,
       saludatum: state.current_saludatum,
       hasActiveFlag: Boolean(activeFlag),
+      activeFlagId: activeFlag?.flag_id,
+      activeFlagCreatedDate: activeFlag?.created_at.slice(0, 10),
       activeFlagEscalation: activeFlag?.escalation_status,
       emittedEventKeys: eventKeysByRegnr.get(state.regnr),
     });
