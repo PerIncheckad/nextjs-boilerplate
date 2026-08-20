@@ -76,93 +76,18 @@ export async function GET(request: Request) {
   ] = await Promise.all([
     admin
       .from('nybil_inventering')
-      .select([
-        'id',
-        'regnr',
-        'bilmarke',
-        'modell',
-        'registreringsdatum',
-        'matarstallning_inkop',
-        'matarstallning_aktuell',
-        'plats_mottagning_ort',
-        'plats_mottagning_station',
-        'plats_aktuell_ort',
-        'plats_aktuell_station',
-        'hjultyp',
-        'hjul_ej_monterade',
-        'hjul_forvaring_ort',
-        'hjul_forvaring_spec',
-        'antal_nycklar',
-        'antal_laddkablar',
-        'antal_insynsskydd',
-        'instruktionsbok',
-        'coc',
-        'lasbultar_med',
-        'dragkrok',
-        'gummimattor',
-        'dackkompressor',
-        'bransletyp',
-        'tankstatus',
-        'laddniva_procent',
-        'har_skador_vid_leverans',
-        'photo_urls',
-        'video_urls',
-        'media_folder',
-        'saludatum_planerat',
-        'saludatum',
-        'is_sold',
-        'sold_date',
-        'created_at',
-        'updated_at',
-      ].join(','))
+      .select('id,regnr,bilmarke,modell,registreringsdatum,matarstallning_inkop,matarstallning_aktuell,plats_mottagning_ort,plats_mottagning_station,plats_aktuell_ort,plats_aktuell_station,hjultyp,hjul_ej_monterade,hjul_forvaring_ort,hjul_forvaring_spec,antal_nycklar,antal_laddkablar,antal_insynsskydd,instruktionsbok,coc,lasbultar_med,dragkrok,gummimattor,dackkompressor,bransletyp,tankstatus,laddniva_procent,har_skador_vid_leverans,photo_urls,video_urls,media_folder,saludatum_planerat,saludatum,is_sold,sold_date,created_at,updated_at')
       .eq('regnr', regnr)
       .order('created_at', { ascending: false })
       .limit(1),
     admin
       .from('vehicles')
-      .select([
-        'regnr',
-        'brand',
-        'model',
-        'is_sold',
-        'sold_date',
-        'antal_nycklar',
-        'antal_laddkablar',
-        'antal_insynsskydd',
-        'har_kompressor',
-        'har_gummimattor',
-        'har_vinterdack',
-        'har_sommarhjul',
-        'hjul_pa_bilen',
-        'wheel_storage_location',
-        'coc_location',
-        'instruktionsbok_location',
-        'bransletyp',
-        'datum_ankomst_mabi',
-        'bilfakta_imported_at',
-      ].join(','))
+      .select('regnr,brand,model,is_sold,sold_date,antal_nycklar,antal_laddkablar,antal_insynsskydd,har_kompressor,har_gummimattor,har_vinterdack,har_sommarhjul,hjul_pa_bilen,wheel_storage_location,coc_location,instruktionsbok_location,bransletyp,datum_ankomst_mabi,bilfakta_imported_at')
       .eq('regnr', regnr)
       .limit(1),
     admin
       .from('checkins')
-      .select([
-        'id',
-        'status',
-        'completed_at',
-        'current_city',
-        'current_station',
-        'current_location_note',
-        'odometer_km',
-        'hjultyp',
-        'fuel_type',
-        'fuel_level',
-        'charge_level_percent',
-        'checklist',
-        'photo_urls',
-        'checker_name',
-        'checker_email',
-        'completed_by',
-      ].join(','))
+      .select('id,status,completed_at,current_city,current_station,current_location_note,odometer_km,hjultyp,fuel_type,fuel_level,charge_level_percent,checklist,photo_urls,checker_name,checker_email,completed_by')
       .eq('regnr', regnr)
       .eq('status', 'COMPLETED')
       .order('completed_at', { ascending: false })
