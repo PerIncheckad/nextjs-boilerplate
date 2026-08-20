@@ -68,13 +68,21 @@ test('Vagnkort surfaces baseline/current equipment changes', () => {
 });
 
 test('Vagnkort document upload uses authenticated prepare/complete and signed Storage upload', () => {
-  assert.match(client, /<DocumentUpload regnr=/);
+  assert.match(client, /<DocumentUpload/);
   assert.match(upload, /action:\s*'prepare'/);
   assert.match(upload, /uploadToSignedUrl/);
   assert.match(upload, /action:\s*'complete'/);
   assert.match(upload, /Släpp filer här/);
   assert.match(upload, /Leverantörsfaktura/);
   assert.match(upload, /Skadebild/);
+});
+
+test('Vagnkort reuses already loaded journey context for document upload', () => {
+  assert.match(client, /damages=\{data\.damages\}/);
+  assert.match(client, /checkpoints=\{data\.salu\.checkpoints\}/);
+  assert.match(client, /childProcesses=\{data\.salu\.childProcesses\}/);
+  assert.doesNotMatch(upload, /\/api\/vehicle-journey\?reg=/);
+  assert.match(upload, /Inga valbara poster/);
 });
 
 test('Vagnkort document upload can bind evidence to vehicle, damage and SALU context', () => {
