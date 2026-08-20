@@ -12,6 +12,7 @@ const periodControls = readFileSync(join(process.cwd(), 'app/vagnkort/journey-pe
 const periodApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/periods/route.ts'), 'utf8');
 const metricsPanel = readFileSync(join(process.cwd(), 'app/vagnkort/journey-metrics-panel.tsx'), 'utf8');
 const metricsApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/metrics/route.ts'), 'utf8');
+const saluPanel = readFileSync(join(process.cwd(), 'app/vagnkort/salu-journey-panel.tsx'), 'utf8');
 const equipmentControls = readFileSync(join(process.cwd(), 'app/vagnkort/equipment-change-controls.tsx'), 'utf8');
 const equipmentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/equipment/route.ts'), 'utf8');
 const journeyApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/route.ts'), 'utf8');
@@ -42,6 +43,20 @@ test('Vagnkort surfaces lifecycle metrics and refreshes them with period changes
   assert.match(metricsPanel, /Operativa perioder överlappar/);
   assert.match(metricsApi, /verifyApiUser\(request\)/);
   assert.match(metricsApi, /computeJourneyLifecycleMetrics/);
+});
+
+test('Vagnkort presents SALU as the endpoint of the vehicle journey with deviations, handling and evidence', () => {
+  assert.match(client, /SALU – slutdelen av bilens resa/);
+  assert.match(client, /<SaluJourneyPanel/);
+  assert.match(client, /documents=\{data\.documents\}/);
+  assert.match(saluPanel, /Ursprungligt SALU-datum/);
+  assert.match(saluPanel, /Aktuellt SALU-datum/);
+  assert.match(saluPanel, /Förskjutning/);
+  assert.match(saluPanel, /Kontrollpunkter som kräver uppmärksamhet/);
+  assert.match(saluPanel, /Hantering/);
+  assert.match(saluPanel, /salu_checkpoint_id/);
+  assert.match(saluPanel, /salu_child_process_id/);
+  assert.match(saluPanel, /underlag/);
 });
 
 test('Vagnkort surfaces baseline/current equipment changes', () => {
