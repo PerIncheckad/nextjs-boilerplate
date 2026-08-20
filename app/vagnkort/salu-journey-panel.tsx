@@ -1,10 +1,13 @@
 'use client';
 
+import { useState } from 'react';
+
 type VehicleDocument = {
   document_id: string;
   document_type: string;
   title: string | null;
   file_name: string;
+  external_url: string | null;
   uploaded_at: string;
   salu_flag_id?: string | null;
   salu_checkpoint_id?: string | null;
@@ -68,7 +71,32 @@ function differenceDays(original: unknown, current: unknown) {
   return Math.round((currentMs - originalMs) / 86_400_000);
 }
 
+function evidenceContext(
+  document: VehicleDocument,
+  checkpoints: Array<Record<string, unknown>>,
+  childProcesses: Array<Record<string, unknown>>,
+) {
+  if (document.salu_checkpoint_id) {
+    const checkpoint = checkpoints.find((candidate) => candidate.checkpoint_id === document.salu_checkpoint_id);
+    return checkpoint
+      ? `Checkpoint ${text(checkpoint.checkpoint_code)} · ${statusLabel(checkpoint.status)}`
+      : 'SALU-checkpoint';
+  }
+
+  if (document.salu_child_process_id) {
+    const childProcess = childProcesses.find((candidate) => candidate.child_process_id === document.salu_child_process_id);
+    return childProcess
+      ? `Åtgärd ${text(childProcess.process_type)} · ${statusLabel(childProcess.status)}`
+      : 'SALU-åtgärd';
+  }
+
+  return 'SALU generellt';
+}
+
 export default function SaluJourneyPanel({ state, latestFlag, checkpoints, childProcesses, documents }: Props) {
+  const [openingDocument, setOpeningDocument] = useState<string | null>(null);
+  const [evidenceError, setEvidenceError] = useState('');
+
   if (!state && !latestFlag && checkpoints.length === 0 && childProcesses.length === 0) {
     return <p style={{ color: '#666' }}>Ingen aktiv eller historisk SALU-process finns för bilen.</p>;
   }
@@ -81,8 +109,28 @@ export default function SaluJourneyPanel({ state, latestFlag, checkpoints, child
   const openActions = childProcesses.filter((process) => !['VERIFIED', 'CANCELLED'].includes(String(process.status ?? '')));
   const flagId = typeof latestFlag?.flag_id === 'string' ? latestFlag.flag_id : null;
   const flagEvidence = flagId
-    ? documents.filter((document) => document.salu_flag_id === flagId).length
-    : 0;
+    ? documents.filter((document) => document.salu_flag_id === flagId)
+    : [];
+
+  async function openEvidence(document: VehicleDocument) {
+    setEvidenceError('');
+    if (document.external_url) {
+      window.open(document.external_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setOpeningDocument(document.document_id);
+    try {
+      const response = await fetch(`/api/vehicle-documents/${encodeURIComponent(document.document_id)}`);
+      const body = await response.json() as { data?: { url: string }; error?: string };
+      if (!response.ok || !body.data?.url) throw new Error(body.error || 'Kunde inte öppna underlaget');
+      window.open(body.data.url, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      setEvidenceError(error instanceof Error ? error.message : 'Kunde inte öppna underlaget');
+    } finally {
+      setOpeningDocument(null);
+    }
+  }
 
   return (
     <div style={{ display: 'grid', gap: '.8rem' }}>
@@ -163,7 +211,35 @@ export default function SaluJourneyPanel({ state, latestFlag, checkpoints, child
       )}
 
       <div style={{ background: '#f6f6f6', borderRadius: 8, padding: '.65rem .75rem', fontSize: 13 }}>
-        <strong>Underlag:</strong> {flagEvidence} dokument kopplade till aktuell SALU-flagga. Dokument som är direkt kopplade till checkpoint eller åtgärd visas även på respektive rad.
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', alignItems: 'baseline' }}>
+          <strong>SALU-underlag</strong>
+          <span>{flagEvidence.length} dokument kopplade till aktuell SALU-flagga</span>
+        </div>
+        {evidenceError && <div style={{ color: '#a00', marginTop: '.45rem' }}>{evidenceError}</div>}
+        {flagEvidence.length === 0 ? (
+          <div style={{ color: '#666', marginTop: '.45rem' }}>Inget dokumenterat underlag är kopplat till den aktuella SALU-processen ännu.</div>
+        ) : (
+          <div style={{ marginTop: '.45rem' }}>
+            {flagEvidence.map((document) => (
+              <div key={document.document_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '.7rem', alignItems: 'center', padding: '.5rem 0', borderTop: '1px solid #ddd' }}>
+                <div style={{ minWidth: 0 }}>
+                  <strong style={{ overflowWrap: 'anywhere' }}>{document.title || document.file_name}</strong>
+                  <div style={{ color: '#666', marginTop: '.1rem' }}>
+                    {evidenceContext(document, checkpoints, childProcesses)} · {document.document_type} · {date(document.uploaded_at)}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void openEvidence(document)}
+                  disabled={openingDocument === document.document_id}
+                  style={{ border: '1px solid #bbb', borderRadius: 7, background: '#fff', padding: '.4rem .65rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {openingDocument === document.document_id ? 'Öppnar…' : 'Öppna underlag'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
