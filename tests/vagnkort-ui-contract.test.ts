@@ -10,6 +10,8 @@ const uploadApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/ro
 const documentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/[id]/route.ts'), 'utf8');
 const periodControls = readFileSync(join(process.cwd(), 'app/vagnkort/journey-period-controls.tsx'), 'utf8');
 const periodApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/periods/route.ts'), 'utf8');
+const metricsPanel = readFileSync(join(process.cwd(), 'app/vagnkort/journey-metrics-panel.tsx'), 'utf8');
+const metricsApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/metrics/route.ts'), 'utf8');
 const equipmentControls = readFileSync(join(process.cwd(), 'app/vagnkort/equipment-change-controls.tsx'), 'utf8');
 const equipmentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/equipment/route.ts'), 'utf8');
 const journeyApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/route.ts'), 'utf8');
@@ -27,6 +29,19 @@ test('Vagnkort reads the authenticated vehicle journey API', () => {
   assert.match(client, /Tid i resan/);
   assert.match(client, /Dokument/);
   assert.match(client, /Tidslinje/);
+});
+
+test('Vagnkort surfaces lifecycle metrics and refreshes them with period changes', () => {
+  assert.match(client, /<JourneyMetricsPanel regnr=\{data\.regnr\} refreshNonce=\{refreshNonce\} \/>/);
+  assert.match(metricsPanel, /\/api\/vehicle-journey\/metrics\?reg=/);
+  assert.match(metricsPanel, /Resans nyckeltal/);
+  assert.match(metricsPanel, /Nyttjandegrad/);
+  assert.match(metricsPanel, /Nybil → första uthyrning/);
+  assert.match(metricsPanel, /Sista retur → SALU/);
+  assert.match(metricsPanel, /Stillestånd per orsak/);
+  assert.match(metricsPanel, /Operativa perioder överlappar/);
+  assert.match(metricsApi, /verifyApiUser\(request\)/);
+  assert.match(metricsApi, /computeJourneyLifecycleMetrics/);
 });
 
 test('Vagnkort surfaces baseline/current equipment changes', () => {
