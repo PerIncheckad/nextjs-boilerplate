@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react';
+import { ChangeEvent, DragEvent, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const DOCUMENT_TYPES = [
@@ -21,8 +21,19 @@ type ContextOption = {
   label: string;
 };
 
+type DamageContext = {
+  id: string;
+  damage_type_raw?: string | null;
+  legacy_damage_source_text?: string | null;
+  damage_date?: string | null;
+  source?: string | null;
+};
+
 type Props = {
   regnr: string;
+  damages: DamageContext[];
+  checkpoints: Array<Record<string, unknown>>;
+  childProcesses: Array<Record<string, unknown>>;
   onUploaded: () => void;
 };
 
@@ -33,71 +44,34 @@ type PrepareResponse = {
 
 type CompleteResponse = { data?: { document_id: string }; error?: string };
 
-type JourneyContextResponse = {
-  data?: {
-    damages?: Array<{
-      id: string;
-      damage_type_raw?: string | null;
-      legacy_damage_source_text?: string | null;
-      damage_date?: string | null;
-      source?: string | null;
-    }>;
-    salu?: {
-      checkpoints?: Array<Record<string, unknown>>;
-      childProcesses?: Array<Record<string, unknown>>;
-    };
-  };
-};
-
 function text(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-export default function DocumentUpload({ regnr, onUploaded }: Props) {
+export default function DocumentUpload({ regnr, damages, checkpoints, childProcesses, onUploaded }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [documentType, setDocumentType] = useState('OVRIGT');
   const [title, setTitle] = useState('');
   const [contextType, setContextType] = useState('VEHICLE');
   const [contextId, setContextId] = useState('');
-  const [damageOptions, setDamageOptions] = useState<ContextOption[]>([]);
-  const [checkpointOptions, setCheckpointOptions] = useState<ContextOption[]>([]);
-  const [childProcessOptions, setChildProcessOptions] = useState<ContextOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
+  const damageOptions = useMemo<ContextOption[]>(() => damages.map((damage) => ({
+    value: damage.id,
+    label: `${damage.damage_type_raw || damage.legacy_damage_source_text || 'Skada'}${damage.damage_date ? ` · ${damage.damage_date}` : ''}${damage.source ? ` · ${damage.source}` : ''}`,
+  })), [damages]);
 
-    async function loadContexts() {
-      try {
-        const response = await fetch(`/api/vehicle-journey?reg=${encodeURIComponent(regnr)}`);
-        if (!response.ok) return;
-        const body = (await response.json()) as JourneyContextResponse;
-        if (cancelled) return;
+  const checkpointOptions = useMemo<ContextOption[]>(() => checkpoints.map((checkpoint) => ({
+    value: text(checkpoint.checkpoint_id),
+    label: `${text(checkpoint.checkpoint_code) || 'Checkpoint'} · ${text(checkpoint.status) || 'okänd status'}`,
+  })).filter((option) => option.value), [checkpoints]);
 
-        setDamageOptions((body.data?.damages ?? []).map((damage) => ({
-          value: damage.id,
-          label: `${damage.damage_type_raw || damage.legacy_damage_source_text || 'Skada'}${damage.damage_date ? ` · ${damage.damage_date}` : ''}${damage.source ? ` · ${damage.source}` : ''}`,
-        })));
-
-        setCheckpointOptions((body.data?.salu?.checkpoints ?? []).map((checkpoint) => ({
-          value: text(checkpoint.checkpoint_id),
-          label: `${text(checkpoint.checkpoint_code) || 'Checkpoint'} · ${text(checkpoint.status) || 'okänd status'}`,
-        })).filter((option) => option.value));
-
-        setChildProcessOptions((body.data?.salu?.childProcesses ?? []).map((process) => ({
-          value: text(process.child_process_id),
-          label: `${text(process.process_type) || 'SALU-åtgärd'}${text(process.source_checkpoint) ? ` · ${text(process.source_checkpoint)}` : ''} · ${text(process.status) || 'okänd status'}`,
-        })).filter((option) => option.value));
-      } catch {
-        // Vagnkortet fungerar fortfarande med bilnivå även om kontextlistan inte kan laddas.
-      }
-    }
-
-    void loadContexts();
-    return () => { cancelled = true; };
-  }, [regnr]);
+  const childProcessOptions = useMemo<ContextOption[]>(() => childProcesses.map((process) => ({
+    value: text(process.child_process_id),
+    label: `${text(process.process_type) || 'SALU-åtgärd'}${text(process.source_checkpoint) ? ` · ${text(process.source_checkpoint)}` : ''} · ${text(process.status) || 'okänd status'}`,
+  })).filter((option) => option.value), [childProcesses]);
 
   const contextOptions = contextType === 'DAMAGE'
     ? damageOptions
@@ -215,8 +189,8 @@ export default function DocumentUpload({ regnr, onUploaded }: Props) {
         {contextType !== 'VEHICLE' && (
           <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
             Välj post
-            <select value={contextId} onChange={(event) => setContextId(event.target.value)} disabled={uploading} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
-              <option value="">Välj…</option>
+            <select value={contextId} onChange={(event) => setContextId(event.target.value)} disabled={uploading || contextOptions.length === 0} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
+              <option value="">{contextOptions.length === 0 ? 'Inga valbara poster' : 'Välj…'}</option>
               {contextOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
             </select>
           </label>
