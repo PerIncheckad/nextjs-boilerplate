@@ -17,6 +17,7 @@ const protectedApiPaths = [
   '/api/notify-arrival',
   '/api/notify-nybil',
   '/api/vehicle-checkpoints?reg=GEU29F',
+  '/api/vehicle-checkpoints/read-model?reg=GEU29F',
   '/api/vehicle-documents',
   '/api/vehicle-documents/00000000-0000-4000-8000-000000000000',
   '/api/vehicle-edits',
