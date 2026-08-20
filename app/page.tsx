@@ -21,6 +21,7 @@ export default function HomePage() {
             <a href="/ankomst" className="btn inkommen">Inkommen</a>
             <a href="/check" className="btn incheckning">Ny incheckning</a>
             <a href="/nybil" className="btn registrera">Registrera ny bil</a>
+            <a href="/vagnkort" className="btn incheckning">Vagnkort</a>
           </div>
           
         </div>
