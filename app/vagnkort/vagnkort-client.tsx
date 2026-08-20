@@ -33,9 +33,19 @@ type VehicleDocument = {
   file_name: string;
   external_url: string | null;
   uploaded_at: string;
+  journey_event_id?: string | null;
+  checkin_id?: string | null;
+  damage_id?: string | null;
   salu_flag_id?: string | null;
   salu_checkpoint_id?: string | null;
   salu_child_process_id?: string | null;
+  metadata?: {
+    context?: {
+      type?: string;
+      id?: string | null;
+      label?: string | null;
+    };
+  } | null;
   sourceKind?: 'vehicle_document' | 'legacy_receipt';
 };
 
@@ -147,6 +157,18 @@ function present(value: unknown) {
 
 function equipmentLabel(field: keyof EquipmentState) {
   return equipmentRows.find(([key]) => key === field)?.[1] ?? String(field);
+}
+
+function documentContextLabel(document: VehicleDocument) {
+  const metadataLabel = document.metadata?.context?.label?.trim();
+  if (metadataLabel) return metadataLabel;
+  if (document.damage_id) return 'Skada';
+  if (document.salu_checkpoint_id) return 'SALU-checkpoint';
+  if (document.salu_child_process_id) return 'SALU-åtgärd';
+  if (document.salu_flag_id) return 'SALU';
+  if (document.checkin_id) return 'Incheckning';
+  if (document.journey_event_id) return 'Resehändelse';
+  return 'Bilen generellt';
 }
 
 export default function VagnkortClient() {
@@ -319,11 +341,16 @@ export default function VagnkortClient() {
                 <div style={{ marginTop: '1rem' }}>
                   {data.documents.length === 0 ? <p>Inga dokument registrerade ännu.</p> : data.documents.slice(0, 20).map((document) => (
                     <div key={document.document_id} style={{ padding: '.55rem 0', borderBottom: '1px solid #eee', display: 'flex', gap: '.7rem', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <strong>{document.title || document.file_name}</strong>
-                        <div style={{ color: '#666', fontSize: 13 }}>{document.document_type} · {formatDate(document.uploaded_at)}</div>
+                      <div style={{ minWidth: 0 }}>
+                        <strong style={{ overflowWrap: 'anywhere' }}>{document.title || document.file_name}</strong>
+                        <div style={{ color: '#666', fontSize: 13, marginTop: '.1rem' }}>{document.document_type} · {formatDate(document.uploaded_at)}</div>
+                        <div style={{ marginTop: '.3rem', display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', background: '#f0f0f0', borderRadius: 999, padding: '.18rem .5rem', fontSize: 12 }}>
+                            Kopplat till: {documentContextLabel(document)}
+                          </span>
+                        </div>
                       </div>
-                      <button type="button" onClick={() => void openDocument(document)} disabled={openingDocument === document.document_id} style={{ border: '1px solid #bbb', borderRadius: 7, background: '#fff', padding: '.45rem .7rem', cursor: 'pointer' }}>
+                      <button type="button" onClick={() => void openDocument(document)} disabled={openingDocument === document.document_id} style={{ border: '1px solid #bbb', borderRadius: 7, background: '#fff', padding: '.45rem .7rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         {openingDocument === document.document_id ? 'Öppnar…' : 'Öppna'}
                       </button>
                     </div>
