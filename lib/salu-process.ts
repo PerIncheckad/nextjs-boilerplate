@@ -10,6 +10,22 @@ export type SaluChildStatus =
   | 'VERIFIED'
   | 'CANCELLED';
 
+export const SALU_CLOSURE_DECISIONS = [
+  'SÄLJAS',
+  'PLANERA VERKSTAD',
+  'LÅNGTID PLANERA SKIFTE',
+  'ANNAT',
+  'FÖRLÄNGA',
+] as const;
+
+export type SaluClosureDecision = (typeof SALU_CLOSURE_DECISIONS)[number];
+
+export type SaluClosureDecisionInput = {
+  decision: SaluClosureDecision;
+  comment?: string | null;
+  newSaludatum?: string | null;
+};
+
 export type SaluFlagSnapshot = {
   flagId: string;
   regnr: string;
@@ -36,6 +52,9 @@ export const SALU_EVENTS = [
   'SALU_SALUDATUM_CHANGED',
   'SALU_SOLD_RECORDED',
   'SALU_HANDOVER_RECORDED',
+  'SALU_PLANERING_HANDOFF_REQUESTED',
+  'SALU_INKOP_HANDOFF_REQUESTED',
+  'SALU_DECISION_REMINDER_DUE',
   'SALU_T10_ESCALATED',
   'SALU_T0_PASSED',
   'SALU_FLAG_READY_FOR_OWNER_DECISION',
@@ -120,9 +139,20 @@ export function moveSaluFlagToFinalAssessment(
   return { ...snapshot, status: 'SLUTBEDÖMNING' };
 }
 
+export function validateSaluClosureDecision(input: SaluClosureDecisionInput): void {
+  if (input.decision === 'ANNAT' && !input.comment?.trim()) {
+    throw new Error('ANNAT requires a closure comment');
+  }
+
+  if (input.decision === 'FÖRLÄNGA' && !input.newSaludatum) {
+    throw new Error('FÖRLÄNGA requires a new saludatum');
+  }
+}
+
 export function closeSaluFlagManually(
   snapshot: SaluFlagSnapshot,
   readiness: SaluCloseReadiness,
+  closure: SaluClosureDecisionInput,
 ): SaluFlagSnapshot {
   if (snapshot.status !== 'SLUTBEDÖMNING') {
     throw new Error('Manual closure requires SLUTBEDÖMNING');
@@ -131,6 +161,8 @@ export function closeSaluFlagManually(
   if (!readiness.ready) {
     throw new Error('SALU flag cannot close while blocking conditions remain');
   }
+
+  validateSaluClosureDecision(closure);
 
   return { ...snapshot, status: 'STÄNGD' };
 }
