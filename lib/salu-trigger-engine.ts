@@ -79,6 +79,10 @@ export function evaluateSaluTriggers(input: {
   }
 
   if (compareDates(input.today, input.saludatum) >= 0) {
+    if (input.activeFlagEscalation === 'PASSERAD') {
+      return { actions, requiresCatchUpPolicy: false };
+    }
+
     const key = eventKey('SALU_T0_PASSED', input.saludatum);
     if (!emitted.has(key)) {
       actions.push({ type: 'SALU_T0_PASSED', eventKey: key, saludatum: input.saludatum });
@@ -87,6 +91,10 @@ export function evaluateSaluTriggers(input: {
   }
 
   if (compareDates(input.today, t10) >= 0) {
+    if (input.activeFlagEscalation === 'T10' || input.activeFlagEscalation === 'PASSERAD') {
+      return { actions, requiresCatchUpPolicy: false };
+    }
+
     const key = eventKey('SALU_T10_ESCALATED', input.saludatum);
     if (!emitted.has(key)) {
       actions.push({ type: 'SALU_T10_ESCALATED', eventKey: key, saludatum: input.saludatum });
