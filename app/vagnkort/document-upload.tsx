@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, DragEvent, useRef, useState } from 'react';
+import { ChangeEvent, DragEvent, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const DOCUMENT_TYPES = [
@@ -16,6 +16,11 @@ const DOCUMENT_TYPES = [
   ['OVRIGT', 'Övrigt'],
 ] as const;
 
+type ContextOption = {
+  value: string;
+  label: string;
+};
+
 type Props = {
   regnr: string;
   onUploaded: () => void;
@@ -28,16 +33,92 @@ type PrepareResponse = {
 
 type CompleteResponse = { data?: { document_id: string }; error?: string };
 
+type JourneyContextResponse = {
+  data?: {
+    damages?: Array<{
+      id: string;
+      damage_type_raw?: string | null;
+      legacy_damage_source_text?: string | null;
+      damage_date?: string | null;
+      source?: string | null;
+    }>;
+    salu?: {
+      checkpoints?: Array<Record<string, unknown>>;
+      childProcesses?: Array<Record<string, unknown>>;
+    };
+  };
+};
+
+function text(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
 export default function DocumentUpload({ regnr, onUploaded }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [documentType, setDocumentType] = useState('OVRIGT');
   const [title, setTitle] = useState('');
+  const [contextType, setContextType] = useState('VEHICLE');
+  const [contextId, setContextId] = useState('');
+  const [damageOptions, setDamageOptions] = useState<ContextOption[]>([]);
+  const [checkpointOptions, setCheckpointOptions] = useState<ContextOption[]>([]);
+  const [childProcessOptions, setChildProcessOptions] = useState<ContextOption[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState('');
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContexts() {
+      try {
+        const response = await fetch(`/api/vehicle-journey?reg=${encodeURIComponent(regnr)}`);
+        if (!response.ok) return;
+        const body = (await response.json()) as JourneyContextResponse;
+        if (cancelled) return;
+
+        setDamageOptions((body.data?.damages ?? []).map((damage) => ({
+          value: damage.id,
+          label: `${damage.damage_type_raw || damage.legacy_damage_source_text || 'Skada'}${damage.damage_date ? ` · ${damage.damage_date}` : ''}${damage.source ? ` · ${damage.source}` : ''}`,
+        })));
+
+        setCheckpointOptions((body.data?.salu?.checkpoints ?? []).map((checkpoint) => ({
+          value: text(checkpoint.checkpoint_id),
+          label: `${text(checkpoint.checkpoint_code) || 'Checkpoint'} · ${text(checkpoint.status) || 'okänd status'}`,
+        })).filter((option) => option.value));
+
+        setChildProcessOptions((body.data?.salu?.childProcesses ?? []).map((process) => ({
+          value: text(process.child_process_id),
+          label: `${text(process.process_type) || 'SALU-åtgärd'}${text(process.source_checkpoint) ? ` · ${text(process.source_checkpoint)}` : ''} · ${text(process.status) || 'okänd status'}`,
+        })).filter((option) => option.value));
+      } catch {
+        // Vagnkortet fungerar fortfarande med bilnivå även om kontextlistan inte kan laddas.
+      }
+    }
+
+    void loadContexts();
+    return () => { cancelled = true; };
+  }, [regnr]);
+
+  const contextOptions = contextType === 'DAMAGE'
+    ? damageOptions
+    : contextType === 'SALU_CHECKPOINT'
+      ? checkpointOptions
+      : contextType === 'SALU_CHILD_PROCESS'
+        ? childProcessOptions
+        : [];
+
+  function changeContextType(nextType: string) {
+    setContextType(nextType);
+    setContextId('');
+  }
+
   async function uploadFiles(files: File[]) {
     if (!files.length || uploading) return;
+    if (contextType !== 'VEHICLE' && !contextId) {
+      setMessage('Välj vilken skada eller SALU-post dokumentet ska kopplas till.');
+      return;
+    }
+
     setUploading(true);
     setMessage('');
 
@@ -81,6 +162,8 @@ export default function DocumentUpload({ regnr, onUploaded }: Props) {
             sizeBytes: file.size,
             documentType,
             title: title.trim() || null,
+            contextType,
+            contextId: contextType === 'VEHICLE' ? null : contextId,
           }),
         });
         const completed = (await completeResponse.json()) as CompleteResponse;
@@ -121,6 +204,24 @@ export default function DocumentUpload({ regnr, onUploaded }: Props) {
           </select>
         </label>
         <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+          Koppla till
+          <select value={contextType} onChange={(event) => changeContextType(event.target.value)} disabled={uploading} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
+            <option value="VEHICLE">Bilen generellt</option>
+            <option value="DAMAGE">Skada</option>
+            <option value="SALU_CHECKPOINT">SALU-checkpoint</option>
+            <option value="SALU_CHILD_PROCESS">SALU-åtgärd</option>
+          </select>
+        </label>
+        {contextType !== 'VEHICLE' && (
+          <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+            Välj post
+            <select value={contextId} onChange={(event) => setContextId(event.target.value)} disabled={uploading} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
+              <option value="">Välj…</option>
+              {contextOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        )}
+        <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
           Rubrik (valfri)
           <input value={title} onChange={(event) => setTitle(event.target.value)} disabled={uploading} placeholder="T.ex. Faktura Werksta 20/8" style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
         </label>
@@ -149,7 +250,7 @@ export default function DocumentUpload({ regnr, onUploaded }: Props) {
         <input ref={inputRef} type="file" multiple onChange={onFileInput} disabled={uploading} style={{ display: 'none' }} />
       </div>
 
-      {message && <div style={{ fontSize: 13, color: message.includes('misslyck') || message.includes('Kunde') || message.includes('större') ? '#a00' : '#176b2c' }}>{message}</div>}
+      {message && <div style={{ fontSize: 13, color: message.includes('misslyck') || message.includes('Kunde') || message.includes('större') || message.includes('Välj') ? '#a00' : '#176b2c' }}>{message}</div>}
     </div>
   );
 }

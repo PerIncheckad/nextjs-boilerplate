@@ -3,8 +3,28 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
 
 const REGNR_RE = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BUCKET = 'vehicle-documents';
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+type ContextType = 'VEHICLE' | 'DAMAGE' | 'SALU_CHECKPOINT' | 'SALU_CHILD_PROCESS';
+
+type ContextResolution =
+  | {
+      ok: true;
+      links: {
+        damage_id: string | null;
+        salu_flag_id: string | null;
+        salu_checkpoint_id: string | null;
+        salu_child_process_id: string | null;
+      };
+      payload: {
+        type: ContextType;
+        id: string | null;
+        label: string | null;
+      };
+    }
+  | { ok: false; status: 400 | 500; error: string };
 
 function cleanRegnr(value: unknown): string {
   return typeof value === 'string' ? value.toUpperCase().replace(/\s+/g, '') : '';
@@ -19,6 +39,18 @@ function cleanFileName(value: unknown): string {
 function cleanDocumentType(value: unknown): string {
   const documentType = typeof value === 'string' ? value.trim().toUpperCase() : '';
   return documentType.replace(/[^A-Z0-9_-]+/g, '_').slice(0, 80) || 'OVRIGT';
+}
+
+function cleanContextType(value: unknown): ContextType | null {
+  const contextType = typeof value === 'string' ? value.trim().toUpperCase() : 'VEHICLE';
+  return ['VEHICLE', 'DAMAGE', 'SALU_CHECKPOINT', 'SALU_CHILD_PROCESS'].includes(contextType)
+    ? contextType as ContextType
+    : null;
+}
+
+function cleanContextId(value: unknown): string | null {
+  const contextId = typeof value === 'string' ? value.trim() : '';
+  return UUID_RE.test(contextId) ? contextId : null;
 }
 
 function createAdminClient() {
@@ -40,6 +72,139 @@ async function vehicleExists(admin: ReturnType<typeof createAdminClient>, regnr:
   const failed = [vehicle, nybil, checkin, salu].find((response) => response.error);
   if (failed?.error) throw failed.error;
   return [vehicle, nybil, checkin, salu].some((response) => (response.data?.length ?? 0) > 0);
+}
+
+async function resolveDocumentContext(
+  admin: ReturnType<typeof createAdminClient>,
+  regnr: string,
+  rawType: unknown,
+  rawId: unknown,
+): Promise<ContextResolution> {
+  const contextType = cleanContextType(rawType);
+  if (!contextType) return { ok: false, status: 400, error: 'Invalid document context type' };
+
+  const emptyLinks = {
+    damage_id: null,
+    salu_flag_id: null,
+    salu_checkpoint_id: null,
+    salu_child_process_id: null,
+  };
+
+  if (contextType === 'VEHICLE') {
+    return {
+      ok: true,
+      links: emptyLinks,
+      payload: { type: 'VEHICLE', id: null, label: 'Bilen' },
+    };
+  }
+
+  const contextId = cleanContextId(rawId);
+  if (!contextId) return { ok: false, status: 400, error: 'Invalid document context id' };
+
+  if (contextType === 'DAMAGE') {
+    const { data: damage, error } = await admin
+      .from('damages')
+      .select('id,damage_type_raw,legacy_damage_source_text,damage_date,source')
+      .eq('id', contextId)
+      .eq('regnr', regnr)
+      .maybeSingle();
+    if (error) {
+      console.error('[vehicle-documents] Could not verify damage context:', error);
+      return { ok: false, status: 500, error: 'Could not verify document context' };
+    }
+    if (!damage) return { ok: false, status: 400, error: 'Damage does not belong to vehicle' };
+
+    const damageName = damage.damage_type_raw || damage.legacy_damage_source_text || 'Skada';
+    const damageDate = damage.damage_date ? ` ${damage.damage_date}` : '';
+    return {
+      ok: true,
+      links: { ...emptyLinks, damage_id: damage.id },
+      payload: {
+        type: 'DAMAGE',
+        id: damage.id,
+        label: `${damageName}${damageDate}`,
+      },
+    };
+  }
+
+  if (contextType === 'SALU_CHECKPOINT') {
+    const { data: checkpoint, error } = await admin
+      .from('salu_checkpoints')
+      .select('checkpoint_id,flag_id,checkpoint_code,status')
+      .eq('checkpoint_id', contextId)
+      .maybeSingle();
+    if (error) {
+      console.error('[vehicle-documents] Could not verify SALU checkpoint context:', error);
+      return { ok: false, status: 500, error: 'Could not verify document context' };
+    }
+    if (!checkpoint) return { ok: false, status: 400, error: 'SALU checkpoint not found' };
+
+    const { data: flag, error: flagError } = await admin
+      .from('salu_flags')
+      .select('flag_id,regnr')
+      .eq('flag_id', checkpoint.flag_id)
+      .maybeSingle();
+    if (flagError) {
+      console.error('[vehicle-documents] Could not verify SALU flag:', flagError);
+      return { ok: false, status: 500, error: 'Could not verify document context' };
+    }
+    if (!flag || flag.regnr !== regnr) {
+      return { ok: false, status: 400, error: 'SALU checkpoint does not belong to vehicle' };
+    }
+
+    return {
+      ok: true,
+      links: {
+        ...emptyLinks,
+        salu_flag_id: flag.flag_id,
+        salu_checkpoint_id: checkpoint.checkpoint_id,
+      },
+      payload: {
+        type: 'SALU_CHECKPOINT',
+        id: checkpoint.checkpoint_id,
+        label: `SALU ${checkpoint.checkpoint_code} · ${checkpoint.status}`,
+      },
+    };
+  }
+
+  const { data: childProcess, error } = await admin
+    .from('salu_child_processes')
+    .select('child_process_id,flag_id,process_type,source_checkpoint,status')
+    .eq('child_process_id', contextId)
+    .maybeSingle();
+  if (error) {
+    console.error('[vehicle-documents] Could not verify SALU child process context:', error);
+    return { ok: false, status: 500, error: 'Could not verify document context' };
+  }
+  if (!childProcess) return { ok: false, status: 400, error: 'SALU action not found' };
+
+  const { data: flag, error: flagError } = await admin
+    .from('salu_flags')
+    .select('flag_id,regnr')
+    .eq('flag_id', childProcess.flag_id)
+    .maybeSingle();
+  if (flagError) {
+    console.error('[vehicle-documents] Could not verify SALU child-process flag:', flagError);
+    return { ok: false, status: 500, error: 'Could not verify document context' };
+  }
+  if (!flag || flag.regnr !== regnr) {
+    return { ok: false, status: 400, error: 'SALU action does not belong to vehicle' };
+  }
+
+  const checkpointLabel = childProcess.source_checkpoint ? ` · ${childProcess.source_checkpoint}` : '';
+  return {
+    ok: true,
+    links: {
+      ...emptyLinks,
+      salu_flag_id: flag.flag_id,
+      salu_child_process_id: childProcess.child_process_id,
+    },
+    payload: {
+      type: 'SALU_CHILD_PROCESS',
+      id: childProcess.child_process_id,
+      label: `${childProcess.process_type}${checkpointLabel} · ${childProcess.status}`,
+    },
+  };
 }
 
 export async function POST(request: Request) {
@@ -101,6 +266,10 @@ export async function POST(request: Request) {
       const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : null;
       const mimeType = typeof body.mimeType === 'string' && body.mimeType.trim() ? body.mimeType.trim().slice(0, 200) : null;
       const expectedSize = Number(body.sizeBytes);
+      const context = await resolveDocumentContext(admin, regnr, body.contextType, body.contextId);
+      if (!context.ok) {
+        return NextResponse.json({ error: context.error }, { status: context.status });
+      }
 
       if (!path.startsWith(`${regnr}/`) || path.includes('..')) {
         return NextResponse.json({ error: 'Invalid storage path' }, { status: 400 });
@@ -137,13 +306,17 @@ export async function POST(request: Request) {
           file_name: fileName,
           mime_type: mimeType,
           size_bytes: Number.isFinite(storedSize) ? storedSize : null,
+          ...context.links,
           source_system: 'VAGNKORT',
           source_record_id: path,
-          metadata: { uploadedVia: 'VAGNKORT' },
+          metadata: {
+            uploadedVia: 'VAGNKORT',
+            context: context.payload,
+          },
           uploaded_by: verification.user.id,
           uploaded_by_email: verification.user.email,
         })
-        .select('document_id,document_type,title,file_name,mime_type,size_bytes,storage_bucket,storage_path,uploaded_at')
+        .select('document_id,document_type,title,file_name,mime_type,size_bytes,storage_bucket,storage_path,damage_id,salu_flag_id,salu_checkpoint_id,salu_child_process_id,metadata,uploaded_at')
         .single();
 
       if (documentError || !document) {
@@ -173,6 +346,7 @@ export async function POST(request: Request) {
             fileName,
             mimeType,
             sizeBytes: document.size_bytes,
+            context: context.payload,
           },
         })
         .select('event_id')
