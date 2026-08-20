@@ -3,167 +3,93 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const page = readFileSync(join(process.cwd(), 'app/vagnkort/page.tsx'), 'utf8');
-const client = readFileSync(join(process.cwd(), 'app/vagnkort/vagnkort-client.tsx'), 'utf8');
-const upload = readFileSync(join(process.cwd(), 'app/vagnkort/document-upload.tsx'), 'utf8');
-const uploadApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/route.ts'), 'utf8');
-const documentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/[id]/route.ts'), 'utf8');
-const periodControls = readFileSync(join(process.cwd(), 'app/vagnkort/journey-period-controls.tsx'), 'utf8');
-const periodApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/periods/route.ts'), 'utf8');
-const metricsPanel = readFileSync(join(process.cwd(), 'app/vagnkort/journey-metrics-panel.tsx'), 'utf8');
-const metricsApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/metrics/route.ts'), 'utf8');
-const saluPanel = readFileSync(join(process.cwd(), 'app/vagnkort/salu-journey-panel.tsx'), 'utf8');
-const equipmentControls = readFileSync(join(process.cwd(), 'app/vagnkort/equipment-change-controls.tsx'), 'utf8');
-const equipmentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/equipment/route.ts'), 'utf8');
-const journeyApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/route.ts'), 'utf8');
-const home = readFileSync(join(process.cwd(), 'app/page.tsx'), 'utf8');
+const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
+const page = read('app/vagnkort/page.tsx');
+const client = read('app/vagnkort/vagnkort-client.tsx');
+const upload = read('app/vagnkort/document-upload.tsx');
+const uploadApi = read('app/api/vehicle-documents/route.ts');
+const documentApi = read('app/api/vehicle-documents/[id]/route.ts');
+const periodControls = read('app/vagnkort/journey-period-controls.tsx');
+const periodApi = read('app/api/vehicle-journey/periods/route.ts');
+const periodMigration = read('migrations/20260820222728_atomic_vehicle_journey_period_events.sql');
+const metricsPanel = read('app/vagnkort/journey-metrics-panel.tsx');
+const metricsApi = read('app/api/vehicle-journey/metrics/route.ts');
+const saluPanel = read('app/vagnkort/salu-journey-panel.tsx');
+const equipmentControls = read('app/vagnkort/equipment-change-controls.tsx');
+const equipmentApi = read('app/api/vehicle-journey/equipment/route.ts');
+const journeyApi = read('app/api/vehicle-journey/route.ts');
+const home = read('app/page.tsx');
+
+function matches(source: string, patterns: RegExp[]) {
+  for (const pattern of patterns) assert.match(source, pattern);
+}
 
 test('Vagnkort page stays behind the existing LoginGate', () => {
-  assert.match(page, /<LoginGate>/);
-  assert.match(page, /<VagnkortClient \/>/);
+  matches(page, [/<LoginGate>/, /<VagnkortClient \/>/]);
 });
 
 test('Vagnkort reads the authenticated vehicle journey API', () => {
-  assert.match(client, /fetch\(`\/api\/vehicle-journey\?reg=/);
-  assert.match(client, /Bilens digitala pärm/);
-  assert.match(client, /Utrustning – Nybil mot nu/);
-  assert.match(client, /Tid i resan/);
-  assert.match(client, /Dokument/);
-  assert.match(client, /Tidslinje/);
+  matches(client, [/fetch\(`\/api\/vehicle-journey\?reg=/, /Bilens digitala pärm/, /Utrustning – Nybil mot nu/, /Tid i resan/, /Dokument/, /Tidslinje/]);
 });
 
 test('Vagnkort surfaces lifecycle metrics and refreshes them with period changes', () => {
-  assert.match(client, /<JourneyMetricsPanel regnr=\{data\.regnr\} refreshNonce=\{refreshNonce\} \/>/);
-  assert.match(metricsPanel, /\/api\/vehicle-journey\/metrics\?reg=/);
-  assert.match(metricsPanel, /Resans nyckeltal/);
-  assert.match(metricsPanel, /Nyttjandegrad/);
-  assert.match(metricsPanel, /Nybil → första uthyrning/);
-  assert.match(metricsPanel, /Sista retur → SALU/);
-  assert.match(metricsPanel, /Stillestånd per orsak/);
-  assert.match(metricsPanel, /Operativa perioder överlappar/);
-  assert.match(metricsApi, /verifyApiUser\(request\)/);
-  assert.match(metricsApi, /computeJourneyLifecycleMetrics/);
+  matches(client, [/<JourneyMetricsPanel regnr=\{data\.regnr\} refreshNonce=\{refreshNonce\} \/>/]);
+  matches(metricsPanel, [/\/api\/vehicle-journey\/metrics\?reg=/, /Resans nyckeltal/, /Nyttjandegrad/, /Nybil → första uthyrning/, /Sista retur → SALU/, /Stillestånd per orsak/, /Operativa perioder överlappar/]);
+  matches(metricsApi, [/verifyApiUser\(request\)/, /computeJourneyLifecycleMetrics/]);
 });
 
-test('Vagnkort presents SALU as the endpoint of the vehicle journey with deviations, handling and evidence', () => {
-  assert.match(client, /SALU – slutdelen av bilens resa/);
-  assert.match(client, /<SaluJourneyPanel/);
-  assert.match(client, /documents=\{data\.documents\}/);
-  assert.match(saluPanel, /Ursprungligt SALU-datum/);
-  assert.match(saluPanel, /Aktuellt SALU-datum/);
-  assert.match(saluPanel, /Förskjutning/);
-  assert.match(saluPanel, /Kontrollpunkter som kräver uppmärksamhet/);
-  assert.match(saluPanel, /Hantering/);
-  assert.match(saluPanel, /salu_checkpoint_id/);
-  assert.match(saluPanel, /salu_child_process_id/);
-  assert.match(saluPanel, /SALU-underlag/);
-  assert.match(saluPanel, /Öppna underlag/);
-  assert.match(saluPanel, /\/api\/vehicle-documents\/\$\{encodeURIComponent\(document\.document_id\)\}/);
-  assert.match(saluPanel, /evidenceContext/);
+test('Vagnkort presents SALU as the endpoint with deviations, handling and evidence', () => {
+  matches(client, [/SALU – slutdelen av bilens resa/, /<SaluJourneyPanel/, /documents=\{data\.documents\}/]);
+  matches(saluPanel, [/Ursprungligt SALU-datum/, /Aktuellt SALU-datum/, /Förskjutning/, /Kontrollpunkter som kräver uppmärksamhet/, /Hantering/, /salu_checkpoint_id/, /salu_child_process_id/, /SALU-underlag/, /Öppna underlag/, /\/api\/vehicle-documents\/\$\{encodeURIComponent\(document\.document_id\)\}/, /evidenceContext/]);
 });
 
 test('Vagnkort surfaces baseline/current equipment changes', () => {
-  assert.match(client, /baseline\[key\] !== current\[key\]/);
-  assert.match(client, /Förändrat/);
+  matches(client, [/baseline\[key\] !== current\[key\]/, /Förändrat/]);
 });
 
-test('Vagnkort document upload uses authenticated prepare/complete and signed Storage upload', () => {
-  assert.match(client, /<DocumentUpload/);
-  assert.match(upload, /action:\s*'prepare'/);
-  assert.match(upload, /uploadToSignedUrl/);
-  assert.match(upload, /action:\s*'complete'/);
-  assert.match(upload, /Släpp filer här/);
-  assert.match(upload, /Leverantörsfaktura/);
-  assert.match(upload, /Skadebild/);
+test('Vagnkort document upload uses authenticated signed Storage flow', () => {
+  matches(client, [/<DocumentUpload/]);
+  matches(upload, [/action:\s*'prepare'/, /uploadToSignedUrl/, /action:\s*'complete'/, /Släpp filer här/, /Leverantörsfaktura/, /Skadebild/]);
 });
 
 test('Vagnkort reuses already loaded journey context for document upload', () => {
-  assert.match(client, /damages=\{data\.damages\}/);
-  assert.match(client, /checkpoints=\{data\.salu\.checkpoints\}/);
-  assert.match(client, /childProcesses=\{data\.salu\.childProcesses\}/);
+  matches(client, [/damages=\{data\.damages\}/, /checkpoints=\{data\.salu\.checkpoints\}/, /childProcesses=\{data\.salu\.childProcesses\}/]);
   assert.doesNotMatch(upload, /\/api\/vehicle-journey\?reg=/);
   assert.match(upload, /Inga valbara poster/);
 });
 
 test('Vagnkort shows document context directly in the document list', () => {
-  assert.match(client, /documentContextLabel/);
-  assert.match(client, /metadata\?\.context\?\.label/);
-  assert.match(client, /Kopplat till:/);
-  assert.match(client, /SALU-checkpoint/);
-  assert.match(client, /SALU-åtgärd/);
-  assert.match(client, /Incheckning/);
-  assert.match(client, /Bilen generellt/);
+  matches(client, [/documentContextLabel/, /metadata\?\.context\?\.label/, /Kopplat till:/, /SALU-checkpoint/, /SALU-åtgärd/, /Incheckning/, /Bilen generellt/]);
 });
 
-test('Vagnkort document upload can bind evidence to vehicle, damage and SALU context', () => {
-  assert.match(upload, /Bilen generellt/);
-  assert.match(upload, /SALU-checkpoint/);
-  assert.match(upload, /SALU-åtgärd/);
-  assert.match(upload, /contextType/);
-  assert.match(upload, /contextId/);
-  assert.match(uploadApi, /resolveDocumentContext/);
-  assert.match(uploadApi, /Damage does not belong to vehicle/);
-  assert.match(uploadApi, /SALU checkpoint does not belong to vehicle/);
-  assert.match(uploadApi, /SALU action does not belong to vehicle/);
-  assert.match(uploadApi, /damage_id/);
-  assert.match(uploadApi, /salu_checkpoint_id/);
-  assert.match(uploadApi, /salu_child_process_id/);
+test('document upload can bind evidence to vehicle, damage and SALU context', () => {
+  matches(upload, [/Bilen generellt/, /SALU-checkpoint/, /SALU-åtgärd/, /contextType/, /contextId/]);
+  matches(uploadApi, [/resolveDocumentContext/, /Damage does not belong to vehicle/, /SALU checkpoint does not belong to vehicle/, /SALU action does not belong to vehicle/, /damage_id/, /salu_checkpoint_id/, /salu_child_process_id/]);
 });
 
-test('document server API verifies identity, keeps private storage server controlled and appends a journey event', () => {
-  assert.match(uploadApi, /verifyApiUser\(request\)/);
-  assert.match(uploadApi, /createSignedUploadUrl/);
-  assert.match(uploadApi, /vehicle_documents/);
-  assert.match(uploadApi, /DOCUMENT_UPLOADED/);
-  assert.match(uploadApi, /uploaded_by:\s*verification\.user\.id/);
-  assert.match(documentApi, /verifyApiUser\(request\)/);
-  assert.match(documentApi, /createSignedUrl/);
-  assert.match(documentApi, /300/);
+test('document server API stays authenticated, private and appends a journey event', () => {
+  matches(uploadApi, [/verifyApiUser\(request\)/, /createSignedUploadUrl/, /vehicle_documents/, /DOCUMENT_UPLOADED/, /uploaded_by:\s*verification\.user\.id/]);
+  matches(documentApi, [/verifyApiUser\(request\)/, /createSignedUrl/, /300/]);
 });
 
 test('Vagnkort can start and close vehicle journey periods', () => {
-  assert.match(client, /<JourneyPeriodControls regnr=/);
-  assert.match(periodControls, /Tillgänglig/);
-  assert.match(periodControls, /Uthyrd/);
-  assert.match(periodControls, /Stillestånd/);
-  assert.match(periodControls, /Verkstad/);
-  assert.match(periodControls, /Väntar reservdelar/);
-  assert.match(periodControls, /action:\s*'START'/);
-  assert.match(periodControls, /action:\s*'CLOSE'/);
-  assert.match(periodControls, /\/api\/vehicle-journey\/periods/);
+  matches(client, [/<JourneyPeriodControls regnr=/]);
+  matches(periodControls, [/Tillgänglig/, /Uthyrd/, /Stillestånd/, /Verkstad/, /Väntar reservdelar/, /action:\s*'START'/, /action:\s*'CLOSE'/, /\/api\/vehicle-journey\/periods/]);
 });
 
-test('journey period API validates vehicle, downtime reason and appends timeline events', () => {
-  assert.match(periodApi, /verifyApiUser\(request\)/);
-  assert.match(periodApi, /vehicleExists/);
-  assert.match(periodApi, /DOWNTIME_REASONS/);
-  assert.match(periodApi, /Downtime requires a valid reason/);
-  assert.match(periodApi, /PERIOD_STARTED/);
-  assert.match(periodApi, /PERIOD_ENDED/);
-  assert.match(periodApi, /vehicle_journey_periods/);
-  assert.match(periodApi, /vehicle_journey_events/);
-  assert.match(periodApi, /created_by:\s*verification\.user\.id/);
+test('journey period API validates input and persists period events atomically', () => {
+  matches(periodApi, [/verifyApiUser\(request\)/, /vehicleExists/, /DOWNTIME_REASONS/, /Downtime requires a valid reason/, /rpc\('start_vehicle_journey_period'/, /rpc\('close_vehicle_journey_period'/]);
+  matches(periodMigration, [/'PERIOD_STARTED'/, /'PERIOD_ENDED'/, /insert into public\.vehicle_journey_periods/i, /insert into public\.vehicle_journey_events/i, /p_actor_id/]);
 });
 
 test('Vagnkort can document equipment changes as append-only journey events', () => {
-  assert.match(client, /<EquipmentChangeControls regnr=/);
-  assert.match(client, /Senaste dokumenterade förändringar/);
-  assert.match(equipmentControls, /Dokumentera utrustningsförändring/);
-  assert.match(equipmentControls, /Kommentar krävs/);
-  assert.match(equipmentControls, /\/api\/vehicle-journey\/equipment/);
-  assert.match(equipmentApi, /verifyApiUser\(request\)/);
-  assert.match(equipmentApi, /EQUIPMENT_CHANGED/);
-  assert.match(equipmentApi, /Equipment change requires a comment/);
-  assert.match(equipmentApi, /actor_id:\s*verification\.user\.id/);
-  assert.match(equipmentApi, /vehicle_journey_events/);
+  matches(client, [/<EquipmentChangeControls regnr=/, /Senaste dokumenterade förändringar/]);
+  matches(equipmentControls, [/Dokumentera utrustningsförändring/, /Kommentar krävs/, /\/api\/vehicle-journey\/equipment/]);
+  matches(equipmentApi, [/verifyApiUser\(request\)/, /EQUIPMENT_CHANGED/, /Equipment change requires a comment/, /actor_id:\s*verification\.user\.id/, /vehicle_journey_events/]);
 });
 
 test('vehicle journey read model overlays latest equipment event without overwriting Nybil baseline', () => {
-  assert.match(journeyApi, /equipmentBaseline/);
-  assert.match(journeyApi, /equipmentChanges/);
-  assert.match(journeyApi, /fieldsOverlaid/);
-  assert.match(journeyApi, /equipmentCurrent\[change\.field\] = change\.value/);
-  assert.match(journeyApi, /event_type === 'EQUIPMENT_CHANGED'/);
+  matches(journeyApi, [/equipmentBaseline/, /equipmentChanges/, /fieldsOverlaid/, /equipmentCurrent\[change\.field\] = change\.value/, /event_type === 'EQUIPMENT_CHANGED'/]);
 });
 
 test('start page links to Vagnkort', () => {
