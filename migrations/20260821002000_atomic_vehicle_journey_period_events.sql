@@ -146,7 +146,7 @@ begin
   returning * into v_period;
 
   v_duration_hours := pg_catalog.round(
-    (pg_catalog.extract(epoch from (p_ended_at - v_period.started_at)) / 3600.0)::numeric,
+    (extract(epoch from (p_ended_at - v_period.started_at)) / 3600.0)::numeric,
     1
   );
 
