@@ -1,0 +1,11 @@
+alter function public._coalesce_expr(text, text, text, text[], text) set search_path = pg_catalog, public;
+alter function public.car_lookup_any(text) set search_path = pg_catalog, public;
+alter function public.damages_lookup_any(text, text) set search_path = pg_catalog, public;
+alter function public.get_documented_legacy_texts(text) set search_path = pg_catalog, public;
+alter function public.get_nybil_baseline(text) set search_path = pg_catalog, public;
+alter function public.heartbeat_lock(text) set search_path = pg_catalog, public;
+alter function public.release_lock(text) set search_path = pg_catalog, public;
+alter function public.set_updated_at() set search_path = pg_catalog, public;
+alter function public.try_lock_checkin(text) set search_path = pg_catalog, public;
+alter function public.upsert_vehicles_from_staging() set search_path = pg_catalog, public;
+alter function public.wheel_lookup_any(text, text) set search_path = pg_catalog, public;
