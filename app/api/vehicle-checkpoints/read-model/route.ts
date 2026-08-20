@@ -4,6 +4,33 @@ import { verifyApiUser } from '@/lib/server-auth';
 
 const REGNR_RE = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
 
+type AssessmentRow = {
+  assessment_id: string;
+  checkpoint_id: string;
+  previous_status: string;
+  status: string;
+  comment: string | null;
+  evidence_refs: unknown;
+  actor_id: string | null;
+  actor_email: string | null;
+  actor_source: string;
+  assessed_at: string;
+  metadata: unknown;
+};
+
+type JourneyEventRow = {
+  event_id: string;
+  event_type: string;
+  occurred_at: string;
+  source_system: string;
+  source_entity: string | null;
+  source_record_id: string | null;
+  actor_source: string;
+  actor_name: string | null;
+  actor_email: string | null;
+  payload: unknown;
+};
+
 function cleanRegnr(value: unknown): string {
   return typeof value === 'string' ? value.toUpperCase().replace(/\s+/g, '') : '';
 }
@@ -145,18 +172,21 @@ export async function GET(request: Request) {
       ]),
     );
 
-    const assessmentMap = new Map<string, (typeof assessmentResponse.data extends Array<infer T> ? T : never)>();
-    for (const assessment of assessmentResponse.data ?? []) {
-      const checkpointId = assessment.checkpoint_id as string;
-      if (!assessmentMap.has(checkpointId)) assessmentMap.set(checkpointId, assessment);
+    const assessments = (assessmentResponse.data ?? []) as AssessmentRow[];
+    const assessmentMap = new Map<string, AssessmentRow>();
+    for (const assessment of assessments) {
+      if (!assessmentMap.has(assessment.checkpoint_id)) {
+        assessmentMap.set(assessment.checkpoint_id, assessment);
+      }
     }
 
+    const checkpointJourneyEvents = (checkpointEventResponse.data ?? []) as JourneyEventRow[];
     const checkpointEventMap = new Map<string, {
-      created: (typeof checkpointEventResponse.data extends Array<infer T> ? T : never) | null;
-      assessed: (typeof checkpointEventResponse.data extends Array<infer T> ? T : never) | null;
+      created: JourneyEventRow | null;
+      assessed: JourneyEventRow | null;
     }>();
 
-    for (const event of checkpointEventResponse.data ?? []) {
+    for (const event of checkpointJourneyEvents) {
       const checkpointId = checkpointIdFromPayload(event.payload);
       if (!checkpointId) continue;
       const existing = checkpointEventMap.get(checkpointId) ?? { created: null, assessed: null };
@@ -165,8 +195,9 @@ export async function GET(request: Request) {
       checkpointEventMap.set(checkpointId, existing);
     }
 
+    const linkedEvents = (linkedEventResponse.data ?? []) as JourneyEventRow[];
     const linkedEventMap = new Map(
-      (linkedEventResponse.data ?? []).map((event) => [event.event_id as string, event]),
+      linkedEvents.map((event) => [event.event_id, event]),
     );
 
     const enriched = checkpointRows.map((checkpoint) => {
