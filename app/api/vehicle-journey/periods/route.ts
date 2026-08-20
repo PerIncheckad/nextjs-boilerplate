@@ -81,41 +81,14 @@ async function vehicleExists(admin: ReturnType<typeof createAdminClient>, regnr:
   return [vehicle, nybil, checkin, salu].some((response) => (response.data?.length ?? 0) > 0);
 }
 
-async function appendPeriodEvent(
-  admin: ReturnType<typeof createAdminClient>,
-  input: {
-    eventType: 'PERIOD_STARTED' | 'PERIOD_ENDED';
-    regnr: string;
-    periodId: string;
-    occurredAt: string;
-    actorId: string;
-    actorEmail: string;
-    payload: Record<string, unknown>;
-  },
-) {
-  const { data: event, error } = await admin
-    .from('vehicle_journey_events')
-    .insert({
-      regnr: input.regnr,
-      event_type: input.eventType,
-      event_key: `vehicle-period:${input.periodId}:${input.eventType}`,
-      occurred_at: input.occurredAt,
-      source_system: 'VAGNKORT',
-      source_entity: 'vehicle_journey_periods',
-      source_record_id: input.periodId,
-      actor_id: input.actorId,
-      actor_source: 'MANUELL',
-      actor_email: input.actorEmail,
-      payload: input.payload,
-    })
-    .select('event_id')
-    .single();
+function rpcErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object' || !('code' in error)) return null;
+  return typeof error.code === 'string' ? error.code : null;
+}
 
-  if (error || !event) {
-    console.error(`[vehicle-journey-periods] Could not append ${input.eventType}:`, error);
-    return null;
-  }
-  return event.event_id as string;
+function rpcErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('message' in error)) return '';
+  return typeof error.message === 'string' ? error.message : '';
 }
 
 export async function POST(request: Request) {
@@ -172,66 +145,27 @@ export async function POST(request: Request) {
         }
       }
 
-      const { data: existingOpen, error: existingError } = await admin
-        .from('vehicle_journey_periods')
-        .select('period_id')
-        .eq('regnr', regnr)
-        .eq('period_type', periodType)
-        .is('ended_at', null)
-        .limit(1);
-      if (existingError) throw existingError;
-      if ((existingOpen?.length ?? 0) > 0) {
-        return NextResponse.json({ error: `${periodType} is already open for vehicle` }, { status: 409 });
-      }
-
       const periodId = crypto.randomUUID();
-      const { data: period, error: periodError } = await admin
-        .from('vehicle_journey_periods')
-        .insert({
-          period_id: periodId,
-          regnr,
-          period_type: periodType,
-          started_at: startedAt,
-          reason_code: reasonCode,
-          reason_text: reasonText,
-          source_system: 'VAGNKORT',
-          source_entity: 'vehicle_journey_periods',
-          source_record_id: periodId,
-          metadata: { createdVia: 'VAGNKORT' },
-          created_by: verification.user.id,
-        })
-        .select('period_id,period_type,started_at,ended_at,reason_code,reason_text,source_system,source_event_id,metadata,created_at,updated_at')
-        .single();
+      const { data: period, error: periodError } = await admin.rpc('start_vehicle_journey_period', {
+        p_period_id: periodId,
+        p_regnr: regnr,
+        p_period_type: periodType,
+        p_started_at: startedAt,
+        p_reason_code: reasonCode,
+        p_reason_text: reasonText,
+        p_actor_id: verification.user.id,
+        p_actor_email: verification.user.email,
+      });
 
-      if (periodError || !period) {
-        console.error('[vehicle-journey-periods] Could not create period:', periodError);
+      if (periodError) {
+        if (rpcErrorCode(periodError) === '23505') {
+          return NextResponse.json({ error: `${periodType} is already open for vehicle` }, { status: 409 });
+        }
+        console.error('[vehicle-journey-periods] Atomic start failed:', periodError);
         return NextResponse.json({ error: 'Could not start period' }, { status: 500 });
       }
 
-      const sourceEventId = await appendPeriodEvent(admin, {
-        eventType: 'PERIOD_STARTED',
-        regnr,
-        periodId,
-        occurredAt: startedAt,
-        actorId: verification.user.id,
-        actorEmail: verification.user.email,
-        payload: {
-          periodType,
-          startedAt,
-          reasonCode,
-          reasonText,
-        },
-      });
-
-      if (sourceEventId) {
-        const { error: linkError } = await admin
-          .from('vehicle_journey_periods')
-          .update({ source_event_id: sourceEventId, updated_at: new Date().toISOString() })
-          .eq('period_id', periodId);
-        if (linkError) console.error('[vehicle-journey-periods] Could not link start event:', linkError);
-      }
-
-      return NextResponse.json({ data: { ...period, source_event_id: sourceEventId } }, { status: 201 });
+      return NextResponse.json({ data: period }, { status: 201 });
     }
 
     if (action === 'CLOSE') {
@@ -247,60 +181,31 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Invalid end time' }, { status: 400 });
       }
 
-      const { data: current, error: currentError } = await admin
-        .from('vehicle_journey_periods')
-        .select('period_id,period_type,started_at,ended_at,reason_code,reason_text,source_event_id')
-        .eq('period_id', periodId)
-        .eq('regnr', regnr)
-        .maybeSingle();
-      if (currentError) throw currentError;
-      if (!current) {
-        return NextResponse.json({ error: 'Period not found for vehicle' }, { status: 404 });
-      }
-      if (current.ended_at) {
-        return NextResponse.json({ error: 'Period is already closed' }, { status: 409 });
-      }
-      if (new Date(endedAt).getTime() < new Date(current.started_at).getTime()) {
-        return NextResponse.json({ error: 'End time cannot be before start time' }, { status: 400 });
-      }
-
-      const updatedAt = new Date().toISOString();
-      const { data: period, error: updateError } = await admin
-        .from('vehicle_journey_periods')
-        .update({ ended_at: endedAt, updated_at: updatedAt })
-        .eq('period_id', periodId)
-        .eq('regnr', regnr)
-        .is('ended_at', null)
-        .select('period_id,period_type,started_at,ended_at,reason_code,reason_text,source_system,source_event_id,metadata,created_at,updated_at')
-        .maybeSingle();
-
-      if (updateError) throw updateError;
-      if (!period) {
-        return NextResponse.json({ error: 'Period changed before it could be closed' }, { status: 409 });
-      }
-
-      const durationHours = Math.round(
-        ((new Date(endedAt).getTime() - new Date(current.started_at).getTime()) / 3_600_000) * 10,
-      ) / 10;
-
-      await appendPeriodEvent(admin, {
-        eventType: 'PERIOD_ENDED',
-        regnr,
-        periodId,
-        occurredAt: endedAt,
-        actorId: verification.user.id,
-        actorEmail: verification.user.email,
-        payload: {
-          periodType: current.period_type,
-          startedAt: current.started_at,
-          endedAt,
-          durationHours,
-          reasonCode: current.reason_code,
-          reasonText: current.reason_text,
-        },
+      const { data: period, error: periodError } = await admin.rpc('close_vehicle_journey_period', {
+        p_period_id: periodId,
+        p_regnr: regnr,
+        p_ended_at: endedAt,
+        p_actor_id: verification.user.id,
+        p_actor_email: verification.user.email,
       });
 
-      return NextResponse.json({ data: { ...period, durationHours } });
+      if (periodError) {
+        const code = rpcErrorCode(periodError);
+        const message = rpcErrorMessage(periodError);
+        if (code === 'P0002' || message.includes('Period not found for vehicle')) {
+          return NextResponse.json({ error: 'Period not found for vehicle' }, { status: 404 });
+        }
+        if (message.includes('Period is already closed')) {
+          return NextResponse.json({ error: 'Period is already closed' }, { status: 409 });
+        }
+        if (code === '22007' || message.includes('End time cannot be before start time')) {
+          return NextResponse.json({ error: 'End time cannot be before start time' }, { status: 400 });
+        }
+        console.error('[vehicle-journey-periods] Atomic close failed:', periodError);
+        return NextResponse.json({ error: 'Could not close period' }, { status: 500 });
+      }
+
+      return NextResponse.json({ data: period });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
