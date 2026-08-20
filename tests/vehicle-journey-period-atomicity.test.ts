@@ -9,7 +9,7 @@ const periodApi = readFileSync(
 );
 
 const migration = readFileSync(
-  join(process.cwd(), 'migrations/20260821002000_atomic_vehicle_journey_period_events.sql'),
+  join(process.cwd(), 'migrations/20260820222728_atomic_vehicle_journey_period_events.sql'),
   'utf8',
 );
 
