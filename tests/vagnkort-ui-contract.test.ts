@@ -10,6 +10,9 @@ const uploadApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/ro
 const documentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/[id]/route.ts'), 'utf8');
 const periodControls = readFileSync(join(process.cwd(), 'app/vagnkort/journey-period-controls.tsx'), 'utf8');
 const periodApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/periods/route.ts'), 'utf8');
+const equipmentControls = readFileSync(join(process.cwd(), 'app/vagnkort/equipment-change-controls.tsx'), 'utf8');
+const equipmentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/equipment/route.ts'), 'utf8');
+const journeyApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/route.ts'), 'utf8');
 const home = readFileSync(join(process.cwd(), 'app/page.tsx'), 'utf8');
 
 test('Vagnkort page stays behind the existing LoginGate', () => {
@@ -89,6 +92,27 @@ test('journey period API validates vehicle, downtime reason and appends timeline
   assert.match(periodApi, /vehicle_journey_periods/);
   assert.match(periodApi, /vehicle_journey_events/);
   assert.match(periodApi, /created_by:\s*verification\.user\.id/);
+});
+
+test('Vagnkort can document equipment changes as append-only journey events', () => {
+  assert.match(client, /<EquipmentChangeControls regnr=/);
+  assert.match(client, /Senaste dokumenterade förändringar/);
+  assert.match(equipmentControls, /Dokumentera utrustningsförändring/);
+  assert.match(equipmentControls, /Kommentar krävs/);
+  assert.match(equipmentControls, /\/api\/vehicle-journey\/equipment/);
+  assert.match(equipmentApi, /verifyApiUser\(request\)/);
+  assert.match(equipmentApi, /EQUIPMENT_CHANGED/);
+  assert.match(equipmentApi, /Equipment change requires a comment/);
+  assert.match(equipmentApi, /actor_id:\s*verification\.user\.id/);
+  assert.match(equipmentApi, /vehicle_journey_events/);
+});
+
+test('vehicle journey read model overlays latest equipment event without overwriting Nybil baseline', () => {
+  assert.match(journeyApi, /equipmentBaseline/);
+  assert.match(journeyApi, /equipmentChanges/);
+  assert.match(journeyApi, /fieldsOverlaid/);
+  assert.match(journeyApi, /equipmentCurrent\[change\.field\] = change\.value/);
+  assert.match(journeyApi, /event_type === 'EQUIPMENT_CHANGED'/);
 });
 
 test('start page links to Vagnkort', () => {

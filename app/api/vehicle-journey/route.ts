@@ -5,6 +5,22 @@ import { verifyApiUser } from '@/lib/server-auth';
 const REGNR_RE = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
 const HOUR_MS = 60 * 60 * 1000;
 
+const EQUIPMENT_FIELDS = [
+  'keys',
+  'chargingCables',
+  'privacyCovers',
+  'instructionBook',
+  'coc',
+  'wheelLocks',
+  'towbar',
+  'rubberMats',
+  'tireCompressor',
+  'mountedWheels',
+  'looseWheels',
+] as const;
+
+type EquipmentField = (typeof EQUIPMENT_FIELDS)[number];
+type EquipmentValue = string | number | boolean | null;
 type QueryError = { message?: string } | null;
 
 function cleanRegnr(value: string): string {
@@ -39,6 +55,28 @@ function firstError(errors: Array<[string, QueryError]>): string | null {
     }
   }
   return null;
+}
+
+function equipmentChangeFromEvent(event: { event_id: string; occurred_at: string; actor_name: string | null; actor_email: string | null; payload: unknown }) {
+  if (!event.payload || typeof event.payload !== 'object' || Array.isArray(event.payload)) return null;
+  const payload = event.payload as Record<string, unknown>;
+  const field = typeof payload.field === 'string' && EQUIPMENT_FIELDS.includes(payload.field as EquipmentField)
+    ? payload.field as EquipmentField
+    : null;
+  if (!field) return null;
+
+  const value = payload.value;
+  if (value !== null && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean') return null;
+
+  return {
+    eventId: event.event_id,
+    field,
+    value: value as EquipmentValue,
+    comment: typeof payload.comment === 'string' ? payload.comment : null,
+    occurredAt: event.occurred_at,
+    actorName: event.actor_name,
+    actorEmail: event.actor_email,
+  };
 }
 
 export async function GET(request: Request) {
@@ -205,20 +243,31 @@ export async function GET(request: Request) {
       }
     : null;
 
-  const equipmentCurrent = vehicle
-    ? {
-        keys: vehicle.antal_nycklar,
-        chargingCables: vehicle.antal_laddkablar,
-        privacyCovers: vehicle.antal_insynsskydd,
-        instructionBookLocation: vehicle.instruktionsbok_location,
-        cocLocation: vehicle.coc_location,
-        rubberMats: vehicle.har_gummimattor,
-        tireCompressor: vehicle.har_kompressor,
-        mountedWheels: vehicle.hjul_pa_bilen,
-        hasWinterWheels: vehicle.har_vinterdack,
-        hasSummerWheels: vehicle.har_sommarhjul,
-      }
-    : null;
+  const equipmentCurrent: Record<EquipmentField, EquipmentValue> = {
+    keys: vehicle?.antal_nycklar ?? nybil?.antal_nycklar ?? null,
+    chargingCables: vehicle?.antal_laddkablar ?? nybil?.antal_laddkablar ?? null,
+    privacyCovers: vehicle?.antal_insynsskydd ?? nybil?.antal_insynsskydd ?? null,
+    instructionBook: vehicle?.instruktionsbok_location ? true : (nybil?.instruktionsbok ?? null),
+    coc: vehicle?.coc_location ? true : (nybil?.coc ?? null),
+    wheelLocks: nybil?.lasbultar_med ?? null,
+    towbar: nybil?.dragkrok ?? null,
+    rubberMats: vehicle?.har_gummimattor ?? nybil?.gummimattor ?? null,
+    tireCompressor: vehicle?.har_kompressor ?? nybil?.dackkompressor ?? null,
+    mountedWheels: vehicle?.hjul_pa_bilen ?? nybil?.hjultyp ?? null,
+    looseWheels: nybil?.hjul_ej_monterade ?? null,
+  };
+
+  const equipmentChanges = (eventsResponse.data ?? [])
+    .filter((event) => event.event_type === 'EQUIPMENT_CHANGED')
+    .map(equipmentChangeFromEvent)
+    .filter((change): change is NonNullable<ReturnType<typeof equipmentChangeFromEvent>> => change !== null);
+
+  const fieldsOverlaid = new Set<EquipmentField>();
+  for (const change of equipmentChanges) {
+    if (fieldsOverlaid.has(change.field)) continue;
+    equipmentCurrent[change.field] = change.value;
+    fieldsOverlaid.add(change.field);
+  }
 
   const documents = [
     ...(documentsResponse.data ?? []).map((document) => ({
@@ -281,6 +330,7 @@ export async function GET(request: Request) {
       equipment: {
         baseline: equipmentBaseline,
         current: equipmentCurrent,
+        changes: equipmentChanges,
       },
       damages: damagesResponse.data ?? [],
       journey: {
