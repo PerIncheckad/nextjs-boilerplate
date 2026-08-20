@@ -80,6 +80,12 @@ test('AUTO normalization ignores case, whitespace, hyphens and punctuation', () 
   assert.equal(selectSaluAutoRule('MERCEDES BENZ', 'SPRINTER-316 CDI', rules)?.id, 'mb-sprinter');
 });
 
+test('verified Nybil make alias MB maps to Mercedes-Benz rules only', () => {
+  assert.equal(selectSaluAutoRule('MB', 'Sprinter 316 CDI', rules)?.id, 'mb-sprinter');
+  assert.equal(selectSaluAutoRule('MB', 'EQA 250 Advanced', rules)?.id, 'mb-default');
+  assert.equal(selectSaluAutoRule('BMW', 'X1', rules)?.id, 'bmw-default');
+});
+
 test('AUTO never guesses when the make has no rule', () => {
   assert.equal(calculateAutoSaludatum({ nyDate: '2026-01-15', make: 'Volvo', model: 'XC40', rules }), null);
 });

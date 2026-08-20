@@ -106,8 +106,13 @@ function normalizedText(value: string): string {
   return normalizeSaluTokenText(value).join(' ');
 }
 
+function normalizedMake(value: string): string {
+  const normalized = normalizedText(value);
+  return normalized === 'MB' ? 'MERCEDES BENZ' : normalized;
+}
+
 function ruleMatches(rule: SaluAutoRule, make: string, modelTokens: Set<string>): boolean {
-  if (rule.active === false || normalizedText(rule.make) !== normalizedText(make)) {
+  if (rule.active === false || normalizedMake(rule.make) !== normalizedMake(make)) {
     return false;
   }
 
