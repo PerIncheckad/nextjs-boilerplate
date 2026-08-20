@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import DocumentUpload from './document-upload';
 import EquipmentChangeControls from './equipment-change-controls';
+import JourneyMetricsPanel from './journey-metrics-panel';
 import JourneyPeriodControls from './journey-period-controls';
 
 type JourneyPeriod = {
@@ -260,6 +261,7 @@ export default function VagnkortClient() {
               <section style={card}>
                 <h2 style={{ marginTop: 0 }}>Tid i resan</h2>
                 <JourneyPeriodControls regnr={data.regnr} openPeriods={data.journey.openPeriods} onChanged={() => setRefreshNonce((value) => value + 1)} />
+                <JourneyMetricsPanel regnr={data.regnr} refreshNonce={refreshNonce} />
                 <div style={{ marginTop: '1rem' }}>
                   {Object.keys(data.journey.totalHoursByType).length === 0 ? <p>Inga avslutade perioder ännu.</p> : Object.entries(data.journey.totalHoursByType).map(([type, total]) => <div key={type} style={{ display: 'flex', justifyContent: 'space-between', padding: '.45rem 0', borderBottom: '1px solid #eee' }}><span>{type}</span><strong>{hours(total)}</strong></div>)}
                 </div>

@@ -21,6 +21,7 @@ const protectedApiPaths = [
   '/api/vehicle-edits',
   '/api/vehicle-info?reg=GEU29F',
   '/api/vehicle-journey?reg=GEU29F',
+  '/api/vehicle-journey/metrics?reg=GEU29F',
 ]
 
 test('all central protected API paths reject unauthenticated requests', async (t) => {
