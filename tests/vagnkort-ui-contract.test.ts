@@ -10,6 +10,10 @@ const uploadApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/ro
 const documentApi = readFileSync(join(process.cwd(), 'app/api/vehicle-documents/[id]/route.ts'), 'utf8');
 const periodControls = readFileSync(join(process.cwd(), 'app/vagnkort/journey-period-controls.tsx'), 'utf8');
 const periodApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/periods/route.ts'), 'utf8');
+const periodAtomicMigration = readFileSync(
+  join(process.cwd(), 'migrations/20260821002000_atomic_vehicle_journey_period_events.sql'),
+  'utf8',
+);
 const metricsPanel = readFileSync(join(process.cwd(), 'app/vagnkort/journey-metrics-panel.tsx'), 'utf8');
 const metricsApi = readFileSync(join(process.cwd(), 'app/api/vehicle-journey/metrics/route.ts'), 'utf8');
 const saluPanel = readFileSync(join(process.cwd(), 'app/vagnkort/salu-journey-panel.tsx'), 'utf8');
@@ -133,16 +137,18 @@ test('Vagnkort can start and close vehicle journey periods', () => {
   assert.match(periodControls, /\/api\/vehicle-journey\/periods/);
 });
 
-test('journey period API validates vehicle, downtime reason and appends timeline events', () => {
+test('journey period API validates input and persists period events atomically', () => {
   assert.match(periodApi, /verifyApiUser\(request\)/);
   assert.match(periodApi, /vehicleExists/);
   assert.match(periodApi, /DOWNTIME_REASONS/);
   assert.match(periodApi, /Downtime requires a valid reason/);
-  assert.match(periodApi, /PERIOD_STARTED/);
-  assert.match(periodApi, /PERIOD_ENDED/);
-  assert.match(periodApi, /vehicle_journey_periods/);
-  assert.match(periodApi, /vehicle_journey_events/);
-  assert.match(periodApi, /created_by:\s*verification\.user\.id/);
+  assert.match(periodApi, /rpc\('start_vehicle_journey_period'/);
+  assert.match(periodApi, /rpc\('close_vehicle_journey_period'/);
+  assert.match(periodAtomicMigration, /'PERIOD_STARTED'/);
+  assert.match(periodAtomicMigration, /'PERIOD_ENDED'/);
+  assert.match(periodAtomicMigration, /insert into public\.vehicle_journey_periods/i);
+  assert.match(periodAtomicMigration, /insert into public\.vehicle_journey_events/i);
+  assert.match(periodAtomicMigration, /p_actor_id/);
 });
 
 test('Vagnkort can document equipment changes as append-only journey events', () => {
