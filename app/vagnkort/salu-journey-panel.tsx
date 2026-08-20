@@ -136,6 +136,9 @@ export default function SaluJourneyPanel({ state, latestFlag, checkpoints, child
           <div style={{ fontWeight: 700, marginBottom: '.35rem' }}>Hantering</div>
           {childProcesses.map((process) => {
             const evidenceCount = documentCountForChildProcess(documents, process.child_process_id);
+            const hasSourceReason = Boolean(process.source_reason);
+            const hasOutcome = Boolean(process.outcome);
+            const hasDeadline = Boolean(process.deadline_at);
             return (
               <div key={String(process.child_process_id)} style={{ borderTop: '1px solid #eee', padding: '.55rem 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
@@ -146,11 +149,11 @@ export default function SaluJourneyPanel({ state, latestFlag, checkpoints, child
                   {process.source_checkpoint ? `Från ${text(process.source_checkpoint)} · ` : ''}
                   Ägare {text(process.owner_ref)} · {text(process.execution_system)}
                 </div>
-                {(process.source_reason || process.outcome || process.deadline_at) && (
+                {(hasSourceReason || hasOutcome || hasDeadline) && (
                   <div style={{ marginTop: '.2rem', fontSize: 13 }}>
-                    {process.source_reason ? <span>{text(process.source_reason)}</span> : null}
-                    {process.outcome ? <span>{process.source_reason ? ' · ' : ''}{text(process.outcome)}</span> : null}
-                    {process.deadline_at ? <span>{process.source_reason || process.outcome ? ' · ' : ''}Deadline {date(process.deadline_at)}</span> : null}
+                    {hasSourceReason ? <span>{text(process.source_reason)}</span> : null}
+                    {hasOutcome ? <span>{hasSourceReason ? ' · ' : ''}{text(process.outcome)}</span> : null}
+                    {hasDeadline ? <span>{hasSourceReason || hasOutcome ? ' · ' : ''}Deadline {date(process.deadline_at)}</span> : null}
                   </div>
                 )}
               </div>
