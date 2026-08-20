@@ -309,7 +309,13 @@ export default function VagnkortClient() {
               </section>
               <section style={card}>
                 <h2 style={{ marginTop: 0 }}>Dokument</h2>
-                <DocumentUpload regnr={data.regnr} onUploaded={() => setRefreshNonce((value) => value + 1)} />
+                <DocumentUpload
+                  regnr={data.regnr}
+                  damages={data.damages}
+                  checkpoints={data.salu.checkpoints}
+                  childProcesses={data.salu.childProcesses}
+                  onUploaded={() => setRefreshNonce((value) => value + 1)}
+                />
                 <div style={{ marginTop: '1rem' }}>
                   {data.documents.length === 0 ? <p>Inga dokument registrerade ännu.</p> : data.documents.slice(0, 20).map((document) => (
                     <div key={document.document_id} style={{ padding: '.55rem 0', borderBottom: '1px solid #eee', display: 'flex', gap: '.7rem', justifyContent: 'space-between', alignItems: 'center' }}>
