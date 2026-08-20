@@ -12,6 +12,7 @@ const metricsPanel = read('app/vagnkort/journey-metrics-panel.tsx');
 
 test('checkpoint read model enriches current status with definition, verified outcome and journey events', () => {
   assert.match(readModelApi, /verifyApiUser\(request\)/);
+  assert.match(readModelApi, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(readModelApi, /vehicleExists/);
   assert.match(readModelApi, /from\('vehicle_checkpoints'\)/);
   assert.match(readModelApi, /from\('checkpoint_definitions'\)/);
@@ -22,6 +23,7 @@ test('checkpoint read model enriches current status with definition, verified ou
   assert.match(readModelApi, /latestAssessment/);
   assert.match(readModelApi, /linkedJourneyEvent/);
   assert.match(readModelApi, /checkpointEvents/);
+  assert.doesNotMatch(readModelApi, /\.(insert|update|upsert|delete)\(/);
 });
 
 test('checkpoint read model exposes blocking readiness without duplicating SALU checkpoints', () => {
