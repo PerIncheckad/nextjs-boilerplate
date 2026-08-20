@@ -2,6 +2,17 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyApiUser } from '@/lib/server-auth';
 
+function isSaluSchedulerRequestAuthorized(request: NextRequest): boolean {
+  if (request.nextUrl.pathname !== '/api/salu/scheduler') return false;
+
+  const authorization = request.headers.get('authorization');
+  const tokens = [process.env.SALU_SCHEDULER_TOKEN, process.env.CRON_SECRET].filter(
+    (token): token is string => Boolean(token),
+  );
+
+  return tokens.some((token) => authorization === `Bearer ${token}`);
+}
+
 export async function proxy(request: NextRequest) {
   const url = request.nextUrl.clone();
 
@@ -10,6 +21,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (!url.pathname.startsWith('/api/') || url.pathname === '/api/health') {
+    return NextResponse.next();
+  }
+
+  if (isSaluSchedulerRequestAuthorized(request)) {
     return NextResponse.next();
   }
 
