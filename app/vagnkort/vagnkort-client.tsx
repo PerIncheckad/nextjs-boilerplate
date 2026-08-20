@@ -6,6 +6,7 @@ import DocumentUpload from './document-upload';
 import EquipmentChangeControls from './equipment-change-controls';
 import JourneyMetricsPanel from './journey-metrics-panel';
 import JourneyPeriodControls from './journey-period-controls';
+import SaluJourneyPanel from './salu-journey-panel';
 
 type JourneyPeriod = {
   period_id: string;
@@ -32,6 +33,9 @@ type VehicleDocument = {
   file_name: string;
   external_url: string | null;
   uploaded_at: string;
+  salu_flag_id?: string | null;
+  salu_checkpoint_id?: string | null;
+  salu_child_process_id?: string | null;
   sourceKind?: 'vehicle_document' | 'legacy_receipt';
 };
 
@@ -267,12 +271,14 @@ export default function VagnkortClient() {
                 </div>
               </section>
               <section style={card}>
-                <h2 style={{ marginTop: 0 }}>SALU</h2>
-                <div><strong>Status:</strong> {present(data.salu.latestFlag?.status)}</div>
-                <div><strong>SALU-datum:</strong> {present(data.salu.state?.current_saludatum)}</div>
-                <div><strong>Eskalering:</strong> {present(data.salu.latestFlag?.escalation_status)}</div>
-                <div><strong>Checkpoints:</strong> {data.salu.checkpoints.length}</div>
-                <div><strong>Barnprocesser:</strong> {data.salu.childProcesses.length}</div>
+                <h2 style={{ marginTop: 0 }}>SALU – slutdelen av bilens resa</h2>
+                <SaluJourneyPanel
+                  state={data.salu.state}
+                  latestFlag={data.salu.latestFlag}
+                  checkpoints={data.salu.checkpoints}
+                  childProcesses={data.salu.childProcesses}
+                  documents={data.documents}
+                />
               </section>
             </div>
 
