@@ -37,6 +37,36 @@ test('/api/health stays outside the API authentication boundary', async () => {
   assert.equal(response.status, 200)
 })
 
+test('SALU scheduler stays protected unless a configured scheduler token matches', async () => {
+  const originalSchedulerToken = process.env.SALU_SCHEDULER_TOKEN
+  const originalCronSecret = process.env.CRON_SECRET
+
+  delete process.env.SALU_SCHEDULER_TOKEN
+  delete process.env.CRON_SECRET
+
+  try {
+    const unauthenticated = await proxy(
+      new NextRequest('http://localhost/api/salu/scheduler'),
+    )
+    assert.equal(unauthenticated.status, 401)
+    assert.deepEqual(await unauthenticated.json(), { error: 'Authentication required' })
+
+    process.env.CRON_SECRET = 'test-cron-secret'
+    const authorized = await proxy(
+      new NextRequest('http://localhost/api/salu/scheduler', {
+        headers: { authorization: 'Bearer test-cron-secret' },
+      }),
+    )
+    assert.equal(authorized.status, 200)
+  } finally {
+    if (originalSchedulerToken === undefined) delete process.env.SALU_SCHEDULER_TOKEN
+    else process.env.SALU_SCHEDULER_TOKEN = originalSchedulerToken
+
+    if (originalCronSecret === undefined) delete process.env.CRON_SECRET
+    else process.env.CRON_SECRET = originalCronSecret
+  }
+})
+
 test('non-API application routes stay outside the API authentication boundary', async () => {
   for (const path of ['/', '/check', '/ankomst', '/status', '/nybil', '/rapport']) {
     const response = await proxy(new NextRequest(`http://localhost${path}`))
