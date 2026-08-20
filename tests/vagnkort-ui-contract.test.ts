@@ -39,6 +39,21 @@ test('Vagnkort document upload uses authenticated prepare/complete and signed St
   assert.match(upload, /Skadebild/);
 });
 
+test('Vagnkort document upload can bind evidence to vehicle, damage and SALU context', () => {
+  assert.match(upload, /Bilen generellt/);
+  assert.match(upload, /SALU-checkpoint/);
+  assert.match(upload, /SALU-åtgärd/);
+  assert.match(upload, /contextType/);
+  assert.match(upload, /contextId/);
+  assert.match(uploadApi, /resolveDocumentContext/);
+  assert.match(uploadApi, /Damage does not belong to vehicle/);
+  assert.match(uploadApi, /SALU checkpoint does not belong to vehicle/);
+  assert.match(uploadApi, /SALU action does not belong to vehicle/);
+  assert.match(uploadApi, /damage_id/);
+  assert.match(uploadApi, /salu_checkpoint_id/);
+  assert.match(uploadApi, /salu_child_process_id/);
+});
+
 test('document server API verifies identity, keeps private storage server controlled and appends a journey event', () => {
   assert.match(uploadApi, /verifyApiUser\(request\)/);
   assert.match(uploadApi, /createSignedUploadUrl/);
