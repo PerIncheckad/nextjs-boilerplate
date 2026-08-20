@@ -16,8 +16,16 @@ const DOCUMENT_TYPES = [
   ['OVRIGT', 'Övrigt'],
 ] as const;
 
+type ContextOption = {
+  value: string;
+  label: string;
+};
+
 type Props = {
   regnr: string;
+  damageOptions: ContextOption[];
+  checkpointOptions: ContextOption[];
+  childProcessOptions: ContextOption[];
   onUploaded: () => void;
 };
 
@@ -28,16 +36,42 @@ type PrepareResponse = {
 
 type CompleteResponse = { data?: { document_id: string }; error?: string };
 
-export default function DocumentUpload({ regnr, onUploaded }: Props) {
+export default function DocumentUpload({
+  regnr,
+  damageOptions,
+  checkpointOptions,
+  childProcessOptions,
+  onUploaded,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [documentType, setDocumentType] = useState('OVRIGT');
   const [title, setTitle] = useState('');
+  const [contextType, setContextType] = useState('VEHICLE');
+  const [contextId, setContextId] = useState('');
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState('');
 
+  const contextOptions = contextType === 'DAMAGE'
+    ? damageOptions
+    : contextType === 'SALU_CHECKPOINT'
+      ? checkpointOptions
+      : contextType === 'SALU_CHILD_PROCESS'
+        ? childProcessOptions
+        : [];
+
+  function changeContextType(nextType: string) {
+    setContextType(nextType);
+    setContextId('');
+  }
+
   async function uploadFiles(files: File[]) {
     if (!files.length || uploading) return;
+    if (contextType !== 'VEHICLE' && !contextId) {
+      setMessage('Välj vilken skada eller SALU-post dokumentet ska kopplas till.');
+      return;
+    }
+
     setUploading(true);
     setMessage('');
 
@@ -81,6 +115,8 @@ export default function DocumentUpload({ regnr, onUploaded }: Props) {
             sizeBytes: file.size,
             documentType,
             title: title.trim() || null,
+            contextType,
+            contextId: contextType === 'VEHICLE' ? null : contextId,
           }),
         });
         const completed = (await completeResponse.json()) as CompleteResponse;
@@ -121,6 +157,24 @@ export default function DocumentUpload({ regnr, onUploaded }: Props) {
           </select>
         </label>
         <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+          Koppla till
+          <select value={contextType} onChange={(event) => changeContextType(event.target.value)} disabled={uploading} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
+            <option value="VEHICLE">Bilen generellt</option>
+            <option value="DAMAGE">Skada</option>
+            <option value="SALU_CHECKPOINT">SALU-checkpoint</option>
+            <option value="SALU_CHILD_PROCESS">SALU-åtgärd</option>
+          </select>
+        </label>
+        {contextType !== 'VEHICLE' && (
+          <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+            Välj post
+            <select value={contextId} onChange={(event) => setContextId(event.target.value)} disabled={uploading} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
+              <option value="">Välj…</option>
+              {contextOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </label>
+        )}
+        <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
           Rubrik (valfri)
           <input value={title} onChange={(event) => setTitle(event.target.value)} disabled={uploading} placeholder="T.ex. Faktura Werksta 20/8" style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
         </label>
@@ -149,7 +203,7 @@ export default function DocumentUpload({ regnr, onUploaded }: Props) {
         <input ref={inputRef} type="file" multiple onChange={onFileInput} disabled={uploading} style={{ display: 'none' }} />
       </div>
 
-      {message && <div style={{ fontSize: 13, color: message.includes('misslyck') || message.includes('Kunde') || message.includes('större') ? '#a00' : '#176b2c' }}>{message}</div>}
+      {message && <div style={{ fontSize: 13, color: message.includes('misslyck') || message.includes('Kunde') || message.includes('större') || message.includes('Välj') ? '#a00' : '#176b2c' }}>{message}</div>}
     </div>
   );
 }
