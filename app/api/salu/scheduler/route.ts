@@ -43,9 +43,11 @@ function utcToday(): string {
 }
 
 function isAuthorized(request: Request): boolean {
-  const token = process.env.SALU_SCHEDULER_TOKEN;
-  if (!token) return false;
-  return request.headers.get('authorization') === `Bearer ${token}`;
+  const authorization = request.headers.get('authorization');
+  const tokens = [process.env.SALU_SCHEDULER_TOKEN, process.env.CRON_SECRET].filter(
+    (token): token is string => Boolean(token),
+  );
+  return tokens.some((token) => authorization === `Bearer ${token}`);
 }
 
 export async function POST(request: Request) {
@@ -162,3 +164,5 @@ export async function POST(request: Request) {
     },
   });
 }
+
+export const GET = POST;
