@@ -56,7 +56,10 @@ test('Vagnkort presents SALU as the endpoint of the vehicle journey with deviati
   assert.match(saluPanel, /Hantering/);
   assert.match(saluPanel, /salu_checkpoint_id/);
   assert.match(saluPanel, /salu_child_process_id/);
-  assert.match(saluPanel, /underlag/);
+  assert.match(saluPanel, /SALU-underlag/);
+  assert.match(saluPanel, /Öppna underlag/);
+  assert.match(saluPanel, /\/api\/vehicle-documents\/\$\{encodeURIComponent\(document\.document_id\)\}/);
+  assert.match(saluPanel, /evidenceContext/);
 });
 
 test('Vagnkort surfaces baseline/current equipment changes', () => {
