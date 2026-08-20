@@ -85,6 +85,16 @@ test('Vagnkort reuses already loaded journey context for document upload', () =>
   assert.match(upload, /Inga valbara poster/);
 });
 
+test('Vagnkort shows document context directly in the document list', () => {
+  assert.match(client, /documentContextLabel/);
+  assert.match(client, /metadata\?\.context\?\.label/);
+  assert.match(client, /Kopplat till:/);
+  assert.match(client, /SALU-checkpoint/);
+  assert.match(client, /SALU-åtgärd/);
+  assert.match(client, /Incheckning/);
+  assert.match(client, /Bilen generellt/);
+});
+
 test('Vagnkort document upload can bind evidence to vehicle, damage and SALU context', () => {
   assert.match(upload, /Bilen generellt/);
   assert.match(upload, /SALU-checkpoint/);
