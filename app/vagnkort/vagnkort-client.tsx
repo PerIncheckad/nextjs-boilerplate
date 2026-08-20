@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import DocumentUpload from './document-upload';
 
 type JourneyPeriod = {
   period_id: string;
@@ -28,6 +29,7 @@ type VehicleDocument = {
   file_name: string;
   external_url: string | null;
   uploaded_at: string;
+  sourceKind?: 'vehicle_document' | 'legacy_receipt';
 };
 
 type Damage = {
@@ -132,6 +134,8 @@ export default function VagnkortClient() {
   const [data, setData] = useState<JourneyResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [openingDocument, setOpeningDocument] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activeRegnr) return;
@@ -161,7 +165,7 @@ export default function VagnkortClient() {
     });
 
     return () => { cancelled = true; };
-  }, [activeRegnr]);
+  }, [activeRegnr, refreshNonce]);
 
   const equipmentDiffs = useMemo(() => {
     const baseline = data?.equipment.baseline;
@@ -184,6 +188,25 @@ export default function VagnkortClient() {
     window.history.replaceState(null, '', `/vagnkort?reg=${encodeURIComponent(normalized)}`);
   }
 
+  async function openDocument(document: VehicleDocument) {
+    if (document.external_url) {
+      window.open(document.external_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    setOpeningDocument(document.document_id);
+    try {
+      const response = await fetch(`/api/vehicle-documents/${encodeURIComponent(document.document_id)}`);
+      const body = await response.json() as { data?: { url: string }; error?: string };
+      if (!response.ok || !body.data?.url) throw new Error(body.error || 'Kunde inte öppna dokumentet');
+      window.open(body.data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Kunde inte öppna dokumentet');
+    } finally {
+      setOpeningDocument(null);
+    }
+  }
+
   return (
     <main style={{ minHeight: '100vh', background: '#f2f4f5', padding: '1.5rem' }}>
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -201,7 +224,7 @@ export default function VagnkortClient() {
         </form>
 
         {loading && <div style={card}>Hämtar bilens resa…</div>}
-        {error && <div style={{ ...card, color: '#a00' }}>{error}</div>}
+        {error && <div style={{ ...card, color: '#a00', marginBottom: '1rem' }}>{error}</div>}
         {!loading && data && !data.found && <div style={card}>Ingen fordonsdata hittades för {data.regnr}.</div>}
 
         {!loading && data?.found && (
@@ -244,7 +267,20 @@ export default function VagnkortClient() {
               </section>
               <section style={card}>
                 <h2 style={{ marginTop: 0 }}>Dokument</h2>
-                {data.documents.length === 0 ? <p>Inga dokument registrerade ännu.</p> : data.documents.slice(0, 12).map((document) => <div key={document.document_id} style={{ padding: '.55rem 0', borderBottom: '1px solid #eee' }}>{document.external_url ? <a href={document.external_url} target="_blank" rel="noreferrer"><strong>{document.title || document.file_name}</strong></a> : <strong>{document.title || document.file_name}</strong>}<div style={{ color: '#666', fontSize: 13 }}>{document.document_type} · {formatDate(document.uploaded_at)}</div></div>)}
+                <DocumentUpload regnr={data.regnr} onUploaded={() => setRefreshNonce((value) => value + 1)} />
+                <div style={{ marginTop: '1rem' }}>
+                  {data.documents.length === 0 ? <p>Inga dokument registrerade ännu.</p> : data.documents.slice(0, 20).map((document) => (
+                    <div key={document.document_id} style={{ padding: '.55rem 0', borderBottom: '1px solid #eee', display: 'flex', gap: '.7rem', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{document.title || document.file_name}</strong>
+                        <div style={{ color: '#666', fontSize: 13 }}>{document.document_type} · {formatDate(document.uploaded_at)}</div>
+                      </div>
+                      <button type="button" onClick={() => void openDocument(document)} disabled={openingDocument === document.document_id} style={{ border: '1px solid #bbb', borderRadius: 7, background: '#fff', padding: '.45rem .7rem', cursor: 'pointer' }}>
+                        {openingDocument === document.document_id ? 'Öppnar…' : 'Öppna'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </section>
             </div>
 
