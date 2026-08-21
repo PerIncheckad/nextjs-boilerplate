@@ -443,7 +443,7 @@ begin
       when p_next_status = 'CANCELLED' then 'CHECKPOINT_ACTION_CANCELLED'
       else 'CHECKPOINT_ACTION_STATUS_CHANGED'
     end,
-    'checkpoint-action:' || p_action_id::text || ':' || p_next_status || ':' || pg_catalog.extract(epoch from pg_catalog.clock_timestamp())::text,
+    'checkpoint-action:' || p_action_id::text || ':' || p_next_status || ':' || extract(epoch from pg_catalog.clock_timestamp())::text,
     pg_catalog.now(),
     'CHECKPOINT_ENGINE',
     'checkpoint_actions',
