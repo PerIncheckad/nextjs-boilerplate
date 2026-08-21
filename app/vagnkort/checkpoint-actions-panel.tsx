@@ -140,10 +140,11 @@ export default function CheckpointActionsPanel({
   const [outcomes, setOutcomes] = useState<Record<string, string>>({});
   const [evidence, setEvidence] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (checkpointId && deviations.some((checkpoint) => checkpoint.checkpoint_id === checkpointId)) return;
-    setCheckpointId(deviations[0]?.checkpoint_id ?? '');
-  }, [checkpointId, deviations]);
+  const selectedCheckpointId = deviations.some(
+    (checkpoint) => checkpoint.checkpoint_id === checkpointId,
+  )
+    ? checkpointId
+    : deviations[0]?.checkpoint_id ?? '';
 
   useEffect(() => {
     let cancelled = false;
@@ -204,7 +205,7 @@ export default function CheckpointActionsPanel({
     try {
       await post({
         action: 'CREATE',
-        checkpointId,
+        checkpointId: selectedCheckpointId,
         title,
         description,
         ownerFunction,
@@ -300,7 +301,7 @@ export default function CheckpointActionsPanel({
       {deviations.length > 0 && (
         <form onSubmit={createAction} style={{ marginTop: '.8rem', background: '#f7f7f7', borderRadius: 9, padding: '.75rem', display: 'grid', gap: '.55rem' }}>
           <strong>Skapa åtgärd för avvikelse</strong>
-          <select value={checkpointId} onChange={(event) => setCheckpointId(event.target.value)} required style={{ padding: '.55rem', borderRadius: 7, border: '1px solid #bbb' }}>
+          <select value={selectedCheckpointId} onChange={(event) => setCheckpointId(event.target.value)} required style={{ padding: '.55rem', borderRadius: 7, border: '1px solid #bbb' }}>
             {deviations.map((checkpoint) => (
               <option key={checkpoint.checkpoint_id} value={checkpoint.checkpoint_id}>
                 {checkpoint.definition?.title ?? checkpoint.checkpoint_code}
