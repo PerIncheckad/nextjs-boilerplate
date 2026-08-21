@@ -12,6 +12,8 @@ import { proxy } from '../proxy'
 
 const protectedApiPaths = [
   '/api/checkin-damages',
+  '/api/checkpoint-actions',
+  '/api/checkpoint-actions/read-model?reg=GEU29F',
   '/api/damage-comments',
   '/api/notify',
   '/api/notify-arrival',
