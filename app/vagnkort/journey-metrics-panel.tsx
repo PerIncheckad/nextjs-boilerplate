@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import CheckpointActionsWrapper from './checkpoint-actions-wrapper';
 import GenericCheckpointsPanel from './generic-checkpoints-panel';
 
 type JourneyMetrics = {
@@ -159,6 +160,7 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
         </div>
       )}
       <GenericCheckpointsPanel regnr={regnr} refreshNonce={refreshNonce} />
+      <CheckpointActionsWrapper regnr={regnr} refreshNonce={refreshNonce} />
     </div>
   );
 }
