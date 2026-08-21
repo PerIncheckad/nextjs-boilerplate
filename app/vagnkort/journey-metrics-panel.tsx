@@ -13,12 +13,17 @@ type JourneyMetrics = {
   rentalHours: number;
   downtimeHours: number;
   workshopHours: number;
-  availableHours: number;
+  serviceHours: number;
+  waitingPartsHours: number;
   transportHours: number;
+  administrationHours: number;
+  missingEquipmentHours: number;
+  availableHours: number;
   measuredOperationalHours: number;
   utilizationPct: number | null;
-  overlappingOperationalPeriods: boolean;
+  overlappingPrimaryPeriods: boolean;
   downtimeHoursByReason: Record<string, number>;
+  activityHoursByType: Record<string, number>;
   firstRentalAt: string | null;
   nybilToFirstRentalHours: number | null;
   lastRentalReturnAt: string | null;
@@ -35,6 +40,7 @@ type MetricsResponse = {
     metrics: JourneyMetrics;
     coverage: {
       periodCount: number;
+      activityPeriodCount: number;
       hasLifecycleStart: boolean;
       hasLifecycleEnd: boolean;
       hasSaluDate: boolean;
@@ -60,6 +66,16 @@ const reasonLabels: Record<string, string> = {
   UNSPECIFIED: 'Ej angiven',
 };
 
+const activityLabels: Record<string, string> = {
+  WORKSHOP: 'Verkstad',
+  SERVICE: 'Service',
+  WAITING_PARTS: 'Väntar reservdelar',
+  TRANSPORT: 'Transport',
+  ADMINISTRATION: 'Administration',
+  MISSING_EQUIPMENT: 'Saknad utrustning',
+  OTHER: 'Övrigt',
+};
+
 function formatHours(value: number | null | undefined) {
   if (value === null || value === undefined) return '—';
   if (value >= 24) return `${Math.round((value / 24) * 10) / 10} dygn`;
@@ -73,6 +89,7 @@ function formatPercent(value: number | null | undefined) {
 export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
   const [metrics, setMetrics] = useState<JourneyMetrics | null>(null);
   const [periodCount, setPeriodCount] = useState(0);
+  const [activityPeriodCount, setActivityPeriodCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -87,6 +104,7 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
         if (!cancelled) {
           setMetrics(body.data.metrics);
           setPeriodCount(body.data.coverage.periodCount);
+          setActivityPeriodCount(body.data.coverage.activityPeriodCount);
         }
       } catch (err) {
         if (!cancelled) {
@@ -114,6 +132,8 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
 
   const downtimeReasons = Object.entries(metrics.downtimeHoursByReason)
     .sort((left, right) => right[1] - left[1]);
+  const activities = Object.entries(metrics.activityHoursByType)
+    .sort((left, right) => right[1] - left[1]);
 
   const stats: Array<[string, string]> = [
     ['Livscykel', formatHours(metrics.lifecycleHours)],
@@ -121,7 +141,7 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
     ['Uthyrd tid', formatHours(metrics.rentalHours)],
     ['Nyttjandegrad', formatPercent(metrics.utilizationPct)],
     ['Stillestånd', formatHours(metrics.downtimeHours)],
-    ['Verkstad', formatHours(metrics.workshopHours)],
+    ['Verkstad inom stillestånd', formatHours(metrics.workshopHours)],
     ['Nybil → första uthyrning', formatHours(metrics.nybilToFirstRentalHours)],
     ['Snitt mellan uthyrningar', formatHours(metrics.averageHoursBetweenRentals)],
     ['Sista retur → SALU', formatHours(metrics.lastRentalToSaluHours)],
@@ -132,12 +152,12 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
       <div style={{ fontWeight: 700, marginBottom: '.55rem' }}>Resans nyckeltal</div>
       {periodCount === 0 && (
         <div style={{ background: '#f6f6f6', borderRadius: 8, padding: '.65rem .75rem', marginBottom: '.7rem', color: '#555' }}>
-          Ingen periodhistorik ännu. Nyckeltalen fylls på när uthyrning, stillestånd, verkstad och andra perioder registreras.
+          Ingen huvudperiodhistorik ännu. Nyckeltalen fylls på när bilens tillstånd registreras som Tillgänglig, Uthyrd, Stillestånd osv.
         </div>
       )}
-      {metrics.overlappingOperationalPeriods && (
+      {metrics.overlappingPrimaryPeriods && (
         <div style={{ background: '#fff2db', borderRadius: 8, padding: '.65rem .75rem', marginBottom: '.7rem' }}>
-          Operativa perioder överlappar. Nyttjandegrad visas därför inte förrän tidslinjen är entydig.
+          Huvudperioder överlappar. Nyttjandegrad visas därför inte förrän bilens tidslinje är entydig.
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '.55rem' }}>
@@ -150,13 +170,27 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
       </div>
       {downtimeReasons.length > 0 && (
         <div style={{ marginTop: '.8rem' }}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: '.25rem' }}>Stillestånd per orsak</div>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: '.25rem' }}>Stillestånd per huvudorsak</div>
           {downtimeReasons.map(([reason, total]) => (
             <div key={reason} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '.3rem 0', borderTop: '1px solid #eee' }}>
               <span>{reasonLabels[reason] ?? reason}</span>
               <strong>{formatHours(total)}</strong>
             </div>
           ))}
+        </div>
+      )}
+      {activityPeriodCount > 0 && activities.length > 0 && (
+        <div style={{ marginTop: '.8rem' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: '.25rem' }}>Aktiviteter inom stillestånd</div>
+          {activities.map(([activity, total]) => (
+            <div key={activity} style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', padding: '.3rem 0', borderTop: '1px solid #eee' }}>
+              <span>{activityLabels[activity] ?? activity}</span>
+              <strong>{formatHours(total)}</strong>
+            </div>
+          ))}
+          <div style={{ fontSize: 12, color: '#666', marginTop: '.4rem' }}>
+            Aktivitetstid är en del av stilleståndet och adderas inte till bilens totala operativa tid.
+          </div>
         </div>
       )}
       <GenericCheckpointsPanel regnr={regnr} refreshNonce={refreshNonce} />
