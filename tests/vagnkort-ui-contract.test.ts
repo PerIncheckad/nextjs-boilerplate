@@ -12,6 +12,7 @@ const documentApi = read('app/api/vehicle-documents/[id]/route.ts');
 const periodControls = read('app/vagnkort/journey-period-controls.tsx');
 const periodApi = read('app/api/vehicle-journey/periods/route.ts');
 const periodMigration = read('migrations/20260820222728_atomic_vehicle_journey_period_events.sql');
+const timeModelMigration = read('migrations/20260821113000_split_vehicle_state_and_activity_periods.sql');
 const metricsPanel = read('app/vagnkort/journey-metrics-panel.tsx');
 const metricsApi = read('app/api/vehicle-journey/metrics/route.ts');
 const saluPanel = read('app/vagnkort/salu-journey-panel.tsx');
@@ -34,8 +35,8 @@ test('Vagnkort reads the authenticated vehicle journey API', () => {
 
 test('Vagnkort surfaces lifecycle metrics and refreshes them with period changes', () => {
   matches(client, [/<JourneyMetricsPanel regnr=\{data\.regnr\} refreshNonce=\{refreshNonce\} \/>/]);
-  matches(metricsPanel, [/\/api\/vehicle-journey\/metrics\?reg=/, /Resans nyckeltal/, /Nyttjandegrad/, /Nybil → första uthyrning/, /Sista retur → SALU/, /Stillestånd per orsak/, /Operativa perioder överlappar/]);
-  matches(metricsApi, [/verifyApiUser\(request\)/, /computeJourneyLifecycleMetrics/]);
+  matches(metricsPanel, [/\/api\/vehicle-journey\/metrics\?reg=/, /Resans nyckeltal/, /Nyttjandegrad/, /Nybil → första uthyrning/, /Sista retur → SALU/, /Stillestånd per huvudorsak/, /Aktiviteter inom stillestånd/, /Huvudperioder överlappar/]);
+  matches(metricsApi, [/verifyApiUser\(request\)/, /computeJourneyLifecycleMetrics/, /vehicle_journey_activity_periods/]);
 });
 
 test('Vagnkort presents SALU as the endpoint with deviations, handling and evidence', () => {
@@ -72,14 +73,17 @@ test('document server API stays authenticated, private and appends a journey eve
   matches(documentApi, [/verifyApiUser\(request\)/, /createSignedUrl/, /300/]);
 });
 
-test('Vagnkort can start and close vehicle journey periods', () => {
+test('Vagnkort treats period controls as one primary vehicle state at a time', () => {
   matches(client, [/<JourneyPeriodControls regnr=/]);
-  matches(periodControls, [/Tillgänglig/, /Uthyrd/, /Stillestånd/, /Verkstad/, /Väntar reservdelar/, /action:\s*'START'/, /action:\s*'CLOSE'/, /\/api\/vehicle-journey\/periods/]);
+  matches(periodControls, [/Tillgänglig/, /Uthyrd/, /Stillestånd/, /Förberedelse/, /ett huvudtillstånd åt gången/, /aktiviteter inom ett stillestånd/, /action:\s*'TRANSITION'/, /action:\s*'CLOSE'/, /\/api\/vehicle-journey\/periods/]);
+  assert.doesNotMatch(periodControls, /\['WORKSHOP', 'Verkstad'\]/);
+  assert.doesNotMatch(periodControls, /\['TRANSPORT', 'Transport'\]/);
 });
 
-test('journey period API validates input and persists period events atomically', () => {
-  matches(periodApi, [/verifyApiUser\(request\)/, /vehicleExists/, /DOWNTIME_REASONS/, /Downtime requires a valid reason/, /rpc\('start_vehicle_journey_period'/, /rpc\('close_vehicle_journey_period'/]);
+test('journey period API validates primary states and activity periods through atomic RPCs', () => {
+  matches(periodApi, [/verifyApiUser\(request\)/, /vehicleExists/, /DOWNTIME_REASONS/, /Downtime requires a valid reason/, /rpc\('transition_vehicle_journey_state'/, /rpc\('close_vehicle_journey_period'/, /rpc\('start_vehicle_journey_activity_period'/, /rpc\('close_vehicle_journey_activity_period'/]);
   matches(periodMigration, [/'PERIOD_STARTED'/, /'PERIOD_ENDED'/, /insert into public\.vehicle_journey_periods/i, /insert into public\.vehicle_journey_events/i, /p_actor_id/]);
+  matches(timeModelMigration, [/vehicle_journey_periods_one_open_state_uidx/, /vehicle_journey_activity_periods/, /ACTIVITY_PERIOD_STARTED/, /ACTIVITY_PERIOD_ENDED/]);
 });
 
 test('Vagnkort can document equipment changes as append-only journey events', () => {
