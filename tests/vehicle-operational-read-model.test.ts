@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildOperationalReadModel } from '../lib/vehicle-operational-read-model';
 
+// Contract guard: the read model may expose VERIFIED facts or UNKNOWN, never inferred state.
 test('ingen öppen period ger UNKNOWN och skapar inget antaget tillstånd', () => {
   const model = buildOperationalReadModel([], []);
   assert.equal(model.knowledgeState, 'UNKNOWN');
