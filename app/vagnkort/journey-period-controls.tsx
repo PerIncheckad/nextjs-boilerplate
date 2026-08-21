@@ -18,15 +18,13 @@ type Props = {
   onChanged: () => void;
 };
 
-const PERIOD_TYPES = [
+const PRIMARY_PERIOD_TYPES = [
   ['AVAILABLE', 'Tillgänglig'],
   ['RENTAL', 'Uthyrd'],
   ['DOWNTIME', 'Stillestånd'],
-  ['WORKSHOP', 'Verkstad'],
-  ['TRANSPORT', 'Transport'],
   ['PREPARATION', 'Förberedelse'],
   ['SALU', 'SALU'],
-  ['OTHER', 'Övrigt'],
+  ['OTHER', 'Övrigt huvudtillstånd'],
 ] as const;
 
 const DOWNTIME_REASONS = [
@@ -46,28 +44,28 @@ function localDateTimeValue(date = new Date()) {
 }
 
 export default function JourneyPeriodControls({ regnr, openPeriods, onChanged }: Props) {
-  const [periodType, setPeriodType] = useState('RENTAL');
+  const [periodType, setPeriodType] = useState('AVAILABLE');
   const [startedAt, setStartedAt] = useState(localDateTimeValue);
   const [reasonCode, setReasonCode] = useState('DAMAGE');
   const [reasonText, setReasonText] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState('');
 
-  const openByType = useMemo(
-    () => new Map(openPeriods.map((period) => [period.period_type, period])),
+  const currentPrimary = useMemo(
+    () => openPeriods.find((period) => period.ended_at === null) ?? null,
     [openPeriods],
   );
 
-  async function startPeriod(event: FormEvent) {
+  async function transitionPeriod(event: FormEvent) {
     event.preventDefault();
-    setBusy('start');
+    setBusy('transition');
     setMessage('');
     try {
       const response = await fetch('/api/vehicle-journey/periods', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'START',
+          action: 'TRANSITION',
           regnr,
           periodType,
           startedAt: new Date(startedAt).toISOString(),
@@ -76,19 +74,19 @@ export default function JourneyPeriodControls({ regnr, openPeriods, onChanged }:
         }),
       });
       const body = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(body.error || 'Kunde inte starta perioden');
-      setMessage('Perioden är startad.');
+      if (!response.ok) throw new Error(body.error || 'Kunde inte byta huvudtillstånd');
+      setMessage('Bilens huvudtillstånd är uppdaterat. Föregående period avslutades vid samma tidpunkt.');
       setStartedAt(localDateTimeValue());
       setReasonText('');
       onChanged();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Kunde inte starta perioden.');
+      setMessage(error instanceof Error ? error.message : 'Kunde inte byta huvudtillstånd.');
     } finally {
       setBusy(null);
     }
   }
 
-  async function closePeriod(period: JourneyPeriod) {
+  async function closeCurrent(period: JourneyPeriod) {
     setBusy(period.period_id);
     setMessage('');
     try {
@@ -103,11 +101,11 @@ export default function JourneyPeriodControls({ regnr, openPeriods, onChanged }:
         }),
       });
       const body = await response.json() as { error?: string };
-      if (!response.ok) throw new Error(body.error || 'Kunde inte avsluta perioden');
-      setMessage('Perioden är avslutad.');
+      if (!response.ok) throw new Error(body.error || 'Kunde inte avsluta huvudperioden');
+      setMessage('Huvudperioden är avslutad. Bilen saknar därefter fastställt huvudtillstånd tills nästa period startas.');
       onChanged();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Kunde inte avsluta perioden.');
+      setMessage(error instanceof Error ? error.message : 'Kunde inte avsluta huvudperioden.');
     } finally {
       setBusy(null);
     }
@@ -115,36 +113,38 @@ export default function JourneyPeriodControls({ regnr, openPeriods, onChanged }:
 
   return (
     <div style={{ display: 'grid', gap: '.9rem' }}>
-      {openPeriods.length > 0 && (
+      <div style={{ background: '#f6f6f6', borderRadius: 8, padding: '.65rem .75rem', fontSize: 13, color: '#555' }}>
+        En bil har ett huvudtillstånd åt gången. Verkstad, service, transport och väntetid är aktiviteter inom ett stillestånd och räknas inte som parallella huvudperioder.
+      </div>
+
+      {currentPrimary && (
         <div style={{ display: 'grid', gap: '.45rem' }}>
-          <strong>Pågående perioder</strong>
-          {openPeriods.map((period) => (
-            <div key={period.period_id} style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem', alignItems: 'center', borderTop: '1px solid #eee', paddingTop: '.5rem' }}>
-              <div>
-                <div><strong>{period.period_type}</strong></div>
-                <div style={{ fontSize: 13, color: '#666' }}>{new Date(period.started_at).toLocaleString('sv-SE')}{period.reason_text ? ` · ${period.reason_text}` : period.reason_code ? ` · ${period.reason_code}` : ''}</div>
-              </div>
-              <button type="button" onClick={() => void closePeriod(period)} disabled={Boolean(busy)} style={{ border: 0, borderRadius: 8, background: '#111', color: '#fff', padding: '.55rem .75rem', fontWeight: 700 }}>
-                {busy === period.period_id ? 'Avslutar…' : 'Avsluta nu'}
-              </button>
+          <strong>Aktuellt huvudtillstånd</strong>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.75rem', alignItems: 'center', borderTop: '1px solid #eee', paddingTop: '.5rem' }}>
+            <div>
+              <div><strong>{currentPrimary.period_type}</strong></div>
+              <div style={{ fontSize: 13, color: '#666' }}>{new Date(currentPrimary.started_at).toLocaleString('sv-SE')}{currentPrimary.reason_text ? ` · ${currentPrimary.reason_text}` : currentPrimary.reason_code ? ` · ${currentPrimary.reason_code}` : ''}</div>
             </div>
-          ))}
+            <button type="button" onClick={() => void closeCurrent(currentPrimary)} disabled={Boolean(busy)} style={{ border: 0, borderRadius: 8, background: '#111', color: '#fff', padding: '.55rem .75rem', fontWeight: 700 }}>
+              {busy === currentPrimary.period_id ? 'Avslutar…' : 'Avsluta utan nytt tillstånd'}
+            </button>
+          </div>
         </div>
       )}
 
-      <form onSubmit={startPeriod} style={{ display: 'grid', gap: '.65rem' }}>
-        <strong>Starta ny period</strong>
+      <form onSubmit={transitionPeriod} style={{ display: 'grid', gap: '.65rem' }}>
+        <strong>{currentPrimary ? 'Byt huvudtillstånd' : 'Starta huvudtillstånd'}</strong>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '.6rem' }}>
           <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
-            Typ
+            Tillstånd
             <select value={periodType} onChange={(event) => setPeriodType(event.target.value)} disabled={Boolean(busy)} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
-              {PERIOD_TYPES.map(([value, label]) => (
-                <option key={value} value={value} disabled={openByType.has(value)}>{label}{openByType.has(value) ? ' · pågår' : ''}</option>
+              {PRIMARY_PERIOD_TYPES.map(([value, label]) => (
+                <option key={value} value={value} disabled={currentPrimary?.period_type === value}>{label}{currentPrimary?.period_type === value ? ' · pågår' : ''}</option>
               ))}
             </select>
           </label>
           <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
-            Starttid
+            Tidpunkt för bytet
             <input type="datetime-local" value={startedAt} onChange={(event) => setStartedAt(event.target.value)} disabled={Boolean(busy)} required style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
           </label>
         </div>
@@ -152,20 +152,20 @@ export default function JourneyPeriodControls({ regnr, openPeriods, onChanged }:
         {periodType === 'DOWNTIME' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '.6rem' }}>
             <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
-              Orsak
+              Huvudorsak
               <select value={reasonCode} onChange={(event) => setReasonCode(event.target.value)} disabled={Boolean(busy)} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
                 {DOWNTIME_REASONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </label>
             <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
               Kommentar {reasonCode === 'OTHER' ? '(krävs)' : '(valfri)'}
-              <input value={reasonText} onChange={(event) => setReasonText(event.target.value)} required={reasonCode === 'OTHER'} disabled={Boolean(busy)} placeholder="T.ex. väntar delar från leverantör" style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
+              <input value={reasonText} onChange={(event) => setReasonText(event.target.value)} required={reasonCode === 'OTHER'} disabled={Boolean(busy)} placeholder="T.ex. skada, väntar delar eller administrativ spärr" style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
             </label>
           </div>
         )}
 
-        <button type="submit" disabled={Boolean(busy) || openByType.has(periodType)} style={{ justifySelf: 'start', border: 0, borderRadius: 8, background: '#111', color: '#fff', padding: '.65rem 1rem', fontWeight: 700 }}>
-          {busy === 'start' ? 'Startar…' : 'Starta period'}
+        <button type="submit" disabled={Boolean(busy) || currentPrimary?.period_type === periodType} style={{ justifySelf: 'start', border: 0, borderRadius: 8, background: '#111', color: '#fff', padding: '.65rem 1rem', fontWeight: 700 }}>
+          {busy === 'transition' ? 'Sparar…' : currentPrimary ? 'Byt tillstånd' : 'Starta tillstånd'}
         </button>
       </form>
 
