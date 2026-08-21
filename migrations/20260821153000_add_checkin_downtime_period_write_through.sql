@@ -53,6 +53,13 @@ begin
 
   v_reason_text := nullif(trim(coalesce(p_checklist ->> 'rental_unavailable_comment', '')), '');
 
+  -- Missing business information is not a technical write-through failure.
+  -- Without an explicit reason no DOWNTIME fact can be established, so this is
+  -- a deliberate no-op before the technical failure boundary below.
+  if v_reason_text is null then
+    return true;
+  end if;
+
   begin
     if exists (
       select 1
@@ -67,11 +74,6 @@ begin
         and source_record_id = v_source_record_id
         and resolved_at is null;
       return true;
-    end if;
-
-    if v_reason_text is null then
-      raise exception 'Check-in rental_unavailable requires an explicit comment before DOWNTIME can be established'
-        using errcode = '22023';
     end if;
 
     select *
