@@ -6,6 +6,7 @@ import { join } from 'node:path';
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 const migration = read('migrations/20260821013000_create_checkpoint_actions_foundation.sql');
 const transitionHardening = read('migrations/20260821013100_harden_checkpoint_action_transitions.sql');
+const blockingGuard = read('migrations/20260821013200_guard_checkpoint_resolution_by_blocking_actions.sql');
 const api = read('app/api/checkpoint-actions/route.ts');
 const readModel = read('app/api/checkpoint-actions/read-model/route.ts');
 const panel = read('app/vagnkort/checkpoint-actions-panel.tsx');
@@ -60,6 +61,18 @@ test('verification requires READY_FOR_VERIFICATION and creates a new checkpoint 
   assert.match(migration, /else 'AVVIKELSE'/i);
 });
 
+test('checkpoint resolution waits until all other blocking actions are terminal', () => {
+  assert.match(blockingGuard, /function public\.verify_checkpoint_action/i);
+  assert.match(blockingGuard, /v_remaining_blocking_actions integer := 0/i);
+  assert.match(blockingGuard, /action_id <> p_action_id/i);
+  assert.match(blockingGuard, /and blocking/i);
+  assert.match(blockingGuard, /status not in \('VERIFIED', 'CANCELLED'\)/i);
+  assert.match(blockingGuard, /when v_remaining_blocking_actions > 0 then 'AVVIKELSE'/i);
+  assert.match(blockingGuard, /remainingBlockingActions/i);
+  assert.match(blockingGuard, /checkpointResolved/i);
+  assert.match(blockingGuard, /checkpoint_resolved/i);
+});
+
 test('generic actions do not duplicate SALU inline actions or child processes', () => {
   assert.doesNotMatch(migration, /insert into public\.salu_inline_actions/i);
   assert.doesNotMatch(migration, /insert into public\.salu_child_processes/i);
@@ -103,6 +116,7 @@ test('Vagnkort makes deviation actions operational through responsibility, deadl
   assert.match(panel, /Verifiera utfall/);
   assert.match(panel, /Försenad/);
   assert.match(panel, /Historik/);
+  assert.match(panel, /selectedCheckpointId/);
   assert.match(panel, /fetch\('\/api\/checkpoint-actions'/);
   assert.match(panel, /action: 'CREATE'/);
   assert.match(panel, /action: 'TRANSITION'/);
