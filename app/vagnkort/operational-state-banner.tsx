@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 type OperationalState = {
   knowledgeState: 'VERIFIED' | 'UNKNOWN';
@@ -24,6 +25,8 @@ type OperationalState = {
 };
 
 type ApiResponse = { data?: OperationalState; error?: string };
+type LoadedState = { regnr: string; data: OperationalState | null };
+type LoadedError = { regnr: string; message: string };
 
 function formatDate(value: string | null) {
   if (!value) return '—';
@@ -37,31 +40,33 @@ function sourceLabel(source: string | null, entity: string | null) {
 }
 
 export default function OperationalStateBanner() {
-  const [state, setState] = useState<OperationalState | null>(null);
-  const [regnr, setRegnr] = useState('');
-  const [error, setError] = useState('');
+  const searchParams = useSearchParams();
+  const regnr = (searchParams.get('reg') ?? '').toUpperCase().replace(/\s+/g, '');
+  const [loaded, setLoaded] = useState<LoadedState | null>(null);
+  const [loadedError, setLoadedError] = useState<LoadedError | null>(null);
 
   useEffect(() => {
-    const normalized = (new URLSearchParams(window.location.search).get('reg') ?? '')
-      .toUpperCase()
-      .replace(/\s+/g, '');
-    setRegnr(normalized);
-    if (!normalized) return;
+    if (!regnr) return;
 
     let cancelled = false;
     void (async () => {
       try {
-        const response = await fetch(`/api/vehicle-journey/operational-state?reg=${encodeURIComponent(normalized)}`);
+        const response = await fetch(`/api/vehicle-journey/operational-state?reg=${encodeURIComponent(regnr)}`);
         const body = (await response.json()) as ApiResponse;
         if (!response.ok) throw new Error(body.error || 'Kunde inte läsa verifierat fordonsläge');
-        if (!cancelled) setState(body.data ?? null);
+        if (!cancelled) setLoaded({ regnr, data: body.data ?? null });
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Kunde inte läsa verifierat fordonsläge');
+        if (!cancelled) {
+          setLoadedError({
+            regnr,
+            message: err instanceof Error ? err.message : 'Kunde inte läsa verifierat fordonsläge',
+          });
+        }
       }
     })();
 
     return () => { cancelled = true; };
-  }, []);
+  }, [regnr]);
 
   if (!regnr) return null;
 
@@ -74,10 +79,11 @@ export default function OperationalStateBanner() {
     boxShadow: '0 8px 30px rgba(0,0,0,0.08)',
   };
 
-  if (error) {
-    return <section style={{ ...shell, border: '1px solid #d9d9d9' }}><strong>Verifierat fordonsläge kunde inte läsas.</strong><div style={{ marginTop: '.35rem', color: '#666' }}>{error}</div></section>;
+  if (loadedError?.regnr === regnr) {
+    return <section style={{ ...shell, border: '1px solid #d9d9d9' }}><strong>Verifierat fordonsläge kunde inte läsas.</strong><div style={{ marginTop: '.35rem', color: '#666' }}>{loadedError.message}</div></section>;
   }
 
+  const state = loaded?.regnr === regnr ? loaded.data : null;
   if (!state) {
     return <section style={shell}>Läser verifierat fordonsläge…</section>;
   }
