@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import GenericCheckpointsPanel from './generic-checkpoints-panel';
 
 type JourneyMetrics = {
   lifecycleStartAt: string | null;
@@ -157,6 +158,7 @@ export default function JourneyMetricsPanel({ regnr, refreshNonce }: Props) {
           ))}
         </div>
       )}
+      <GenericCheckpointsPanel regnr={regnr} refreshNonce={refreshNonce} />
     </div>
   );
 }
