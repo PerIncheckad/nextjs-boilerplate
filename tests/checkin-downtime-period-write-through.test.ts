@@ -32,9 +32,10 @@ test('explicit unavailable Check-in creates one idempotent DOWNTIME fact with so
   assert.match(migration, /'sourceField', 'checklist\.rental_unavailable'/i);
 });
 
-test('explicit unavailable Check-in requires the operator comment', () => {
-  assert.match(migration, /Check-in rental_unavailable requires an explicit comment before DOWNTIME can be established/i);
-  assert.match(migration, /'OTHER',[\s\S]*v_reason_text/i);
+test('explicit unavailable Check-in without comment is a business no-op before failure logging', () => {
+  assert.match(migration, /v_reason_text := nullif\(trim\(coalesce\(p_checklist ->> 'rental_unavailable_comment', ''\)\), ''\);[\s\S]*if v_reason_text is null then\s+return true;\s+end if;[\s\S]*begin/i);
+  assert.doesNotMatch(migration, /rental_unavailable requires an explicit comment/i);
+  assert.match(migration, /period_write_through_failures/i);
 });
 
 test('existing DOWNTIME is continued and confirmed without splitting the open period', () => {
