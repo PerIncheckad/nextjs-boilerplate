@@ -6,8 +6,8 @@ import { NextRequest } from 'next/server';
 import { proxy } from '../proxy';
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
-const contract = read('migrations/20260821050000_add_checkpoint_action_timer_contract.sql');
-const runner = read('migrations/20260821050100_add_checkpoint_action_timer_runner.sql');
+const contract = read('migrations/20260821070723_add_checkpoint_action_timer_contract.sql');
+const runner = read('migrations/20260821070855_add_checkpoint_action_timer_runner.sql');
 const scheduler = read('app/api/checkpoint-actions/scheduler/route.ts');
 const readModel = read('app/api/checkpoint-actions/read-model/route.ts');
 const panel = read('app/vagnkort/checkpoint-actions-panel.tsx');
