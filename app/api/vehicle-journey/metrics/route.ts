@@ -50,10 +50,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Vehicle journey unavailable' }, { status: 503 });
   }
 
-  const [periodsResponse, nybilResponse, vehicleResponse, saluResponse] = await Promise.all([
+  const [periodsResponse, activitiesResponse, nybilResponse, vehicleResponse, saluResponse] = await Promise.all([
     admin
       .from('vehicle_journey_periods')
       .select('period_type,started_at,ended_at,reason_code')
+      .eq('regnr', regnr)
+      .order('started_at', { ascending: true }),
+    admin
+      .from('vehicle_journey_activity_periods')
+      .select('activity_type,started_at,ended_at')
       .eq('regnr', regnr)
       .order('started_at', { ascending: true }),
     admin
@@ -76,6 +81,7 @@ export async function GET(request: Request) {
 
   const failedSource = firstError([
     ['periods', periodsResponse.error],
+    ['activities', activitiesResponse.error],
     ['nybil', nybilResponse.error],
     ['vehicle', vehicleResponse.error],
     ['SALU', saluResponse.error],
@@ -104,6 +110,7 @@ export async function GET(request: Request) {
 
   const metrics = computeJourneyLifecycleMetrics({
     periods: periodsResponse.data ?? [],
+    activities: activitiesResponse.data ?? [],
     lifecycleStartAt,
     lifecycleEndAt,
     saluAt,
@@ -115,6 +122,7 @@ export async function GET(request: Request) {
       metrics,
       coverage: {
         periodCount: periodsResponse.data?.length ?? 0,
+        activityPeriodCount: activitiesResponse.data?.length ?? 0,
         hasLifecycleStart: Boolean(lifecycleStartAt),
         hasLifecycleEnd: Boolean(lifecycleEndAt),
         hasSaluDate: Boolean(saluAt),
