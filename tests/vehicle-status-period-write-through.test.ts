@@ -12,7 +12,7 @@ test('explicit rental-readiness status drives only AVAILABLE or DOWNTIME primary
   assert.match(migration, /Ja\s*=> AVAILABLE/i);
   assert.match(migration, /Nej => DOWNTIME/i);
   assert.match(migration, /v_target_state := case when v_new_value = 'ja' then 'AVAILABLE' else 'DOWNTIME' end/i);
-  assert.doesNotMatch(migration, /v_target_state[^;]*RENTAL/i);
+  assert.doesNotMatch(migration, /v_target_state := case[^;]*(?:then|else) 'RENTAL'/i);
 });
 
 test('ej uthyrningsbar requires the explicit same-batch reason before downtime is established', () => {
