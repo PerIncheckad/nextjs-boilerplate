@@ -2,15 +2,25 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { verifyApiUser } from '@/lib/server-auth';
 
-function isSaluSchedulerRequestAuthorized(request: NextRequest): boolean {
-  if (request.nextUrl.pathname !== '/api/salu/scheduler') return false;
-
+function isSchedulerRequestAuthorized(request: NextRequest): boolean {
   const authorization = request.headers.get('authorization');
-  const tokens = [process.env.SALU_SCHEDULER_TOKEN, process.env.CRON_SECRET].filter(
-    (token): token is string => Boolean(token),
-  );
 
-  return tokens.some((token) => authorization === `Bearer ${token}`);
+  if (request.nextUrl.pathname === '/api/salu/scheduler') {
+    const tokens = [process.env.SALU_SCHEDULER_TOKEN, process.env.CRON_SECRET].filter(
+      (token): token is string => Boolean(token),
+    );
+    return tokens.some((token) => authorization === `Bearer ${token}`);
+  }
+
+  if (request.nextUrl.pathname === '/api/checkpoint-actions/scheduler') {
+    const tokens = [
+      process.env.CHECKPOINT_ACTION_SCHEDULER_TOKEN,
+      process.env.CRON_SECRET,
+    ].filter((token): token is string => Boolean(token));
+    return tokens.some((token) => authorization === `Bearer ${token}`);
+  }
+
+  return false;
 }
 
 export async function proxy(request: NextRequest) {
@@ -24,7 +34,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isSaluSchedulerRequestAuthorized(request)) {
+  if (isSchedulerRequestAuthorized(request)) {
     return NextResponse.next();
   }
 
