@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import DocumentUpload from './document-upload';
+import PeriodManager from './period-manager';
 
 type JourneyPeriod = {
   period_id: string;
@@ -241,6 +242,9 @@ export default function VagnkortClient() {
             </section>
 
             <div style={grid}>
+              <section style={card}>
+                <PeriodManager regnr={data.regnr} openPeriods={data.journey.openPeriods} onChanged={() => setRefreshNonce((value) => value + 1)} />
+              </section>
               <section style={card}>
                 <h2 style={{ marginTop: 0 }}>Tid i resan</h2>
                 {Object.keys(data.journey.totalHoursByType).length === 0 ? <p>Inga perioder registrerade ännu.</p> : Object.entries(data.journey.totalHoursByType).map(([type, total]) => <div key={type} style={{ display: 'flex', justifyContent: 'space-between', padding: '.45rem 0', borderBottom: '1px solid #eee' }}><span>{type}</span><strong>{hours(total)}</strong></div>)}
