@@ -106,7 +106,7 @@ test('Vagnkort makes deviation actions operational through responsibility, deadl
   assert.match(metricsPanel, /CheckpointActionsWrapper/);
   assert.match(wrapper, /\/api\/vehicle-checkpoints\/read-model\?reg=/);
   assert.match(wrapper, /<CheckpointActionsPanel/);
-  assert.match(panel, /Åtgärder och ny verifiering/);
+  assert.match(panel, /Åtgärder, timer och ny verifiering/);
   assert.match(panel, /Ansvarig funktion/);
   assert.match(panel, /Ansvarig person\/referens/);
   assert.match(panel, /datetime-local/);

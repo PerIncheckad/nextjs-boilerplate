@@ -25,6 +25,15 @@ type ActionRow = {
   outcome: string | null;
   outcome_comment: string | null;
   verification_assessment_id: string | null;
+  timer_rule_code: string;
+  timer_rule_version: number;
+  timer_status: string;
+  reminder_count: number;
+  last_reminder_at: string | null;
+  overdue_at: string | null;
+  escalated_at: string | null;
+  timer_closed_at: string | null;
+  next_timer_at: string | null;
   created_by_email: string | null;
   created_at: string;
   accepted_at: string | null;
@@ -40,6 +49,7 @@ type ActionEventRow = {
   action_event_id: string;
   action_id: string;
   checkpoint_id: string;
+  event_key: string | null;
   event_type: string;
   previous_status: string | null;
   status: string;
@@ -123,6 +133,9 @@ export async function GET(request: Request) {
             readyForVerification: 0,
             verified: 0,
             cancelled: 0,
+            dueSoon: 0,
+            escalated: 0,
+            reminders: 0,
           },
           actions: [],
         },
@@ -135,7 +148,7 @@ export async function GET(request: Request) {
     const [actionResponse, definitionResponse] = await Promise.all([
       admin
         .from('checkpoint_actions')
-        .select('action_id,checkpoint_id,source_assessment_id,title,description,owner_function,owner_ref,deadline_at,blocking,status,outcome,outcome_comment,verification_assessment_id,created_by_email,created_at,accepted_at,ready_for_verification_at,verified_at,cancelled_at,cancel_reason,updated_by_email,updated_at')
+        .select('action_id,checkpoint_id,source_assessment_id,title,description,owner_function,owner_ref,deadline_at,blocking,status,outcome,outcome_comment,verification_assessment_id,timer_rule_code,timer_rule_version,timer_status,reminder_count,last_reminder_at,overdue_at,escalated_at,timer_closed_at,next_timer_at,created_by_email,created_at,accepted_at,ready_for_verification_at,verified_at,cancelled_at,cancel_reason,updated_by_email,updated_at')
         .in('checkpoint_id', checkpointIds)
         .order('created_at', { ascending: false }),
       admin
@@ -154,7 +167,7 @@ export async function GET(request: Request) {
       ? { data: [], error: null }
       : await admin
           .from('checkpoint_action_events')
-          .select('action_event_id,action_id,checkpoint_id,event_type,previous_status,status,comment,actor_email,actor_source,occurred_at,payload')
+          .select('action_event_id,action_id,checkpoint_id,event_key,event_type,previous_status,status,comment,actor_email,actor_source,occurred_at,payload')
           .in('action_id', actionIds)
           .order('occurred_at', { ascending: false });
 
@@ -185,10 +198,15 @@ export async function GET(request: Request) {
         : null;
       const terminal = action.status === 'VERIFIED' || action.status === 'CANCELLED';
       const deadline = new Date(action.deadline_at).getTime();
+      const overdue = !terminal && (
+        action.timer_status === 'OVERDUE'
+        || action.timer_status === 'ESCALATED'
+        || (Number.isFinite(deadline) && deadline < now)
+      );
 
       return {
         ...action,
-        overdue: !terminal && Number.isFinite(deadline) && deadline < now,
+        overdue,
         checkpoint: checkpoint
           ? {
               ...checkpoint,
@@ -201,9 +219,12 @@ export async function GET(request: Request) {
 
     const summary = enriched.reduce((totals, action) => {
       totals.total += 1;
+      totals.reminders += action.reminder_count;
       if (action.status === 'VERIFIED') totals.verified += 1;
       if (action.status === 'CANCELLED') totals.cancelled += 1;
       if (action.status === 'READY_FOR_VERIFICATION') totals.readyForVerification += 1;
+      if (action.timer_status === 'DUE_SOON') totals.dueSoon += 1;
+      if (action.timer_status === 'ESCALATED') totals.escalated += 1;
       if (action.overdue) totals.overdue += 1;
       if (action.status !== 'VERIFIED' && action.status !== 'CANCELLED') {
         totals.open += 1;
@@ -218,6 +239,9 @@ export async function GET(request: Request) {
       readyForVerification: 0,
       verified: 0,
       cancelled: 0,
+      dueSoon: 0,
+      escalated: 0,
+      reminders: 0,
     });
 
     return NextResponse.json({ data: { regnr, summary, actions: enriched } });

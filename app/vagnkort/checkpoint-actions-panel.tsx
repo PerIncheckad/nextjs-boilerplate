@@ -14,6 +14,7 @@ type CheckpointOption = {
 
 type ActionEvent = {
   action_event_id: string;
+  event_key: string | null;
   event_type: string;
   previous_status: string | null;
   status: string;
@@ -35,6 +36,15 @@ type CheckpointAction = {
   status: string;
   outcome: string | null;
   outcome_comment: string | null;
+  timer_rule_code: string;
+  timer_rule_version: number;
+  timer_status: string;
+  reminder_count: number;
+  last_reminder_at: string | null;
+  overdue_at: string | null;
+  escalated_at: string | null;
+  timer_closed_at: string | null;
+  next_timer_at: string | null;
   created_at: string;
   accepted_at: string | null;
   ready_for_verification_at: string | null;
@@ -64,6 +74,9 @@ type ActionReadModel = {
     readyForVerification: number;
     verified: number;
     cancelled: number;
+    dueSoon: number;
+    escalated: number;
+    reminders: number;
   };
   actions: CheckpointAction[];
 };
@@ -84,6 +97,14 @@ const actionStatusLabels: Record<string, string> = {
   CANCELLED: 'Avbruten',
 };
 
+const timerStatusLabels: Record<string, string> = {
+  NORMAL: 'Timer aktiv',
+  DUE_SOON: 'Förfaller snart',
+  OVERDUE: 'Försenad',
+  ESCALATED: 'Eskalerad',
+  CLOSED: 'Timer stängd',
+};
+
 const outcomeLabels: Record<string, string> = {
   ATGARDAD: 'Åtgärdad',
   ACCEPTERAD_AVVIKELSE: 'Accepterad avvikelse',
@@ -102,6 +123,14 @@ function statusStyle(status: string): React.CSSProperties {
   if (status === 'CANCELLED') return { background: '#eeeeee', color: '#555555' };
   if (status === 'READY_FOR_VERIFICATION') return { background: '#e8f0ff', color: '#244d93' };
   return { background: '#fff2db', color: '#704300' };
+}
+
+function timerStatusStyle(status: string): React.CSSProperties {
+  if (status === 'ESCALATED') return { background: '#7d1712', color: '#ffffff' };
+  if (status === 'OVERDUE') return { background: '#fde8e7', color: '#8a1f17' };
+  if (status === 'DUE_SOON') return { background: '#fff2db', color: '#704300' };
+  if (status === 'CLOSED') return { background: '#eeeeee', color: '#555555' };
+  return { background: '#e7f6eb', color: '#165c2e' };
 }
 
 function defaultDeadline() {
@@ -279,9 +308,9 @@ export default function CheckpointActionsPanel({
   return (
     <div style={{ marginTop: '1rem', borderTop: '1px solid #e5e5e5', paddingTop: '1rem' }}>
       <div>
-        <div style={{ fontWeight: 700 }}>Åtgärder och ny verifiering</div>
+        <div style={{ fontWeight: 700 }}>Åtgärder, timer och ny verifiering</div>
         <div style={{ color: '#666', fontSize: 13, marginTop: '.15rem' }}>
-          En avvikelse får ansvar, deadline och utförande. Åtgärden avslutas först efter en separat verifiering.
+          En avvikelse får ansvar, deadline, påminnelser och eskalering. Åtgärden avslutas först efter en separat verifiering.
         </div>
       </div>
 
@@ -289,9 +318,12 @@ export default function CheckpointActionsPanel({
         <div style={{ display: 'flex', gap: '.4rem', flexWrap: 'wrap', marginTop: '.7rem' }}>
           <span style={{ background: '#eee', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.total} totalt</span>
           <span style={{ background: '#fff2db', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.open} öppna</span>
+          <span style={{ background: '#fff2db', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.dueSoon} förfaller snart</span>
           <span style={{ background: '#fde8e7', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.overdue} försenade</span>
+          <span style={{ background: '#7d1712', color: '#fff', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.escalated} eskalerade</span>
           <span style={{ background: '#fde8e7', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.blockingOpen} blockerande</span>
           <span style={{ background: '#e8f0ff', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.readyForVerification} för verifiering</span>
+          <span style={{ background: '#eee', borderRadius: 999, padding: '.25rem .55rem', fontSize: 12 }}>{summary.reminders} påminnelser</span>
         </div>
       )}
 
@@ -337,9 +369,12 @@ export default function CheckpointActionsPanel({
           {data.actions.map((action) => {
             const busy = busyActionId === action.action_id;
             const terminal = action.status === 'VERIFIED' || action.status === 'CANCELLED';
+            const effectiveTimerStatus = action.timer_status === 'NORMAL' && action.overdue
+              ? 'OVERDUE'
+              : action.timer_status;
 
             return (
-              <article key={action.action_id} style={{ border: action.overdue ? '1px solid #d33' : '1px solid #e4e4e4', borderRadius: 9, padding: '.75rem' }}>
+              <article key={action.action_id} style={{ border: effectiveTimerStatus === 'ESCALATED' ? '2px solid #7d1712' : action.overdue ? '1px solid #d33' : '1px solid #e4e4e4', borderRadius: 9, padding: '.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: '.6rem', flexWrap: 'wrap' }}>
                   <div>
                     <strong>{action.title}</strong>
@@ -349,7 +384,9 @@ export default function CheckpointActionsPanel({
                   </div>
                   <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
                     {action.blocking && <span style={{ background: '#fde8e7', borderRadius: 999, padding: '.2rem .5rem', fontSize: 12, fontWeight: 700 }}>Blockerande</span>}
-                    {action.overdue && <span style={{ background: '#fde8e7', color: '#8a1f17', borderRadius: 999, padding: '.2rem .5rem', fontSize: 12, fontWeight: 700 }}>Försenad</span>}
+                    <span style={{ ...timerStatusStyle(effectiveTimerStatus), borderRadius: 999, padding: '.2rem .5rem', fontSize: 12, fontWeight: 700 }}>
+                      {timerStatusLabels[effectiveTimerStatus] ?? effectiveTimerStatus}
+                    </span>
                     <span style={{ ...statusStyle(action.status), borderRadius: 999, padding: '.2rem .5rem', fontSize: 12, fontWeight: 700 }}>{actionStatusLabels[action.status] ?? action.status}</span>
                   </div>
                 </div>
@@ -360,7 +397,16 @@ export default function CheckpointActionsPanel({
                   <div><strong>Ansvar:</strong> {action.owner_function}{action.owner_ref ? ` · ${action.owner_ref}` : ''}</div>
                   <div><strong>Deadline:</strong> {formatDate(action.deadline_at)}</div>
                   <div><strong>Utfall:</strong> {action.outcome ? outcomeLabels[action.outcome] ?? action.outcome : '—'}</div>
+                  <div><strong>Påminnelser:</strong> {action.reminder_count}</div>
+                  <div><strong>Senaste påminnelse:</strong> {formatDate(action.last_reminder_at)}</div>
+                  <div><strong>Nästa timer:</strong> {formatDate(action.next_timer_at)}</div>
                 </div>
+
+                {effectiveTimerStatus === 'ESCALATED' && (
+                  <div style={{ marginTop: '.6rem', background: '#fde8e7', color: '#8a1f17', borderRadius: 8, padding: '.6rem .7rem', fontSize: 13 }}>
+                    Åtgärden eskalerades {formatDate(action.escalated_at)} och kräver omedelbar uppföljning.
+                  </div>
+                )}
 
                 {!terminal && (
                   <div style={{ display: 'grid', gap: '.45rem', marginTop: '.65rem' }}>
@@ -391,7 +437,7 @@ export default function CheckpointActionsPanel({
                 {action.events.length > 0 && (
                   <details style={{ marginTop: '.6rem' }}>
                     <summary style={{ cursor: 'pointer', fontSize: 12, color: '#666' }}>Historik ({action.events.length})</summary>
-                    {action.events.slice(0, 5).map((event) => (
+                    {action.events.slice(0, 8).map((event) => (
                       <div key={event.action_event_id} style={{ borderTop: '1px solid #eee', padding: '.35rem 0', fontSize: 12 }}>
                         <strong>{event.event_type}</strong> · {actionStatusLabels[event.status] ?? event.status} · {formatDate(event.occurred_at)}
                         {event.actor_email ? ` · ${event.actor_email}` : ''}
