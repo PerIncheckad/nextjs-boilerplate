@@ -76,8 +76,17 @@ test('document server API stays authenticated, private and appends a journey eve
 test('Vagnkort treats period controls as one primary vehicle state at a time', () => {
   matches(client, [/<JourneyPeriodControls regnr=/]);
   matches(periodControls, [/Tillgänglig/, /Uthyrd/, /Stillestånd/, /Förberedelse/, /ett huvudtillstånd åt gången/, /aktiviteter inom ett stillestånd/, /action:\s*'TRANSITION'/, /action:\s*'CLOSE'/, /\/api\/vehicle-journey\/periods/]);
-  assert.doesNotMatch(periodControls, /\['WORKSHOP', 'Verkstad'\]/);
-  assert.doesNotMatch(periodControls, /\['TRANSPORT', 'Transport'\]/);
+
+  const primaryBlock = periodControls.match(/const PRIMARY_PERIOD_TYPES = \[([\s\S]*?)\] as const;/)?.[1] ?? '';
+  assert.match(primaryBlock, /AVAILABLE/);
+  assert.match(primaryBlock, /RENTAL/);
+  assert.match(primaryBlock, /DOWNTIME/);
+  assert.doesNotMatch(primaryBlock, /WORKSHOP/);
+  assert.doesNotMatch(primaryBlock, /TRANSPORT/);
+
+  const reasonBlock = periodControls.match(/const DOWNTIME_REASONS = \[([\s\S]*?)\] as const;/)?.[1] ?? '';
+  assert.match(reasonBlock, /WORKSHOP/);
+  assert.match(reasonBlock, /TRANSPORT/);
 });
 
 test('journey period API validates primary states and activity periods through atomic RPCs', () => {
