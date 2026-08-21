@@ -54,7 +54,10 @@ export default function OperationalStateBanner() {
         const response = await fetch(`/api/vehicle-journey/operational-state?reg=${encodeURIComponent(regnr)}`);
         const body = (await response.json()) as ApiResponse;
         if (!response.ok) throw new Error(body.error || 'Kunde inte läsa verifierat fordonsläge');
-        if (!cancelled) setLoaded({ regnr, data: body.data ?? null });
+        if (!cancelled) {
+          setLoadedError((current) => current?.regnr === regnr ? null : current);
+          setLoaded({ regnr, data: body.data ?? null });
+        }
       } catch (err) {
         if (!cancelled) {
           setLoadedError({
