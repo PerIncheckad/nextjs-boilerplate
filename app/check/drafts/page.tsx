@@ -1,9 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
 
 type DraftRow = { regnr: string; updated_at: string };
+
+type DraftResponse = {
+  data?: DraftRow[];
+  error?: string;
+};
 
 export default function DraftsPage() {
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
@@ -11,19 +15,27 @@ export default function DraftsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase
-        .from('checkin_drafts')
-        .select('regnr, updated_at')
-        .order('updated_at', { ascending: false })
-        .limit(50);
 
-      if (!cancelled) {
-        if (error) console.error(error);
-        setDrafts((data as DraftRow[]) || []);
-        setLoading(false);
+    (async () => {
+      try {
+        const response = await fetch('/api/checkin-drafts');
+        const payload = await response.json() as DraftResponse;
+
+        if (!response.ok) {
+          throw new Error(payload.error || 'Kunde inte läsa utkast');
+        }
+
+        if (!cancelled) {
+          setDrafts(payload.data ?? []);
+        }
+      } catch (error) {
+        console.error(error);
+        if (!cancelled) setDrafts([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
+
     return () => { cancelled = true; };
   }, []);
 
