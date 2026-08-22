@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState, useMemo } from "react";
 import stationer from '../../data/stationer.json';
-import { supabase } from "@/lib/supabase";
 import MediaModal from "@/components/MediaModal";
 
 // ==============================
@@ -15,9 +14,9 @@ type DamageWithVehicle = {
   damage_date: string;
   ort: string;
   station_namn: string;
-  damage_type: string; // Använder nu det primära fältet
-  notering: string; // Generell notering
-  description: string; // Specifik skadebeskrivning/kommentar
+  damage_type: string;
+  notering: string;
+  description: string;
   inchecker_name?: string;
   godkandAv?: string;
   media_url?: string;
@@ -25,18 +24,16 @@ type DamageWithVehicle = {
   brand?: string;
   model?: string;
   region?: string;
-  // Fält som inte längre behövs här men kan finnas i datan:
-  damage_type_raw?: string; 
+  damage_type_raw?: string;
   note_internal?: string;
   huvudstation_id?: string;
   station_id?: string;
   saludatum?: string;
 };
 
-type MediaItem = {
-  url: string;
-  type: "image" | "video";
-  comment?: string;
+type ReportResponse<T> = {
+  data?: T;
+  error?: string;
 };
 
 const SortArrow = ({ column, sortKey, sortOrder }: { column: string, sortKey: string, sortOrder: string }) => {
@@ -73,14 +70,16 @@ function formatCheckinTime(row: DamageWithVehicle): string {
   } catch { return ""; }
 }
 
-const mapOrtToRegion = (ort: string): string => {
-    if (!ort) return "--";
-    const ortLower = ort.toLowerCase();
-    if (['halmstad', 'varberg', 'falkenberg'].includes(ortLower)) return 'Norr';
-    if (['helsingborg', 'ängelholm'].includes(ortLower)) return 'Mitt';
-    if (['malmö', 'trelleborg', 'lund'].includes(ortLower)) return 'Syd';
-    return "--";
-};
+async function readReportApi<T>(url: string): Promise<T> {
+  const response = await fetch(url);
+  const body = await response.json() as ReportResponse<T>;
+
+  if (!response.ok) {
+    throw new Error(body.error || `HTTP ${response.status}`);
+  }
+
+  return body.data ?? ([] as T);
+}
 
 // ==============================
 // Huvudkomponent
@@ -95,7 +94,7 @@ export default function RapportPage() {
   const [plats, setPlats] = useState(platsAlternativ[0]);
   const [sortKey, setSortKey] = useState("created_at");
   const [sortOrder, setSortOrder] = useState("desc");
-  
+
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMedia, setModalMedia] = useState<any[]>([]);
   const [modalTitle, setModalTitle] = useState("");
@@ -103,36 +102,25 @@ export default function RapportPage() {
   const [modalIdx, setModalIdx] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchAllData() {
       setLoading(true);
       setError("");
       try {
-        const { data: damagesData, error: damagesError } = await supabase
-          .from("damages")
-          .select('*')
-          .order("created_at", { ascending: false });
-        if (damagesError) throw damagesError;
-
-        const { data: vehiclesData, error: vehiclesError } = await supabase.from("vehicles").select("regnr, brand, model");
-        if (vehiclesError) throw vehiclesError;
-
-        const vehiclesMap = new Map(vehiclesData.map(v => [v.regnr, v]));
-        
-        const combinedData = damagesData.map((damage: any) => ({
-          ...damage,
-          brand: vehiclesMap.get(damage.regnr)?.brand,
-          model: vehiclesMap.get(damage.regnr)?.model,
-          region: mapOrtToRegion(damage.ort),
-        }));
-
-        setAllDamages(combinedData);
-      } catch (e: any) {
-        setError("Misslyckades hämta data: " + e.message);
+        const rows = await readReportApi<DamageWithVehicle[]>('/api/report-damages');
+        if (!cancelled) setAllDamages(rows);
+      } catch (e: unknown) {
+        if (!cancelled) {
+          setError("Misslyckades hämta data: " + (e instanceof Error ? e.message : 'Okänt fel'));
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
+
     fetchAllData();
+    return () => { cancelled = true; };
   }, []);
 
   const filteredRows = useMemo(() => {
@@ -180,35 +168,38 @@ export default function RapportPage() {
     setModalOpen(true);
     setModalIsLoading(true);
     setModalTitle(`${row.regnr} - ${row.damage_type || "--"}`);
-    setModalMedia([]); // Rensa gammal media direkt
+    setModalMedia([]);
     setModalIdx(0);
 
-    const { data, error } = await supabase.from('damage_media').select('url, type, comment').eq('damage_id', row.id);
-    
-    if (error || !data) {
-      console.error("Kunde inte hämta media:", error);
-      setModalMedia([]); // Sätt till tom array vid fel
-    } else {
+    try {
+      const data = await readReportApi<Array<{ url: string; type: string; comment?: string }>>(
+        `/api/report-damages?damageId=${encodeURIComponent(row.id)}`,
+      );
+
       const formattedMedia = data.map(media => ({
-          url: media.url,
-          type: media.type as 'image' | 'video',
-          metadata: {
-              date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
-              time: formatCheckinTime(row),
-              damageType: row.damage_type || "--",
-              station: row.station_namn || "--",
-              note: media.comment || row.description, // Specifik notering från media, fallback till skada
-              generalNote: row.notering, // Generell notering
-              inchecker: row.inchecker_name || row.godkandAv || "",
-              documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
-              damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
-          }
+        url: media.url,
+        type: media.type as 'image' | 'video',
+        metadata: {
+          date: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : "--",
+          time: formatCheckinTime(row),
+          damageType: row.damage_type || "--",
+          station: row.station_namn || "--",
+          note: media.comment || row.description,
+          generalNote: row.notering,
+          inchecker: row.inchecker_name || row.godkandAv || "",
+          documentationDate: row.created_at ? new Date(row.created_at).toLocaleDateString("sv-SE") : undefined,
+          damageDate: row.damage_date ? new Date(row.damage_date).toLocaleDateString("sv-SE") : undefined,
+        }
       }));
       setModalMedia(formattedMedia);
+    } catch (e) {
+      console.error("Kunde inte hämta media:", e);
+      setModalMedia([]);
+    } finally {
+      setModalIsLoading(false);
     }
-    setModalIsLoading(false);
   };
-  
+
   const handleModalPrev = () => setModalIdx(idx => (idx > 0 ? idx - 1 : idx));
   const handleModalNext = () => setModalIdx(idx => (idx < modalMedia.length - 1 ? idx + 1 : idx));
 
@@ -225,7 +216,7 @@ export default function RapportPage() {
       <div className="rapport-card">
         <h1 className="rapport-title">Rapport & Statistik</h1>
         <div className="rapport-divider" />
-        
+
         <div className="rapport-stats rapport-stats-centered">
           <div><strong>Totalt incheckningar (all tid):</strong> {totIncheckningar}</div>
           <div><strong>Totalt skador (all tid):</strong> {totSkador}</div>
@@ -260,9 +251,9 @@ export default function RapportPage() {
           <button className="rapport-search-btn" onClick={() => setActiveRegnr(searchRegnr.trim())} disabled={!searchRegnr.trim()}>Sök</button>
           {activeRegnr && (<button className="rapport-reset-btn" onClick={() => { setActiveRegnr(""); setSearchRegnr(""); }}>Rensa</button>)}
         </div>
-        
-        {loading ? (<div>Hämtar data...</div>) 
-         : error ? (<div style={{ color: "red" }}>{error}</div>) 
+
+        {loading ? (<div>Hämtar data...</div>)
+         : error ? (<div style={{ color: "red" }}>{error}</div>)
          : (
           <div className="rapport-table-wrap">
             <table className="rapport-table">
@@ -317,17 +308,17 @@ export default function RapportPage() {
         )}
       </div>
       <footer className="copyright-footer">&copy; {new Date().getFullYear()} Albarone AB &mdash; Alla rättigheter förbehållna</footer>
-      <MediaModal 
-        open={modalOpen} 
-        onClose={() => setModalOpen(false)} 
-        media={modalMedia} 
-        title={modalTitle} 
+      <MediaModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        media={modalMedia}
+        title={modalTitle}
         currentIdx={modalIdx}
         isLoading={modalIsLoading}
-        onPrev={modalMedia.length > 1 ? handleModalPrev : undefined} 
+        onPrev={modalMedia.length > 1 ? handleModalPrev : undefined}
         onNext={modalMedia.length > 1 ? handleModalNext : undefined}
-        hasPrev={modalIdx > 0} 
-        hasNext={modalIdx < modalMedia.length - 1} 
+        hasPrev={modalIdx > 0}
+        hasNext={modalIdx < modalMedia.length - 1}
       />
     </main>
   );
