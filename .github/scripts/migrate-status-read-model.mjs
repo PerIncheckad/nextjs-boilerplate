@@ -57,6 +57,28 @@ if (replacedDamageCountBlocks !== 2) {
   throw new Error(`damage count blocks: expected 2 total matches, found ${replacedDamageCountBlocks}`);
 }
 
+// Pay down equivalent legacy any-debt so this migration never increases the file's type-safety debt.
+replaceOnce(
+  'checkin damage positions type',
+  '  positions?: any[] | null;',
+  '  positions?: Array<{ carPart?: string; position?: string }> | null;',
+);
+replaceOnce(
+  'toDateOnly input type',
+  'function toDateOnly(d: any): string {',
+  'function toDateOnly(d: unknown): string {',
+);
+replaceOnce(
+  'damage entry priority type',
+  'function getDamageEntryPriority(entry: { matchedCheckinDamage?: any | null }): number {',
+  'function getDamageEntryPriority(entry: { matchedCheckinDamage?: unknown | null }): number {',
+);
+replaceOnce(
+  'damage positions helper types',
+  "function formatDamagePositions(userPositions: any[]): string {\n  const positions = userPositions.map((pos: any) => {",
+  "function formatDamagePositions(userPositions: Array<{ carPart?: string; position?: string }>): string {\n  const positions = userPositions.map((pos) => {",
+);
+
 if (source.includes("from './supabase'")) throw new Error('Supabase import remains');
 const remaining = [...source.matchAll(/\bsupabase\s*\.(from|rpc)\s*\(/g)];
 if (remaining.length > 0) {
