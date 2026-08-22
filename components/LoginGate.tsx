@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { isWhitelistedEmail } from '@/lib/access-control';
 import { installAuthenticatedApiFetch } from '@/lib/api-auth-client';
 
 type Props = { children: React.ReactNode };
@@ -21,26 +20,20 @@ export default function LoginGate({ children }: Props) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setState('login'); return; }
 
-      const lower = user.email?.toLowerCase() ?? null;
+      try {
+        const response = await fetch('/api/auth/me');
+        if (!response.ok) {
+          await supabase.auth.signOut();
+          setState('denied');
+          return;
+        }
 
-      if (isWhitelistedEmail(lower)) {
         setState('ok');
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('employees')
-        .select('email,is_active')
-        .eq('email', lower!)
-        .single();
-
-      if (error || !data?.is_active) {
+      } catch (error) {
+        console.error('[LoginGate] Access verification failed:', error);
         await supabase.auth.signOut();
         setState('denied');
-        return;
       }
-
-      setState('ok');
     })();
 
     return uninstallApiAuthFetch;
@@ -83,9 +76,6 @@ export default function LoginGate({ children }: Props) {
       return;
     }
 
-    // Re-run the existing whitelist / employees authorization check using
-    // the newly established Supabase session. This avoids creating a second
-    // authorization path for OTP sign-in.
     window.location.reload();
   };
 
@@ -148,7 +138,7 @@ export default function LoginGate({ children }: Props) {
     );
   }
 
-  if (state === 'denied') return <div className="login-bg"><div className="login-card">Åtkomst nekad (ej vitlistad).</div></div>;
+  if (state === 'denied') return <div className="login-bg"><div className="login-card">Åtkomst nekad.</div></div>;
   if (state === 'checking') return <div className="login-bg"><div className="login-card">Kontrollerar inloggning…</div></div>;
   return <>{children}</>;
 }
