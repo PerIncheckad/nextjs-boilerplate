@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { fetchStatusReadModelSourceData } from './status-read-model-source';
 import { formatDamageTypeSwedish } from './damage-type-mapping';
 
 // =================================================================
@@ -389,7 +389,7 @@ type CheckinDamageData = {
   description: string | null;
   photo_urls: string[] | null;
   video_urls: string[] | null;
-  positions?: any[] | null;
+  positions?: Array<{ carPart?: string; position?: string }> | null;
   regnr?: string | null;
   created_at: string;
 };
@@ -447,7 +447,7 @@ function createBuhsDamageKey(regnr: string, legacySourceText: string | null | un
 
 // Helper to extract date-only part from a date string (strips time)
 // Ensures consistent keys regardless of whether timestamp is included
-function toDateOnly(d: any): string {
+function toDateOnly(d: unknown): string {
   if (!d) return "";
   const s = String(d).trim();
   const t = s.indexOf("T");
@@ -466,14 +466,14 @@ function createStableKey(legacyDamageSourceText: string | null | undefined, date
 
 // Dedup helper: determines priority for same-key damages
 // Priority: handled (documented/existing/not_found) > BUHS-unmatched
-function getDamageEntryPriority(entry: { matchedCheckinDamage?: any | null }): number {
+function getDamageEntryPriority(entry: { matchedCheckinDamage?: unknown | null }): number {
   if (entry.matchedCheckinDamage) return 1; // handled = highest priority
   return 2; // BUHS-unmatched = lower priority
 }
 
 // Helper to format damage positions from user_positions array
-function formatDamagePositions(userPositions: any[]): string {
-  const positions = userPositions.map((pos: any) => {
+function formatDamagePositions(userPositions: Array<{ carPart?: string; position?: string }>): string {
+  const positions = userPositions.map((pos) => {
     const parts: string[] = [];
     if (pos.carPart) parts.push(pos.carPart);
     if (pos.position) parts.push(pos.position);
@@ -888,81 +888,27 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     };
   }
 
-  // Fetch data from all sources concurrently
-  const [nybilResponse, vehicleResponse, damagesResponse, legacyDamagesResponse, checkinsResponse, arrivalsResponse, vehicleEditsResponse] = await Promise.all([
-    // nybil_inventering - newest first
-    supabase
-      .from('nybil_inventering')
-      .select('*')
-      .ilike('regnr', cleanedRegnr)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    
-    // vehicles (Bilkontroll-filen) - use RPC for trimmed search
-    supabase
-      .rpc('get_vehicle_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
-    
-    // damages (from our damages table) - filter by imported_at IS NOT NULL for BUHS-imported
-    // Note: We'll use this to identify BUHS-imported damages that were documented
-    supabase
-      .from('damages')
-      .select('*')
-      .eq('regnr', cleanedRegnr)
-      .order('created_at', { ascending: false }),
-    
-    // legacy damages (from BUHS via RPC) - includes saludatum
-    // Note: This returns damages from the source BUHS system
-    supabase
-      .rpc('get_damages_by_trimmed_regnr', { p_regnr: cleanedRegnr }),
-    
-    // checkins - order by created_at
-    supabase
-      .from('checkins')
-      .select('*')
-      .eq('regnr', cleanedRegnr)
-      .order('created_at', { ascending: false }),
-    
-    // arrivals (from /ankomst form)
-    supabase
-      .from('arrivals')
-      .select('*')
-      .eq('regnr', cleanedRegnr)
-      .order('created_at', { ascending: false }),
-
-    // vehicle_edits — manuella ändringar (senaste first)
-    supabase
-      .from('vehicle_edits')
-      .select('*')
-      .eq('regnr', cleanedRegnr)
-      .order('edited_at', { ascending: false }),
-  ]);
-
-  const vehicleEditsData = vehicleEditsResponse.data || [];
-  const nybilData = nybilResponse.data;
-
-  // Hämta skadekommentarer för alla damages.id för denna regnr.
-  // Görs sekventiellt efter Promise.all eftersom vi behöver damage IDs
-  // (medvetet ingen FK i damage_comments → Supabase-join inte tillgänglig).
-  const damageIdsForComments = (damagesResponse.data || [])
-    .map((d: any) => d.id)
-    .filter((id: any): id is string => typeof id === 'string');
-
-  let damageCommentsData: DamageComment[] = [];
-  if (damageIdsForComments.length > 0) {
-    const { data: commentsRaw } = await supabase
-      .from('damage_comments')
-      .select('*')
-      .in('damage_id', damageIdsForComments)
-      .order('created_at', { ascending: false });
-    damageCommentsData = (commentsRaw || []).map((dc: any) => ({
-      id: dc.id,
-      damage_id: dc.damage_id,
-      comment: dc.comment,
-      created_by: dc.created_by,
-      created_at: dc.created_at,
-    }));
-  }
+  // Read all Status raw data through the authenticated same-origin API boundary.
+  const sourceData = await fetchStatusReadModelSourceData(cleanedRegnr);
+  const vehicleEditsData = sourceData.vehicleEdits as any[];
+  const nybilData = sourceData.nybil as NybilInventeringData | null;
+  const vehicleData = (sourceData.vehicle[0] || null) as any;
+  const damages = sourceData.damages as any[];
+  const legacyDamages = sourceData.legacyDamages as LegacyDamage[];
+  const checkins = sourceData.checkins as any[];
+  const arrivals = sourceData.arrivals as any[];
+  const damageCommentsData: DamageComment[] = sourceData.damageComments.map((dc: any) => ({
+    id: dc.id,
+    damage_id: dc.damage_id,
+    comment: dc.comment,
+    created_by: dc.created_by,
+    created_at: dc.created_at,
+  }));
+  const allCheckinDamages: CheckinDamageData[] = sourceData.checkinDamages
+    .map((cd: any) => cd as CheckinDamageData)
+    .filter(cd =>
+      cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing' || cd.type === 'new'
+    );
 
   // Bygg Map<damage_id, DamageComment[]> — newest-first (data sorterad desc ovan)
   const commentsByDamageId = new Map<string, DamageComment[]>();
@@ -1056,12 +1002,6 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     }
   }
 
-  const vehicleData = vehicleResponse.data?.[0] || null;
-  const damages = damagesResponse.data || [];
-  const legacyDamages = legacyDamagesResponse.data || [];
-  const checkins = checkinsResponse.data || [];
-  const arrivals = arrivalsResponse.data || [];
-
   // Lookup-Map för damages.id baserat på matchningsnycklar.
   // legacyDamages från RPC saknar id-fältet, men damages-tabellen har UUID:er.
   // Data är sorterad created_at DESC i Promise.all, så första-match = senaste imported_at.
@@ -1109,50 +1049,7 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     })));
   }
   
-  // Fetch all checkin_damages for this regnr via server-side API
-  // This uses service role on the server to bypass RLS issues
   const checkinIds = checkins.map(c => c.id).filter(Boolean);
-  
-  let allCheckinDamages: CheckinDamageData[] = [];
-  
-  // Fetch checkin_damages via API route (server-side with service role)
-  if (checkinIds.length > 0) {
-    try {
-      const apiResponse = await fetch(`/api/checkin-damages?regnr=${encodeURIComponent(cleanedRegnr)}`);
-      
-      if (!apiResponse.ok) {
-        const errorData = await apiResponse.json();
-        console.error(`[ERROR ${cleanedRegnr}] API /checkin-damages failed:`, errorData);
-      } else {
-        const apiData = await apiResponse.json();
-        
-        // Include all damage types: new, documented, not_found, and existing
-        const rawData = (apiData.data || []) as CheckinDamageData[];
-        allCheckinDamages = rawData.filter(cd => 
-          cd.type === 'documented' || cd.type === 'not_found' || cd.type === 'existing' || cd.type === 'new'
-        );
-        
-        // DEBUG: Log checkin_damages for LRA75R
-        if (cleanedRegnr === 'LRA75R') {
-          console.log('[DEBUG LRA75R] All checkin_damages:', allCheckinDamages.map(cd => ({
-            id: cd.id,
-            checkin_id: cd.checkin_id,
-            type: cd.type,
-            damage_type: cd.damage_type,
-            car_part: cd.car_part,
-            position: cd.position,
-            description: cd.description,
-            photo_urls: cd.photo_urls,
-            video_urls: cd.video_urls,
-          })));
-        }
-      }
-    } catch (err) {
-      console.error(`[ERROR ${cleanedRegnr}] Failed to call /api/checkin-damages:`, err);
-      // Continue with empty array
-      allCheckinDamages = [];
-    }
-  }
   
   // Get saludatum from legacy damages if available
   const legacySaludatum = legacyDamages.length > 0 ? legacyDamages[0]?.saludatum : null;
@@ -1675,17 +1572,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     const damageCounts = new Map<string, number>();
     
     if (checkinIds.length > 0) {
-      const { data: damageData } = await supabase
-        .from('checkin_damages')
-        .select('checkin_id')
-        .in('checkin_id', checkinIds)
-        .eq('type', 'new');
-      
-      if (damageData) {
-        for (const damage of damageData) {
-          const count = damageCounts.get(damage.checkin_id) || 0;
-          damageCounts.set(damage.checkin_id, count + 1);
-        }
+      for (const damage of allCheckinDamages) {
+        if (damage.type !== 'new' || !damage.checkin_id || !checkinIds.includes(damage.checkin_id)) continue;
+        const count = damageCounts.get(damage.checkin_id) || 0;
+        damageCounts.set(damage.checkin_id, count + 1);
       }
     }
     
@@ -2807,17 +2697,10 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const damageCounts = new Map<string, number>();
   
   if (checkinIds.length > 0) {
-    const { data: damageData } = await supabase
-      .from('checkin_damages')
-      .select('checkin_id')
-      .in('checkin_id', checkinIds)
-      .eq('type', 'new');
-    
-    if (damageData) {
-      for (const damage of damageData) {
-        const count = damageCounts.get(damage.checkin_id) || 0;
-        damageCounts.set(damage.checkin_id, count + 1);
-      }
+    for (const damage of allCheckinDamages) {
+      if (damage.type !== 'new' || !damage.checkin_id || !checkinIds.includes(damage.checkin_id)) continue;
+      const count = damageCounts.get(damage.checkin_id) || 0;
+      damageCounts.set(damage.checkin_id, count + 1);
     }
   }
 
