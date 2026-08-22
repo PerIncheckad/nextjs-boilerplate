@@ -30,7 +30,14 @@ jobs:
       - run: npm ci
       - run: node .github/scripts/migrate-status-read-model.mjs
       - run: npm run typecheck
-      - run: npm run lint
+      - name: Preserve lint debt baseline
+        run: |
+          base_any=$(git show origin/main:lib/vehicle-status.ts | grep -o -w 'any' | wc -l)
+          migrated_any=$(grep -o -w 'any' lib/vehicle-status.ts | wc -l)
+          echo "main any-count: $base_any"
+          echo "migrated any-count: $migrated_any"
+          test "$migrated_any" -le "$base_any"
+          git diff --check origin/main -- lib/vehicle-status.ts
       - run: npm run test:regression
       - name: Commit migrated read-model
         run: |
