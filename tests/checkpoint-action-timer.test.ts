@@ -8,6 +8,7 @@ import { proxy } from '../proxy';
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 const contract = read('migrations/20260821070723_add_checkpoint_action_timer_contract.sql');
 const runner = read('migrations/20260821070855_add_checkpoint_action_timer_runner.sql');
+const cronMigration = read('migrations/20260822215000_enable_checkpoint_action_timer_cron.sql');
 const scheduler = read('app/api/checkpoint-actions/scheduler/route.ts');
 const readModel = read('app/api/checkpoint-actions/read-model/route.ts');
 const panel = read('app/vagnkort/checkpoint-actions-panel.tsx');
@@ -72,15 +73,20 @@ test('timer tables and RPCs remain server-only', () => {
   assert.match(runner, /grant execute on function public\.run_checkpoint_action_timers[\s\S]*to service_role/i);
 });
 
-test('scheduler is token-protected, supports dry run and delegates to one timer RPC', () => {
+test('scheduler route is token-protected and Postgres owns the hourly production trigger', () => {
   assert.match(scheduler, /CHECKPOINT_ACTION_SCHEDULER_TOKEN/);
   assert.match(scheduler, /CRON_SECRET/);
   assert.match(scheduler, /dryRun/);
   assert.match(scheduler, /rpc\('run_checkpoint_action_timers'/);
   assert.match(scheduler, /p_apply:\s*!dryRun/);
   assert.doesNotMatch(scheduler, /verifyApiUser/);
-  assert.match(vercel, /"path": "\/api\/checkpoint-actions\/scheduler"/);
-  assert.match(vercel, /"schedule": "0 \* \* \* \*"/);
+
+  assert.match(cronMigration, /create extension if not exists pg_cron/i);
+  assert.match(cronMigration, /checkpoint-action-timers-hourly/);
+  assert.match(cronMigration, /'0 \* \* \* \*'/);
+  assert.match(cronMigration, /run_checkpoint_action_timers\(now\(\), true\)/i);
+
+  assert.doesNotMatch(vercel, /"path": "\/api\/checkpoint-actions\/scheduler"/);
   assert.match(vercel, /"path": "\/api\/salu\/scheduler"/);
 });
 
