@@ -1,0 +1,40 @@
+name: Status read-model migration
+
+on:
+  push:
+    branches:
+      - auth-api-status-read-model-switch
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: dummy-service-role-key
+      RESEND_API_KEY: re_dummy
+      NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3127
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: auth-api-status-read-model-switch
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: node .github/scripts/migrate-status-read-model.mjs
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Commit migrated read-model
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/scripts/migrate-status-read-model.mjs .github/workflows/status-read-model-migration.yml
+          git add lib/vehicle-status.ts
+          git commit -m "Route Status read-model through authenticated API"
+          git push origin HEAD:auth-api-status-read-model-switch
