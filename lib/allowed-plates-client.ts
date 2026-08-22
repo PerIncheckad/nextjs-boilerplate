@@ -3,8 +3,15 @@ export type AllowedPlatesResponse = {
   error?: string;
 };
 
-export async function fetchAllowedPlates(): Promise<string[]> {
-  const response = await fetch('/api/allowed-plates');
+type AllowedPlatesOptions = {
+  excludeSold?: boolean;
+};
+
+export async function fetchAllowedPlates(options: AllowedPlatesOptions = {}): Promise<string[]> {
+  const params = new URLSearchParams();
+  if (options.excludeSold) params.set('excludeSold', 'true');
+  const query = params.toString();
+  const response = await fetch(`/api/allowed-plates${query ? `?${query}` : ''}`);
   const payload = await response.json() as AllowedPlatesResponse;
 
   if (!response.ok) {
