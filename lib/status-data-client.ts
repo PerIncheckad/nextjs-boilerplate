@@ -1,13 +1,13 @@
 export type StatusDataPayload = {
-  nybil: any | null;
-  vehicle: any[];
-  damages: any[];
-  legacyDamages: any[];
-  checkins: any[];
-  arrivals: any[];
-  vehicleEdits: any[];
-  damageComments: any[];
-  checkinDamages: any[];
+  nybil: unknown | null;
+  vehicle: unknown[];
+  damages: unknown[];
+  legacyDamages: unknown[];
+  checkins: unknown[];
+  arrivals: unknown[];
+  vehicleEdits: unknown[];
+  damageComments: unknown[];
+  checkinDamages: unknown[];
 };
 
 type StatusDataResponse = {
