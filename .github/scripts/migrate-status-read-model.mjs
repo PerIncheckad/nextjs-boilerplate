@@ -52,7 +52,15 @@ if (countMatches !== 1) {
 source = source.replace(oldDamageCountBlock, newDamageCountBlock);
 
 if (source.includes("from './supabase'")) throw new Error('Supabase import remains');
-if (/\bsupabase\s*\.(from|rpc)\s*\(/.test(source)) throw new Error('Direct Supabase access remains');
+const remaining = [...source.matchAll(/\bsupabase\s*\.(from|rpc)\s*\(/g)];
+if (remaining.length > 0) {
+  const details = remaining.map((match) => {
+    const line = source.slice(0, match.index).split('\n').length;
+    const snippet = source.slice(Math.max(0, match.index - 180), Math.min(source.length, match.index + 360));
+    return `line ${line}: ${snippet}`;
+  }).join('\n---\n');
+  throw new Error(`Direct Supabase access remains (${remaining.length})\n${details}`);
+}
 if (!source.includes('fetchStatusReadModelSourceData(cleanedRegnr)')) throw new Error('Adapter not wired');
 
 fs.writeFileSync(path, source);
