@@ -46,10 +46,10 @@ source = source.slice(0, checkinStartIndex)
 const oldDamageCountBlock = `  if (checkinIds.length > 0) {\n    const { data: damageData } = await supabase\n      .from('checkin_damages')\n      .select('checkin_id')\n      .in('checkin_id', checkinIds)\n      .eq('type', 'new');\n    \n    if (damageData) {\n      for (const damage of damageData) {\n        const count = damageCounts.get(damage.checkin_id) || 0;\n        damageCounts.set(damage.checkin_id, count + 1);\n      }\n    }\n  }`;
 const newDamageCountBlock = `  if (checkinIds.length > 0) {\n    for (const damage of allCheckinDamages) {\n      if (damage.type !== 'new' || !damage.checkin_id || !checkinIds.includes(damage.checkin_id)) continue;\n      const count = damageCounts.get(damage.checkin_id) || 0;\n      damageCounts.set(damage.checkin_id, count + 1);\n    }\n  }`;
 const countMatches = source.split(oldDamageCountBlock).length - 1;
-if (countMatches !== 2) {
-  throw new Error(`damage count blocks: expected 2 matches, found ${countMatches}`);
+if (countMatches !== 1) {
+  throw new Error(`damage count blocks: expected 1 match, found ${countMatches}`);
 }
-source = source.split(oldDamageCountBlock).join(newDamageCountBlock);
+source = source.replace(oldDamageCountBlock, newDamageCountBlock);
 
 if (source.includes("from './supabase'")) throw new Error('Supabase import remains');
 if (/\bsupabase\s*\.(from|rpc)\s*\(/.test(source)) throw new Error('Direct Supabase access remains');
@@ -57,4 +57,3 @@ if (!source.includes('fetchStatusReadModelSourceData(cleanedRegnr)')) throw new 
 
 fs.writeFileSync(path, source);
 console.log('Migrated lib/vehicle-status.ts to authenticated Status read-model source.');
-// Trigger commit after workflow registration.
