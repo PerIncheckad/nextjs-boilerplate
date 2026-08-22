@@ -79,7 +79,8 @@ test('scheduler is token-protected, supports dry run and delegates to one timer 
   assert.match(scheduler, /rpc\('run_checkpoint_action_timers'/);
   assert.match(scheduler, /p_apply:\s*!dryRun/);
   assert.doesNotMatch(scheduler, /verifyApiUser/);
-  assert.doesNotMatch(vercel, /"path": "\/api\/checkpoint-actions\/scheduler"/);
+  assert.match(vercel, /"path": "\/api\/checkpoint-actions\/scheduler"/);
+  assert.match(vercel, /"schedule": "0 \* \* \* \*"/);
   assert.match(vercel, /"path": "\/api\/salu\/scheduler"/);
 });
 
