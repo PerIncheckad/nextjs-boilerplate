@@ -7,6 +7,7 @@ import { DAMAGE_OPTIONS, DAMAGE_TYPES } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
 import { compressImage } from '@/lib/image-utils';
 import { withNybilLegacyAliases } from '@/lib/nybil-aliases';
+import { checkNybilDuplicate, countNybilDuplicatesForDate, createNybilDamage, createNybilRegistration, updateNybilDuplicateGroup } from '@/lib/nybil-api-client';
 
 // Constants
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
@@ -924,61 +925,11 @@ export default function NybilForm() {
     return true; // Validation passed
   };
 
-  // Check for duplicate registrations
-  const checkForDuplicate = async (regnr: string): Promise<{
-    existsInBilkontroll: boolean;
-    existsInNybil: boolean;
-    previousRegistration: { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null;
-    vehicleInfo: { bilmarke?: string; modell?: string } | null;
-  }> => {
+  // Check for duplicate registrations through the authenticated API boundary.
+  const checkForDuplicate = async (regnr: string) => {
     const normalizedRegnr = regnr.toUpperCase().replace(/\s/g, '');
     console.log('Checking duplicate for:', normalizedRegnr);
-    
-    // Check vehicles table (Bilkontroll-filen) - use ilike for case-insensitive matching
-    const { data: vehicleMatch, error: vehicleError } = await supabase
-      .from('vehicles')
-      .select('regnr, brand, model')
-      .ilike('regnr', normalizedRegnr)
-      .maybeSingle();
-    
-    if (vehicleError) {
-      console.error('Error checking vehicles table:', vehicleError);
-    }
-    console.log('Vehicle match:', vehicleMatch);
-    
-    // Check nybil_inventering table - use ilike for case-insensitive matching
-    // Include created_at and fullstandigt_namn for modal display
-    // Order by created_at ASCENDING to get the FIRST (original) registration for original_registration_id
-    const { data: nybilMatch, error: nybilError } = await supabase
-      .from('nybil_inventering')
-      .select('id, regnr, registreringsdatum, bilmarke, modell, duplicate_group_id, created_at, fullstandigt_namn')
-      .ilike('regnr', normalizedRegnr)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    
-    if (nybilError) {
-      console.error('Error checking nybil_inventering table:', nybilError);
-    }
-    console.log('Nybil match:', nybilMatch);
-    console.log('Nybil match id type:', typeof nybilMatch?.id, 'value:', nybilMatch?.id);
-    
-    // The ID is a UUID string from Supabase, keep it as-is
-    const previousRegistration = nybilMatch ? {
-      ...nybilMatch,
-      id: String(nybilMatch.id) // Ensure it's a string (UUID)
-    } : null;
-    
-    const result = {
-      existsInBilkontroll: !!vehicleMatch,
-      existsInNybil: !!nybilMatch,
-      previousRegistration: previousRegistration as { id: string; regnr: string; registreringsdatum: string; bilmarke: string; modell: string; duplicate_group_id?: string; created_at?: string; fullstandigt_namn?: string } | null,
-      vehicleInfo: vehicleMatch ? { bilmarke: vehicleMatch.brand, modell: vehicleMatch.model } : null
-    };
-    console.log('Duplicate result:', result);
-    console.log('previousRegistration.id:', previousRegistration?.id, 'type:', typeof previousRegistration?.id);
-    
-    return result;
+    return checkNybilDuplicate(normalizedRegnr);
   };
 
   const handleRegisterClick = async () => {
@@ -1053,27 +1004,14 @@ export default function NybilForm() {
       // Upload photos to Supabase Storage
       const dateStr = formatDateForFolder(now);
       
-      // Determine folder suffix for duplicates
-      // For duplicates, query to count existing registrations for this regnr+date
+      // Determine folder suffix for duplicates through the authenticated API boundary.
       let folderSuffix = '';
       if (isDuplicate) {
         try {
-          const { data: existingRegs, error } = await supabase
-            .from('nybil_inventering')
-            .select('id')
-            .eq('regnr', normalizedReg)
-            .eq('registreringsdatum', now.toISOString().split('T')[0]);
-          
-          if (!error && existingRegs) {
-            const duplicateCount = existingRegs.length;
-            folderSuffix = `-DUBBLETT-${duplicateCount}`;
-          } else {
-            // Fallback to timestamp if query fails
-            folderSuffix = `-DUBBLETT-${Math.floor(now.getTime() / 1000)}`;
-          }
+          const duplicateCount = await countNybilDuplicatesForDate(normalizedReg, now.toISOString().split('T')[0]);
+          folderSuffix = `-DUBBLETT-${duplicateCount}`;
         } catch (e) {
           console.error('Error counting duplicates:', e);
-          // Fallback to timestamp
           folderSuffix = `-DUBBLETT-${Math.floor(now.getTime() / 1000)}`;
         }
       }
@@ -1130,7 +1068,7 @@ export default function NybilForm() {
       }
       
       // Upload damage photos to damage-photos bucket and save to damages table
-      let savedNybilId: number | null = null;
+      let savedNybilId: string | number | null = null;
       
       // Generate duplicate_group_id if this is a duplicate
       const duplicateGroupId = isDuplicate 
@@ -1215,33 +1153,17 @@ export default function NybilForm() {
         is_sold: null
       });
       console.log('Attempting to insert inventoryData:', inventoryData);
-      const { data, error } = await supabase
-        .from('nybil_inventering')
-        .insert([inventoryData])
-        .select();
-      console.log('Database insert result - data:', data, 'error:', error);
-      if (error) {
-        console.error('Database error:', error);
-        alert(`Fel vid sparande: ${error.message}`);
-        return;
-      }
-      
-      savedNybilId = data?.[0]?.id || null;
+      savedNybilId = await createNybilRegistration(inventoryData as Record<string, unknown>);
       console.log('Saved nybil ID:', savedNybilId);
       
-      // If this is a duplicate, update the first registration to have the same duplicate_group_id
+      // If this is a duplicate, update the first registration to have the same duplicate_group_id.
       if (isDuplicate && duplicateGroupId && duplicateInfo?.previousRegistration?.id) {
-        // Only update if the first registration doesn't already have a duplicate_group_id
         if (!duplicateInfo.previousRegistration.duplicate_group_id) {
-          const { error: updateError } = await supabase
-            .from('nybil_inventering')
-            .update({ duplicate_group_id: duplicateGroupId })
-            .eq('id', duplicateInfo.previousRegistration.id);
-          
-          if (updateError) {
-            console.error('Error updating first registration with duplicate_group_id:', updateError);
-          } else {
+          try {
+            await updateNybilDuplicateGroup(duplicateInfo.previousRegistration.id, duplicateGroupId);
             console.log('Updated first registration with duplicate_group_id:', duplicateGroupId);
+          } catch (updateError) {
+            console.error('Error updating first registration with duplicate_group_id:', updateError);
           }
         }
       }
@@ -1288,33 +1210,32 @@ export default function NybilForm() {
           uploadedDamagePhotoUrls[damage.id] = damagePhotoUrls;
           uploadedDamageFolders[damage.id] = skadaFolder;
           
-          // Save to damages table with correct column names matching schema
-          const { error: damageError } = await supabase.from('damages').insert({
-            regnr: normalizedReg,
-            damage_date: now.toISOString().split('T')[0],
-            damage_type: damage.damageType,
-            damage_type_raw: damage.damageType,
-            user_type: damage.damageType,
-            description: damage.comment || null,
-            inchecker_name: fullName,
-            status: 'complete',
-            uploads: {
-              photo_urls: damagePhotoUrls,
-              video_urls: [],
-              folder: skadaFolder
-            },
-            user_positions: damage.positions.map(pos => ({
-              carPart: pos.carPart,
-              position: pos.position
-            })),
-            source: 'NYBIL',
-            nybil_inventering_id: savedNybilId,
-            created_at: now.toISOString()
-          });
-          
-          if (damageError) {
+          // Save damage through the authenticated API boundary.
+          try {
+            await createNybilDamage({
+              regnr: normalizedReg,
+              damage_date: now.toISOString().split('T')[0],
+              damage_type: damage.damageType,
+              damage_type_raw: damage.damageType,
+              user_type: damage.damageType,
+              description: damage.comment || null,
+              inchecker_name: fullName,
+              status: 'complete',
+              uploads: {
+                photo_urls: damagePhotoUrls,
+                video_urls: [],
+                folder: skadaFolder
+              },
+              user_positions: damage.positions.map(pos => ({
+                carPart: pos.carPart,
+                position: pos.position
+              })),
+              source: 'NYBIL',
+              nybil_inventering_id: savedNybilId,
+              created_at: now.toISOString()
+            });
+          } catch (damageError) {
             console.error('Error saving damage:', damageError);
-            // Continue with other damages even if one fails
           }
         }
       }
