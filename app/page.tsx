@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import LoginGate from '@/components/LoginGate';
 const currentYear = new Date().getFullYear();
 export const metadata: Metadata = {
   title: 'Incheckad',
@@ -8,28 +7,26 @@ export const metadata: Metadata = {
 const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
 export default function HomePage() {
   return (
-    <LoginGate>
-      <main className="welcome-main">
-        <div className="background-img" />
+    <main className="welcome-main">
+      <div className="background-img" />
+      
+      <div className="welcome-card">
+        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
         
-        <div className="welcome-card">
-          <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
-          
-          <h1 className="welcome-title">Välkommen!</h1>
-          
-          <div className="btn-group">
-            <a href="/ankomst" className="btn inkommen">Inkommen</a>
-            <a href="/check" className="btn incheckning">Ny incheckning</a>
-            <a href="/nybil" className="btn registrera">Registrera ny bil</a>
-            <a href="/vagnkort" className="btn incheckning">Vagnkort</a>
-          </div>
-          
+        <h1 className="welcome-title">Välkommen!</h1>
+        
+        <div className="btn-group">
+          <a href="/ankomst" className="btn inkommen">Inkommen</a>
+          <a href="/check" className="btn incheckning">Ny incheckning</a>
+          <a href="/nybil" className="btn registrera">Registrera ny bil</a>
+          <a href="/vagnkort" className="btn incheckning">Vagnkort</a>
         </div>
         
-        <footer className="homepage-footer">
-          &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
-        </footer>
-      </main>
-    </LoginGate>
+      </div>
+      
+      <footer className="homepage-footer">
+        &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
+      </footer>
+    </main>
   );
 }

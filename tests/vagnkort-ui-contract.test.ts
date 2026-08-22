@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { isPublicAppPath } from '../lib/app-access';
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
 const page = read('app/vagnkort/page.tsx');
+const layout = read('app/layout.tsx');
 const client = read('app/vagnkort/vagnkort-client.tsx');
 const upload = read('app/vagnkort/document-upload.tsx');
 const uploadApi = read('app/api/vehicle-documents/route.ts');
@@ -25,8 +27,11 @@ function matches(source: string, patterns: RegExp[]) {
   for (const pattern of patterns) assert.match(source, pattern);
 }
 
-test('Vagnkort page stays behind the existing LoginGate', () => {
-  matches(page, [/<LoginGate>/, /<VagnkortClient \/>/]);
+test('Vagnkort stays behind the central app auth boundary', () => {
+  assert.equal(isPublicAppPath('/vagnkort'), false);
+  matches(layout, [/<AppAuthBoundary>\{children\}<\/AppAuthBoundary>/]);
+  matches(page, [/<VagnkortClient \/>/]);
+  assert.doesNotMatch(page, /LoginGate/);
 });
 
 test('Vagnkort reads the authenticated vehicle journey API', () => {

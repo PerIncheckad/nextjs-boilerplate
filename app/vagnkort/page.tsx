@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import LoginGate from '@/components/LoginGate';
 import VagnkortClient from './vagnkort-client';
 import OperationalStateBanner from './operational-state-banner';
 
@@ -12,9 +11,9 @@ export const metadata: Metadata = {
 
 export default function VagnkortPage() {
   return (
-    <LoginGate>
+    <>
       <OperationalStateBanner />
       <VagnkortClient />
-    </LoginGate>
+    </>
   );
 }
