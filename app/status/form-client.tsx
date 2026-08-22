@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo, useCallback, Fragment } from 'reac
 import { supabase } from '@/lib/supabase';
 import { getVehicleStatus, VehicleStatusResult, DamageRecord, HistoryRecord, DamageComment, formatDateTime } from '@/lib/vehicle-status';
 import { BILMARKEN, FUEL_TYPE_OPTIONS, VAXEL_OPTIONS, HJULTYP_OPTIONS, ORTER } from '@/lib/constants';
+import { fetchAllowedPlates } from '@/lib/allowed-plates-client';
 
 // =================================================================
 // 1. CONSTANTS
@@ -406,11 +407,13 @@ export default function StatusForm() {
   // Fetch all registrations for autocomplete
   useEffect(() => {
     async function fetchAllRegistrations() {
-      const { data, error } = await supabase.rpc('get_all_allowed_plates');
-      if (error) console.error("Could not fetch registrations via RPC:", error);
-      else if (data) setAllRegistrations(data.map((item: any) => item.regnr));
+      try {
+        setAllRegistrations(await fetchAllowedPlates());
+      } catch (error) {
+        console.error('Could not fetch registrations via authenticated API:', error);
+      }
     }
-    fetchAllRegistrations();
+    void fetchAllRegistrations();
   }, []);
 
   // Update suggestions based on input
