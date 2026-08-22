@@ -57,3 +57,4 @@ if (!source.includes('fetchStatusReadModelSourceData(cleanedRegnr)')) throw new 
 
 fs.writeFileSync(path, source);
 console.log('Migrated lib/vehicle-status.ts to authenticated Status read-model source.');
+// Trigger commit after workflow registration.
