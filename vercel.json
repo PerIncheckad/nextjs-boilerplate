@@ -4,6 +4,10 @@
     {
       "path": "/api/salu/scheduler",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/checkpoint-actions/scheduler",
+      "schedule": "0 * * * *"
     }
   ]
 }
