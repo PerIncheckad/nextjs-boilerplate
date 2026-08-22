@@ -1,16 +1,16 @@
 name: Status read-model migration
 
 on:
-  push:
+  pull_request:
     branches:
-      - auth-api-status-read-model-switch
+      - main
 
 permissions:
   contents: write
 
 jobs:
   migrate:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && github.head_ref == 'auth-api-status-read-model-switch'
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
@@ -22,6 +22,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: auth-api-status-read-model-switch
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -30,6 +31,7 @@ jobs:
       - run: node .github/scripts/migrate-status-read-model.mjs
       - run: npm run typecheck
       - run: npm run lint
+      - run: npm run test:regression
       - name: Commit migrated read-model
         run: |
           git config user.name "github-actions[bot]"
