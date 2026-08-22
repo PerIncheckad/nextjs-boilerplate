@@ -9,6 +9,7 @@ import { DAMAGE_OPTIONS } from '@/data/damage-options';
 import ImageAnnotator from '@/components/ImageAnnotator';
 import { compressImage } from '@/lib/image-utils';
 import { formatDamageTypeSwedish } from '@/lib/damage-type-mapping';
+import { fetchAllowedPlates } from '@/lib/allowed-plates-client';
 
 // =================================================================
 // 1. DATA, TYPES & HELPERS
@@ -908,46 +909,13 @@ export default function CheckInForm() {
 
   useEffect(() => {
     async function fetchAllRegistrations() {
-      const { data, error } = await supabase.rpc('get_all_allowed_plates').range(0, 4999);
-      if (error) {
-        console.error("Could not fetch registrations via RPC:", error);
-        return;
+      try {
+        setAllRegistrations(await fetchAllowedPlates({ excludeSold: true }));
+      } catch (error) {
+        console.error('Could not fetch registrations via authenticated API:', error);
       }
-      if (!data) return;
-      
-      // Fetch sold vehicles to exclude from autocomplete
-      const { data: soldData } = await supabase
-        .from('nybil_inventering')
-        .select('regnr')
-        .eq('is_sold', true);
-
-      const { data: soldEditsData } = await supabase
-        .from('vehicle_edits')
-        .select('regnr, new_value, edited_at')
-        .eq('field_name', 'is_sold')
-        .order('edited_at', { ascending: false });
-
-      // Bygg Map med senaste is_sold per regnr från vehicle_edits
-      const soldEditsMap = new Map<string, string>();
-      for (const edit of (soldEditsData || [])) {
-        const normalized = edit.regnr?.toUpperCase().replace(/\s/g, '');
-        if (normalized && !soldEditsMap.has(normalized)) {
-          soldEditsMap.set(normalized, edit.new_value);
-        }
-      }
-
-      const soldSet = new Set([
-        ...(soldData || []).map((item: any) => item.regnr?.toUpperCase().replace(/\s/g, '')),
-        ...[...soldEditsMap.entries()].filter(([_, v]) => v === 'true').map(([k]) => k),
-      ]);
-      
-      const filtered = data
-        .map((item: any) => item.regnr)
-        .filter((regnr: string) => !soldSet.has(regnr));
-      
-      setAllRegistrations(filtered);
     }
-    fetchAllRegistrations();
+    void fetchAllRegistrations();
   }, []);
 
   useEffect(() => {
