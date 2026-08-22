@@ -43,13 +43,19 @@ source = source.slice(0, checkinStartIndex)
   + '  const checkinIds = checkins.map(c => c.id).filter(Boolean);\n  \n'
   + source.slice(checkinEndIndex);
 
-const oldDamageCountBlock = `  if (checkinIds.length > 0) {\n    const { data: damageData } = await supabase\n      .from('checkin_damages')\n      .select('checkin_id')\n      .in('checkin_id', checkinIds)\n      .eq('type', 'new');\n    \n    if (damageData) {\n      for (const damage of damageData) {\n        const count = damageCounts.get(damage.checkin_id) || 0;\n        damageCounts.set(damage.checkin_id, count + 1);\n      }\n    }\n  }`;
-const newDamageCountBlock = `  if (checkinIds.length > 0) {\n    for (const damage of allCheckinDamages) {\n      if (damage.type !== 'new' || !damage.checkin_id || !checkinIds.includes(damage.checkin_id)) continue;\n      const count = damageCounts.get(damage.checkin_id) || 0;\n      damageCounts.set(damage.checkin_id, count + 1);\n    }\n  }`;
-const countMatches = source.split(oldDamageCountBlock).length - 1;
-if (countMatches !== 1) {
-  throw new Error(`damage count blocks: expected 1 match, found ${countMatches}`);
+function replaceDamageCountBlock(indent) {
+  const oldBlock = `${indent}if (checkinIds.length > 0) {\n${indent}  const { data: damageData } = await supabase\n${indent}    .from('checkin_damages')\n${indent}    .select('checkin_id')\n${indent}    .in('checkin_id', checkinIds)\n${indent}    .eq('type', 'new');\n${indent}  \n${indent}  if (damageData) {\n${indent}    for (const damage of damageData) {\n${indent}      const count = damageCounts.get(damage.checkin_id) || 0;\n${indent}      damageCounts.set(damage.checkin_id, count + 1);\n${indent}    }\n${indent}  }\n${indent}}`;
+  const newBlock = `${indent}if (checkinIds.length > 0) {\n${indent}  for (const damage of allCheckinDamages) {\n${indent}    if (damage.type !== 'new' || !damage.checkin_id || !checkinIds.includes(damage.checkin_id)) continue;\n${indent}    const count = damageCounts.get(damage.checkin_id) || 0;\n${indent}    damageCounts.set(damage.checkin_id, count + 1);\n${indent}  }\n${indent}}`;
+  const count = source.split(oldBlock).length - 1;
+  if (count > 1) throw new Error(`damage count block indent ${indent.length}: expected max 1, found ${count}`);
+  if (count === 1) source = source.replace(oldBlock, newBlock);
+  return count;
 }
-source = source.replace(oldDamageCountBlock, newDamageCountBlock);
+
+const replacedDamageCountBlocks = replaceDamageCountBlock('  ') + replaceDamageCountBlock('    ');
+if (replacedDamageCountBlocks !== 2) {
+  throw new Error(`damage count blocks: expected 2 total matches, found ${replacedDamageCountBlocks}`);
+}
 
 if (source.includes("from './supabase'")) throw new Error('Supabase import remains');
 const remaining = [...source.matchAll(/\bsupabase\s*\.(from|rpc)\s*\(/g)];
