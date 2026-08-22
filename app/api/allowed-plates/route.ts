@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     if (error) throw error;
 
     let plates: string[] = (data ?? [])
-      .map((row: { regnr?: unknown }) => normalizeRegnr(row.regnr))
+      .map((row: { regnr?: unknown }) => (typeof row.regnr === 'string' ? row.regnr : null))
       .filter((regnr: string | null): regnr is string => Boolean(regnr));
 
     if (excludeSold) {
@@ -65,10 +65,12 @@ export async function GET(request: Request) {
       }
       for (const [regnr, value] of soldEditsMap.entries()) {
         if (value === 'true') soldSet.add(regnr);
-        if (value === 'false') soldSet.delete(regnr);
       }
 
-      plates = plates.filter((regnr: string) => !soldSet.has(regnr));
+      plates = plates.filter((regnr: string) => {
+        const normalized = normalizeRegnr(regnr);
+        return !normalized || !soldSet.has(normalized);
+      });
     }
 
     return NextResponse.json({ data: plates });
