@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef, Fragment } from 'react';
 import { ORTER, STATIONER } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
+import { fetchAllowedPlates } from '@/lib/allowed-plates-client';
 
 // =================================================================
 // 1. DATA & HELPERS
@@ -327,11 +328,13 @@ export default function ArrivalForm() {
   // Load all registrations for autocomplete
   useEffect(() => {
     async function fetchAllRegistrations() {
-      const { data, error } = await supabase.rpc('get_all_allowed_plates').range(0, 4999);
-      if (error) console.error('Could not fetch registrations via RPC:', error);
-      else if (data) setAllRegistrations(data.map((item: any) => item.regnr));
+      try {
+        setAllRegistrations(await fetchAllowedPlates());
+      } catch (error) {
+        console.error('Could not fetch registrations via authenticated API:', error);
+      }
     }
-    fetchAllRegistrations();
+    void fetchAllRegistrations();
   }, []);
 
   // Autocomplete filtering
