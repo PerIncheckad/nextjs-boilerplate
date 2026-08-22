@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     const { data, error } = await admin.rpc('get_all_allowed_plates').range(0, 4999);
     if (error) throw error;
 
-    let plates = (data ?? [])
+    let plates: string[] = (data ?? [])
       .map((row: { regnr?: unknown }) => normalizeRegnr(row.regnr))
       .filter((regnr: string | null): regnr is string => Boolean(regnr));
 
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
         if (value === 'false') soldSet.delete(regnr);
       }
 
-      plates = plates.filter((regnr) => !soldSet.has(regnr));
+      plates = plates.filter((regnr: string) => !soldSet.has(regnr));
     }
 
     return NextResponse.json({ data: plates });
