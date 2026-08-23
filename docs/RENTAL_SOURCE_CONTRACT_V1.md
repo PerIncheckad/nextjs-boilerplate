@@ -113,7 +113,7 @@ The source facts mean exactly:
 
 G is the only source fact that may establish a RENTAL start. H is the only source fact that may end that source-owned RENTAL.
 
-After H, INCHECKAD must not infer `AVAILABLE`. If no later authoritative source establishes a new primary operational state, the operational read model is `UNKNOWN`.
+After H, INCHECKAD must not infer `AVAILABLE`. If no later authoritative source establishes a new primary operational state, the operational read model must be `UNKNOWN`.
 
 If a later verified Status or Check-in fact actually occurred after H but its write-through was deferred while RENTAL was still open in Incheckad, it may be replayed at its own verified timestamp after H. Facts from before H are not moved forward. Exact timestamp ties across different sources do not invent a source precedence.
 
