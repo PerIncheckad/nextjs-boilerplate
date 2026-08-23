@@ -13,7 +13,7 @@ create table public.business_function_definitions (
   active boolean not null default true,
   changed_by uuid,
   changed_at timestamptz not null default now(),
-  check (function_code ~ '^[A-Z0-9][A-Z0-9_-]{1,79}$')
+  check (function_code ~ '^[A-ZÅÄÖ0-9][A-ZÅÄÖ0-9_-]{1,79}$')
 );
 
 create table public.mandate_capability_definitions (
@@ -278,8 +278,6 @@ revoke all on function public.actor_has_process_mandate(uuid,text,text,text,text
 revoke all on function public.assert_actor_process_mandate(uuid,text,text,text,text) from public, anon, authenticated;
 revoke all on function public.transition_handoff_authorized(uuid,text,text,jsonb,uuid,text,text) from public, anon, authenticated;
 
--- Existing raw transition remains server-internal for migrations/repair paths.
--- Product/API paths must use transition_handoff_authorized once employee mandates are assigned.
 grant select, insert, update, delete on public.business_function_definitions to service_role;
 grant select, insert, update, delete on public.mandate_capability_definitions to service_role;
 grant select, insert, update on public.employee_mandates to service_role;
