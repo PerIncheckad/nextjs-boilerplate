@@ -5,17 +5,6 @@ import { verifyApiUser } from '@/lib/server-auth';
 const REGNR_RE = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const PRIMARY_PERIOD_TYPES = [
-  'PREPARATION',
-  'AVAILABLE',
-  'RENTAL',
-  'DOWNTIME',
-  'SALU',
-  'OTHER',
-] as const;
-
-type PrimaryPeriodType = (typeof PRIMARY_PERIOD_TYPES)[number];
-
 const ACTIVITY_TYPES = [
   'WORKSHOP',
   'SERVICE',
@@ -28,36 +17,13 @@ const ACTIVITY_TYPES = [
 
 type ActivityType = (typeof ACTIVITY_TYPES)[number];
 
-const DOWNTIME_REASONS = [
-  'DAMAGE',
-  'WORKSHOP',
-  'SERVICE',
-  'WAITING_PARTS',
-  'MISSING_EQUIPMENT',
-  'TRANSPORT',
-  'ADMINISTRATION',
-  'OTHER',
-] as const;
-
-type DowntimeReason = (typeof DOWNTIME_REASONS)[number];
-
 function cleanRegnr(value: unknown): string {
   return typeof value === 'string' ? value.toUpperCase().replace(/\s+/g, '') : '';
-}
-
-function cleanPrimaryPeriodType(value: unknown): PrimaryPeriodType | null {
-  const periodType = typeof value === 'string' ? value.trim().toUpperCase() : '';
-  return PRIMARY_PERIOD_TYPES.includes(periodType as PrimaryPeriodType) ? periodType as PrimaryPeriodType : null;
 }
 
 function cleanActivityType(value: unknown): ActivityType | null {
   const activityType = typeof value === 'string' ? value.trim().toUpperCase() : '';
   return ACTIVITY_TYPES.includes(activityType as ActivityType) ? activityType as ActivityType : null;
-}
-
-function cleanReasonCode(value: unknown): string | null {
-  if (typeof value !== 'string' || !value.trim()) return null;
-  return value.trim().toUpperCase().replace(/[^A-Z0-9_-]+/g, '_').slice(0, 80) || null;
 }
 
 function cleanReasonText(value: unknown): string | null {
@@ -124,6 +90,16 @@ export async function POST(request: Request) {
   }
 
   const action = typeof body.action === 'string' ? body.action.trim().toUpperCase() : '';
+
+  // Primary operational state is source-controlled. Vagnkort is a read model and
+  // must never manufacture, transition or close AVAILABLE/RENTAL/DOWNTIME/etc.
+  if (action === 'START' || action === 'TRANSITION' || action === 'CLOSE') {
+    return NextResponse.json(
+      { error: 'Primary vehicle state is source-controlled and cannot be changed manually from Vagnkort' },
+      { status: 403 },
+    );
+  }
+
   const regnr = cleanRegnr(body.regnr);
   if (!REGNR_RE.test(regnr)) {
     return NextResponse.json({ error: 'Invalid regnr' }, { status: 400 });
@@ -140,98 +116,6 @@ export async function POST(request: Request) {
   try {
     if (!(await vehicleExists(admin, regnr))) {
       return NextResponse.json({ error: 'Vehicle not found' }, { status: 404 });
-    }
-
-    if (action === 'START' || action === 'TRANSITION') {
-      const periodType = cleanPrimaryPeriodType(body.periodType);
-      if (!periodType) {
-        return NextResponse.json({ error: 'Invalid primary period type' }, { status: 400 });
-      }
-
-      const startedAt = parseTimestamp(body.startedAt, true);
-      if (!startedAt) {
-        return NextResponse.json({ error: 'Invalid start time' }, { status: 400 });
-      }
-
-      const reasonCode = cleanReasonCode(body.reasonCode);
-      const reasonText = cleanReasonText(body.reasonText);
-      if (periodType === 'DOWNTIME') {
-        if (!reasonCode || !DOWNTIME_REASONS.includes(reasonCode as DowntimeReason)) {
-          return NextResponse.json({ error: 'Downtime requires a valid reason' }, { status: 400 });
-        }
-        if (reasonCode === 'OTHER' && !reasonText) {
-          return NextResponse.json({ error: 'Other downtime requires a comment' }, { status: 400 });
-        }
-      }
-
-      const periodId = crypto.randomUUID();
-      const { data: period, error: periodError } = await admin.rpc('transition_vehicle_journey_state', {
-        p_period_id: periodId,
-        p_regnr: regnr,
-        p_period_type: periodType,
-        p_started_at: startedAt,
-        p_reason_code: reasonCode,
-        p_reason_text: reasonText,
-        p_source_system: 'VAGNKORT',
-        p_source_entity: 'vehicle_journey_periods',
-        p_source_record_id: periodId,
-        p_actor_id: verification.user.id,
-        p_actor_source: 'MANUELL',
-        p_actor_email: verification.user.email,
-        p_metadata: { createdVia: 'VAGNKORT' },
-      });
-
-      if (periodError) {
-        const message = rpcErrorMessage(periodError);
-        if (message.includes('already in requested state')) {
-          return NextResponse.json({ error: 'Vehicle is already in requested state' }, { status: 409 });
-        }
-        if (rpcErrorCode(periodError) === '22007') {
-          return NextResponse.json({ error: 'Transition time is before current state start' }, { status: 400 });
-        }
-        console.error('[vehicle-journey-periods] Atomic transition failed:', periodError);
-        return NextResponse.json({ error: 'Could not transition vehicle state' }, { status: 500 });
-      }
-
-      return NextResponse.json({ data: period }, { status: 201 });
-    }
-
-    if (action === 'CLOSE') {
-      const periodId = cleanUuid(body.periodId);
-      if (!periodId) {
-        return NextResponse.json({ error: 'Invalid period id' }, { status: 400 });
-      }
-
-      const endedAt = parseTimestamp(body.endedAt, true);
-      if (!endedAt) {
-        return NextResponse.json({ error: 'Invalid end time' }, { status: 400 });
-      }
-
-      const { data: period, error: periodError } = await admin.rpc('close_vehicle_journey_period', {
-        p_period_id: periodId,
-        p_regnr: regnr,
-        p_ended_at: endedAt,
-        p_actor_id: verification.user.id,
-        p_actor_email: verification.user.email,
-      });
-
-      if (periodError) {
-        const code = rpcErrorCode(periodError);
-        const message = rpcErrorMessage(periodError);
-        if (code === 'P0002' || message.includes('Period not found for vehicle')) {
-          return NextResponse.json({ error: 'Period not found for vehicle' }, { status: 404 });
-        }
-        if (message.includes('Period is already closed')) {
-          return NextResponse.json({ error: 'Period is already closed' }, { status: 409 });
-        }
-        if (code === '22007' || message.includes('End time cannot be before start time')) {
-          return NextResponse.json({ error: 'End time cannot be before start time' }, { status: 400 });
-        }
-        console.error('[vehicle-journey-periods] Atomic close failed:', periodError);
-        return NextResponse.json({ error: 'Could not close period' }, { status: 500 });
-      }
-
-      return NextResponse.json({ data: period });
     }
 
     if (action === 'START_ACTIVITY') {
