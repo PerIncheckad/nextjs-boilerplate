@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
-import { parseRentalSourceReport, type ParsedRentalSourceRow } from '@/lib/rental-source-report';
+import {
+  RENTAL_BASELINE_HEADERS,
+  parseRentalSourceReport,
+  type ParsedRentalSourceRow,
+} from '@/lib/rental-source-report';
 
 export const runtime = 'nodejs';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const CHUNK_SIZE = 250;
 const SOURCE_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+const BASELINE_HEADER_SET = new Set<string>(RENTAL_BASELINE_HEADERS);
 
 function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -196,15 +201,7 @@ export async function POST(request: Request) {
     accepted,
     conflicts,
     conflictCodes,
-    extraColumns: parsed.headers.filter(
-      (header) => ![
-        'Avsl. Månad','Stn','Ut Stn','Avsl. År','Avsl. Datum','AvtalsNr','UtDt','InDt','RegNr',
-        'Fordonstyp','Debiterad Klass','Uthyrd Klass','Avtalstyp','Prislista','Företagsnamn','Hyror',
-        'S:a Intäkt','S:a Hyra','S:a Dagar','Snitt Intäkt','Snitt Hyra','Driv medel','S-Skydd Halv',
-        'S-Skydd Hel','Skade kostnad','Tillval','Avgifter','Väg o Miljö','Tillbeh.','Bildeb','Bildeb/ Hyra',
-        'Marg. Hyra 3110','Marg./ Dag 3110',
-      ].includes(header),
-    ),
+    extraColumns: parsed.headers.filter((header) => !BASELINE_HEADER_SET.has(header)),
   };
 
   if (conflicts > 0) {
