@@ -9,6 +9,8 @@ export const HANDOFF_STATUSES = [
 ] as const;
 
 export type HandoffStatus = (typeof HANDOFF_STATUSES)[number];
+type ActiveHandoffStatus = Exclude<HandoffStatus, 'VERIFIED' | 'CANCELLED'>;
+type TerminalHandoffStatus = Extract<HandoffStatus, 'VERIFIED' | 'CANCELLED'>;
 
 export const HANDOFF_VERIFICATION_MODES = [
   'MANUELL',
@@ -29,7 +31,7 @@ export type HandoffDefinition = {
   blocking: boolean;
 };
 
-const transitions: Record<Exclude<HandoffStatus, 'VERIFIED' | 'CANCELLED'>, HandoffStatus[]> = {
+const transitions: Record<ActiveHandoffStatus, HandoffStatus[]> = {
   REQUESTED: ['HANDED_OVER', 'CANCELLED'],
   HANDED_OVER: ['RECEIVED', 'CANCELLED'],
   RECEIVED: ['ACCEPTED', 'CANCELLED'],
@@ -37,7 +39,9 @@ const transitions: Record<Exclude<HandoffStatus, 'VERIFIED' | 'CANCELLED'>, Hand
   COMPLETED: ['VERIFIED', 'CANCELLED'],
 };
 
-export function isTerminalHandoffStatus(status: HandoffStatus): boolean {
+export function isTerminalHandoffStatus(
+  status: HandoffStatus,
+): status is TerminalHandoffStatus {
   return status === 'VERIFIED' || status === 'CANCELLED';
 }
 
