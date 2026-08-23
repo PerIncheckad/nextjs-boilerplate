@@ -18,9 +18,11 @@ const splitMigration = readFileSync(
   'utf8',
 );
 
-test('journey period API delegates primary transitions and activity periods to database RPCs', () => {
-  assert.match(periodApi, /rpc\('transition_vehicle_journey_state'/);
-  assert.match(periodApi, /rpc\('close_vehicle_journey_period'/);
+test('Vagnkort period API blocks manual primary state writes and keeps downtime activities', () => {
+  assert.match(periodApi, /action === 'START' \|\| action === 'TRANSITION' \|\| action === 'CLOSE'/);
+  assert.match(periodApi, /Primary vehicle state is source-controlled and cannot be changed manually from Vagnkort/);
+  assert.doesNotMatch(periodApi, /rpc\('transition_vehicle_journey_state'/);
+  assert.doesNotMatch(periodApi, /rpc\('close_vehicle_journey_period'/);
   assert.match(periodApi, /rpc\('start_vehicle_journey_activity_period'/);
   assert.match(periodApi, /rpc\('close_vehicle_journey_activity_period'/);
   assert.doesNotMatch(periodApi, /from\('vehicle_journey_events'\)\.insert/);
