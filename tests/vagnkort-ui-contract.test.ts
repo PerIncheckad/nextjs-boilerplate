@@ -38,7 +38,7 @@ test('Vagnkort reads the authenticated vehicle journey API', () => {
   matches(client, [/fetch\(`\/api\/vehicle-journey\?reg=/, /Bilens digitala pärm/, /Utrustning – Nybil mot nu/, /Tid i resan/, /Dokument/, /Tidslinje/]);
 });
 
-test('Vagnkort surfaces lifecycle metrics and refreshes them with period changes', () => {
+test('Vagnkort surfaces lifecycle metrics and refreshes them with journey changes', () => {
   matches(client, [/<JourneyMetricsPanel regnr=\{data\.regnr\} refreshNonce=\{refreshNonce\} \/>/]);
   matches(metricsPanel, [/\/api\/vehicle-journey\/metrics\?reg=/, /Resans nyckeltal/, /Nyttjandegrad/, /Nybil → första uthyrning/, /Sista retur → SALU/, /Stillestånd per huvudorsak/, /Aktiviteter inom stillestånd/, /Huvudperioder överlappar/]);
   matches(metricsApi, [/verifyApiUser\(request\)/, /computeJourneyLifecycleMetrics/, /vehicle_journey_activity_periods/]);
@@ -78,24 +78,20 @@ test('document server API stays authenticated, private and appends a journey eve
   matches(documentApi, [/verifyApiUser\(request\)/, /createSignedUrl/, /300/]);
 });
 
-test('Vagnkort treats period controls as one primary vehicle state at a time', () => {
+test('Vagnkort primary state UI is read-only and reflects source-controlled truth', () => {
   matches(client, [/<JourneyPeriodControls regnr=/]);
-  matches(periodControls, [/Tillgänglig/, /Uthyrd/, /Stillestånd/, /Förberedelse/, /ett huvudtillstånd åt gången/, /aktiviteter inom ett stillestånd/, /action:\s*'TRANSITION'/, /action:\s*'CLOSE'/, /\/api\/vehicle-journey\/periods/]);
-
-  const primaryBlock = periodControls.match(/const PRIMARY_PERIOD_TYPES = \[([\s\S]*?)\] as const;/)?.[1] ?? '';
-  assert.match(primaryBlock, /AVAILABLE/);
-  assert.match(primaryBlock, /RENTAL/);
-  assert.match(primaryBlock, /DOWNTIME/);
-  assert.doesNotMatch(primaryBlock, /WORKSHOP/);
-  assert.doesNotMatch(primaryBlock, /TRANSPORT/);
-
-  const reasonBlock = periodControls.match(/const DOWNTIME_REASONS = \[([\s\S]*?)\] as const;/)?.[1] ?? '';
-  assert.match(reasonBlock, /WORKSHOP/);
-  assert.match(reasonBlock, /TRANSPORT/);
+  matches(periodControls, [/Huvudtillståndet är verifierad verksamhetsdata/, /Vagnkortet visar läget men skapar eller avslutar inte huvudperioder manuellt/, /Aktuellt huvudtillstånd/, /Inget verifierat huvudtillstånd/, /Incheckad gissar inte nästa läge/]);
+  assert.doesNotMatch(periodControls, /fetch\(/);
+  assert.doesNotMatch(periodControls, /action:\s*'TRANSITION'/);
+  assert.doesNotMatch(periodControls, /action:\s*'CLOSE'/);
+  assert.doesNotMatch(periodControls, /<form/);
+  assert.doesNotMatch(periodControls, /<button/);
 });
 
-test('journey period API validates primary states and activity periods through atomic RPCs', () => {
-  matches(periodApi, [/verifyApiUser\(request\)/, /vehicleExists/, /DOWNTIME_REASONS/, /Downtime requires a valid reason/, /rpc\('transition_vehicle_journey_state'/, /rpc\('close_vehicle_journey_period'/, /rpc\('start_vehicle_journey_activity_period'/, /rpc\('close_vehicle_journey_activity_period'/]);
+test('journey period API blocks manual primary writes but retains authenticated downtime activities', () => {
+  matches(periodApi, [/verifyApiUser\(request\)/, /Primary vehicle state is source-controlled/, /action === 'START'/, /action === 'TRANSITION'/, /action === 'CLOSE'/, /rpc\('start_vehicle_journey_activity_period'/, /rpc\('close_vehicle_journey_activity_period'/]);
+  assert.doesNotMatch(periodApi, /rpc\('transition_vehicle_journey_state'/);
+  assert.doesNotMatch(periodApi, /rpc\('close_vehicle_journey_period'/);
   matches(periodMigration, [/'PERIOD_STARTED'/, /'PERIOD_ENDED'/, /insert into public\.vehicle_journey_periods/i, /insert into public\.vehicle_journey_events/i, /p_actor_id/]);
   matches(timeModelMigration, [/vehicle_journey_periods_one_open_state_uidx/, /vehicle_journey_activity_periods/, /ACTIVITY_PERIOD_STARTED/, /ACTIVITY_PERIOD_ENDED/]);
 });
