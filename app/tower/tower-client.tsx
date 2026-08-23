@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './tower.module.css';
 
@@ -66,6 +67,13 @@ function label(value: string): string {
   return labels[value] ?? value;
 }
 
+async function fetchCockpit(): Promise<CockpitData> {
+  const response = await fetch('/api/operator-cockpit', { cache: 'no-store' });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Tower');
+  return payload.data as CockpitData;
+}
+
 export default function OperatorCockpit() {
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,10 +85,7 @@ export default function OperatorCockpit() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/operator-cockpit', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Tower');
-      setData(payload.data as CockpitData);
+      setData(await fetchCockpit());
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Tower');
     } finally {
@@ -89,8 +94,24 @@ export default function OperatorCockpit() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    void fetchCockpit()
+      .then((next) => {
+        if (!active) return;
+        setData(next);
+        setError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Tower');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const stations = useMemo(() => {
     const values = new Set((data?.items ?? []).map((item) => item.station).filter(Boolean) as string[]);
@@ -117,7 +138,7 @@ export default function OperatorCockpit() {
           <p>Vad kräver min uppmärksamhet just nu?</p>
         </div>
         <div className={styles.headerActions}>
-          <a className={styles.secondaryButton} href="/">Startsida</a>
+          <Link className={styles.secondaryButton} href="/">Startsida</Link>
           <button className={styles.primaryButton} type="button" onClick={() => void load()} disabled={loading}>
             {loading ? 'Uppdaterar…' : 'Uppdatera'}
           </button>
@@ -208,7 +229,7 @@ export default function OperatorCockpit() {
                     <td>
                       {item.nextSteps.length ? item.nextSteps.map((step) => <span key={step} className={styles.nextStep}>{step}</span>) : '—'}
                     </td>
-                    <td><a className={styles.openLink} href={item.links.vagnkort}>Öppna →</a></td>
+                    <td><Link className={styles.openLink} href={item.links.vagnkort}>Öppna →</Link></td>
                   </tr>
                 ))}
               </tbody>
