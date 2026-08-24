@@ -16,6 +16,7 @@ export default function HomePage() {
         <h1 className="welcome-title">Välkommen!</h1>
         
         <div className="btn-group">
+          <a href="/tower" className="btn inkommen">Tower</a>
           <a href="/ankomst" className="btn inkommen">Inkommen</a>
           <a href="/check" className="btn incheckning">Ny incheckning</a>
           <a href="/nybil" className="btn registrera">Registrera ny bil</a>
