@@ -624,7 +624,7 @@ export default function CheckInForm() {
 
     return isChecklistComplete;
   }, [
-    regInput, ort, station, matarstallning, hjultyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, literpris, laddniva, antalLaddkablar,
+    regInput, ort, station, matarstallning, hjultyp, detailedBransletyp, needsTank, needsChargeLevel, needsChargeCables, tankniva, liters, literpris, receiptMedia, receiptMissing, receiptMissingReason, laddniva, antalLaddkablar,
     skadekontroll, newDamages, existingDamages, isChecklistComplete, garInteAttHyraUt, garInteAttHyraUtKommentar, varningslampaLyser, varningslampaBeskrivning,
     behoverRekond, rekondUtvandig, rekondInvandig, rekondMedia, bilenStarNuOrt, bilenStarNuStation, locationDiffers, matarstallningAvlamning, unhandledLegacyDamages, tankstatusChoice
   ]);
