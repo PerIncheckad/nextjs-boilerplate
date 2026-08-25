@@ -41,7 +41,8 @@ test('planning keeps SALU BEHOV UTOK MINSKNING and BESTALLT separate without inv
 test('planning is monthly and retains Excel-like direct work', () => {
   assert.match(planningApi, /MONTH_RE/);
   assert.match(planningUi, /type="month"/);
-  assert.match(planningUi, /currentMonth/);
+  assert.match(planningUi, /defaultPeriod/);
+  assert.match(planningUi, /toISOString\(\)\.slice\(0, 7\)/);
   assert.match(planningUi, /pasteSheet/);
   assert.match(planningUi, /data-sheet-cell/);
   assert.match(planningCss, /position:sticky/);
