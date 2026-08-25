@@ -35,7 +35,7 @@ export async function GET(request: Request) {
   try {
     const [checkinsRes, receiptsRes] = await Promise.all([
       admin.from('checkins')
-        .select('id,regnr,completed_at,current_station,station,fuel_level,fuel_liters,fuel_price_per_liter,fuel_currency')
+        .select('id,regnr,completed_at,current_station,station,fuel_level,fuel_liters,fuel_price_per_liter,fuel_currency,fuel_receipt_status,fuel_receipt_missing_reason')
         .eq('status', 'COMPLETED')
         .eq('fuel_level', 'tankad_nu')
         .gte('completed_at', since)
@@ -70,6 +70,9 @@ export async function GET(request: Request) {
       const total = Number.isFinite(liters) && Number.isFinite(pricePerLiter)
         ? Math.round(liters * pricePerLiter * 100) / 100
         : null;
+      const receiptStatus = checkin.fuel_receipt_status === 'DOCUMENTED' || checkin.fuel_receipt_status === 'MISSING_WITH_REASON'
+        ? checkin.fuel_receipt_status
+        : null;
       return {
         checkinId: checkin.id,
         regnr: checkin.regnr,
@@ -81,12 +84,22 @@ export async function GET(request: Request) {
         calculatedTotal: total,
         hasReceipt: Boolean(receipt),
         receipt,
+        receiptStatus,
+        receiptMissingReason: receiptStatus === 'MISSING_WITH_REASON' ? checkin.fuel_receipt_missing_reason ?? null : null,
+        classification: receiptStatus === 'DOCUMENTED'
+          ? 'VERIFIED_EVIDENCE'
+          : receiptStatus === 'MISSING_WITH_REASON'
+            ? 'VERIFIED_DEVIATION'
+            : 'LEGACY_UNCLASSIFIED',
         vagnkort: `/vagnkort?reg=${encodeURIComponent(checkin.regnr)}`,
       };
     });
 
     const withReceipt = rows.filter((row) => row.hasReceipt).length;
     const withoutReceipt = rows.length - withReceipt;
+    const documentedEvidence = rows.filter((row) => row.classification === 'VERIFIED_EVIDENCE').length;
+    const verifiedDeviations = rows.filter((row) => row.classification === 'VERIFIED_DEVIATION').length;
+    const legacyUnclassified = rows.filter((row) => row.classification === 'LEGACY_UNCLASSIFIED').length;
     const coveragePercent = rows.length ? Math.round((withReceipt / rows.length) * 1000) / 10 : null;
 
     return NextResponse.json({
@@ -98,12 +111,16 @@ export async function GET(request: Request) {
           tankedCheckins: rows.length,
           withReceipt,
           withoutReceipt,
+          documentedEvidence,
+          verifiedDeviations,
+          legacyUnclassified,
           coveragePercent,
         },
         interpretation: {
-          receiptIsOptional: true,
+          receiptRequiredForNewTankings: true,
+          missingReceiptRequiresReason: true,
           monetaryInterpretation: false,
-          message: 'Kvittotäckning beskriver dokumenterad evidens, inte kostnadsansvar eller ekonomiskt utfall.',
+          message: 'Ny tankning klassas som verifierad evidens när kvittobild finns, eller verifierad avvikelse när kvitto saknas och obligatorisk orsak har registrerats. Äldre rader utan den nya klassificeringen lämnas historiskt oklassificerade.',
         },
         rows,
       },
