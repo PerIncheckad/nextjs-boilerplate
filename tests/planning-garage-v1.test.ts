@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const migration = readFileSync('migrations/20260825201500_add_planning_and_garage_v1.sql', 'utf8');
 const modelMigration = readFileSync('migrations/20260825205500_add_planning_vehicle_models_v1.sql', 'utf8');
+const directionMigration = readFileSync('migrations/20260825211000_add_garage_direction_v1.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const planningUi = readFileSync('app/planning/planning-client.tsx', 'utf8');
@@ -52,6 +53,7 @@ test('planning and Garage writes stay behind authenticated APIs and service role
   assert.match(planningApi, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(garageApi, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(modelMigration, /revoke all on public\.planning_vehicle_models from anon, authenticated/);
+  assert.match(directionMigration, /revoke all on public\.garage_direction_events from anon, authenticated/);
   assert.match(migration, /revoke all on public\.planning_stations from anon, authenticated/);
   assert.match(migration, /revoke all on public\.fleet_planning_cells from anon, authenticated/);
   assert.match(migration, /revoke all on public\.garage_items from anon, authenticated/);
@@ -64,6 +66,20 @@ test('Garage is an independent planning domain and preserves station replanning 
   assert.match(garageApi, /stationChanged/);
   assert.match(garageApi, /garage_station_events/);
   assert.match(garageUi, /Omplanerad i Garaget/);
+});
+
+test('Garage has explicit UTVECKLA IN and AVVECKLA UT directions with append-only change history', () => {
+  assert.match(directionMigration, /garage_direction text/);
+  assert.match(directionMigration, /in \('IN','UT'\)/i);
+  assert.match(directionMigration, /garage_direction_events/);
+  assert.match(directionMigration, /append-only/);
+  assert.match(directionMigration, /do not rewrite Layer 1 history/);
+  assert.match(garageApi, /DIRECTIONS/);
+  assert.match(garageApi, /directionChanged/);
+  assert.match(garageApi, /garage_direction_events/);
+  assert.match(garageUi, /UTVECKLA \/ IN/);
+  assert.match(garageUi, /AVVECKLA \/ UT/);
+  assert.match(garageUi, /Riktning är planering, inte omskrivning av Lager 1/);
 });
 
 test('Garage supports pre-identity cars, SALU return and planned operating fields without Kistan semantics', () => {
