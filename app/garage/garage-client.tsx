@@ -94,7 +94,20 @@ export default function GarageClient() {
     }
   }, [applyPayload]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/garage', { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
+        if (!active) return;
+        applyPayload(payload);
+        setError(null);
+      })
+      .catch((loadError: unknown) => { if (active) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garaget'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [applyPayload]);
 
   const create = async () => {
     if (!draft.model.trim()) return setError('Modell måste anges.');
