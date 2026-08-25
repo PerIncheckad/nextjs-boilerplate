@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
 import styles from './planning.module.css';
 
 const METRICS = [
@@ -31,6 +31,8 @@ type ModelRow = {
   dirty: boolean;
 };
 
+type SheetColumn = { station: string; metric: Metric };
+
 const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 0, minskning_count: 0, ordered_count: 0 });
 const defaultPeriod = () => {
   const now = new Date();
@@ -58,6 +60,10 @@ function pivot(cells: ApiCell[], stations: PlanningStation[]): ModelRow[] {
   return [...map.values()].sort((a, b) => a.model.localeCompare(b.model, 'sv'));
 }
 
+function normalizedCount(raw: string): number {
+  return Math.max(0, Number.parseInt(raw.trim() || '0', 10) || 0);
+}
+
 export default function FleetPlanningClient() {
   const [initialPeriod] = useState(() => defaultPeriod());
   const [period, setPeriod] = useState(initialPeriod);
@@ -68,6 +74,8 @@ export default function FleetPlanningClient() {
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const sheetColumns = useMemo<SheetColumn[]>(() => METRICS.flatMap(([metric]) => stations.map(({ station_code }) => ({ metric, station: station_code }))), [stations]);
 
   const applyPayload = useCallback((payload: { data?: ApiCell[]; periods?: string[]; stations?: PlanningStation[] }, nextPeriod: string) => {
     const nextStations = payload.stations ?? [];
@@ -109,14 +117,16 @@ export default function FleetPlanningClient() {
   }, [applyPayload, initialPeriod]);
 
   const updateCount = (key: string, station: string, metric: Metric, raw: string) => {
-    const value = Math.max(0, Number.parseInt(raw || '0', 10) || 0);
+    const value = normalizedCount(raw);
     setRows((current) => current.map((row) => row.key === key
       ? { ...row, dirty: true, stations: { ...row.stations, [station]: { ...(row.stations[station] ?? emptyCounts()), [metric]: value } } }
       : row));
   };
+
   const updateText = (key: string, field: 'model' | 'note', value: string) => {
     setRows((current) => current.map((row) => row.key === key ? { ...row, [field]: value, dirty: true } : row));
   };
+
   const addRow = () => {
     const key = `new-${crypto.randomUUID()}`;
     setRows((current) => [...current, {
@@ -126,7 +136,12 @@ export default function FleetPlanningClient() {
       dirty: true,
       stations: Object.fromEntries(stations.map((station) => [station.station_code, emptyCounts()])),
     }]);
+    requestAnimationFrame(() => {
+      const inputs = document.querySelectorAll<HTMLInputElement>('input[data-model-cell="true"]');
+      inputs.item(inputs.length - 1)?.focus();
+    });
   };
+
   const saveRow = async (row: ModelRow) => {
     const model = row.model.trim();
     if (!model) return setError('Modell måste anges innan raden kan sparas.');
@@ -152,6 +167,39 @@ export default function FleetPlanningClient() {
     }
   };
 
+  const moveSheetFocus = (event: KeyboardEvent<HTMLInputElement>, direction: number) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const cells = [...document.querySelectorAll<HTMLInputElement>('input[data-sheet-cell="true"]')];
+    const index = cells.indexOf(event.currentTarget);
+    cells[index + direction]?.focus();
+    cells[index + direction]?.select();
+  };
+
+  const pasteSheet = (rowIndex: number, columnIndex: number, event: ClipboardEvent<HTMLInputElement>) => {
+    const text = event.clipboardData.getData('text/plain');
+    if (!text.includes('\t') && !text.includes('\n')) return;
+    event.preventDefault();
+    const matrix = text.replace(/\r/g, '').split('\n').filter((line, index, all) => line.length > 0 || index < all.length - 1).map((line) => line.split('\t'));
+    setRows((current) => {
+      const next = current.map((row) => ({ ...row, stations: { ...row.stations } }));
+      matrix.forEach((pasteRow, rowOffset) => {
+        const targetRow = next[rowIndex + rowOffset];
+        if (!targetRow) return;
+        pasteRow.forEach((raw, columnOffset) => {
+          const column = sheetColumns[columnIndex + columnOffset];
+          if (!column) return;
+          targetRow.stations[column.station] = {
+            ...(targetRow.stations[column.station] ?? emptyCounts()),
+            [column.metric]: normalizedCount(raw),
+          };
+          targetRow.dirty = true;
+        });
+      });
+      return next;
+    });
+  };
+
   const totals = useMemo(() => {
     const result: Record<string, Counts> = Object.fromEntries(stations.map(({ station_code }) => [station_code, emptyCounts()]));
     for (const row of rows) for (const { station_code } of stations) for (const [metric] of METRICS) result[station_code][metric] += (row.stations[station_code] ?? emptyCounts())[metric];
@@ -161,33 +209,82 @@ export default function FleetPlanningClient() {
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <div><div className={styles.eyebrow}>INCHECKAD / VAGNPARKSPLANERING</div><h1>Planering</h1><p>Excel-lik stationsplanering. Aktiva stationer styrs av konfiguration.</p></div>
-        <div className={styles.headerActions}><Link href="/tower" className={styles.secondaryButton}>Tower</Link><Link href="/garage" className={styles.primaryButton}>Garaget</Link></div>
+        <div>
+          <div className={styles.eyebrow}>INCHECKAD / VAGNPARKSPLANERING</div>
+          <h1>Planering</h1>
+          <p>Arbetsmatris för vagnparksplanering.</p>
+        </div>
+        <div className={styles.headerActions}>
+          <Link href="/tower" className={styles.secondaryButton}>Tower</Link>
+          <Link href="/garage" className={styles.primaryButton}>Garaget</Link>
+        </div>
       </header>
-      <section className={styles.periodBar}>
-        <label><span>Period</span><input list="planning-periods" value={periodInput} onChange={(event) => setPeriodInput(event.target.value)} /><datalist id="planning-periods">{periods.map((value) => <option key={value} value={value} />)}</datalist></label>
-        <button type="button" className={styles.secondaryButton} onClick={() => void load(periodInput.trim() || defaultPeriod())}>Öppna period</button>
-        <button type="button" className={styles.primaryButton} onClick={addRow} disabled={stations.length === 0}>+ Ny modellrad</button>
+
+      <section className={styles.toolbar}>
+        <label className={styles.periodControl}>
+          <span>Period</span>
+          <input list="planning-periods" value={periodInput} onChange={(event) => setPeriodInput(event.target.value)} />
+          <datalist id="planning-periods">{periods.map((value) => <option key={value} value={value} />)}</datalist>
+        </label>
+        <button type="button" className={styles.secondaryButton} onClick={() => void load(periodInput.trim() || defaultPeriod())}>Öppna</button>
+        <button type="button" className={styles.primaryButton} onClick={addRow} disabled={stations.length === 0}>+ Rad</button>
+        <div className={styles.sheetHint}>Enter = nästa cell · Tab = nästa cell · klistra in direkt från Excel</div>
         <div className={styles.periodStatus}><span>Aktiv period</span><strong>{period}</strong></div>
       </section>
+
       {error ? <div className={styles.error}>{error}</div> : null}
+
       <section className={styles.gridSection}>
-        <div className={styles.gridHeading}><div><h2>Planeringsmatris</h2><p>SALU · BEHOV · UTÖKNING · MINSKNING · BESTÄLLT</p></div><strong>{rows.length} modeller · {stations.length} stationer</strong></div>
+        <div className={styles.gridHeading}>
+          <div><strong>PLANERINGSMATRIS</strong><span>SALU · BEHOV · UTÖKNING · MINSKNING · BESTÄLLT</span></div>
+          <strong>{rows.length} modeller · {stations.length} stationer</strong>
+        </div>
+
         {loading ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
-          <div className={styles.tableWrap}><table className={styles.planningTable}>
-            <thead><tr><th rowSpan={2} className={styles.modelColumn}>Modell</th>{METRICS.map(([metric, title]) => <th key={metric} colSpan={stations.length} className={styles.groupHeader}>{title}</th>)}<th rowSpan={2} className={styles.noteColumn}>Kommentar</th><th rowSpan={2} className={styles.actionColumn}>Spara</th></tr>
-            <tr>{METRICS.flatMap(([metric]) => stations.map((station) => <th key={`${metric}-${station.station_code}`}>{station.display_name || station.station_code}</th>))}</tr></thead>
-            <tbody>{rows.map((row) => <tr key={row.key}>
-              <td className={styles.modelColumn}><input value={row.model} onChange={(event) => updateText(row.key, 'model', event.target.value)} placeholder="Modell" /></td>
-              {METRICS.flatMap(([metric]) => stations.map(({ station_code }) => <td key={`${row.key}-${metric}-${station_code}`} className={styles.numberCell}><input type="number" min={0} inputMode="numeric" value={(row.stations[station_code] ?? emptyCounts())[metric]} onChange={(event) => updateCount(row.key, station_code, metric, event.target.value)} aria-label={`${row.model || 'Ny modell'} ${metric} ${station_code}`} /></td>))}
-              <td className={styles.noteColumn}><input value={row.note} onChange={(event) => updateText(row.key, 'note', event.target.value)} placeholder="Avrop, avvikelse, kommentar…" /></td>
-              <td className={styles.actionColumn}><button type="button" className={row.dirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key}>{savingKey === row.key ? 'Sparar…' : row.dirty ? 'Spara*' : 'Spara'}</button></td>
-            </tr>)}
-            <tr className={styles.totalRow}><td>TOTALT</td>{METRICS.flatMap(([metric]) => stations.map(({ station_code }) => <td key={`total-${metric}-${station_code}`}>{totals[station_code]?.[metric] ?? 0}</td>))}<td /><td /></tr></tbody>
-          </table></div>
+          <div className={styles.tableWrap}>
+            <table className={styles.planningTable}>
+              <thead>
+                <tr>
+                  <th rowSpan={2} className={styles.modelColumn}>Modell</th>
+                  {METRICS.map(([metric, title]) => <th key={metric} colSpan={stations.length} className={styles.groupHeader}>{title}</th>)}
+                  <th rowSpan={2} className={styles.noteColumn}>Kommentar</th>
+                  <th rowSpan={2} className={styles.actionColumn} />
+                </tr>
+                <tr>{METRICS.flatMap(([metric]) => stations.map((station) => <th key={`${metric}-${station.station_code}`}>{station.display_name || station.station_code}</th>))}</tr>
+              </thead>
+              <tbody>
+                {rows.map((row, rowIndex) => <tr key={row.key} className={row.dirty ? styles.dirtyRow : undefined}>
+                  <td className={styles.modelColumn}><input data-model-cell="true" value={row.model} onChange={(event) => updateText(row.key, 'model', event.target.value)} placeholder="Modell" /></td>
+                  {sheetColumns.map(({ metric, station }, columnIndex) => (
+                    <td key={`${row.key}-${metric}-${station}`} className={styles.numberCell}>
+                      <input
+                        data-sheet-cell="true"
+                        type="number"
+                        min={0}
+                        inputMode="numeric"
+                        value={(row.stations[station] ?? emptyCounts())[metric]}
+                        onChange={(event) => updateCount(row.key, station, metric, event.target.value)}
+                        onKeyDown={(event) => moveSheetFocus(event, event.shiftKey ? -1 : 1)}
+                        onPaste={(event) => pasteSheet(rowIndex, columnIndex, event)}
+                        onFocus={(event) => event.currentTarget.select()}
+                        aria-label={`${row.model || 'Ny modell'} ${metric} ${station}`}
+                      />
+                    </td>
+                  ))}
+                  <td className={styles.noteColumn}><input value={row.note} onChange={(event) => updateText(row.key, 'note', event.target.value)} placeholder="Avrop, avvikelse, kommentar…" /></td>
+                  <td className={styles.actionColumn}><button type="button" className={row.dirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key}>{savingKey === row.key ? '…' : row.dirty ? 'Spara*' : 'Spara'}</button></td>
+                </tr>)}
+                <tr className={styles.totalRow}>
+                  <td className={styles.modelColumn}>TOTALT</td>
+                  {sheetColumns.map(({ metric, station }) => <td key={`total-${metric}-${station}`}>{totals[station]?.[metric] ?? 0}</td>)}
+                  <td />
+                  <td />
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
-      <section className={styles.explainer}><strong>Systemgräns</strong><p>Planeringen beskriver avsikt och framtida balans. Den skriver inte om Lager 1 och skapar ingen monetär konsekvens. Individuella bilar landar i Garaget.</p></section>
     </main>
   );
 }
