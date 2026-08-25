@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import styles from './garage.module.css';
 
 const STATIONS = ['166', '170', '274'] as const;
@@ -74,7 +74,25 @@ export default function GarageClient() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/garage', { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
+        if (!active) return;
+        setItems(payload.data ?? []);
+        setError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garaget');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const create = async () => {
     if (!draft.model.trim()) {
@@ -196,6 +214,6 @@ export default function GarageClient() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className={styles.field}><span>{label}</span>{children}</label>;
 }
