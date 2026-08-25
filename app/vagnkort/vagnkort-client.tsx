@@ -26,11 +26,24 @@ type JourneyEvent = {
   actor_name: string | null;
 };
 
+type DocumentSourceFacts = {
+  supplier?: string | null;
+  invoiceNumber?: string | null;
+  documentDate?: string | null;
+  totalAmount?: number | null;
+  currency?: string | null;
+  provenance?: string | null;
+  monetaryInterpretation?: boolean | null;
+};
+
 type VehicleDocument = {
   document_id: string;
   document_type: string;
   title: string | null;
   file_name: string;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  source_system?: string | null;
   external_url: string | null;
   uploaded_at: string;
   journey_event_id?: string | null;
@@ -40,6 +53,9 @@ type VehicleDocument = {
   salu_checkpoint_id?: string | null;
   salu_child_process_id?: string | null;
   metadata?: {
+    contentFingerprint?: string | null;
+    fingerprintSource?: string | null;
+    sourceFacts?: DocumentSourceFacts | null;
     context?: {
       type?: string;
       id?: string | null;
@@ -144,6 +160,24 @@ function formatDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString('sv-SE');
 }
 
+function formatDocumentDate(value: string | null | undefined) {
+  if (!value) return '—';
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString('sv-SE');
+}
+
+function formatMoney(value: number | null | undefined, currency = 'SEK') {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  return new Intl.NumberFormat('sv-SE', { style: 'currency', currency, maximumFractionDigits: 2 }).format(value);
+}
+
+function formatFileSize(value: number | null | undefined) {
+  if (!value || value < 1) return '—';
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round((value / 1024) * 10) / 10} KB`;
+  return `${Math.round((value / (1024 * 1024)) * 10) / 10} MB`;
+}
+
 function hours(value: number | undefined) {
   if (!value) return '0 h';
   return value >= 24 ? `${Math.round((value / 24) * 10) / 10} dygn` : `${value} h`;
@@ -221,6 +255,16 @@ export default function VagnkortClient() {
       current: current[key],
       changed: baseline[key] !== undefined && current[key] !== undefined && baseline[key] !== current[key],
     }));
+  }, [data]);
+
+  const fingerprintCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const document of data?.documents ?? []) {
+      const fingerprint = document.metadata?.contentFingerprint;
+      if (!fingerprint) continue;
+      counts.set(fingerprint, (counts.get(fingerprint) ?? 0) + 1);
+    }
+    return counts;
   }, [data]);
 
   function submit(event: FormEvent) {
@@ -338,23 +382,49 @@ export default function VagnkortClient() {
                   childProcesses={data.salu.childProcesses}
                   onUploaded={() => setRefreshNonce((value) => value + 1)}
                 />
-                <div style={{ marginTop: '1rem' }}>
-                  {data.documents.length === 0 ? <p>Inga dokument registrerade ännu.</p> : data.documents.slice(0, 20).map((document) => (
-                    <div key={document.document_id} style={{ padding: '.55rem 0', borderBottom: '1px solid #eee', display: 'flex', gap: '.7rem', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <strong style={{ overflowWrap: 'anywhere' }}>{document.title || document.file_name}</strong>
-                        <div style={{ color: '#666', fontSize: 13, marginTop: '.1rem' }}>{document.document_type} · {formatDate(document.uploaded_at)}</div>
-                        <div style={{ marginTop: '.3rem', display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
+                <div style={{ marginTop: '1rem', display: 'grid', gap: '.65rem' }}>
+                  {data.documents.length === 0 ? <p>Inga dokument registrerade ännu.</p> : data.documents.slice(0, 20).map((document) => {
+                    const sourceFacts = document.metadata?.sourceFacts;
+                    const fingerprint = document.metadata?.contentFingerprint;
+                    const duplicateCount = fingerprint ? fingerprintCounts.get(fingerprint) ?? 0 : 0;
+                    return (
+                      <div key={document.document_id} style={{ padding: '.8rem', border: '1px solid #e3e3e3', borderRadius: 10, background: duplicateCount > 1 ? '#fff7ed' : '#fff', display: 'grid', gap: '.6rem' }}>
+                        <div style={{ display: 'flex', gap: '.7rem', justifyContent: 'space-between', alignItems: 'start' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                              <strong style={{ overflowWrap: 'anywhere' }}>{document.title || document.file_name}</strong>
+                              {duplicateCount > 1 && <span style={{ background: '#fed7aa', color: '#9a3412', borderRadius: 999, padding: '.15rem .45rem', fontSize: 11, fontWeight: 700 }}>EXAKT FIL-DUBBLETT · {duplicateCount} st</span>}
+                            </div>
+                            <div style={{ color: '#666', fontSize: 13, marginTop: '.15rem' }}>{document.document_type} · {formatDate(document.uploaded_at)} · {formatFileSize(document.size_bytes)}</div>
+                            <div style={{ color: '#777', fontSize: 12, marginTop: '.15rem' }}>{document.source_system || (document.sourceKind === 'legacy_receipt' ? 'LEGACY_RECEIPTS' : 'INCHECKAD')}</div>
+                          </div>
+                          <button type="button" onClick={() => void openDocument(document)} disabled={openingDocument === document.document_id} style={{ border: '1px solid #bbb', borderRadius: 7, background: '#fff', padding: '.45rem .7rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            {openingDocument === document.document_id ? 'Öppnar…' : 'Visa dokument'}
+                          </button>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '.35rem', flexWrap: 'wrap' }}>
                           <span style={{ display: 'inline-flex', alignItems: 'center', background: '#f0f0f0', borderRadius: 999, padding: '.18rem .5rem', fontSize: 12 }}>
                             Kopplat till: {documentContextLabel(document)}
                           </span>
+                          {fingerprint && <span style={{ display: 'inline-flex', alignItems: 'center', background: '#eef6ff', borderRadius: 999, padding: '.18rem .5rem', fontSize: 12 }}>Filfingeravtryck finns</span>}
                         </div>
+
+                        {sourceFacts && (
+                          <div style={{ borderTop: '1px solid #eee', paddingTop: '.6rem' }}>
+                            <div style={{ fontSize: 12, color: '#666', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: '.35rem' }}>Källfakta från dokument</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.45rem' }}>
+                              <div><span style={{ display: 'block', fontSize: 11, color: '#777' }}>Leverantör</span><strong>{sourceFacts.supplier || '—'}</strong></div>
+                              <div><span style={{ display: 'block', fontSize: 11, color: '#777' }}>Faktura-/kvittonr</span><strong>{sourceFacts.invoiceNumber || '—'}</strong></div>
+                              <div><span style={{ display: 'block', fontSize: 11, color: '#777' }}>Dokumentdatum</span><strong>{formatDocumentDate(sourceFacts.documentDate)}</strong></div>
+                              <div><span style={{ display: 'block', fontSize: 11, color: '#777' }}>Dokumentbelopp</span><strong>{formatMoney(sourceFacts.totalAmount, sourceFacts.currency || 'SEK')}</strong></div>
+                            </div>
+                            <div style={{ marginTop: '.35rem', fontSize: 11, color: '#777' }}>Källregistrerat belopp · ingen bedömning av kostnadsansvar eller ekonomiskt utfall.</div>
+                          </div>
+                        )}
                       </div>
-                      <button type="button" onClick={() => void openDocument(document)} disabled={openingDocument === document.document_id} style={{ border: '1px solid #bbb', borderRadius: 7, background: '#fff', padding: '.45rem .7rem', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        {openingDocument === document.document_id ? 'Öppnar…' : 'Öppna'}
-                      </button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             </div>
