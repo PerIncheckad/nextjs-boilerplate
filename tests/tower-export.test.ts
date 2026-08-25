@@ -48,3 +48,26 @@ test('Tower CSV export escapes quotes and never invents missing values', () => {
   assert.match(csv, /"Väntar på ""del"""/);
   assert.match(csv, /"XYZ789","","",""/);
 });
+
+test('Tower CSV export neutralizes spreadsheet formulas from operational text', () => {
+  const csv = buildTowerCsv([
+    {
+      regnr: 'FORM01',
+      station: 'MALMÖ',
+      state: 'DOWNTIME',
+      stateStartedAt: null,
+      downtimeReason: '=HYPERLINK("https://example.invalid","x")',
+      attention: [],
+      ownerFunctions: ['+SUM(A1:A2)'],
+      actionStatus: null,
+      deadlineAt: null,
+      overdue: false,
+      waitingVerification: false,
+      nextSteps: [' @cmd'],
+    },
+  ], '2026-08-25T02:00:00.000Z');
+
+  assert.match(csv, /"'=HYPERLINK\(""https:\/\/example\.invalid"",""x""\)"/);
+  assert.match(csv, /"'\+SUM\(A1:A2\)"/);
+  assert.match(csv, /"' @cmd"/);
+});
