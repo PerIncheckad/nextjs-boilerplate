@@ -14,6 +14,9 @@ type FuelEvidenceRow = {
   calculatedTotal: number | null;
   hasReceipt: boolean;
   receipt: { url: string; uploadedAt: string | null } | null;
+  receiptStatus: 'DOCUMENTED' | 'MISSING_WITH_REASON' | null;
+  receiptMissingReason: string | null;
+  classification: 'VERIFIED_EVIDENCE' | 'VERIFIED_DEVIATION' | 'LEGACY_UNCLASSIFIED';
   vagnkort: string;
 };
 
@@ -25,10 +28,14 @@ type FuelEvidenceData = {
     tankedCheckins: number;
     withReceipt: number;
     withoutReceipt: number;
+    documentedEvidence: number;
+    verifiedDeviations: number;
+    legacyUnclassified: number;
     coveragePercent: number | null;
   };
   interpretation: {
-    receiptIsOptional: boolean;
+    receiptRequiredForNewTankings: boolean;
+    missingReceiptRequiresReason: boolean;
     monetaryInterpretation: boolean;
     message: string;
   };
@@ -57,6 +64,12 @@ function formatDate(value: string | null) {
 function money(value: number | null, currency: string) {
   if (value == null) return '—';
   return `${value.toLocaleString('sv-SE', { maximumFractionDigits: 2 })} ${currency}`;
+}
+
+function evidenceLabel(row: FuelEvidenceRow) {
+  if (row.classification === 'VERIFIED_EVIDENCE') return 'Verifierad evidens';
+  if (row.classification === 'VERIFIED_DEVIATION') return 'Verifierad avvikelse';
+  return 'Historisk / oklassificerad';
 }
 
 async function fetchEvidence(hours: number): Promise<FuelEvidenceData> {
@@ -108,7 +121,7 @@ export default function FuelEvidenceClient() {
           <div>
             <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: '.08em', color: '#666' }}>INCHECKAD / DRIFT & EVIDENS</div>
             <h1 style={{ margin: '.2rem 0' }}>Tankningsevidens</h1>
-            <p style={{ margin: 0 }}>Hur stor del av registrerade tankningar har dokumenterat tankkvitto?</p>
+            <p style={{ margin: 0 }}>Tankad → kvitto finns = verifierad evidens. Tankad → kvitto saknas + orsak = verifierad avvikelse.</p>
           </div>
           <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap' }}>
             <Link href="/tower" style={{ color: '#111' }}>Tower</Link>
@@ -117,7 +130,7 @@ export default function FuelEvidenceClient() {
         </header>
 
         <section style={{ ...card, background: '#fffbe8' }}>
-          Read-only uppföljning. Kvitto är fortfarande frivilligt och denna vy gör ingen bedömning av kostnadsansvar, ersättning eller monetärt utfall.
+          Read-only uppföljning. För nya registrerade tankningar krävs kvittobild eller uttryckligt “Kvitto saknas” med obligatorisk orsak. Äldre data skrivs inte om. Ingen bedömning av kostnadsansvar, ersättning eller monetärt utfall görs här.
         </section>
 
         {error ? <section style={{ ...card, color: '#a00' }}>{error}</section> : null}
@@ -138,8 +151,9 @@ export default function FuelEvidenceClient() {
 
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
           <Metric title="Tankad nu" value={data?.summary.tankedCheckins ?? 0} />
-          <Metric title="Med kvitto" value={data?.summary.withReceipt ?? 0} />
-          <Metric title="Utan kvitto" value={data?.summary.withoutReceipt ?? 0} />
+          <Metric title="Verifierad evidens" value={data?.summary.documentedEvidence ?? 0} />
+          <Metric title="Verifierad avvikelse" value={data?.summary.verifiedDeviations ?? 0} />
+          <Metric title="Historisk / oklassificerad" value={data?.summary.legacyUnclassified ?? 0} />
           <Metric title="Kvittotäckning" value={data?.summary.coveragePercent == null ? '—' : `${data.summary.coveragePercent}%`} />
         </section>
 
@@ -156,6 +170,7 @@ export default function FuelEvidenceClient() {
                     <th style={{ textAlign: 'left', padding: '.55rem' }}>Fordon</th>
                     <th style={{ textAlign: 'left', padding: '.55rem' }}>Station</th>
                     <th style={{ textAlign: 'left', padding: '.55rem' }}>Tankning</th>
+                    <th style={{ textAlign: 'left', padding: '.55rem' }}>Evidensstatus</th>
                     <th style={{ textAlign: 'left', padding: '.55rem' }}>Kvitto</th>
                     <th style={{ textAlign: 'left', padding: '.55rem' }}>Vagnkort</th>
                   </tr>
@@ -171,7 +186,13 @@ export default function FuelEvidenceClient() {
                         <div style={{ fontSize: 12, color: '#666' }}>Beräknat: {money(row.calculatedTotal, row.currency)}</div>
                       </td>
                       <td style={{ padding: '.6rem', borderTop: '1px solid #eee' }}>
-                        {row.receipt ? <a href={row.receipt.url} target="_blank" rel="noreferrer">Visa kvitto →</a> : <strong style={{ color: '#a00' }}>Saknas</strong>}
+                        <strong style={{ color: row.classification === 'VERIFIED_DEVIATION' ? '#a00' : row.classification === 'VERIFIED_EVIDENCE' ? '#166534' : '#666' }}>
+                          {evidenceLabel(row)}
+                        </strong>
+                        {row.receiptMissingReason ? <div style={{ fontSize: 12, color: '#a00', marginTop: '.2rem' }}>Orsak: {row.receiptMissingReason}</div> : null}
+                      </td>
+                      <td style={{ padding: '.6rem', borderTop: '1px solid #eee' }}>
+                        {row.receipt ? <a href={row.receipt.url} target="_blank" rel="noreferrer">Visa kvitto →</a> : '—'}
                       </td>
                       <td style={{ padding: '.6rem', borderTop: '1px solid #eee' }}><Link href={row.vagnkort}>Öppna →</Link></td>
                     </tr>
@@ -184,7 +205,7 @@ export default function FuelEvidenceClient() {
 
         <section style={card}>
           <h2 style={{ marginTop: 0 }}>Tolkning</h2>
-          <p style={{ marginBottom: 0 }}>{data?.interpretation.message ?? 'Kvittotäckning beskriver endast dokumenterad evidens.'}</p>
+          <p style={{ marginBottom: 0 }}>{data?.interpretation.message ?? 'Tankningsevidens beskriver endast registrerad evidens och avvikelse.'}</p>
         </section>
       </div>
     </main>
