@@ -8,10 +8,16 @@ const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const planningUi = readFileSync('app/planning/planning-client.tsx', 'utf8');
 const garageUi = readFileSync('app/garage/garage-client.tsx', 'utf8');
 
-test('planning is station adapted to exactly 166, 170 and 274', () => {
-  assert.match(migration, /station in \('166', '170', '274'\)/);
-  assert.match(planningApi, /new Set\(\['166', '170', '274'\]\)/);
-  assert.match(planningUi, /const STATIONS = \['166', '170', '274'\] as const/);
+test('planning starts with 166, 170 and 274 but station growth is configuration, not code', () => {
+  assert.match(migration, /create table if not exists public\.planning_stations/);
+  for (const station of ['166', '170', '274']) assert.match(migration, new RegExp(`\\('${station}'`));
+  assert.match(migration, /references public\.planning_stations\(station_code\)/);
+  assert.match(planningApi, /from\('planning_stations'\)/);
+  assert.match(garageApi, /from\('planning_stations'\)/);
+  assert.doesNotMatch(planningUi, /const STATIONS/);
+  assert.doesNotMatch(garageUi, /const STATIONS/);
+  assert.match(planningUi, /stations\.map/);
+  assert.match(garageUi, /stations\.map/);
 });
 
 test('planning keeps the locked business concepts separate', () => {
@@ -32,12 +38,13 @@ test('planning and Garage writes stay behind authenticated APIs and service role
   assert.match(garageApi, /verifyApiUser/);
   assert.match(planningApi, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(garageApi, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(migration, /revoke all on public\.planning_stations from anon, authenticated/);
   assert.match(migration, /revoke all on public\.fleet_planning_cells from anon, authenticated/);
   assert.match(migration, /revoke all on public\.garage_items from anon, authenticated/);
 });
 
 test('Garage is an independent planning domain and preserves station replanning history', () => {
-  assert.match(migration, /Garaget planning objects|Garage planning objects/);
+  assert.match(migration, /Garage planning objects/);
   assert.match(migration, /outside Layer 1 and Layer 2/);
   assert.match(migration, /garage_station_events/);
   assert.match(garageApi, /stationChanged/);
