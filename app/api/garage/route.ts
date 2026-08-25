@@ -5,6 +5,7 @@ import { verifyApiUser } from '@/lib/server-auth';
 const REASONS = new Set(['BEHOV', 'UTOK', 'MINSKNING', 'SALU_RETUR', 'ANNAT']);
 const CONFIRMATION = new Set(['PLANERAD', 'BESTALLD', 'AVROPAD', 'AVVAKTAR_BEKRAFTELSE', 'BEKRAFTAD']);
 const TRANSPORT = new Set(['EJ_BOKAD', 'TRANSPORTBOKAD', 'PA_VAG', 'ANKOMMEN']);
+const DIRECTIONS = new Set(['IN', 'UT']);
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -56,6 +57,13 @@ function normalizeBody(body: Record<string, unknown>, stations: Set<string>, par
   for (const field of fields) if (!partial || Object.hasOwn(body, field)) out[field] = text(body[field]);
   if (!partial && !out.model) return null;
   if (Object.hasOwn(body, 'model') && !out.model) return null;
+
+  if (!partial || Object.hasOwn(body, 'garage_direction')) {
+    const value = upper(body.garage_direction);
+    if (!partial && !value) return null;
+    if (value && !DIRECTIONS.has(value)) return null;
+    out.garage_direction = value;
+  }
   if (!partial || Object.hasOwn(body, 'planning_reason')) { const value = upper(body.planning_reason) ?? 'BEHOV'; if (!REASONS.has(value)) return null; out.planning_reason = value; }
   if (!partial || Object.hasOwn(body, 'planned_station')) { const value = text(body.planned_station); if (value && !stations.has(value)) return null; out.planned_station = value; }
   if (!partial || Object.hasOwn(body, 'confirmation_status')) { const value = upper(body.confirmation_status) ?? 'PLANERAD'; if (!CONFIRMATION.has(value)) return null; out.confirmation_status = value; }
@@ -82,9 +90,11 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const period = params.get('period')?.trim() || null;
   const station = params.get('station')?.trim() || null;
-  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,created_at,updated_at').order('updated_at', { ascending: false });
+  const direction = upper(params.get('direction'));
+  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,garage_direction,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,created_at,updated_at').order('updated_at', { ascending: false });
   if (period) query = query.eq('planning_period', period);
   if (station && stations.has(station)) query = query.eq('planned_station', station);
+  if (direction && DIRECTIONS.has(direction)) query = query.eq('garage_direction', direction);
   const { data, error } = await query;
   if (error) { console.error('[garage] GET failed', error); return NextResponse.json({ error: 'Kunde inte läsa Garaget' }, { status: 500 }); }
   return NextResponse.json({ data: data ?? [], stations: stationRows, models: modelRows });
@@ -98,12 +108,16 @@ export async function POST(request: Request) {
   let stationRows: Array<{ station_code: string }>;
   try { stationRows = await loadStations(admin) as Array<{ station_code: string }>; } catch (error) { console.error('[garage] station lookup failed', error); return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 }); }
   const normalized = normalizeBody(body, new Set(stationRows.map((row) => row.station_code)));
-  if (!normalized) return NextResponse.json({ error: 'Ogiltiga Garage-data' }, { status: 400 });
+  if (!normalized) return NextResponse.json({ error: 'Ogiltiga Garage-data: modell, riktning och station måste vara giltiga' }, { status: 400 });
   try { normalized.model = await ensureModel(admin, normalized.model, verification.user.id); } catch (error) { console.error('[garage] model register failed', error); return NextResponse.json({ error: 'Kunde inte uppdatera modellregistret' }, { status: 500 }); }
   const now = new Date().toISOString();
   const payload = { ...normalized, created_at: now, updated_at: now, created_by: verification.user.id, updated_by: verification.user.id };
   const { data, error } = await admin.from('garage_items').insert(payload).select('*').single();
   if (error) { console.error('[garage] POST failed', error); return NextResponse.json({ error: 'Kunde inte skapa Garage-objekt' }, { status: 500 }); }
+  if (data.garage_direction) {
+    const { error: directionError } = await admin.from('garage_direction_events').insert({ garage_item_id: data.garage_item_id, from_direction: null, to_direction: data.garage_direction, reason: text(body.direction_change_reason) ?? 'Riktning satt vid skapande', changed_at: now, changed_by: verification.user.id });
+    if (directionError) console.error('[garage] initial direction audit failed after item insert', directionError);
+  }
   return NextResponse.json({ data }, { status: 201 });
 }
 
@@ -121,17 +135,24 @@ export async function PATCH(request: Request) {
   if (Object.hasOwn(normalized, 'model')) {
     try { normalized.model = await ensureModel(admin, normalized.model, verification.user.id); } catch (error) { console.error('[garage] model register failed', error); return NextResponse.json({ error: 'Kunde inte uppdatera modellregistret' }, { status: 500 }); }
   }
-  const { data: existing, error: existingError } = await admin.from('garage_items').select('garage_item_id,planned_station').eq('garage_item_id', id).maybeSingle();
+  const { data: existing, error: existingError } = await admin.from('garage_items').select('garage_item_id,planned_station,garage_direction').eq('garage_item_id', id).maybeSingle();
   if (existingError) { console.error('[garage] existing lookup failed', existingError); return NextResponse.json({ error: 'Kunde inte läsa Garage-objektet' }, { status: 500 }); }
   if (!existing) return NextResponse.json({ error: 'Garage-objektet finns inte' }, { status: 404 });
   const nextStation = Object.hasOwn(normalized, 'planned_station') ? (normalized.planned_station as string | null) : existing.planned_station;
   const stationChanged = Object.hasOwn(normalized, 'planned_station') && nextStation !== existing.planned_station;
+  const nextDirection = Object.hasOwn(normalized, 'garage_direction') ? (normalized.garage_direction as string | null) : existing.garage_direction;
+  const directionChanged = Object.hasOwn(normalized, 'garage_direction') && nextDirection !== existing.garage_direction;
+  if (directionChanged && !nextDirection) return NextResponse.json({ error: 'Garage-riktning kan inte tas bort; välj IN eller UT' }, { status: 400 });
   const now = new Date().toISOString();
   const { data, error } = await admin.from('garage_items').update({ ...normalized, updated_at: now, updated_by: verification.user.id }).eq('garage_item_id', id).select('*').single();
   if (error) { console.error('[garage] PATCH failed', error); return NextResponse.json({ error: 'Kunde inte uppdatera Garage-objektet' }, { status: 500 }); }
   if (stationChanged) {
     const { error: auditError } = await admin.from('garage_station_events').insert({ garage_item_id: id, from_station: existing.planned_station, to_station: nextStation, reason: text(body.station_change_reason), changed_at: now, changed_by: verification.user.id });
     if (auditError) console.error('[garage] station audit failed after item update', auditError);
+  }
+  if (directionChanged && nextDirection) {
+    const { error: directionError } = await admin.from('garage_direction_events').insert({ garage_item_id: id, from_direction: existing.garage_direction, to_direction: nextDirection, reason: text(body.direction_change_reason), changed_at: now, changed_by: verification.user.id });
+    if (directionError) console.error('[garage] direction audit failed after item update', directionError);
   }
   return NextResponse.json({ data });
 }
