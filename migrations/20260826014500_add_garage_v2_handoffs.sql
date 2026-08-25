@@ -141,6 +141,8 @@ begin
 end;
 $$;
 
+revoke all on function public.sync_nybil_garage_handoff() from public, anon, authenticated;
+
 drop trigger if exists nybil_garage_handoff_sync on public.nybil_inventering;
 create trigger nybil_garage_handoff_sync
 after insert on public.nybil_inventering
