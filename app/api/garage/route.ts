@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
 
-const STATIONS = new Set(['166', '170', '274']);
 const REASONS = new Set(['BEHOV', 'UTOK', 'MINSKNING', 'SALU_RETUR', 'ANNAT']);
 const CONFIRMATION = new Set(['PLANERAD', 'BESTALLD', 'AVROPAD', 'AVVAKTAR_BEKRAFTELSE', 'BEKRAFTAD']);
 const TRANSPORT = new Set(['EJ_BOKAD', 'TRANSPORTBOKAD', 'PA_VAG', 'ANKOMMEN']);
@@ -37,7 +36,18 @@ function money(value: unknown): number | null {
   return Number.isFinite(numeric) && numeric >= 0 ? numeric : null;
 }
 
-function normalizeBody(body: Record<string, unknown>, partial = false) {
+async function loadStations(admin: ReturnType<typeof adminClient>) {
+  const { data, error } = await admin
+    .from('planning_stations')
+    .select('station_code,display_name,sort_order')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+    .order('station_code', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+function normalizeBody(body: Record<string, unknown>, stations: Set<string>, partial = false) {
   const out: Record<string, unknown> = {};
   const fields = ['planning_period', 'model', 'supplier', 'order_reference', 'saluort', 'note'] as const;
   for (const field of fields) {
@@ -53,7 +63,7 @@ function normalizeBody(body: Record<string, unknown>, partial = false) {
   }
   if (!partial || Object.hasOwn(body, 'planned_station')) {
     const value = text(body.planned_station);
-    if (value && !STATIONS.has(value)) return null;
+    if (value && !stations.has(value)) return null;
     out.planned_station = value;
   }
   if (!partial || Object.hasOwn(body, 'confirmation_status')) {
@@ -85,22 +95,32 @@ export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
 
+  const admin = adminClient();
+  let stationRows: Array<{ station_code: string; display_name: string | null; sort_order: number }>;
+  try {
+    stationRows = await loadStations(admin) as typeof stationRows;
+  } catch (error) {
+    console.error('[garage] station lookup failed', error);
+    return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 });
+  }
+  const stations = new Set(stationRows.map((row) => row.station_code));
+
   const params = new URL(request.url).searchParams;
   const period = params.get('period')?.trim() || null;
   const station = params.get('station')?.trim() || null;
-  let query = adminClient()
+  let query = admin
     .from('garage_items')
     .select('garage_item_id,planning_period,model,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,created_at,updated_at')
     .order('updated_at', { ascending: false });
   if (period) query = query.eq('planning_period', period);
-  if (station && STATIONS.has(station)) query = query.eq('planned_station', station);
+  if (station && stations.has(station)) query = query.eq('planned_station', station);
 
   const { data, error } = await query;
   if (error) {
     console.error('[garage] GET failed', error);
     return NextResponse.json({ error: 'Kunde inte läsa Garaget' }, { status: 500 });
   }
-  return NextResponse.json({ data: data ?? [] });
+  return NextResponse.json({ data: data ?? [], stations: stationRows });
 }
 
 export async function POST(request: Request) {
@@ -114,12 +134,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 });
   }
 
-  const normalized = normalizeBody(body);
+  const admin = adminClient();
+  let stationRows: Array<{ station_code: string }>;
+  try {
+    stationRows = await loadStations(admin) as Array<{ station_code: string }>;
+  } catch (error) {
+    console.error('[garage] station lookup failed', error);
+    return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 });
+  }
+  const normalized = normalizeBody(body, new Set(stationRows.map((row) => row.station_code)));
   if (!normalized) return NextResponse.json({ error: 'Ogiltiga Garage-data' }, { status: 400 });
 
   const now = new Date().toISOString();
   const payload = { ...normalized, created_at: now, updated_at: now, created_by: verification.user.id, updated_by: verification.user.id };
-  const { data, error } = await adminClient().from('garage_items').insert(payload).select('*').single();
+  const { data, error } = await admin.from('garage_items').insert(payload).select('*').single();
   if (error) {
     console.error('[garage] POST failed', error);
     return NextResponse.json({ error: 'Kunde inte skapa Garage-objekt' }, { status: 500 });
@@ -140,10 +168,18 @@ export async function PATCH(request: Request) {
 
   const id = text(body.garage_item_id);
   if (!id) return NextResponse.json({ error: 'garage_item_id saknas' }, { status: 400 });
-  const normalized = normalizeBody(body, true);
-  if (!normalized || Object.keys(normalized).length === 0) return NextResponse.json({ error: 'Inga giltiga ändringar' }, { status: 400 });
 
   const admin = adminClient();
+  let stationRows: Array<{ station_code: string }>;
+  try {
+    stationRows = await loadStations(admin) as Array<{ station_code: string }>;
+  } catch (error) {
+    console.error('[garage] station lookup failed', error);
+    return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 });
+  }
+  const normalized = normalizeBody(body, new Set(stationRows.map((row) => row.station_code)), true);
+  if (!normalized || Object.keys(normalized).length === 0) return NextResponse.json({ error: 'Inga giltiga ändringar' }, { status: 400 });
+
   const { data: existing, error: existingError } = await admin
     .from('garage_items')
     .select('garage_item_id,planned_station')
