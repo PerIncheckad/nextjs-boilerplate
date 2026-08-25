@@ -159,6 +159,7 @@ export default function OperatorCockpit() {
         <div className={styles.headerActions}>
           <Link className={styles.secondaryButton} href="/">Startsida</Link>
           <Link className={styles.secondaryButton} href="/tower/history">Drifthistorik</Link>
+          <Link className={styles.secondaryButton} href="/tower/metrics">Driftmätning</Link>
           <button className={styles.secondaryButton} type="button" onClick={exportCurrentView} disabled={!data || items.length === 0}>
             Exportera CSV
           </button>
