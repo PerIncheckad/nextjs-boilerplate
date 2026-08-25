@@ -43,10 +43,17 @@ export async function countNybilDuplicatesForDate(regnr: string, registrationDat
 }
 
 export async function createNybilRegistration(inventoryData: Record<string, unknown>): Promise<string | number | null> {
+  const garageItemId = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('garage_item_id')?.trim() || null
+    : null;
+  const payloadInventory = garageItemId
+    ? { ...inventoryData, source_garage_item_id: garageItemId }
+    : inventoryData;
+
   const response = await fetch('/api/nybil', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inventoryData }),
+    body: JSON.stringify({ inventoryData: payloadInventory }),
   });
   const data = await readJson<{ id: string | number | null }>(response, 'Kunde inte spara nybilsregistreringen');
   return data.id;
