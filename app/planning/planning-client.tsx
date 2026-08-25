@@ -76,7 +76,20 @@ export default function FleetPlanningClient() {
     finally { setLoading(false); }
   }, [applyPayload]);
 
-  useEffect(() => { void load(initialPeriod); }, [initialPeriod, load]);
+  useEffect(() => {
+    let active = true;
+    void fetch(`/api/fleet-planning?period=${encodeURIComponent(initialPeriod)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa planeringen');
+        if (!active) return;
+        applyPayload(payload, initialPeriod);
+        setError(null);
+      })
+      .catch((loadError: unknown) => { if (active) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa planeringen'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [applyPayload, initialPeriod]);
 
   const updateCount = (key: string, station: string, metric: Metric, raw: string) => {
     const value = normalizedCount(raw);
