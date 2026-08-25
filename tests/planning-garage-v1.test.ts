@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const migration = readFileSync('migrations/20260825201500_add_planning_and_garage_v1.sql', 'utf8');
+const modelMigration = readFileSync('migrations/20260825205500_add_planning_vehicle_models_v1.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const planningUi = readFileSync('app/planning/planning-client.tsx', 'utf8');
@@ -33,11 +34,24 @@ test('planning keeps the locked business concepts separate', () => {
   assert.match(planningUi, /BESTÄLLT/);
 });
 
+test('planning and Garage share a reusable model registry', () => {
+  assert.match(modelMigration, /create table if not exists public\.planning_vehicle_models/);
+  assert.match(modelMigration, /model_code text primary key/);
+  assert.match(modelMigration, /upper\(trim\(model\)\)/);
+  assert.match(planningApi, /from\('planning_vehicle_models'\)/);
+  assert.match(garageApi, /from\('planning_vehicle_models'\)/);
+  assert.match(planningUi, /planning-models/);
+  assert.match(garageUi, /garage-models/);
+  assert.match(planningUi, /Välj eller skriv modell/);
+  assert.match(garageUi, /Välj eller skriv modell/);
+});
+
 test('planning and Garage writes stay behind authenticated APIs and service role', () => {
   assert.match(planningApi, /verifyApiUser/);
   assert.match(garageApi, /verifyApiUser/);
   assert.match(planningApi, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(garageApi, /SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(modelMigration, /revoke all on public\.planning_vehicle_models from anon, authenticated/);
   assert.match(migration, /revoke all on public\.planning_stations from anon, authenticated/);
   assert.match(migration, /revoke all on public\.fleet_planning_cells from anon, authenticated/);
   assert.match(migration, /revoke all on public\.garage_items from anon, authenticated/);
