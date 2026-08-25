@@ -81,7 +81,33 @@ export default function GarageV2Panel() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      fetch('/api/garage/lager1-sources', { cache: 'no-store' }),
+      fetch('/api/garage/nybil-handoff', { cache: 'no-store' }),
+    ])
+      .then(async ([lager1Response, handoffResponse]) => {
+        const lager1Payload = await lager1Response.json();
+        const handoffPayload = await handoffResponse.json();
+        if (!lager1Response.ok) throw new Error(lager1Payload?.error ?? 'Kunde inte läsa Lager 1');
+        if (!handoffResponse.ok) throw new Error(handoffPayload?.error ?? 'Kunde inte läsa Garage → Ny bil');
+        if (!active) return;
+        setLager1(lager1Payload.data ?? []);
+        setHandoffs(handoffPayload.data ?? []);
+        const nextStations = lager1Payload.stations ?? [];
+        setStations(nextStations);
+        setStation((current) => current || nextStations[0]?.station_code || '');
+        setError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garage v2');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const importFromLager1 = async (source: Lager1Source) => {
     if (!station) return setError('Välj station.');
