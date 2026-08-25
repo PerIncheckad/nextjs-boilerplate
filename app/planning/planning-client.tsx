@@ -74,8 +74,9 @@ function pivot(cells: ApiCell[]): ModelRow[] {
 }
 
 export default function FleetPlanningClient() {
-  const [period, setPeriod] = useState(defaultPeriod());
-  const [periodInput, setPeriodInput] = useState(defaultPeriod());
+  const initialPeriod = useMemo(defaultPeriod, []);
+  const [period, setPeriod] = useState(initialPeriod);
+  const [periodInput, setPeriodInput] = useState(initialPeriod);
   const [periods, setPeriods] = useState<string[]>([]);
   const [rows, setRows] = useState<ModelRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,8 +102,25 @@ export default function FleetPlanningClient() {
   }, []);
 
   useEffect(() => {
-    void load(defaultPeriod());
-  }, [load]);
+    let active = true;
+    void fetch(`/api/fleet-planning?period=${encodeURIComponent(initialPeriod)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa planeringen');
+        if (!active) return;
+        setRows(pivot(payload.data as ApiCell[]));
+        setPeriods(payload.periods ?? []);
+        setError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa planeringen');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [initialPeriod]);
 
   const updateCount = (key: string, station: Station, metric: Metric, raw: string) => {
     const value = Math.max(0, Number.parseInt(raw || '0', 10) || 0);
