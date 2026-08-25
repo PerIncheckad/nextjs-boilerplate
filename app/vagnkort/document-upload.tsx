@@ -42,7 +42,11 @@ type PrepareResponse = {
   error?: string;
 };
 
-type CompleteResponse = { data?: { document_id: string }; error?: string };
+type CompleteResponse = {
+  data?: { document_id: string };
+  error?: string;
+  duplicate?: { documentId: string; fileName: string; documentType: string; uploadedAt: string };
+};
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value : '';
@@ -54,9 +58,16 @@ export default function DocumentUpload({ regnr, damages, checkpoints, childProce
   const [title, setTitle] = useState('');
   const [contextType, setContextType] = useState('VEHICLE');
   const [contextId, setContextId] = useState('');
+  const [supplier, setSupplier] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [documentDate, setDocumentDate] = useState('');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [currency, setCurrency] = useState('SEK');
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [message, setMessage] = useState('');
+
+  const isEconomicSource = documentType === 'LEVERANTORSFAKTURA' || documentType === 'KVITTO';
 
   const damageOptions = useMemo<ContextOption[]>(() => damages.map((damage) => ({
     value: damage.id,
@@ -138,6 +149,13 @@ export default function DocumentUpload({ regnr, damages, checkpoints, childProce
             title: title.trim() || null,
             contextType,
             contextId: contextType === 'VEHICLE' ? null : contextId,
+            sourceFacts: isEconomicSource ? {
+              supplier: supplier.trim() || null,
+              invoiceNumber: invoiceNumber.trim() || null,
+              documentDate: documentDate || null,
+              totalAmount: totalAmount.trim() || null,
+              currency,
+            } : null,
           }),
         });
         const completed = (await completeResponse.json()) as CompleteResponse;
@@ -148,6 +166,11 @@ export default function DocumentUpload({ regnr, damages, checkpoints, childProce
 
       setMessage(files.length === 1 ? 'Dokumentet är sparat på Vagnkortet.' : `${files.length} dokument är sparade på Vagnkortet.`);
       setTitle('');
+      setSupplier('');
+      setInvoiceNumber('');
+      setDocumentDate('');
+      setTotalAmount('');
+      setCurrency('SEK');
       if (inputRef.current) inputRef.current.value = '';
       onUploaded();
     } catch (error) {
@@ -201,6 +224,38 @@ export default function DocumentUpload({ regnr, damages, checkpoints, childProce
         </label>
       </div>
 
+      {isEconomicSource && (
+        <div style={{ border: '1px solid #d7d7d7', borderRadius: 10, padding: '.8rem', background: '#fafafa' }}>
+          <div style={{ fontWeight: 700, marginBottom: '.5rem' }}>Källfakta från dokumentet</div>
+          <div style={{ color: '#666', fontSize: 12, marginBottom: '.65rem' }}>Fälten är källregistrering, inte kostnadsansvar eller ekonomisk tolkning.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '.6rem' }}>
+            <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+              Leverantör
+              <input value={supplier} onChange={(event) => setSupplier(event.target.value)} disabled={uploading} placeholder="Leverantör" style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
+            </label>
+            <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+              Faktura-/kvittonummer
+              <input value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} disabled={uploading} placeholder="Nummer" style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
+            </label>
+            <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+              Dokumentdatum
+              <input type="date" value={documentDate} onChange={(event) => setDocumentDate(event.target.value)} disabled={uploading} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
+            </label>
+            <label style={{ display: 'grid', gap: '.25rem', fontSize: 13 }}>
+              Totalbelopp
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 74px', gap: '.4rem' }}>
+                <input type="number" min="0" step="0.01" value={totalAmount} onChange={(event) => setTotalAmount(event.target.value)} disabled={uploading} placeholder="0,00" style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }} />
+                <select value={currency} onChange={(event) => setCurrency(event.target.value)} disabled={uploading} style={{ padding: '.65rem', border: '1px solid #bbb', borderRadius: 8 }}>
+                  <option value="SEK">SEK</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+            </label>
+          </div>
+        </div>
+      )}
+
       <div
         onDragEnter={(event) => { event.preventDefault(); setDragging(true); }}
         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
@@ -224,7 +279,7 @@ export default function DocumentUpload({ regnr, damages, checkpoints, childProce
         <input ref={inputRef} type="file" multiple onChange={onFileInput} disabled={uploading} style={{ display: 'none' }} />
       </div>
 
-      {message && <div style={{ fontSize: 13, color: message.includes('misslyck') || message.includes('Kunde') || message.includes('större') || message.includes('Välj') ? '#a00' : '#176b2c' }}>{message}</div>}
+      {message && <div style={{ fontSize: 13, color: message.includes('misslyck') || message.includes('Kunde') || message.includes('större') || message.includes('Välj') || message.includes('redan') ? '#a00' : '#176b2c' }}>{message}</div>}
     </div>
   );
 }
