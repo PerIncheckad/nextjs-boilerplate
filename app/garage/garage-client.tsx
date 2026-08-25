@@ -5,11 +5,15 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import styles from './garage.module.css';
 
 type PlanningStation = { station_code: string; display_name: string | null; sort_order: number };
+type PlanningModel = { model_code: string; display_name: string; sort_order: number };
+type GarageDirection = 'IN' | 'UT';
+type PlanningReason = 'BEHOV' | 'UTOK' | 'MINSKNING' | 'SALU' | 'SALU_RETUR' | 'ANNAT';
 type GarageItem = {
   garage_item_id: string;
   planning_period: string | null;
   model: string;
-  planning_reason: 'BEHOV' | 'UTOK' | 'MINSKNING' | 'SALU_RETUR' | 'ANNAT';
+  garage_direction: GarageDirection | null;
+  planning_reason: PlanningReason;
   supplier: string | null;
   order_reference: string | null;
   regnr: string | null;
@@ -24,31 +28,55 @@ type GarageItem = {
   transport_status: string;
   planned_delivery_date: string | null;
   note: string | null;
+  source_kind: 'MANUELL' | 'PLANERING' | 'SALU';
+  source_planning_cell_id: string | null;
+  source_planning_unit_no: number | null;
+  source_salu_flag_id: string | null;
   updated_at: string;
 };
-type Draft = Omit<GarageItem, 'garage_item_id' | 'updated_at'>;
+type Draft = Omit<GarageItem, 'garage_item_id' | 'updated_at' | 'source_kind' | 'source_planning_cell_id' | 'source_planning_unit_no' | 'source_salu_flag_id'>;
+type PlanningSource = { planning_cell_id: string; period_code: string; model: string; station: string; ordered_count: number; note: string | null; materialized_count: number; remaining_count: number };
+type SaluSource = { flag_id: string; regnr: string; current_saludatum: string; status: string; imported: boolean; brand: string | null; model: string | null };
+type SortField = 'UPDATED' | 'MODEL' | 'REGNR' | 'STATION' | 'DIRECTION' | 'PERIOD';
 
+const currentMonth = () => new Date().toISOString().slice(0, 7);
 const emptyDraft = (station: string | null = null): Draft => ({
-  planning_period: '', model: '', planning_reason: 'BEHOV', supplier: '', order_reference: '', regnr: '', vin: '', source_regnr: '',
-  planned_station: station, saluort: '', daily_rate: null, ordered_at: '', calloff_at: '', confirmation_status: 'PLANERAD',
-  transport_status: 'EJ_BOKAD', planned_delivery_date: '', note: '',
+  planning_period: currentMonth(), model: '', garage_direction: null, planning_reason: 'BEHOV', supplier: '', order_reference: '', regnr: '', vin: '', source_regnr: '',
+  planned_station: station, saluort: '', daily_rate: null, ordered_at: '', calloff_at: '', confirmation_status: 'PLANERAD', transport_status: 'EJ_BOKAD', planned_delivery_date: '', note: '',
 });
+const directionLabel = (value: GarageDirection | null) => value === 'IN' ? 'UTVECKLA / IN' : value === 'UT' ? 'AVVECKLA / UT' : 'Ej satt';
+const sourceLabel = (item: GarageItem) => item.source_kind === 'PLANERING' ? `Planering #${item.source_planning_unit_no ?? '—'}` : item.source_kind === 'SALU' ? 'SALU' : 'Manuell';
 
 export default function GarageClient() {
   const [items, setItems] = useState<GarageItem[]>([]);
   const [stations, setStations] = useState<PlanningStation[]>([]);
+  const [models, setModels] = useState<PlanningModel[]>([]);
   const [draft, setDraft] = useState<Draft>(() => emptyDraft());
   const [station, setStation] = useState('ALLA');
+  const [direction, setDirection] = useState<'ALLA' | GarageDirection>('ALLA');
+  const [periodFilter, setPeriodFilter] = useState('');
   const [query, setQuery] = useState('');
+  const [sortField, setSortField] = useState<SortField>('UPDATED');
+  const [sortDesc, setSortDesc] = useState(true);
+  const [planningPeriod, setPlanningPeriod] = useState(currentMonth());
+  const [planningSources, setPlanningSources] = useState<PlanningSource[]>([]);
+  const [planningDirection, setPlanningDirection] = useState<GarageDirection | ''>('');
+  const [planningReason, setPlanningReason] = useState<PlanningReason>('BEHOV');
+  const [planningQty, setPlanningQty] = useState<Record<string, number>>({});
+  const [saluSources, setSaluSources] = useState<SaluSource[]>([]);
+  const [saluDirection, setSaluDirection] = useState<GarageDirection | ''>('');
+  const [saluStation, setSaluStation] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const applyPayload = useCallback((payload: { data?: GarageItem[]; stations?: PlanningStation[] }) => {
+  const applyPayload = useCallback((payload: { data?: GarageItem[]; stations?: PlanningStation[]; models?: PlanningModel[] }) => {
     const nextStations = payload.stations ?? [];
     setStations(nextStations);
+    setModels(payload.models ?? []);
     setItems(payload.data ?? []);
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
+    setSaluStation((current) => current || nextStations[0]?.station_code || '');
   }, []);
 
   const load = useCallback(async () => {
@@ -83,18 +111,21 @@ export default function GarageClient() {
 
   const create = async () => {
     if (!draft.model.trim()) return setError('Modell måste anges.');
+    if (!draft.garage_direction) return setError('Välj UTVECKLA / IN eller AVVECKLA / UT.');
     if (!draft.planned_station) return setError('Planerad station måste anges.');
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch('/api/garage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
+      const response = await fetch('/api/garage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...draft, direction_change_reason: 'Riktning satt vid skapande' }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte skapa bilen i Garaget');
       setDraft(emptyDraft(stations[0]?.station_code ?? null));
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Kunde inte skapa bilen i Garaget');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   const patch = async (item: GarageItem, changes: Record<string, unknown>) => {
@@ -105,59 +136,151 @@ export default function GarageClient() {
     setItems((current) => current.map((value) => value.garage_item_id === item.garage_item_id ? payload.data : value));
   };
 
+  const loadPlanningSources = async () => {
+    setError(null);
+    const response = await fetch(`/api/garage/planning-sources?period=${encodeURIComponent(planningPeriod)}`, { cache: 'no-store' });
+    const payload = await response.json();
+    if (!response.ok) return setError(payload?.error ?? 'Kunde inte läsa Planering');
+    setPlanningSources(payload.data ?? []);
+    setPlanningQty(Object.fromEntries((payload.data ?? []).map((row: PlanningSource) => [row.planning_cell_id, Math.min(1, row.remaining_count)])));
+  };
+
+  const importPlanning = async (source: PlanningSource) => {
+    if (!planningDirection) return setError('Välj riktning för hämtning från Planering.');
+    const quantity = planningQty[source.planning_cell_id] ?? 0;
+    const response = await fetch('/api/garage/planning-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ planning_cell_id: source.planning_cell_id, quantity, garage_direction: planningDirection, planning_reason: planningReason }) });
+    const payload = await response.json();
+    if (!response.ok) return setError(payload?.error ?? 'Kunde inte hämta från Planering');
+    await Promise.all([load(), loadPlanningSources()]);
+  };
+
+  const loadSaluSources = async () => {
+    setError(null);
+    const response = await fetch('/api/garage/salu-sources', { cache: 'no-store' });
+    const payload = await response.json();
+    if (!response.ok) return setError(payload?.error ?? 'Kunde inte läsa SALU');
+    setSaluSources(payload.data ?? []);
+  };
+
+  const importSalu = async (source: SaluSource) => {
+    if (!saluDirection || !saluStation) return setError('Välj riktning och station för SALU-bilen.');
+    const response = await fetch('/api/garage/salu-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ salu_flag_id: source.flag_id, garage_direction: saluDirection, planned_station: saluStation }) });
+    const payload = await response.json();
+    if (!response.ok) return setError(payload?.error ?? 'Kunde inte hämta SALU-bilen');
+    await Promise.all([load(), loadSaluSources()]);
+  };
+
   const visible = useMemo(() => {
     const needle = query.trim().toUpperCase();
-    return items.filter((item) => {
+    const filtered = items.filter((item) => {
       if (station !== 'ALLA' && item.planned_station !== station) return false;
+      if (direction !== 'ALLA' && item.garage_direction !== direction) return false;
+      if (periodFilter && item.planning_period !== periodFilter) return false;
       if (!needle) return true;
-      return [item.model, item.regnr, item.vin, item.supplier, item.order_reference, item.source_regnr].some((value) => value?.toUpperCase().includes(needle));
+      return [item.model, item.regnr, item.vin, item.supplier, item.order_reference, item.source_regnr, item.saluort].some((value) => value?.toUpperCase().includes(needle));
     });
-  }, [items, station, query]);
+    const sortValue = (item: GarageItem) => sortField === 'MODEL' ? item.model : sortField === 'REGNR' ? item.regnr ?? '' : sortField === 'STATION' ? item.planned_station ?? '' : sortField === 'DIRECTION' ? item.garage_direction ?? '' : sortField === 'PERIOD' ? item.planning_period ?? '' : item.updated_at;
+    return filtered.sort((a, b) => {
+      const result = String(sortValue(a)).localeCompare(String(sortValue(b)), 'sv');
+      return sortDesc ? -result : result;
+    });
+  }, [items, station, direction, periodFilter, query, sortField, sortDesc]);
+
+  const blurPatch = (item: GarageItem, field: string, oldValue: unknown, nextValue: unknown) => {
+    if (String(nextValue ?? '') !== String(oldValue ?? '')) void patch(item, { [field]: nextValue });
+  };
 
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>Garaget</h1><p>Konkreta bilar mellan planering och faktisk fordonsresa.</p></div>
-        <div className={styles.headerActions}><Link href="/planning" className={styles.primaryButton}>Planering</Link><Link href="/tower" className={styles.secondaryButton}>Tower</Link></div>
+        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>Garaget</h1><p>UTVECKLA / IN · AVVECKLA / UT · från Planering, SALU eller manuellt.</p></div>
+        <div className={styles.headerActions}><Link href="/planning" className={styles.primaryButton}>Planering</Link><Link href="/tower" className={styles.secondaryButton}>Tower</Link><button className={styles.secondaryButton} type="button" onClick={() => window.print()}>Skriv ut</button><button className={styles.secondaryButton} type="button" onClick={() => window.print()} title="Välj Spara som PDF i utskriftsdialogen">PDF</button></div>
       </header>
+
+      <datalist id="garage-models">{models.map((model) => <option key={model.model_code} value={model.display_name} />)}</datalist>
       {error ? <div className={styles.error}>{error}</div> : null}
+
+      <section className={styles.sourceGrid}>
+        <div className={styles.sourcePanel}>
+          <div className={styles.panelTitle}><h2>Hämta från Planering</h2><span>BESTÄLLT blir individuella Garage-objekt.</span></div>
+          <div className={styles.inlineControls}>
+            <label><span>Månad</span><input type="month" value={planningPeriod} onChange={(e) => setPlanningPeriod(e.target.value)} /></label>
+            <label><span>Riktning</span><select value={planningDirection} onChange={(e) => setPlanningDirection(e.target.value as GarageDirection | '')}><option value="">Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></label>
+            <label><span>Orsak</span><select value={planningReason} onChange={(e) => setPlanningReason(e.target.value as PlanningReason)}><option>BEHOV</option><option value="UTOK">UTÖK</option><option>MINSKNING</option><option>SALU</option><option value="SALU_RETUR">SALU RETUR</option><option>ANNAT</option></select></label>
+            <button className={styles.secondaryButton} type="button" onClick={() => void loadPlanningSources()}>Läs Planering</button>
+          </div>
+          <div className={styles.sourceList}>{planningSources.filter((row) => row.remaining_count > 0).map((row) => <div className={styles.sourceRow} key={row.planning_cell_id}><strong>{row.model}</strong><span>Stn {row.station}</span><span>BESTÄLLT {row.ordered_count}</span><span>I Garaget {row.materialized_count}</span><span>Kvar {row.remaining_count}</span><input type="number" min={1} max={row.remaining_count} value={planningQty[row.planning_cell_id] ?? 1} onChange={(e) => setPlanningQty((current) => ({ ...current, [row.planning_cell_id]: Number(e.target.value) }))} /><button className={styles.primaryButton} type="button" onClick={() => void importPlanning(row)}>Hämta</button></div>)}</div>
+        </div>
+
+        <div className={styles.sourcePanel}>
+          <div className={styles.panelTitle}><h2>Hämta från SALU</h2><span>Exakt SALU-cykel kan bara hämtas en gång.</span></div>
+          <div className={styles.inlineControls}>
+            <label><span>Riktning</span><select value={saluDirection} onChange={(e) => setSaluDirection(e.target.value as GarageDirection | '')}><option value="">Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></label>
+            <label><span>Station</span><select value={saluStation} onChange={(e) => setSaluStation(e.target.value)}><option value="">Välj</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></label>
+            <button className={styles.secondaryButton} type="button" onClick={() => void loadSaluSources()}>Läs SALU</button>
+          </div>
+          <div className={styles.sourceList}>{saluSources.map((row) => <div className={styles.sourceRow} key={row.flag_id}><strong>{row.regnr}</strong><span>{[row.brand, row.model].filter(Boolean).join(' ') || 'Modell saknas'}</span><span>{row.status}</span><span>{row.current_saludatum}</span><button className={styles.primaryButton} type="button" disabled={row.imported} onClick={() => void importSalu(row)}>{row.imported ? 'Redan hämtad' : 'Hämta'}</button></div>)}</div>
+        </div>
+      </section>
+
       <section className={styles.createPanel}>
-        <div className={styles.panelTitle}><h2>Lägg bil i Garaget</h2><span>Reg.nr/VIN får vara tomt tills uppgiften finns.</span></div>
+        <div className={styles.panelTitle}><h2>Lägg bil manuellt</h2><span>Reg.nr/VIN får vara tomt tills uppgiften finns.</span></div>
         <div className={styles.formGrid}>
-          <Field label="Period"><input value={draft.planning_period ?? ''} onChange={(e) => setDraft({ ...draft, planning_period: e.target.value })} placeholder="2026-Q3" /></Field>
-          <Field label="Modell"><input value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} /></Field>
-          <Field label="Orsak"><select value={draft.planning_reason} onChange={(e) => setDraft({ ...draft, planning_reason: e.target.value as Draft['planning_reason'] })}><option>BEHOV</option><option value="UTOK">UTÖK</option><option>MINSKNING</option><option value="SALU_RETUR">SALU RETUR</option><option>ANNAT</option></select></Field>
-          <Field label="Planerad station"><select value={draft.planned_station ?? ''} onChange={(e) => setDraft({ ...draft, planned_station: e.target.value || null })} disabled={stations.length === 0}><option value="">Välj station</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></Field>
+          <Field label="Riktning"><select value={draft.garage_direction ?? ''} onChange={(e) => setDraft({ ...draft, garage_direction: (e.target.value || null) as GarageDirection | null })}><option value="">Välj riktning</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></Field>
+          <Field label="Månad"><input type="month" value={draft.planning_period ?? ''} onChange={(e) => setDraft({ ...draft, planning_period: e.target.value })} /></Field>
+          <Field label="Modell"><input list="garage-models" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Välj eller skriv modell" /></Field>
+          <Field label="Orsak"><select value={draft.planning_reason} onChange={(e) => setDraft({ ...draft, planning_reason: e.target.value as PlanningReason })}><option>BEHOV</option><option value="UTOK">UTÖK</option><option>MINSKNING</option><option>SALU</option><option value="SALU_RETUR">SALU RETUR</option><option>ANNAT</option></select></Field>
+          <Field label="Planerad station"><select value={draft.planned_station ?? ''} onChange={(e) => setDraft({ ...draft, planned_station: e.target.value || null })}><option value="">Välj station</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></Field>
           <Field label="Leverantör"><input value={draft.supplier ?? ''} onChange={(e) => setDraft({ ...draft, supplier: e.target.value })} /></Field>
           <Field label="Order / avrop"><input value={draft.order_reference ?? ''} onChange={(e) => setDraft({ ...draft, order_reference: e.target.value })} /></Field>
           <Field label="Reg.nr"><input value={draft.regnr ?? ''} onChange={(e) => setDraft({ ...draft, regnr: e.target.value.toUpperCase() })} /></Field>
           <Field label="VIN"><input value={draft.vin ?? ''} onChange={(e) => setDraft({ ...draft, vin: e.target.value.toUpperCase() })} /></Field>
+          <Field label="Källreg.nr"><input value={draft.source_regnr ?? ''} onChange={(e) => setDraft({ ...draft, source_regnr: e.target.value.toUpperCase() })} /></Field>
           <Field label="Saluort"><input value={draft.saluort ?? ''} onChange={(e) => setDraft({ ...draft, saluort: e.target.value })} /></Field>
           <Field label="Dygnsdebitering"><input type="number" min="0" value={draft.daily_rate ?? ''} onChange={(e) => setDraft({ ...draft, daily_rate: e.target.value === '' ? null : Number(e.target.value) })} /></Field>
+          <Field label="Beställd"><input type="date" value={draft.ordered_at ?? ''} onChange={(e) => setDraft({ ...draft, ordered_at: e.target.value })} /></Field>
+          <Field label="Avropad"><input type="date" value={draft.calloff_at ?? ''} onChange={(e) => setDraft({ ...draft, calloff_at: e.target.value })} /></Field>
           <Field label="Planerad leverans"><input type="date" value={draft.planned_delivery_date ?? ''} onChange={(e) => setDraft({ ...draft, planned_delivery_date: e.target.value })} /></Field>
           <Field label="Kommentar"><input value={draft.note ?? ''} onChange={(e) => setDraft({ ...draft, note: e.target.value })} /></Field>
         </div>
         <button className={styles.primaryButton} type="button" onClick={() => void create()} disabled={saving || stations.length === 0}>{saving ? 'Sparar…' : 'Lägg i Garaget'}</button>
       </section>
+
       <section className={styles.controls}>
+        <label><span>Riktning</span><select value={direction} onChange={(e) => setDirection(e.target.value as 'ALLA' | GarageDirection)}><option value="ALLA">Alla</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></label>
         <label><span>Station</span><select value={station} onChange={(e) => setStation(e.target.value)}><option value="ALLA">Alla</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></label>
-        <label className={styles.search}><span>Sök</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Modell, reg.nr, VIN, leverantör…" /></label><strong>{visible.length} objekt</strong>
+        <label><span>Månad</span><input type="month" value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value)} /></label>
+        <button className={styles.secondaryButton} type="button" onClick={() => setPeriodFilter('')}>Alla månader</button>
+        <label><span>Sortera</span><select value={sortField} onChange={(e) => setSortField(e.target.value as SortField)}><option value="UPDATED">Senast ändrad</option><option value="MODEL">Modell</option><option value="REGNR">Reg.nr</option><option value="STATION">Station</option><option value="DIRECTION">Riktning</option><option value="PERIOD">Månad</option></select></label>
+        <button className={styles.secondaryButton} type="button" onClick={() => setSortDesc((value) => !value)}>{sortDesc ? '↓' : '↑'}</button>
+        <label className={styles.search}><span>Sök</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Modell, reg.nr, VIN, leverantör…" /></label>
+        <strong>{visible.length} objekt</strong>
       </section>
+
       <section className={styles.tableSection}>{loading ? <div className={styles.empty}>Läser Garaget…</div> : (
-        <div className={styles.tableWrap}><table><thead><tr><th>Modell</th><th>Reg.nr</th><th>VIN</th><th>Orsak</th><th>Station</th><th>Leverantör</th><th>Order</th><th>Saluort</th><th>Dygn</th><th>Bekräftelse</th><th>Transport</th><th>Leverans</th><th>Kommentar</th></tr></thead>
+        <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Riktning</th><th>Månad</th><th>Modell</th><th>Reg.nr</th><th>VIN</th><th>Källreg</th><th>Orsak</th><th>Station</th><th>Leverantör</th><th>Order</th><th>Beställd</th><th>Avropad</th><th>Saluort</th><th>Dygn</th><th>Bekräftelse</th><th>Transport</th><th>Leverans</th><th>Kommentar</th></tr></thead>
           <tbody>{visible.map((item) => <tr key={item.garage_item_id}>
-            <td>{item.model}</td><td>{item.regnr ?? '—'}</td><td className={styles.vin}>{item.vin ?? '—'}</td><td>{item.planning_reason}</td>
+            <td>{sourceLabel(item)}</td>
+            <td><select value={item.garage_direction ?? ''} onChange={(e) => { const next = e.target.value as GarageDirection; if (next) void patch(item, { garage_direction: next, direction_change_reason: `Ändrad i Garaget till ${directionLabel(next)}` }); }}><option value="" disabled>Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></td>
+            <td><input type="month" defaultValue={item.planning_period ?? ''} onBlur={(e) => blurPatch(item, 'planning_period', item.planning_period, e.target.value || null)} /></td>
+            <td><input list="garage-models" defaultValue={item.model} onBlur={(e) => blurPatch(item, 'model', item.model, e.target.value)} /></td>
+            <td><input defaultValue={item.regnr ?? ''} onBlur={(e) => blurPatch(item, 'regnr', item.regnr, e.target.value.toUpperCase() || null)} /></td>
+            <td><input className={styles.vin} defaultValue={item.vin ?? ''} onBlur={(e) => blurPatch(item, 'vin', item.vin, e.target.value.toUpperCase() || null)} /></td>
+            <td><input defaultValue={item.source_regnr ?? ''} onBlur={(e) => blurPatch(item, 'source_regnr', item.source_regnr, e.target.value.toUpperCase() || null)} /></td>
+            <td><select value={item.planning_reason} onChange={(e) => void patch(item, { planning_reason: e.target.value })}><option>BEHOV</option><option value="UTOK">UTÖK</option><option>MINSKNING</option><option>SALU</option><option value="SALU_RETUR">SALU RETUR</option><option>ANNAT</option></select></td>
             <td><select value={item.planned_station ?? ''} onChange={(e) => void patch(item, { planned_station: e.target.value || null, station_change_reason: 'Omplanerad i Garaget' })}><option value="">—</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></td>
-            <td>{item.supplier ?? '—'}</td><td>{item.order_reference ?? '—'}</td>
-            <td><input defaultValue={item.saluort ?? ''} onBlur={(e) => { if (e.target.value !== (item.saluort ?? '')) void patch(item, { saluort: e.target.value }); }} /></td>
-            <td><input className={styles.rate} type="number" min="0" defaultValue={item.daily_rate ?? ''} onBlur={(e) => { const next = e.target.value === '' ? null : Number(e.target.value); if (next !== item.daily_rate) void patch(item, { daily_rate: next }); }} /></td>
+            <td><input defaultValue={item.supplier ?? ''} onBlur={(e) => blurPatch(item, 'supplier', item.supplier, e.target.value || null)} /></td>
+            <td><input defaultValue={item.order_reference ?? ''} onBlur={(e) => blurPatch(item, 'order_reference', item.order_reference, e.target.value || null)} /></td>
+            <td><input type="date" defaultValue={item.ordered_at ?? ''} onBlur={(e) => blurPatch(item, 'ordered_at', item.ordered_at, e.target.value || null)} /></td>
+            <td><input type="date" defaultValue={item.calloff_at ?? ''} onBlur={(e) => blurPatch(item, 'calloff_at', item.calloff_at, e.target.value || null)} /></td>
+            <td><input defaultValue={item.saluort ?? ''} onBlur={(e) => blurPatch(item, 'saluort', item.saluort, e.target.value || null)} /></td>
+            <td><input className={styles.rate} type="number" min="0" defaultValue={item.daily_rate ?? ''} onBlur={(e) => blurPatch(item, 'daily_rate', item.daily_rate, e.target.value === '' ? null : Number(e.target.value))} /></td>
             <td><select value={item.confirmation_status} onChange={(e) => void patch(item, { confirmation_status: e.target.value })}><option>PLANERAD</option><option>BESTALLD</option><option>AVROPAD</option><option>AVVAKTAR_BEKRAFTELSE</option><option>BEKRAFTAD</option></select></td>
-            <td><select value={item.transport_status} onChange={(e) => void patch(item, { transport_status: e.target.value })}><option>EJ_BOKAD</option><option>TRANSPORTBOKAD</option><option>PA_VAG</option><option>ANKOMMEN</option></select></td>
-            <td><input type="date" defaultValue={item.planned_delivery_date ?? ''} onBlur={(e) => { if (e.target.value !== (item.planned_delivery_date ?? '')) void patch(item, { planned_delivery_date: e.target.value }); }} /></td>
-            <td><input defaultValue={item.note ?? ''} onBlur={(e) => { if (e.target.value !== (item.note ?? '')) void patch(item, { note: e.target.value }); }} /></td>
+            <td><select value={item.transport_status} onChange={(e) => void patch(item, { transport_status: e.target.value })}><option>EJ_BOKAD</option><option>TRANSPORTBOKAD</option><option>PA_VAG</option></select></td>
+            <td><input type="date" defaultValue={item.planned_delivery_date ?? ''} onBlur={(e) => blurPatch(item, 'planned_delivery_date', item.planned_delivery_date, e.target.value || null)} /></td>
+            <td><input defaultValue={item.note ?? ''} onBlur={(e) => blurPatch(item, 'note', item.note, e.target.value || null)} /></td>
           </tr>)}</tbody></table></div>
       )}</section>
-      <section className={styles.explainer}><strong>Garaget är inte Lager 1 eller Lager 2.</strong><p>Det är BK:s planeringsbestånd. Aktiva stationer är konfiguration och kan utökas utan att bygga om gränssnittet.</p></section>
     </main>
   );
 }
