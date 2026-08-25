@@ -444,6 +444,8 @@ export default function CheckInForm() {
   // Tank/charge fields
   const [tankniva, setTankniva] = useState<'återlämnades_fulltankad' | 'tankad_nu' | 'ej_upptankad' | null>(null);
   const [receiptMedia, setReceiptMedia] = useState<MediaFile | null>(null);
+  const [receiptMissing, setReceiptMissing] = useState(false);
+  const [receiptMissingReason, setReceiptMissingReason] = useState('');
   const [liters, setLiters] = useState('');
   const [literpris, setLiterpris] = useState('');
   const [laddniva, setLaddniva] = useState('');
@@ -599,7 +601,7 @@ export default function CheckInForm() {
     if (locationDiffers && !matarstallningAvlamning) return false;
     // Tank validation (Bensin, Diesel, Hybrid bensin, Hybrid diesel)
     // PR 2a: Ärvd tankstatus ('inherit') kräver inget val
-    if (needsTank && tankstatusChoice !== 'inherit' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !literpris)))) return false;
+    if (needsTank && tankstatusChoice !== 'inherit' && (!tankniva || (tankniva === 'tankad_nu' && (!liters || !literpris || (!receiptMedia && !(receiptMissing && receiptMissingReason.trim())))))) return false;
     // Charge validation (El full, Hybrid bensin, Hybrid diesel)
     if (needsChargeLevel && !laddniva) return false;
     if (needsChargeCables && antalLaddkablar === null) return false;
@@ -1138,7 +1140,7 @@ export default function CheckInForm() {
             await uploadOne(createCommentFile(damage.resolvedComment!), `${damagePath}/kommentar.txt`);
         }
 
-        // --- Handle Receipt Upload (frivilligt, icke-blockerande) ---
+        // --- Handle Receipt Upload (obligatorisk evidensväg; uppladdningsfel blockerar) ---
         if (receiptMedia && tankniva === 'tankad_nu') {
             try {
                 const pad = (n: number) => n.toString().padStart(2, '0');
@@ -1153,8 +1155,8 @@ export default function CheckInForm() {
                 tempReceiptName = fileName;
                 tempReceiptMime = receiptMedia.file.type;
             } catch (e) {
-                console.error('Receipt upload failed (non-blocking):', e);
-                alert('Tankkvittot kunde inte laddas upp, men incheckningen sparas.');
+                console.error('Receipt upload failed (blocking):', e);
+                throw new Error('Tankkvittot kunde inte laddas upp. Försök igen eller välj Kvitto saknas och ange obligatorisk orsak.');
             }
         }
       
@@ -1167,6 +1169,8 @@ export default function CheckInForm() {
             rokning: { ...finalPayloadForUI.rokning, folder: tempRokningFolder },
             dokumenterade_skador: legacyDamagesForUpload,
             nya_skador: newDamagesForUpload,
+            fuel_receipt_status: tankniva === 'tankad_nu' ? (tempReceiptUrl ? 'DOCUMENTED' : 'MISSING_WITH_REASON') : null,
+            fuel_receipt_missing_reason: tankniva === 'tankad_nu' && !tempReceiptUrl ? receiptMissingReason.trim() : null,
             tankning_receipt: tempReceiptUrl ? {
                 file_url: tempReceiptUrl,
                 file_path: tempReceiptPath,
@@ -1838,7 +1842,7 @@ export default function CheckInForm() {
           </div>
         </Card>
 
-        <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !detailedBransletyp || (needsTank && !tankniva) || (needsTank && tankniva === 'tankad_nu' && (!liters || !literpris)) || (needsChargeLevel && !laddniva) || (needsChargeCables && antalLaddkablar === null))}>
+        <Card data-error={showFieldErrors && (!matarstallning || !hjultyp || !detailedBransletyp || (needsTank && !tankniva) || (needsTank && tankniva === 'tankad_nu' && (!liters || !literpris || (!receiptMedia && !(receiptMissing && receiptMissingReason.trim())))) || (needsChargeLevel && !laddniva) || (needsChargeCables && antalLaddkablar === null))}>
           <SectionHeader title="Fordonsstatus" />
           <SubSectionHeader title="Mätarställning" /><Field label="Mätarställning vid incheckning (km) *"><input type="number" value={matarstallning} onChange={e => setMatarstallning(e.target.value)} onBlur={handleOdometerBlur} placeholder="12345" /></Field>
 <SubSectionHeader title="Däck som sitter på" /><Field label="Däcktyp *"><div className="grid-2-col"><ChoiceButton onClick={() => handleHjultypSelect('Sommardäck')} isActive={hjultyp === 'Sommardäck'} isSet={hjultyp !== null}>Sommardäck</ChoiceButton><ChoiceButton onClick={() => handleHjultypSelect('Vinterdäck')} isActive={hjultyp === 'Vinterdäck'} isSet={hjultyp !== null}>Vinterdäck</ChoiceButton></div></Field>
@@ -1883,16 +1887,16 @@ export default function CheckInForm() {
                   </div>
                 )}
                 <Field label="Tankstatus *"><div className="grid-3-col">
-                  <ChoiceButton onClick={() => setTankniva('återlämnades_fulltankad')} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
+                  <ChoiceButton onClick={() => { setTankniva('återlämnades_fulltankad'); setReceiptMedia(null); setReceiptMissing(false); setReceiptMissingReason(''); }} isActive={tankniva === 'återlämnades_fulltankad'} isSet={tankniva !== null}>Återlämnades fulltankad</ChoiceButton>
                   <ChoiceButton onClick={() => setTankniva('tankad_nu')} isActive={tankniva === 'tankad_nu'} isSet={tankniva !== null}>Tankad nu av MABI</ChoiceButton>
-                  <ChoiceButton onClick={() => setTankniva('ej_upptankad')} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
+                  <ChoiceButton onClick={() => { setTankniva('ej_upptankad'); setReceiptMedia(null); setReceiptMissing(false); setReceiptMissingReason(''); }} isActive={tankniva === 'ej_upptankad'} isSet={tankniva !== null} variant={tankniva === 'ej_upptankad' ? 'warning' : 'default'}>Ej upptankad</ChoiceButton>
                 </div></Field>
                 {tankniva === 'tankad_nu' && <div className="grid-2-col">
                   <Field label="Antal liter *"><input type="number" value={liters} onChange={e => setLiters(e.target.value)} placeholder="50" /></Field>
                   <Field label={`Literpris (${bransletyp || 'kr'}) *`}><input type="number" value={literpris} onChange={e => setLiterpris(e.target.value)} placeholder="20.50" /></Field>
                 </div>}
                 {tankniva === 'tankad_nu' && (
-                  <Field label="Tankkvitto (frivilligt)">
+                  <Field label="Tankkvitto *">
                     {receiptMedia ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', fontSize: '0.9rem' }}>
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{receiptMedia.file.name}</span>
@@ -1900,16 +1904,18 @@ export default function CheckInForm() {
                       </div>
                     ) : (
                       <>
-                        <label htmlFor="receipt-upload-input" className="media-label optional">Ladda upp tankkvitto</label>
+                        <label htmlFor="receipt-upload-input" className="media-label mandatory">Fotografera tankkvitto</label>
                         <input
                           id="receipt-upload-input"
                           type="file"
-                          accept="image/*,application/pdf"
+                          accept="image/*"
+                          capture="environment"
                           onChange={e => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const type = file.type.startsWith('video') ? 'video' : 'image';
-                              setReceiptMedia({ file, type });
+                              setReceiptMedia({ file, type: 'image' });
+                              setReceiptMissing(false);
+                              setReceiptMissingReason('');
                             }
                             e.target.value = '';
                           }}
@@ -1917,6 +1923,26 @@ export default function CheckInForm() {
                         />
                       </>
                     )}
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <ChoiceButton
+                        onClick={() => {
+                          const next = !receiptMissing;
+                          setReceiptMissing(next);
+                          if (next) setReceiptMedia(null);
+                          if (!next) setReceiptMissingReason('');
+                        }}
+                        isActive={receiptMissing}
+                      >Kvitto saknas</ChoiceButton>
+                    </div>
+                    {receiptMissing && (
+                      <div className="field" data-error={showFieldErrors && !receiptMissingReason.trim()} style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                        <label>Orsak till att kvitto saknas *</label>
+                        <textarea value={receiptMissingReason} onChange={e => setReceiptMissingReason(e.target.value)} placeholder="Ange varför kvittot saknas..." rows={2}></textarea>
+                      </div>
+                    )}
+                    <div style={{ marginTop: '0.6rem', fontSize: '0.8rem', color: '#6b7280' }}>
+                      Kvitto finns = verifierad evidens. Kvitto saknas + orsak = verifierad avvikelse.
+                    </div>
                   </Field>
                 )}
               </Fragment>

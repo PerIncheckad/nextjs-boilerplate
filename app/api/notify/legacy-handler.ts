@@ -699,6 +699,27 @@ export async function POST(request: Request) {
 
     const regNr = payload.regnr || '';
 
+    const isNewFuelReceiptEvent = payload.tankning?.tankniva === 'tankad_nu';
+    const declaredReceiptStatus = payload.fuel_receipt_status;
+    const declaredMissingReason = typeof payload.fuel_receipt_missing_reason === 'string'
+      ? payload.fuel_receipt_missing_reason.trim()
+      : '';
+    const hasReceiptEvidence = Boolean(payload.tankning_receipt?.file_url);
+    const fuelReceiptStatus = isNewFuelReceiptEvent
+      ? hasReceiptEvidence
+        ? 'DOCUMENTED'
+        : declaredReceiptStatus === 'MISSING_WITH_REASON' && declaredMissingReason
+          ? 'MISSING_WITH_REASON'
+          : null
+      : null;
+
+    if (isNewFuelReceiptEvent && !fuelReceiptStatus) {
+      return NextResponse.json(
+        { error: 'Tankad nu kräver kvittobild eller Kvitto saknas med obligatorisk orsak.' },
+        { status: 400 }
+      );
+    }
+
    // Mottagare/ämnen
     const finalOrt = payload.bilen_star_nu?.ort || payload.ort;
     const huvudstationTo = getHuvudstationRecipients(finalOrt);
@@ -821,6 +842,8 @@ export async function POST(request: Request) {
             return isNaN(parsed) ? null : parsed;
           })(),
 fuel_level: payload.tankning?.tankniva || null,
+          fuel_receipt_status: fuelReceiptStatus,
+          fuel_receipt_missing_reason: fuelReceiptStatus === 'MISSING_WITH_REASON' ? declaredMissingReason : null,
         
           // Laddning (charging) - for electric vehicles
           charge_level_percent: (() => {
@@ -1055,7 +1078,7 @@ fuel_level: payload.tankning?.tankniva || null,
             }
           }
 
-          // Save tankning_receipt if provided (frivilligt — fil är redan uppladdad till Storage av klienten)
+          // Save tankning_receipt if provided (obligatorisk evidensväg för DOCUMENTED; filen är redan uppladdad av klienten)
           if (payload.tankning_receipt) {
             const r = payload.tankning_receipt;
             const { error: receiptError } = await supabaseAdmin.from('vehicle_receipts').insert({
