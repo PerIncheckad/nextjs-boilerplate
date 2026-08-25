@@ -11,6 +11,7 @@ test('operator cockpit is authenticated and read-only', () => {
   assert.doesNotMatch(route, /\.insert\(/);
   assert.doesNotMatch(route, /\.update\(/);
   assert.doesNotMatch(route, /\.delete\(/);
+  assert.doesNotMatch(route, /\.rpc\(/);
 });
 
 test('cockpit answers the locked operational attention questions', () => {
@@ -32,4 +33,15 @@ test('tower links to vagnkort rather than duplicating vehicle history', () => {
   assert.match(route, /\/vagnkort\?reg=/);
   assert.match(client, /Aktuella operativa ärenden/);
   assert.match(client, /Vagnkortet innehåller individresan och evidensen/);
+});
+
+test('tower exposes existing tank receipt evidence without creating a new truth source', () => {
+  assert.match(route, /from\('vehicle_receipts'\)/);
+  assert.match(route, /eq\('receipt_type', 'tankning'\)/);
+  assert.match(route, /select\('regnr,file_url,uploaded_at'\)/);
+  assert.match(route, /tankReceiptCount/);
+  assert.doesNotMatch(route, /uploaded_by_email/);
+  assert.match(client, /Evidens/);
+  assert.match(client, /Tankkvitto/);
+  assert.match(client, /target="_blank"/);
 });
