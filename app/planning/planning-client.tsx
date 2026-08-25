@@ -8,7 +8,7 @@ const STATIONS = ['166', '170', '274'] as const;
 const METRICS = [
   ['salu_count', 'SALU'],
   ['behov_count', 'BEHOV'],
-  ['utok_count', 'UTÖK'],
+  ['utok_count', 'UTÖKNING'],
   ['minskning_count', 'MINSKNING'],
   ['ordered_count', 'BESTÄLLT'],
 ] as const;
@@ -74,7 +74,7 @@ function pivot(cells: ApiCell[]): ModelRow[] {
 }
 
 export default function FleetPlanningClient() {
-  const initialPeriod = useMemo(defaultPeriod, []);
+  const [initialPeriod] = useState(() => defaultPeriod());
   const [period, setPeriod] = useState(initialPeriod);
   const [periodInput, setPeriodInput] = useState(initialPeriod);
   const [periods, setPeriods] = useState<string[]>([]);
