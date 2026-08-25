@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { buildTowerCsv } from '@/lib/tower-export';
 import styles from './tower.module.css';
 
 type CockpitItem = {
@@ -74,6 +75,10 @@ async function fetchCockpit(): Promise<CockpitData> {
   return payload.data as CockpitData;
 }
 
+function safeFilePart(value: string): string {
+  return value.replaceAll(':', '-').replaceAll('.', '-');
+}
+
 export default function OperatorCockpit() {
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -129,6 +134,20 @@ export default function OperatorCockpit() {
     });
   }, [data, station, query]);
 
+  const exportCurrentView = useCallback(() => {
+    if (!data || items.length === 0) return;
+    const csv = buildTowerCsv(items, data.generatedAt);
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `incheckad-tower-${safeFilePart(data.generatedAt)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  }, [data, items]);
+
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
@@ -139,6 +158,9 @@ export default function OperatorCockpit() {
         </div>
         <div className={styles.headerActions}>
           <Link className={styles.secondaryButton} href="/">Startsida</Link>
+          <button className={styles.secondaryButton} type="button" onClick={exportCurrentView} disabled={!data || items.length === 0}>
+            Exportera CSV
+          </button>
           <button className={styles.primaryButton} type="button" onClick={() => void load()} disabled={loading}>
             {loading ? 'Uppdaterar…' : 'Uppdatera'}
           </button>
