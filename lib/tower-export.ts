@@ -13,8 +13,12 @@ export type TowerExportItem = {
   nextSteps: string[];
 };
 
+function neutralizeSpreadsheetFormula(text: string): string {
+  return /^[\t\r\n ]*[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
 function csvCell(value: string | number | boolean | null | undefined): string {
-  const text = value == null ? '' : String(value);
+  const text = value == null ? '' : neutralizeSpreadsheetFormula(String(value));
   return `"${text.replaceAll('"', '""')}"`;
 }
 
