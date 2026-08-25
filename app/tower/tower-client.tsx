@@ -18,6 +18,8 @@ type CockpitItem = {
   overdue: boolean;
   waitingVerification: boolean;
   nextSteps: string[];
+  tankReceipt: { url: string; uploadedAt: string | null } | null;
+  tankReceiptCount: number;
   links: { vagnkort: string };
 };
 
@@ -220,6 +222,7 @@ export default function OperatorCockpit() {
                   <th>Ansvar</th>
                   <th>Action / deadline</th>
                   <th>Nästa steg</th>
+                  <th>Evidens</th>
                   <th />
                 </tr>
               </thead>
@@ -252,6 +255,14 @@ export default function OperatorCockpit() {
                     </td>
                     <td>
                       {item.nextSteps.length ? item.nextSteps.map((step) => <span key={step} className={styles.nextStep}>{step}</span>) : '—'}
+                    </td>
+                    <td>
+                      {item.tankReceipt ? (
+                        <>
+                          <a className={styles.openLink} href={item.tankReceipt.url} target="_blank" rel="noopener noreferrer">Tankkvitto →</a>
+                          <span className={styles.subtle}>{formatDate(item.tankReceipt.uploadedAt)}{item.tankReceiptCount > 1 ? ` · ${item.tankReceiptCount} kvitton` : ''}</span>
+                        </>
+                      ) : '—'}
                     </td>
                     <td><Link className={styles.openLink} href={item.links.vagnkort}>Öppna →</Link></td>
                   </tr>

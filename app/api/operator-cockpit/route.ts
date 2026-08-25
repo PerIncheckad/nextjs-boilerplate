@@ -17,6 +17,8 @@ type AttentionItem = {
   overdue: boolean;
   waitingVerification: boolean;
   nextSteps: string[];
+  tankReceipt: { url: string; uploadedAt: string | null } | null;
+  tankReceiptCount: number;
   links: { vagnkort: string };
 };
 
@@ -77,7 +79,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [periodsRes, checkpointsRes, checkpointDefsRes, actionsRes, handoffsRes, handoffDefsRes, saluRes, checkinsRes] = await Promise.all([
+    const [periodsRes, checkpointsRes, checkpointDefsRes, actionsRes, handoffsRes, handoffDefsRes, saluRes, checkinsRes, receiptsRes] = await Promise.all([
       admin.from('vehicle_journey_periods')
         .select('period_id,regnr,period_type,started_at,reason_code,reason_text,source_system,source_entity,source_record_id')
         .is('ended_at', null),
@@ -99,9 +101,14 @@ export async function GET(request: Request) {
         .not('completed_at', 'is', null)
         .order('completed_at', { ascending: false })
         .limit(5000),
+      admin.from('vehicle_receipts')
+        .select('regnr,file_url,uploaded_at')
+        .eq('receipt_type', 'tankning')
+        .order('uploaded_at', { ascending: false })
+        .limit(5000),
     ]);
 
-    const responses = [periodsRes, checkpointsRes, checkpointDefsRes, actionsRes, handoffsRes, handoffDefsRes, saluRes, checkinsRes];
+    const responses = [periodsRes, checkpointsRes, checkpointDefsRes, actionsRes, handoffsRes, handoffDefsRes, saluRes, checkinsRes, receiptsRes];
     const failed = responses.find((response) => response.error);
     if (failed?.error) throw failed.error;
 
@@ -113,6 +120,7 @@ export async function GET(request: Request) {
     const handoffDefs = (handoffDefsRes.data ?? []) as GenericRow[];
     const saluFlags = (saluRes.data ?? []) as GenericRow[];
     const checkins = (checkinsRes.data ?? []) as GenericRow[];
+    const receipts = (receiptsRes.data ?? []) as GenericRow[];
 
     const checkpointDefMap = new Map(
       checkpointDefs.map((row) => [`${row.checkpoint_code}:${row.definition_version}`, row]),
@@ -127,6 +135,19 @@ export async function GET(request: Request) {
       const regnr = text(row.regnr)?.toUpperCase();
       const station = text(row.station);
       if (regnr && station && !stationMap.has(regnr)) stationMap.set(regnr, station);
+    }
+
+    const receiptMap = new Map<string, { url: string; uploadedAt: string | null; count: number }>();
+    for (const row of receipts) {
+      const regnr = text(row.regnr)?.toUpperCase();
+      const url = text(row.file_url);
+      if (!regnr || !url) continue;
+      const existing = receiptMap.get(regnr);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        receiptMap.set(regnr, { url, uploadedAt: dateText(row.uploaded_at), count: 1 });
+      }
     }
 
     const openPeriodMap = new Map<string, GenericRow>();
@@ -186,6 +207,7 @@ export async function GET(request: Request) {
       const vehicleActions = openActions.filter((row) => checkpointIds.has(String(row.checkpoint_id)));
       const vehicleHandoffs = openBlockingHandoffs.filter((row) => text(row.regnr)?.toUpperCase() === regnr);
       const vehicleSalu = escalatedSalu.find((row) => text(row.regnr)?.toUpperCase() === regnr);
+      const receipt = receiptMap.get(regnr) ?? null;
 
       const deadlines = vehicleActions
         .map((row) => dateText(row.deadline_at))
@@ -241,6 +263,8 @@ export async function GET(request: Request) {
         overdue,
         waitingVerification,
         nextSteps,
+        tankReceipt: receipt ? { url: receipt.url, uploadedAt: receipt.uploadedAt } : null,
+        tankReceiptCount: receipt?.count ?? 0,
         links: { vagnkort: `/vagnkort?reg=${encodeURIComponent(regnr)}` },
       };
     });
