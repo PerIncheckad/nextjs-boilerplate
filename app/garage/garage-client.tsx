@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import styles from './garage.module.css';
 
 type PlanningStation = { station_code: string; display_name: string | null; sort_order: number };
+type PlanningModel = { model_code: string; display_name: string; sort_order: number };
 type GarageItem = {
   garage_item_id: string;
   planning_period: string | null;
@@ -37,6 +38,7 @@ const emptyDraft = (station: string | null = null): Draft => ({
 export default function GarageClient() {
   const [items, setItems] = useState<GarageItem[]>([]);
   const [stations, setStations] = useState<PlanningStation[]>([]);
+  const [models, setModels] = useState<PlanningModel[]>([]);
   const [draft, setDraft] = useState<Draft>(() => emptyDraft());
   const [station, setStation] = useState('ALLA');
   const [query, setQuery] = useState('');
@@ -44,9 +46,10 @@ export default function GarageClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const applyPayload = useCallback((payload: { data?: GarageItem[]; stations?: PlanningStation[] }) => {
+  const applyPayload = useCallback((payload: { data?: GarageItem[]; stations?: PlanningStation[]; models?: PlanningModel[] }) => {
     const nextStations = payload.stations ?? [];
     setStations(nextStations);
+    setModels(payload.models ?? []);
     setItems(payload.data ?? []);
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
   }, []);
@@ -61,9 +64,7 @@ export default function GarageClient() {
       applyPayload(payload);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garaget');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, [applyPayload]);
 
   useEffect(() => {
@@ -120,12 +121,13 @@ export default function GarageClient() {
         <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>Garaget</h1><p>Konkreta bilar mellan planering och faktisk fordonsresa.</p></div>
         <div className={styles.headerActions}><Link href="/planning" className={styles.primaryButton}>Planering</Link><Link href="/tower" className={styles.secondaryButton}>Tower</Link></div>
       </header>
+      <datalist id="garage-models">{models.map((model) => <option key={model.model_code} value={model.display_name} />)}</datalist>
       {error ? <div className={styles.error}>{error}</div> : null}
       <section className={styles.createPanel}>
         <div className={styles.panelTitle}><h2>Lägg bil i Garaget</h2><span>Reg.nr/VIN får vara tomt tills uppgiften finns.</span></div>
         <div className={styles.formGrid}>
           <Field label="Period"><input value={draft.planning_period ?? ''} onChange={(e) => setDraft({ ...draft, planning_period: e.target.value })} placeholder="2026-Q3" /></Field>
-          <Field label="Modell"><input value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} /></Field>
+          <Field label="Modell"><input list="garage-models" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Välj eller skriv modell" autoComplete="off" /></Field>
           <Field label="Orsak"><select value={draft.planning_reason} onChange={(e) => setDraft({ ...draft, planning_reason: e.target.value as Draft['planning_reason'] })}><option>BEHOV</option><option value="UTOK">UTÖK</option><option>MINSKNING</option><option value="SALU_RETUR">SALU RETUR</option><option>ANNAT</option></select></Field>
           <Field label="Planerad station"><select value={draft.planned_station ?? ''} onChange={(e) => setDraft({ ...draft, planned_station: e.target.value || null })} disabled={stations.length === 0}><option value="">Välj station</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></Field>
           <Field label="Leverantör"><input value={draft.supplier ?? ''} onChange={(e) => setDraft({ ...draft, supplier: e.target.value })} /></Field>
@@ -141,7 +143,7 @@ export default function GarageClient() {
       </section>
       <section className={styles.controls}>
         <label><span>Station</span><select value={station} onChange={(e) => setStation(e.target.value)}><option value="ALLA">Alla</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></label>
-        <label className={styles.search}><span>Sök</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Modell, reg.nr, VIN, leverantör…" /></label><strong>{visible.length} objekt</strong>
+        <label className={styles.search}><span>Sök</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Modell, reg.nr, VIN, leverantör…" /></label><strong>{visible.length} objekt · {models.length} modeller</strong>
       </section>
       <section className={styles.tableSection}>{loading ? <div className={styles.empty}>Läser Garaget…</div> : (
         <div className={styles.tableWrap}><table><thead><tr><th>Modell</th><th>Reg.nr</th><th>VIN</th><th>Orsak</th><th>Station</th><th>Leverantör</th><th>Order</th><th>Saluort</th><th>Dygn</th><th>Bekräftelse</th><th>Transport</th><th>Leverans</th><th>Kommentar</th></tr></thead>
@@ -157,7 +159,7 @@ export default function GarageClient() {
             <td><input defaultValue={item.note ?? ''} onBlur={(e) => { if (e.target.value !== (item.note ?? '')) void patch(item, { note: e.target.value }); }} /></td>
           </tr>)}</tbody></table></div>
       )}</section>
-      <section className={styles.explainer}><strong>Garaget är inte Lager 1 eller Lager 2.</strong><p>Det är BK:s planeringsbestånd. Aktiva stationer är konfiguration och kan utökas utan att bygga om gränssnittet.</p></section>
+      <section className={styles.explainer}><strong>Garaget är inte Lager 1 eller Lager 2.</strong><p>Det är BK:s planeringsbestånd. Aktiva stationer och modeller är gemensam referensdata.</p></section>
     </main>
   );
 }
