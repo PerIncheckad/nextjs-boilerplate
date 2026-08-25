@@ -6,10 +6,12 @@ import styles from './garage.module.css';
 
 type PlanningStation = { station_code: string; display_name: string | null; sort_order: number };
 type PlanningModel = { model_code: string; display_name: string; sort_order: number };
+type GarageDirection = 'IN' | 'UT';
 type GarageItem = {
   garage_item_id: string;
   planning_period: string | null;
   model: string;
+  garage_direction: GarageDirection | null;
   planning_reason: 'BEHOV' | 'UTOK' | 'MINSKNING' | 'SALU_RETUR' | 'ANNAT';
   supplier: string | null;
   order_reference: string | null;
@@ -30,10 +32,16 @@ type GarageItem = {
 type Draft = Omit<GarageItem, 'garage_item_id' | 'updated_at'>;
 
 const emptyDraft = (station: string | null = null): Draft => ({
-  planning_period: '', model: '', planning_reason: 'BEHOV', supplier: '', order_reference: '', regnr: '', vin: '', source_regnr: '',
+  planning_period: '', model: '', garage_direction: null, planning_reason: 'BEHOV', supplier: '', order_reference: '', regnr: '', vin: '', source_regnr: '',
   planned_station: station, saluort: '', daily_rate: null, ordered_at: '', calloff_at: '', confirmation_status: 'PLANERAD',
   transport_status: 'EJ_BOKAD', planned_delivery_date: '', note: '',
 });
+
+function directionLabel(direction: GarageDirection | null) {
+  if (direction === 'IN') return 'UTVECKLA / IN';
+  if (direction === 'UT') return 'AVVECKLA / UT';
+  return 'Ej satt';
+}
 
 export default function GarageClient() {
   const [items, setItems] = useState<GarageItem[]>([]);
@@ -41,6 +49,7 @@ export default function GarageClient() {
   const [models, setModels] = useState<PlanningModel[]>([]);
   const [draft, setDraft] = useState<Draft>(() => emptyDraft());
   const [station, setStation] = useState('ALLA');
+  const [direction, setDirection] = useState<'ALLA' | GarageDirection>('ALLA');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,11 +93,12 @@ export default function GarageClient() {
 
   const create = async () => {
     if (!draft.model.trim()) return setError('Modell måste anges.');
+    if (!draft.garage_direction) return setError('Välj UTVECKLA / IN eller AVVECKLA / UT.');
     if (!draft.planned_station) return setError('Planerad station måste anges.');
     setSaving(true);
     setError(null);
     try {
-      const response = await fetch('/api/garage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(draft) });
+      const response = await fetch('/api/garage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...draft, direction_change_reason: 'Riktning satt vid skapande' }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte skapa bilen i Garaget');
       setDraft(emptyDraft(stations[0]?.station_code ?? null));
@@ -110,23 +120,25 @@ export default function GarageClient() {
     const needle = query.trim().toUpperCase();
     return items.filter((item) => {
       if (station !== 'ALLA' && item.planned_station !== station) return false;
+      if (direction !== 'ALLA' && item.garage_direction !== direction) return false;
       if (!needle) return true;
       return [item.model, item.regnr, item.vin, item.supplier, item.order_reference, item.source_regnr].some((value) => value?.toUpperCase().includes(needle));
     });
-  }, [items, station, query]);
+  }, [items, station, direction, query]);
 
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>Garaget</h1><p>Konkreta bilar mellan planering och faktisk fordonsresa.</p></div>
+        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>Garaget</h1><p>Ett Garage. Två riktningar: UTVECKLA / IN och AVVECKLA / UT.</p></div>
         <div className={styles.headerActions}><Link href="/planning" className={styles.primaryButton}>Planering</Link><Link href="/tower" className={styles.secondaryButton}>Tower</Link></div>
       </header>
       <datalist id="garage-models">{models.map((model) => <option key={model.model_code} value={model.display_name} />)}</datalist>
       {error ? <div className={styles.error}>{error}</div> : null}
       <section className={styles.createPanel}>
-        <div className={styles.panelTitle}><h2>Lägg bil i Garaget</h2><span>Reg.nr/VIN får vara tomt tills uppgiften finns.</span></div>
+        <div className={styles.panelTitle}><h2>Lägg bil i Garaget</h2><span>Riktning är ett aktivt beslut. Reg.nr/VIN får vara tomt tills uppgiften finns.</span></div>
         <div className={styles.formGrid}>
-          <Field label="Period"><input value={draft.planning_period ?? ''} onChange={(e) => setDraft({ ...draft, planning_period: e.target.value })} placeholder="2026-Q3" /></Field>
+          <Field label="Riktning"><select value={draft.garage_direction ?? ''} onChange={(e) => setDraft({ ...draft, garage_direction: (e.target.value || null) as GarageDirection | null })}><option value="">Välj riktning</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></Field>
+          <Field label="Period"><input value={draft.planning_period ?? ''} onChange={(e) => setDraft({ ...draft, planning_period: e.target.value })} placeholder="2026-08" /></Field>
           <Field label="Modell"><input list="garage-models" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Välj eller skriv modell" autoComplete="off" /></Field>
           <Field label="Orsak"><select value={draft.planning_reason} onChange={(e) => setDraft({ ...draft, planning_reason: e.target.value as Draft['planning_reason'] })}><option>BEHOV</option><option value="UTOK">UTÖK</option><option>MINSKNING</option><option value="SALU_RETUR">SALU RETUR</option><option>ANNAT</option></select></Field>
           <Field label="Planerad station"><select value={draft.planned_station ?? ''} onChange={(e) => setDraft({ ...draft, planned_station: e.target.value || null })} disabled={stations.length === 0}><option value="">Välj station</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></Field>
@@ -142,12 +154,14 @@ export default function GarageClient() {
         <button className={styles.primaryButton} type="button" onClick={() => void create()} disabled={saving || stations.length === 0}>{saving ? 'Sparar…' : 'Lägg i Garaget'}</button>
       </section>
       <section className={styles.controls}>
+        <label><span>Riktning</span><select value={direction} onChange={(e) => setDirection(e.target.value as 'ALLA' | GarageDirection)}><option value="ALLA">Alla</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></label>
         <label><span>Station</span><select value={station} onChange={(e) => setStation(e.target.value)}><option value="ALLA">Alla</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></label>
         <label className={styles.search}><span>Sök</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Modell, reg.nr, VIN, leverantör…" /></label><strong>{visible.length} objekt · {models.length} modeller</strong>
       </section>
       <section className={styles.tableSection}>{loading ? <div className={styles.empty}>Läser Garaget…</div> : (
-        <div className={styles.tableWrap}><table><thead><tr><th>Modell</th><th>Reg.nr</th><th>VIN</th><th>Orsak</th><th>Station</th><th>Leverantör</th><th>Order</th><th>Saluort</th><th>Dygn</th><th>Bekräftelse</th><th>Transport</th><th>Leverans</th><th>Kommentar</th></tr></thead>
+        <div className={styles.tableWrap}><table><thead><tr><th>Riktning</th><th>Modell</th><th>Reg.nr</th><th>VIN</th><th>Orsak</th><th>Station</th><th>Leverantör</th><th>Order</th><th>Saluort</th><th>Dygn</th><th>Bekräftelse</th><th>Transport</th><th>Leverans</th><th>Kommentar</th></tr></thead>
           <tbody>{visible.map((item) => <tr key={item.garage_item_id}>
+            <td><select value={item.garage_direction ?? ''} onChange={(e) => { const next = e.target.value as GarageDirection; if (next) void patch(item, { garage_direction: next, direction_change_reason: `Ändrad i Garaget till ${directionLabel(next)}` }); }}><option value="" disabled>Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></td>
             <td>{item.model}</td><td>{item.regnr ?? '—'}</td><td className={styles.vin}>{item.vin ?? '—'}</td><td>{item.planning_reason}</td>
             <td><select value={item.planned_station ?? ''} onChange={(e) => void patch(item, { planned_station: e.target.value || null, station_change_reason: 'Omplanerad i Garaget' })}><option value="">—</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></td>
             <td>{item.supplier ?? '—'}</td><td>{item.order_reference ?? '—'}</td>
@@ -159,7 +173,7 @@ export default function GarageClient() {
             <td><input defaultValue={item.note ?? ''} onBlur={(e) => { if (e.target.value !== (item.note ?? '')) void patch(item, { note: e.target.value }); }} /></td>
           </tr>)}</tbody></table></div>
       )}</section>
-      <section className={styles.explainer}><strong>Garaget är inte Lager 1 eller Lager 2.</strong><p>Det är BK:s planeringsbestånd. Aktiva stationer och modeller är gemensam referensdata.</p></section>
+      <section className={styles.explainer}><strong>Riktning är planering, inte omskrivning av Lager 1.</strong><p>IN betyder utveckla eller föra bilen in/tillbaka i verksamheten. UT betyder avveckla bilen ur verksamheten. En bil kan byta riktning och ändringen loggas.</p></section>
     </main>
   );
 }
