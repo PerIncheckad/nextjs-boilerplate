@@ -53,6 +53,59 @@ function cleanContextId(value: unknown): string | null {
   return UUID_RE.test(contextId) ? contextId : null;
 }
 
+function cleanText(value: unknown, maxLength = 200): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.slice(0, maxLength) : null;
+}
+
+function cleanAmount(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const normalized = typeof value === 'string' ? value.replace(',', '.') : value;
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount < 0 || amount > 100_000_000) return null;
+  return Math.round(amount * 100) / 100;
+}
+
+function cleanDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return null;
+  const parsed = new Date(`${trimmed}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? null : trimmed;
+}
+
+function cleanCurrency(value: unknown): string {
+  const currency = typeof value === 'string' ? value.trim().toUpperCase() : 'SEK';
+  return /^[A-Z]{3}$/.test(currency) ? currency : 'SEK';
+}
+
+function cleanFingerprint(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const cleaned = value.replaceAll('"', '').trim().toLowerCase();
+  return /^[a-f0-9]{16,128}$/.test(cleaned) ? cleaned : null;
+}
+
+function cleanSourceFacts(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const raw = value as Record<string, unknown>;
+  const supplier = cleanText(raw.supplier);
+  const invoiceNumber = cleanText(raw.invoiceNumber, 100);
+  const documentDate = cleanDate(raw.documentDate);
+  const totalAmount = cleanAmount(raw.totalAmount);
+  const currency = cleanCurrency(raw.currency);
+  if (!supplier && !invoiceNumber && !documentDate && totalAmount === null) return null;
+  return {
+    supplier,
+    invoiceNumber,
+    documentDate,
+    totalAmount,
+    currency,
+    provenance: 'USER_ENTERED',
+    monetaryInterpretation: false,
+  };
+}
+
 function createAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -263,9 +316,10 @@ export async function POST(request: Request) {
       const path = typeof body.path === 'string' ? body.path.trim() : '';
       const fileName = cleanFileName(body.fileName);
       const documentType = cleanDocumentType(body.documentType);
-      const title = typeof body.title === 'string' && body.title.trim() ? body.title.trim().slice(0, 200) : null;
-      const mimeType = typeof body.mimeType === 'string' && body.mimeType.trim() ? body.mimeType.trim().slice(0, 200) : null;
+      const title = cleanText(body.title);
+      const mimeType = cleanText(body.mimeType);
       const expectedSize = Number(body.sizeBytes);
+      const sourceFacts = cleanSourceFacts(body.sourceFacts);
       const context = await resolveDocumentContext(admin, regnr, body.contextType, body.contextId);
       if (!context.ok) {
         return NextResponse.json({ error: context.error }, { status: context.status });
@@ -295,6 +349,42 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Uploaded file size mismatch' }, { status: 409 });
       }
 
+      const contentFingerprint = cleanFingerprint(storedObject.metadata?.eTag);
+      if (contentFingerprint) {
+        const { data: duplicate, error: duplicateError } = await admin
+          .from('vehicle_documents')
+          .select('document_id,file_name,document_type,uploaded_at')
+          .eq('regnr', regnr)
+          .contains('metadata', { contentFingerprint })
+          .order('uploaded_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (duplicateError) {
+          console.error('[vehicle-documents] Duplicate lookup failed:', duplicateError);
+          return NextResponse.json({ error: 'Could not verify document uniqueness' }, { status: 500 });
+        }
+        if (duplicate) {
+          const { error: cleanupError } = await admin.storage.from(BUCKET).remove([path]);
+          if (cleanupError) console.error('[vehicle-documents] Could not remove duplicate upload:', cleanupError);
+          return NextResponse.json({
+            error: `Exakt samma fil finns redan på Vagnkortet som ${duplicate.file_name}.`,
+            duplicate: {
+              documentId: duplicate.document_id,
+              fileName: duplicate.file_name,
+              documentType: duplicate.document_type,
+              uploadedAt: duplicate.uploaded_at,
+            },
+          }, { status: 409 });
+        }
+      }
+
+      const metadata = {
+        uploadedVia: 'VAGNKORT',
+        context: context.payload,
+        ...(contentFingerprint ? { contentFingerprint, fingerprintSource: 'SUPABASE_STORAGE_ETAG' } : {}),
+        ...(sourceFacts ? { sourceFacts } : {}),
+      };
+
       const { data: document, error: documentError } = await admin
         .from('vehicle_documents')
         .insert({
@@ -309,10 +399,7 @@ export async function POST(request: Request) {
           ...context.links,
           source_system: 'VAGNKORT',
           source_record_id: path,
-          metadata: {
-            uploadedVia: 'VAGNKORT',
-            context: context.payload,
-          },
+          metadata,
           uploaded_by: verification.user.id,
           uploaded_by_email: verification.user.email,
         })
@@ -347,6 +434,8 @@ export async function POST(request: Request) {
             mimeType,
             sizeBytes: document.size_bytes,
             context: context.payload,
+            contentFingerprint,
+            sourceFacts,
           },
         })
         .select('event_id')
