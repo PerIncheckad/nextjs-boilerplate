@@ -8,7 +8,7 @@ const planningPage = readFileSync('app/planning/page.tsx', 'utf8');
 
 test('planning UI is a dense spreadsheet workspace rather than documentation panel', () => {
   assert.match(planningUi, /PLANERINGSMATRIS/);
-  assert.match(planningUi, /klistra in direkt från Excel/);
+  assert.match(planningUi, /klistra in från Excel/);
   assert.doesNotMatch(planningUi, /Systemgräns/);
   assert.match(planningCss, /max-height:calc\(100vh - 165px\)/);
   assert.match(planningCss, /position:sticky;left:0/);
