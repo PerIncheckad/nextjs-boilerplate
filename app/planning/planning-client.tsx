@@ -15,6 +15,7 @@ const METRICS = [
 type Metric = typeof METRICS[number][0];
 type Counts = Record<Metric, number>;
 type PlanningStation = { station_code: string; display_name: string | null; sort_order: number };
+type PlanningModel = { model_code: string; display_name: string; sort_order: number };
 type ApiCell = Counts & {
   planning_cell_id: string;
   period_code: string;
@@ -30,7 +31,6 @@ type ModelRow = {
   stations: Record<string, Counts>;
   dirty: boolean;
 };
-
 type SheetColumn = { station: string; metric: Metric };
 
 const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 0, minskning_count: 0, ordered_count: 0 });
@@ -44,9 +44,7 @@ function pivot(cells: ApiCell[], stations: PlanningStation[]): ModelRow[] {
   const map = new Map<string, ModelRow>();
   for (const cell of cells) {
     const key = cell.model.trim().toUpperCase();
-    if (!map.has(key)) {
-      map.set(key, { key, model: cell.model, note: cell.note ?? '', dirty: false, stations: stationTemplate() });
-    }
+    if (!map.has(key)) map.set(key, { key, model: cell.model, note: cell.note ?? '', dirty: false, stations: stationTemplate() });
     const row = map.get(key)!;
     row.stations[cell.station] = {
       salu_count: cell.salu_count,
@@ -70,6 +68,7 @@ export default function FleetPlanningClient() {
   const [periodInput, setPeriodInput] = useState(initialPeriod);
   const [periods, setPeriods] = useState<string[]>([]);
   const [stations, setStations] = useState<PlanningStation[]>([]);
+  const [models, setModels] = useState<PlanningModel[]>([]);
   const [rows, setRows] = useState<ModelRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -77,9 +76,10 @@ export default function FleetPlanningClient() {
 
   const sheetColumns = useMemo<SheetColumn[]>(() => METRICS.flatMap(([metric]) => stations.map(({ station_code }) => ({ metric, station: station_code }))), [stations]);
 
-  const applyPayload = useCallback((payload: { data?: ApiCell[]; periods?: string[]; stations?: PlanningStation[] }, nextPeriod: string) => {
+  const applyPayload = useCallback((payload: { data?: ApiCell[]; periods?: string[]; stations?: PlanningStation[]; models?: PlanningModel[] }, nextPeriod: string) => {
     const nextStations = payload.stations ?? [];
     setStations(nextStations);
+    setModels(payload.models ?? []);
     setRows(pivot(payload.data ?? [], nextStations));
     setPeriods(payload.periods ?? []);
     setPeriod(nextPeriod);
@@ -209,80 +209,37 @@ export default function FleetPlanningClient() {
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <div>
-          <div className={styles.eyebrow}>INCHECKAD / VAGNPARKSPLANERING</div>
-          <h1>Planering</h1>
-          <p>Arbetsmatris för vagnparksplanering.</p>
-        </div>
-        <div className={styles.headerActions}>
-          <Link href="/tower" className={styles.secondaryButton}>Tower</Link>
-          <Link href="/garage" className={styles.primaryButton}>Garaget</Link>
-        </div>
+        <div><div className={styles.eyebrow}>INCHECKAD / VAGNPARKSPLANERING</div><h1>Planering</h1><p>Arbetsmatris för vagnparksplanering.</p></div>
+        <div className={styles.headerActions}><Link href="/tower" className={styles.secondaryButton}>Tower</Link><Link href="/garage" className={styles.primaryButton}>Garaget</Link></div>
       </header>
 
       <section className={styles.toolbar}>
-        <label className={styles.periodControl}>
-          <span>Period</span>
-          <input list="planning-periods" value={periodInput} onChange={(event) => setPeriodInput(event.target.value)} />
-          <datalist id="planning-periods">{periods.map((value) => <option key={value} value={value} />)}</datalist>
-        </label>
+        <label className={styles.periodControl}><span>Period</span><input list="planning-periods" value={periodInput} onChange={(event) => setPeriodInput(event.target.value)} /><datalist id="planning-periods">{periods.map((value) => <option key={value} value={value} />)}</datalist></label>
         <button type="button" className={styles.secondaryButton} onClick={() => void load(periodInput.trim() || defaultPeriod())}>Öppna</button>
         <button type="button" className={styles.primaryButton} onClick={addRow} disabled={stations.length === 0}>+ Rad</button>
-        <div className={styles.sheetHint}>Enter = nästa cell · Tab = nästa cell · klistra in direkt från Excel</div>
+        <div className={styles.sheetHint}>{models.length} modeller i registret · Enter = nästa cell · klistra in direkt från Excel</div>
         <div className={styles.periodStatus}><span>Aktiv period</span><strong>{period}</strong></div>
       </section>
 
+      <datalist id="planning-models">{models.map((model) => <option key={model.model_code} value={model.display_name} />)}</datalist>
       {error ? <div className={styles.error}>{error}</div> : null}
 
       <section className={styles.gridSection}>
-        <div className={styles.gridHeading}>
-          <div><strong>PLANERINGSMATRIS</strong><span>SALU · BEHOV · UTÖKNING · MINSKNING · BESTÄLLT</span></div>
-          <strong>{rows.length} modeller · {stations.length} stationer</strong>
-        </div>
-
+        <div className={styles.gridHeading}><div><strong>PLANERINGSMATRIS</strong><span>SALU · BEHOV · UTÖKNING · MINSKNING · BESTÄLLT</span></div><strong>{rows.length} modeller · {stations.length} stationer</strong></div>
         {loading ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
-          <div className={styles.tableWrap}>
-            <table className={styles.planningTable}>
-              <thead>
-                <tr>
-                  <th rowSpan={2} className={styles.modelColumn}>Modell</th>
-                  {METRICS.map(([metric, title]) => <th key={metric} colSpan={stations.length} className={styles.groupHeader}>{title}</th>)}
-                  <th rowSpan={2} className={styles.noteColumn}>Kommentar</th>
-                  <th rowSpan={2} className={styles.actionColumn} />
-                </tr>
-                <tr>{METRICS.flatMap(([metric]) => stations.map((station) => <th key={`${metric}-${station.station_code}`}>{station.display_name || station.station_code}</th>))}</tr>
-              </thead>
-              <tbody>
-                {rows.map((row, rowIndex) => <tr key={row.key} className={row.dirty ? styles.dirtyRow : undefined}>
-                  <td className={styles.modelColumn}><input data-model-cell="true" value={row.model} onChange={(event) => updateText(row.key, 'model', event.target.value)} placeholder="Modell" /></td>
-                  {sheetColumns.map(({ metric, station }, columnIndex) => (
-                    <td key={`${row.key}-${metric}-${station}`} className={styles.numberCell}>
-                      <input
-                        data-sheet-cell="true"
-                        type="number"
-                        min={0}
-                        inputMode="numeric"
-                        value={(row.stations[station] ?? emptyCounts())[metric]}
-                        onChange={(event) => updateCount(row.key, station, metric, event.target.value)}
-                        onKeyDown={(event) => moveSheetFocus(event, event.shiftKey ? -1 : 1)}
-                        onPaste={(event) => pasteSheet(rowIndex, columnIndex, event)}
-                        onFocus={(event) => event.currentTarget.select()}
-                        aria-label={`${row.model || 'Ny modell'} ${metric} ${station}`}
-                      />
-                    </td>
-                  ))}
-                  <td className={styles.noteColumn}><input value={row.note} onChange={(event) => updateText(row.key, 'note', event.target.value)} placeholder="Avrop, avvikelse, kommentar…" /></td>
-                  <td className={styles.actionColumn}><button type="button" className={row.dirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key}>{savingKey === row.key ? '…' : row.dirty ? 'Spara*' : 'Spara'}</button></td>
-                </tr>)}
-                <tr className={styles.totalRow}>
-                  <td className={styles.modelColumn}>TOTALT</td>
-                  {sheetColumns.map(({ metric, station }) => <td key={`total-${metric}-${station}`}>{totals[station]?.[metric] ?? 0}</td>)}
-                  <td />
-                  <td />
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <div className={styles.tableWrap}><table className={styles.planningTable}>
+            <thead><tr><th rowSpan={2} className={styles.modelColumn}>Modell</th>{METRICS.map(([metric, title]) => <th key={metric} colSpan={stations.length} className={styles.groupHeader}>{title}</th>)}<th rowSpan={2} className={styles.noteColumn}>Kommentar</th><th rowSpan={2} className={styles.actionColumn} /></tr>
+            <tr>{METRICS.flatMap(([metric]) => stations.map((station) => <th key={`${metric}-${station.station_code}`}>{station.display_name || station.station_code}</th>))}</tr></thead>
+            <tbody>
+              {rows.map((row, rowIndex) => <tr key={row.key} className={row.dirty ? styles.dirtyRow : undefined}>
+                <td className={styles.modelColumn}><input data-model-cell="true" list="planning-models" value={row.model} onChange={(event) => updateText(row.key, 'model', event.target.value)} placeholder="Välj eller skriv modell" autoComplete="off" /></td>
+                {sheetColumns.map(({ metric, station }, columnIndex) => <td key={`${row.key}-${metric}-${station}`} className={styles.numberCell}><input data-sheet-cell="true" type="number" min={0} inputMode="numeric" value={(row.stations[station] ?? emptyCounts())[metric]} onChange={(event) => updateCount(row.key, station, metric, event.target.value)} onKeyDown={(event) => moveSheetFocus(event, event.shiftKey ? -1 : 1)} onPaste={(event) => pasteSheet(rowIndex, columnIndex, event)} onFocus={(event) => event.currentTarget.select()} aria-label={`${row.model || 'Ny modell'} ${metric} ${station}`} /></td>)}
+                <td className={styles.noteColumn}><input value={row.note} onChange={(event) => updateText(row.key, 'note', event.target.value)} placeholder="Avrop, avvikelse, kommentar…" /></td>
+                <td className={styles.actionColumn}><button type="button" className={row.dirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key}>{savingKey === row.key ? '…' : row.dirty ? 'Spara*' : 'Spara'}</button></td>
+              </tr>)}
+              <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td>{sheetColumns.map(({ metric, station }) => <td key={`total-${metric}-${station}`}>{totals[station]?.[metric] ?? 0}</td>)}<td /><td /></tr>
+            </tbody>
+          </table></div>
         )}
       </section>
     </main>
