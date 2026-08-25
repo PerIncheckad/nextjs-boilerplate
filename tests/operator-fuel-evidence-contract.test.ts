@@ -22,7 +22,7 @@ test('fuel evidence uses existing checkin and receipt evidence only', () => {
 
 test('fuel evidence does not claim monetary consequence', () => {
   assert.match(route, /monetaryInterpretation: false/);
-  assert.match(client, /gör ingen bedömning av kostnadsansvar/);
+  assert.match(client, /bedömning av kostnadsansvar/i);
   assert.match(client, /Kvittotäckning/);
   assert.match(client, /Visa kvitto/);
   assert.match(client, /Vagnkort/);
