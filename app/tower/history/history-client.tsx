@@ -79,8 +79,24 @@ export default function OperatorHistory() {
   }, []);
 
   useEffect(() => {
-    void load(hours);
-  }, [hours, load]);
+    let active = true;
+    void fetchHistory(24)
+      .then((next) => {
+        if (!active) return;
+        setData(next);
+        setError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa drifthistorik');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const events = useMemo(() => {
     const needle = query.trim().toUpperCase();
@@ -129,7 +145,14 @@ export default function OperatorHistory() {
       <section className={styles.controls}>
         <label>
           <span>Tidsfönster</span>
-          <select value={hours} onChange={(event) => setHours(Number(event.target.value))}>
+          <select
+            value={hours}
+            onChange={(event) => {
+              const nextHours = Number(event.target.value);
+              setHours(nextHours);
+              void load(nextHours);
+            }}
+          >
             {WINDOWS.map((window) => <option key={window.hours} value={window.hours}>{window.label}</option>)}
           </select>
         </label>
