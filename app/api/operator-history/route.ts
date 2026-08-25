@@ -14,7 +14,6 @@ type DriftEvent = {
   sourceSystem: string | null;
   sourceEntity: string | null;
   actorSource: string | null;
-  actorEmail: string | null;
 };
 
 const ALLOWED_WINDOWS = new Set([24, 72, 168]);
@@ -63,17 +62,17 @@ export async function GET(request: Request) {
   try {
     const [journeyRes, actionEventsRes, handoffEventsRes] = await Promise.all([
       admin.from('vehicle_journey_events')
-        .select('regnr,event_type,occurred_at,source_system,source_entity,actor_source,actor_email,payload')
+        .select('regnr,event_type,occurred_at,source_system,source_entity,actor_source,payload')
         .gte('occurred_at', since)
         .order('occurred_at', { ascending: false })
         .limit(1500),
       admin.from('checkpoint_action_events')
-        .select('event_type,status,occurred_at,actor_source,actor_email,checkpoint_id,vehicle_checkpoints!inner(regnr,checkpoint_code)')
+        .select('event_type,status,occurred_at,actor_source,checkpoint_id')
         .gte('occurred_at', since)
         .order('occurred_at', { ascending: false })
         .limit(1000),
       admin.from('handoff_events')
-        .select('event_type,status,occurred_at,actor_source,actor_email,handoffs!inner(regnr,handoff_code)')
+        .select('event_type,status,occurred_at,actor_source,handoff_id')
         .gte('occurred_at', since)
         .order('occurred_at', { ascending: false })
         .limit(1000),
@@ -81,6 +80,30 @@ export async function GET(request: Request) {
 
     const failed = [journeyRes, actionEventsRes, handoffEventsRes].find((response) => response.error);
     if (failed?.error) throw failed.error;
+
+    const actionEvents = (actionEventsRes.data ?? []) as GenericRow[];
+    const handoffEvents = (handoffEventsRes.data ?? []) as GenericRow[];
+    const checkpointIds = [...new Set(actionEvents.map((row) => text(row.checkpoint_id)).filter((value): value is string => Boolean(value)))];
+    const handoffIds = [...new Set(handoffEvents.map((row) => text(row.handoff_id)).filter((value): value is string => Boolean(value)))];
+
+    const [checkpointsRes, handoffsRes] = await Promise.all([
+      checkpointIds.length
+        ? admin.from('vehicle_checkpoints').select('checkpoint_id,regnr,checkpoint_code').in('checkpoint_id', checkpointIds)
+        : Promise.resolve({ data: [], error: null }),
+      handoffIds.length
+        ? admin.from('handoffs').select('handoff_id,regnr,handoff_code').in('handoff_id', handoffIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    const relationFailure = [checkpointsRes, handoffsRes].find((response) => response.error);
+    if (relationFailure?.error) throw relationFailure.error;
+
+    const checkpointMap = new Map(
+      ((checkpointsRes.data ?? []) as GenericRow[]).map((row) => [String(row.checkpoint_id), row]),
+    );
+    const handoffMap = new Map(
+      ((handoffsRes.data ?? []) as GenericRow[]).map((row) => [String(row.handoff_id), row]),
+    );
 
     const events: DriftEvent[] = [];
 
@@ -98,14 +121,13 @@ export async function GET(request: Request) {
         sourceSystem: text(row.source_system),
         sourceEntity: text(row.source_entity),
         actorSource: text(row.actor_source),
-        actorEmail: text(row.actor_email),
       });
     }
 
-    for (const row of (actionEventsRes.data ?? []) as GenericRow[]) {
+    for (const row of actionEvents) {
       const occurredAt = iso(row.occurred_at);
       if (!occurredAt) continue;
-      const checkpoint = jsonObject(row.vehicle_checkpoints);
+      const checkpoint = checkpointMap.get(String(row.checkpoint_id)) ?? {};
       events.push({
         occurredAt,
         regnr: text(checkpoint.regnr)?.toUpperCase() ?? null,
@@ -116,14 +138,13 @@ export async function GET(request: Request) {
         sourceSystem: 'CHECKPOINT_ENGINE',
         sourceEntity: 'checkpoint_action_events',
         actorSource: text(row.actor_source),
-        actorEmail: text(row.actor_email),
       });
     }
 
-    for (const row of (handoffEventsRes.data ?? []) as GenericRow[]) {
+    for (const row of handoffEvents) {
       const occurredAt = iso(row.occurred_at);
       if (!occurredAt) continue;
-      const handoff = jsonObject(row.handoffs);
+      const handoff = handoffMap.get(String(row.handoff_id)) ?? {};
       events.push({
         occurredAt,
         regnr: text(handoff.regnr)?.toUpperCase() ?? null,
@@ -134,7 +155,6 @@ export async function GET(request: Request) {
         sourceSystem: 'PROCESS_ENGINE',
         sourceEntity: 'handoff_events',
         actorSource: text(row.actor_source),
-        actorEmail: text(row.actor_email),
       });
     }
 
@@ -143,10 +163,12 @@ export async function GET(request: Request) {
     const byType = new Map<string, number>();
     const vehicles = new Set<string>();
     let manualEvents = 0;
+    let systemEvents = 0;
     for (const event of events) {
       byType.set(event.eventType, (byType.get(event.eventType) ?? 0) + 1);
       if (event.regnr) vehicles.add(event.regnr);
       if (event.actorSource === 'MANUELL') manualEvents += 1;
+      if (event.actorSource === 'SYSTEM') systemEvents += 1;
     }
 
     return NextResponse.json({
@@ -158,7 +180,7 @@ export async function GET(request: Request) {
           events: events.length,
           vehicles: vehicles.size,
           manualEvents,
-          systemEvents: events.filter((event) => event.actorSource === 'SYSTEM').length,
+          systemEvents,
           handoffEvents: events.filter((event) => event.source === 'HANDOFF').length,
           actionEvents: events.filter((event) => event.source === 'CHECKPOINT_ACTION').length,
         },
