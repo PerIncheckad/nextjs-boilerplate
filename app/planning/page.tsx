@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Planering | Incheckad',
-  description: 'Stationsanpassad vagnparksplanering för 166, 170 och 274',
+  description: 'Excel-lik vagnparksplanering med konfigurerbara stationer',
 };
 
 export default function PlanningPage() {
