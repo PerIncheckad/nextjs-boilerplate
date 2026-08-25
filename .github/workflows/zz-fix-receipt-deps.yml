@@ -1,0 +1,39 @@
+name: Fix receipt validation deps
+
+on:
+  push:
+    branches:
+      - checkin-required-fuel-receipt-evidence
+    paths:
+      - .github/workflows/zz-fix-receipt-deps.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: checkin-required-fuel-receipt-evidence
+          fetch-depth: 0
+      - name: Add receipt dependencies
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/check/form-client.tsx')
+          s = p.read_text()
+          old = "needsChargeLevel, needsChargeCables, tankniva, liters, literpris, laddniva, antalLaddkablar,"
+          new = "needsChargeLevel, needsChargeCables, tankniva, liters, literpris, receiptMedia, receiptMissing, receiptMissingReason, laddniva, antalLaddkablar,"
+          if old not in s:
+              raise SystemExit('dependency marker missing')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit
+        run: |
+          git config user.name "PerIncheckad"
+          git config user.email "per@incheckad.se"
+          git add app/check/form-client.tsx
+          git commit -m "Fix fuel receipt validation dependencies"
+          git push origin HEAD:checkin-required-fuel-receipt-evidence
