@@ -188,7 +188,7 @@ export async function GET(request: Request) {
       key: item.modelKey,
       label: item.model,
       monthCounts: Array(HORIZON_MONTHS).fill(0),
-      stationCounts: {},
+      stationCounts: {} as Record<string, number>,
       total: 0,
     };
     current.monthCounts[item.monthIndex] += 1;
