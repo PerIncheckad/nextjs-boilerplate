@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./login.css";
 import type { Metadata } from "next";
 import AppAuthBoundary from "@/components/AppAuthBoundary";
 
