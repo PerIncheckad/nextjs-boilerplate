@@ -95,8 +95,8 @@ export default function OperationalStateBanner() {
     return (
       <section style={{ ...shell, border: '2px solid #777' }}>
         <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.08em' }}>OPERATIVT HUVUDTILLSTÅND</div>
-        <div style={{ fontSize: 24, fontWeight: 800, marginTop: '.3rem' }}>UNKNOWN</div>
-        <div style={{ marginTop: '.35rem', color: '#555' }}>Ingen verifierad statusförändring finns. Incheckad gissar inte AVAILABLE, RENTAL eller något annat tillstånd.</div>
+        <div style={{ fontSize: 24, fontWeight: 800, marginTop: '.3rem' }}>Ej verifierat ännu</div>
+        <div style={{ marginTop: '.35rem', color: '#555' }}>Ingen verifierad statusförändring finns registrerad för bilen. Nästa huvudtillstånd visas först när en verifierad källa har fastställt det.</div>
         {state.sale.state !== 'UNKNOWN' && <div style={{ marginTop: '.7rem', fontWeight: 700 }}>SÅLD-faktum: {state.sale.state === 'SOLD' ? 'SÅLD' : 'KORRIGERAT / INTE SÅLD'} · {formatDate(state.sale.occurredAt)}</div>}
       </section>
     );
