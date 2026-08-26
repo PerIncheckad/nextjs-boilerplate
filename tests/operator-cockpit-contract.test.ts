@@ -31,8 +31,9 @@ test('cockpit answers the locked operational attention questions', () => {
 
 test('tower links to vagnkort rather than duplicating vehicle history', () => {
   assert.match(route, /\/vagnkort\?reg=/);
-  assert.match(client, /Aktuella operativa ärenden/);
-  assert.match(client, /Vagnkortet innehåller individresan och evidensen/);
+  assert.match(client, /selected\.links\.vagnkort/);
+  assert.match(client, /ÖPPNA VAGNKORT/);
+  assert.doesNotMatch(client, /\/api\/vehicle-journey/);
 });
 
 test('tower exposes existing tank receipt evidence without creating a new truth source', () => {
