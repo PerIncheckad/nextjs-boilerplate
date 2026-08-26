@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import VagnkortClient from './vagnkort-client';
+import VagnkortClient from './vagnkort-client-loader';
 import OperationalStateBanner from './operational-state-banner';
 import styles from './vagnkort-shell.module.css';
 
