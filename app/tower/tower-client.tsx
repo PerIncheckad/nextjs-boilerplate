@@ -150,12 +150,15 @@ export default function OperatorCockpit() {
   }, []);
 
   useEffect(() => {
-    const savedTheme = window.localStorage.getItem('incheckad-tower-theme') as TowerTheme | null;
-    const savedLayout = window.localStorage.getItem('incheckad-tower-layout') as TowerLayout | null;
-    const savedCompact = window.localStorage.getItem('incheckad-tower-compact');
-    if (savedTheme && savedTheme in themeLabels) setTheme(savedTheme);
-    if (savedLayout === 'cockpit' || savedLayout === 'focus' || savedLayout === 'command') setLayout(savedLayout);
-    if (savedCompact === '1') setCompact(true);
+    const timer = window.setTimeout(() => {
+      const savedTheme = window.localStorage.getItem('incheckad-tower-theme') as TowerTheme | null;
+      const savedLayout = window.localStorage.getItem('incheckad-tower-layout') as TowerLayout | null;
+      const savedCompact = window.localStorage.getItem('incheckad-tower-compact');
+      if (savedTheme && savedTheme in themeLabels) setTheme(savedTheme);
+      if (savedLayout === 'cockpit' || savedLayout === 'focus' || savedLayout === 'command') setLayout(savedLayout);
+      if (savedCompact === '1') setCompact(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -212,13 +215,6 @@ export default function OperatorCockpit() {
       .sort((a, b) => b.overdue - a.overdue || b.attention - a.attention || a.name.localeCompare(b.name, 'sv'))
       .slice(0, 6);
   }, [data]);
-
-  useEffect(() => {
-    if (!selectedReg && items.length > 0) setSelectedReg(items[0].regnr);
-    if (selectedReg && items.length > 0 && !items.some((item) => item.regnr === selectedReg)) {
-      setSelectedReg(items[0].regnr);
-    }
-  }, [items, selectedReg]);
 
   const selected = useMemo(
     () => items.find((item) => item.regnr === selectedReg) ?? signalItems.find((item) => item.regnr === selectedReg) ?? items[0] ?? null,
