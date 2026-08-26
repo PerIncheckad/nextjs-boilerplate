@@ -6,6 +6,22 @@
   --invisto-steel: #60666A;
 }
 
+/* Shared INCHECKAD operational background v1.
+   Kept as a local product asset so it can be replaced without touching workflow logic. */
+.background-img {
+  background-image: url('/brand/incheckad-operations-bg.webp') !important;
+  background-position: center center !important;
+  background-size: cover !important;
+}
+
+[style*="MB%20front%20grill%20logo.jpg"],
+[style*="MB front grill logo.jpg"] {
+  background-image: url('/brand/incheckad-operations-bg.webp') !important;
+  background-position: center center !important;
+  background-size: cover !important;
+  background-repeat: no-repeat !important;
+}
+
 .login-shell {
   min-height: 100dvh;
   display: grid;
