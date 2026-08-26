@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Planering | Incheckad',
-  description: 'Vagnparksplanering med SALU-beslutsstöd och stationsmatris',
+  description: 'Vagnparksplanering med SALU-beslutsstöd och konfigurerbara stationer',
 };
 
 export default function PlanningPage() {
