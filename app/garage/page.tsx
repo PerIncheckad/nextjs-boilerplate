@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import GarageClient from './garage-client';
 import GarageV2Panel from './garage-v2-panel';
+import GarageWheelChangePanel from './garage-wheel-change-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ export default function GaragePage() {
   return (
     <>
       <GarageV2Panel />
+      <GarageWheelChangePanel />
       <GarageClient />
     </>
   );
