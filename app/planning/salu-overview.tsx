@@ -39,7 +39,6 @@ export default function SaluOverview() {
 
   useEffect(() => {
     let active = true;
-    setLoading(true); setError(null);
     void fetch(`/api/planning/salu-overview?period=${encodeURIComponent(period)}`, { cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json();
@@ -56,6 +55,14 @@ export default function SaluOverview() {
     return data.items.filter((item) => item.modelKey === selectedModel);
   }, [data, selectedModel]);
 
+  const changePeriod = (nextPeriod: string) => {
+    setLoading(true);
+    setError(null);
+    setData(null);
+    setSelectedModel(null);
+    setPeriod(nextPeriod || currentPeriod());
+  };
+
   return (
     <section className={styles.panel}>
       <div className={styles.header}>
@@ -64,7 +71,7 @@ export default function SaluOverview() {
           <h2>Kommande SALU — 1 till 4 månader</h2>
           <p>SALU informerar. Den skapar inte BEHOV, UTÖKNING, MINSKNING eller BESTÄLLT.</p>
         </div>
-        <label className={styles.period}><span>Från månad</span><input type="month" value={period} onChange={(event) => setPeriod(event.target.value || currentPeriod())} /></label>
+        <label className={styles.period}><span>Från månad</span><input type="month" value={period} onChange={(event) => changePeriod(event.target.value)} /></label>
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
