@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 export default function TowerPage() {
   return (
     <>
-      <TowerWheelChangePanel />
       <OperatorCockpit />
+      <TowerWheelChangePanel />
     </>
   );
 }
