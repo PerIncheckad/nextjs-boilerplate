@@ -27,6 +27,14 @@ type Payload = {
   items: SaluItem[];
   semantics: string;
 };
+type DecisionRow = {
+  regnr: string;
+  decision_status: 'REPLACE' | 'CANCELLED';
+  salu_date_at_decision: string;
+  model_snapshot: string | null;
+  station_code_snapshot: string | null;
+};
+type DecisionPayload = { data?: DecisionRow[]; storageReady?: boolean; error?: string };
 
 function currentPeriod() { return new Date().toISOString().slice(0, 7); }
 
@@ -36,6 +44,10 @@ export default function SaluOverview() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, DecisionRow>>({});
+  const [decisionStorageReady, setDecisionStorageReady] = useState<boolean | null>(null);
+  const [decisionSaving, setDecisionSaving] = useState<string | null>(null);
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -43,7 +55,21 @@ export default function SaluOverview() {
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body?.error ?? 'Kunde inte läsa SALU-översikten');
-        if (active) setData(body.data as Payload);
+        if (!active) return;
+        const nextData = body.data as Payload;
+        setData(nextData);
+        const regnrs = nextData.items.map((item) => item.regnr);
+        if (regnrs.length === 0) {
+          setDecisions({});
+          setDecisionStorageReady(null);
+          return;
+        }
+        const decisionResponse = await fetch(`/api/planning/replacement-decisions?regnrs=${encodeURIComponent(regnrs.join(','))}`, { cache: 'no-store' });
+        const decisionBody = await decisionResponse.json() as DecisionPayload;
+        if (!decisionResponse.ok) throw new Error(decisionBody.error ?? 'Kunde inte läsa ersättningsbeslut');
+        if (!active) return;
+        setDecisionStorageReady(decisionBody.storageReady ?? true);
+        setDecisions(Object.fromEntries((decisionBody.data ?? []).map((row) => [row.regnr, row])));
       })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa SALU-översikten'); })
       .finally(() => { if (active) setLoading(false); });
@@ -55,12 +81,48 @@ export default function SaluOverview() {
     return data.items.filter((item) => item.modelKey === selectedModel);
   }, [data, selectedModel]);
 
+  const activeReplacementCount = useMemo(
+    () => Object.values(decisions).filter((decision) => decision.decision_status === 'REPLACE').length,
+    [decisions],
+  );
+
   const changePeriod = (nextPeriod: string) => {
     setLoading(true);
     setError(null);
     setData(null);
     setSelectedModel(null);
+    setDecisions({});
+    setDecisionStorageReady(null);
+    setDecisionNotice(null);
     setPeriod(nextPeriod || currentPeriod());
+  };
+
+  const setReplacementDecision = async (item: SaluItem, nextStatus: 'REPLACE' | 'CANCELLED') => {
+    setDecisionSaving(item.regnr);
+    setError(null);
+    setDecisionNotice(null);
+    try {
+      const response = await fetch('/api/planning/replacement-decisions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          regnr: item.regnr,
+          decisionStatus: nextStatus,
+          saluDate: item.saluDate,
+          model: item.model,
+          stationCode: item.stationCode,
+        }),
+      });
+      const body = await response.json() as DecisionPayload;
+      if (!response.ok || !body.data) throw new Error(body.error ?? 'Kunde inte spara ersättningsbeslut');
+      setDecisionStorageReady(body.storageReady ?? true);
+      setDecisions((current) => ({ ...current, [item.regnr]: body.data! }));
+      setDecisionNotice(nextStatus === 'REPLACE' ? `${item.regnr}: ERSÄTT är beslutat.` : `${item.regnr}: ersättningsbeslut borttaget.`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Kunde inte spara ersättningsbeslut');
+    } finally {
+      setDecisionSaving(null);
+    }
   };
 
   return (
@@ -75,6 +137,8 @@ export default function SaluOverview() {
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
+      {decisionNotice ? <div className={styles.notice}>{decisionNotice}</div> : null}
+      {decisionStorageReady === false ? <div className={styles.storageWarning}>ERSÄTT är färdigbyggt i grenen men väntar på databasaktivering. Inget beslut kan sparas förrän den lagringen är godkänd.</div> : null}
       {loading ? <div className={styles.loading}>Läser kommande SALU…</div> : data ? (
         <>
           <div className={styles.horizonGrid}>
@@ -86,6 +150,7 @@ export default function SaluOverview() {
               </article>
             ))}
             <article className={styles.horizonCard}><span>HELHET 4 MÅN</span><strong>{data.total}</strong><small>samtliga kommande SALU</small></article>
+            <article className={styles.horizonCard}><span>ERSÄTT BESLUTAT</span><strong>{activeReplacementCount}</strong><small>explicit valda bilar</small></article>
           </div>
 
           <div className={styles.layout}>
@@ -105,11 +170,24 @@ export default function SaluOverview() {
 
             <aside className={styles.detail}>
               <div className={styles.detailHead}><strong>{selectedModel ? data.models.find((model) => model.key === selectedModel)?.label : 'Välj modell'}</strong><span>{detailItems.length ? `${detailItems.length} bilar` : 'HELHET → MODELL → BIL'}</span></div>
-              {selectedModel ? <div className={styles.vehicleList}>{detailItems.map((item) => <div key={`${item.regnr}-${item.saluDate}`} className={styles.vehicleRow}>
-                <div><strong>{item.regnr}</strong><span>{item.model}</span></div>
-                <div><strong>{item.saluDate}</strong><span>{item.stationCode ?? 'Station ej fastställd'}{item.stationName ? ` · ${item.stationName}` : ''}</span></div>
-                <button type="button" disabled title="Ersättningsbeslut byggs i nästa steg">ERSÄTT</button>
-              </div>)}</div> : <div className={styles.empty}>Klicka på en modell för att se vilka bilar som bygger SALU-helheten.</div>}
+              {selectedModel ? <div className={styles.vehicleList}>{detailItems.map((item) => {
+                const decision = decisions[item.regnr];
+                const active = decision?.decision_status === 'REPLACE';
+                const disabled = decisionSaving === item.regnr || decisionStorageReady === false;
+                return <div key={`${item.regnr}-${item.saluDate}`} className={`${styles.vehicleRow} ${active ? styles.replacementSelected : ''}`}>
+                  <div><strong>{item.regnr}</strong><span>{item.model}</span></div>
+                  <div><strong>{item.saluDate}</strong><span>{item.stationCode ?? 'Station ej fastställd'}{item.stationName ? ` · ${item.stationName}` : ''}</span></div>
+                  <button
+                    type="button"
+                    className={active ? styles.replaceActive : styles.replaceButton}
+                    disabled={disabled}
+                    onClick={() => void setReplacementDecision(item, active ? 'CANCELLED' : 'REPLACE')}
+                    title={decisionStorageReady === false ? 'Databaslagringen är ännu inte aktiverad' : active ? 'Ta bort ersättningsbeslut' : 'Markera bilen för ersättning'}
+                  >
+                    {decisionSaving === item.regnr ? 'SPARAR…' : active ? 'ERSÄTTS ✓' : 'ERSÄTT'}
+                  </button>
+                </div>;
+              })}</div> : <div className={styles.empty}>Klicka på en modell för att se vilka bilar som bygger SALU-helheten.</div>}
             </aside>
           </div>
         </>
