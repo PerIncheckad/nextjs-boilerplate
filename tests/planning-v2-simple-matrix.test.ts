@@ -26,3 +26,10 @@ test('Planering v2 preserves all existing cell fields when saving', () => {
   assert.match(ui, /note: row\.note\.trim\(\) \|\| null/);
   assert.match(ui, /fetch\('\/api\/fleet-planning'/);
 });
+
+test('Planering v2 preserves existing drafts and uses model masterdata', () => {
+  assert.match(ui, /incheckad-planning-draft:/);
+  assert.match(ui, /parsed\.version !== 1 && parsed\.version !== 2/);
+  assert.match(ui, /pivot\(payload\.data \?\? \[\], nextStations, nextModels\)/);
+  assert.match(ui, /for \(const model of \[\.\.\.models\]/);
+});
