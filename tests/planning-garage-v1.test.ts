@@ -12,7 +12,6 @@ const planningSourceApi = readFileSync('app/api/garage/planning-sources/route.ts
 const saluSourceApi = readFileSync('app/api/garage/salu-sources/route.ts', 'utf8');
 const planningUi = readFileSync('app/planning/planning-client.tsx', 'utf8');
 const garageUi = readFileSync('app/garage/garage-client.tsx', 'utf8');
-const planningCss = readFileSync('app/planning/planning.module.css', 'utf8');
 const garageCss = readFileSync('app/garage/garage.module.css', 'utf8');
 
 test('planning starts with 166, 170 and 274 but station growth is configuration, not code', () => {
@@ -25,29 +24,27 @@ test('planning starts with 166, 170 and 274 but station growth is configuration,
   assert.doesNotMatch(garageUi, /const STATIONS/);
 });
 
-test('planning keeps SALU BEHOV UTOK MINSKNING and BESTALLT separate without inventing a formula', () => {
+test('planning keeps SALU support separate from BEHOV UTOK MINSKNING and BESTALLT decisions', () => {
   for (const field of ['salu_count', 'behov_count', 'utok_count', 'minskning_count', 'ordered_count']) {
     assert.match(migration, new RegExp(field));
     assert.match(planningApi, new RegExp(field));
     assert.match(planningUi, new RegExp(field));
   }
-  assert.match(planningUi, /SALU/);
+  assert.match(planningUi, /SALU ovanför är endast beslutsstöd/);
   assert.match(planningUi, /BEHOV/);
   assert.match(planningUi, /UTÖKNING/);
   assert.match(planningUi, /MINSKNING/);
   assert.match(planningUi, /BESTÄLLT/);
+  assert.doesNotMatch(planningUi, /\['salu_count',\s*'SALU'\]/);
 });
 
-test('planning is monthly and retains Excel-like direct work', () => {
+test('planning is monthly and retains direct keyboard work in the simple matrix', () => {
   assert.match(planningApi, /MONTH_RE/);
   assert.match(planningUi, /type="month"/);
   assert.match(planningUi, /defaultPeriod/);
   assert.match(planningUi, /toISOString\(\)\.slice\(0, 7\)/);
-  assert.match(planningUi, /pasteSheet/);
-  assert.match(planningUi, /data-sheet-cell/);
-  assert.match(planningCss, /position:sticky/);
-  assert.match(planningUi, /window\.print/);
-  assert.match(planningUi, />PDF</);
+  assert.match(planningUi, /moveFocus/);
+  assert.match(planningUi, /data-planning-cell/);
 });
 
 test('planning and Garage share a reusable model registry', () => {
@@ -56,9 +53,9 @@ test('planning and Garage share a reusable model registry', () => {
   assert.match(modelMigration, /upper\(trim\(model\)\)/);
   assert.match(planningApi, /from\('planning_vehicle_models'\)/);
   assert.match(garageApi, /from\('planning_vehicle_models'\)/);
-  assert.match(planningUi, /planning-models/);
+  assert.match(planningUi, /payload\.models/);
+  assert.match(planningUi, /pivot\(payload\.data \?\? \[\], nextStations, nextModels\)/);
   assert.match(garageUi, /garage-models/);
-  assert.match(planningUi, /Välj eller skriv modell/);
   assert.match(garageUi, /Välj eller skriv modell/);
 });
 
