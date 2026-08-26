@@ -7,7 +7,7 @@ const api = readFileSync('app/api/garage/wheel-changes/route.ts', 'utf8');
 const garagePanel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
 const garagePage = readFileSync('app/garage/page.tsx', 'utf8');
 const towerPanel = readFileSync('app/tower/tower-wheel-change-panel.tsx', 'utf8');
-const towerPage = readFileSync('app/tower/page.tsx', 'utf8');
+const towerClient = readFileSync('app/tower/tower-client.tsx', 'utf8');
 
 test('wheel change is an operational Garage workflow backed by an L2 checkpoint', () => {
   assert.match(migration, /'HJULSKIFTE'/);
@@ -54,7 +54,7 @@ test('Garage wheel change API is authenticated and server-only database access',
 });
 
 test('Tower is read-only for wheel change and points operations back to Garage', () => {
-  assert.match(towerPage, /TowerWheelChangePanel/);
+  assert.match(towerClient, /TowerWheelChangePanel/);
   assert.match(towerPanel, /Read-only kontrollvy/);
   assert.match(towerPanel, /Öppna Garaget/);
   assert.match(towerPanel, /fetch\('\/api\/garage\/wheel-changes'/);
