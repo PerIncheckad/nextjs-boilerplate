@@ -1,35 +1,97 @@
 import type { Metadata } from 'next';
-const currentYear = new Date().getFullYear();
+import Image from 'next/image';
+import Link from 'next/link';
+
 export const metadata: Metadata = {
-  title: 'Incheckad',
-  description: 'Startsida',
+  title: 'INCHECKAD',
+  description: 'Operativ plattform',
 };
-const MABI_LOGO_URL = "https://ufioaijcmaujlvmveyra.supabase.co/storage/v1/object/public/MABI%20Syd%20logga/MABI%20Syd%20logga%202.png";
+
+const controlModules = [
+  { href: '/tower', label: 'Tower', detail: 'Överblick och kontroll' },
+  { href: '/planning', label: 'Planering', detail: 'Framtida behov och beslut' },
+  { href: '/garage', label: 'Garaget', detail: 'Operativ fordonsstyrning' },
+];
+
+const operationModules = [
+  { href: '/ankomst', label: 'Ankomst', detail: 'Registrera faktisk ankomst' },
+  { href: '/check', label: 'Incheckning', detail: 'Kontrollera och verifiera' },
+  { href: '/nybil', label: 'Ny bil', detail: 'Registrera ny bil' },
+];
+
+function ModuleLink({ href, label, detail }: { href: string; label: string; detail: string }) {
+  return (
+    <Link href={href} className="home-module-link">
+      <span>
+        <strong>{label}</strong>
+        <small>{detail}</small>
+      </span>
+      <span className="home-module-arrow" aria-hidden="true">→</span>
+    </Link>
+  );
+}
+
 export default function HomePage() {
   return (
-    <main className="welcome-main">
-      <div className="background-img" />
-      
-      <div className="welcome-card">
-        <img src={MABI_LOGO_URL} alt="MABI Syd logga" className="main-logo" />
-        
-        <h1 className="welcome-title">Välkommen!</h1>
-        
-        <div className="btn-group">
-          <a href="/tower" className="btn inkommen">Tower</a>
-          <a href="/planning" className="btn inkommen">Planering</a>
-          <a href="/garage" className="btn inkommen">Garaget</a>
-          <a href="/ankomst" className="btn inkommen">Inkommen</a>
-          <a href="/check" className="btn incheckning">Ny incheckning</a>
-          <a href="/nybil" className="btn registrera">Registrera ny bil</a>
-          <a href="/vagnkort" className="btn incheckning">Vagnkort</a>
+    <main className="home-shell">
+      <section className="home-workspace" aria-label="INCHECKAD navigation">
+        <header className="home-header">
+          <Image
+            src="/brand/incheckad-by-invisto-it.svg"
+            alt="INCHECKAD — BY INVISTO / IT"
+            width={520}
+            height={210}
+            priority
+            className="home-brand-mark"
+          />
+          <div className="home-header-meta">
+            <span>OPERATIV PLATTFORM</span>
+            <span>SECURE ACCESS</span>
+          </div>
+        </header>
+
+        <div className="home-intro">
+          <p className="home-eyebrow">CONTROL / OPERATIONS</p>
+          <h1>Vad ska du göra?</h1>
+          <p>Välj arbetsyta. Systemet håller isär kontroll, planering och operativt arbete.</p>
         </div>
-        
-      </div>
-      
-      <footer className="homepage-footer">
-        &copy; {currentYear} Albarone AB &mdash; Alla rättigheter förbehållna
-      </footer>
+
+        <div className="home-module-groups">
+          <section className="home-module-group" aria-labelledby="home-control-title">
+            <div className="home-group-heading">
+              <span>01</span>
+              <h2 id="home-control-title">Kontroll</h2>
+            </div>
+            <div className="home-module-list">
+              {controlModules.map((item) => <ModuleLink key={item.href} {...item} />)}
+            </div>
+          </section>
+
+          <section className="home-module-group" aria-labelledby="home-operations-title">
+            <div className="home-group-heading">
+              <span>02</span>
+              <h2 id="home-operations-title">Operativt</h2>
+            </div>
+            <div className="home-module-list">
+              {operationModules.map((item) => <ModuleLink key={item.href} {...item} />)}
+              <ModuleLink href="/vagnkort" label="Vagnkort" detail="Fordonsinformation" />
+            </div>
+          </section>
+        </div>
+
+        <footer className="home-footer">
+          <span>MABISYD MOBILITY / ALBARONE</span>
+          <span>OPERATIV MILJÖ</span>
+        </footer>
+      </section>
+
+      <aside className="home-visual" aria-hidden="true">
+        <div className="home-visual-overlay" />
+        <div className="home-visual-copy">
+          <span>DATA → INSIGHT → ACTION → EFFECT</span>
+          <strong>CONTROL THE WORK.<br />PROVE THE EFFECT.</strong>
+        </div>
+      </aside>
     </main>
   );
 }
