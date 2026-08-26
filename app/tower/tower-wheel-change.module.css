@@ -1,1 +1,108 @@
-.shell{margin:0 22px 12px;background:#fff;border:1px solid #d8dee4;color:#17212b;padding:13px}.heading{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:10px}.heading h2{margin:2px 0 2px;font-size:18px}.heading p{margin:0;color:#64707d;font-size:11px}.eyebrow{font-size:10px;font-weight:900;letter-spacing:.1em;color:#5d6c7b}.metrics{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:11px}.metrics span{white-space:nowrap}.metrics strong{font-size:15px;margin-right:3px}.link{font-weight:900;color:#17212b;text-decoration:none}.error{background:#fee2e2;color:#991b1b;border:1px solid #fecaca;padding:8px 10px;margin-bottom:8px;font-size:11px}.empty{padding:12px;color:#64707d;font-size:11px;background:#f7f9fa}.tableWrap{overflow:auto}.tableWrap table{border-collapse:separate;border-spacing:0;width:100%;min-width:920px;font-size:11px}.tableWrap th,.tableWrap td{padding:6px;border-right:1px solid #dce1e6;border-bottom:1px solid #dce1e6;text-align:left;vertical-align:middle}.tableWrap th{background:#e9edf0;font-weight:900}.attentionRow{background:#fff7ed}.flag{display:block;color:#b45309;font-size:9px;font-weight:900;margin-top:2px}@media(max-width:700px){.shell{margin:0 12px 10px;padding:10px}.heading{align-items:flex-start;flex-direction:column}}@media print{.shell{margin:0 0 6mm;padding:0;border:0}.link{display:none}.tableWrap{overflow:visible}.tableWrap table{min-width:0;font-size:8px}}
+.shell {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--tower-line, rgba(183,179,174,.18));
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(255,255,255,.015), transparent), var(--tower-panel, #12191e);
+  color: var(--tower-text, #f3f0ea);
+  font-family: Aeonik, Arial, Helvetica, sans-serif;
+}
+
+.heading {
+  min-height: 62px;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--tower-line, rgba(183,179,174,.18));
+}
+
+.heading h2 {
+  margin: 4px 0 2px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -.02em;
+}
+
+.heading p {
+  margin: 0;
+  color: var(--tower-muted, #a9adb0);
+  font-size: 9px;
+}
+
+.eyebrow {
+  color: var(--tower-accent, #d8c4aa);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .14em;
+}
+
+.metrics {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 13px;
+  flex-wrap: wrap;
+  color: var(--tower-muted, #a9adb0);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.metrics span { white-space: nowrap; }
+.metrics strong { color: var(--tower-text, #f3f0ea); font-size: 14px; margin-right: 3px; }
+
+.link {
+  color: var(--tower-text, #f3f0ea);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1px solid var(--tower-accent-2, #a69485);
+}
+
+.error {
+  margin: 10px 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(241,98,89,.42);
+  border-left: 2px solid var(--tower-bad, #f16259);
+  border-radius: 9px;
+  background: rgba(241,98,89,.07);
+  color: var(--tower-bad, #f16259);
+  font-size: 9px;
+}
+
+.empty {
+  padding: 22px;
+  color: var(--tower-muted, #a9adb0);
+  font-size: 9px;
+  text-align: center;
+}
+
+.tableWrap { overflow: auto; }
+.tableWrap table { width: 100%; min-width: 900px; border-collapse: collapse; font-size: 9px; }
+.tableWrap th,
+.tableWrap td { padding: 8px 10px; border-bottom: 1px solid var(--tower-line, rgba(183,179,174,.18)); text-align: left; vertical-align: middle; }
+.tableWrap th {
+  background: var(--tower-panel-2, #161f25);
+  color: var(--tower-muted, #a9adb0);
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.tableWrap tbody tr:hover { background: rgba(166,148,133,.06); }
+.attentionRow { box-shadow: inset 2px 0 0 var(--tower-bad, #f16259); background: rgba(241,98,89,.025); }
+.flag { display: block; margin-top: 3px; color: var(--tower-bad, #f16259); font-size: 7px; font-weight: 700; }
+
+@media (max-width: 700px) {
+  .heading { align-items: flex-start; flex-direction: column; }
+  .metrics { justify-content: flex-start; }
+}
+
+@media print {
+  .shell { border: 1px solid #aaa; }
+  .link { display: none; }
+  .tableWrap { overflow: visible; }
+  .tableWrap table { min-width: 0; font-size: 8px; }
+}
