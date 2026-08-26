@@ -17,7 +17,6 @@ const operationModules = [
   { href: '/ankomst', label: 'Ankomst', detail: 'Registrera faktisk ankomst' },
   { href: '/check', label: 'Incheckning', detail: 'Kontrollera och verifiera' },
   { href: '/nybil', label: 'Ny bil', detail: 'Registrera ny bil' },
-  { href: '/vagnkort', label: 'Vagnkort', detail: 'Fordonsinformation' },
 ];
 
 function ModuleLink({ href, label, detail }: { href: string; label: string; detail: string }) {
@@ -75,6 +74,7 @@ export default function HomePage() {
             </div>
             <div className="home-module-list">
               {operationModules.map((item) => <ModuleLink key={item.href} {...item} />)}
+              <ModuleLink href="/vagnkort" label="Vagnkort" detail="Fordonsinformation" />
             </div>
           </section>
         </div>
