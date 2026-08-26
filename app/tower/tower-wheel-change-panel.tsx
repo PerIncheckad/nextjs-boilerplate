@@ -15,6 +15,7 @@ type WheelChange = {
   location: string | null;
   note: string | null;
   updated_at: string;
+  overdue: boolean;
 };
 
 const statusLabel = (status: WheelStatus) => ({
@@ -54,7 +55,7 @@ export default function TowerWheelChangePanel() {
 
   const open = useMemo(() => items.filter((item) => item.status !== 'KLAR'), [items]);
   const deviations = open.filter((item) => item.status === 'AVVIKELSE').length;
-  const overdue = open.filter((item) => item.booked_for && Date.parse(item.booked_for) < Date.now() && item.status !== 'PAGAENDE').length;
+  const overdue = open.filter((item) => item.overdue).length;
 
   return (
     <section className={styles.shell} aria-label="Hjulskifte översikt">
@@ -77,19 +78,16 @@ export default function TowerWheelChangePanel() {
         <div className={styles.tableWrap}>
           <table>
             <thead><tr><th>Bil</th><th>Status</th><th>Bokad tid</th><th>Leverantör</th><th>Plats</th><th>Kommentar</th></tr></thead>
-            <tbody>{open.map((item) => {
-              const isOverdue = Boolean(item.booked_for && Date.parse(item.booked_for) < Date.now() && item.status !== 'PAGAENDE');
-              return (
-                <tr key={item.wheel_change_id} className={item.status === 'AVVIKELSE' || isOverdue ? styles.attentionRow : undefined}>
-                  <td><strong>{item.regnr}</strong></td>
-                  <td><strong>{statusLabel(item.status)}</strong>{isOverdue ? <span className={styles.flag}>Passerad bokning</span> : null}</td>
-                  <td>{dateLabel(item.booked_for)}</td>
-                  <td>{item.supplier ?? '—'}</td>
-                  <td>{item.location ?? '—'}</td>
-                  <td>{item.note ?? '—'}</td>
-                </tr>
-              );
-            })}</tbody>
+            <tbody>{open.map((item) => (
+              <tr key={item.wheel_change_id} className={item.status === 'AVVIKELSE' || item.overdue ? styles.attentionRow : undefined}>
+                <td><strong>{item.regnr}</strong></td>
+                <td><strong>{statusLabel(item.status)}</strong>{item.overdue ? <span className={styles.flag}>Passerad bokning</span> : null}</td>
+                <td>{dateLabel(item.booked_for)}</td>
+                <td>{item.supplier ?? '—'}</td>
+                <td>{item.location ?? '—'}</td>
+                <td>{item.note ?? '—'}</td>
+              </tr>
+            ))}</tbody>
           </table>
         </div>
       )}
