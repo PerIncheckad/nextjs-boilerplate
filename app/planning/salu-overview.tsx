@@ -34,7 +34,8 @@ type DecisionRow = {
   model_snapshot: string | null;
   station_code_snapshot: string | null;
 };
-type DecisionPayload = { data?: DecisionRow[]; storageReady?: boolean; error?: string };
+type DecisionReadPayload = { data?: DecisionRow[]; storageReady?: boolean; error?: string };
+type DecisionWritePayload = { data?: DecisionRow; storageReady?: boolean; error?: string };
 
 function currentPeriod() { return new Date().toISOString().slice(0, 7); }
 
@@ -65,7 +66,7 @@ export default function SaluOverview() {
           return;
         }
         const decisionResponse = await fetch(`/api/planning/replacement-decisions?regnrs=${encodeURIComponent(regnrs.join(','))}`, { cache: 'no-store' });
-        const decisionBody = await decisionResponse.json() as DecisionPayload;
+        const decisionBody = await decisionResponse.json() as DecisionReadPayload;
         if (!decisionResponse.ok) throw new Error(decisionBody.error ?? 'Kunde inte läsa ersättningsbeslut');
         if (!active) return;
         setDecisionStorageReady(decisionBody.storageReady ?? true);
@@ -113,10 +114,11 @@ export default function SaluOverview() {
           stationCode: item.stationCode,
         }),
       });
-      const body = await response.json() as DecisionPayload;
+      const body = await response.json() as DecisionWritePayload;
       if (!response.ok || !body.data) throw new Error(body.error ?? 'Kunde inte spara ersättningsbeslut');
       setDecisionStorageReady(body.storageReady ?? true);
-      setDecisions((current) => ({ ...current, [item.regnr]: body.data! }));
+      const savedDecision = body.data;
+      setDecisions((current) => ({ ...current, [item.regnr]: savedDecision }));
       setDecisionNotice(nextStatus === 'REPLACE' ? `${item.regnr}: ERSÄTT är beslutat.` : `${item.regnr}: ersättningsbeslut borttaget.`);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Kunde inte spara ersättningsbeslut');
