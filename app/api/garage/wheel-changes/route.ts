@@ -71,10 +71,21 @@ export async function GET(request: Request) {
     if (itemsRes.error) throw itemsRes.error;
     if (wheelRes.error) throw wheelRes.error;
 
+    const now = Date.now();
+    const wheelChanges = (wheelRes.data ?? []).map((item) => ({
+      ...item,
+      overdue: Boolean(
+        item.booked_for
+        && Date.parse(item.booked_for) < now
+        && item.status !== 'PAGAENDE'
+        && item.status !== 'KLAR'
+      ),
+    }));
+
     return NextResponse.json({
       data: {
         garageItems: itemsRes.data ?? [],
-        wheelChanges: wheelRes.data ?? [],
+        wheelChanges,
       },
     });
   } catch (error) {
@@ -138,14 +149,17 @@ export async function PATCH(request: Request) {
 
   const wheelChangeId = cleanUuid(body.wheel_change_id ?? body.wheelChangeId);
   const status = cleanStatus(body.status);
-  const bookedFor = cleanTimestamp(body.booked_for ?? body.bookedFor);
+  const rawBookedFor = body.booked_for ?? body.bookedFor;
+  const bookedFor = cleanTimestamp(rawBookedFor);
   const supplier = cleanText(body.supplier, 200);
   const location = cleanText(body.location, 200);
   const note = cleanText(body.note, 1000);
 
   if (!wheelChangeId) return NextResponse.json({ error: 'Ogiltigt hjulskifte' }, { status: 400 });
   if (!status) return NextResponse.json({ error: 'Ogiltig status' }, { status: 400 });
-  if ((body.booked_for || body.bookedFor) && !bookedFor) return NextResponse.json({ error: 'Ogiltigt bokningsdatum' }, { status: 400 });
+  if (rawBookedFor !== null && rawBookedFor !== undefined && rawBookedFor !== '' && !bookedFor) {
+    return NextResponse.json({ error: 'Ogiltigt bokningsdatum' }, { status: 400 });
+  }
 
   let admin: ReturnType<typeof createAdminClient>;
   try {
