@@ -18,16 +18,24 @@ type PlanningStation = { station_code: string; display_name: string | null; sort
 type PlanningModel = { model_code: string; display_name: string; sort_order: number };
 type ApiCell = Counts & { planning_cell_id: string; period_code: string; model: string; station: string; note: string | null; updated_at: string };
 type ModelRow = { key: string; model: string; note: string; stations: Record<string, Counts>; dirty: boolean };
-type DraftEnvelope = { version: 2; savedAt: string; rows: ModelRow[] };
+type DraftEnvelope = { version: 1 | 2; savedAt: string; rows: ModelRow[] };
 
 const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 0, minskning_count: 0, ordered_count: 0 });
 const defaultPeriod = () => new Date().toISOString().slice(0, 7);
-const draftKey = (period: string) => `incheckad-planning-v2-draft:${period}`;
+const draftKey = (period: string) => `incheckad-planning-draft:${period}`;
 const normalizedCount = (raw: string) => Math.max(0, Number.parseInt(raw.trim() || '0', 10) || 0);
 
-function pivot(cells: ApiCell[], stations: PlanningStation[]): ModelRow[] {
+function pivot(cells: ApiCell[], stations: PlanningStation[], models: PlanningModel[]): ModelRow[] {
   const stationTemplate = () => Object.fromEntries(stations.map((station) => [station.station_code, emptyCounts()]));
   const map = new Map<string, ModelRow>();
+
+  for (const model of [...models].sort((a, b) => a.sort_order - b.sort_order || a.display_name.localeCompare(b.display_name, 'sv'))) {
+    const displayName = model.display_name.trim();
+    if (!displayName) continue;
+    const key = displayName.toUpperCase();
+    if (!map.has(key)) map.set(key, { key, model: displayName, note: '', dirty: false, stations: stationTemplate() });
+  }
+
   for (const cell of cells) {
     const key = cell.model.trim().toUpperCase();
     if (!map.has(key)) map.set(key, { key, model: cell.model, note: cell.note ?? '', dirty: false, stations: stationTemplate() });
@@ -56,8 +64,9 @@ function restoreDraft(period: string, serverRows: ModelRow[], stations: Planning
     const raw = window.localStorage.getItem(draftKey(period));
     if (!raw) return { rows: serverRows, restored: 0 };
     const parsed = JSON.parse(raw) as Partial<DraftEnvelope>;
-    if (parsed.version !== 2 || !Array.isArray(parsed.rows)) return { rows: serverRows, restored: 0 };
+    if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.rows)) return { rows: serverRows, restored: 0 };
     const rows = [...serverRows];
+    let restored = 0;
     for (const candidate of parsed.rows) {
       if (!candidate?.key || !candidate.model) continue;
       const draftRow: ModelRow = {
@@ -69,8 +78,9 @@ function restoreDraft(period: string, serverRows: ModelRow[], stations: Planning
       };
       const index = rows.findIndex((row) => row.key === draftRow.key);
       if (index >= 0) rows[index] = draftRow; else rows.push(draftRow);
+      restored += 1;
     }
-    return { rows, restored: parsed.rows.length };
+    return { rows, restored };
   } catch { return { rows: serverRows, restored: 0 }; }
 }
 
@@ -98,10 +108,11 @@ export default function FleetPlanningClient() {
 
   const applyPayload = useCallback((payload: { data?: ApiCell[]; stations?: PlanningStation[]; models?: PlanningModel[] }, nextPeriod: string, recover = true) => {
     const nextStations = payload.stations ?? [];
-    const serverRows = pivot(payload.data ?? [], nextStations);
+    const nextModels = payload.models ?? [];
+    const serverRows = pivot(payload.data ?? [], nextStations, nextModels);
     const restored = recover ? restoreDraft(nextPeriod, serverRows, nextStations) : { rows: serverRows, restored: 0 };
     setStations(nextStations);
-    setModels(payload.models ?? []);
+    setModels(nextModels);
     setRows(restored.rows);
     setPeriod(nextPeriod);
     setPeriodInput(nextPeriod);
@@ -119,7 +130,23 @@ export default function FleetPlanningClient() {
     finally { setLoading(false); }
   }, [applyPayload]);
 
-  useEffect(() => { void load(initialPeriod); }, [initialPeriod, load]);
+  useEffect(() => {
+    let active = true;
+    void fetch(`/api/fleet-planning?period=${encodeURIComponent(initialPeriod)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa planeringen');
+        return payload;
+      })
+      .then((payload) => {
+        if (!active) return;
+        applyPayload(payload, initialPeriod);
+        setError(null);
+      })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa planeringen'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [applyPayload, initialPeriod]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
