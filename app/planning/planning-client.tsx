@@ -27,6 +27,7 @@ const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 
 const defaultPeriod = () => new Date().toISOString().slice(0, 7);
 const draftKey = (period: string) => `incheckad-planning-draft:${period}`;
 const normalizedCount = (raw: string) => Math.max(0, Number.parseInt(raw.trim() || '0', 10) || 0);
+const planningModelKey = (value: string) => value.toUpperCase().replace(/[^A-Z0-9ÅÄÖ+]/g, '');
 
 function pivot(cells: ApiCell[], stations: PlanningStation[], models: PlanningModel[]): ModelRow[] {
   const stationTemplate = () => Object.fromEntries(stations.map((station) => [station.station_code, emptyCounts()]));
@@ -88,13 +89,13 @@ function restoreDraft(period: string, serverRows: ModelRow[], stations: Planning
 }
 
 function mergeSaluModels(payload: PlanningPayload, saluModels: SaluModel[]): PlanningPayload {
-  const existing = new Set((payload.models ?? []).map((model) => model.display_name.trim().toUpperCase()));
+  const existing = new Set((payload.models ?? []).map((model) => planningModelKey(model.display_name)));
   const additions: PlanningModel[] = [];
   for (const model of saluModels) {
     const label = model.label?.trim();
     if (!label || label.toLocaleLowerCase('sv') === 'modell saknas') continue;
-    const key = label.toUpperCase();
-    if (existing.has(key)) continue;
+    const key = planningModelKey(label);
+    if (!key || existing.has(key)) continue;
     existing.add(key);
     additions.push({ model_code: `SALU:${model.key}`, display_name: label, sort_order: 10000 + additions.length });
   }
@@ -159,7 +160,6 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     void fetchPlanningBundle(selectedPeriod)
       .then((payload) => {
         if (!active) return;
