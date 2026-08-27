@@ -36,11 +36,7 @@ type DecisionRow = {
 };
 type DecisionReadPayload = { data?: DecisionRow[]; storageReady?: boolean; error?: string };
 type DecisionWritePayload = { data?: DecisionRow; storageReady?: boolean; error?: string };
-
-type Props = {
-  period: string;
-  onPeriodChange: (period: string) => void;
-};
+type Props = { period: string; onPeriodChange: (period: string) => void };
 
 function currentPeriod() { return new Date().toISOString().slice(0, 7); }
 
@@ -56,27 +52,20 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
-    setData(null);
-    setSelectedModel(null);
-    setDecisions({});
-    setDecisionStorageReady(null);
-    setDecisionNotice(null);
-
     void fetch(`/api/planning/salu-overview?period=${encodeURIComponent(period)}`, { cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json();
         if (!response.ok) throw new Error(body?.error ?? 'Kunde inte läsa SALU-översikten');
         if (!active) return;
         const nextData = body.data as Payload;
+        setError(null);
+        setSelectedModel(null);
+        setDecisionNotice(null);
+        setDecisions({});
+        setDecisionStorageReady(null);
         setData(nextData);
         const regnrs = nextData.items.map((item) => item.regnr);
-        if (regnrs.length === 0) {
-          setDecisions({});
-          setDecisionStorageReady(null);
-          return;
-        }
+        if (regnrs.length === 0) return;
         const decisionResponse = await fetch(`/api/planning/replacement-decisions?regnrs=${encodeURIComponent(regnrs.join(','))}`, { cache: 'no-store' });
         const decisionBody = await decisionResponse.json() as DecisionReadPayload;
         if (!decisionResponse.ok) throw new Error(decisionBody.error ?? 'Kunde inte läsa ersättningsbeslut');
@@ -98,6 +87,8 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
     () => Object.values(decisions).filter((decision) => decision.decision_status === 'REPLACE').length,
     [decisions],
   );
+
+  const periodChanging = data?.period !== period && !error;
 
   const changePeriod = (nextPeriod: string) => {
     onPeriodChange(nextPeriod || currentPeriod());
@@ -146,7 +137,7 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
       {error ? <div className={styles.error}>{error}</div> : null}
       {decisionNotice ? <div className={styles.notice}>{decisionNotice}</div> : null}
       {decisionStorageReady === false ? <div className={styles.storageWarning}>ERSÄTT är färdigbyggt i grenen men väntar på databasaktivering. Inget beslut kan sparas förrän den lagringen är godkänd.</div> : null}
-      {loading ? <div className={styles.loading}>Läser kommande SALU…</div> : data ? (
+      {loading || periodChanging ? <div className={styles.loading}>Läser kommande SALU…</div> : data ? (
         <>
           <div className={styles.horizonGrid}>
             {data.months.map((month) => (
