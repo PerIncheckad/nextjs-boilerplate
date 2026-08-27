@@ -14,7 +14,6 @@ const modules = [
   { href: '/ankomst', label: 'Ankomst', detail: 'Registrera faktisk ankomst', index: '04' },
   { href: '/check', label: 'Incheckning', detail: 'Kontrollera och verifiera', index: '05' },
   { href: '/nybil', label: 'Ny bil', detail: 'Registrera och verifiera ny bil', index: '06' },
-  { href: '/vagnkort', label: 'Vagnkort', detail: 'Fordonsinformation och historik', index: '07' },
 ];
 
 export default function HomePage() {
@@ -72,6 +71,15 @@ export default function HomePage() {
                 <span className={styles.arrow} aria-hidden="true">→</span>
               </Link>
             ))}
+
+            <Link href="/vagnkort" className={styles.moduleCard}>
+              <span className={styles.index}>07</span>
+              <div>
+                <strong>Vagnkort</strong>
+                <small>Fordonsinformation och historik</small>
+              </div>
+              <span className={styles.arrow} aria-hidden="true">→</span>
+            </Link>
           </div>
         </section>
       </section>
