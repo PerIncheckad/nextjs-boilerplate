@@ -19,5 +19,6 @@ test('Planering v2 has one shared planning month for SALU and decision matrix', 
 
 test('changing shared month reloads both read support and planning cells', () => {
   assert.match(salu, /salu-overview\?period=\$\{encodeURIComponent\(period\)\}/);
-  assert.match(matrix, /fleet-planning\?period=\$\{encodeURIComponent\(selectedPeriod\)\}/);
+  assert.match(matrix, /fleet-planning\?period=\$\{encodeURIComponent\(nextPeriod\)\}/);
+  assert.match(matrix, /fetchPlanningBundle\(selectedPeriod\)/);
 });
