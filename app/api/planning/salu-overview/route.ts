@@ -17,6 +17,7 @@ type CheckinRow = {
   station: string | null;
   completed_at: string | null;
 };
+type PlanningOrderRow = { period_code: string; model: string; ordered_count: number | null };
 
 type SaluItem = {
   regnr: string;
@@ -29,6 +30,16 @@ type SaluItem = {
   stationCode: string | null;
   stationName: string | null;
   city: string | null;
+};
+
+type SaluModelSummary = {
+  key: string;
+  label: string;
+  monthCounts: number[];
+  orderedMonthCounts: number[];
+  stationCounts: Record<string, number>;
+  total: number;
+  orderedTotal: number;
 };
 
 function adminClient() {
@@ -70,6 +81,10 @@ function modelKey(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9ÅÄÖ+]/g, '') || 'MODELL_SAKNAS';
 }
 
+function monthIndexFor(period: string, start: Date): number {
+  return (Number(period.slice(0, 4)) - start.getUTCFullYear()) * 12 + Number(period.slice(5, 7)) - (start.getUTCMonth() + 1);
+}
+
 function mainStationCode(city: string | null, activeStations: Set<string>): string | null {
   if (!city) return null;
   const match = HUVUDSTATIONER.find((station) => station.name.toLocaleLowerCase('sv') === city.toLocaleLowerCase('sv'));
@@ -91,7 +106,7 @@ export async function GET(request: Request) {
   const endInclusive = new Date(endExclusive.getTime() - 24 * 60 * 60 * 1000);
   const admin = adminClient();
 
-  const [statesResult, stationsResult] = await Promise.all([
+  const [statesResult, stationsResult, ordersResult] = await Promise.all([
     admin.from('salu_vehicle_state')
       .select('regnr,current_saludatum')
       .gte('current_saludatum', isoDate(start))
@@ -101,6 +116,10 @@ export async function GET(request: Request) {
       .select('station_code,display_name,sort_order')
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
+    admin.from('fleet_planning_cells')
+      .select('period_code,model,ordered_count')
+      .gte('period_code', period)
+      .lt('period_code', periodCode(endExclusive)),
   ]);
 
   if (statesResult.error) {
@@ -111,8 +130,13 @@ export async function GET(request: Request) {
     console.error('[planning salu overview] station lookup failed', stationsResult.error);
     return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 });
   }
+  if (ordersResult.error) {
+    console.error('[planning salu overview] BESTÄLLT lookup failed', ordersResult.error);
+    return NextResponse.json({ error: 'Kunde inte läsa BESTÄLLT för SALU-översikten' }, { status: 500 });
+  }
 
   const states = (statesResult.data ?? []) as SaluState[];
+  const orderRows = (ordersResult.data ?? []) as PlanningOrderRow[];
   const regnrs = [...new Set(states.map((row) => String(row.regnr).toUpperCase()))];
   const activeStations = new Set((stationsResult.data ?? []).map((row) => String(row.station_code)));
 
@@ -157,9 +181,7 @@ export async function GET(request: Request) {
     const city = clean(checkin?.current_city) ?? clean(checkin?.city);
     const stationCode = mainStationCode(city, activeStations);
     const month = state.current_saludatum.slice(0, 7);
-    const monthIndex = Math.max(0, Math.min(HORIZON_MONTHS - 1,
-      (Number(month.slice(0, 4)) - start.getUTCFullYear()) * 12 + Number(month.slice(5, 7)) - (start.getUTCMonth() + 1),
-    ));
+    const monthIndex = Math.max(0, Math.min(HORIZON_MONTHS - 1, monthIndexFor(month, start)));
 
     return {
       regnr,
@@ -175,21 +197,18 @@ export async function GET(request: Request) {
     };
   });
 
-  const monthRows = Array.from({ length: HORIZON_MONTHS }, (_, index) => {
-    const month = periodCode(addMonths(start, index));
-    const count = items.filter((item) => item.period === month).length;
-    const cumulativeCount = items.filter((item) => item.monthIndex <= index).length;
-    return { index, period: month, label: monthLabel(month), count, cumulativeCount };
-  });
+  const orderedByMonth = Array(HORIZON_MONTHS).fill(0) as number[];
+  const modelMap = new Map<string, SaluModelSummary>();
 
-  const modelMap = new Map<string, { key: string; label: string; monthCounts: number[]; stationCounts: Record<string, number>; total: number }>();
   for (const item of items) {
     const current = modelMap.get(item.modelKey) ?? {
       key: item.modelKey,
       label: item.model,
       monthCounts: Array(HORIZON_MONTHS).fill(0),
+      orderedMonthCounts: Array(HORIZON_MONTHS).fill(0),
       stationCounts: {} as Record<string, number>,
       total: 0,
+      orderedTotal: 0,
     };
     current.monthCounts[item.monthIndex] += 1;
     current.total += 1;
@@ -198,7 +217,37 @@ export async function GET(request: Request) {
     modelMap.set(item.modelKey, current);
   }
 
-  const models = [...modelMap.values()].sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, 'sv'));
+  for (const row of orderRows) {
+    const rowPeriod = clean(row.period_code);
+    const rawModel = clean(row.model);
+    const quantity = Number(row.ordered_count ?? 0);
+    if (!rowPeriod || !rawModel || !Number.isFinite(quantity) || quantity <= 0) continue;
+    const index = monthIndexFor(rowPeriod, start);
+    if (index < 0 || index >= HORIZON_MONTHS) continue;
+    orderedByMonth[index] += quantity;
+    const key = modelKey(rawModel);
+    const current = modelMap.get(key) ?? {
+      key,
+      label: rawModel,
+      monthCounts: Array(HORIZON_MONTHS).fill(0),
+      orderedMonthCounts: Array(HORIZON_MONTHS).fill(0),
+      stationCounts: {} as Record<string, number>,
+      total: 0,
+      orderedTotal: 0,
+    };
+    current.orderedMonthCounts[index] += quantity;
+    current.orderedTotal += quantity;
+    modelMap.set(key, current);
+  }
+
+  const monthRows = Array.from({ length: HORIZON_MONTHS }, (_, index) => {
+    const month = periodCode(addMonths(start, index));
+    const count = items.filter((item) => item.period === month).length;
+    const cumulativeCount = items.filter((item) => item.monthIndex <= index).length;
+    return { index, period: month, label: monthLabel(month), count, cumulativeCount, orderedCount: orderedByMonth[index] };
+  });
+
+  const models = [...modelMap.values()].sort((a, b) => b.total - a.total || b.orderedTotal - a.orderedTotal || a.label.localeCompare(b.label, 'sv'));
   const stationTotals: Record<string, number> = {};
   for (const item of items) {
     const station = item.stationCode ?? 'EJ_FASTSTALLD';
@@ -211,6 +260,7 @@ export async function GET(request: Request) {
       horizonMonths: HORIZON_MONTHS,
       months: monthRows,
       total: items.length,
+      orderedTotal: orderedByMonth.reduce((sum, value) => sum + value, 0),
       stationTotals,
       planningStations: stationsResult.data ?? [],
       models,
