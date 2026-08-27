@@ -105,6 +105,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const totalForRow = (row: ModelRow) => stations.reduce((sum, station) => sum + (row.stations[station.station_code] ?? emptyCounts())[metric], 0);
   const stationTotals = useMemo(() => Object.fromEntries(stations.map((station) => [station.station_code, rows.reduce((sum, row) => sum + (row.stations[station.station_code] ?? emptyCounts())[metric], 0)])), [metric, rows, stations]);
   const grandTotal = useMemo(() => Object.values(stationTotals).reduce((sum, value) => sum + value, 0), [stationTotals]);
+  const periodChanging = period !== selectedPeriod && !error;
 
   const applyPayload = useCallback((payload: { data?: ApiCell[]; stations?: PlanningStation[]; models?: PlanningModel[] }, nextPeriod: string, recover = true) => {
     const nextStations = payload.stations ?? [];
@@ -132,9 +133,6 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
-    setStatus(null);
     void fetch(`/api/fleet-planning?period=${encodeURIComponent(selectedPeriod)}`, { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json();
@@ -145,6 +143,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
         if (!active) return;
         applyPayload(payload, selectedPeriod);
         setError(null);
+        setStatus(null);
       })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa planeringen'); })
       .finally(() => { if (active) setLoading(false); });
@@ -261,7 +260,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
 
       <section className={styles.gridSection}>
         <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>Modell | stationer | totalt</span></div><strong>{dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{rows.length} modeller</strong></div>
-        {loading ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
+        {loading || periodChanging ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
           <div className={styles.tableWrap}><table className={styles.simplePlanningTable}>
             <thead><tr><th className={styles.modelColumn}>Modell</th>{stations.map((station) => <th key={station.station_code}>{station.station_code}<small>{station.display_name && station.display_name !== station.station_code ? station.display_name : ''}</small></th>)}<th>Totalt</th><th className={styles.noteColumn}>Kommentar</th><th className={styles.actionColumn}>Spara</th></tr></thead>
             <tbody>
