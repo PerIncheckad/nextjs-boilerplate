@@ -19,12 +19,15 @@ type PlanningModel = { model_code: string; display_name: string; sort_order: num
 type ApiCell = Counts & { planning_cell_id: string; period_code: string; model: string; station: string; note: string | null; updated_at: string };
 type ModelRow = { key: string; model: string; note: string; stations: Record<string, Counts>; dirty: boolean };
 type DraftEnvelope = { version: 1 | 2; savedAt: string; rows: ModelRow[] };
+type PlanningPayload = { data?: ApiCell[]; stations?: PlanningStation[]; models?: PlanningModel[] };
+type SaluModel = { key: string; label: string };
 type Props = { selectedPeriod: string; onPeriodChange: (period: string) => void };
 
 const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 0, minskning_count: 0, ordered_count: 0 });
 const defaultPeriod = () => new Date().toISOString().slice(0, 7);
 const draftKey = (period: string) => `incheckad-planning-draft:${period}`;
 const normalizedCount = (raw: string) => Math.max(0, Number.parseInt(raw.trim() || '0', 10) || 0);
+const planningModelKey = (value: string) => value.toUpperCase().replace(/[^A-Z0-9ÅÄÖ+]/g, '');
 
 function pivot(cells: ApiCell[], stations: PlanningStation[], models: PlanningModel[]): ModelRow[] {
   const stationTemplate = () => Object.fromEntries(stations.map((station) => [station.station_code, emptyCounts()]));
@@ -85,6 +88,32 @@ function restoreDraft(period: string, serverRows: ModelRow[], stations: Planning
   } catch { return { rows: serverRows, restored: 0 }; }
 }
 
+function mergeSaluModels(payload: PlanningPayload, saluModels: SaluModel[]): PlanningPayload {
+  const existing = new Set((payload.models ?? []).map((model) => planningModelKey(model.display_name)));
+  const additions: PlanningModel[] = [];
+  for (const model of saluModels) {
+    const label = model.label?.trim();
+    if (!label || label.toLocaleLowerCase('sv') === 'modell saknas') continue;
+    const key = planningModelKey(label);
+    if (!key || existing.has(key)) continue;
+    existing.add(key);
+    additions.push({ model_code: `SALU:${model.key}`, display_name: label, sort_order: 10000 + additions.length });
+  }
+  return { ...payload, models: [...(payload.models ?? []), ...additions] };
+}
+
+async function fetchPlanningBundle(nextPeriod: string): Promise<PlanningPayload> {
+  const [planningResponse, saluResponse] = await Promise.all([
+    fetch(`/api/fleet-planning?period=${encodeURIComponent(nextPeriod)}`, { cache: 'no-store' }),
+    fetch(`/api/planning/salu-overview?period=${encodeURIComponent(nextPeriod)}`, { cache: 'no-store' }),
+  ]);
+  const payload = await planningResponse.json() as PlanningPayload & { error?: string };
+  if (!planningResponse.ok) throw new Error(payload.error ?? 'Kunde inte läsa planeringen');
+  if (!saluResponse.ok) return payload;
+  const saluBody = await saluResponse.json() as { data?: { models?: SaluModel[] } };
+  return mergeSaluModels(payload, saluBody.data?.models ?? []);
+}
+
 export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: Props) {
   const [period, setPeriod] = useState(selectedPeriod);
   const [periodInput, setPeriodInput] = useState(selectedPeriod);
@@ -107,7 +136,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const grandTotal = useMemo(() => Object.values(stationTotals).reduce((sum, value) => sum + value, 0), [stationTotals]);
   const periodChanging = period !== selectedPeriod && !error;
 
-  const applyPayload = useCallback((payload: { data?: ApiCell[]; stations?: PlanningStation[]; models?: PlanningModel[] }, nextPeriod: string, recover = true) => {
+  const applyPayload = useCallback((payload: PlanningPayload, nextPeriod: string, recover = true) => {
     const nextStations = payload.stations ?? [];
     const nextModels = payload.models ?? [];
     const serverRows = pivot(payload.data ?? [], nextStations, nextModels);
@@ -123,9 +152,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const load = useCallback(async (nextPeriod: string, recover = true) => {
     setLoading(true); setError(null); setStatus(null);
     try {
-      const response = await fetch(`/api/fleet-planning?period=${encodeURIComponent(nextPeriod)}`, { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa planeringen');
+      const payload = await fetchPlanningBundle(nextPeriod);
       applyPayload(payload, nextPeriod, recover);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Kunde inte läsa planeringen'); }
     finally { setLoading(false); }
@@ -133,12 +160,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
 
   useEffect(() => {
     let active = true;
-    void fetch(`/api/fleet-planning?period=${encodeURIComponent(selectedPeriod)}`, { cache: 'no-store' })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa planeringen');
-        return payload;
-      })
+    void fetchPlanningBundle(selectedPeriod)
       .then((payload) => {
         if (!active) return;
         applyPayload(payload, selectedPeriod);
@@ -249,8 +271,9 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
         <div className={styles.decisionTabs} role="tablist" aria-label="Planeringsbeslut">
           {DECISIONS.map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={metric === key} className={metric === key ? styles.decisionTabActive : styles.decisionTab} onClick={() => setMetric(key)}>{label}</button>)}
         </div>
+        <button type="button" className={styles.primaryButton} onClick={() => setMetric('ordered_count')}>Beställ</button>
         <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button>
-        <div className={styles.sheetHint}>{models.length} modeller · Enter = nästa cell</div>
+        <div className={styles.sheetHint}>{models.length} modeller · register + aktuell SALU · Enter = nästa cell</div>
         <div className={styles.periodStatus}><span>Aktiv månad</span><strong>{period}</strong></div>
       </section>
 
@@ -259,7 +282,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
       {error ? <div className={styles.error}>{error}</div> : null}
 
       <section className={styles.gridSection}>
-        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>Modell | stationer | totalt</span></div><strong>{dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{rows.length} modeller</strong></div>
+        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>{metric === 'ordered_count' ? 'Lägg in beställningen per modell och station' : 'Modell | stationer | totalt'}</span></div><strong>{dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{rows.length} modeller</strong></div>
         {loading || periodChanging ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
           <div className={styles.tableWrap}><table className={styles.simplePlanningTable}>
             <thead><tr><th className={styles.modelColumn}>Modell</th>{stations.map((station) => <th key={station.station_code}>{station.station_code}<small>{station.display_name && station.display_name !== station.station_code ? station.display_name : ''}</small></th>)}<th>Totalt</th><th className={styles.noteColumn}>Kommentar</th><th className={styles.actionColumn}>Spara</th></tr></thead>
