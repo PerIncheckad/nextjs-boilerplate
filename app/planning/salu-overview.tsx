@@ -55,13 +55,16 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
   const [dataWidth, setDataWidth] = useState(86);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as { modelWidth?: number; dataWidth?: number };
-      if (typeof saved.modelWidth === 'number') setModelWidth(Math.min(360, Math.max(130, saved.modelWidth)));
-      if (typeof saved.dataWidth === 'number') setDataWidth(Math.min(150, Math.max(58, saved.dataWidth)));
-    } catch { /* keep defaults */ }
+    const timer = window.setTimeout(() => {
+      try {
+        const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw) as { modelWidth?: number; dataWidth?: number };
+        if (typeof saved.modelWidth === 'number') setModelWidth(Math.min(360, Math.max(130, saved.modelWidth)));
+        if (typeof saved.dataWidth === 'number') setDataWidth(Math.min(150, Math.max(58, saved.dataWidth)));
+      } catch { /* keep defaults */ }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -70,7 +73,6 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
     void fetch(`/api/planning/salu-overview?period=${encodeURIComponent(period)}`, { cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json();
