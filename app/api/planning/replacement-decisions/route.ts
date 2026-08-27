@@ -16,6 +16,8 @@ type DecisionRow = {
   updated_by: string;
 };
 
+type SupabaseErrorLike = { code?: string | null } | null;
+
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -33,6 +35,16 @@ function normalizeRegnr(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const next = value.trim().toUpperCase().replace(/\s+/g, '');
   return REGNR_RE.test(next) ? next : null;
+}
+
+function normalizeDate(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match?.[1] ?? null;
+}
+
+function isMissingDecisionStorage(error: SupabaseErrorLike): boolean {
+  return error?.code === '42P01' || error?.code === 'PGRST205';
 }
 
 export async function GET(request: Request) {
@@ -54,7 +66,7 @@ export async function GET(request: Request) {
     .in('regnr', regnrs);
 
   if (error) {
-    if (error.code === '42P01') return NextResponse.json({ data: [], storageReady: false });
+    if (isMissingDecisionStorage(error)) return NextResponse.json({ data: [], storageReady: false });
     console.error('[replacement decisions] read failed', error);
     return NextResponse.json({ error: 'Kunde inte läsa ersättningsbeslut' }, { status: 500 });
   }
@@ -74,7 +86,7 @@ export async function PUT(request: Request) {
   const source = body as Record<string, unknown>;
   const regnr = normalizeRegnr(source.regnr);
   const status = source.decisionStatus === 'REPLACE' || source.decisionStatus === 'CANCELLED' ? source.decisionStatus : null;
-  const saluDate = typeof source.saluDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(source.saluDate) ? source.saluDate : null;
+  const saluDate = normalizeDate(source.saluDate);
   if (!regnr || !status || !saluDate) return NextResponse.json({ error: 'regnr, beslut och SALU-datum krävs' }, { status: 400 });
 
   const admin = adminClient();
@@ -88,13 +100,22 @@ export async function PUT(request: Request) {
     console.error('[replacement decisions] SALU validation failed', saluError);
     return NextResponse.json({ error: 'Kunde inte verifiera SALU-bilen' }, { status: 500 });
   }
-  if (!saluState?.current_saludatum) return NextResponse.json({ error: 'Bilen saknar verifierad SALU-status' }, { status: 409 });
+
+  const currentSaluDate = normalizeDate(saluState?.current_saludatum);
+  if (!currentSaluDate) return NextResponse.json({ error: 'Bilen saknar verifierad SALU-status' }, { status: 409 });
+  if (currentSaluDate !== saluDate) {
+    return NextResponse.json({
+      error: 'SALU-datumet har ändrats. Ladda om beslutsstödet och försök igen.',
+      conflict: 'STALE_SALU_DATE',
+      currentSaluDate,
+    }, { status: 409 });
+  }
 
   const now = new Date().toISOString();
   const payload = {
     regnr,
     decision_status: status,
-    salu_date_at_decision: String(saluState.current_saludatum),
+    salu_date_at_decision: currentSaluDate,
     model_snapshot: clean(source.model),
     station_code_snapshot: clean(source.stationCode),
     decided_at: now,
@@ -110,7 +131,7 @@ export async function PUT(request: Request) {
     .single();
 
   if (error) {
-    if (error.code === '42P01') return NextResponse.json({ error: 'Ersättningsbeslut är ännu inte aktiverat i databasen', storageReady: false }, { status: 503 });
+    if (isMissingDecisionStorage(error)) return NextResponse.json({ error: 'Ersättningsbeslut är ännu inte aktiverat i databasen', storageReady: false }, { status: 503 });
     console.error('[replacement decisions] write failed', error);
     return NextResponse.json({ error: 'Kunde inte spara ersättningsbeslut' }, { status: 500 });
   }
