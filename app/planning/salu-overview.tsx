@@ -37,10 +37,14 @@ type DecisionRow = {
 type DecisionReadPayload = { data?: DecisionRow[]; storageReady?: boolean; error?: string };
 type DecisionWritePayload = { data?: DecisionRow; storageReady?: boolean; error?: string };
 
+type Props = {
+  period: string;
+  onPeriodChange: (period: string) => void;
+};
+
 function currentPeriod() { return new Date().toISOString().slice(0, 7); }
 
-export default function SaluOverview() {
-  const [period, setPeriod] = useState(currentPeriod());
+export default function SaluOverview({ period, onPeriodChange }: Props) {
   const [data, setData] = useState<Payload | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -52,6 +56,14 @@ export default function SaluOverview() {
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError(null);
+    setData(null);
+    setSelectedModel(null);
+    setDecisions({});
+    setDecisionStorageReady(null);
+    setDecisionNotice(null);
+
     void fetch(`/api/planning/salu-overview?period=${encodeURIComponent(period)}`, { cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json();
@@ -88,14 +100,7 @@ export default function SaluOverview() {
   );
 
   const changePeriod = (nextPeriod: string) => {
-    setLoading(true);
-    setError(null);
-    setData(null);
-    setSelectedModel(null);
-    setDecisions({});
-    setDecisionStorageReady(null);
-    setDecisionNotice(null);
-    setPeriod(nextPeriod || currentPeriod());
+    onPeriodChange(nextPeriod || currentPeriod());
   };
 
   const setReplacementDecision = async (item: SaluItem, nextStatus: 'REPLACE' | 'CANCELLED') => {
@@ -135,7 +140,7 @@ export default function SaluOverview() {
           <h2>Kommande SALU — 1 till 4 månader</h2>
           <p>SALU informerar. Den skapar inte BEHOV, UTÖKNING, MINSKNING eller BESTÄLLT.</p>
         </div>
-        <label className={styles.period}><span>Från månad</span><input type="month" value={period} onChange={(event) => changePeriod(event.target.value)} /></label>
+        <label className={styles.period}><span>Planeringsmånad</span><input type="month" value={period} onChange={(event) => changePeriod(event.target.value)} /></label>
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
