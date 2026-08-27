@@ -15,34 +15,38 @@ type HandoffRow = {
   remaining_count: number;
 };
 
+type HandoffResult = { period: string; rows: HandoffRow[]; error: string | null };
 type Props = { period: string };
 
 export default function PlanningGarageHandoff({ period }: Props) {
-  const [rows, setRows] = useState<HandoffRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<HandoffResult | null>(null);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError(null);
 
     void fetch(`/api/garage/planning-sources?period=${encodeURIComponent(period)}`, { cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json() as { data?: HandoffRow[]; error?: string };
         if (!response.ok) throw new Error(body.error ?? 'Kunde inte läsa handslaget mot Garaget');
         if (!active) return;
-        setRows(body.data ?? []);
+        setResult({ period, rows: body.data ?? [], error: null });
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setRows([]);
-        setError(reason instanceof Error ? reason.message : 'Kunde inte läsa handslaget mot Garaget');
-      })
-      .finally(() => { if (active) setLoading(false); });
+        setResult({
+          period,
+          rows: [],
+          error: reason instanceof Error ? reason.message : 'Kunde inte läsa handslaget mot Garaget',
+        });
+      });
 
     return () => { active = false; };
   }, [period]);
+
+  const currentResult = result?.period === period ? result : null;
+  const rows = currentResult?.rows ?? [];
+  const error = currentResult?.error ?? null;
+  const loading = currentResult === null;
 
   const totals = useMemo(() => rows.reduce(
     (sum, row) => ({
