@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import styles from './salu-overview.module.css';
 
-type MonthRow = { index: number; period: string; label: string; count: number; cumulativeCount: number };
-type ModelRow = { key: string; label: string; monthCounts: number[]; stationCounts: Record<string, number>; total: number };
+type MonthRow = { index: number; period: string; label: string; count: number; cumulativeCount: number; orderedCount: number };
+type ModelRow = { key: string; label: string; monthCounts: number[]; orderedMonthCounts: number[]; stationCounts: Record<string, number>; total: number; orderedTotal: number };
 type SaluItem = {
   regnr: string;
   saluDate: string;
@@ -22,6 +22,7 @@ type Payload = {
   horizonMonths: number;
   months: MonthRow[];
   total: number;
+  orderedTotal: number;
   stationTotals: Record<string, number>;
   models: ModelRow[];
   items: SaluItem[];
@@ -38,6 +39,7 @@ type DecisionReadPayload = { data?: DecisionRow[]; storageReady?: boolean; error
 type DecisionWritePayload = { data?: DecisionRow; storageReady?: boolean; error?: string };
 type Props = { period: string; onPeriodChange: (period: string) => void };
 
+const WIDTH_STORAGE_KEY = 'incheckad-planning-salu-column-widths-v1';
 function currentPeriod() { return new Date().toISOString().slice(0, 7); }
 
 export default function SaluOverview({ period, onPeriodChange }: Props) {
@@ -49,9 +51,26 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
   const [decisionStorageReady, setDecisionStorageReady] = useState<boolean | null>(null);
   const [decisionSaving, setDecisionSaving] = useState<string | null>(null);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const [modelWidth, setModelWidth] = useState(190);
+  const [dataWidth, setDataWidth] = useState(86);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(WIDTH_STORAGE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { modelWidth?: number; dataWidth?: number };
+      if (typeof saved.modelWidth === 'number') setModelWidth(Math.min(360, Math.max(130, saved.modelWidth)));
+      if (typeof saved.dataWidth === 'number') setDataWidth(Math.min(150, Math.max(58, saved.dataWidth)));
+    } catch { /* keep defaults */ }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(WIDTH_STORAGE_KEY, JSON.stringify({ modelWidth, dataWidth }));
+  }, [modelWidth, dataWidth]);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     void fetch(`/api/planning/salu-overview?period=${encodeURIComponent(period)}`, { cache: 'no-store' })
       .then(async (response) => {
         const body = await response.json();
@@ -89,6 +108,7 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
   );
 
   const periodChanging = data?.period !== period && !error;
+  const tableStyle = { '--model-width': `${modelWidth}px`, '--data-width': `${dataWidth}px` } as CSSProperties;
 
   const changePeriod = (nextPeriod: string) => {
     onPeriodChange(nextPeriod || currentPeriod());
@@ -129,14 +149,20 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
         <div>
           <div className={styles.eyebrow}>SALU / BESLUTSSTÖD</div>
           <h2>Kommande SALU — 1 till 4 månader</h2>
-          <p>SALU informerar. Den skapar inte BEHOV, UTÖKNING, MINSKNING eller BESTÄLLT.</p>
+          <p>SALU informerar. BESTÄLLT visas bredvid som separat verksamhetsbeslut — ingen automatisk nettning.</p>
         </div>
-        <label className={styles.period}><span>Planeringsmånad</span><input type="month" value={period} onChange={(event) => changePeriod(event.target.value)} /></label>
+        <div className={styles.headerControls}>
+          <div className={styles.columnControls} aria-label="Kolumnbredder">
+            <label><span>Modell</span><input type="range" min={130} max={360} step={10} value={modelWidth} onChange={(event) => setModelWidth(Number(event.target.value))} /></label>
+            <label><span>Data</span><input type="range" min={58} max={150} step={4} value={dataWidth} onChange={(event) => setDataWidth(Number(event.target.value))} /></label>
+          </div>
+          <label className={styles.period}><span>Planeringsmånad</span><input type="month" value={period} onChange={(event) => changePeriod(event.target.value)} /></label>
+        </div>
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
       {decisionNotice ? <div className={styles.notice}>{decisionNotice}</div> : null}
-      {decisionStorageReady === false ? <div className={styles.storageWarning}>ERSÄTT är färdigbyggt i grenen men väntar på databasaktivering. Inget beslut kan sparas förrän den lagringen är godkänd.</div> : null}
+      {decisionStorageReady === false ? <div className={styles.storageWarning}>ERSÄTT kan inte sparas eftersom beslutslagret inte är tillgängligt.</div> : null}
       {loading || periodChanging ? <div className={styles.loading}>Läser kommande SALU…</div> : data ? (
         <>
           <div className={styles.horizonGrid}>
@@ -144,22 +170,22 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
               <article key={month.period} className={styles.horizonCard}>
                 <span>{month.index + 1} MÅN</span>
                 <strong>{month.cumulativeCount}</strong>
-                <small>{month.label} · {month.count} i månaden</small>
+                <small>{month.label} · SALU {month.count} · BESTÄLLT {month.orderedCount}</small>
               </article>
             ))}
-            <article className={styles.horizonCard}><span>HELHET 4 MÅN</span><strong>{data.total}</strong><small>samtliga kommande SALU</small></article>
+            <article className={styles.horizonCard}><span>HELHET 4 MÅN</span><strong>{data.total}</strong><small>SALU {data.total} · BESTÄLLT {data.orderedTotal}</small></article>
             <article className={styles.horizonCard}><span>ERSÄTT BESLUTAT</span><strong>{activeReplacementCount}</strong><small>explicit valda bilar</small></article>
           </div>
 
           <div className={styles.layout}>
             <div className={styles.modelTableWrap}>
-              <table className={styles.table}>
-                <thead><tr><th>Modell</th>{data.months.map((month) => <th key={month.period}>{month.label}</th>)}<th>Totalt</th><th>166</th><th>170</th><th>274</th><th>Ej fastställd</th></tr></thead>
+              <table className={styles.table} style={tableStyle}>
+                <thead><tr><th>Modell</th>{data.months.map((month) => <th key={month.period}>{month.label}<small>SALU / BESTÄLLT</small></th>)}<th>Totalt<small>SALU / BESTÄLLT</small></th><th>166</th><th>170</th><th>274</th><th>Ej fastställd</th></tr></thead>
                 <tbody>
                   {data.models.map((model) => <tr key={model.key} className={selectedModel === model.key ? styles.selected : undefined} onClick={() => setSelectedModel(model.key)}>
                     <td><button type="button" className={styles.modelButton}>{model.label}</button></td>
-                    {model.monthCounts.map((count, index) => <td key={index}>{count}</td>)}
-                    <td><strong>{model.total}</strong></td>
+                    {model.monthCounts.map((count, index) => <td key={index}><div className={styles.pairedValue}><strong>{count}</strong><span>{model.orderedMonthCounts[index] ?? 0}</span></div></td>)}
+                    <td><div className={styles.pairedValue}><strong>{model.total}</strong><span>{model.orderedTotal}</span></div></td>
                     <td>{model.stationCounts['166'] ?? 0}</td><td>{model.stationCounts['170'] ?? 0}</td><td>{model.stationCounts['274'] ?? 0}</td><td>{model.stationCounts.EJ_FASTSTALLD ?? 0}</td>
                   </tr>)}
                 </tbody>
@@ -180,7 +206,7 @@ export default function SaluOverview({ period, onPeriodChange }: Props) {
                     className={active ? styles.replaceActive : styles.replaceButton}
                     disabled={disabled}
                     onClick={() => void setReplacementDecision(item, active ? 'CANCELLED' : 'REPLACE')}
-                    title={decisionStorageReady === false ? 'Databaslagringen är ännu inte aktiverad' : active ? 'Ta bort ersättningsbeslut' : 'Markera bilen för ersättning'}
+                    title={decisionStorageReady === false ? 'Beslutslagret är inte tillgängligt' : active ? 'Ta bort ersättningsbeslut' : 'Markera bilen för ersättning'}
                   >
                     {decisionSaving === item.regnr ? 'SPARAR…' : active ? 'ERSÄTTS ✓' : 'ERSÄTT'}
                   </button>
