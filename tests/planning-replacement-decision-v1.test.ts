@@ -25,9 +25,18 @@ test('replacement storage remains private behind authenticated server API', () =
 test('replacement validates against current SALU but does not mutate SALU', () => {
   assert.match(api, /from\('salu_vehicle_state'\)/);
   assert.match(api, /current_saludatum/);
+  assert.match(api, /currentSaluDate !== saluDate/);
+  assert.match(api, /STALE_SALU_DATE/);
+  assert.match(api, /status: 409/);
   assert.doesNotMatch(api, /from\('salu_vehicle_state'\)[\s\S]{0,300}\.(update|upsert|insert|delete)\(/);
   assert.doesNotMatch(api, /fleet_planning_cells/);
   assert.doesNotMatch(api, /garage_items/);
+});
+
+test('replacement missing storage recognizes both Postgres and PostgREST table-missing errors', () => {
+  assert.match(api, /42P01/);
+  assert.match(api, /PGRST205/);
+  assert.match(api, /isMissingDecisionStorage/);
 });
 
 test('replacement does not automatically create planning quantities', () => {
