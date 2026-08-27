@@ -3,6 +3,7 @@ import CoreProductShell from '@/components/CoreProductShell';
 import GarageClient from './garage-client';
 import GarageV2Panel from './garage-v2-panel';
 import GarageWheelChangePanel from './garage-wheel-change-panel';
+import OrderWorkflowPanel from './order-workflow-panel';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,7 @@ export default function GaragePage() {
       eyebrow="INVISTO CORE / GARAGE CONTROL"
     >
       <GarageV2Panel />
+      <OrderWorkflowPanel />
       <GarageWheelChangePanel />
       <GarageClient />
     </CoreProductShell>
