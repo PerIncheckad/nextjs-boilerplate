@@ -19,6 +19,7 @@ type PlanningModel = { model_code: string; display_name: string; sort_order: num
 type ApiCell = Counts & { planning_cell_id: string; period_code: string; model: string; station: string; note: string | null; updated_at: string };
 type ModelRow = { key: string; model: string; note: string; stations: Record<string, Counts>; dirty: boolean };
 type DraftEnvelope = { version: 1 | 2; savedAt: string; rows: ModelRow[] };
+type Props = { selectedPeriod: string; onPeriodChange: (period: string) => void };
 
 const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 0, minskning_count: 0, ordered_count: 0 });
 const defaultPeriod = () => new Date().toISOString().slice(0, 7);
@@ -84,10 +85,9 @@ function restoreDraft(period: string, serverRows: ModelRow[], stations: Planning
   } catch { return { rows: serverRows, restored: 0 }; }
 }
 
-export default function FleetPlanningClient() {
-  const [initialPeriod] = useState(defaultPeriod);
-  const [period, setPeriod] = useState(initialPeriod);
-  const [periodInput, setPeriodInput] = useState(initialPeriod);
+export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: Props) {
+  const [period, setPeriod] = useState(selectedPeriod);
+  const [periodInput, setPeriodInput] = useState(selectedPeriod);
   const [metric, setMetric] = useState<DecisionMetric>('behov_count');
   const [stations, setStations] = useState<PlanningStation[]>([]);
   const [models, setModels] = useState<PlanningModel[]>([]);
@@ -132,7 +132,10 @@ export default function FleetPlanningClient() {
 
   useEffect(() => {
     let active = true;
-    void fetch(`/api/fleet-planning?period=${encodeURIComponent(initialPeriod)}`, { cache: 'no-store' })
+    setLoading(true);
+    setError(null);
+    setStatus(null);
+    void fetch(`/api/fleet-planning?period=${encodeURIComponent(selectedPeriod)}`, { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa planeringen');
@@ -140,13 +143,13 @@ export default function FleetPlanningClient() {
       })
       .then((payload) => {
         if (!active) return;
-        applyPayload(payload, initialPeriod);
+        applyPayload(payload, selectedPeriod);
         setError(null);
       })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa planeringen'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [applyPayload, initialPeriod]);
+  }, [applyPayload, selectedPeriod]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -217,6 +220,15 @@ export default function FleetPlanningClient() {
     finally { setSavingAll(false); }
   };
 
+  const openPeriod = () => {
+    const nextPeriod = periodInput || defaultPeriod();
+    if (nextPeriod === selectedPeriod) {
+      void load(nextPeriod);
+      return;
+    }
+    onPeriodChange(nextPeriod);
+  };
+
   const moveFocus = (event: KeyboardEvent<HTMLInputElement>, direction: number) => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
@@ -234,7 +246,7 @@ export default function FleetPlanningClient() {
 
       <section className={styles.toolbar}>
         <label className={styles.periodControl}><span>Månad</span><input type="month" value={periodInput} onChange={(event) => setPeriodInput(event.target.value)} /></label>
-        <button type="button" className={styles.secondaryButton} onClick={() => void load(periodInput || defaultPeriod())}>Öppna</button>
+        <button type="button" className={styles.secondaryButton} onClick={openPeriod}>Öppna</button>
         <div className={styles.decisionTabs} role="tablist" aria-label="Planeringsbeslut">
           {DECISIONS.map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={metric === key} className={metric === key ? styles.decisionTabActive : styles.decisionTab} onClick={() => setMetric(key)}>{label}</button>)}
         </div>
