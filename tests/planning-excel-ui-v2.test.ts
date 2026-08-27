@@ -3,24 +3,25 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const planningUi = readFileSync('app/planning/planning-client.tsx', 'utf8');
-const planningCss = readFileSync('app/planning/planning.module.css', 'utf8');
 const planningPage = readFileSync('app/planning/page.tsx', 'utf8');
 
-test('planning UI is a dense spreadsheet workspace rather than documentation panel', () => {
-  assert.match(planningUi, /PLANERINGSMATRIS/);
-  assert.match(planningUi, /klistra in från Excel/);
+test('planning UI is a simple decision matrix rather than the superseded wide spreadsheet', () => {
+  assert.match(planningUi, /const DECISIONS/);
+  assert.match(planningUi, /Modell \| stationer \| totalt/);
+  assert.match(planningUi, /data-planning-cell/);
+  assert.match(planningUi, /stations\.map/);
+  assert.doesNotMatch(planningUi, /data-sheet-cell/);
+  assert.doesNotMatch(planningUi, /pasteSheet/);
+  assert.doesNotMatch(planningUi, /klistra in från Excel/);
   assert.doesNotMatch(planningUi, /Systemgräns/);
-  assert.match(planningCss, /max-height:calc\(100vh - 165px\)/);
-  assert.match(planningCss, /position:sticky;left:0/);
-  assert.match(planningCss, /position:sticky;bottom:0/);
 });
 
-test('planning spreadsheet supports keyboard movement and multi-cell paste', () => {
-  assert.match(planningUi, /data-sheet-cell/);
-  assert.match(planningUi, /moveSheetFocus/);
-  assert.match(planningUi, /pasteSheet/);
-  assert.match(planningUi, /clipboardData\.getData\('text\/plain'\)/);
-  assert.match(planningUi, /split\('\\t'\)/);
+test('planning matrix supports direct keyboard movement while one decision domain is active', () => {
+  assert.match(planningUi, /moveFocus/);
+  assert.match(planningUi, /event\.key !== 'Enter'/);
+  assert.match(planningUi, /querySelectorAll<HTMLInputElement>\('input\[data-planning-cell="true"\]'\)/);
+  assert.match(planningUi, /aria-selected=\{metric === key\}/);
+  for (const label of ['BEHOV', 'UTÖKNING', 'MINSKNING', 'BESTÄLLT']) assert.match(planningUi, new RegExp(label));
 });
 
 test('planning page no longer describes a fixed station set', () => {
