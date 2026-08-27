@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import CoreProductShell from '@/components/CoreProductShell';
-import FleetPlanningClient from './planning-client';
-import SaluOverview from './salu-overview';
+import PlanningWorkspace from './planning-workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +17,7 @@ export default function PlanningPage() {
       descriptor="VAGNPARK / FRAMTIDA INTENT / STATIONER"
       eyebrow="INVISTO CORE / FLEET PLANNING"
     >
-      <SaluOverview />
-      <FleetPlanningClient />
+      <PlanningWorkspace />
     </CoreProductShell>
   );
 }

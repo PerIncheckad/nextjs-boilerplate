@@ -36,11 +36,11 @@ type DecisionRow = {
 };
 type DecisionReadPayload = { data?: DecisionRow[]; storageReady?: boolean; error?: string };
 type DecisionWritePayload = { data?: DecisionRow; storageReady?: boolean; error?: string };
+type Props = { period: string; onPeriodChange: (period: string) => void };
 
 function currentPeriod() { return new Date().toISOString().slice(0, 7); }
 
-export default function SaluOverview() {
-  const [period, setPeriod] = useState(currentPeriod());
+export default function SaluOverview({ period, onPeriodChange }: Props) {
   const [data, setData] = useState<Payload | null>(null);
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,13 +58,14 @@ export default function SaluOverview() {
         if (!response.ok) throw new Error(body?.error ?? 'Kunde inte läsa SALU-översikten');
         if (!active) return;
         const nextData = body.data as Payload;
+        setError(null);
+        setSelectedModel(null);
+        setDecisionNotice(null);
+        setDecisions({});
+        setDecisionStorageReady(null);
         setData(nextData);
         const regnrs = nextData.items.map((item) => item.regnr);
-        if (regnrs.length === 0) {
-          setDecisions({});
-          setDecisionStorageReady(null);
-          return;
-        }
+        if (regnrs.length === 0) return;
         const decisionResponse = await fetch(`/api/planning/replacement-decisions?regnrs=${encodeURIComponent(regnrs.join(','))}`, { cache: 'no-store' });
         const decisionBody = await decisionResponse.json() as DecisionReadPayload;
         if (!decisionResponse.ok) throw new Error(decisionBody.error ?? 'Kunde inte läsa ersättningsbeslut');
@@ -87,15 +88,10 @@ export default function SaluOverview() {
     [decisions],
   );
 
+  const periodChanging = data?.period !== period && !error;
+
   const changePeriod = (nextPeriod: string) => {
-    setLoading(true);
-    setError(null);
-    setData(null);
-    setSelectedModel(null);
-    setDecisions({});
-    setDecisionStorageReady(null);
-    setDecisionNotice(null);
-    setPeriod(nextPeriod || currentPeriod());
+    onPeriodChange(nextPeriod || currentPeriod());
   };
 
   const setReplacementDecision = async (item: SaluItem, nextStatus: 'REPLACE' | 'CANCELLED') => {
@@ -135,13 +131,13 @@ export default function SaluOverview() {
           <h2>Kommande SALU — 1 till 4 månader</h2>
           <p>SALU informerar. Den skapar inte BEHOV, UTÖKNING, MINSKNING eller BESTÄLLT.</p>
         </div>
-        <label className={styles.period}><span>Från månad</span><input type="month" value={period} onChange={(event) => changePeriod(event.target.value)} /></label>
+        <label className={styles.period}><span>Planeringsmånad</span><input type="month" value={period} onChange={(event) => changePeriod(event.target.value)} /></label>
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
       {decisionNotice ? <div className={styles.notice}>{decisionNotice}</div> : null}
       {decisionStorageReady === false ? <div className={styles.storageWarning}>ERSÄTT är färdigbyggt i grenen men väntar på databasaktivering. Inget beslut kan sparas förrän den lagringen är godkänd.</div> : null}
-      {loading ? <div className={styles.loading}>Läser kommande SALU…</div> : data ? (
+      {loading || periodChanging ? <div className={styles.loading}>Läser kommande SALU…</div> : data ? (
         <>
           <div className={styles.horizonGrid}>
             {data.months.map((month) => (
