@@ -105,8 +105,24 @@ export default function OperatorCockpit() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    void fetchCockpit()
+      .then((next) => {
+        if (!active) return;
+        setData(next);
+        setError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Tower');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const stations = useMemo(() => {
     const values = new Set((data?.items ?? []).map((item) => item.station).filter(Boolean) as string[]);
