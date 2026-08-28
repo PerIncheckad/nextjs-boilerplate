@@ -18,6 +18,8 @@ const operationModules = [
   { href: '/ankomst', label: 'Ankomst' },
   { href: '/check', label: 'Incheckning' },
   { href: '/nybil', label: 'Ny bil' },
+  { href: '/status', label: 'Status' },
+  { href: '/vagnkort', label: 'Vagnkort' },
 ];
 
 export default function HomePage() {
@@ -75,7 +77,6 @@ export default function HomePage() {
             {operationModules.map((item) => (
               <Link href={item.href} key={item.href}>{item.label}</Link>
             ))}
-            <Link href="/vagnkort">Vagnkort</Link>
           </nav>
           <span className={styles.footerMark}>MABISYD MOBILITY / ALBARONE</span>
         </footer>

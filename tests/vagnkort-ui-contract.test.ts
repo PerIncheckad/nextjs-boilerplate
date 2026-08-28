@@ -106,6 +106,6 @@ test('vehicle journey read model overlays latest equipment event without overwri
   matches(journeyApi, [/equipmentBaseline/, /equipmentChanges/, /fieldsOverlaid/, /equipmentCurrent\[change\.field\] = change\.value/, /event_type === 'EQUIPMENT_CHANGED'/]);
 });
 
-test('start page links to Vagnkort', () => {
-  assert.match(home, /href="\/vagnkort"/);
+test('start page exposes Vagnkort and Status through the operational module registry', () => {
+  matches(home, [/href:\s*'\/vagnkort'/, /label:\s*'Vagnkort'/, /href:\s*'\/status'/, /label:\s*'Status'/]);
 });
