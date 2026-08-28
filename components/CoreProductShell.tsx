@@ -12,6 +12,7 @@ const modules = [
   ['/ankomst', 'Ankomst', 'ankomst'],
   ['/check', 'Incheckning', 'check'],
   ['/nybil', 'Ny bil', 'nybil'],
+  ['/status', 'Status', 'status'],
   ['/vagnkort', 'Vagnkort', 'vagnkort'],
 ] as const;
 
