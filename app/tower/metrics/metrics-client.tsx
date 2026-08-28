@@ -124,6 +124,7 @@ export default function OperatorMetrics() {
         <div className={styles.actions}>
           <Link className={styles.secondaryButton} href="/tower">Tower</Link>
           <Link className={styles.secondaryButton} href="/tower/history">Drifthistorik</Link>
+          <Link className={styles.secondaryButton} href="/">Startsida</Link>
           <button className={styles.primaryButton} type="button" onClick={() => void load(hours)} disabled={loading}>
             {loading ? 'Uppdaterar…' : 'Uppdatera'}
           </button>
