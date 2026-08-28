@@ -18,9 +18,21 @@ export default function CheckPage() {
       </header>
 
       <section className={styles.hero}>
-        <span>INCHECKAD CORE / CHECK-IN</span>
-        <h1>Incheckning</h1>
-        <p>Kontrollera bilen, dokumentera avvikelser och verifiera verkligt utfall.</p>
+        <div className={styles.heroCopy}>
+          <span>INCHECKAD CORE / CHECK-IN</span>
+          <h1>Incheckning</h1>
+          <p>Kontrollera bilen, dokumentera avvikelser och verifiera verkligt utfall.</p>
+        </div>
+
+        <div className={styles.flow} aria-label="Arbetsgång för incheckning">
+          <span className={styles.flowLabel}>ARBETSGÅNG</span>
+          <ol>
+            <li><span>01</span>Fordon</li>
+            <li><span>02</span>Kontroll</li>
+            <li><span>03</span>Avvikelser</li>
+            <li><span>04</span>Verifiera</li>
+          </ol>
+        </div>
       </section>
 
       <section className={styles.formSurface}>
