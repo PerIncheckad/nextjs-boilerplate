@@ -15,7 +15,7 @@ export default function VagnkortPage() {
   return (
     <main className={styles.shell}>
       <header className={styles.topbar}>
-        <Link className={styles.backLink} href="/tower">← Tower</Link>
+        <Link className={styles.backLink} href="/">← Startsida</Link>
 
         <div className={styles.identity}>
           <strong>INCHECKAD</strong>
@@ -23,7 +23,7 @@ export default function VagnkortPage() {
         </div>
 
         <div className={styles.topActions}>
-          <Link className={styles.homeLink} href="/">Startsida</Link>
+          <Link className={styles.homeLink} href="/status">Status</Link>
           <span className={styles.mode}>VAGNKORT</span>
         </div>
       </header>
