@@ -1,9 +1,15 @@
 // app/check/page.tsx
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
 import styles from './check-shell.module.css';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Incheckning | Incheckad',
+  description: 'Kontrollera bilen, dokumentera avvikelser och verifiera verkligt utfall',
+};
 
 export default function CheckPage() {
   return (
