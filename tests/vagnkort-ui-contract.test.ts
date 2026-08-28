@@ -1,73 +1,99 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { isPublicAppPath } from '../lib/app-access';
 
-const client = fs.readFileSync('app/vagnkort/vagnkort-client.tsx', 'utf8');
-const page = fs.readFileSync('app/vagnkort/page.tsx', 'utf8');
-const journeyApi = fs.readFileSync('app/api/vehicle-journey/route.ts', 'utf8');
-const metricsApi = fs.readFileSync('app/api/vehicle-journey/metrics/route.ts', 'utf8');
-const periodApi = fs.readFileSync('app/api/vehicle-journey/periods/route.ts', 'utf8');
-const documentApi = fs.readFileSync('app/api/vehicle-documents/route.ts', 'utf8');
-const documentItemApi = fs.readFileSync('app/api/vehicle-documents/[id]/route.ts', 'utf8');
-const equipmentApi = fs.readFileSync('app/api/vehicle-journey/equipment/route.ts', 'utf8');
-const equipmentControls = fs.readFileSync('app/vagnkort/equipment-change-controls.tsx', 'utf8');
-const home = fs.readFileSync('app/page.tsx', 'utf8');
+const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8');
+const page = read('app/vagnkort/page.tsx');
+const layout = read('app/layout.tsx');
+const client = read('app/vagnkort/vagnkort-client.tsx');
+const upload = read('app/vagnkort/document-upload.tsx');
+const uploadApi = read('app/api/vehicle-documents/route.ts');
+const documentApi = read('app/api/vehicle-documents/[id]/route.ts');
+const periodControls = read('app/vagnkort/journey-period-controls.tsx');
+const periodApi = read('app/api/vehicle-journey/periods/route.ts');
+const periodMigration = read('migrations/20260820222728_atomic_vehicle_journey_period_events.sql');
+const timeModelMigration = read('migrations/20260821113000_split_vehicle_state_and_activity_periods.sql');
+const metricsPanel = read('app/vagnkort/journey-metrics-panel.tsx');
+const metricsApi = read('app/api/vehicle-journey/metrics/route.ts');
+const saluPanel = read('app/vagnkort/salu-journey-panel.tsx');
+const equipmentControls = read('app/vagnkort/equipment-change-controls.tsx');
+const equipmentApi = read('app/api/vehicle-journey/equipment/route.ts');
+const journeyApi = read('app/api/vehicle-journey/route.ts');
+const home = read('app/page.tsx');
 
-const matches = (source: string, patterns: RegExp[]) => {
+function matches(source: string, patterns: RegExp[]) {
   for (const pattern of patterns) assert.match(source, pattern);
-};
+}
 
 test('Vagnkort stays behind the central app auth boundary', () => {
-  matches(page, [/VagnkortClient/, /INCHECKAD CORE \/ VAGNKORT/]);
+  assert.equal(isPublicAppPath('/vagnkort'), false);
+  matches(layout, [/<AppAuthBoundary>\{children\}<\/AppAuthBoundary>/]);
+  matches(page, [/<VagnkortClient \/>/]);
+  assert.doesNotMatch(page, /LoginGate/);
 });
 
 test('Vagnkort reads the authenticated vehicle journey API', () => {
-  matches(client, [/\/api\/vehicle-journey\?reg=/, /fetch\(/]);
-  assert.doesNotMatch(client, /supabase\s*\.\s*from\(/);
+  matches(client, [/fetch\(`\/api\/vehicle-journey\?reg=/, /Bilens digitala pärm/, /Utrustning – Nybil mot nu/, /Tid i resan/, /Dokument/, /Tidslinje/]);
 });
 
 test('Vagnkort surfaces lifecycle metrics and refreshes them with journey changes', () => {
-  matches(client, [/\/api\/vehicle-journey\/metrics\?reg=/, /lifecycleMetrics/, /refreshJourney/]);
-  matches(metricsApi, [/verifyApiUser\(request\)/, /calculateVehicleLifecycleMetrics/, /vehicle_journey_periods/]);
+  matches(client, [/<JourneyMetricsPanel regnr=\{data\.regnr\} refreshNonce=\{refreshNonce\} \/>/]);
+  matches(metricsPanel, [/\/api\/vehicle-journey\/metrics\?reg=/, /Resans nyckeltal/, /Nyttjandegrad/, /Nybil → första uthyrning/, /Sista retur → SALU/, /Stillestånd per huvudorsak/, /Aktiviteter inom stillestånd/, /Huvudperioder överlappar/]);
+  matches(metricsApi, [/verifyApiUser\(request\)/, /computeJourneyLifecycleMetrics/, /vehicle_journey_activity_periods/]);
 });
 
 test('Vagnkort presents SALU as the endpoint with deviations, handling and evidence', () => {
-  matches(client, [/SALU/, /saluflagga/, /salustatus/, /saluEvents/]);
+  matches(client, [/SALU – slutdelen av bilens resa/, /<SaluJourneyPanel/, /documents=\{data\.documents\}/]);
+  matches(saluPanel, [/Ursprungligt SALU-datum/, /Aktuellt SALU-datum/, /Förskjutning/, /Kontrollpunkter som kräver uppmärksamhet/, /Hantering/, /salu_checkpoint_id/, /salu_child_process_id/, /SALU-underlag/, /Öppna underlag/, /\/api\/vehicle-documents\/\$\{encodeURIComponent\(document\.document_id\)\}/, /evidenceContext/]);
 });
 
 test('Vagnkort surfaces baseline/current equipment changes', () => {
-  matches(client, [/equipmentBaseline/, /equipmentCurrent/, /equipmentChanges/]);
+  matches(client, [/baseline\[key\] !== current\[key\]/, /Förändrat/]);
 });
 
 test('Vagnkort document upload uses authenticated signed Storage flow', () => {
-  matches(client, [/\/api\/vehicle-documents/, /signedUpload/, /upload/]);
-  matches(documentApi, [/verifyApiUser\(request\)/, /createSignedUploadUrl/, /vehicle_documents/]);
+  matches(client, [/<DocumentUpload/]);
+  matches(upload, [/action:\s*'prepare'/, /uploadToSignedUrl/, /action:\s*'complete'/, /Släpp filer här/, /Leverantörsfaktura/, /Skadebild/]);
 });
 
 test('Vagnkort reuses already loaded journey context for document upload', () => {
-  matches(client, [/journeyContext/, /vehicleId/]);
+  matches(client, [/damages=\{data\.damages\}/, /checkpoints=\{data\.salu\.checkpoints\}/, /childProcesses=\{data\.salu\.childProcesses\}/]);
+  assert.doesNotMatch(upload, /\/api\/vehicle-journey\?reg=/);
+  assert.match(upload, /Inga valbara poster/);
 });
 
 test('Vagnkort shows document context directly in the document list', () => {
-  matches(client, [/documents/, /context/]);
+  matches(client, [/documentContextLabel/, /metadata\?\.context\?\.label/, /Kopplat till:/, /SALU-checkpoint/, /SALU-åtgärd/, /Incheckning/, /Bilen generellt/]);
 });
 
 test('document upload can bind evidence to vehicle, damage and SALU context', () => {
-  matches(documentApi, [/vehicle_id/, /damage_id/, /salu/]);
+  matches(upload, [/Bilen generellt/, /SALU-checkpoint/, /SALU-åtgärd/, /contextType/, /contextId/]);
+  matches(uploadApi, [/resolveDocumentContext/, /Damage does not belong to vehicle/, /SALU checkpoint does not belong to vehicle/, /SALU action does not belong to vehicle/, /damage_id/, /salu_checkpoint_id/, /salu_child_process_id/]);
 });
 
 test('document server API stays authenticated, private and appends a journey event', () => {
-  matches(documentApi, [/verifyApiUser\(request\)/, /vehicle_journey_events/]);
-  matches(documentItemApi, [/verifyApiUser\(request\)/]);
+  matches(uploadApi, [/verifyApiUser\(request\)/, /createSignedUploadUrl/, /vehicle_documents/, /DOCUMENT_UPLOADED/, /uploaded_by:\s*verification\.user\.id/]);
+  matches(documentApi, [/verifyApiUser\(request\)/, /createSignedUrl/, /300/]);
 });
 
 test('Vagnkort primary state UI is read-only and reflects source-controlled truth', () => {
-  matches(client, [/primaryState/, /source/]);
-  assert.doesNotMatch(client, /transitionPrimaryState/);
+  matches(client, [/<JourneyPeriodControls regnr=/]);
+  matches(periodControls, [/Huvudtillståndet är verifierad verksamhetsdata/, /Vagnkortet visar läget men skapar eller avslutar inte huvudperioder manuellt/, /Aktuellt huvudtillstånd/, /Inget verifierat huvudtillstånd/, /Incheckad gissar inte nästa läge/]);
+  assert.doesNotMatch(periodControls, /fetch\(/);
+  assert.doesNotMatch(periodControls, /action:\s*'TRANSITION'/);
+  assert.doesNotMatch(periodControls, /action:\s*'CLOSE'/);
+  assert.doesNotMatch(periodControls, /<form/);
+  assert.doesNotMatch(periodControls, /<button/);
 });
 
 test('journey period API blocks manual primary writes but retains authenticated downtime activities', () => {
-  matches(periodApi, [/verifyApiUser\(request\)/, /DOWNTIME/]);
+  matches(periodApi, [/verifyApiUser\(request\)/, /Primary vehicle state is source-controlled/, /action === 'START'/, /action === 'TRANSITION'/, /action === 'CLOSE'/, /rpc\('start_vehicle_journey_activity_period'/, /rpc\('close_vehicle_journey_activity_period'/]);
+  assert.doesNotMatch(periodApi, /rpc\('transition_vehicle_journey_state'/);
+  assert.doesNotMatch(periodApi, /rpc\('close_vehicle_journey_period'/);
+  matches(periodMigration, [/'PERIOD_STARTED'/, /'PERIOD_ENDED'/, /insert into public\.vehicle_journey_periods/i, /insert into public\.vehicle_journey_events/i, /p_actor_id/]);
+  matches(timeModelMigration, [/vehicle_journey_periods_one_open_state_uidx/, /vehicle_journey_activity_periods/, /ACTIVITY_PERIOD_STARTED/, /ACTIVITY_PERIOD_ENDED/]);
 });
 
 test('Vagnkort can document equipment changes as append-only journey events', () => {
