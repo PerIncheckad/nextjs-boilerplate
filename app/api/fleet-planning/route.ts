@@ -150,6 +150,19 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Planeringsrad kräver månad YYYY-MM, aktiv modell, aktiv station och giltiga antal' }, { status: 400 });
   }
 
+  const periods = [...new Set(rows.map((row) => String(row!.period_code)))];
+  const { data: lockedPeriods, error: statusError } = await admin.from('planning_period_status')
+    .select('period_code,status')
+    .in('period_code', periods)
+    .eq('status', 'KLAR');
+  if (statusError) {
+    console.error('[fleet-planning] period status lookup failed', statusError);
+    return NextResponse.json({ error: 'Kunde inte kontrollera planeringsstatus' }, { status: 500 });
+  }
+  if ((lockedPeriods ?? []).length > 0) {
+    return NextResponse.json({ error: 'Planeringen är markerad KLAR. Öppna planeringen igen innan du ändrar den.' }, { status: 409 });
+  }
+
   const now = new Date().toISOString();
   const payload = rows.map((row) => ({ ...row, updated_at: now, updated_by: verification.user.id }));
   const { data, error } = await admin.from('fleet_planning_cells')

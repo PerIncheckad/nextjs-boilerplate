@@ -19,6 +19,15 @@ function clean(value: unknown): string | null {
   return next || null;
 }
 
+async function periodStatus(admin: ReturnType<typeof adminClient>, period: string) {
+  const { data, error } = await admin.from('planning_period_status')
+    .select('status,ready_at')
+    .eq('period_code', period)
+    .maybeSingle();
+  if (error) throw error;
+  return { status: data?.status ?? 'PAGAENDE', ready_at: data?.ready_at ?? null };
+}
+
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -27,6 +36,13 @@ export async function GET(request: Request) {
   if (!MONTH_RE.test(period)) return NextResponse.json({ error: 'Period måste vara YYYY-MM' }, { status: 400 });
 
   const admin = adminClient();
+  let gate: { status: string; ready_at: string | null };
+  try { gate = await periodStatus(admin, period); }
+  catch (error) {
+    console.error('[garage planning sources] period status lookup failed', error);
+    return NextResponse.json({ error: 'Kunde inte läsa planeringsstatus' }, { status: 500 });
+  }
+
   const { data: cells, error } = await admin
     .from('fleet_planning_cells')
     .select('planning_cell_id,period_code,model,station,ordered_count,note')
@@ -59,6 +75,9 @@ export async function GET(request: Request) {
   for (const row of materialized) byCell.set(row.source_planning_cell_id, (byCell.get(row.source_planning_cell_id) ?? 0) + 1);
 
   return NextResponse.json({
+    status: gate.status,
+    ready_at: gate.ready_at,
+    can_materialize: gate.status === 'KLAR',
     data: (cells ?? []).map((row) => {
       const materializedCount = byCell.get(row.planning_cell_id) ?? 0;
       return {
@@ -97,6 +116,16 @@ export async function POST(request: Request) {
   }
   if (!cell) return NextResponse.json({ error: 'Planeringsraden finns inte' }, { status: 404 });
   if (!MONTH_RE.test(String(cell.period_code))) return NextResponse.json({ error: 'Endast månadsplanering kan hämtas till Garaget' }, { status: 409 });
+
+  let gate: { status: string; ready_at: string | null };
+  try { gate = await periodStatus(admin, String(cell.period_code)); }
+  catch (error) {
+    console.error('[garage planning sources] period status lookup failed', error);
+    return NextResponse.json({ error: 'Kunde inte kontrollera planeringsstatus' }, { status: 500 });
+  }
+  if (gate.status !== 'KLAR') {
+    return NextResponse.json({ error: 'Planeringen är PÅGÅENDE. Markera månaden KLAR innan Garaget får hämta BESTÄLLT.' }, { status: 409 });
+  }
 
   const { data: existing, error: existingError } = await admin
     .from('garage_items')
