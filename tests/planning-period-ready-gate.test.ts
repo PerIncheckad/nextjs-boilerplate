@@ -33,5 +33,6 @@ test('handoff UI exposes explicit ready/reopen control and rejects local unsaved
   assert.match(handoffUi, /Markera planering KLAR/);
   assert.match(handoffUi, /Öppna planering igen/);
   assert.match(handoffUi, /incheckad-planning-draft-v3/);
-  assert.match(handoffUi, /Garaget är spärrat/);
+  assert.match(handoffUi, /BESTÄLLT ligger kvar i Planering/);
+  assert.match(handoffUi, /Garage-objekten automatiskt/);
 });
