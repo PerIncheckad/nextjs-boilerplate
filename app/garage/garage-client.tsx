@@ -80,7 +80,7 @@ export default function GarageClient() {
     setSupplierDrafts(Object.fromEntries(nextItems.map((item) => [item.garage_item_id, item.supplier ?? ''])));
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
     setSaluStation((current) => current || nextStations[0]?.station_code || '');
-  }, []);
+  }, [setStations, setModels, setItems, setSupplierDrafts, setDraft, setSaluStation]);
 
   const load = useCallback(async () => {
     setLoading(true);
