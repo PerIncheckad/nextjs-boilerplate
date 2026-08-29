@@ -74,56 +74,43 @@ export async function POST(request: Request) {
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
 
   let body: Record<string, unknown>;
-  try { body = await request.json(); } catch { return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 }); }
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 });
+  }
+
   const flagId = clean(body.salu_flag_id);
   const direction = clean(body.garage_direction)?.toUpperCase() ?? '';
   const station = clean(body.planned_station);
-  if (!flagId || !DIRECTIONS.has(direction) || !station) return NextResponse.json({ error: 'SALU-cykel, riktning och planerad station krävs' }, { status: 400 });
+  if (!flagId || !DIRECTIONS.has(direction) || !station) {
+    return NextResponse.json({ error: 'SALU-cykel, riktning och planerad station krävs' }, { status: 400 });
+  }
 
   const admin = adminClient();
-  const { data: stationRow, error: stationError } = await admin.from('planning_stations').select('station_code').eq('station_code', station).eq('is_active', true).maybeSingle();
-  if (stationError) return NextResponse.json({ error: 'Kunde inte kontrollera station' }, { status: 500 });
-  if (!stationRow) return NextResponse.json({ error: 'Planerad station är inte aktiv' }, { status: 400 });
+  const { data, error } = await admin.rpc('materialize_salu_to_garage', {
+    p_flag_id: flagId,
+    p_direction: direction,
+    p_station: station,
+    p_actor: verification.user.id,
+  });
 
-  const { data: flag, error: flagError } = await admin.from('salu_flags').select('flag_id,regnr,cycle_saludatum,current_saludatum,status,closure_comment').eq('flag_id', flagId).maybeSingle();
-  if (flagError) return NextResponse.json({ error: 'Kunde inte läsa SALU-cykeln' }, { status: 500 });
-  if (!flag) return NextResponse.json({ error: 'SALU-cykeln finns inte' }, { status: 404 });
-
-  const { data: existing, error: existingError } = await admin.from('garage_items').select('garage_item_id').eq('source_kind', 'SALU').eq('source_salu_flag_id', flagId).is('voided_at', null).maybeSingle();
-  if (existingError) return NextResponse.json({ error: 'Kunde inte kontrollera befintligt Garage-objekt' }, { status: 500 });
-  if (existing) return NextResponse.json({ error: 'Den här SALU-cykeln finns redan i Garaget' }, { status: 409 });
-
-  const { data: vehicle, error: vehicleError } = await admin.from('vehicles').select('brand,model').eq('regnr', flag.regnr).maybeSingle();
-  if (vehicleError) return NextResponse.json({ error: 'Kunde inte läsa fordonet' }, { status: 500 });
-  const model = [vehicle?.brand, vehicle?.model].filter(Boolean).join(' ').trim() || String(flag.regnr);
-  const now = new Date().toISOString();
-  const note = [flag.closure_comment, `Hämtad från SALU ${flag.current_saludatum}`].filter(Boolean).join(' · ');
-
-  const { data, error } = await admin.from('garage_items').insert({
-    planning_period: String(flag.current_saludatum).slice(0, 7),
-    model,
-    garage_direction: direction,
-    planning_reason: 'SALU',
-    regnr: flag.regnr,
-    source_regnr: flag.regnr,
-    planned_station: station,
-    confirmation_status: 'PLANERAD',
-    transport_status: 'EJ_BOKAD',
-    source_kind: 'SALU',
-    source_salu_flag_id: flag.flag_id,
-    note: note || null,
-    created_at: now,
-    updated_at: now,
-    created_by: verification.user.id,
-    updated_by: verification.user.id,
-  }).select('*').single();
   if (error) {
-    console.error('[garage salu sources] insert failed', error);
+    console.error('[garage salu sources] atomic handoff failed', error);
+    const message = error.message ?? 'Kunde inte hämta SALU-bilen till Garaget';
+    if (message.includes('Planerad station är inte aktiv') || message.includes('Ogiltig riktning')) {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    if (message.includes('SALU-cykeln finns inte')) {
+      return NextResponse.json({ error: message }, { status: 404 });
+    }
     return NextResponse.json({ error: 'Kunde inte hämta SALU-bilen till Garaget' }, { status: 500 });
   }
 
-  const { error: eventError } = await admin.from('garage_direction_events').insert({ garage_item_id: data.garage_item_id, from_direction: null, to_direction: direction, reason: 'Hämtad från SALU', changed_at: now, changed_by: verification.user.id });
-  if (eventError) console.error('[garage salu sources] direction audit failed after insert', eventError);
+  const result = data as { already_exists?: boolean; data?: unknown } | null;
+  if (result?.already_exists) {
+    return NextResponse.json({ error: 'Den här SALU-cykeln finns redan i Garaget' }, { status: 409 });
+  }
 
-  return NextResponse.json({ data }, { status: 201 });
+  return NextResponse.json({ data: result?.data ?? null }, { status: 201 });
 }
