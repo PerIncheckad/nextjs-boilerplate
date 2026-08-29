@@ -97,7 +97,7 @@ export default function PlanningGarageHandoff({ period }: Props) {
           <button type="button" className={styles.garageLink} disabled={changingStatus} onClick={() => void changeStatus(planningStatus === 'KLAR' ? 'PAGAENDE' : 'KLAR')}>
             {changingStatus ? 'Sparar…' : planningStatus === 'KLAR' ? 'Öppna planering igen' : 'Markera planering KLAR'}
           </button>
-          <Link href="/garage" className={styles.garageLink}>Öppna Garaget</Link>
+          <Link href={`/garage?period=${period}&direction=IN`} className={styles.garageLink}>Öppna Garaget</Link>
         </div>
       </div>
 
