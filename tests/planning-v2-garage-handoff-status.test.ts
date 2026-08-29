@@ -19,8 +19,9 @@ test('handoff exposes ordered, materialized and remaining quantities without aut
   assert.match(ui, /remaining_count/);
   assert.match(ui, /Ingen automatisk överföring/);
   assert.doesNotMatch(ui, /method:\s*'POST'/);
-  assert.doesNotMatch(ui, /method:\s*'PUT'/);
   assert.doesNotMatch(ui, /method:\s*'PATCH'/);
+  assert.match(ui, /\/api\/planning\/period-status/);
+  assert.match(ui, /method:\s*'PUT'/);
 });
 
 test('Garage planning source read model derives remaining from persisted BESTÄLLT and materialized units', () => {
