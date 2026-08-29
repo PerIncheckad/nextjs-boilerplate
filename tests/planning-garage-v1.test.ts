@@ -94,7 +94,7 @@ test('Garage station replanning is atomic and audited', () => {
   assert.match(garageUi, /Omplanerad i Garaget/);
 });
 
-test('KLAR materializes BESTALLT automatically without duplicate units', () => {
+test('KLAR materializes BESTALLT automatically without duplicate units and stamps Avropad', () => {
   assert.match(finalMigration, /source_kind.*PLANERING/s);
   assert.match(finalMigration, /garage_items_planning_source_uidx/);
   assert.match(planningStatusApi, /materializePlanningToGarage/);
@@ -103,6 +103,8 @@ test('KLAR materializes BESTALLT automatically without duplicate units', () => {
   assert.match(planningStatusApi, /garage_direction: 'IN'/);
   assert.match(planningStatusApi, /from\('planning_vehicle_models'\)/);
   assert.match(planningStatusApi, /daily_rate/);
+  assert.match(planningStatusApi, /calloff_at: calloffDate/);
+  assert.match(planningStatusApi, /Europe\/Stockholm/);
   assert.doesNotMatch(garageUi, /Hämta från Planering/);
   assert.match(garageUi, /markeras KLAR skapas BESTÄLLT automatiskt/);
 });
@@ -126,6 +128,25 @@ test('Garage supports operational editing, sorting, print and PDF', () => {
   assert.match(garageUi, /Beställd/);
   assert.match(garageUi, /Avropad/);
   assert.match(garageCss, /@media print/);
+});
+
+test('UTVECKLA has explicit supplier save and a compact registration column', () => {
+  assert.match(garageUi, /saveSupplier/);
+  assert.match(garageUi, /supplierEditor/);
+  assert.match(garageUi, /rowSaveButton/);
+  assert.match(garageUi, /regnrColumn/);
+  assert.match(garageUi, /regnrInput/);
+  assert.match(garageCss, /\.regnrColumn/);
+  assert.match(garageCss, /\.supplierEditor/);
+  assert.match(garageCss, /\.rowSaveButton/);
+});
+
+test('KLAR planning is read-only and removes row save actions after Garage handoff', () => {
+  assert.match(planningUi, /planningStatus/);
+  assert.match(planningUi, /const locked = planningStatus === 'KLAR'/);
+  assert.match(planningUi, /SKICKAD TILL GARAGET/);
+  assert.match(planningUi, /!locked \? <th className=\{styles\.actionColumn\}>Spara/);
+  assert.match(planningUi, /disabled=\{locked\}/);
 });
 
 test('Garage transport does not manually claim actual Layer 1 arrival', () => {
