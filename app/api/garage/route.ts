@@ -75,7 +75,7 @@ export async function GET(request: Request) {
   const period = params.get('period')?.trim() || null;
   const station = params.get('station')?.trim() || null;
   const direction = upper(params.get('direction'));
-  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,garage_direction,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,source_planning_unit_no,source_salu_flag_id,created_at,updated_at').order('updated_at', { ascending: false });
+  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,garage_direction,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,source_planning_unit_no,source_salu_flag_id,created_at,updated_at').is('voided_at', null).order('updated_at', { ascending: false });
   if (period) query = query.eq('planning_period', period);
   if (station && stations.has(station)) query = query.eq('planned_station', station);
   if (direction && DIRECTIONS.has(direction)) query = query.eq('garage_direction', direction);
@@ -112,6 +112,11 @@ export async function PATCH(request: Request) {
   const id = text(body.garage_item_id);
   if (!id) return NextResponse.json({ error: 'garage_item_id saknas' }, { status: 400 });
   const admin = adminClient();
+
+  const { data: activeItem, error: activeError } = await admin.from('garage_items').select('garage_item_id').eq('garage_item_id', id).is('voided_at', null).maybeSingle();
+  if (activeError) return NextResponse.json({ error: 'Kunde inte läsa Garage-objektet' }, { status: 500 });
+  if (!activeItem) return NextResponse.json({ error: 'Garage-objektet finns inte eller är makulerat' }, { status: 404 });
+
   let stationRows: Array<{ station_code: string }>;
   try { stationRows = await loadStations(admin) as Array<{ station_code: string }>; } catch (error) { console.error('[garage] station lookup failed', error); return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 }); }
 
@@ -136,11 +141,8 @@ export async function PATCH(request: Request) {
   if (Object.hasOwn(normalized, 'model')) {
     try { normalized.model = await ensureModel(admin, normalized.model, verification.user.id); } catch (error) { console.error('[garage] model register failed', error); return NextResponse.json({ error: 'Kunde inte uppdatera modellregistret' }, { status: 500 }); }
   }
-  const { data: existing, error: existingError } = await admin.from('garage_items').select('source_kind').eq('garage_item_id', id).maybeSingle();
-  if (existingError) return NextResponse.json({ error: 'Kunde inte läsa Garage-objektet' }, { status: 500 });
-  if (!existing) return NextResponse.json({ error: 'Garage-objektet finns inte' }, { status: 404 });
   const now = new Date().toISOString();
-  const { data, error } = await admin.from('garage_items').update({ ...normalized, updated_at: now, updated_by: verification.user.id }).eq('garage_item_id', id).select('*').single();
+  const { data, error } = await admin.from('garage_items').update({ ...normalized, updated_at: now, updated_by: verification.user.id }).eq('garage_item_id', id).is('voided_at', null).select('*').single();
   if (error) { console.error('[garage] PATCH failed', error); return NextResponse.json({ error: 'Kunde inte uppdatera Garage-objektet' }, { status: 500 }); }
   return NextResponse.json({ data });
 }
