@@ -7,8 +7,14 @@ const migration = readFileSync('migrations/20260829143000_garage_model_daily_rat
 
 test('Garage highlights the active row and keeps regnr visible while scrolling', () => {
   assert.match(css, /tbody tr:focus-within td/);
-  assert.match(css, /\.regnrColumn\{position:sticky!important;left:0/);
+  assert.match(css, /\.regnrColumn,/);
+  assert.match(css, /table:not\(:has\(th\.regnrColumn\)\) th:nth-child\(5\)/);
   assert.match(css, /tbody tr:focus-within td\.regnrColumn/);
+});
+
+test('UTVECKLA table uses compact width instead of detailed Garage width', () => {
+  assert.match(css, /table:has\(th\.regnrColumn\)\{min-width:1280px\}/);
+  assert.match(css, /table\{border-collapse:separate;border-spacing:0;min-width:2450px/);
 });
 
 test('first Planering daily rate establishes only a missing model default', () => {
