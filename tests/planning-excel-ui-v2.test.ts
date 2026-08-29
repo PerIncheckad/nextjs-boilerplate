@@ -21,11 +21,12 @@ test('planning removes BEHOV as an active decision and keeps three explicit deci
   assert.match(planningUi, /role="tablist" aria-label="Planeringsbeslut"/);
 });
 
-test('planning makes brand, model, EL and daily rate editable from the work surface', () => {
-  assert.match(planningUi, /value=\{row\.brand\} onChange=\{\(event\) => updateModel\(row\.key, \{ brand: event\.target\.value \}\)\}/);
-  assert.match(planningUi, /value=\{row\.model\} onChange=\{\(event\) => updateModel\(row\.key, \{ model: event\.target\.value \}\)\}/);
-  assert.match(planningUi, /type="checkbox" checked=\{row\.isElectric\}/);
+test('planning makes brand, model, EL and daily rate editable while PAGAENDE and read-only when KLAR', () => {
+  assert.match(planningUi, /value=\{row\.brand\}[^>]*onChange=\{\(event\) => updateModel\(row\.key, \{ brand: event\.target\.value \}\)\}/);
+  assert.match(planningUi, /value=\{row\.model\}[^>]*onChange=\{\(event\) => updateModel\(row\.key, \{ model: event\.target\.value \}\)\}/);
+  assert.match(planningUi, /type="checkbox" checked=\{row\.isElectric\} disabled=\{locked\}/);
   assert.match(planningUi, /row\.dailyRate/);
+  assert.match(planningUi, /disabled=\{locked\}/);
   assert.match(planningUi, /\/api\/planning\/models/);
   assert.match(planningUi, /\+ Märke \/ modell/);
   assert.match(planningUi, /list="planning-saved-brands"/);
