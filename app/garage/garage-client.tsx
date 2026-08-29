@@ -80,7 +80,7 @@ export default function GarageClient() {
     setSupplierDrafts(Object.fromEntries(nextItems.map((item) => [item.garage_item_id, item.supplier ?? ''])));
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
     setSaluStation((current) => current || nextStations[0]?.station_code || '');
-  }, [setStations, setModels, setItems, setSupplierDrafts, setDraft, setSaluStation]);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -192,6 +192,20 @@ export default function GarageClient() {
     if (String(nextValue ?? '') !== String(oldValue ?? '')) void patch(item, { [field]: nextValue });
   };
 
+  const changeDraftDirection = (next: GarageDirection | null) => {
+    setDraft((current) => next === 'IN' ? {
+      ...current,
+      garage_direction: next,
+      vin: '',
+      source_regnr: '',
+      planning_reason: 'ANNAT',
+      order_reference: '',
+      ordered_at: '',
+      confirmation_status: 'PLANERAD',
+      transport_status: 'EJ_BOKAD',
+    } : { ...current, garage_direction: next });
+  };
+
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
@@ -221,7 +235,7 @@ export default function GarageClient() {
       <section className={styles.createPanel}>
         <div className={styles.panelTitle}><h2>Lägg bil manuellt</h2><span>Manuell väg för undantag som inte kommer från Planering.</span></div>
         <div className={styles.formGrid}>
-          <Field label="Riktning"><select value={draft.garage_direction ?? ''} onChange={(e) => setDraft({ ...draft, garage_direction: (e.target.value || null) as GarageDirection | null })}><option value="">Välj riktning</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></Field>
+          <Field label="Riktning"><select value={draft.garage_direction ?? ''} onChange={(e) => changeDraftDirection((e.target.value || null) as GarageDirection | null)}><option value="">Välj riktning</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></Field>
           <Field label="Månad"><input type="month" value={draft.planning_period ?? ''} onChange={(e) => setDraft({ ...draft, planning_period: e.target.value })} /></Field>
           <Field label="Modell"><input list="garage-models" value={draft.model} onChange={(e) => setDraft({ ...draft, model: e.target.value })} placeholder="Välj eller skriv modell" /></Field>
           <Field label="Planerad station"><select value={draft.planned_station ?? ''} onChange={(e) => setDraft({ ...draft, planned_station: e.target.value || null })}><option value="">Välj station</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></Field>
@@ -229,6 +243,15 @@ export default function GarageClient() {
           <Field label="Reg.nr"><input value={draft.regnr ?? ''} onChange={(e) => setDraft({ ...draft, regnr: e.target.value.toUpperCase() })} /></Field>
           <Field label="Dygnsdeb"><input type="number" min="0" value={draft.daily_rate ?? ''} onChange={(e) => setDraft({ ...draft, daily_rate: e.target.value === '' ? null : Number(e.target.value) })} /></Field>
           <Field label="Avropad"><input type="date" value={draft.calloff_at ?? ''} onChange={(e) => setDraft({ ...draft, calloff_at: e.target.value })} /></Field>
+          {draft.garage_direction === 'UT' ? <>
+            <Field label="VIN"><input value={draft.vin ?? ''} onChange={(e) => setDraft({ ...draft, vin: e.target.value.toUpperCase() })} /></Field>
+            <Field label="Källreg"><input value={draft.source_regnr ?? ''} onChange={(e) => setDraft({ ...draft, source_regnr: e.target.value.toUpperCase() })} /></Field>
+            <Field label="Orsak"><select value={draft.planning_reason} onChange={(e) => setDraft({ ...draft, planning_reason: e.target.value as PlanningReason })}><option>BEHOV</option><option value="UTOK">UTÖK</option><option>MINSKNING</option><option>SALU</option><option value="SALU_RETUR">SALU RETUR</option><option>ANNAT</option></select></Field>
+            <Field label="Order"><input value={draft.order_reference ?? ''} onChange={(e) => setDraft({ ...draft, order_reference: e.target.value })} /></Field>
+            <Field label="Beställd"><input type="date" value={draft.ordered_at ?? ''} onChange={(e) => setDraft({ ...draft, ordered_at: e.target.value })} /></Field>
+            <Field label="Bekräftelse"><select value={draft.confirmation_status} onChange={(e) => setDraft({ ...draft, confirmation_status: e.target.value })}><option value="PLANERAD">Planerad</option><option value="BESTALLD">Beställd</option><option value="AVROPAD">Avropad</option><option value="AVVAKTAR_BEKRAFTELSE">Avvaktar bekräftelse</option><option value="BEKRAFTAD">Bekräftad</option></select></Field>
+            <Field label="Transport"><select value={draft.transport_status} onChange={(e) => setDraft({ ...draft, transport_status: e.target.value })}><option value="EJ_BOKAD">Ej bokad</option><option value="TRANSPORTBOKAD">Transport bokad</option><option value="PA_VAG">På väg</option></select></Field>
+          </> : null}
           <Field label="Planerad leverans"><input type="date" value={draft.planned_delivery_date ?? ''} onChange={(e) => setDraft({ ...draft, planned_delivery_date: e.target.value })} /></Field>
           <Field label="Kommentar"><input value={draft.note ?? ''} onChange={(e) => setDraft({ ...draft, note: e.target.value })} /></Field>
         </div>
