@@ -60,6 +60,7 @@ const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 
 const defaultPeriod = () => new Date().toISOString().slice(0, 7);
 const draftKey = (period: string) => `incheckad-planning-draft-v3:${period}`;
 const normalizedCount = (raw: string) => Math.max(0, Number.parseInt(raw.trim() || '0', 10) || 0);
+const normalizeText = (value: string) => value.trim().toLocaleUpperCase('sv');
 
 function pivot(cells: ApiCell[], stations: PlanningStation[], models: PlanningModel[], saluModels: SaluModel[]): ModelRow[] {
   const stationTemplate = () => Object.fromEntries(stations.map((station) => [station.station_code, emptyCounts()]));
@@ -139,6 +140,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const [periodInput, setPeriodInput] = useState(selectedPeriod);
   const [metric, setMetric] = useState<DecisionMetric>('ordered_count');
   const [stations, setStations] = useState<PlanningStation[]>([]);
+  const [registryModels, setRegistryModels] = useState<PlanningModel[]>([]);
   const [rows, setRows] = useState<ModelRow[]>([]);
   const [saluWindow, setSaluWindow] = useState<SaluWindow | null>(null);
   const [unmappedSalu, setUnmappedSalu] = useState<SaluModel[]>([]);
@@ -161,6 +163,16 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
       .filter((row) => !needle || row.model.toLocaleLowerCase('sv').includes(needle) || row.brand.toLocaleLowerCase('sv').includes(needle))
       .sort((a, b) => a.brand.localeCompare(b.brand, 'sv') || a.sortOrder - b.sortOrder || a.model.localeCompare(b.model, 'sv'));
   }, [rows, search]);
+  const savedBrands = useMemo(() => [...new Set(registryModels.map((model) => model.brand.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'sv')), [registryModels]);
+  const savedModels = useMemo(() => {
+    const brand = normalizeText(newBrand);
+    return registryModels
+      .filter((model) => !brand || normalizeText(model.brand) === brand)
+      .map((model) => model.display_name.trim())
+      .filter(Boolean)
+      .filter((value, index, all) => all.findIndex((item) => normalizeText(item) === normalizeText(value)) === index)
+      .sort((a, b) => a.localeCompare(b, 'sv'));
+  }, [newBrand, registryModels]);
   const totalForRow = (row: ModelRow) => stations.reduce((sum, station) => sum + (row.stations[station.station_code] ?? emptyCounts())[metric], 0);
   const stationTotals = useMemo(() => Object.fromEntries(stations.map((station) => [station.station_code, rows.reduce((sum, row) => sum + (row.stations[station.station_code] ?? emptyCounts())[metric], 0)])), [metric, rows, stations]);
   const grandTotal = useMemo(() => Object.values(stationTotals).reduce((sum, value) => sum + value, 0), [stationTotals]);
@@ -175,6 +187,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
     const restored = recover ? restoreDraft(nextPeriod, serverRows) : { rows: serverRows, restored: 0 };
     const codes = new Set(nextModels.map((model) => model.model_code));
     setStations(nextStations);
+    setRegistryModels(nextModels);
     setRows(restored.rows);
     setSaluWindow(bundle.salu.data?.saluWindow ?? null);
     setUnmappedSalu(saluModels.filter((model) => !codes.has(model.key) && (model.windowTotal ?? 0) > 0));
@@ -311,36 +324,44 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
     if (!brand || !name) return;
     setError(null); setStatus(null);
     try {
-      const modelCode = `CUSTOM:${crypto.randomUUID()}`;
-      const modelResponse = await fetch('/api/planning/models', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_code: modelCode, display_name: name, brand, is_electric: false, is_automatic: false, daily_rate: null, aliases: [], sort_order: 9999, is_active: true }),
-      });
-      const modelBody = await modelResponse.json();
-      if (!modelResponse.ok) throw new Error(modelBody?.error ?? 'Kunde inte lägga till modellen');
+      const existing = registryModels.find((model) => normalizeText(model.brand) === normalizeText(brand) && normalizeText(model.display_name) === normalizeText(name));
+      let modelCode = existing?.model_code ?? `CUSTOM:${crypto.randomUUID()}`;
 
-      const periodRows = stations.map((station) => ({
-        period_code: period,
-        model_code: modelCode,
-        model: name,
-        station: station.station_code,
-        ...emptyCounts(),
-        note: null,
-      }));
-      if (periodRows.length) {
-        const planningResponse = await fetch('/api/fleet-planning', {
+      if (!existing) {
+        const modelResponse = await fetch('/api/planning/models', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(periodRows),
+          body: JSON.stringify({ model_code: modelCode, display_name: name, brand, is_electric: false, is_automatic: false, daily_rate: null, aliases: [], sort_order: 9999, is_active: true }),
         });
-        const planningBody = await planningResponse.json();
-        if (!planningResponse.ok) throw new Error(planningBody?.error ?? 'Kunde inte lägga till raden i planeringen');
+        const modelBody = await modelResponse.json() as { data?: PlanningModel; error?: string };
+        if (!modelResponse.ok) throw new Error(modelBody?.error ?? 'Kunde inte lägga till modellen');
+        modelCode = modelBody.data?.model_code ?? modelCode;
       }
 
-      setNewBrand(''); setNewModel(''); setAddingModel(false);
+      const alreadyInPeriod = rows.some((row) => row.modelCode === modelCode);
+      if (!alreadyInPeriod) {
+        const periodRows = stations.map((station) => ({
+          period_code: period,
+          model_code: modelCode,
+          model: existing?.display_name ?? name,
+          station: station.station_code,
+          ...emptyCounts(),
+          note: null,
+        }));
+        if (periodRows.length) {
+          const planningResponse = await fetch('/api/fleet-planning', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(periodRows),
+          });
+          const planningBody = await planningResponse.json();
+          if (!planningResponse.ok) throw new Error(planningBody?.error ?? 'Kunde inte lägga till raden i planeringen');
+        }
+      }
+
+      setNewBrand(brand.toUpperCase()); setNewModel(''); setAddingModel(false);
       await load(period, false);
-      setStatus(`${brand.toUpperCase()} ${name} tillagd i ${period}.`);
+      setStatus(alreadyInPeriod ? `${brand.toUpperCase()} ${name} finns redan i ${period}.` : `${brand.toUpperCase()} ${name} tillagd i ${period}.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Kunde inte lägga till modellen'); }
   };
 
@@ -379,8 +400,10 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
       </section>
 
       {addingModel ? <section className={styles.addModelBar}>
-        <input value={newBrand} onChange={(event) => setNewBrand(event.target.value)} placeholder="Nytt märke" aria-label="Nytt märke" />
-        <input value={newModel} onChange={(event) => setNewModel(event.target.value)} placeholder="Ny modell" aria-label="Ny modell" onKeyDown={(event) => { if (event.key === 'Enter') void createModel(); }} />
+        <input list="planning-saved-brands" value={newBrand} onChange={(event) => setNewBrand(event.target.value)} placeholder="Märke" aria-label="Märke" autoComplete="off" />
+        <datalist id="planning-saved-brands">{savedBrands.map((brand) => <option key={brand} value={brand} />)}</datalist>
+        <input list="planning-saved-models" value={newModel} onChange={(event) => setNewModel(event.target.value)} placeholder="Modell" aria-label="Modell" autoComplete="off" onKeyDown={(event) => { if (event.key === 'Enter') void createModel(); }} />
+        <datalist id="planning-saved-models">{savedModels.map((model) => <option key={model} value={model} />)}</datalist>
         <button type="button" className={styles.primaryButton} onClick={() => void createModel()} disabled={!newBrand.trim() || !newModel.trim()}>Lägg till</button>
       </section> : null}
 
