@@ -65,18 +65,22 @@ export default function GarageClient() {
   const [saluSources, setSaluSources] = useState<SaluSource[]>([]);
   const [saluDirection, setSaluDirection] = useState<GarageDirection | ''>('');
   const [saluStation, setSaluStation] = useState('');
+  const [supplierDrafts, setSupplierDrafts] = useState<Record<string, string>>({});
+  const [savingSupplierId, setSavingSupplierId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const applyPayload = useCallback((payload: { data?: GarageItem[]; stations?: PlanningStation[]; models?: PlanningModel[] }) => {
     const nextStations = payload.stations ?? [];
+    const nextItems = payload.data ?? [];
     setStations(nextStations);
     setModels(payload.models ?? []);
-    setItems(payload.data ?? []);
+    setItems(nextItems);
+    setSupplierDrafts(Object.fromEntries(nextItems.map((item) => [item.garage_item_id, item.supplier ?? ''])));
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
     setSaluStation((current) => current || nextStations[0]?.station_code || '');
-  }, [setStations, setModels, setItems, setDraft, setSaluStation]);
+  }, [setStations, setModels, setItems, setSupplierDrafts, setDraft, setSaluStation]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,6 +137,23 @@ export default function GarageClient() {
     const payload = await response.json();
     if (!response.ok) return setError(payload?.error ?? 'Kunde inte uppdatera Garaget');
     setItems((current) => current.map((value) => value.garage_item_id === item.garage_item_id ? payload.data : value));
+  };
+
+  const saveSupplier = async (item: GarageItem) => {
+    setSavingSupplierId(item.garage_item_id);
+    setError(null);
+    try {
+      const value = supplierDrafts[item.garage_item_id]?.trim() || null;
+      const response = await fetch('/api/garage', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ garage_item_id: item.garage_item_id, supplier: value }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte spara leverantör');
+      setItems((current) => current.map((entry) => entry.garage_item_id === item.garage_item_id ? payload.data : entry));
+      setSupplierDrafts((current) => ({ ...current, [item.garage_item_id]: payload.data?.supplier ?? '' }));
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Kunde inte spara leverantör');
+    } finally {
+      setSavingSupplierId(null);
+    }
   };
 
   const loadSaluSources = async () => {
@@ -226,14 +247,14 @@ export default function GarageClient() {
       </section>
 
       <section className={styles.tableSection}>{loading ? <div className={styles.empty}>Läser Garaget…</div> : direction === 'IN' ? (
-        <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Månad</th><th>Modell</th><th>Reg.nr</th><th>Station</th><th>Leverantör</th><th>Dygnsdeb</th><th>Avropad</th><th>Leverans</th><th>Kommentar</th></tr></thead>
+        <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Månad</th><th>Modell</th><th className={styles.regnrColumn}>Reg.nr</th><th>Station</th><th>Leverantör</th><th>Dygnsdeb</th><th>Avropad</th><th>Leverans</th><th>Kommentar</th></tr></thead>
           <tbody>{visible.map((item) => <tr key={item.garage_item_id}>
             <td>{sourceLabel(item)}</td>
             <td>{item.planning_period ?? '—'}</td>
             <td>{item.model}</td>
-            <td><input defaultValue={item.regnr ?? ''} onBlur={(e) => blurPatch(item, 'regnr', item.regnr, e.target.value.toUpperCase() || null)} /></td>
+            <td className={styles.regnrColumn}><input className={styles.regnrInput} defaultValue={item.regnr ?? ''} onBlur={(e) => blurPatch(item, 'regnr', item.regnr, e.target.value.toUpperCase() || null)} /></td>
             <td>{item.planned_station ?? '—'}</td>
-            <td><input defaultValue={item.supplier ?? ''} onBlur={(e) => blurPatch(item, 'supplier', item.supplier, e.target.value || null)} /></td>
+            <td><div className={styles.supplierEditor}><input value={supplierDrafts[item.garage_item_id] ?? ''} onChange={(e) => setSupplierDrafts((current) => ({ ...current, [item.garage_item_id]: e.target.value }))} /><button type="button" className={styles.rowSaveButton} disabled={savingSupplierId === item.garage_item_id || (supplierDrafts[item.garage_item_id] ?? '') === (item.supplier ?? '')} onClick={() => void saveSupplier(item)}>{savingSupplierId === item.garage_item_id ? '…' : 'Spara'}</button></div></td>
             <td><input className={styles.rate} type="number" min="0" defaultValue={item.daily_rate ?? ''} onBlur={(e) => blurPatch(item, 'daily_rate', item.daily_rate, e.target.value === '' ? null : Number(e.target.value))} /></td>
             <td><input type="date" defaultValue={item.calloff_at ?? ''} onBlur={(e) => blurPatch(item, 'calloff_at', item.calloff_at, e.target.value || null)} /></td>
             <td><input type="date" defaultValue={item.planned_delivery_date ?? ''} onBlur={(e) => blurPatch(item, 'planned_delivery_date', item.planned_delivery_date, e.target.value || null)} /></td>

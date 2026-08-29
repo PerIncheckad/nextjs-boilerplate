@@ -18,6 +18,15 @@ function clean(value: unknown): string | null {
   return next || null;
 }
 
+function stockholmDate() {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Europe/Stockholm',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
 async function materializePlanningToGarage(
   admin: ReturnType<typeof adminClient>,
   period: string,
@@ -60,6 +69,7 @@ async function materializePlanningToGarage(
   }
 
   const now = new Date().toISOString();
+  const calloffDate = stockholmDate();
   const rows: Record<string, unknown>[] = [];
   for (const cell of cells) {
     const used = usedByCell.get(cell.planning_cell_id) ?? new Set<number>();
@@ -72,6 +82,7 @@ async function materializePlanningToGarage(
         planning_reason: 'ANNAT',
         planned_station: cell.station,
         daily_rate: cell.model_code ? (rateByModelCode.get(cell.model_code) ?? null) : null,
+        calloff_at: calloffDate,
         confirmation_status: 'PLANERAD',
         transport_status: 'EJ_BOKAD',
         source_kind: 'PLANERING',

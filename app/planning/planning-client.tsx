@@ -54,6 +54,8 @@ type PlanningPayload = { data?: ApiCell[]; stations?: PlanningStation[]; models?
 type SaluModel = { key: string; label: string; windowTotal?: number };
 type SaluWindow = { start: string; end: string; total: number; marginDays: number };
 type SaluPayload = { data?: { models?: SaluModel[]; saluWindow?: SaluWindow } };
+type PlanningStatus = 'PAGAENDE' | 'KLAR';
+type PlanningStatusPayload = { data?: { status?: PlanningStatus } };
 type Props = { selectedPeriod: string; onPeriodChange: (period: string) => void };
 
 const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 0, minskning_count: 0, ordered_count: 0 });
@@ -125,14 +127,16 @@ function restoreDraft(period: string, serverRows: ModelRow[]) {
 }
 
 async function fetchPlanningBundle(nextPeriod: string) {
-  const [planningResponse, saluResponse] = await Promise.all([
+  const [planningResponse, saluResponse, statusResponse] = await Promise.all([
     fetch(`/api/fleet-planning?period=${encodeURIComponent(nextPeriod)}`, { cache: 'no-store' }),
     fetch(`/api/planning/salu-overview?period=${encodeURIComponent(nextPeriod)}`, { cache: 'no-store' }),
+    fetch(`/api/planning/period-status?period=${encodeURIComponent(nextPeriod)}`, { cache: 'no-store' }),
   ]);
   const planning = await planningResponse.json() as PlanningPayload & { error?: string };
   if (!planningResponse.ok) throw new Error(planning.error ?? 'Kunde inte läsa planeringen');
   const salu = saluResponse.ok ? await saluResponse.json() as SaluPayload : {};
-  return { planning, salu };
+  const planningStatus = statusResponse.ok ? await statusResponse.json() as PlanningStatusPayload : {};
+  return { planning, salu, planningStatus };
 }
 
 export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: Props) {
@@ -144,6 +148,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const [rows, setRows] = useState<ModelRow[]>([]);
   const [saluWindow, setSaluWindow] = useState<SaluWindow | null>(null);
   const [unmappedSalu, setUnmappedSalu] = useState<SaluModel[]>([]);
+  const [planningStatus, setPlanningStatus] = useState<PlanningStatus>('PAGAENDE');
   const [loading, setLoading] = useState(true);
   const [savingAll, setSavingAll] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -155,6 +160,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
 
+  const locked = planningStatus === 'KLAR';
   const dirtyRows = useMemo(() => rows.filter((row) => row.dirtyPlanning || row.dirtyModel), [rows]);
   const metricLabel = DECISIONS.find(([key]) => key === metric)?.[1] ?? 'BESTÄLLT';
   const visibleRows = useMemo(() => {
@@ -183,17 +189,20 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
     const nextStations = bundle.planning.stations ?? [];
     const nextModels = bundle.planning.models ?? [];
     const saluModels = bundle.salu.data?.models ?? [];
+    const nextStatus = bundle.planningStatus.data?.status === 'KLAR' ? 'KLAR' : 'PAGAENDE';
     const serverRows = pivot(bundle.planning.data ?? [], nextStations, nextModels, saluModels);
-    const restored = recover ? restoreDraft(nextPeriod, serverRows) : { rows: serverRows, restored: 0 };
+    const restored = recover && nextStatus !== 'KLAR' ? restoreDraft(nextPeriod, serverRows) : { rows: serverRows, restored: 0 };
     const codes = new Set(nextModels.map((model) => model.model_code));
     setStations(nextStations);
     setRegistryModels(nextModels);
     setRows(restored.rows);
     setSaluWindow(bundle.salu.data?.saluWindow ?? null);
     setUnmappedSalu(saluModels.filter((model) => !codes.has(model.key) && (model.windowTotal ?? 0) > 0));
+    setPlanningStatus(nextStatus);
     setPeriod(nextPeriod);
     setPeriodInput(nextPeriod);
     setDraftNotice(restored.restored ? `Återställde ${restored.restored} osparade rader.` : null);
+    if (nextStatus === 'KLAR' && typeof window !== 'undefined') window.localStorage.removeItem(draftKey(nextPeriod));
   }, []);
 
   const load = useCallback(async (nextPeriod: string, recover = true) => {
@@ -215,22 +224,24 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   }, [applyBundle, selectedPeriod]);
 
   useEffect(() => {
+    if (locked) return;
     const timer = window.setTimeout(() => {
       if (!dirtyRows.length) { window.localStorage.removeItem(draftKey(period)); return; }
       const envelope: DraftEnvelope = { version: 3, savedAt: new Date().toISOString(), rows: dirtyRows };
       window.localStorage.setItem(draftKey(period), JSON.stringify(envelope));
     }, 150);
     return () => window.clearTimeout(timer);
-  }, [dirtyRows, period]);
+  }, [dirtyRows, locked, period]);
 
   useEffect(() => {
-    if (!dirtyRows.length) return;
+    if (locked || !dirtyRows.length) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirtyRows.length]);
+  }, [dirtyRows.length, locked]);
 
   const updateCount = (key: string, stationCode: string, raw: string) => {
+    if (locked) return;
     const value = normalizedCount(raw);
     setStatus(null); setDraftNotice(null);
     setRows((current) => current.map((row) => row.key === key ? {
@@ -241,10 +252,12 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   };
 
   const updateNote = (key: string, value: string) => {
+    if (locked) return;
     setRows((current) => current.map((row) => row.key === key ? { ...row, note: value, dirtyPlanning: true } : row));
   };
 
   const updateModel = (key: string, patch: Partial<Pick<ModelRow, 'brand' | 'model' | 'isElectric' | 'dailyRate'>>) => {
+    if (locked) return;
     setStatus(null);
     setRows((current) => current.map((row) => row.key === key ? { ...row, ...patch, dirtyModel: true } : row));
   };
@@ -289,6 +302,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   };
 
   const saveRow = async (row: ModelRow) => {
+    if (locked) return;
     setSavingKey(row.key); setError(null); setStatus(null);
     try {
       if (row.dirtyModel) await saveModel(row);
@@ -300,7 +314,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   };
 
   const saveAll = async () => {
-    if (!dirtyRows.length) return;
+    if (locked || !dirtyRows.length) return;
     setSavingAll(true); setError(null); setStatus(null);
     try {
       for (const row of dirtyRows.filter((item) => item.dirtyModel)) await saveModel(row);
@@ -319,6 +333,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   };
 
   const createModel = async () => {
+    if (locked) return;
     const brand = newBrand.trim();
     const name = newModel.trim();
     if (!brand || !name) return;
@@ -394,12 +409,12 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
           {DECISIONS.map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={metric === key} className={metric === key ? styles.decisionTabActive : styles.decisionTab} onClick={() => setMetric(key)}>{label}</button>)}
         </div>
         <input className={styles.searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök märke/modell…" aria-label="Sök märke eller modell" />
-        <button type="button" className={styles.secondaryButton} onClick={() => setAddingModel((value) => !value)}>+ Märke / modell</button>
-        <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button>
+        {!locked ? <button type="button" className={styles.secondaryButton} onClick={() => setAddingModel((value) => !value)}>+ Märke / modell</button> : null}
+        {!locked ? <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button> : <div className={styles.periodStatus}><span>PLANERING</span><strong>SKICKAD TILL GARAGET</strong></div>}
         <div className={styles.periodStatus}><span>SALU-fönster</span><strong>{saluWindow ? `${saluWindow.start} – ${saluWindow.end}` : '–'}</strong></div>
       </section>
 
-      {addingModel ? <section className={styles.addModelBar}>
+      {!locked && addingModel ? <section className={styles.addModelBar}>
         <input list="planning-saved-brands" value={newBrand} onChange={(event) => setNewBrand(event.target.value)} placeholder="Märke" aria-label="Märke" autoComplete="off" />
         <datalist id="planning-saved-brands">{savedBrands.map((brand) => <option key={brand} value={brand} />)}</datalist>
         <input list="planning-saved-models" value={newModel} onChange={(event) => setNewModel(event.target.value)} placeholder="Modell" aria-label="Modell" autoComplete="off" onKeyDown={(event) => { if (event.key === 'Enter') void createModel(); }} />
@@ -413,33 +428,33 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
       {unmappedSalu.length ? <div className={styles.info}><strong>SALU utan modellkoppling:</strong> {unmappedSalu.map((item) => `${item.label} (${item.windowTotal ?? 0})`).join(' · ')}. Lägg till eller rätta märke/modell vid behov.</div> : null}
 
       <section className={styles.gridSection}>
-        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>MÄRKE · MODELL · EL · stationer · SUMMA · SALU · DYGNDEB</span></div><strong>{dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{visibleRows.length} rader</strong></div>
+        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>MÄRKE · MODELL · EL · stationer · SUMMA · SALU · DYGNDEB</span></div><strong>{!locked && dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{visibleRows.length} rader</strong></div>
         {loading || periodChanging ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
           <div className={styles.tableWrap}><table className={styles.simplePlanningTable}>
             <thead><tr>
               <th className={styles.modelColumn}>Märke</th><th className={styles.modelColumn}>Modell</th><th className={styles.flagColumn}>EL</th>
               {stations.map((station) => <th key={station.station_code}>{station.station_code}<small>{station.display_name && station.display_name !== station.station_code ? station.display_name : ''}</small></th>)}
-              <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th><th className={styles.actionColumn}>Spara</th><th className={styles.rateColumn}>Dygnsdeb</th>
+              <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th>{!locked ? <th className={styles.actionColumn}>Spara</th> : null}<th className={styles.rateColumn}>Dygnsdeb</th>
             </tr></thead>
             <tbody>
               {visibleRows.flatMap((row, index) => {
                 const brandHeader = index === 0 || visibleRows[index - 1]?.brand !== row.brand
-                  ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + 8}>{row.brand}</td></tr>
+                  ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + (locked ? 7 : 8)}>{row.brand}</td></tr>
                   : null;
                 const isDirty = row.dirtyModel || row.dirtyPlanning;
-                return [brandHeader, <tr key={row.key} className={isDirty ? styles.dirtyRow : undefined}>
-                  <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.brand} onChange={(event) => updateModel(row.key, { brand: event.target.value })} aria-label={`Märke ${row.modelCode}`} /></td>
-                  <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.model} onChange={(event) => updateModel(row.key, { model: event.target.value })} aria-label={`Modellnamn ${row.modelCode}`} /></td>
-                  <td className={styles.flagColumn}><input className={styles.checkInput} type="checkbox" checked={row.isElectric} onChange={(event) => updateModel(row.key, { isElectric: event.target.checked })} aria-label={`${row.model} EL`} /></td>
-                  {stations.map((station) => <td key={`${row.key}-${station.station_code}`} className={styles.numberCell}><input data-planning-cell="true" type="number" min={0} inputMode="numeric" value={(row.stations[station.station_code] ?? emptyCounts())[metric]} onChange={(event) => updateCount(row.key, station.station_code, event.target.value)} onKeyDown={(event) => moveFocus(event, event.shiftKey ? -1 : 1)} onFocus={(event) => event.currentTarget.select()} aria-label={`${row.model} ${metricLabel} ${station.station_code}`} /></td>)}
+                return [brandHeader, <tr key={row.key} className={!locked && isDirty ? styles.dirtyRow : undefined}>
+                  <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.brand} disabled={locked} onChange={(event) => updateModel(row.key, { brand: event.target.value })} aria-label={`Märke ${row.modelCode}`} /></td>
+                  <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.model} disabled={locked} onChange={(event) => updateModel(row.key, { model: event.target.value })} aria-label={`Modellnamn ${row.modelCode}`} /></td>
+                  <td className={styles.flagColumn}><input className={styles.checkInput} type="checkbox" checked={row.isElectric} disabled={locked} onChange={(event) => updateModel(row.key, { isElectric: event.target.checked })} aria-label={`${row.model} EL`} /></td>
+                  {stations.map((station) => <td key={`${row.key}-${station.station_code}`} className={styles.numberCell}><input data-planning-cell="true" type="number" min={0} inputMode="numeric" value={(row.stations[station.station_code] ?? emptyCounts())[metric]} disabled={locked} onChange={(event) => updateCount(row.key, station.station_code, event.target.value)} onKeyDown={(event) => moveFocus(event, event.shiftKey ? -1 : 1)} onFocus={(event) => event.currentTarget.select()} aria-label={`${row.model} ${metricLabel} ${station.station_code}`} /></td>)}
                   <td className={styles.rowTotal}>{totalForRow(row)}</td>
                   <td className={styles.saluColumn}>{row.salu}</td>
-                  <td className={styles.noteColumn}><input value={row.note} onChange={(event) => updateNote(row.key, event.target.value)} placeholder="Kommentar…" /></td>
-                  <td className={styles.actionColumn}><button type="button" className={isDirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key || !isDirty}>{savingKey === row.key ? '…' : isDirty ? 'Spara*' : 'Sparad'}</button></td>
-                  <td className={styles.rateColumn}><input type="number" min={0} inputMode="numeric" value={row.dailyRate ?? ''} placeholder="–" onChange={(event) => updateModel(row.key, { dailyRate: event.target.value === '' ? null : normalizedCount(event.target.value) })} aria-label={`${row.model} dygnsdeb`} /></td>
+                  <td className={styles.noteColumn}><input value={row.note} disabled={locked} onChange={(event) => updateNote(row.key, event.target.value)} placeholder="Kommentar…" /></td>
+                  {!locked ? <td className={styles.actionColumn}><button type="button" className={isDirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key || !isDirty}>{savingKey === row.key ? '…' : isDirty ? 'Spara*' : 'Sparad'}</button></td> : null}
+                  <td className={styles.rateColumn}><input type="number" min={0} inputMode="numeric" value={row.dailyRate ?? ''} placeholder="–" disabled={locked} onChange={(event) => updateModel(row.key, { dailyRate: event.target.value === '' ? null : normalizedCount(event.target.value) })} aria-label={`${row.model} dygnsdeb`} /></td>
                 </tr>];
               })}
-              <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td><td /><td />{stations.map((station) => <td key={`total-${station.station_code}`}>{stationTotals[station.station_code] ?? 0}</td>)}<td className={styles.rowTotal}>{grandTotal}</td><td className={styles.saluColumn}>{saluTotal}</td><td /><td /><td /></tr>
+              <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td><td /><td />{stations.map((station) => <td key={`total-${station.station_code}`}>{stationTotals[station.station_code] ?? 0}</td>)}<td className={styles.rowTotal}>{grandTotal}</td><td className={styles.saluColumn}>{saluTotal}</td><td />{!locked ? <td /> : null}<td /></tr>
             </tbody>
           </table></div>
         )}
