@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const migration = readFileSync('migrations/20260829123500_add_garage_voiding_v1.sql', 'utf8');
+const atomicHandoffMigration = readFileSync('migrations/20260830010000_atomic_planning_garage_handoff.sql', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const voidApi = readFileSync('app/api/garage/void/route.ts', 'utf8');
-const planningStatus = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
 const planningSources = readFileSync('app/api/garage/planning-sources/route.ts', 'utf8');
 const lager1Sources = readFileSync('app/api/garage/lager1-sources/route.ts', 'utf8');
 const saluSources = readFileSync('app/api/garage/salu-sources/route.ts', 'utf8');
@@ -28,9 +28,11 @@ test('Garage voiding refuses objects already handed to Ny bil or with wheel-chan
 });
 
 test('active Garage read models consistently exclude voided objects', () => {
-  for (const source of [garageApi, planningStatus, planningSources, lager1Sources, saluSources, nybilHandoff]) {
+  for (const source of [garageApi, planningSources, lager1Sources, saluSources, nybilHandoff]) {
     assert.match(source, /is\('voided_at', null\)/);
   }
+  assert.match(atomicHandoffMigration, /gi\.voided_at is null/);
+  assert.match(atomicHandoffMigration, /where source_kind = 'PLANERING' and voided_at is null/);
 });
 
 test('void endpoint is authenticated and delegates to the server-only RPC', () => {

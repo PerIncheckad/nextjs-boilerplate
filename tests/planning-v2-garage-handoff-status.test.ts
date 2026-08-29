@@ -6,6 +6,7 @@ const ui = readFileSync('app/planning/planning-garage-handoff.tsx', 'utf8');
 const workspace = readFileSync('app/planning/planning-workspace.tsx', 'utf8');
 const route = readFileSync('app/api/garage/planning-sources/route.ts', 'utf8');
 const statusRoute = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
+const atomicHandoffMigration = readFileSync('migrations/20260830010000_atomic_planning_garage_handoff.sql', 'utf8');
 
 test('Planning shows a read-only BESTÄLLT to Garage handoff for the shared month', () => {
   assert.match(workspace, /<PlanningGarageHandoff period=\{period\} \/>/);
@@ -23,8 +24,10 @@ test('KLAR is the only user action that releases BESTÄLLT to Garage', () => {
   assert.doesNotMatch(ui, /method:\s*'PATCH'/);
   assert.match(ui, /\/api\/planning\/period-status/);
   assert.match(ui, /method:\s*'PUT'/);
-  assert.match(statusRoute, /materializePlanningToGarage/);
   assert.match(statusRoute, /status === 'KLAR'/);
+  assert.match(statusRoute, /admin\.rpc\('finalize_planning_period_to_garage'/);
+  assert.match(atomicHandoffMigration, /insert into public\.garage_items/);
+  assert.match(atomicHandoffMigration, /insert into public\.planning_period_status/);
 });
 
 test('Garage planning source read model derives remaining from persisted BESTÄLLT and materialized units', () => {

@@ -6,6 +6,7 @@ const migration = readFileSync('migrations/20260825201500_add_planning_and_garag
 const modelMigration = readFileSync('migrations/20260825205500_add_planning_vehicle_models_v1.sql', 'utf8');
 const directionMigration = readFileSync('migrations/20260825211000_add_garage_direction_v1.sql', 'utf8');
 const finalMigration = readFileSync('migrations/20260825213500_finalize_planning_garage_v1.sql', 'utf8');
+const atomicHandoffMigration = readFileSync('migrations/20260830010000_atomic_planning_garage_handoff.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const planningModelApi = readFileSync('app/api/planning/models/route.ts', 'utf8');
 const planningStatusApi = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
@@ -97,14 +98,15 @@ test('Garage station replanning is atomic and audited', () => {
 test('KLAR materializes BESTALLT automatically without duplicate units and stamps Avropad', () => {
   assert.match(finalMigration, /source_kind.*PLANERING/s);
   assert.match(finalMigration, /garage_items_planning_source_uidx/);
-  assert.match(planningStatusApi, /materializePlanningToGarage/);
-  assert.match(planningStatusApi, /source_planning_unit_no/);
-  assert.match(planningStatusApi, /source_kind: 'PLANERING'/);
-  assert.match(planningStatusApi, /garage_direction: 'IN'/);
-  assert.match(planningStatusApi, /from\('planning_vehicle_models'\)/);
-  assert.match(planningStatusApi, /daily_rate/);
-  assert.match(planningStatusApi, /calloff_at: calloffDate/);
-  assert.match(planningStatusApi, /Europe\/Stockholm/);
+  assert.match(planningStatusApi, /admin\.rpc\('finalize_planning_period_to_garage'/);
+  assert.match(atomicHandoffMigration, /source_planning_unit_no/);
+  assert.match(atomicHandoffMigration, /'PLANERING'/);
+  assert.match(atomicHandoffMigration, /'IN'/);
+  assert.match(atomicHandoffMigration, /planning_vehicle_models/);
+  assert.match(atomicHandoffMigration, /daily_rate/);
+  assert.match(atomicHandoffMigration, /v_calloff_date/);
+  assert.match(atomicHandoffMigration, /Europe\/Stockholm/);
+  assert.match(atomicHandoffMigration, /voided_at is null/);
   assert.doesNotMatch(garageUi, /Hämta från Planering/);
   assert.match(garageUi, /markeras KLAR skapas BESTÄLLT automatiskt/);
 });
