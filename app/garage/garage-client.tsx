@@ -69,11 +69,6 @@ export default function GarageClient() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (MONTH_RE.test(requestedPeriod)) setPeriodFilter(requestedPeriod);
-    setDirection(requestedDirection);
-  }, [requestedPeriod, requestedDirection]);
-
   const applyPayload = useCallback((payload: { data?: GarageItem[]; stations?: PlanningStation[]; models?: PlanningModel[] }) => {
     const nextStations = payload.stations ?? [];
     setStations(nextStations);
@@ -81,7 +76,7 @@ export default function GarageClient() {
     setItems(payload.data ?? []);
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
     setSaluStation((current) => current || nextStations[0]?.station_code || '');
-  }, []);
+  }, [setStations, setModels, setItems, setDraft, setSaluStation]);
 
   const load = useCallback(async () => {
     setLoading(true);
