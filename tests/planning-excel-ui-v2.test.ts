@@ -28,7 +28,16 @@ test('planning makes brand, model, EL and daily rate editable from the work surf
   assert.match(planningUi, /row\.dailyRate/);
   assert.match(planningUi, /\/api\/planning\/models/);
   assert.match(planningUi, /\+ Märke \/ modell/);
-  assert.match(planningUi, /placeholder="Nytt märke"/);
+  assert.match(planningUi, /list="planning-saved-brands"/);
+  assert.match(planningUi, /datalist id="planning-saved-brands"/);
+  assert.match(planningUi, /list="planning-saved-models"/);
+  assert.match(planningUi, /datalist id="planning-saved-models"/);
+});
+
+test('saved brand and model can reuse stable model identity', () => {
+  assert.match(planningUi, /registryModels\.find/);
+  assert.match(planningUi, /existing\?\.model_code/);
+  assert.match(planningUi, /alreadyInPeriod/);
 });
 
 test('planning period list is built from period cells instead of every master model', () => {
