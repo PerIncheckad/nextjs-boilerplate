@@ -22,11 +22,15 @@ test('KLAR locks further planning writes until reopened', () => {
   assert.match(planningApi, /Öppna planeringen igen/);
 });
 
-test('Garage materialization is server-blocked while planning is ongoing', () => {
+test('Garage Planning source is read-only and materialization only uses the atomic KLAR RPC', () => {
+  assert.match(planningSourceApi, /export async function GET/);
   assert.match(planningSourceApi, /periodStatus/);
-  assert.match(planningSourceApi, /gate\.status !== 'KLAR'/);
-  assert.match(planningSourceApi, /Planeringen är PÅGÅENDE/);
+  assert.match(planningSourceApi, /\.eq\('source_kind', 'PLANERING'\)/);
+  assert.match(planningSourceApi, /\.is\('voided_at', null\)/);
   assert.match(planningSourceApi, /can_materialize: gate\.status === 'KLAR'/);
+  assert.doesNotMatch(planningSourceApi, /export async function POST/);
+  assert.doesNotMatch(planningSourceApi, /\.from\('garage_items'\)\.insert/);
+  assert.match(statusApi, /finalize_planning_period_to_garage/);
 });
 
 test('handoff UI exposes explicit ready/reopen control and rejects local unsaved draft', () => {
