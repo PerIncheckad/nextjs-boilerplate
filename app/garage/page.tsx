@@ -25,31 +25,31 @@ export default function GaragePage() {
       <div className={styles.workspace}>
         <nav className={styles.flowNav} aria-label="Garaget arbetsflöde">
           <span>ARBETSFLÖDE</span>
-          <a href="#overlamningar">1. Överlämningar</a>
-          <a href="#orderflode">2. Orderflöde</a>
-          <a href="#kontrollpunkter">3. Kontrollpunkter</a>
-          <a href="#garageobjekt">4. Garage-objekt</a>
+          <a href="#garageobjekt">1. Garage</a>
+          <a href="#nybil">2. Ny bil</a>
+          <a href="#avveckla">3. Avveckla</a>
+          <a href="#kontrollpunkter">4. Kontrollpunkter</a>
         </nav>
 
-        <section id="overlamningar" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>01 / ÖVERLÄMNINGAR</strong><span>In i Garaget och vidare till Ny bil</span></div>
+        <section id="garageobjekt" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>01 / GARAGE</strong><span>UTVECKLA / IN börjar här · Planering KLAR skapar objekten automatiskt</span></div>
+          <GarageClient />
+          <GarageVoidPanel />
+        </section>
+
+        <section id="nybil" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>02 / NY BIL</strong><span>Överlämna UTVECKLA-bilen när fysisk identitet finns</span></div>
           <GarageV2Panel />
         </section>
 
-        <section id="orderflode" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>02 / ORDERFLÖDE</strong><span>Beställning, bekräftelse och transport</span></div>
+        <section id="avveckla" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>03 / AVVECKLA / UT</strong><span>Bekräftelse och transport gäller avvecklingsflödet</span></div>
           <OrderWorkflowPanel />
         </section>
 
         <section id="kontrollpunkter" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>03 / KONTROLLPUNKTER</strong><span>Operativ uppföljning i Garaget</span></div>
+          <div className={styles.sectionLabel}><strong>04 / KONTROLLPUNKTER</strong><span>Operativ uppföljning i Garaget</span></div>
           <GarageWheelChangePanel />
-        </section>
-
-        <section id="garageobjekt" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>04 / GARAGE-OBJEKT</strong><span>Detaljerad hantering och källdata</span></div>
-          <GarageClient />
-          <GarageVoidPanel />
         </section>
       </div>
     </CoreProductShell>

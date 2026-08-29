@@ -17,15 +17,18 @@ test('Planning exposes a visible three-step operating flow without changing busi
   assert.match(planning, /<PlanningGarageHandoff/);
 });
 
-test('Garage exposes the operating sequence from handoff through detailed objects', () => {
-  assert.match(garage, /1\. Överlämningar/);
-  assert.match(garage, /2\. Orderflöde/);
-  assert.match(garage, /3\. Kontrollpunkter/);
-  assert.match(garage, /4\. Garage-objekt/);
-  assert.match(garage, /<GarageV2Panel/);
-  assert.match(garage, /<OrderWorkflowPanel/);
-  assert.match(garage, /<GarageWheelChangePanel/);
-  assert.match(garage, /<GarageClient/);
+test('Garage exposes the reduced-click operating sequence with the work surface first', () => {
+  assert.match(garage, /1\. Garage/);
+  assert.match(garage, /2\. Ny bil/);
+  assert.match(garage, /3\. Avveckla/);
+  assert.match(garage, /4\. Kontrollpunkter/);
+  const garagePosition = garage.indexOf('<GarageClient');
+  const nybilPosition = garage.indexOf('<GarageV2Panel');
+  const avvecklaPosition = garage.indexOf('<OrderWorkflowPanel');
+  const controlsPosition = garage.indexOf('<GarageWheelChangePanel');
+  assert.ok(garagePosition >= 0 && garagePosition < nybilPosition);
+  assert.ok(nybilPosition < avvecklaPosition);
+  assert.ok(avvecklaPosition < controlsPosition);
 });
 
 test('refinement is navigation and grouping only', () => {
