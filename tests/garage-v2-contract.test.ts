@@ -18,7 +18,7 @@ test('Garage v2 keeps regnr as vehicle identity and UUIDs as episode references'
   assert.doesNotMatch(lager1Api, /source_vehicle_id/);
 });
 
-test('Lager 1 can create a Garage disposition without mutating Layer 1', () => {
+test('Lager 1 source contract can create a Garage disposition without mutating Layer 1, but is not an import step in Garage UI', () => {
   assert.match(migration, /'LAGER1'/);
   assert.match(migration, /garage_items_lager1_source_uidx/);
   assert.match(lager1Api, /from\('vehicle_journey_periods'\)/);
@@ -28,14 +28,15 @@ test('Lager 1 can create a Garage disposition without mutating Layer 1', () => {
   assert.match(lager1Api, /source_journey_event_id: period\.source_event_id/);
   assert.doesNotMatch(lager1Api, /from\('vehicle_journey_periods'\)\s*\.update/s);
   assert.doesNotMatch(lager1Api, /from\('vehicle_journey_events'\)\s*\.insert/s);
-  assert.match(garagePanel, /Lager 1 behåller verkligheten/);
-  assert.match(garagePanel, /Lägg i Garaget/);
+  assert.doesNotMatch(garagePanel, /\/api\/garage\/lager1-sources/);
+  assert.doesNotMatch(garagePanel, /Lägg i Garaget/);
+  assert.match(garagePanel, /Lager 1 importeras inte här/);
 });
 
 test('Garage to Ny bil is allowed only for UTVECKLA IN with a real regnr', () => {
   assert.match(handoffApi, /garage_direction !== 'IN'/);
   assert.match(handoffApi, /Registreringsnummer krävs före överlämning till Ny bil/);
-  assert.match(garagePanel, /Överlämna till Ny bil/);
+  assert.match(garagePanel, /Till Ny bil/);
   assert.match(garagePanel, /\/nybil\?garage_item_id=/);
 });
 
@@ -71,5 +72,6 @@ test('Garage v2 does not invent ANKOMST or directly create Layer 1 truth', () =>
     assert.doesNotMatch(source, /ANKOMMEN/);
     assert.doesNotMatch(source, /transition_vehicle_journey_state/);
   }
-  assert.match(garagePanel, /Ny bil-kontrollen gör det när den sparas/);
+  assert.match(garagePanel, /Överlämna fysisk bil/);
+  assert.match(garagePanel, /Garage → Ny bil/);
 });
