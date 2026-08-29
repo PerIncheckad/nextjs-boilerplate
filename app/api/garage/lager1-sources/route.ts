@@ -36,7 +36,8 @@ export async function GET(request: Request) {
     admin
       .from('garage_items')
       .select('garage_item_id,source_journey_period_id')
-      .eq('source_kind', 'LAGER1'),
+      .eq('source_kind', 'LAGER1')
+      .is('voided_at', null),
     admin
       .from('planning_stations')
       .select('station_code,display_name,sort_order')
@@ -157,6 +158,7 @@ export async function POST(request: Request) {
       .select('garage_item_id')
       .eq('source_kind', 'LAGER1')
       .eq('source_journey_period_id', period.period_id)
+      .is('voided_at', null)
       .maybeSingle(),
     admin.from('vehicles').select('brand,model').eq('regnr', regnr).maybeSingle(),
     admin
