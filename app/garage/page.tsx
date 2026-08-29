@@ -3,6 +3,7 @@ import CoreProductShell from '@/components/CoreProductShell';
 import GarageClient from './garage-client';
 import GarageV2Panel from './garage-v2-panel';
 import GarageWheelChangePanel from './garage-wheel-change-panel';
+import GarageVoidPanel from './garage-void-panel';
 import OrderWorkflowPanel from './order-workflow-panel';
 import styles from './garage-workspace.module.css';
 
@@ -48,6 +49,7 @@ export default function GaragePage() {
         <section id="garageobjekt" className={styles.section}>
           <div className={styles.sectionLabel}><strong>04 / GARAGE-OBJEKT</strong><span>Detaljerad hantering och källdata</span></div>
           <GarageClient />
+          <GarageVoidPanel />
         </section>
       </div>
     </CoreProductShell>
