@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const planning = readFileSync('app/planning/planning-workspace.tsx', 'utf8');
+const planningHandoff = readFileSync('app/planning/planning-garage-handoff.tsx', 'utf8');
 const planningCss = readFileSync('app/planning/planning-workspace.module.css', 'utf8');
 const garage = readFileSync('app/garage/page.tsx', 'utf8');
+const garageClient = readFileSync('app/garage/garage-client.tsx', 'utf8');
 const garageCss = readFileSync('app/garage/garage-workspace.module.css', 'utf8');
 
 test('Planning exposes a visible three-step operating flow without changing business components', () => {
@@ -29,6 +31,15 @@ test('Garage exposes the reduced-click operating sequence with the work surface 
   assert.ok(garagePosition >= 0 && garagePosition < nybilPosition);
   assert.ok(nybilPosition < avvecklaPosition);
   assert.ok(avvecklaPosition < controlsPosition);
+});
+
+test('Planning handoff opens Garage directly in the selected month and UTVECKLA direction', () => {
+  assert.match(planningHandoff, /\/garage\?period=\$\{period\}&direction=IN/);
+  assert.match(garageClient, /useSearchParams/);
+  assert.match(garageClient, /searchParams\.get\('period'\)/);
+  assert.match(garageClient, /searchParams\.get\('direction'\)/);
+  assert.match(garageClient, /useState\(MONTH_RE\.test\(requestedPeriod\) \? requestedPeriod : ''\)/);
+  assert.match(garageClient, /useState<'ALLA' \| GarageDirection>\(requestedDirection\)/);
 });
 
 test('refinement is navigation and grouping only', () => {

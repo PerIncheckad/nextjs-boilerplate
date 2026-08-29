@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import styles from './garage.module.css';
 
@@ -45,15 +46,19 @@ const emptyDraft = (station: string | null = null): Draft => ({
 });
 const directionLabel = (value: GarageDirection | null) => value === 'IN' ? 'UTVECKLA / IN' : value === 'UT' ? 'AVVECKLA / UT' : 'Ej satt';
 const sourceLabel = (item: GarageItem) => item.source_kind === 'PLANERING' ? `Planering #${item.source_planning_unit_no ?? '—'}` : item.source_kind === 'SALU' ? 'SALU' : item.source_kind === 'LAGER1' ? 'Lager 1' : 'Manuell';
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export default function GarageClient() {
+  const searchParams = useSearchParams();
+  const requestedPeriod = searchParams.get('period')?.trim() ?? '';
+  const requestedDirection = searchParams.get('direction') === 'UT' ? 'UT' : 'IN';
   const [items, setItems] = useState<GarageItem[]>([]);
   const [stations, setStations] = useState<PlanningStation[]>([]);
   const [models, setModels] = useState<PlanningModel[]>([]);
   const [draft, setDraft] = useState<Draft>(() => emptyDraft());
   const [station, setStation] = useState('ALLA');
-  const [direction, setDirection] = useState<'ALLA' | GarageDirection>('IN');
-  const [periodFilter, setPeriodFilter] = useState('');
+  const [direction, setDirection] = useState<'ALLA' | GarageDirection>(requestedDirection);
+  const [periodFilter, setPeriodFilter] = useState(MONTH_RE.test(requestedPeriod) ? requestedPeriod : '');
   const [query, setQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('UPDATED');
   const [sortDesc, setSortDesc] = useState(true);
@@ -71,7 +76,7 @@ export default function GarageClient() {
     setItems(payload.data ?? []);
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
     setSaluStation((current) => current || nextStations[0]?.station_code || '');
-  }, []);
+  }, [setStations, setModels, setItems, setDraft, setSaluStation]);
 
   const load = useCallback(async () => {
     setLoading(true);
