@@ -36,6 +36,7 @@ async function materializePlanningToGarage(
     .from('garage_items')
     .select('source_planning_cell_id,source_planning_unit_no')
     .eq('source_kind', 'PLANERING')
+    .is('voided_at', null)
     .in('source_planning_cell_id', cellIds);
   if (existingError) throw existingError;
 
