@@ -18,14 +18,17 @@ test('Garage v2 keeps regnr as vehicle identity and UUIDs as episode references'
   assert.doesNotMatch(lager1Api, /source_vehicle_id/);
 });
 
-test('Lager 1 source contract can create a Garage disposition without mutating Layer 1, but is not an import step in Garage UI', () => {
+test('Lager 1 source is read-only provenance and is not an import step in Garage UI', () => {
   assert.match(migration, /'LAGER1'/);
   assert.match(migration, /garage_items_lager1_source_uidx/);
+  assert.match(lager1Api, /export async function GET/);
   assert.match(lager1Api, /from\('vehicle_journey_periods'\)/);
   assert.match(lager1Api, /\.is\('ended_at', null\)/);
-  assert.match(lager1Api, /source_kind: 'LAGER1'/);
-  assert.match(lager1Api, /source_journey_period_id: period\.period_id/);
-  assert.match(lager1Api, /source_journey_event_id: period\.source_event_id/);
+  assert.match(lager1Api, /\.eq\('source_kind', 'LAGER1'\)/);
+  assert.match(lager1Api, /source_journey_period_id/);
+  assert.match(lager1Api, /source_event_id/);
+  assert.doesNotMatch(lager1Api, /export async function POST/);
+  assert.doesNotMatch(lager1Api, /\.from\('garage_items'\)\.insert/);
   assert.doesNotMatch(lager1Api, /from\('vehicle_journey_periods'\)\s*\.update/s);
   assert.doesNotMatch(lager1Api, /from\('vehicle_journey_events'\)\s*\.insert/s);
   assert.doesNotMatch(garagePanel, /\/api\/garage\/lager1-sources/);
