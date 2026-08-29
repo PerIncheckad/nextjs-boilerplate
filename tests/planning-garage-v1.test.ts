@@ -7,6 +7,7 @@ const modelMigration = readFileSync('migrations/20260825205500_add_planning_vehi
 const directionMigration = readFileSync('migrations/20260825211000_add_garage_direction_v1.sql', 'utf8');
 const finalMigration = readFileSync('migrations/20260825213500_finalize_planning_garage_v1.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
+const planningModelApi = readFileSync('app/api/planning/models/route.ts', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const planningSourceApi = readFileSync('app/api/garage/planning-sources/route.ts', 'utf8');
 const saluSourceApi = readFileSync('app/api/garage/salu-sources/route.ts', 'utf8');
@@ -24,21 +25,20 @@ test('planning starts with 166, 170 and 274 but station growth is configuration,
   assert.doesNotMatch(garageUi, /const STATIONS/);
 });
 
-test('planning keeps SALU support separate from BEHOV UTOK MINSKNING and BESTALLT decisions', () => {
+test('planning retains stored cell fields but BEHOV is no longer an active planning decision', () => {
   for (const field of ['salu_count', 'behov_count', 'utok_count', 'minskning_count', 'ordered_count']) {
     assert.match(migration, new RegExp(field));
     assert.match(planningApi, new RegExp(field));
-    assert.match(planningUi, new RegExp(field));
   }
-  assert.match(planningUi, /SALU ovanför är endast beslutsstöd/);
-  assert.match(planningUi, /BEHOV/);
+  assert.doesNotMatch(planningUi, /\['behov_count', 'BEHOV'\]/);
   assert.match(planningUi, /UTÖKNING/);
   assert.match(planningUi, /MINSKNING/);
   assert.match(planningUi, /BESTÄLLT/);
+  assert.match(planningUi, /SALU är beslutsstöd/);
   assert.doesNotMatch(planningUi, /\['salu_count',\s*'SALU'\]/);
 });
 
-test('planning is monthly and retains direct keyboard work in the simple matrix', () => {
+test('planning is monthly and retains direct keyboard work in the matrix', () => {
   assert.match(planningApi, /MONTH_RE/);
   assert.match(planningUi, /type="month"/);
   assert.match(planningUi, /defaultPeriod/);
@@ -47,20 +47,24 @@ test('planning is monthly and retains direct keyboard work in the simple matrix'
   assert.match(planningUi, /data-planning-cell/);
 });
 
-test('planning and Garage share a reusable model registry', () => {
+test('planning uses stable model identity and exposes editable masterdata through authenticated API', () => {
   assert.match(modelMigration, /create table if not exists public\.planning_vehicle_models/);
   assert.match(modelMigration, /model_code text primary key/);
-  assert.match(modelMigration, /upper\(trim\(model\)\)/);
   assert.match(planningApi, /from\('planning_vehicle_models'\)/);
+  assert.match(planningApi, /model_code/);
+  assert.match(planningModelApi, /verifyApiUser/);
+  assert.match(planningModelApi, /display_name/);
+  assert.match(planningModelApi, /is_electric/);
+  assert.match(planningModelApi, /is_automatic/);
+  assert.match(planningModelApi, /daily_rate/);
+  assert.match(planningUi, /modelNameInput/);
   assert.match(garageApi, /from\('planning_vehicle_models'\)/);
-  assert.match(planningUi, /payload\.models/);
-  assert.match(planningUi, /pivot\(payload\.data \?\? \[\], nextStations, nextModels\)/);
   assert.match(garageUi, /garage-models/);
   assert.match(garageUi, /Välj eller skriv modell/);
 });
 
 test('planning and Garage writes stay behind authenticated server APIs and service role', () => {
-  for (const api of [planningApi, garageApi, planningSourceApi, saluSourceApi]) {
+  for (const api of [planningApi, planningModelApi, garageApi, planningSourceApi, saluSourceApi]) {
     assert.match(api, /verifyApiUser/);
     assert.match(api, /SUPABASE_SERVICE_ROLE_KEY/);
   }
