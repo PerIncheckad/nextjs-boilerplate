@@ -399,9 +399,12 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
               <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th><th className={styles.actionColumn}>Spara</th><th className={styles.rateColumn}>Dygnsdeb</th>
             </tr></thead>
             <tbody>
-              {visibleRows.map((row) => {
+              {visibleRows.flatMap((row, index) => {
+                const brandHeader = index === 0 || visibleRows[index - 1]?.brand !== row.brand
+                  ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + 8}>{row.brand}</td></tr>
+                  : null;
                 const isDirty = row.dirtyModel || row.dirtyPlanning;
-                return <tr key={row.key} className={isDirty ? styles.dirtyRow : undefined}>
+                return [brandHeader, <tr key={row.key} className={isDirty ? styles.dirtyRow : undefined}>
                   <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.brand} onChange={(event) => updateModel(row.key, { brand: event.target.value })} aria-label={`Märke ${row.modelCode}`} /></td>
                   <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.model} onChange={(event) => updateModel(row.key, { model: event.target.value })} aria-label={`Modellnamn ${row.modelCode}`} /></td>
                   <td className={styles.flagColumn}><input className={styles.checkInput} type="checkbox" checked={row.isElectric} onChange={(event) => updateModel(row.key, { isElectric: event.target.checked })} aria-label={`${row.model} EL`} /></td>
@@ -411,7 +414,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
                   <td className={styles.noteColumn}><input value={row.note} onChange={(event) => updateNote(row.key, event.target.value)} placeholder="Kommentar…" /></td>
                   <td className={styles.actionColumn}><button type="button" className={isDirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key || !isDirty}>{savingKey === row.key ? '…' : isDirty ? 'Spara*' : 'Sparad'}</button></td>
                   <td className={styles.rateColumn}><input type="number" min={0} inputMode="numeric" value={row.dailyRate ?? ''} placeholder="–" onChange={(event) => updateModel(row.key, { dailyRate: event.target.value === '' ? null : normalizedCount(event.target.value) })} aria-label={`${row.model} dygnsdeb`} /></td>
-                </tr>;
+                </tr>];
               })}
               <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td><td /><td />{stations.map((station) => <td key={`total-${station.station_code}`}>{stationTotals[station.station_code] ?? 0}</td>)}<td className={styles.rowTotal}>{grandTotal}</td><td className={styles.saluColumn}>{saluTotal}</td><td /><td /><td /></tr>
             </tbody>
