@@ -29,8 +29,10 @@ test('Planering v3 shows SALU window beside explicit BESTÄLLT entry', () => {
 });
 
 test('manual BESTÄLLT is not dependent on a SALU row', () => {
-  assert.match(planningUi, /\+ Modell/);
+  assert.match(planningUi, /\+ Märke \/ modell/);
   assert.match(planningUi, /createModel/);
+  assert.match(planningUi, /placeholder="Nytt märke"/);
+  assert.match(planningUi, /placeholder="Ny modell"/);
   assert.doesNotMatch(planningUi, /if \(!row\.salu\)/);
   assert.doesNotMatch(planningUi, /salu.*required/i);
 });
