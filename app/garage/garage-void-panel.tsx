@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from './garage.module.css';
 
 type GarageItem = {
@@ -26,22 +26,30 @@ export default function GarageVoidPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/garage', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
-      setItems(payload.data ?? []);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Kunde inte läsa Garaget');
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/garage', { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
+        if (active) {
+          setItems(payload.data ?? []);
+          setError(null);
+        }
+      })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa Garaget');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const refresh = async () => {
+    const response = await fetch('/api/garage', { cache: 'no-store' });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
+    setItems(payload.data ?? []);
+  };
 
   const voidItem = async (item: GarageItem) => {
     const label = item.regnr || item.model;
@@ -59,7 +67,7 @@ export default function GarageVoidPanel() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte makulera Garage-objektet');
-      await load();
+      await refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Kunde inte makulera Garage-objektet');
     } finally {
