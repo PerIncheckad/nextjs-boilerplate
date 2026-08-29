@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './planning-garage-handoff.module.css';
 
 type HandoffRow = {
@@ -15,36 +15,41 @@ type HandoffRow = {
   remaining_count: number;
 };
 
-type HandoffResult = { period: string; rows: HandoffRow[]; error: string | null };
+type PlanningStatus = 'PAGAENDE' | 'KLAR';
+type HandoffResult = { period: string; rows: HandoffRow[]; status: PlanningStatus; error: string | null };
 type Props = { period: string };
 
 export default function PlanningGarageHandoff({ period }: Props) {
   const [result, setResult] = useState<HandoffResult | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const response = await fetch(`/api/garage/planning-sources?period=${encodeURIComponent(period)}`, { cache: 'no-store' });
+    const body = await response.json() as { data?: HandoffRow[]; status?: PlanningStatus; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Kunde inte läsa handslaget mot Garaget');
+    setResult({ period, rows: body.data ?? [], status: body.status ?? 'PAGAENDE', error: null });
+  }, [period]);
 
   useEffect(() => {
     let active = true;
-
     void fetch(`/api/garage/planning-sources?period=${encodeURIComponent(period)}`, { cache: 'no-store' })
       .then(async (response) => {
-        const body = await response.json() as { data?: HandoffRow[]; error?: string };
+        const body = await response.json() as { data?: HandoffRow[]; status?: PlanningStatus; error?: string };
         if (!response.ok) throw new Error(body.error ?? 'Kunde inte läsa handslaget mot Garaget');
         if (!active) return;
-        setResult({ period, rows: body.data ?? [], error: null });
+        setResult({ period, rows: body.data ?? [], status: body.status ?? 'PAGAENDE', error: null });
       })
       .catch((reason: unknown) => {
         if (!active) return;
-        setResult({
-          period,
-          rows: [],
-          error: reason instanceof Error ? reason.message : 'Kunde inte läsa handslaget mot Garaget',
-        });
+        setResult({ period, rows: [], status: 'PAGAENDE', error: reason instanceof Error ? reason.message : 'Kunde inte läsa handslaget mot Garaget' });
       });
-
     return () => { active = false; };
   }, [period]);
 
   const currentResult = result?.period === period ? result : null;
   const rows = currentResult?.rows ?? [];
+  const planningStatus = currentResult?.status ?? 'PAGAENDE';
   const error = currentResult?.error ?? null;
   const loading = currentResult === null;
 
@@ -57,23 +62,54 @@ export default function PlanningGarageHandoff({ period }: Props) {
     { ordered: 0, materialized: 0, remaining: 0 },
   ), [rows]);
 
+  const changeStatus = async (nextStatus: PlanningStatus) => {
+    setStatusError(null);
+    if (nextStatus === 'KLAR' && window.localStorage.getItem(`incheckad-planning-draft-v3:${period}`)) {
+      setStatusError('Det finns osparade ändringar i Planering. Spara allt innan månaden markeras KLAR.');
+      return;
+    }
+    setChangingStatus(true);
+    try {
+      const response = await fetch('/api/planning/period-status', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period_code: period, status: nextStatus }),
+      });
+      const body = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(body.error ?? 'Kunde inte uppdatera planeringsstatus');
+      await load();
+    } catch (reason) {
+      setStatusError(reason instanceof Error ? reason.message : 'Kunde inte uppdatera planeringsstatus');
+    } finally {
+      setChangingStatus(false);
+    }
+  };
+
   return (
     <section className={styles.panel} aria-label="BESTÄLLT till Garaget">
       <div className={styles.header}>
         <div>
           <div className={styles.eyebrow}>BESTÄLLT / HANDSLAG</div>
           <h2>Planering → Garaget</h2>
-          <p>Verifierar sparade BESTÄLLT mot individuella Garage-objekt. Ingen automatisk överföring och ingen ändring av planeringsbeslut.</p>
+          <p>Verifierar sparade BESTÄLLT mot individuella Garage-objekt. Garaget får hämta först när månaden är markerad KLAR.</p>
         </div>
-        <Link href="/garage" className={styles.garageLink}>Öppna Garaget</Link>
+        <div>
+          <button type="button" className={styles.garageLink} disabled={changingStatus} onClick={() => void changeStatus(planningStatus === 'KLAR' ? 'PAGAENDE' : 'KLAR')}>
+            {changingStatus ? 'Sparar…' : planningStatus === 'KLAR' ? 'Öppna planering igen' : 'Markera planering KLAR'}
+          </button>
+          <Link href="/garage" className={styles.garageLink}>Öppna Garaget</Link>
+        </div>
       </div>
 
       <div className={styles.summary}>
+        <div><span>PLANERING</span><strong>{planningStatus === 'KLAR' ? 'KLAR' : 'PÅGÅENDE'}</strong></div>
         <div><span>BESTÄLLT</span><strong>{totals.ordered}</strong></div>
         <div><span>I GARAGET</span><strong>{totals.materialized}</strong></div>
         <div><span>KVAR</span><strong>{totals.remaining}</strong></div>
       </div>
 
+      {planningStatus !== 'KLAR' ? <div className={styles.error}>Garaget är spärrat från att hämta BESTÄLLT tills planeringen är KLAR.</div> : null}
+      {statusError ? <div className={styles.error}>{statusError}</div> : null}
       {error ? <div className={styles.error}>{error}</div> : null}
       {loading ? <div className={styles.empty}>Läser handslag…</div> : rows.length === 0 ? (
         <div className={styles.empty}>Inga sparade BESTÄLLT finns för {period}.</div>
