@@ -5,6 +5,7 @@ import { verifyApiUser } from '@/lib/server-auth';
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 const HORIZON_MONTHS = 4;
+const SALU_MARGIN_DAYS = 7;
 
 type SaluState = { regnr: string; current_saludatum: string };
 type VehicleRow = { regnr: string; brand: string | null; model: string | null };
@@ -17,7 +18,8 @@ type CheckinRow = {
   station: string | null;
   completed_at: string | null;
 };
-type PlanningOrderRow = { period_code: string; model: string; ordered_count: number | null };
+type PlanningOrderRow = { period_code: string; model_code: string | null; model: string; ordered_count: number | null };
+type PlanningModelRow = { model_code: string; display_name: string; brand: string; aliases: string[] | null };
 
 type SaluItem = {
   regnr: string;
@@ -39,6 +41,7 @@ type SaluModelSummary = {
   orderedMonthCounts: number[];
   stationCounts: Record<string, number>;
   total: number;
+  windowTotal: number;
   orderedTotal: number;
 };
 
@@ -56,6 +59,10 @@ function monthStart(period: string): Date {
 
 function addMonths(date: Date, months: number): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, 1));
+}
+
+function addDays(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
 function isoDate(date: Date): string {
@@ -102,14 +109,16 @@ export async function GET(request: Request) {
   if (!PERIOD_RE.test(period)) return NextResponse.json({ error: 'Planeringsperiod måste vara YYYY-MM' }, { status: 400 });
 
   const start = monthStart(period);
+  const windowStart = addDays(start, -SALU_MARGIN_DAYS);
+  const windowEnd = addDays(addMonths(start, 1), SALU_MARGIN_DAYS - 1);
   const endExclusive = addMonths(start, HORIZON_MONTHS);
-  const endInclusive = new Date(endExclusive.getTime() - 24 * 60 * 60 * 1000);
+  const endInclusive = addDays(endExclusive, -1);
   const admin = adminClient();
 
-  const [statesResult, stationsResult, ordersResult] = await Promise.all([
+  const [statesResult, stationsResult, ordersResult, modelRegistryResult] = await Promise.all([
     admin.from('salu_vehicle_state')
       .select('regnr,current_saludatum')
-      .gte('current_saludatum', isoDate(start))
+      .gte('current_saludatum', isoDate(windowStart))
       .lte('current_saludatum', isoDate(endInclusive))
       .order('current_saludatum', { ascending: true }),
     admin.from('planning_stations')
@@ -117,9 +126,12 @@ export async function GET(request: Request) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
     admin.from('fleet_planning_cells')
-      .select('period_code,model,ordered_count')
+      .select('period_code,model_code,model,ordered_count')
       .gte('period_code', period)
       .lt('period_code', periodCode(endExclusive)),
+    admin.from('planning_vehicle_models')
+      .select('model_code,display_name,brand,aliases')
+      .eq('is_active', true),
   ]);
 
   if (statesResult.error) {
@@ -134,11 +146,25 @@ export async function GET(request: Request) {
     console.error('[planning salu overview] BESTÄLLT lookup failed', ordersResult.error);
     return NextResponse.json({ error: 'Kunde inte läsa BESTÄLLT för SALU-översikten' }, { status: 500 });
   }
+  if (modelRegistryResult.error) {
+    console.error('[planning salu overview] model registry lookup failed', modelRegistryResult.error);
+    return NextResponse.json({ error: 'Kunde inte läsa modellregistret för SALU' }, { status: 500 });
+  }
 
   const states = (statesResult.data ?? []) as SaluState[];
   const orderRows = (ordersResult.data ?? []) as PlanningOrderRow[];
+  const registry = (modelRegistryResult.data ?? []) as PlanningModelRow[];
   const regnrs = [...new Set(states.map((row) => String(row.regnr).toUpperCase()))];
   const activeStations = new Set((stationsResult.data ?? []).map((row) => String(row.station_code)));
+
+  const canonicalModels = new Map<string, { key: string; label: string; brand: string }>();
+  for (const model of registry) {
+    const values = [model.model_code, model.display_name, ...(model.aliases ?? [])];
+    for (const value of values) {
+      const normalized = modelKey(value);
+      if (!canonicalModels.has(normalized)) canonicalModels.set(normalized, { key: model.model_code, label: model.display_name, brand: model.brand });
+    }
+  }
 
   const vehicleMap = new Map<string, VehicleRow>();
   const nybilMap = new Map<string, NybilRow>();
@@ -171,49 +197,61 @@ export async function GET(request: Request) {
     }
   }
 
-  const items: SaluItem[] = states.map((state) => {
+  const allItems: SaluItem[] = states.map((state) => {
     const regnr = String(state.regnr).toUpperCase();
     const vehicle = vehicleMap.get(regnr);
     const nybil = nybilMap.get(regnr);
     const checkin = checkinMap.get(regnr);
     const rawModel = clean(nybil?.modell) ?? clean(vehicle?.model) ?? 'Modell saknas';
-    const brand = clean(nybil?.bilmarke) ?? clean(vehicle?.brand);
+    const rawBrand = clean(nybil?.bilmarke) ?? clean(vehicle?.brand);
+    const canonical = canonicalModels.get(modelKey(rawModel));
     const city = clean(checkin?.current_city) ?? clean(checkin?.city);
     const stationCode = mainStationCode(city, activeStations);
     const month = state.current_saludatum.slice(0, 7);
-    const monthIndex = Math.max(0, Math.min(HORIZON_MONTHS - 1, monthIndexFor(month, start)));
 
     return {
       regnr,
       saluDate: state.current_saludatum,
       period: month,
-      monthIndex,
-      modelKey: modelKey(rawModel),
-      model: rawModel,
-      brand,
+      monthIndex: monthIndexFor(month, start),
+      modelKey: canonical?.key ?? modelKey(rawModel),
+      model: canonical?.label ?? rawModel,
+      brand: canonical?.brand ?? rawBrand,
       stationCode,
       stationName: clean(checkin?.current_station) ?? clean(checkin?.station),
       city,
     };
   });
 
+  const horizonItems = allItems.filter((item) => item.saluDate >= isoDate(start) && item.saluDate <= isoDate(endInclusive));
+  const windowItems = allItems.filter((item) => item.saluDate >= isoDate(windowStart) && item.saluDate <= isoDate(windowEnd));
   const orderedByMonth = Array(HORIZON_MONTHS).fill(0) as number[];
   const modelMap = new Map<string, SaluModelSummary>();
 
-  for (const item of items) {
-    const current = modelMap.get(item.modelKey) ?? {
-      key: item.modelKey,
-      label: item.model,
-      monthCounts: Array(HORIZON_MONTHS).fill(0),
-      orderedMonthCounts: Array(HORIZON_MONTHS).fill(0),
-      stationCounts: {} as Record<string, number>,
-      total: 0,
-      orderedTotal: 0,
-    };
+  const getSummary = (key: string, label: string): SaluModelSummary => modelMap.get(key) ?? {
+    key,
+    label,
+    monthCounts: Array(HORIZON_MONTHS).fill(0),
+    orderedMonthCounts: Array(HORIZON_MONTHS).fill(0),
+    stationCounts: {},
+    total: 0,
+    windowTotal: 0,
+    orderedTotal: 0,
+  };
+
+  for (const item of horizonItems) {
+    if (item.monthIndex < 0 || item.monthIndex >= HORIZON_MONTHS) continue;
+    const current = getSummary(item.modelKey, item.model);
     current.monthCounts[item.monthIndex] += 1;
     current.total += 1;
     const station = item.stationCode ?? 'EJ_FASTSTALLD';
     current.stationCounts[station] = (current.stationCounts[station] ?? 0) + 1;
+    modelMap.set(item.modelKey, current);
+  }
+
+  for (const item of windowItems) {
+    const current = getSummary(item.modelKey, item.model);
+    current.windowTotal += 1;
     modelMap.set(item.modelKey, current);
   }
 
@@ -225,16 +263,10 @@ export async function GET(request: Request) {
     const index = monthIndexFor(rowPeriod, start);
     if (index < 0 || index >= HORIZON_MONTHS) continue;
     orderedByMonth[index] += quantity;
-    const key = modelKey(rawModel);
-    const current = modelMap.get(key) ?? {
-      key,
-      label: rawModel,
-      monthCounts: Array(HORIZON_MONTHS).fill(0),
-      orderedMonthCounts: Array(HORIZON_MONTHS).fill(0),
-      stationCounts: {} as Record<string, number>,
-      total: 0,
-      orderedTotal: 0,
-    };
+    const key = clean(row.model_code) ?? modelKey(rawModel);
+    const registryModel = registry.find((model) => model.model_code === key);
+    const label = registryModel?.display_name ?? rawModel;
+    const current = getSummary(key, label);
     current.orderedMonthCounts[index] += quantity;
     current.orderedTotal += quantity;
     modelMap.set(key, current);
@@ -242,14 +274,14 @@ export async function GET(request: Request) {
 
   const monthRows = Array.from({ length: HORIZON_MONTHS }, (_, index) => {
     const month = periodCode(addMonths(start, index));
-    const count = items.filter((item) => item.period === month).length;
-    const cumulativeCount = items.filter((item) => item.monthIndex <= index).length;
+    const count = horizonItems.filter((item) => item.period === month).length;
+    const cumulativeCount = horizonItems.filter((item) => item.monthIndex <= index).length;
     return { index, period: month, label: monthLabel(month), count, cumulativeCount, orderedCount: orderedByMonth[index] };
   });
 
-  const models = [...modelMap.values()].sort((a, b) => b.total - a.total || b.orderedTotal - a.orderedTotal || a.label.localeCompare(b.label, 'sv'));
+  const models = [...modelMap.values()].sort((a, b) => b.windowTotal - a.windowTotal || b.total - a.total || b.orderedTotal - a.orderedTotal || a.label.localeCompare(b.label, 'sv'));
   const stationTotals: Record<string, number> = {};
-  for (const item of items) {
+  for (const item of horizonItems) {
     const station = item.stationCode ?? 'EJ_FASTSTALLD';
     stationTotals[station] = (stationTotals[station] ?? 0) + 1;
   }
@@ -259,12 +291,18 @@ export async function GET(request: Request) {
       period,
       horizonMonths: HORIZON_MONTHS,
       months: monthRows,
-      total: items.length,
+      total: horizonItems.length,
       orderedTotal: orderedByMonth.reduce((sum, value) => sum + value, 0),
       stationTotals,
       planningStations: stationsResult.data ?? [],
       models,
-      items,
+      items: horizonItems,
+      saluWindow: {
+        start: isoDate(windowStart),
+        end: isoDate(windowEnd),
+        total: windowItems.length,
+        marginDays: SALU_MARGIN_DAYS,
+      },
       semantics: 'SALU_STOD_ONLY',
     },
   });

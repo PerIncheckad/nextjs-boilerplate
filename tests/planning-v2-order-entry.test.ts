@@ -6,25 +6,33 @@ const saluApi = readFileSync('app/api/planning/salu-overview/route.ts', 'utf8');
 const saluUi = readFileSync('app/planning/salu-overview.tsx', 'utf8');
 const planningUi = readFileSync('app/planning/planning-client.tsx', 'utf8');
 
-test('SALU overview shows BESTÄLLT by the same four planning months without netting', () => {
+test('SALU overview still shows BESTÄLLT by four planning months without netting', () => {
   assert.match(saluApi, /orderedMonthCounts/);
   assert.match(saluApi, /orderedCount: orderedByMonth\[index\]/);
   assert.match(saluUi, /SALU \/ BESTÄLLT/);
   assert.match(saluUi, /ingen automatisk nettning/);
 });
 
-test('SALU overview column widths are user adjustable and stored locally', () => {
+test('SALU overview column widths remain user adjustable and stored locally', () => {
   assert.match(saluUi, /incheckad-planning-salu-column-widths-v1/);
   assert.match(saluUi, /type="range"/);
   assert.match(saluUi, /--model-width/);
   assert.match(saluUi, /--data-width/);
 });
 
-test('Planering can use current SALU models for explicit BESTÄLLT entry', () => {
+test('Planering v3 shows SALU window beside explicit BESTÄLLT entry', () => {
   assert.match(planningUi, /fetchPlanningBundle/);
-  assert.match(planningUi, /mergeSaluModels/);
-  assert.match(planningUi, /setMetric\('ordered_count'\)/);
-  assert.match(planningUi, /Lägg in beställningen per modell och station/);
+  assert.match(planningUi, /windowTotal/);
+  assert.match(planningUi, /SALU-fönster/);
+  assert.match(planningUi, /\['ordered_count', 'BESTÄLLT'\]/);
+  assert.match(planningUi, /model_code: row\.modelCode/);
+});
+
+test('manual BESTÄLLT is not dependent on a SALU row', () => {
+  assert.match(planningUi, /\+ Modell/);
+  assert.match(planningUi, /createModel/);
+  assert.doesNotMatch(planningUi, /if \(!row\.salu\)/);
+  assert.doesNotMatch(planningUi, /salu.*required/i);
 });
 
 test('SALU support still does not write planning decisions itself', () => {
