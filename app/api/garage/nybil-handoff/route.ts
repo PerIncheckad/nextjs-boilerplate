@@ -27,6 +27,7 @@ export async function GET(request: Request) {
       .from('garage_items')
       .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,updated_at')
       .eq('garage_direction', 'IN')
+      .is('voided_at', null)
       .not('regnr', 'is', null)
       .order('updated_at', { ascending: false });
     if (error) {
@@ -40,13 +41,14 @@ export async function GET(request: Request) {
     .from('garage_items')
     .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at')
     .eq('garage_item_id', garageItemId)
+    .is('voided_at', null)
     .maybeSingle();
 
   if (error) {
     console.error('[garage/nybil-handoff] item lookup failed', error);
     return NextResponse.json({ error: 'Kunde inte läsa Garage-objektet' }, { status: 500 });
   }
-  if (!item) return NextResponse.json({ error: 'Garage-objektet finns inte' }, { status: 404 });
+  if (!item) return NextResponse.json({ error: 'Garage-objektet finns inte eller är makulerat' }, { status: 404 });
   if (item.garage_direction !== 'IN') {
     return NextResponse.json({ error: 'Endast UTVECKLA / IN kan överlämnas till Ny bil' }, { status: 409 });
   }

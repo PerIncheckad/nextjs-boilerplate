@@ -63,6 +63,7 @@ export async function GET(request: Request) {
       .from('garage_items')
       .select('source_planning_cell_id,source_planning_unit_no')
       .eq('source_kind', 'PLANERING')
+      .is('voided_at', null)
       .in('source_planning_cell_id', ids);
     if (materializedError) {
       console.error('[garage planning sources] materialized lookup failed', materializedError);
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
     .select('source_planning_unit_no')
     .eq('source_kind', 'PLANERING')
     .eq('source_planning_cell_id', planningCellId)
+    .is('voided_at', null)
     .order('source_planning_unit_no', { ascending: true });
   if (existingError) {
     console.error('[garage planning sources] existing lookup failed', existingError);
