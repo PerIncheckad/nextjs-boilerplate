@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       .from('garage_items')
       .select('source_salu_flag_id')
       .eq('source_kind', 'SALU')
+      .is('voided_at', null)
       .in('source_salu_flag_id', ids);
     if (importedError) {
       console.error('[garage salu sources] imported lookup failed', importedError);
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
   if (flagError) return NextResponse.json({ error: 'Kunde inte läsa SALU-cykeln' }, { status: 500 });
   if (!flag) return NextResponse.json({ error: 'SALU-cykeln finns inte' }, { status: 404 });
 
-  const { data: existing, error: existingError } = await admin.from('garage_items').select('garage_item_id').eq('source_kind', 'SALU').eq('source_salu_flag_id', flagId).maybeSingle();
+  const { data: existing, error: existingError } = await admin.from('garage_items').select('garage_item_id').eq('source_kind', 'SALU').eq('source_salu_flag_id', flagId).is('voided_at', null).maybeSingle();
   if (existingError) return NextResponse.json({ error: 'Kunde inte kontrollera befintligt Garage-objekt' }, { status: 500 });
   if (existing) return NextResponse.json({ error: 'Den här SALU-cykeln finns redan i Garaget' }, { status: 409 });
 
