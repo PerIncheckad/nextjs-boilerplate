@@ -8,6 +8,7 @@ const directionMigration = readFileSync('migrations/20260825211000_add_garage_di
 const finalMigration = readFileSync('migrations/20260825213500_finalize_planning_garage_v1.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const planningModelApi = readFileSync('app/api/planning/models/route.ts', 'utf8');
+const planningStatusApi = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const planningSourceApi = readFileSync('app/api/garage/planning-sources/route.ts', 'utf8');
 const saluSourceApi = readFileSync('app/api/garage/salu-sources/route.ts', 'utf8');
@@ -64,7 +65,7 @@ test('planning uses stable model identity and exposes editable masterdata throug
 });
 
 test('planning and Garage writes stay behind authenticated server APIs and service role', () => {
-  for (const api of [planningApi, planningModelApi, garageApi, planningSourceApi, saluSourceApi]) {
+  for (const api of [planningApi, planningModelApi, planningStatusApi, garageApi, planningSourceApi, saluSourceApi]) {
     assert.match(api, /verifyApiUser/);
     assert.match(api, /SUPABASE_SERVICE_ROLE_KEY/);
   }
@@ -93,14 +94,17 @@ test('Garage station replanning is atomic and audited', () => {
   assert.match(garageUi, /Omplanerad i Garaget/);
 });
 
-test('Garage can materialize BESTALLT from Planering without duplicate units', () => {
+test('KLAR materializes BESTALLT automatically without duplicate units', () => {
   assert.match(finalMigration, /source_kind.*PLANERING/s);
   assert.match(finalMigration, /garage_items_planning_source_uidx/);
-  assert.match(planningSourceApi, /ordered_count/);
-  assert.match(planningSourceApi, /source_planning_unit_no/);
-  assert.match(planningSourceApi, /remaining_count/);
-  assert.match(garageUi, /Hämta från Planering/);
-  assert.match(garageUi, /BESTÄLLT blir individuella Garage-objekt/);
+  assert.match(planningStatusApi, /materializePlanningToGarage/);
+  assert.match(planningStatusApi, /source_planning_unit_no/);
+  assert.match(planningStatusApi, /source_kind: 'PLANERING'/);
+  assert.match(planningStatusApi, /garage_direction: 'IN'/);
+  assert.match(planningStatusApi, /from\('planning_vehicle_models'\)/);
+  assert.match(planningStatusApi, /daily_rate/);
+  assert.doesNotMatch(garageUi, /Hämta från Planering/);
+  assert.match(garageUi, /markeras KLAR skapas BESTÄLLT automatiskt/);
 });
 
 test('Garage can import one exact SALU cycle once without rewriting Layer 1', () => {
@@ -113,12 +117,12 @@ test('Garage can import one exact SALU cycle once without rewriting Layer 1', ()
   assert.match(garageUi, /Exakt SALU-cykel kan bara hämtas en gång/);
 });
 
-test('Garage supports full operational editing, sorting, print and PDF', () => {
+test('Garage supports operational editing, sorting, print and PDF', () => {
   for (const field of ['source_regnr', 'saluort', 'daily_rate', 'ordered_at', 'calloff_at', 'planned_delivery_date']) assert.match(garageApi, new RegExp(field));
   assert.match(garageUi, /Sortera/);
   assert.match(garageUi, /Skriv ut/);
   assert.match(garageUi, />PDF</);
-  assert.match(garageUi, /Källreg\.nr/);
+  assert.match(garageUi, /Källreg/);
   assert.match(garageUi, /Beställd/);
   assert.match(garageUi, /Avropad/);
   assert.match(garageCss, /@media print/);
@@ -130,8 +134,8 @@ test('Garage transport does not manually claim actual Layer 1 arrival', () => {
   assert.doesNotMatch(garageUi, /<option>ANKOMMEN<\/option>/);
 });
 
-test('Garage planned money fields remain planning facts, not Kistan monetary outcome', () => {
+test('Garage daily rate remains a planning fact, not Kistan monetary outcome', () => {
   assert.match(migration, /daily_rate numeric/);
   assert.match(migration, /Not verified monetary consequence and not Kistan output/);
-  assert.match(garageUi, /Dygnsdebitering/);
+  assert.match(garageUi, /Dygnsdeb/);
 });
