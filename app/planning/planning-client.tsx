@@ -159,7 +159,6 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
       .filter((row) => !needle || row.model.toLocaleLowerCase('sv').includes(needle) || row.brand.toLocaleLowerCase('sv').includes(needle))
       .sort((a, b) => a.brand.localeCompare(b.brand, 'sv') || a.sortOrder - b.sortOrder || a.model.localeCompare(b.model, 'sv'));
   }, [rows, search]);
-  const registeredCodes = useMemo(() => new Set(rows.map((row) => row.modelCode)), [rows]);
   const totalForRow = (row: ModelRow) => stations.reduce((sum, station) => sum + (row.stations[station.station_code] ?? emptyCounts())[metric], 0);
   const stationTotals = useMemo(() => Object.fromEntries(stations.map((station) => [station.station_code, rows.reduce((sum, row) => sum + (row.stations[station.station_code] ?? emptyCounts())[metric], 0)])), [metric, rows, stations]);
   const grandTotal = useMemo(() => Object.values(stationTotals).reduce((sum, value) => sum + value, 0), [stationTotals]);
@@ -338,8 +337,6 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
     cells[index + direction]?.select();
   };
 
-  let previousBrand = '';
-
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
@@ -380,9 +377,8 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
               <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th><th className={styles.actionColumn}>Spara</th>
             </tr></thead>
             <tbody>
-              {visibleRows.flatMap((row) => {
-                const brandHeader = row.brand !== previousBrand ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + 8}>{row.brand}</td></tr> : null;
-                previousBrand = row.brand;
+              {visibleRows.flatMap((row, index) => {
+                const brandHeader = index === 0 || visibleRows[index - 1]?.brand !== row.brand ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + 8}>{row.brand}</td></tr> : null;
                 const isDirty = row.dirtyModel || row.dirtyPlanning;
                 return [brandHeader, <tr key={row.key} className={isDirty ? styles.dirtyRow : undefined}>
                   <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.model} onChange={(event) => updateModel(row.key, { model: event.target.value })} aria-label={`Modellnamn ${row.modelCode}`} /></td>
@@ -401,7 +397,6 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
           </table></div>
         )}
       </section>
-      <span className={styles.srOnly}>{registeredCodes.size} registrerade modeller</span>
     </main>
   );
 }
