@@ -91,7 +91,7 @@ export default function PlanningGarageHandoff({ period }: Props) {
         <div>
           <div className={styles.eyebrow}>BESTÄLLT / HANDSLAG</div>
           <h2>Planering → Garaget</h2>
-          <p>Verifierar sparade BESTÄLLT mot individuella Garage-objekt. Garaget får hämta först när månaden är markerad KLAR.</p>
+          <p>Verifierar sparade BESTÄLLT mot individuella Garage-objekt. Ingen automatisk överföring. Garaget får hämta först när månaden är markerad KLAR.</p>
         </div>
         <div>
           <button type="button" className={styles.garageLink} disabled={changingStatus} onClick={() => void changeStatus(planningStatus === 'KLAR' ? 'PAGAENDE' : 'KLAR')}>
