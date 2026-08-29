@@ -164,7 +164,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
 
-  const locked = planningStatus !== 'PAGAENDE';
+  const locked = planningStatus !== 'PAGAENDE' || period !== selectedPeriod;
   const dirtyRows = useMemo(() => rows.filter((row) => row.dirtyPlanning || row.dirtyModel), [rows]);
   const metricLabel = DECISIONS.find(([key]) => key === metric)?.[1] ?? 'BESTÄLLT';
   const visibleRows = useMemo(() => {
@@ -220,7 +220,6 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
 
   useEffect(() => {
     let active = true;
-    setPlanningStatus('UNKNOWN');
     void fetchPlanningBundle(selectedPeriod)
       .then((bundle) => { if (active) { applyBundle(bundle, selectedPeriod); setError(null); setStatus(null); } })
       .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa planeringen'); })
@@ -415,7 +414,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
         </div>
         <input className={styles.searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök märke/modell…" aria-label="Sök märke eller modell" />
         {!locked ? <button type="button" className={styles.secondaryButton} onClick={() => setAddingModel((value) => !value)}>+ Märke / modell</button> : null}
-        {planningStatus === 'PAGAENDE' ? <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button> : <div className={styles.periodStatus}><span>PLANERING</span><strong>{planningStatus === 'KLAR' ? 'SKICKAD TILL GARAGET' : 'STATUS KONTROLLERAS'}</strong></div>}
+        {planningStatus === 'PAGAENDE' && period === selectedPeriod ? <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button> : <div className={styles.periodStatus}><span>PLANERING</span><strong>{planningStatus === 'KLAR' && period === selectedPeriod ? 'SKICKAD TILL GARAGET' : 'STATUS KONTROLLERAS'}</strong></div>}
         <div className={styles.periodStatus}><span>SALU-fönster</span><strong>{saluWindow ? `${saluWindow.start} – ${saluWindow.end}` : '–'}</strong></div>
       </section>
 
