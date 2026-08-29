@@ -38,8 +38,8 @@ test('Planning handoff opens Garage directly in the selected month and UTVECKLA 
   assert.match(garageClient, /useSearchParams/);
   assert.match(garageClient, /searchParams\.get\('period'\)/);
   assert.match(garageClient, /searchParams\.get\('direction'\)/);
-  assert.match(garageClient, /setPeriodFilter\(requestedPeriod\)/);
-  assert.match(garageClient, /setDirection\(requestedDirection\)/);
+  assert.match(garageClient, /useState\(MONTH_RE\.test\(requestedPeriod\) \? requestedPeriod : ''\)/);
+  assert.match(garageClient, /useState<'ALLA' \| GarageDirection>\(requestedDirection\)/);
 });
 
 test('refinement is navigation and grouping only', () => {
