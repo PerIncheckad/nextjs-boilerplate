@@ -64,30 +64,32 @@ const normalizedCount = (raw: string) => Math.max(0, Number.parseInt(raw.trim() 
 function pivot(cells: ApiCell[], stations: PlanningStation[], models: PlanningModel[], saluModels: SaluModel[]): ModelRow[] {
   const stationTemplate = () => Object.fromEntries(stations.map((station) => [station.station_code, emptyCounts()]));
   const saluByModel = new Map(saluModels.map((model) => [model.key, model.windowTotal ?? 0]));
+  const modelsByCode = new Map(models.map((model) => [model.model_code, model]));
   const map = new Map<string, ModelRow>();
-
-  for (const model of [...models].sort((a, b) => a.brand.localeCompare(b.brand, 'sv') || a.sort_order - b.sort_order || a.display_name.localeCompare(b.display_name, 'sv'))) {
-    map.set(model.model_code, {
-      key: model.model_code,
-      modelCode: model.model_code,
-      brand: model.brand,
-      model: model.display_name,
-      isElectric: model.is_electric,
-      isAutomatic: model.is_automatic,
-      dailyRate: model.daily_rate,
-      aliases: model.aliases ?? [],
-      sortOrder: model.sort_order,
-      salu: saluByModel.get(model.model_code) ?? 0,
-      note: '',
-      dirtyPlanning: false,
-      dirtyModel: false,
-      stations: stationTemplate(),
-    });
-  }
 
   for (const cell of cells) {
     const modelCode = cell.model_code;
-    if (!modelCode || !map.has(modelCode)) continue;
+    if (!modelCode) continue;
+    const model = modelsByCode.get(modelCode);
+    if (!model) continue;
+    if (!map.has(modelCode)) {
+      map.set(modelCode, {
+        key: modelCode,
+        modelCode,
+        brand: model.brand,
+        model: model.display_name,
+        isElectric: model.is_electric,
+        isAutomatic: model.is_automatic,
+        dailyRate: model.daily_rate,
+        aliases: model.aliases ?? [],
+        sortOrder: model.sort_order,
+        salu: saluByModel.get(modelCode) ?? 0,
+        note: '',
+        dirtyPlanning: false,
+        dirtyModel: false,
+        stations: stationTemplate(),
+      });
+    }
     const row = map.get(modelCode)!;
     row.stations[cell.station] = {
       salu_count: cell.salu_count,
@@ -148,7 +150,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [addingModel, setAddingModel] = useState(false);
-  const [newBrand, setNewBrand] = useState('MB');
+  const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
 
   const dirtyRows = useMemo(() => rows.filter((row) => row.dirtyPlanning || row.dirtyModel), [rows]);
@@ -229,7 +231,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
     setRows((current) => current.map((row) => row.key === key ? { ...row, note: value, dirtyPlanning: true } : row));
   };
 
-  const updateModel = (key: string, patch: Partial<Pick<ModelRow, 'model' | 'isElectric' | 'isAutomatic' | 'dailyRate'>>) => {
+  const updateModel = (key: string, patch: Partial<Pick<ModelRow, 'brand' | 'model' | 'isElectric' | 'dailyRate'>>) => {
     setStatus(null);
     setRows((current) => current.map((row) => row.key === key ? { ...row, ...patch, dirtyModel: true } : row));
   };
@@ -279,7 +281,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
       if (row.dirtyModel) await saveModel(row);
       if (row.dirtyPlanning) await savePlanningRow(row);
       setRows((current) => current.map((item) => item.key === row.key ? { ...item, dirtyModel: false, dirtyPlanning: false } : item));
-      setStatus(`${row.model} sparad.`);
+      setStatus(`${row.brand} ${row.model} sparad.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Kunde inte spara raden'); }
     finally { setSavingKey(null); }
   };
@@ -304,21 +306,41 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   };
 
   const createModel = async () => {
+    const brand = newBrand.trim();
     const name = newModel.trim();
-    if (!name) return;
+    if (!brand || !name) return;
     setError(null); setStatus(null);
     try {
       const modelCode = `CUSTOM:${crypto.randomUUID()}`;
-      const response = await fetch('/api/planning/models', {
+      const modelResponse = await fetch('/api/planning/models', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model_code: modelCode, display_name: name, brand: newBrand, is_electric: false, is_automatic: false, daily_rate: null, aliases: [], sort_order: 9999, is_active: true }),
+        body: JSON.stringify({ model_code: modelCode, display_name: name, brand, is_electric: false, is_automatic: false, daily_rate: null, aliases: [], sort_order: 9999, is_active: true }),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.error ?? 'Kunde inte lägga till modellen');
-      setNewModel(''); setAddingModel(false);
+      const modelBody = await modelResponse.json();
+      if (!modelResponse.ok) throw new Error(modelBody?.error ?? 'Kunde inte lägga till modellen');
+
+      const periodRows = stations.map((station) => ({
+        period_code: period,
+        model_code: modelCode,
+        model: name,
+        station: station.station_code,
+        ...emptyCounts(),
+        note: null,
+      }));
+      if (periodRows.length) {
+        const planningResponse = await fetch('/api/fleet-planning', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(periodRows),
+        });
+        const planningBody = await planningResponse.json();
+        if (!planningResponse.ok) throw new Error(planningBody?.error ?? 'Kunde inte lägga till raden i planeringen');
+      }
+
+      setNewBrand(''); setNewModel(''); setAddingModel(false);
       await load(period, false);
-      setStatus(`${name} tillagd.`);
+      setStatus(`${brand.toUpperCase()} ${name} tillagd i ${period}.`);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Kunde inte lägga till modellen'); }
   };
 
@@ -350,49 +372,48 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
         <div className={styles.decisionTabs} role="tablist" aria-label="Planeringsbeslut">
           {DECISIONS.map(([key, label]) => <button key={key} type="button" role="tab" aria-selected={metric === key} className={metric === key ? styles.decisionTabActive : styles.decisionTab} onClick={() => setMetric(key)}>{label}</button>)}
         </div>
-        <input className={styles.searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök modell…" aria-label="Sök modell" />
-        <button type="button" className={styles.secondaryButton} onClick={() => setAddingModel((value) => !value)}>+ Modell</button>
+        <input className={styles.searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök märke/modell…" aria-label="Sök märke eller modell" />
+        <button type="button" className={styles.secondaryButton} onClick={() => setAddingModel((value) => !value)}>+ Märke / modell</button>
         <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button>
         <div className={styles.periodStatus}><span>SALU-fönster</span><strong>{saluWindow ? `${saluWindow.start} – ${saluWindow.end}` : '–'}</strong></div>
       </section>
 
       {addingModel ? <section className={styles.addModelBar}>
-        <select value={newBrand} onChange={(event) => setNewBrand(event.target.value)} aria-label="Märke"><option>MB</option><option>VW</option><option>NISSAN</option><option>BMW</option><option>ÖVRIGT</option></select>
-        <input value={newModel} onChange={(event) => setNewModel(event.target.value)} placeholder="Ny modell" onKeyDown={(event) => { if (event.key === 'Enter') void createModel(); }} />
-        <button type="button" className={styles.primaryButton} onClick={() => void createModel()}>Lägg till</button>
+        <input value={newBrand} onChange={(event) => setNewBrand(event.target.value)} placeholder="Nytt märke" aria-label="Nytt märke" />
+        <input value={newModel} onChange={(event) => setNewModel(event.target.value)} placeholder="Ny modell" aria-label="Ny modell" onKeyDown={(event) => { if (event.key === 'Enter') void createModel(); }} />
+        <button type="button" className={styles.primaryButton} onClick={() => void createModel()} disabled={!newBrand.trim() || !newModel.trim()}>Lägg till</button>
       </section> : null}
 
       {draftNotice ? <div className={styles.info}>{draftNotice}</div> : null}
       {status ? <div className={styles.success}>{status}</div> : null}
       {error ? <div className={styles.error}>{error}</div> : null}
-      {unmappedSalu.length ? <div className={styles.info}><strong>SALU utan modellkoppling:</strong> {unmappedSalu.map((item) => `${item.label} (${item.windowTotal ?? 0})`).join(' · ')}. Lägg till eller rätta modellen i registret.</div> : null}
+      {unmappedSalu.length ? <div className={styles.info}><strong>SALU utan modellkoppling:</strong> {unmappedSalu.map((item) => `${item.label} (${item.windowTotal ?? 0})`).join(' · ')}. Lägg till eller rätta märke/modell vid behov.</div> : null}
 
       <section className={styles.gridSection}>
-        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>MODELL · EL · AUT · DYGNDEB · stationer · SUMMA · SALU</span></div><strong>{dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{visibleRows.length} modeller</strong></div>
+        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>MÄRKE · MODELL · EL · stationer · SUMMA · SALU · DYGNDEB</span></div><strong>{dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{visibleRows.length} rader</strong></div>
         {loading || periodChanging ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
           <div className={styles.tableWrap}><table className={styles.simplePlanningTable}>
             <thead><tr>
-              <th className={styles.modelColumn}>Modell</th><th className={styles.flagColumn}>EL</th><th className={styles.flagColumn}>AUT</th><th className={styles.rateColumn}>Dygnsdeb</th>
+              <th className={styles.modelColumn}>Märke</th><th className={styles.modelColumn}>Modell</th><th className={styles.flagColumn}>EL</th>
               {stations.map((station) => <th key={station.station_code}>{station.station_code}<small>{station.display_name && station.display_name !== station.station_code ? station.display_name : ''}</small></th>)}
-              <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th><th className={styles.actionColumn}>Spara</th>
+              <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th><th className={styles.actionColumn}>Spara</th><th className={styles.rateColumn}>Dygnsdeb</th>
             </tr></thead>
             <tbody>
-              {visibleRows.flatMap((row, index) => {
-                const brandHeader = index === 0 || visibleRows[index - 1]?.brand !== row.brand ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + 8}>{row.brand}</td></tr> : null;
+              {visibleRows.map((row) => {
                 const isDirty = row.dirtyModel || row.dirtyPlanning;
-                return [brandHeader, <tr key={row.key} className={isDirty ? styles.dirtyRow : undefined}>
+                return <tr key={row.key} className={isDirty ? styles.dirtyRow : undefined}>
+                  <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.brand} onChange={(event) => updateModel(row.key, { brand: event.target.value })} aria-label={`Märke ${row.modelCode}`} /></td>
                   <td className={styles.modelColumn}><input className={styles.modelNameInput} value={row.model} onChange={(event) => updateModel(row.key, { model: event.target.value })} aria-label={`Modellnamn ${row.modelCode}`} /></td>
                   <td className={styles.flagColumn}><input className={styles.checkInput} type="checkbox" checked={row.isElectric} onChange={(event) => updateModel(row.key, { isElectric: event.target.checked })} aria-label={`${row.model} EL`} /></td>
-                  <td className={styles.flagColumn}><input className={styles.checkInput} type="checkbox" checked={row.isAutomatic} onChange={(event) => updateModel(row.key, { isAutomatic: event.target.checked })} aria-label={`${row.model} AUT`} /></td>
-                  <td className={styles.rateColumn}><input type="number" min={0} inputMode="numeric" value={row.dailyRate ?? ''} placeholder="–" onChange={(event) => updateModel(row.key, { dailyRate: event.target.value === '' ? null : normalizedCount(event.target.value) })} aria-label={`${row.model} dygnsdeb`} /></td>
                   {stations.map((station) => <td key={`${row.key}-${station.station_code}`} className={styles.numberCell}><input data-planning-cell="true" type="number" min={0} inputMode="numeric" value={(row.stations[station.station_code] ?? emptyCounts())[metric]} onChange={(event) => updateCount(row.key, station.station_code, event.target.value)} onKeyDown={(event) => moveFocus(event, event.shiftKey ? -1 : 1)} onFocus={(event) => event.currentTarget.select()} aria-label={`${row.model} ${metricLabel} ${station.station_code}`} /></td>)}
                   <td className={styles.rowTotal}>{totalForRow(row)}</td>
                   <td className={styles.saluColumn}>{row.salu}</td>
                   <td className={styles.noteColumn}><input value={row.note} onChange={(event) => updateNote(row.key, event.target.value)} placeholder="Kommentar…" /></td>
                   <td className={styles.actionColumn}><button type="button" className={isDirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key || !isDirty}>{savingKey === row.key ? '…' : isDirty ? 'Spara*' : 'Sparad'}</button></td>
-                </tr>];
+                  <td className={styles.rateColumn}><input type="number" min={0} inputMode="numeric" value={row.dailyRate ?? ''} placeholder="–" onChange={(event) => updateModel(row.key, { dailyRate: event.target.value === '' ? null : normalizedCount(event.target.value) })} aria-label={`${row.model} dygnsdeb`} /></td>
+                </tr>;
               })}
-              <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td><td /><td /><td />{stations.map((station) => <td key={`total-${station.station_code}`}>{stationTotals[station.station_code] ?? 0}</td>)}<td className={styles.rowTotal}>{grandTotal}</td><td className={styles.saluColumn}>{saluTotal}</td><td /><td /></tr>
+              <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td><td /><td />{stations.map((station) => <td key={`total-${station.station_code}`}>{stationTotals[station.station_code] ?? 0}</td>)}<td className={styles.rowTotal}>{grandTotal}</td><td className={styles.saluColumn}>{saluTotal}</td><td /><td /><td /></tr>
             </tbody>
           </table></div>
         )}
