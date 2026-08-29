@@ -54,8 +54,8 @@ type PlanningPayload = { data?: ApiCell[]; stations?: PlanningStation[]; models?
 type SaluModel = { key: string; label: string; windowTotal?: number };
 type SaluWindow = { start: string; end: string; total: number; marginDays: number };
 type SaluPayload = { data?: { models?: SaluModel[]; saluWindow?: SaluWindow } };
-type PlanningStatus = 'PAGAENDE' | 'KLAR';
-type PlanningStatusPayload = { data?: { status?: PlanningStatus } };
+type PlanningStatus = 'PAGAENDE' | 'KLAR' | 'UNKNOWN';
+type PlanningStatusPayload = { data?: { status?: Exclude<PlanningStatus, 'UNKNOWN'> }; error?: string };
 type Props = { selectedPeriod: string; onPeriodChange: (period: string) => void };
 
 const emptyCounts = (): Counts => ({ salu_count: 0, behov_count: 0, utok_count: 0, minskning_count: 0, ordered_count: 0 });
@@ -135,7 +135,11 @@ async function fetchPlanningBundle(nextPeriod: string) {
   const planning = await planningResponse.json() as PlanningPayload & { error?: string };
   if (!planningResponse.ok) throw new Error(planning.error ?? 'Kunde inte läsa planeringen');
   const salu = saluResponse.ok ? await saluResponse.json() as SaluPayload : {};
-  const planningStatus = statusResponse.ok ? await statusResponse.json() as PlanningStatusPayload : {};
+  const planningStatus = await statusResponse.json() as PlanningStatusPayload;
+  if (!statusResponse.ok) throw new Error(planningStatus.error ?? 'Kunde inte läsa planeringens status');
+  if (planningStatus.data?.status !== 'PAGAENDE' && planningStatus.data?.status !== 'KLAR') {
+    throw new Error('Planeringens status kunde inte verifieras');
+  }
   return { planning, salu, planningStatus };
 }
 
@@ -148,7 +152,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const [rows, setRows] = useState<ModelRow[]>([]);
   const [saluWindow, setSaluWindow] = useState<SaluWindow | null>(null);
   const [unmappedSalu, setUnmappedSalu] = useState<SaluModel[]>([]);
-  const [planningStatus, setPlanningStatus] = useState<PlanningStatus>('PAGAENDE');
+  const [planningStatus, setPlanningStatus] = useState<PlanningStatus>('UNKNOWN');
   const [loading, setLoading] = useState(true);
   const [savingAll, setSavingAll] = useState(false);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -160,7 +164,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   const [newBrand, setNewBrand] = useState('');
   const [newModel, setNewModel] = useState('');
 
-  const locked = planningStatus === 'KLAR';
+  const locked = planningStatus !== 'PAGAENDE' || period !== selectedPeriod;
   const dirtyRows = useMemo(() => rows.filter((row) => row.dirtyPlanning || row.dirtyModel), [rows]);
   const metricLabel = DECISIONS.find(([key]) => key === metric)?.[1] ?? 'BESTÄLLT';
   const visibleRows = useMemo(() => {
@@ -189,7 +193,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
     const nextStations = bundle.planning.stations ?? [];
     const nextModels = bundle.planning.models ?? [];
     const saluModels = bundle.salu.data?.models ?? [];
-    const nextStatus = bundle.planningStatus.data?.status === 'KLAR' ? 'KLAR' : 'PAGAENDE';
+    const nextStatus: Exclude<PlanningStatus, 'UNKNOWN'> = bundle.planningStatus.data!.status!;
     const serverRows = pivot(bundle.planning.data ?? [], nextStations, nextModels, saluModels);
     const restored = recover && nextStatus !== 'KLAR' ? restoreDraft(nextPeriod, serverRows) : { rows: serverRows, restored: 0 };
     const codes = new Set(nextModels.map((model) => model.model_code));
@@ -206,7 +210,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
   }, []);
 
   const load = useCallback(async (nextPeriod: string, recover = true) => {
-    setLoading(true); setError(null); setStatus(null);
+    setLoading(true); setPlanningStatus('UNKNOWN'); setError(null); setStatus(null);
     try {
       const bundle = await fetchPlanningBundle(nextPeriod);
       applyBundle(bundle, nextPeriod, recover);
@@ -410,7 +414,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
         </div>
         <input className={styles.searchInput} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Sök märke/modell…" aria-label="Sök märke eller modell" />
         {!locked ? <button type="button" className={styles.secondaryButton} onClick={() => setAddingModel((value) => !value)}>+ Märke / modell</button> : null}
-        {!locked ? <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button> : <div className={styles.periodStatus}><span>PLANERING</span><strong>SKICKAD TILL GARAGET</strong></div>}
+        {planningStatus === 'PAGAENDE' && period === selectedPeriod ? <button type="button" className={dirtyRows.length ? styles.saveAllButtonDirty : styles.saveAllButton} onClick={() => void saveAll()} disabled={!dirtyRows.length || savingAll}>{savingAll ? 'Sparar…' : dirtyRows.length ? `Spara alla (${dirtyRows.length})` : 'Allt sparat'}</button> : <div className={styles.periodStatus}><span>PLANERING</span><strong>{planningStatus === 'KLAR' && period === selectedPeriod ? 'SKICKAD TILL GARAGET' : 'STATUS KONTROLLERAS'}</strong></div>}
         <div className={styles.periodStatus}><span>SALU-fönster</span><strong>{saluWindow ? `${saluWindow.start} – ${saluWindow.end}` : '–'}</strong></div>
       </section>
 

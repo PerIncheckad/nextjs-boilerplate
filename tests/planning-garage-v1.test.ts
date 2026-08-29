@@ -141,11 +141,14 @@ test('UTVECKLA has explicit supplier save and a compact registration column', ()
   assert.match(garageCss, /\.rowSaveButton/);
 });
 
-test('KLAR planning is read-only and removes row save actions after Garage handoff', () => {
-  assert.match(planningUi, /planningStatus/);
-  assert.match(planningUi, /const locked = planningStatus === 'KLAR'/);
+test('Planning status is fail-safe: only verified PAGAENDE is editable', () => {
+  assert.match(planningUi, /type PlanningStatus = 'PAGAENDE' \| 'KLAR' \| 'UNKNOWN'/);
+  assert.match(planningUi, /useState<PlanningStatus>\('UNKNOWN'\)/);
+  assert.match(planningUi, /const locked = planningStatus !== 'PAGAENDE'/);
+  assert.match(planningUi, /if \(!statusResponse\.ok\) throw new Error/);
+  assert.match(planningUi, /Planeringens status kunde inte verifieras/);
+  assert.match(planningUi, /STATUS KONTROLLERAS/);
   assert.match(planningUi, /SKICKAD TILL GARAGET/);
-  assert.match(planningUi, /!locked \? <th className=\{styles\.actionColumn\}>Spara/);
   assert.match(planningUi, /disabled=\{locked\}/);
 });
 
