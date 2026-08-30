@@ -4,6 +4,7 @@ import FormClient from './form-client';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './ankomst-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
+import actionStyles from '../operational-action-contract.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,7 @@ export default function AnkomstPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.arrivalSurface} ${cleanupStyles.legacyHeaderHidden}`}>
+      <section className={`${styles.formSurface} ${cleanupStyles.arrivalSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <FormClient />
       </section>
 
