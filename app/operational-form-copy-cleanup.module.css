@@ -1,0 +1,19 @@
+/*
+ * Scoped copy cleanup for operational forms.
+ *
+ * These rules remove only headings that duplicate the immediately following
+ * field label. They intentionally leave form semantics, validation, data flow
+ * and meaningful subsection headings untouched.
+ */
+
+.checkSurface :global(.card:has(> .section-header + .sub-section-header + .field + .sub-section-header + .field) > .sub-section-header) {
+  display: none !important;
+}
+
+.arrivalSurface :global(.card > .section-header + .sub-section-header) {
+  display: none !important;
+}
+
+.newVehicleSurface :global(.nybil-form .sub-section-header) {
+  display: none !important;
+}
