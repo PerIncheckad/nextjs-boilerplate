@@ -1,0 +1,1 @@
+Final contract: UTVECKLA / IN displays Hålltid after Dygnsdeb with allowed values 4/6/9/12/18/24 months. Leverans is removed from the IN view only. Existing delivery data and AVVECKLA / UT remain unchanged.
