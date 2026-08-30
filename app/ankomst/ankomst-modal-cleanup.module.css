@@ -1,10 +1,84 @@
-.surface :global(.modal-content[style*='max-width: 500px']) {
-  border-top: 1px solid #111315 !important;
+.surface :global(.modal-content) {
+  width: min(440px, calc(100vw - 24px)) !important;
   max-width: 440px !important;
   padding: 16px !important;
+  border: 1px solid #b7b3ae !important;
   border-radius: 10px !important;
   background: rgba(245, 244, 240, .98) !important;
+  color: #111315 !important;
   box-shadow: 0 12px 34px rgba(17, 19, 21, .14) !important;
+}
+
+.surface :global(.modal-actions) {
+  gap: 6px !important;
+  padding-top: 10px !important;
+}
+
+.surface :global(.modal-actions .btn) {
+  min-height: 34px !important;
+  padding: 0 12px !important;
+  border: 1px solid #b7b3ae !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 760 !important;
+  box-shadow: none !important;
+}
+
+.surface :global(.modal-actions .btn.secondary) {
+  background: #fff !important;
+  color: #60666a !important;
+}
+
+.surface :global(.modal-actions .btn.success),
+.surface :global(.modal-actions .btn.primary) {
+  border-color: #111315 !important;
+  background: #111315 !important;
+  color: #fff !important;
+}
+
+.surface :global(.modal-actions .btn.danger) {
+  border-color: #dc2626 !important;
+  background: #dc2626 !important;
+  color: #fff !important;
+}
+
+.surface :global(.spinner-overlay) {
+  color: #111315 !important;
+  font-size: 12px !important;
+  font-weight: 760 !important;
+}
+
+.surface :global(.spinner) {
+  width: 34px !important;
+  height: 34px !important;
+  border-width: 4px !important;
+  border-color: #d2cdc7 !important;
+  border-top-color: #111315 !important;
+  margin-bottom: 8px !important;
+}
+
+.surface :global(.success-icon) {
+  margin-bottom: 6px !important;
+  font-size: 28px !important;
+}
+
+.surface :global(.confirm-header) {
+  margin-bottom: 10px !important;
+  padding-bottom: 10px !important;
+}
+
+.surface :global(.confirm-modal-title) {
+  font-size: 16px !important;
+  line-height: 1.2 !important;
+}
+
+.surface :global(.confirm-vehicle-info) {
+  margin: 4px 0 8px !important;
+  font-size: 13px !important;
+}
+
+.surface :global(.modal-content[style*='max-width: 500px']) {
+  border-top: 1px solid #111315 !important;
 }
 
 .surface :global(.modal-content[style*='max-width: 500px'] > div:first-child) {
@@ -34,4 +108,14 @@
   border-color: #111315 !important;
   background: #111315 !important;
   color: #fff !important;
+}
+
+@media (max-width: 480px) {
+  .surface :global(.modal-actions) {
+    flex-direction: column-reverse !important;
+  }
+
+  .surface :global(.modal-actions .btn) {
+    width: 100% !important;
+  }
 }
