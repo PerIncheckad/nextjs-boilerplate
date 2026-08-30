@@ -734,7 +734,7 @@ export default function ArrivalForm() {
         {/* SUBMIT BUTTON */}
         <div className="form-actions">
           <Button onClick={handleSubmit} variant={isFormValid ? 'success' : 'primary'} disabled={isSaving}>
-            {isSaving ? 'Skickar...' : 'Registrera ankomst'}
+            {isSaving ? 'Skickar...' : isFormValid ? 'Registrera ankomst' : 'Visa saknad information'}
           </Button>
         </div>
       </div>
