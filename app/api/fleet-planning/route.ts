@@ -29,6 +29,13 @@ type PlanningModel = {
   sort_order: number;
 };
 
+type ExistingPlanningCell = {
+  planning_cell_id: string;
+  period_code: string;
+  model_code: string | null;
+  station: string;
+};
+
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -45,6 +52,10 @@ function cleanText(value: unknown): string | null {
 function count(value: unknown): number | null {
   const numeric = typeof value === 'number' ? value : Number(value);
   return Number.isInteger(numeric) && numeric >= 0 ? numeric : null;
+}
+
+function planningCellKey(period: string, modelCode: string, station: string): string {
+  return `${period}\u0000${modelCode}\u0000${station}`;
 }
 
 function normalize(input: PlanningInput, stations: Set<string>, models: Map<string, PlanningModel>) {
@@ -149,8 +160,9 @@ export async function PUT(request: Request) {
   if (rows.some((row) => row === null)) {
     return NextResponse.json({ error: 'Planeringsrad kräver månad YYYY-MM, aktiv modell, aktiv station och giltiga antal' }, { status: 400 });
   }
+  const validRows = rows as Record<string, unknown>[];
 
-  const periods = [...new Set(rows.map((row) => String(row!.period_code)))];
+  const periods = [...new Set(validRows.map((row) => String(row.period_code)))];
   const { data: lockedPeriods, error: statusError } = await admin.from('planning_period_status')
     .select('period_code,status')
     .in('period_code', periods)
@@ -163,12 +175,62 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: 'Planeringen är markerad KLAR. Öppna planeringen igen innan du ändrar den.' }, { status: 409 });
   }
 
+  const { data: existingCells, error: cellError } = await admin.from('fleet_planning_cells')
+    .select('planning_cell_id,period_code,model_code,station')
+    .in('period_code', periods);
+  if (cellError) {
+    console.error('[fleet-planning] materialization floor cell lookup failed', cellError);
+    return NextResponse.json({ error: 'Kunde inte kontrollera redan överlämnade BESTÄLLT' }, { status: 500 });
+  }
+
+  const cells = (existingCells ?? []) as ExistingPlanningCell[];
+  const cellByKey = new Map(cells
+    .filter((cell) => cell.model_code)
+    .map((cell) => [planningCellKey(cell.period_code, cell.model_code!, cell.station), cell]));
+  const cellIds = cells.map((cell) => cell.planning_cell_id);
+  const activeMaterializedByCell = new Map<string, number>();
+
+  if (cellIds.length > 0) {
+    const { data: materializedRows, error: materializedError } = await admin.from('garage_items')
+      .select('source_planning_cell_id')
+      .eq('source_kind', 'PLANERING')
+      .is('voided_at', null)
+      .in('source_planning_cell_id', cellIds);
+    if (materializedError) {
+      console.error('[fleet-planning] materialization floor Garage lookup failed', materializedError);
+      return NextResponse.json({ error: 'Kunde inte kontrollera redan överlämnade Garage-objekt' }, { status: 500 });
+    }
+    for (const materialized of materializedRows ?? []) {
+      const cellId = materialized.source_planning_cell_id;
+      if (!cellId) continue;
+      activeMaterializedByCell.set(cellId, (activeMaterializedByCell.get(cellId) ?? 0) + 1);
+    }
+  }
+
+  for (const row of validRows) {
+    const cell = cellByKey.get(planningCellKey(String(row.period_code), String(row.model_code), String(row.station)));
+    if (!cell) continue;
+    const activeMaterialized = activeMaterializedByCell.get(cell.planning_cell_id) ?? 0;
+    const orderedCount = Number(row.ordered_count);
+    if (orderedCount < activeMaterialized) {
+      return NextResponse.json({
+        error: `BESTÄLLT kan inte sänkas till ${orderedCount}. ${activeMaterialized} aktiva Garage-objekt är redan överlämnade för ${String(row.model)} / ${String(row.station)}. Hantera de individuella Garage-objekten först.`,
+      }, { status: 409 });
+    }
+  }
+
   const now = new Date().toISOString();
-  const payload = rows.map((row) => ({ ...row, updated_at: now, updated_by: verification.user.id }));
+  const payload = validRows.map((row) => ({ ...row, updated_at: now, updated_by: verification.user.id }));
   const { data, error } = await admin.from('fleet_planning_cells')
     .upsert(payload, { onConflict: 'period_code,model_code,station' })
     .select('planning_cell_id,period_code,model_code,model,station,salu_count,behov_count,utok_count,minskning_count,ordered_count,note,updated_at');
 
-  if (error) { console.error('[fleet-planning] PUT failed', error); return NextResponse.json({ error: 'Kunde inte spara planeringen' }, { status: 500 }); }
+  if (error) {
+    if (error.code === '23514' && error.message.includes('active materialized Garage units')) {
+      return NextResponse.json({ error: 'BESTÄLLT kan inte sänkas under antal aktiva Garage-objekt som redan har överlämnats från Planering.' }, { status: 409 });
+    }
+    console.error('[fleet-planning] PUT failed', error);
+    return NextResponse.json({ error: 'Kunde inte spara planeringen' }, { status: 500 });
+  }
   return NextResponse.json({ data: data ?? [] });
 }
