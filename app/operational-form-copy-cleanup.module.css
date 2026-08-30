@@ -1,10 +1,15 @@
 /*
  * Scoped visual copy cleanup for operational forms.
  *
- * These selectors target only verified duplicate subsection headings.
+ * These selectors target only verified duplicate subsection headings and the
+ * legacy form header that duplicated route-level identity/user metadata.
  * Form fields, validation, handlers, data flow and meaningful dynamic headings
  * remain untouched.
  */
+
+.legacyHeaderHidden :global(.main-header) {
+  display: none !important;
+}
 
 /* Check / Fordonsstatus:
  * SectionHeader -> Matarstallning heading -> field -> Dack heading -> field.
