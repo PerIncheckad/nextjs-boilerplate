@@ -23,6 +23,7 @@ type GarageItem = {
   planned_station: string | null;
   saluort: string | null;
   daily_rate: number | null;
+  holding_period_months: number | null;
   ordered_at: string | null;
   calloff_at: string | null;
   confirmation_status: string;
@@ -39,10 +40,11 @@ type Draft = Omit<GarageItem, 'garage_item_id' | 'updated_at' | 'source_kind' | 
 type SaluSource = { flag_id: string; regnr: string; current_saludatum: string; status: string; imported: boolean; brand: string | null; model: string | null };
 type SortField = 'UPDATED' | 'MODEL' | 'REGNR' | 'STATION' | 'DIRECTION' | 'PERIOD';
 
+const HOLDING_PERIODS = [4, 6, 9, 12, 18, 24] as const;
 const currentMonth = () => new Date().toISOString().slice(0, 7);
 const emptyDraft = (station: string | null = null): Draft => ({
   planning_period: currentMonth(), model: '', garage_direction: null, planning_reason: 'ANNAT', supplier: '', order_reference: '', regnr: '', vin: '', source_regnr: '',
-  planned_station: station, saluort: '', daily_rate: null, ordered_at: '', calloff_at: '', confirmation_status: 'PLANERAD', transport_status: 'EJ_BOKAD', planned_delivery_date: '', note: '',
+  planned_station: station, saluort: '', daily_rate: null, holding_period_months: null, ordered_at: '', calloff_at: '', confirmation_status: 'PLANERAD', transport_status: 'EJ_BOKAD', planned_delivery_date: '', note: '',
 });
 const directionLabel = (value: GarageDirection | null) => value === 'IN' ? 'UTVECKLA / IN' : value === 'UT' ? 'AVVECKLA / UT' : 'Ej satt';
 const sourceLabel = (item: GarageItem) => item.source_kind === 'PLANERING' ? `Planering #${item.source_planning_unit_no ?? '—'}` : item.source_kind === 'SALU' ? 'SALU' : item.source_kind === 'LAGER1' ? 'Lager 1' : 'Manuell';
@@ -242,6 +244,7 @@ export default function GarageClient() {
           <Field label="Leverantör"><input value={draft.supplier ?? ''} onChange={(e) => setDraft({ ...draft, supplier: e.target.value })} /></Field>
           <Field label="Reg.nr"><input value={draft.regnr ?? ''} onChange={(e) => setDraft({ ...draft, regnr: e.target.value.toUpperCase() })} /></Field>
           <Field label="Dygnsdeb"><input type="number" min="0" value={draft.daily_rate ?? ''} onChange={(e) => setDraft({ ...draft, daily_rate: e.target.value === '' ? null : Number(e.target.value) })} /></Field>
+          {draft.garage_direction === 'IN' ? <Field label="Hålltid"><select value={draft.holding_period_months ?? ''} onChange={(e) => setDraft({ ...draft, holding_period_months: e.target.value === '' ? null : Number(e.target.value) })}><option value="">Välj</option>{HOLDING_PERIODS.map((months) => <option key={months} value={months}>{months} mån</option>)}</select></Field> : null}
           <Field label="Avropad"><input type="date" value={draft.calloff_at ?? ''} onChange={(e) => setDraft({ ...draft, calloff_at: e.target.value })} /></Field>
           {draft.garage_direction === 'UT' ? <>
             <Field label="VIN"><input value={draft.vin ?? ''} onChange={(e) => setDraft({ ...draft, vin: e.target.value.toUpperCase() })} /></Field>
@@ -251,8 +254,8 @@ export default function GarageClient() {
             <Field label="Beställd"><input type="date" value={draft.ordered_at ?? ''} onChange={(e) => setDraft({ ...draft, ordered_at: e.target.value })} /></Field>
             <Field label="Bekräftelse"><select value={draft.confirmation_status} onChange={(e) => setDraft({ ...draft, confirmation_status: e.target.value })}><option value="PLANERAD">Planerad</option><option value="BESTALLD">Beställd</option><option value="AVROPAD">Avropad</option><option value="AVVAKTAR_BEKRAFTELSE">Avvaktar bekräftelse</option><option value="BEKRAFTAD">Bekräftad</option></select></Field>
             <Field label="Transport"><select value={draft.transport_status} onChange={(e) => setDraft({ ...draft, transport_status: e.target.value })}><option value="EJ_BOKAD">Ej bokad</option><option value="TRANSPORTBOKAD">Transport bokad</option><option value="PA_VAG">På väg</option></select></Field>
+            <Field label="Planerad leverans"><input type="date" value={draft.planned_delivery_date ?? ''} onChange={(e) => setDraft({ ...draft, planned_delivery_date: e.target.value })} /></Field>
           </> : null}
-          <Field label="Planerad leverans"><input type="date" value={draft.planned_delivery_date ?? ''} onChange={(e) => setDraft({ ...draft, planned_delivery_date: e.target.value })} /></Field>
           <Field label="Kommentar"><input value={draft.note ?? ''} onChange={(e) => setDraft({ ...draft, note: e.target.value })} /></Field>
         </div>
         <button className={styles.primaryButton} type="button" onClick={() => void create()} disabled={saving || stations.length === 0}>{saving ? 'Sparar…' : 'Lägg i Garaget'}</button>
@@ -270,7 +273,7 @@ export default function GarageClient() {
       </section>
 
       <section className={styles.tableSection}>{loading ? <div className={styles.empty}>Läser Garaget…</div> : direction === 'IN' ? (
-        <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Månad</th><th>Modell</th><th className={styles.regnrColumn}>Reg.nr</th><th>Station</th><th>Leverantör</th><th>Dygnsdeb</th><th>Avropad</th><th>Leverans</th><th>Kommentar</th></tr></thead>
+        <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Månad</th><th>Modell</th><th className={styles.regnrColumn}>Reg.nr</th><th>Station</th><th>Leverantör</th><th>Dygnsdeb</th><th>Hålltid</th><th>Avropad</th><th>Kommentar</th></tr></thead>
           <tbody>{visible.map((item) => <tr key={item.garage_item_id}>
             <td>{sourceLabel(item)}</td>
             <td>{item.planning_period ?? '—'}</td>
@@ -279,8 +282,8 @@ export default function GarageClient() {
             <td>{item.planned_station ?? '—'}</td>
             <td><div className={styles.supplierEditor}><input value={supplierDrafts[item.garage_item_id] ?? ''} onChange={(e) => setSupplierDrafts((current) => ({ ...current, [item.garage_item_id]: e.target.value }))} /><button type="button" className={styles.rowSaveButton} disabled={savingSupplierId === item.garage_item_id || (supplierDrafts[item.garage_item_id] ?? '') === (item.supplier ?? '')} onClick={() => void saveSupplier(item)}>{savingSupplierId === item.garage_item_id ? '…' : 'Spara'}</button></div></td>
             <td><input className={styles.rate} type="number" min="0" defaultValue={item.daily_rate ?? ''} onBlur={(e) => blurPatch(item, 'daily_rate', item.daily_rate, e.target.value === '' ? null : Number(e.target.value))} /></td>
+            <td><select value={item.holding_period_months ?? ''} onChange={(e) => void patch(item, { holding_period_months: e.target.value === '' ? null : Number(e.target.value) })}><option value="">—</option>{HOLDING_PERIODS.map((months) => <option key={months} value={months}>{months} mån</option>)}</select></td>
             <td><input type="date" defaultValue={item.calloff_at ?? ''} onBlur={(e) => blurPatch(item, 'calloff_at', item.calloff_at, e.target.value || null)} /></td>
-            <td><input type="date" defaultValue={item.planned_delivery_date ?? ''} onBlur={(e) => blurPatch(item, 'planned_delivery_date', item.planned_delivery_date, e.target.value || null)} /></td>
             <td><input defaultValue={item.note ?? ''} onBlur={(e) => blurPatch(item, 'note', item.note, e.target.value || null)} /></td>
           </tr>)}</tbody></table></div>
       ) : (

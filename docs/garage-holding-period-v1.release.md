@@ -1,0 +1,1 @@
+Release scope: Garage UTVECKLA / IN only. Hålltid is stored as holding_period_months and offered as 4, 6, 9, 12, 18, 24 months. Leverans is removed from the IN view only; planned_delivery_date remains stored and AVVECKLA / UT is unchanged.

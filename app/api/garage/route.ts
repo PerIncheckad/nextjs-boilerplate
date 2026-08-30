@@ -6,6 +6,7 @@ const REASONS = new Set(['BEHOV', 'UTOK', 'MINSKNING', 'SALU', 'SALU_RETUR', 'AN
 const CONFIRMATION = new Set(['PLANERAD', 'BESTALLD', 'AVROPAD', 'AVVAKTAR_BEKRAFTELSE', 'BEKRAFTAD']);
 const TRANSPORT = new Set(['EJ_BOKAD', 'TRANSPORTBOKAD', 'PA_VAG']);
 const DIRECTIONS = new Set(['IN', 'UT']);
+const HOLDING_PERIODS = new Set([4, 6, 9, 12, 18, 24]);
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 function adminClient() {
@@ -18,6 +19,7 @@ function text(value: unknown): string | null { if (typeof value !== 'string') re
 function upper(value: unknown): string | null { const next = text(value); return next ? next.toUpperCase() : null; }
 function date(value: unknown): string | null { const next = text(value); return !next ? null : /^\d{4}-\d{2}-\d{2}$/.test(next) ? next : null; }
 function money(value: unknown): number | null { if (value === null || value === undefined || value === '') return null; const numeric = Number(value); return Number.isFinite(numeric) && numeric >= 0 ? numeric : null; }
+function holdingPeriod(value: unknown): number | null { if (value === null || value === undefined || value === '') return null; const numeric = Number(value); return Number.isInteger(numeric) && HOLDING_PERIODS.has(numeric) ? numeric : null; }
 
 async function loadStations(admin: ReturnType<typeof adminClient>) {
   const { data, error } = await admin.from('planning_stations').select('station_code,display_name,sort_order').eq('is_active', true).order('sort_order', { ascending: true }).order('station_code', { ascending: true });
@@ -59,6 +61,7 @@ function normalizeBody(body: Record<string, unknown>, stations: Set<string>, par
   if (!partial || Object.hasOwn(body, 'calloff_at')) out.calloff_at = date(body.calloff_at);
   if (!partial || Object.hasOwn(body, 'planned_delivery_date')) out.planned_delivery_date = date(body.planned_delivery_date);
   if (!partial || Object.hasOwn(body, 'daily_rate')) { const value = money(body.daily_rate); if (body.daily_rate !== null && body.daily_rate !== undefined && body.daily_rate !== '' && value === null) return null; out.daily_rate = value; }
+  if (!partial || Object.hasOwn(body, 'holding_period_months')) { const value = holdingPeriod(body.holding_period_months); if (body.holding_period_months !== null && body.holding_period_months !== undefined && body.holding_period_months !== '' && value === null) return null; out.holding_period_months = value; }
   return out;
 }
 
@@ -75,7 +78,7 @@ export async function GET(request: Request) {
   const period = params.get('period')?.trim() || null;
   const station = params.get('station')?.trim() || null;
   const direction = upper(params.get('direction'));
-  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,garage_direction,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,source_planning_unit_no,source_salu_flag_id,created_at,updated_at').is('voided_at', null).order('updated_at', { ascending: false });
+  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,garage_direction,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,source_planning_unit_no,source_salu_flag_id,created_at,updated_at').is('voided_at', null).order('updated_at', { ascending: false });
   if (period) query = query.eq('planning_period', period);
   if (station && stations.has(station)) query = query.eq('planned_station', station);
   if (direction && DIRECTIONS.has(direction)) query = query.eq('garage_direction', direction);
@@ -92,7 +95,7 @@ export async function POST(request: Request) {
   let stationRows: Array<{ station_code: string }>;
   try { stationRows = await loadStations(admin) as Array<{ station_code: string }>; } catch (error) { console.error('[garage] station lookup failed', error); return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 }); }
   const normalized = normalizeBody(body, new Set(stationRows.map((row) => row.station_code)));
-  if (!normalized) return NextResponse.json({ error: 'Ogiltiga Garage-data: modell, riktning och station måste vara giltiga' }, { status: 400 });
+  if (!normalized) return NextResponse.json({ error: 'Ogiltiga Garage-data: modell, riktning, station och hålltid måste vara giltiga' }, { status: 400 });
   try { normalized.model = await ensureModel(admin, normalized.model, verification.user.id); } catch (error) { console.error('[garage] model register failed', error); return NextResponse.json({ error: 'Kunde inte uppdatera modellregistret' }, { status: 500 }); }
   const now = new Date().toISOString();
   const payload = { ...normalized, source_kind: 'MANUELL', created_at: now, updated_at: now, created_by: verification.user.id, updated_by: verification.user.id };
