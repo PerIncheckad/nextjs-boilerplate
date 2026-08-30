@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Status | Incheckad',
-  description: 'Läs och verifiera fordonets aktuella läge och historik',
+  description: 'Läs och verifiera fordonets aktuella läge, historik och spårbara manuella ändringar',
 };
 
 export default function StatusPage() {
@@ -33,7 +33,7 @@ export default function StatusPage() {
           <span>INCHECKAD CORE / STATUS</span>
           <h1>Läs bilens verifierade läge.</h1>
           <p>
-            Sök ett fordon och läs aktuell information, avvikelser, historik och evidens utan att skapa en ny verklighet.
+            Sök ett fordon och läs aktuell information, avvikelser, historik och evidens. Korrigeringar görs som spårbara manuella ändringar.
           </p>
         </div>
 
