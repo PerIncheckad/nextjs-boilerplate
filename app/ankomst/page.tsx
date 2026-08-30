@@ -3,6 +3,7 @@ import Link from 'next/link';
 import FormClient from './form-client';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './ankomst-shell.module.css';
+import modalStyles from './ankomst-modal-cleanup.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 import actionStyles from '../operational-action-contract.module.css';
 
@@ -49,7 +50,7 @@ export default function AnkomstPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.arrivalSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
+      <section className={`${styles.formSurface} ${modalStyles.surface} ${cleanupStyles.arrivalSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <FormClient />
       </section>
 
