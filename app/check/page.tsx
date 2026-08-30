@@ -5,6 +5,7 @@ import FormClient from './form-client';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './check-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
+import actionStyles from '../operational-action-contract.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +44,7 @@ export default function CheckPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.checkSurface} ${cleanupStyles.legacyHeaderHidden}`}>
+      <section className={`${styles.formSurface} ${cleanupStyles.checkSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <FormClient />
       </section>
     </main>

@@ -1,0 +1,32 @@
+/* Shared action hierarchy for operational form footers.
+ * Keeps action semantics in the INCHECKAD palette and prevents legacy
+ * blue/green CTA styling from leaking into Check, Ankomst and Ny bil.
+ */
+
+.actionSurface :global(.form-actions .btn.secondary) {
+  background: #ffffff !important;
+  color: #60666a !important;
+  border-color: #b7b3ae !important;
+}
+
+.actionSurface :global(.form-actions .btn.primary) {
+  background: #f5f4f0 !important;
+  color: #111315 !important;
+  border-color: #111315 !important;
+}
+
+.actionSurface :global(.form-actions .btn.success) {
+  background: #111315 !important;
+  color: #ffffff !important;
+  border-color: #111315 !important;
+}
+
+.actionSurface :global(.form-actions .btn:disabled) {
+  opacity: .55 !important;
+  cursor: not-allowed !important;
+}
+
+.actionSurface :global(.form-actions .btn:focus-visible) {
+  outline: 2px solid rgba(17, 19, 21, .28) !important;
+  outline-offset: 2px !important;
+}
