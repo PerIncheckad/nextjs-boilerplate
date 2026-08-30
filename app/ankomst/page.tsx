@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
+import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './ankomst-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 
@@ -22,10 +23,9 @@ export default function AnkomstPage() {
           <span>BY INVISTO / IT</span>
         </div>
 
-        <div className={styles.topActions}>
+        <OperationalTopbarMeta mode="ANKOMST">
           <Link className={styles.nextLink} href="/check">Incheckning</Link>
-          <span className={styles.mode}>ANKOMST</span>
-        </div>
+        </OperationalTopbarMeta>
       </header>
 
       <section className={styles.hero}>
@@ -48,7 +48,7 @@ export default function AnkomstPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.arrivalSurface}`}>
+      <section className={`${styles.formSurface} ${cleanupStyles.arrivalSurface} ${cleanupStyles.legacyHeaderHidden}`}>
         <FormClient />
       </section>
 

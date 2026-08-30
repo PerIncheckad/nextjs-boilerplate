@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
+import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './status-shell.module.css';
+import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,10 +23,9 @@ export default function StatusPage() {
           <span>BY INVISTO / IT</span>
         </div>
 
-        <div className={styles.topActions}>
+        <OperationalTopbarMeta mode="STATUS">
           <Link className={styles.nextLink} href="/vagnkort">Vagnkort</Link>
-          <span className={styles.mode}>STATUS</span>
-        </div>
+        </OperationalTopbarMeta>
       </header>
 
       <section className={styles.hero}>
@@ -47,7 +48,7 @@ export default function StatusPage() {
         </div>
       </section>
 
-      <section className={styles.formSurface}>
+      <section className={`${styles.formSurface} ${cleanupStyles.legacyHeaderHidden}`}>
         <FormClient />
       </section>
 
