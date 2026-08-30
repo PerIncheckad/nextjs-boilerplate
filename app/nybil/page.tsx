@@ -5,6 +5,7 @@ import GarageNybilPrefillBridge from './garage-prefill-bridge';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './nybil-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
+import actionStyles from '../operational-action-contract.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +52,7 @@ export default function NybilPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface} ${cleanupStyles.legacyHeaderHidden}`}>
+      <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <FormClient />
       </section>
 
