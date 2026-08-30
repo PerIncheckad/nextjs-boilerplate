@@ -6,7 +6,7 @@
   --steel: #60666a;
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 218px minmax(0, 1fr);
+  grid-template-columns: 196px minmax(0, 1fr);
   background: var(--ivory);
   color: var(--ink);
   font-family: Aeonik, Arial, Helvetica, sans-serif;
@@ -18,92 +18,94 @@
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 28px 22px 24px;
+  padding: 20px 16px 18px;
   background: #111315;
   color: #f5f4f0;
-  border-right: 1px solid rgba(183, 179, 174, 0.24);
+  border-right: 1px solid rgba(183, 179, 174, 0.3);
 }
 
 .brand {
   display: grid;
-  gap: 3px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid rgba(183, 179, 174, 0.22);
+  gap: 2px;
+  padding: 0 4px 16px;
+  border-bottom: 1px solid rgba(183, 179, 174, 0.28);
 }
 
 .brand strong {
-  font-size: 18px;
+  font-size: 16px;
   letter-spacing: 0.04em;
 }
 
 .brand span,
 .sidebarFoot small {
-  color: rgba(245, 244, 240, 0.54);
-  font-size: 10px;
+  color: rgba(245, 244, 240, 0.56);
+  font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
 }
 
 .brand i {
-  width: 42px;
+  width: 36px;
   height: 1px;
-  margin-top: 10px;
+  margin-top: 8px;
   background: var(--taupe);
 }
 
 .nav {
   display: grid;
-  gap: 5px;
-  margin-top: 28px;
+  gap: 3px;
+  margin-top: 18px;
 }
 
 .nav a {
   position: relative;
   display: flex;
   align-items: center;
-  min-height: 40px;
-  padding: 0 10px 0 15px;
-  border-radius: 8px;
-  color: rgba(245, 244, 240, 0.6);
+  min-height: 34px;
+  padding: 0 8px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: rgba(245, 244, 240, 0.62);
   text-decoration: none;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 680;
-  letter-spacing: 0.035em;
-  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+  letter-spacing: 0.025em;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
 }
 
 .nav a:hover {
   color: #fff;
-  background: rgba(255, 255, 255, 0.055);
-  transform: translateX(2px);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(183, 179, 174, 0.16);
 }
 
 .nav .active {
   color: #fff;
-  background: rgba(255, 255, 255, 0.075);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(183, 179, 174, 0.22);
 }
 
 .nav .active::before {
   content: '';
   position: absolute;
-  left: 0;
+  left: -1px;
   width: 2px;
-  height: 20px;
+  height: 18px;
   background: var(--taupe);
 }
 
 .sidebarFoot {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   margin-top: auto;
-  padding-top: 20px;
-  border-top: 1px solid rgba(183, 179, 174, 0.22);
+  padding: 14px 4px 0;
+  border-top: 1px solid rgba(183, 179, 174, 0.24);
 }
 
 .sidebarFoot span {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 780;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
 }
 
 .surface {
@@ -111,32 +113,32 @@
 }
 
 .topbar {
-  min-height: 72px;
+  min-height: 56px;
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 0 clamp(22px, 4vw, 58px);
-  border-bottom: 1px solid rgba(183, 179, 174, 0.62);
-  background: rgba(245, 244, 240, 0.9);
-  backdrop-filter: blur(18px);
+  gap: 14px;
+  padding: 0 clamp(18px, 3vw, 42px);
+  border-bottom: 1px solid rgba(183, 179, 174, 0.72);
+  background: rgba(245, 244, 240, 0.94);
+  backdrop-filter: blur(16px);
 }
 
 .topbarTitle {
   display: grid;
-  gap: 2px;
+  gap: 1px;
 }
 
 .topbarTitle strong {
-  font-size: 14px;
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  letter-spacing: 0.015em;
 }
 
 .topbarTitle span,
 .mode {
   color: var(--steel);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 760;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.14em;
 }
 
 .topbarSpacer {
@@ -144,33 +146,33 @@
 }
 
 .mode {
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid var(--stone);
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--ink);
 }
 
 .hero {
-  padding: 34px clamp(22px, 4vw, 58px) 16px;
+  padding: 22px clamp(18px, 3vw, 42px) 10px;
 }
 
 .hero span {
   color: var(--taupe);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
 }
 
 .hero h1 {
-  margin: 5px 0 12px;
-  font-size: clamp(40px, 5vw, 62px);
-  line-height: 0.95;
-  letter-spacing: -0.04em;
+  margin: 4px 0 8px;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
 }
 
 .hero i {
   display: block;
-  width: 68px;
+  width: 52px;
   height: 1px;
   background: var(--taupe);
 }
@@ -196,21 +198,22 @@
   .sidebar {
     position: relative;
     height: auto;
-    padding: 18px 20px;
+    padding: 14px 16px;
   }
 
   .brand {
-    padding-bottom: 14px;
+    padding-bottom: 10px;
   }
 
   .nav {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    margin-top: 14px;
+    margin-top: 10px;
   }
 
   .nav a {
     justify-content: center;
-    padding: 0 6px;
+    min-height: 32px;
+    padding: 0 5px;
     text-align: center;
   }
 
@@ -226,12 +229,15 @@
   }
 
   .topbar {
-    min-height: auto;
-    padding-top: 14px;
-    padding-bottom: 14px;
+    min-height: 52px;
+    padding: 0 14px;
   }
 
   .mode {
     display: none;
+  }
+
+  .hero {
+    padding: 18px 14px 8px;
   }
 }
