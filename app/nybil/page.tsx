@@ -3,6 +3,7 @@ import Link from 'next/link';
 import FormClient from './form-client';
 import GarageNybilPrefillBridge from './garage-prefill-bridge';
 import styles from './nybil-shell.module.css';
+import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,7 +51,7 @@ export default function NybilPage() {
         </div>
       </section>
 
-      <section className={styles.formSurface}>
+      <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface}`}>
         <FormClient />
       </section>
 

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
 import styles from './ankomst-shell.module.css';
+import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export default function AnkomstPage() {
         </div>
       </section>
 
-      <section className={styles.formSurface}>
+      <section className={`${styles.formSurface} ${cleanupStyles.arrivalSurface}`}>
         <FormClient />
       </section>
 
