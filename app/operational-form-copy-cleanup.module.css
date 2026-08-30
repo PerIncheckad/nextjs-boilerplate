@@ -1,19 +1,31 @@
 /*
- * Scoped copy cleanup for operational forms.
+ * Scoped visual copy cleanup for operational forms.
  *
- * These rules remove only headings that duplicate the immediately following
- * field label. They intentionally leave form semantics, validation, data flow
- * and meaningful subsection headings untouched.
+ * These selectors target only verified duplicate subsection headings.
+ * Form fields, validation, handlers, data flow and meaningful dynamic headings
+ * remain untouched.
  */
 
-.checkSurface :global(.card:has(> .section-header + .sub-section-header + .field + .sub-section-header + .field) > .sub-section-header) {
+/* Check / Fordonsstatus:
+ * SectionHeader -> Matarstallning heading -> field -> Dack heading -> field.
+ * Hide exactly those two duplicate headings, not Skador subsections.
+ */
+.checkSurface :global(.card:has(> .section-header + .sub-section-header + .field + .sub-section-header + .field) > .section-header + .sub-section-header),
+.checkSurface :global(.card:has(> .section-header + .sub-section-header + .field + .sub-section-header + .field) > .field + .sub-section-header) {
   display: none !important;
 }
 
-.arrivalSurface :global(.card > .section-header + .sub-section-header) {
+/* Ankomst / Fordonsstatus:
+ * Hide only the first duplicate Matarstallning heading. The following dynamic
+ * Tankstatus/Laddstatus subsection remains visible.
+ */
+.arrivalSurface :global(.card:has(> .section-header + .sub-section-header + .field + .sub-section-header) > .section-header + .sub-section-header) {
   display: none !important;
 }
 
+/* Ny bil currently has exactly two SubSectionHeader usages in the form:
+ * Dack and Drivmedel. Both duplicate the following field label.
+ */
 .newVehicleSurface :global(.nybil-form .sub-section-header) {
   display: none !important;
 }
