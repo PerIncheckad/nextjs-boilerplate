@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
 import GarageNybilPrefillBridge from './garage-prefill-bridge';
+import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './nybil-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 
@@ -25,10 +26,9 @@ export default function NybilPage() {
           <span>BY INVISTO / IT</span>
         </div>
 
-        <div className={styles.topActions}>
+        <OperationalTopbarMeta mode="NY BIL">
           <Link className={styles.homeLink} href="/">Startsida</Link>
-          <span className={styles.mode}>NY BIL</span>
-        </div>
+        </OperationalTopbarMeta>
       </header>
 
       <section className={styles.hero}>
@@ -51,7 +51,7 @@ export default function NybilPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface}`}>
+      <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface} ${cleanupStyles.legacyHeaderHidden}`}>
         <FormClient />
       </section>
 
