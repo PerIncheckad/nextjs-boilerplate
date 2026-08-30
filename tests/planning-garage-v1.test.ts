@@ -7,6 +7,7 @@ const modelMigration = readFileSync('migrations/20260825205500_add_planning_vehi
 const directionMigration = readFileSync('migrations/20260825211000_add_garage_direction_v1.sql', 'utf8');
 const finalMigration = readFileSync('migrations/20260825213500_finalize_planning_garage_v1.sql', 'utf8');
 const atomicHandoffMigration = readFileSync('migrations/20260830010000_atomic_planning_garage_handoff.sql', 'utf8');
+const atomicSaluMigration = readFileSync('migrations/20260830015500_atomic_salu_garage_handoff.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const planningModelApi = readFileSync('app/api/planning/models/route.ts', 'utf8');
 const planningStatusApi = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
@@ -111,12 +112,18 @@ test('KLAR materializes BESTALLT automatically without duplicate units and stamp
   assert.match(garageUi, /markeras KLAR skapas BESTÄLLT automatiskt/);
 });
 
-test('Garage can import one exact SALU cycle once without rewriting Layer 1', () => {
+test('Garage imports one exact SALU cycle atomically without rewriting Layer 1', () => {
   assert.match(finalMigration, /source_salu_flag_id/);
   assert.match(finalMigration, /garage_items_salu_source_uidx/);
   assert.match(saluSourceApi, /from\('salu_flags'\)/);
-  assert.match(saluSourceApi, /source_salu_flag_id/);
-  assert.match(saluSourceApi, /planning_reason: 'SALU'/);
+  assert.match(saluSourceApi, /admin\.rpc\('materialize_salu_to_garage'/);
+  assert.doesNotMatch(saluSourceApi, /from\('garage_items'\)\.insert/);
+  assert.match(atomicSaluMigration, /create or replace function public\.materialize_salu_to_garage/);
+  assert.match(atomicSaluMigration, /pg_advisory_xact_lock/);
+  assert.match(atomicSaluMigration, /source_kind = 'SALU'/);
+  assert.match(atomicSaluMigration, /insert into public\.garage_items/);
+  assert.match(atomicSaluMigration, /insert into public\.garage_direction_events/);
+  assert.match(atomicSaluMigration, /grant execute on function public\.materialize_salu_to_garage.*service_role/s);
   assert.match(garageUi, /Hämta från SALU/);
   assert.match(garageUi, /Exakt SALU-cykel kan bara hämtas en gång/);
 });
