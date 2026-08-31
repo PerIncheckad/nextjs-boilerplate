@@ -5,6 +5,7 @@ import styles from './garage-wheel-change.module.css';
 
 type WheelStatus = 'KRAVS' | 'BOKAD' | 'PAGAENDE' | 'KLAR' | 'AVVIKELSE';
 type WheelEligibility = 'REQUIRES_CHANGE' | 'ALREADY_CORRECT' | 'SALU_EXEMPT' | 'UNKNOWN_WHEEL_STATUS';
+type WheelStorageSource = 'EDIT' | 'NYBIL' | 'VEHICLES' | 'MISSING';
 
 type WheelChange = {
   wheel_change_id: string;
@@ -31,6 +32,12 @@ type WheelCandidate = {
   current_station: string | null;
   current_saludatum: string | null;
   eligibility: WheelEligibility;
+};
+
+type WheelStorageFact = {
+  regnr: string;
+  wheel_storage_location: string | null;
+  wheel_storage_source: WheelStorageSource;
 };
 
 type Season = {
@@ -78,19 +85,7 @@ const ALLOWED_STATUSES: Record<WheelStatus, WheelStatus[]> = {
   KLAR: ['KLAR'],
 };
 
-const WHEEL_STATION_BY_CITY: Readonly<Record<string, '166' | '170' | '274'>> = {
-  Malmö: '166',
-  Helsingborg: '170',
-  Halmstad: '274',
-  Varberg: '274',
-};
-
 const allowedStatuses = (status: WheelStatus): WheelStatus[] => ALLOWED_STATUSES[status];
-
-function wheelStationCode(city: string | null): string {
-  if (!city) return '—';
-  return WHEEL_STATION_BY_CITY[city] ?? '—';
-}
 
 function localDateTime(value: string | null): string {
   if (!value) return '';
@@ -113,6 +108,7 @@ function makeDraft(item: WheelChange): Draft {
 export default function GarageWheelChangePanel() {
   const [wheelChanges, setWheelChanges] = useState<WheelChange[]>([]);
   const [candidates, setCandidates] = useState<WheelCandidate[]>([]);
+  const [storageByRegnr, setStorageByRegnr] = useState<Record<string, WheelStorageFact>>({});
   const [season, setSeason] = useState<Season | null>(null);
   const [counts, setCounts] = useState<Counts>({ REQUIRES_CHANGE: 0, ALREADY_CORRECT: 0, SALU_EXEMPT: 0, UNKNOWN_WHEEL_STATUS: 0 });
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
@@ -130,29 +126,43 @@ export default function GarageWheelChangePanel() {
     setDrafts(Object.fromEntries(nextChanges.map((item) => [item.wheel_change_id, makeDraft(item)])));
   }, []);
 
+  const applyStoragePayload = useCallback((payload: { storage?: WheelStorageFact[] }) => {
+    setStorageByRegnr(Object.fromEntries((payload.storage ?? []).map((item) => [item.regnr, item])));
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/garage/wheel-changes', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa hjulskiften');
-      applyPayload(payload.data ?? {});
+      const [wheelResponse, storageResponse] = await Promise.all([
+        fetch('/api/garage/wheel-changes', { cache: 'no-store' }),
+        fetch('/api/garage/wheel-storage', { cache: 'no-store' }),
+      ]);
+      const [wheelPayload, storagePayload] = await Promise.all([wheelResponse.json(), storageResponse.json()]);
+      if (!wheelResponse.ok) throw new Error(wheelPayload?.error ?? 'Kunde inte läsa hjulskiften');
+      if (!storageResponse.ok) throw new Error(storagePayload?.error ?? 'Kunde inte läsa hjulförvaring');
+      applyPayload(wheelPayload.data ?? {});
+      applyStoragePayload(storagePayload.data ?? {});
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa hjulskiften');
     } finally {
       setLoading(false);
     }
-  }, [applyPayload]);
+  }, [applyPayload, applyStoragePayload]);
 
   useEffect(() => {
     let active = true;
-    void fetch('/api/garage/wheel-changes', { cache: 'no-store' })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa hjulskiften');
+    void Promise.all([
+      fetch('/api/garage/wheel-changes', { cache: 'no-store' }),
+      fetch('/api/garage/wheel-storage', { cache: 'no-store' }),
+    ])
+      .then(async ([wheelResponse, storageResponse]) => {
+        const [wheelPayload, storagePayload] = await Promise.all([wheelResponse.json(), storageResponse.json()]);
+        if (!wheelResponse.ok) throw new Error(wheelPayload?.error ?? 'Kunde inte läsa hjulskiften');
+        if (!storageResponse.ok) throw new Error(storagePayload?.error ?? 'Kunde inte läsa hjulförvaring');
         if (!active) return;
-        applyPayload(payload.data ?? {});
+        applyPayload(wheelPayload.data ?? {});
+        applyStoragePayload(storagePayload.data ?? {});
         setError(null);
       })
       .catch((loadError: unknown) => {
@@ -160,7 +170,7 @@ export default function GarageWheelChangePanel() {
       })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [applyPayload]);
+  }, [applyPayload, applyStoragePayload]);
 
   const openRegnrs = useMemo(
     () => new Set(wheelChanges.filter((item) => item.status !== 'KLAR').map((item) => item.regnr)),
@@ -263,13 +273,13 @@ export default function GarageWheelChangePanel() {
       {actionableCandidates.length > 0 ? (
         <div className={styles.tableWrap}>
           <table className={styles.candidateTable}>
-            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Station</th><th>Bedömning</th>{season?.active ? <th /> : null}</tr></thead>
+            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Hjulförvaring</th><th>Bedömning</th>{season?.active ? <th /> : null}</tr></thead>
             <tbody>{actionableCandidates.map((item) => (
               <tr key={item.regnr}>
                 <td><strong>{item.regnr}</strong><span className={styles.subtle}>Check-in {item.latest_checkin_at.slice(0, 10)}</span></td>
                 <td>{item.current_wheel_type ?? '—'}</td>
                 <td>{item.current_saludatum ?? '—'}</td>
-                <td><strong>{wheelStationCode(item.current_city)}</strong></td>
+                <td><strong>{storageByRegnr[item.regnr]?.wheel_storage_location ?? 'Saknas'}</strong></td>
                 <td><strong>{eligibilityLabel(item.eligibility)}</strong></td>
                 {season?.active ? <td><button type="button" className={styles.primaryButton} disabled={savingId === `NEW:${item.regnr}`} onClick={() => void startWheelChange(item.regnr)}>{savingId === `NEW:${item.regnr}` ? 'Startar…' : 'Starta'}</button></td> : null}
               </tr>
