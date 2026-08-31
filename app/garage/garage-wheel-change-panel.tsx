@@ -70,13 +70,15 @@ const eligibilityLabel = (eligibility: WheelEligibility) => ({
   UNKNOWN_WHEEL_STATUS: 'Hjulstatus saknas',
 })[eligibility];
 
-const allowedStatuses = (status: WheelStatus): WheelStatus[] => ({
+const ALLOWED_STATUSES: Record<WheelStatus, WheelStatus[]> = {
   KRAVS: ['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'],
   BOKAD: ['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'],
   PAGAENDE: ['BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'],
   AVVIKELSE: ['KRAVS', 'BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'],
   KLAR: ['KLAR'],
-})[status];
+};
+
+const allowedStatuses = (status: WheelStatus): WheelStatus[] => ALLOWED_STATUSES[status];
 
 function localDateTime(value: string | null): string {
   if (!value) return '';
