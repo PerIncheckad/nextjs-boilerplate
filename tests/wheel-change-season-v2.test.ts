@@ -17,6 +17,7 @@ test('winter season and SALU exemption use the locked dates', () => {
   assert.equal(season.startDate, '2026-10-01');
   assert.equal(season.endDate, '2027-04-15');
   assert.equal(season.saluExemptEnd, '2026-12-05');
+  assert.equal(classifyWheelEligibility(season, 'Sommardäck', '2026-09-15'), 'SALU_EXEMPT');
   assert.equal(classifyWheelEligibility(season, 'Sommardäck', '2026-12-05'), 'SALU_EXEMPT');
   assert.equal(classifyWheelEligibility(season, 'Sommardäck', '2026-12-06'), 'REQUIRES_CHANGE');
   assert.equal(classifyWheelEligibility(season, 'Vinterdäck', '2026-11-20'), 'ALREADY_CORRECT');
@@ -26,8 +27,8 @@ test('summer season and SALU exemption use the locked dates', () => {
   const season = summerSeason(2027);
   assert.equal(season.startDate, '2027-03-31');
   assert.equal(season.endDate, '2027-05-31');
-  assert.equal(season.saluExemptStart, '2027-04-01');
   assert.equal(season.saluExemptEnd, '2027-06-05');
+  assert.equal(classifyWheelEligibility(season, 'Vinterdäck', '2027-03-15'), 'SALU_EXEMPT');
   assert.equal(classifyWheelEligibility(season, 'Vinterdäck', '2027-06-05'), 'SALU_EXEMPT');
   assert.equal(classifyWheelEligibility(season, 'Vinterdäck', '2027-06-06'), 'REQUIRES_CHANGE');
   assert.equal(classifyWheelEligibility(season, 'Sommardäck', null), 'ALREADY_CORRECT');
