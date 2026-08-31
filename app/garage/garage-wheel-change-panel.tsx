@@ -177,9 +177,19 @@ export default function GarageWheelChangePanel() {
     [wheelChanges],
   );
 
-  const actionableCandidates = useMemo(
+  const requiresChangeCandidates = useMemo(
     () => candidates.filter((item) => item.eligibility === 'REQUIRES_CHANGE' && !openRegnrs.has(item.regnr)),
     [candidates, openRegnrs],
+  );
+
+  const missingStorageCandidates = useMemo(
+    () => requiresChangeCandidates.filter((item) => !storageByRegnr[item.regnr]?.wheel_storage_location),
+    [requiresChangeCandidates, storageByRegnr],
+  );
+
+  const actionableCandidates = useMemo(
+    () => requiresChangeCandidates.filter((item) => Boolean(storageByRegnr[item.regnr]?.wheel_storage_location)),
+    [requiresChangeCandidates, storageByRegnr],
   );
 
   const unknownCandidates = useMemo(
@@ -264,22 +274,40 @@ export default function GarageWheelChangePanel() {
 
       <div className={styles.startRow}>
         <strong>{counts.REQUIRES_CHANGE} behöver skifte</strong>
+        <span>{missingStorageCandidates.length} saknar hjulförvaring</span>
         <span>{counts.ALREADY_CORRECT} redan rätt</span>
         <span>{counts.SALU_EXEMPT} SALU-undantagna</span>
         <span>{counts.UNKNOWN_WHEEL_STATUS} saknar hjulstatus</span>
         <button type="button" className={styles.secondaryButton} disabled={loading} onClick={() => void load()}>{loading ? 'Läser…' : 'Uppdatera'}</button>
       </div>
 
+      {missingStorageCandidates.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table className={styles.candidateTable} aria-label="Bilar som saknar hjulförvaring">
+            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>Senaste Check-in</th><th>Hjulförvaring</th><th>Åtgärd</th></tr></thead>
+            <tbody>{missingStorageCandidates.map((item) => (
+              <tr key={`MISSING-STORAGE:${item.regnr}`}>
+                <td><strong>{item.regnr}</strong></td>
+                <td>{item.current_wheel_type ?? '—'}</td>
+                <td>{item.latest_checkin_at.slice(0, 10)}</td>
+                <td><strong>Saknas</strong><span className={styles.subtle}>Ange registrerad förvaring i Status.</span></td>
+                <td><a className={styles.secondaryButton} href={`/status?reg=${encodeURIComponent(item.regnr)}`}>Ange förvaring</a></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : null}
+
       {actionableCandidates.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.candidateTable}>
+          <table className={styles.candidateTable} aria-label="Bilar redo för hjulskifte">
             <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Hjulförvaring</th><th>Bedömning</th>{season?.active ? <th /> : null}</tr></thead>
             <tbody>{actionableCandidates.map((item) => (
               <tr key={item.regnr}>
                 <td><strong>{item.regnr}</strong><span className={styles.subtle}>Check-in {item.latest_checkin_at.slice(0, 10)}</span></td>
                 <td>{item.current_wheel_type ?? '—'}</td>
                 <td>{item.current_saludatum ?? '—'}</td>
-                <td><strong>{storageByRegnr[item.regnr]?.wheel_storage_location ?? 'Saknas'}</strong></td>
+                <td><strong>{storageByRegnr[item.regnr]?.wheel_storage_location}</strong></td>
                 <td><strong>{eligibilityLabel(item.eligibility)}</strong></td>
                 {season?.active ? <td><button type="button" className={styles.primaryButton} disabled={savingId === `NEW:${item.regnr}`} onClick={() => void startWheelChange(item.regnr)}>{savingId === `NEW:${item.regnr}` ? 'Startar…' : 'Starta'}</button></td> : null}
               </tr>
