@@ -34,10 +34,10 @@ const transportLabels: Record<TransportStatus, string> = {
   PA_VAG: 'På väg',
 };
 
-const shell: React.CSSProperties = { maxWidth: 1500, margin: '0 auto 20px', padding: 18, border: '1px solid #d7d7d7', borderRadius: 14, background: 'rgba(255,255,255,0.96)', boxShadow: '0 6px 24px rgba(0,0,0,0.06)' };
-const summary: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, margin: '14px 0' };
-const card: React.CSSProperties = { border: '1px solid #e2e2e2', borderRadius: 10, padding: 12, background: '#fff' };
-const select: React.CSSProperties = { padding: '8px 9px', border: '1px solid #ccc', borderRadius: 8, background: '#fff', minWidth: 160 };
+const shell: React.CSSProperties = { width: '100%', margin: 0, padding: '12px 14px', border: '1px solid #d7d7d7', borderRadius: 8, background: '#fff', boxSizing: 'border-box' };
+const summary: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(4,minmax(120px,180px))', gap: 8, margin: '10px 0' };
+const card: React.CSSProperties = { border: '1px solid #e2e2e2', borderRadius: 7, padding: '8px 10px', background: '#fff' };
+const select: React.CSSProperties = { padding: '6px 8px', border: '1px solid #ccc', borderRadius: 6, background: '#fff', minWidth: 150, fontSize: 13 };
 
 export default function OrderWorkflowPanel() {
   const [result, setResult] = useState<Result | null>(null);
@@ -94,32 +94,32 @@ export default function OrderWorkflowPanel() {
   return (
     <section style={shell} aria-label="AVVECKLA i Garaget">
       <div>
-        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.08em' }}>GARAGE / AVVECKLA / UT</div>
-        <h2 style={{ margin: '3px 0 0' }}>Avvecklingsflöde</h2>
-        <p style={{ margin: '5px 0 0', color: '#555' }}>Bekräftelse och transport hör bara till AVVECKLA / UT här. UTVECKLA / IN hanteras i den förenklade Garage-listan.</p>
+        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE / AVVECKLA / UT</div>
+        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Avvecklingsflöde</h2>
+        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>Bekräftelse och transport hör bara till AVVECKLA / UT här. UTVECKLA / IN hanteras i den förenklade Garage-listan.</p>
       </div>
 
       <div style={summary}>
-        <div style={card}><div style={{ fontSize: 12, color: '#666' }}>AVVECKLA</div><strong style={{ fontSize: 24 }}>{counts.total}</strong></div>
-        <div style={card}><div style={{ fontSize: 12, color: '#666' }}>AVVAKTAR BEKRÄFTELSE</div><strong style={{ fontSize: 24 }}>{counts.awaiting}</strong></div>
-        <div style={card}><div style={{ fontSize: 12, color: '#666' }}>BEKRÄFTADE</div><strong style={{ fontSize: 24 }}>{counts.confirmed}</strong></div>
-        <div style={card}><div style={{ fontSize: 12, color: '#666' }}>PÅ VÄG</div><strong style={{ fontSize: 24 }}>{counts.inTransit}</strong></div>
+        <div style={card}><div style={{ fontSize: 12, color: '#666', fontWeight: 800 }}>AVVECKLA</div><strong style={{ fontSize: 21 }}>{counts.total}</strong></div>
+        <div style={card}><div style={{ fontSize: 12, color: '#666', fontWeight: 800 }}>AVVAKTAR BEKRÄFTELSE</div><strong style={{ fontSize: 21 }}>{counts.awaiting}</strong></div>
+        <div style={card}><div style={{ fontSize: 12, color: '#666', fontWeight: 800 }}>BEKRÄFTADE</div><strong style={{ fontSize: 21 }}>{counts.confirmed}</strong></div>
+        <div style={card}><div style={{ fontSize: 12, color: '#666', fontWeight: 800 }}>PÅ VÄG</div><strong style={{ fontSize: 21 }}>{counts.inTransit}</strong></div>
       </div>
 
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-        <label><span style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>Bekräftelsestatus</span><select style={select} value={confirmationFilter} onChange={(e) => setConfirmationFilter(e.target.value as 'ALLA' | ConfirmationStatus)}><option value="ALLA">Alla</option>{Object.entries(confirmationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label><span style={{ display: 'block', fontSize: 12, fontWeight: 700 }}>Transportstatus</span><select style={select} value={transportFilter} onChange={(e) => setTransportFilter(e.target.value as 'ALLA' | TransportStatus)}><option value="ALLA">Alla</option>{Object.entries(transportLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 9 }}>
+        <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>Bekräftelsestatus</span><select style={select} value={confirmationFilter} onChange={(e) => setConfirmationFilter(e.target.value as 'ALLA' | ConfirmationStatus)}><option value="ALLA">Alla</option>{Object.entries(confirmationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>Transportstatus</span><select style={select} value={transportFilter} onChange={(e) => setTransportFilter(e.target.value as 'ALLA' | TransportStatus)}><option value="ALLA">Alla</option>{Object.entries(transportLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
       </div>
 
-      {result?.error ? <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: '#fff1f1', color: '#a40000', fontWeight: 650 }}>{result.error}</div> : null}
-      {!result ? <div style={{ color: '#666' }}>Läser AVVECKLA…</div> : filtered.length === 0 ? <div style={{ color: '#666' }}>Inga AVVECKLA / UT-objekt matchar filtret.</div> : (
-        <div style={{ display: 'grid', gap: 8 }}>
+      {result?.error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{result.error}</div> : null}
+      {!result ? <div style={{ color: '#666', fontSize: 14 }}>Läser AVVECKLA…</div> : filtered.length === 0 ? <div style={{ color: '#666', fontSize: 14 }}>Inga AVVECKLA / UT-objekt matchar filtret.</div> : (
+        <div style={{ display: 'grid', gap: 6 }}>
           {filtered.map((item) => (
-            <div key={item.garage_item_id} style={{ ...card, display: 'grid', gridTemplateColumns: 'minmax(180px,1.2fr) minmax(160px,1fr) minmax(180px,1fr) minmax(180px,1fr)', gap: 10, alignItems: 'center' }}>
-              <div><strong>{item.model}</strong><div style={{ fontSize: 12, color: '#666' }}>{item.regnr || 'Regnr saknas'} · Stn {item.planned_station || '—'} · {item.source_kind}</div><div style={{ fontSize: 12, color: '#666' }}>{item.order_reference ? `Order ${item.order_reference}` : 'Orderreferens saknas'}{item.planned_delivery_date ? ` · Leverans ${item.planned_delivery_date}` : ''}</div></div>
-              <div><div style={{ fontSize: 12, color: '#666' }}>Bekräftelse</div><select disabled={busy === item.garage_item_id} style={select} value={item.confirmation_status} onChange={(e) => void patch(item, { confirmation_status: e.target.value as ConfirmationStatus })}>{Object.entries(confirmationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
-              <div><div style={{ fontSize: 12, color: '#666' }}>Transport</div><select disabled={busy === item.garage_item_id} style={select} value={item.transport_status} onChange={(e) => void patch(item, { transport_status: e.target.value as TransportStatus })}>{Object.entries(transportLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
-              <div style={{ fontSize: 12, color: '#555' }}><strong>{confirmationLabels[item.confirmation_status]}</strong><br />{transportLabels[item.transport_status]}{item.calloff_at ? <><br />Avrop {item.calloff_at}</> : null}</div>
+            <div key={item.garage_item_id} style={{ ...card, display: 'grid', gridTemplateColumns: 'minmax(220px,1.4fr) minmax(150px,.8fr) minmax(150px,.8fr) minmax(150px,.8fr)', gap: 10, alignItems: 'center' }}>
+              <div><strong style={{ fontSize: 14 }}>{item.model}</strong><div style={{ fontSize: 13, color: '#666' }}>{item.regnr || 'Regnr saknas'} · Stn {item.planned_station || '—'} · {item.source_kind}</div><div style={{ fontSize: 13, color: '#666' }}>{item.order_reference ? `Order ${item.order_reference}` : 'Orderreferens saknas'}{item.planned_delivery_date ? ` · Leverans ${item.planned_delivery_date}` : ''}</div></div>
+              <div><div style={{ fontSize: 13, color: '#666', marginBottom: 2 }}>Bekräftelse</div><select disabled={busy === item.garage_item_id} style={select} value={item.confirmation_status} onChange={(e) => void patch(item, { confirmation_status: e.target.value as ConfirmationStatus })}>{Object.entries(confirmationLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+              <div><div style={{ fontSize: 13, color: '#666', marginBottom: 2 }}>Transport</div><select disabled={busy === item.garage_item_id} style={select} value={item.transport_status} onChange={(e) => void patch(item, { transport_status: e.target.value as TransportStatus })}>{Object.entries(transportLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+              <div style={{ fontSize: 13, color: '#555' }}><strong>{confirmationLabels[item.confirmation_status]}</strong><br />{transportLabels[item.transport_status]}{item.calloff_at ? <><br />Avrop {item.calloff_at}</> : null}</div>
             </div>
           ))}
         </div>
