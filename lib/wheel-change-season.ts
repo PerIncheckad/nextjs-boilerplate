@@ -40,17 +40,22 @@ export function summerSeason(year: number): WheelSeason {
   };
 }
 
-function dateOnly(value: Date): string {
-  return value.toISOString().slice(0, 10);
+function stockholmDate(value: Date): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Stockholm',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(value);
 }
 
 export function operationalWheelSeason(now: Date): { season: WheelSeason; active: boolean } {
-  const today = dateOnly(now);
-  const year = now.getUTCFullYear();
+  const today = stockholmDate(now);
+  const year = Number(today.slice(0, 4));
   const currentSummer = summerSeason(year);
   const currentWinter = today >= isoDate(year, 10, 1) ? winterSeason(year) : winterSeason(year - 1);
 
-  // The business windows overlap 31 Mar-15 Apr. The campaign that started most recently
+  // Business windows overlap 31 Mar-15 Apr. The campaign that started most recently
   // is operationally current, so summer takes precedence from 31 March.
   if (today >= currentSummer.startDate && today <= currentSummer.endDate) {
     return { season: currentSummer, active: true };
