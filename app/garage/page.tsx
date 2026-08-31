@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import CoreProductShell from '@/components/CoreProductShell';
+import GarageOverviewPanel from './garage-overview-panel';
 import GarageClient from './garage-client';
 import GarageV2Panel from './garage-v2-panel';
 import GarageWheelChangePanel from './garage-wheel-change-panel';
@@ -25,11 +26,17 @@ export default function GaragePage() {
       <div className={styles.workspace}>
         <nav className={styles.flowNav} aria-label="Garaget arbetsflöde">
           <span>ARBETSFLÖDE</span>
+          <a href="#oversikt">0. Översikt</a>
           <a href="#garageobjekt">1. Garage</a>
           <a href="#nybil">2. Ny bil</a>
           <a href="#avveckla">3. Avveckla</a>
           <a href="#kontrollpunkter">4. Kontrollpunkter</a>
         </nav>
+
+        <section id="oversikt" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>00 / OPERATIV ÖVERSIKT</strong><span>En bil kan bära flera samtidiga signaler och visas i flera arbetsvyer</span></div>
+          <GarageOverviewPanel />
+        </section>
 
         <section id="garageobjekt" className={styles.section}>
           <div className={styles.sectionLabel}><strong>01 / GARAGE</strong><span>UTVECKLA / IN börjar här · Planering KLAR skapar objekten automatiskt</span></div>
