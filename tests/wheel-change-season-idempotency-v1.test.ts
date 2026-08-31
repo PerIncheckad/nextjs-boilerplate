@@ -16,7 +16,7 @@ test('seasonal wheel change is permanently unique per vehicle and season', () =>
 test('API hides already handled vehicles for the current season', () => {
   assert.match(api, /const handledThisSeason = new Set/);
   assert.match(api, /item\.season_key === operational\.season\.key/);
-  assert.match(api, /filter\(\(item\) => !handledThisSeason\.has/);
+  assert.match(api, /!handledThisSeason\.has\(regnr\)/);
 });
 
 test('API rejects same-season restart before candidate evaluation', () => {

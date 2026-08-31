@@ -82,6 +82,39 @@ async function readCandidateSource(admin: ReturnType<typeof createAdminClient>):
   return (data ?? []) as CandidateSource[];
 }
 
+async function readSoldRegnrs(admin: ReturnType<typeof createAdminClient>): Promise<Set<string>> {
+  const [soldInventoryResponse, soldEditsResponse] = await Promise.all([
+    admin.from('nybil_inventering').select('regnr').eq('is_sold', true),
+    admin
+      .from('vehicle_edits')
+      .select('regnr,new_value,edited_at')
+      .eq('field_name', 'is_sold')
+      .order('edited_at', { ascending: false }),
+  ]);
+
+  if (soldInventoryResponse.error) throw soldInventoryResponse.error;
+  if (soldEditsResponse.error) throw soldEditsResponse.error;
+
+  const latestSoldEdits = new Map<string, string>();
+  for (const edit of soldEditsResponse.data ?? []) {
+    const regnr = cleanRegnr(edit.regnr);
+    if (regnr && !latestSoldEdits.has(regnr)) {
+      latestSoldEdits.set(regnr, edit.new_value ?? '');
+    }
+  }
+
+  const soldRegnrs = new Set<string>();
+  for (const row of soldInventoryResponse.data ?? []) {
+    const regnr = cleanRegnr(row.regnr);
+    if (regnr) soldRegnrs.add(regnr);
+  }
+  for (const [regnr, value] of latestSoldEdits.entries()) {
+    if (value === 'true') soldRegnrs.add(regnr);
+  }
+
+  return soldRegnrs;
+}
+
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -97,7 +130,7 @@ export async function GET(request: Request) {
   try {
     const now = new Date();
     const operational = operationalWheelSeason(now);
-    const [itemsRes, wheelRes, candidateSource] = await Promise.all([
+    const [itemsRes, wheelRes, candidateSource, soldRegnrs] = await Promise.all([
       admin.from('garage_items')
         .select('garage_item_id,regnr,model,planned_station,garage_direction,source_kind,updated_at')
         .not('regnr', 'is', null)
@@ -107,6 +140,7 @@ export async function GET(request: Request) {
         .select('wheel_change_id,garage_item_id,regnr,checkpoint_id,status,season_key,target_wheel_type,booked_for,supplier,location,note,completed_at,created_at,updated_at')
         .order('updated_at', { ascending: false }),
       readCandidateSource(admin),
+      readSoldRegnrs(admin),
     ]);
 
     if (itemsRes.error) throw itemsRes.error;
@@ -130,7 +164,10 @@ export async function GET(request: Request) {
     );
 
     const candidates = buildCandidates(candidateSource, operational.season)
-      .filter((item) => !handledThisSeason.has(cleanRegnr(item.regnr) ?? ''));
+      .filter((item) => {
+        const regnr = cleanRegnr(item.regnr) ?? '';
+        return !soldRegnrs.has(regnr) && !handledThisSeason.has(regnr);
+      });
 
     const counts = candidates.reduce<Record<WheelEligibility, number>>((acc, item) => {
       acc[item.eligibility] += 1;
@@ -153,7 +190,7 @@ export async function GET(request: Request) {
         },
         candidates,
         counts,
-        semantics: 'LATEST_COMPLETED_CHECKIN_PLUS_CURRENT_SALU',
+        semantics: 'LATEST_COMPLETED_CHECKIN_PLUS_CURRENT_SALU_EXCLUDING_SOLD',
       },
     });
   } catch (error) {
@@ -192,18 +229,24 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Hjulskiftesäsongen har inte startat ännu' }, { status: 409 });
       }
 
-      const { data: existingSeasonal, error: existingSeasonalError } = await admin
-        .from('garage_wheel_changes')
-        .select('wheel_change_id')
-        .eq('regnr', regnr)
-        .eq('season_key', operational.season.key)
-        .limit(1);
-      if (existingSeasonalError) throw existingSeasonalError;
-      if ((existingSeasonal ?? []).length > 0) {
+      const [existingSeasonalResponse, soldRegnrs, source] = await Promise.all([
+        admin
+          .from('garage_wheel_changes')
+          .select('wheel_change_id')
+          .eq('regnr', regnr)
+          .eq('season_key', operational.season.key)
+          .limit(1),
+        readSoldRegnrs(admin),
+        readCandidateSource(admin),
+      ]);
+      if (existingSeasonalResponse.error) throw existingSeasonalResponse.error;
+      if ((existingSeasonalResponse.data ?? []).length > 0) {
         return NextResponse.json({ error: 'Hjulskifte finns redan för bilen och säsongen' }, { status: 409 });
       }
+      if (soldRegnrs.has(regnr)) {
+        return NextResponse.json({ error: 'Bilen är markerad som såld och kan inte starta säsongsbundet hjulskifte' }, { status: 409 });
+      }
 
-      const source = await readCandidateSource(admin);
       const candidate = source.find((item) => cleanRegnr(item.regnr) === regnr);
       if (!candidate) return NextResponse.json({ error: 'Bilen saknar verifierad Check-in för hjulbedömning' }, { status: 409 });
 
