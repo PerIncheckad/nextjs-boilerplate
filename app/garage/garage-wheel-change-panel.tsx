@@ -276,7 +276,21 @@ export default function GarageWheelChangePanel() {
         </div>
       ) : null}
 
-      {unknownCandidates.length > 0 ? <div className={styles.startRow}><strong>{unknownCandidates.length} bilar kräver verifierad hjulstatus innan systemet får avgöra hjulskifte.</strong></div> : null}
+      {unknownCandidates.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table className={styles.candidateTable} aria-label="Bilar med okänd hjulstatus">
+            <thead><tr><th>Bil</th><th>Senaste Check-in</th><th>Ort / station</th><th>Bedömning</th></tr></thead>
+            <tbody>{unknownCandidates.map((item) => (
+              <tr key={`UNKNOWN:${item.regnr}`}>
+                <td><strong>{item.regnr}</strong></td>
+                <td>{item.latest_checkin_at.slice(0, 10)}</td>
+                <td>{item.current_city ?? '—'}{item.current_station ? ` / ${item.current_station}` : ''}</td>
+                <td><strong>{eligibilityLabel(item.eligibility)}</strong><span className={styles.subtle}>Verifiera hjultyp innan Hjulskifte kan avgöras.</span></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : null}
 
       <div className={styles.tableWrap}>
         <table className={styles.activeTable}>
