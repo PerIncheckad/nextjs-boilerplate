@@ -12,27 +12,29 @@ type HandoffItem = {
 };
 
 const shell: React.CSSProperties = {
-  maxWidth: 1500,
-  margin: '0 auto 20px',
-  padding: '18px',
+  width: '100%',
+  margin: 0,
+  padding: '12px 14px',
   border: '1px solid #d7d7d7',
-  borderRadius: 14,
-  background: 'rgba(255,255,255,0.96)',
-  boxShadow: '0 6px 24px rgba(0,0,0,0.06)',
+  borderRadius: 8,
+  background: '#fff',
+  boxSizing: 'border-box',
 };
 const row: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(110px,1fr) minmax(130px,1.4fr) auto',
-  gap: 10,
+  gridTemplateColumns: 'minmax(150px,220px) minmax(180px,1fr) auto',
+  gap: 16,
   alignItems: 'center',
-  padding: '10px 0',
-  borderTop: '1px solid #eee',
+  padding: '9px 0',
+  borderTop: '1px solid #e6e6e6',
+  fontSize: 14,
 };
 const button: React.CSSProperties = {
   border: 0,
-  borderRadius: 8,
-  padding: '9px 12px',
-  fontWeight: 700,
+  borderRadius: 6,
+  padding: '8px 12px',
+  fontSize: 13,
+  fontWeight: 800,
   cursor: 'pointer',
   background: '#111',
   color: '#fff',
@@ -67,21 +69,21 @@ export default function GarageV2Panel() {
 
   return (
     <section style={shell} aria-label="Garage till Ny bil">
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.08em' }}>GARAGE → NY BIL</div>
-        <h2 style={{ margin: '3px 0 0' }}>Överlämna fysisk bil</h2>
-        <p style={{ margin: '5px 0 0', color: '#555' }}>När en UTVECKLA-bil har fått registreringsnummer kan den lämnas vidare till Ny bil. Lager 1 importeras inte här.</p>
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE → NY BIL</div>
+        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Överlämna fysisk bil</h2>
+        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>När en UTVECKLA-bil har fått registreringsnummer kan den lämnas vidare till Ny bil. Lager 1 importeras inte här.</p>
       </div>
 
-      {error ? <div style={{ marginBottom: 12, padding: 10, borderRadius: 8, background: '#fff1f1', color: '#a40000', fontWeight: 650 }}>{error}</div> : null}
+      {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
       {handoffs.length === 0 ? (
-        <div style={{ color: '#666', padding: '10px 0' }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr att överlämna.'}</div>
+        <div style={{ color: '#666', padding: '8px 0', fontSize: 14 }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr att överlämna.'}</div>
       ) : handoffs.map((item) => (
         <div key={item.garage_item_id} style={row}>
-          <div><strong>{item.regnr}</strong><div style={{ fontSize: 12, color: '#666' }}>{item.source_kind}</div></div>
-          <div><strong>{item.model}</strong><div style={{ fontSize: 12, color: '#666' }}>Stn {item.planned_station || '—'}</div></div>
-          {item.handed_off_nybil_id ? <div style={{ fontWeight: 750, color: '#176b33' }}>Överlämnad</div> : <a style={button} href={`/nybil?garage_item_id=${encodeURIComponent(item.garage_item_id)}`}>Till Ny bil</a>}
+          <div><strong style={{ fontSize: 15 }}>{item.regnr}</strong><div style={{ fontSize: 13, color: '#666' }}>{item.source_kind}</div></div>
+          <div><strong style={{ fontSize: 15 }}>{item.model}</strong><div style={{ fontSize: 13, color: '#666' }}>Stn {item.planned_station || '—'}</div></div>
+          {item.handed_off_nybil_id ? <div style={{ fontWeight: 800, color: '#176b33', fontSize: 13 }}>Överlämnad</div> : <a style={button} href={`/nybil?garage_item_id=${encodeURIComponent(item.garage_item_id)}`}>Till Ny bil</a>}
         </div>
       ))}
     </section>
