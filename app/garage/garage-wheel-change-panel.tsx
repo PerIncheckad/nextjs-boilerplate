@@ -230,6 +230,7 @@ export default function GarageWheelChangePanel() {
           <div className={styles.eyebrow}>INCHECKAD / GARAGET / HJULSKIFTE</div>
           <h2>Hjulskifte</h2>
           <p>{season ? `${season.type === 'WINTER' ? 'Vinter' : 'Sommar'} · ${season.startDate}–${season.endDate} · mål ${season.targetWheelType}${season.active ? '' : ' · FÖRHANDSVY'}` : 'Läser säsongsregel…'}</p>
+          <p>Garaget hanterar arbetet. Processmotorn håller kontrollpunkten och Tower visar läget.</p>
         </div>
         <label className={styles.toggle}>
           <input type="checkbox" checked={showCompleted} onChange={(event) => setShowCompleted(event.target.checked)} />
