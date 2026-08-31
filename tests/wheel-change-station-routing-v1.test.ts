@@ -4,13 +4,16 @@ import test from 'node:test';
 
 const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
 
-test('Hjulskifte routes operational cities to locked station codes', () => {
-  assert.match(panel, /Malmö: '166'/);
-  assert.match(panel, /Helsingborg: '170'/);
-  assert.match(panel, /Halmstad: '274'/);
-  assert.match(panel, /Varberg: '274'/);
+test('Hjulskifte does not infer wheel storage from vehicle city or station', () => {
+  assert.doesNotMatch(panel, /Malmö: '166'/);
+  assert.doesNotMatch(panel, /Helsingborg: '170'/);
+  assert.doesNotMatch(panel, /Halmstad: '274'/);
+  assert.doesNotMatch(panel, /Varberg: '274'/);
+  assert.doesNotMatch(panel, /wheelStationCode\(item\.current_city\)/);
 });
 
-test('unknown cities are not inferred into a wheel station', () => {
-  assert.match(panel, /WHEEL_STATION_BY_CITY\[city\] \?\? '—'/);
+test('Hjulskifte presents registered wheel storage as the operational fact', () => {
+  assert.match(panel, /Hjulförvaring/);
+  assert.match(panel, /wheel_storage_location/);
+  assert.match(panel, /Saknas/);
 });
