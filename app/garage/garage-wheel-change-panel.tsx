@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { HUVUDSTATIONER } from '@/lib/constants';
 import styles from './garage-wheel-change.module.css';
 
 type WheelStatus = 'KRAVS' | 'BOKAD' | 'PAGAENDE' | 'KLAR' | 'AVVIKELSE';
@@ -79,15 +78,18 @@ const ALLOWED_STATUSES: Record<WheelStatus, WheelStatus[]> = {
   KLAR: ['KLAR'],
 };
 
-const ACTIVE_WHEEL_STATIONS = new Set(['166', '170', '274']);
+const WHEEL_STATION_BY_CITY: Readonly<Record<string, '166' | '170' | '274'>> = {
+  Malmö: '166',
+  Helsingborg: '170',
+  Halmstad: '274',
+  Varberg: '274',
+};
 
 const allowedStatuses = (status: WheelStatus): WheelStatus[] => ALLOWED_STATUSES[status];
 
 function wheelStationCode(city: string | null): string {
   if (!city) return '—';
-  const station = HUVUDSTATIONER.find((item) => item.name.toLocaleLowerCase('sv') === city.toLocaleLowerCase('sv'));
-  const code = station ? String(station.id) : '';
-  return ACTIVE_WHEEL_STATIONS.has(code) ? code : '—';
+  return WHEEL_STATION_BY_CITY[city] ?? '—';
 }
 
 function localDateTime(value: string | null): string {
