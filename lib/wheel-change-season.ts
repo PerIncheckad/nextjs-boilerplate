@@ -85,7 +85,10 @@ export function classifyWheelEligibility(
   const wheelType = normalizeWheelType(currentWheelType);
   if (!wheelType) return 'UNKNOWN_WHEEL_STATUS';
   if (wheelType === season.targetWheelType) return 'ALREADY_CORRECT';
-  if (currentSaluDate && currentSaluDate >= season.saluExemptStart && currentSaluDate <= season.saluExemptEnd) {
+
+  // Locked rule: a current SALU date through and including the cutoff exempts
+  // the vehicle. Do not invent a lower bound tied to the campaign start date.
+  if (currentSaluDate && currentSaluDate <= season.saluExemptEnd) {
     return 'SALU_EXEMPT';
   }
   return 'REQUIRES_CHANGE';
