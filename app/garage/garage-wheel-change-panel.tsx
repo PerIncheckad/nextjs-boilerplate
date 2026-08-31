@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { HUVUDSTATIONER } from '@/lib/constants';
 import styles from './garage-wheel-change.module.css';
 
 type WheelStatus = 'KRAVS' | 'BOKAD' | 'PAGAENDE' | 'KLAR' | 'AVVIKELSE';
@@ -78,7 +79,16 @@ const ALLOWED_STATUSES: Record<WheelStatus, WheelStatus[]> = {
   KLAR: ['KLAR'],
 };
 
+const ACTIVE_WHEEL_STATIONS = new Set(['166', '170', '274']);
+
 const allowedStatuses = (status: WheelStatus): WheelStatus[] => ALLOWED_STATUSES[status];
+
+function wheelStationCode(city: string | null): string {
+  if (!city) return '—';
+  const station = HUVUDSTATIONER.find((item) => item.name.toLocaleLowerCase('sv') === city.toLocaleLowerCase('sv'));
+  const code = station ? String(station.id) : '';
+  return ACTIVE_WHEEL_STATIONS.has(code) ? code : '—';
+}
 
 function localDateTime(value: string | null): string {
   if (!value) return '';
@@ -250,16 +260,16 @@ export default function GarageWheelChangePanel() {
 
       {actionableCandidates.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table>
-            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Station</th><th>Bedömning</th><th /></tr></thead>
+          <table className={styles.candidateTable}>
+            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Station</th><th>Bedömning</th>{season?.active ? <th /> : null}</tr></thead>
             <tbody>{actionableCandidates.map((item) => (
               <tr key={item.regnr}>
                 <td><strong>{item.regnr}</strong><span className={styles.subtle}>Check-in {item.latest_checkin_at.slice(0, 10)}</span></td>
                 <td>{item.current_wheel_type ?? '—'}</td>
                 <td>{item.current_saludatum ?? '—'}</td>
-                <td>{item.current_station ?? item.current_city ?? '—'}</td>
+                <td><strong>{wheelStationCode(item.current_city)}</strong></td>
                 <td><strong>{eligibilityLabel(item.eligibility)}</strong></td>
-                <td><button type="button" className={styles.primaryButton} disabled={!season?.active || savingId === `NEW:${item.regnr}`} onClick={() => void startWheelChange(item.regnr)}>{season?.active ? (savingId === `NEW:${item.regnr}` ? 'Startar…' : 'Starta') : 'Förhandsvy'}</button></td>
+                {season?.active ? <td><button type="button" className={styles.primaryButton} disabled={savingId === `NEW:${item.regnr}`} onClick={() => void startWheelChange(item.regnr)}>{savingId === `NEW:${item.regnr}` ? 'Startar…' : 'Starta'}</button></td> : null}
               </tr>
             ))}</tbody>
           </table>
@@ -269,7 +279,7 @@ export default function GarageWheelChangePanel() {
       {unknownCandidates.length > 0 ? <div className={styles.startRow}><strong>{unknownCandidates.length} bilar kräver verifierad hjulstatus innan systemet får avgöra hjulskifte.</strong></div> : null}
 
       <div className={styles.tableWrap}>
-        <table>
+        <table className={styles.activeTable}>
           <thead>
             <tr><th>Bil</th><th>Säsong</th><th>Status</th><th>Bokad tid</th><th>Leverantör</th><th>Plats</th><th>Kommentar / avvikelse</th><th>Kontroll</th><th /></tr>
           </thead>
