@@ -3,24 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import styles from './garage-wheel-change.module.css';
 
-type GarageItem = {
-  garage_item_id: string;
-  regnr: string;
-  model: string;
-  planned_station: string | null;
-  garage_direction: 'IN' | 'UT' | null;
-  source_kind: string;
-  updated_at: string;
-};
-
 type WheelStatus = 'KRAVS' | 'BOKAD' | 'PAGAENDE' | 'KLAR' | 'AVVIKELSE';
+type WheelEligibility = 'REQUIRES_CHANGE' | 'ALREADY_CORRECT' | 'SALU_EXEMPT' | 'UNKNOWN_WHEEL_STATUS';
 
 type WheelChange = {
   wheel_change_id: string;
-  garage_item_id: string;
+  garage_item_id: string | null;
   regnr: string;
   checkpoint_id: string;
   status: WheelStatus;
+  season_key: string | null;
+  target_wheel_type: string | null;
   booked_for: string | null;
   supplier: string | null;
   location: string | null;
@@ -29,6 +22,30 @@ type WheelChange = {
   created_at: string;
   updated_at: string;
 };
+
+type WheelCandidate = {
+  regnr: string;
+  current_wheel_type: string | null;
+  latest_checkin_at: string;
+  current_city: string | null;
+  current_station: string | null;
+  current_saludatum: string | null;
+  eligibility: WheelEligibility;
+};
+
+type Season = {
+  type: 'WINTER' | 'SUMMER';
+  key: string;
+  targetWheelType: 'Vinterdäck' | 'Sommardäck';
+  startDate: string;
+  endDate: string;
+  saluExemptStart: string;
+  saluExemptEnd: string;
+  active: boolean;
+  mode: 'ACTIVE' | 'PREVIEW';
+};
+
+type Counts = Record<WheelEligibility, number>;
 
 type Draft = {
   status: WheelStatus;
@@ -45,6 +62,23 @@ const statusLabel = (status: WheelStatus) => ({
   KLAR: 'Klar / verifierad',
   AVVIKELSE: 'Avvikelse',
 })[status];
+
+const eligibilityLabel = (eligibility: WheelEligibility) => ({
+  REQUIRES_CHANGE: 'Hjulskifte krävs',
+  ALREADY_CORRECT: 'Rätt hjul sitter på',
+  SALU_EXEMPT: 'Undantagen SALU',
+  UNKNOWN_WHEEL_STATUS: 'Hjulstatus saknas',
+})[eligibility];
+
+const ALLOWED_STATUSES: Record<WheelStatus, WheelStatus[]> = {
+  KRAVS: ['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'],
+  BOKAD: ['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'],
+  PAGAENDE: ['BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'],
+  AVVIKELSE: ['KRAVS', 'BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'],
+  KLAR: ['KLAR'],
+};
+
+const allowedStatuses = (status: WheelStatus): WheelStatus[] => ALLOWED_STATUSES[status];
 
 function localDateTime(value: string | null): string {
   if (!value) return '';
@@ -65,21 +99,22 @@ function makeDraft(item: WheelChange): Draft {
 }
 
 export default function GarageWheelChangePanel() {
-  const [garageItems, setGarageItems] = useState<GarageItem[]>([]);
   const [wheelChanges, setWheelChanges] = useState<WheelChange[]>([]);
+  const [candidates, setCandidates] = useState<WheelCandidate[]>([]);
+  const [season, setSeason] = useState<Season | null>(null);
+  const [counts, setCounts] = useState<Counts>({ REQUIRES_CHANGE: 0, ALREADY_CORRECT: 0, SALU_EXEMPT: 0, UNKNOWN_WHEEL_STATUS: 0 });
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-  const [selectedGarageItem, setSelectedGarageItem] = useState('');
-  const [newNote, setNewNote] = useState('');
   const [showCompleted, setShowCompleted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const applyPayload = useCallback((payload: { garageItems?: GarageItem[]; wheelChanges?: WheelChange[] }) => {
-    const nextItems = payload.garageItems ?? [];
+  const applyPayload = useCallback((payload: { wheelChanges?: WheelChange[]; candidates?: WheelCandidate[]; season?: Season; counts?: Counts }) => {
     const nextChanges = payload.wheelChanges ?? [];
-    setGarageItems(nextItems);
     setWheelChanges(nextChanges);
+    setCandidates(payload.candidates ?? []);
+    setSeason(payload.season ?? null);
+    if (payload.counts) setCounts(payload.counts);
     setDrafts(Object.fromEntries(nextChanges.map((item) => [item.wheel_change_id, makeDraft(item)])));
   }, []);
 
@@ -115,14 +150,19 @@ export default function GarageWheelChangePanel() {
     return () => { active = false; };
   }, [applyPayload]);
 
-  const activeGarageItemIds = useMemo(
-    () => new Set(wheelChanges.filter((item) => item.status !== 'KLAR').map((item) => item.garage_item_id)),
+  const openRegnrs = useMemo(
+    () => new Set(wheelChanges.filter((item) => item.status !== 'KLAR').map((item) => item.regnr)),
     [wheelChanges],
   );
 
-  const availableItems = useMemo(
-    () => garageItems.filter((item) => !activeGarageItemIds.has(item.garage_item_id)),
-    [garageItems, activeGarageItemIds],
+  const actionableCandidates = useMemo(
+    () => candidates.filter((item) => item.eligibility === 'REQUIRES_CHANGE' && !openRegnrs.has(item.regnr)),
+    [candidates, openRegnrs],
+  );
+
+  const unknownCandidates = useMemo(
+    () => candidates.filter((item) => item.eligibility === 'UNKNOWN_WHEEL_STATUS'),
+    [candidates],
   );
 
   const visibleChanges = useMemo(
@@ -130,20 +170,17 @@ export default function GarageWheelChangePanel() {
     [wheelChanges, showCompleted],
   );
 
-  const startWheelChange = async () => {
-    if (!selectedGarageItem) return setError('Välj en bil i Garaget.');
-    setSavingId('NEW');
+  const startWheelChange = async (regnr: string) => {
+    setSavingId(`NEW:${regnr}`);
     setError(null);
     try {
       const response = await fetch('/api/garage/wheel-changes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ garage_item_id: selectedGarageItem, note: newNote }),
+        body: JSON.stringify({ regnr }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte starta hjulskifte');
-      setSelectedGarageItem('');
-      setNewNote('');
       await load();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Kunde inte starta hjulskifte');
@@ -190,8 +227,9 @@ export default function GarageWheelChangePanel() {
     <section className={styles.shell} aria-label="Hjulskifte i Garaget">
       <div className={styles.heading}>
         <div>
-          <div className={styles.eyebrow}>INCHECKAD / GARAGET / L2</div>
+          <div className={styles.eyebrow}>INCHECKAD / GARAGET / HJULSKIFTE</div>
           <h2>Hjulskifte</h2>
+          <p>{season ? `${season.type === 'WINTER' ? 'Vinter' : 'Sommar'} · ${season.startDate}–${season.endDate} · mål ${season.targetWheelType}${season.active ? '' : ' · FÖRHANDSVY'}` : 'Läser säsongsregel…'}</p>
           <p>Garaget hanterar arbetet. Processmotorn håller kontrollpunkten och Tower visar läget.</p>
         </div>
         <label className={styles.toggle}>
@@ -203,61 +241,49 @@ export default function GarageWheelChangePanel() {
       {error ? <div className={styles.error}>{error}</div> : null}
 
       <div className={styles.startRow}>
-        <label>
-          <span>Bil i Garaget</span>
-          <select value={selectedGarageItem} onChange={(event) => setSelectedGarageItem(event.target.value)}>
-            <option value="">Välj bil</option>
-            {availableItems.map((item) => (
-              <option key={item.garage_item_id} value={item.garage_item_id}>
-                {item.regnr} · {item.model} · {item.planned_station ?? 'station saknas'}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className={styles.noteField}>
-          <span>Kommentar</span>
-          <input value={newNote} onChange={(event) => setNewNote(event.target.value)} placeholder="Valfri startkommentar" />
-        </label>
-        <button type="button" className={styles.primaryButton} disabled={!selectedGarageItem || savingId === 'NEW'} onClick={() => void startWheelChange()}>
-          {savingId === 'NEW' ? 'Startar…' : 'Markera hjulskifte krävs'}
-        </button>
-        <button type="button" className={styles.secondaryButton} disabled={loading} onClick={() => void load()}>
-          {loading ? 'Läser…' : 'Uppdatera'}
-        </button>
+        <strong>{counts.REQUIRES_CHANGE} behöver skifte</strong>
+        <span>{counts.ALREADY_CORRECT} redan rätt</span>
+        <span>{counts.SALU_EXEMPT} SALU-undantagna</span>
+        <span>{counts.UNKNOWN_WHEEL_STATUS} saknar hjulstatus</span>
+        <button type="button" className={styles.secondaryButton} disabled={loading} onClick={() => void load()}>{loading ? 'Läser…' : 'Uppdatera'}</button>
       </div>
+
+      {actionableCandidates.length > 0 ? (
+        <div className={styles.tableWrap}>
+          <table>
+            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Station</th><th>Bedömning</th><th /></tr></thead>
+            <tbody>{actionableCandidates.map((item) => (
+              <tr key={item.regnr}>
+                <td><strong>{item.regnr}</strong><span className={styles.subtle}>Check-in {item.latest_checkin_at.slice(0, 10)}</span></td>
+                <td>{item.current_wheel_type ?? '—'}</td>
+                <td>{item.current_saludatum ?? '—'}</td>
+                <td>{item.current_station ?? item.current_city ?? '—'}</td>
+                <td><strong>{eligibilityLabel(item.eligibility)}</strong></td>
+                <td><button type="button" className={styles.primaryButton} disabled={!season?.active || savingId === `NEW:${item.regnr}`} onClick={() => void startWheelChange(item.regnr)}>{season?.active ? (savingId === `NEW:${item.regnr}` ? 'Startar…' : 'Starta') : 'Förhandsvy'}</button></td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {unknownCandidates.length > 0 ? <div className={styles.startRow}><strong>{unknownCandidates.length} bilar kräver verifierad hjulstatus innan systemet får avgöra hjulskifte.</strong></div> : null}
 
       <div className={styles.tableWrap}>
         <table>
           <thead>
-            <tr>
-              <th>Bil</th>
-              <th>Status</th>
-              <th>Bokad tid</th>
-              <th>Leverantör</th>
-              <th>Plats</th>
-              <th>Kommentar / avvikelse</th>
-              <th>Kontroll</th>
-              <th />
-            </tr>
+            <tr><th>Bil</th><th>Säsong</th><th>Status</th><th>Bokad tid</th><th>Leverantör</th><th>Plats</th><th>Kommentar / avvikelse</th><th>Kontroll</th><th /></tr>
           </thead>
           <tbody>
             {visibleChanges.length === 0 ? (
-              <tr><td colSpan={8} className={styles.empty}>Inga aktiva hjulskiften.</td></tr>
+              <tr><td colSpan={9} className={styles.empty}>Inga aktiva hjulskiften.</td></tr>
             ) : visibleChanges.map((item) => {
               const draft = drafts[item.wheel_change_id] ?? makeDraft(item);
               const closed = item.status === 'KLAR';
               return (
                 <tr key={item.wheel_change_id} className={item.status === 'AVVIKELSE' ? styles.deviationRow : undefined}>
-                  <td><strong>{item.regnr}</strong><span className={styles.subtle}>{garageItems.find((garageItem) => garageItem.garage_item_id === item.garage_item_id)?.model ?? '—'}</span></td>
-                  <td>
-                    <select value={draft.status} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { status: event.target.value as WheelStatus })}>
-                      <option value="KRAVS">Krävs / ej bokad</option>
-                      <option value="BOKAD">Bokad</option>
-                      <option value="PAGAENDE">Pågående</option>
-                      <option value="AVVIKELSE">Avvikelse</option>
-                      <option value="KLAR">Klar / verifierad</option>
-                    </select>
-                  </td>
+                  <td><strong>{item.regnr}</strong><span className={styles.subtle}>{item.target_wheel_type ?? 'Legacy'}</span></td>
+                  <td>{item.season_key ?? '—'}</td>
+                  <td><select value={draft.status} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { status: event.target.value as WheelStatus })}>{allowedStatuses(item.status).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></td>
                   <td><input type="datetime-local" value={draft.booked_for} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { booked_for: event.target.value })} /></td>
                   <td><input value={draft.supplier} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { supplier: event.target.value })} placeholder="Leverantör" /></td>
                   <td><input value={draft.location} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { location: event.target.value })} placeholder="Plats" /></td>
