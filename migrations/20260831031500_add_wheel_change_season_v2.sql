@@ -18,6 +18,45 @@ create unique index if not exists garage_wheel_changes_one_open_per_regnr_season
   on public.garage_wheel_changes (regnr, season_key)
   where status <> 'KLAR' and season_key is not null;
 
+create or replace function public.get_wheel_change_candidate_source()
+returns table (
+  regnr text,
+  current_wheel_type text,
+  latest_checkin_at timestamptz,
+  current_city text,
+  current_station text,
+  current_saludatum date
+)
+language sql
+security invoker
+set search_path = pg_catalog
+as $$
+  with latest_checkin as (
+    select distinct on (upper(regexp_replace(c.regnr, '\s+', '', 'g')))
+      upper(regexp_replace(c.regnr, '\s+', '', 'g')) as regnr,
+      c.hjultyp as current_wheel_type,
+      c.completed_at as latest_checkin_at,
+      coalesce(nullif(trim(c.current_city), ''), nullif(trim(c.city), '')) as current_city,
+      coalesce(nullif(trim(c.current_station), ''), nullif(trim(c.station), '')) as current_station
+    from public.checkins c
+    where c.regnr is not null
+      and length(trim(c.regnr)) > 0
+      and c.completed_at is not null
+      and c.status = 'COMPLETED'
+    order by upper(regexp_replace(c.regnr, '\s+', '', 'g')), c.completed_at desc
+  )
+  select
+    l.regnr,
+    l.current_wheel_type,
+    l.latest_checkin_at,
+    l.current_city,
+    l.current_station,
+    s.current_saludatum
+  from latest_checkin l
+  left join public.salu_vehicle_state s
+    on upper(regexp_replace(s.regnr, '\s+', '', 'g')) = l.regnr;
+$$;
+
 create or replace function public.create_garage_wheel_change_for_vehicle(
   p_regnr text,
   p_season_key text,
@@ -181,6 +220,9 @@ begin
   return to_jsonb(v_change);
 end;
 $$;
+
+revoke all on function public.get_wheel_change_candidate_source() from public, anon, authenticated;
+grant execute on function public.get_wheel_change_candidate_source() to service_role;
 
 revoke all on function public.create_garage_wheel_change_for_vehicle(text, text, text, text, uuid, text)
   from public, anon, authenticated;
