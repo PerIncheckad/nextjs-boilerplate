@@ -121,7 +121,17 @@ export async function GET(request: Request) {
         && item.status !== 'KLAR'
       ),
     }));
-    const candidates = buildCandidates(candidateSource, operational.season);
+
+    const handledThisSeason = new Set(
+      wheelChanges
+        .filter((item) => item.season_key === operational.season.key)
+        .map((item) => cleanRegnr(item.regnr))
+        .filter((regnr): regnr is string => Boolean(regnr)),
+    );
+
+    const candidates = buildCandidates(candidateSource, operational.season)
+      .filter((item) => !handledThisSeason.has(cleanRegnr(item.regnr) ?? ''));
+
     const counts = candidates.reduce<Record<WheelEligibility, number>>((acc, item) => {
       acc[item.eligibility] += 1;
       return acc;
@@ -180,6 +190,17 @@ export async function POST(request: Request) {
       const operational = operationalWheelSeason(new Date());
       if (!operational.active) {
         return NextResponse.json({ error: 'Hjulskiftesäsongen har inte startat ännu' }, { status: 409 });
+      }
+
+      const { data: existingSeasonal, error: existingSeasonalError } = await admin
+        .from('garage_wheel_changes')
+        .select('wheel_change_id')
+        .eq('regnr', regnr)
+        .eq('season_key', operational.season.key)
+        .limit(1);
+      if (existingSeasonalError) throw existingSeasonalError;
+      if ((existingSeasonal ?? []).length > 0) {
+        return NextResponse.json({ error: 'Hjulskifte finns redan för bilen och säsongen' }, { status: 409 });
       }
 
       const source = await readCandidateSource(admin);
