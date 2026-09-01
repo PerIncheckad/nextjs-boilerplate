@@ -87,7 +87,9 @@ Före permanent migration visade Production:
 
 Ett rollback-baserat acceptanstest kördes på de sju Planering-origin Garage-rader som delar stabil modellidentitet `MB:CLA`.
 
-Testet verifierade:
+Det första testet hittade en trigger-depth-lucka: modellstandarden etablerades men endast startbilen fylldes. Implementationen ändrades därför innan Production-migration så att första Garage-värdet själv fyller tomma syskon för samma `model_code`.
+
+Det korrigerade testet verifierade:
 
 1. första explicita Dygnsdeb/Hålltid etablerade modellstandard
 2. alla sju tomma syskonrader fick samma standard
@@ -95,12 +97,16 @@ Testet verifierade:
 4. den individuella overriden ändrade inte modellstandarden
 5. all testdata och tillfällig DDL rullades tillbaka
 
-Efter den permanenta migrationen verifierades att ingen osäker backfill genomförts:
+Den permanenta migrationen `planning_model_defaults_rate_holding` applicerades därefter i Production.
+
+Efter migrationen verifierades att ingen osäker backfill genomförts:
 
 - fortfarande 83 aktiva Planering-origin Garage-rader
 - fortfarande 25 utan Dygnsdeb
 - fortfarande 83 utan Hålltid
-- den nya modellkolumnen och båda propagationstrigger-kontrakten är aktiva
+- `planning_vehicle_models.holding_period_months` finns
+- modelltriggern och Garage-triggern för standard/override-kontraktet är aktiva
+- `MB:CLA` har fortsatt tom modellstandard tills verksamheten anger ett verkligt värde
 
 Det låsta detaljkontraktet finns i `GARAGE_MODEL_DEFAULTS_RATE_HOLDING_2026-09-01.md`.
 
