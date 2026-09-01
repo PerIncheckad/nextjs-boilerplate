@@ -1,26 +1,27 @@
 # INCHECKAD – Hjulskifte Production-acceptans
 
 Datum: 2026-09-01
-Status: DELVIS VERIFIERAD I PRODUCTION
-Bas: main `23dfe92bf8437e2359c5a786072d8e9076a6eabb` efter PR #521
+Status: TEKNISKT SLUTACCEPTERAD I PRODUCTION
+Bas: main `96087d6f4f14255b0efb9101fcd6c4edfe418bcc`
 
 ## 1. Syfte
 
-Detta dokument skiljer mellan vad som är tekniskt och datamässigt verifierat i Production nu och vad som måste vänta på verklig verksamhetsdata eller aktiv hjulskiftesäsong.
+Detta dokument skiljer mellan vad som är tekniskt verifierat i Production och vad som återstår som vanlig verksamhetsanvändning.
 
-Ingen testdata ska skapas enbart för att få en grön acceptans.
+Ingen permanent testdata har skapats. Fullflödet verifierades i en transaktion som avsiktligt avslutades med rollback efter lyckat test.
 
-## 2. Production-status för #520 och #521
+## 2. Production-status
 
 - #520 är mergad och Vercel Production = SUCCESS.
 - #521 är mergad och Vercel Production = SUCCESS.
+- #522 dokumenterade första Production-acceptansen.
 - Production-funktionen `get_wheel_change_candidate_source()` använder senaste manuella `vehicle_edits.hjultyp` före senaste COMPLETED Check-in.
 - Historiska Check-in-rader skrivs inte om.
 - `/status?reg=<REGNR>` normaliserar regnumret och hämtar bilen direkt.
 
 ## 3. Aktuell vinterpopulation
 
-För WINTER_2026 visar Production-underlaget:
+För WINTER_2026 visade Production-underlaget vid kontrollen:
 
 - 259 bilar med `REQUIRES_CHANGE`
   - 56 med registrerad Nybil-förvaring
@@ -30,7 +31,7 @@ För WINTER_2026 visar Production-underlaget:
 - 95 SALU-undantagna
 - 2 med `UNKNOWN_WHEEL_STATUS`
 - 1 såld kandidat, `BMP08Z`, exkluderas från Hjulskifte
-- 0 skapade Hjulskifte-rader för `WINTER_2026`
+- 0 verkliga skapade Hjulskifte-rader för `WINTER_2026`
 
 Siffrorna är en ögonblicksbild och inte en permanent flottstorlek.
 
@@ -52,7 +53,7 @@ De ska därför ligga kvar som UNKNOWN tills någon manuellt verifierar faktisk 
 
 ## 5. Verifierad hjultyp-precedence
 
-Status och Hjulskifte använder nu samma operativa princip:
+Status och Hjulskifte använder samma operativa princip:
 
 1. senaste icke-tomma manuella `vehicle_edits.hjultyp`
 2. senaste COMPLETED Check-in `checkins.hjultyp`
@@ -62,7 +63,7 @@ Vid införandet fanns 0 kandidatbilar med manuell hjultyp-edit. Migrationen änd
 
 ## 6. Verifierad hjulförvaring
 
-Förvaringskällan är fortsatt separat från bilens station:
+Förvaringskällan är separat från bilens station:
 
 1. senaste manuella edit av `hjul_forvaring_ort` / `hjul_forvaring_spec`
 2. `nybil_inventering`
@@ -71,54 +72,93 @@ Förvaringskällan är fortsatt separat från bilens station:
 
 Production har en befintlig manuell förvaringsedit på SDH20Y (`Malmö - hylla 3`), vilket verifierar att edit-lagret är aktivt i den gemensamma datamodellen.
 
-## 7. Acceptansmatris
+## 7. Fullt rollback-baserat Production-test
+
+Ett fullständigt tekniskt acceptanstest genomfördes på en verklig aktuell vinterkandidat, `FGD62S`.
+
+Före testet var bilen:
+
+- `Sommardäck`
+- aktuell vinterkandidat
+- verifierad hjulförvaring `Malmö - Sonax tvätthall`
+- inget befintligt `WINTER_2026`-ärende
+
+Testet kördes i en enda databastransaktion och verifierade följande ordning:
+
+1. `create_garage_wheel_change_for_vehicle()` skapade ett ärende i `KRAVS`.
+2. `garage_wheel_changes.location` blev exakt `Malmö - Sonax tvätthall`.
+3. checkpointens `source_context.wheelStorageLocation` innehöll samma snapshot.
+4. CREATED-eventets snapshot innehöll samma location.
+5. `vehicle_journey_events.payload.wheelStorageLocation` innehöll samma snapshot.
+6. statusövergång `KRAVS → BOKAD` passerade med bokad tid.
+7. statusövergång `BOKAD → PAGAENDE` passerade.
+8. statusövergång `PAGAENDE → KLAR` passerade.
+9. `completed_at` sattes vid KLAR.
+10. exakt fyra wheel-change-events skapades för skapande/statuskedjan.
+11. ett nytt försök att skapa Hjulskifte för samma `regnr + WINTER_2026` blockerades med `Hjulskifte finns redan för bilen och säsongen` även efter KLAR.
+
+Efter samtliga kontroller kastades en avsiktlig `ACCEPTANCE_PASS_ROLLBACK`-signal för att rulla tillbaka hela transaktionen.
+
+Efter rollback verifierades explicit:
+
+- 0 test-hjulskiften kvar
+- 0 test-events kvar
+- 0 test-checkpoints kvar
+- 0 test-journey-events kvar
+
+Ingen permanent Production-data skapades eller ändrades av acceptanstestet.
+
+## 8. Säsongsgrind
+
+Den ordinarie API-vägen för säsongsbaserat Hjulskifte kontrollerades separat.
+
+Före aktiv säsong:
+
+- `operationalWheelSeason(new Date())` måste vara `active = false`
+- säsongsbaserad POST returnerar HTTP 409 med `Hjulskiftesäsongen har inte startat ännu`
+- RPC för att skapa säsongsärendet anropas inte
+- UI visar FÖRHANDSVY och exponerar inte `Starta`
+
+Databasmotorn kunde därför fulltestas nu utan att den verkliga användarvägen öppnades före verksamhetens säsongsstart.
+
+## 9. Slutlig acceptansmatris
 
 | Kontroll | Status | Bevis / kommentar |
 | --- | --- | --- |
-| Modern registrerad hjulförvaring visas som källa | PASS – DATA | 56 REQUIRES_CHANGE använder Nybil-förvaring |
-| Legacy-fallback utan stationsinferens | PASS – DATA | 116 REQUIRES_CHANGE använder legacy-förvaring |
-| Saknad förvaring separeras | PASS – DATA + KOD | 87 REQUIRES_CHANGE saknar förvaring och ska till worklist |
-| `Ange förvaring` går till rätt Status-bil | PASS – KOD | `/status?reg=<REGNR>` förladdar och hämtar bilen |
-| Manuell hjultyp kan lösa UNKNOWN | PASS – TEKNIK | #521 precedence finns i Production; ingen verklig edit ännu |
-| UNKNOWN infereras inte | PASS – DATA | AZH62Z och ESN24G ligger kvar eftersom verifierad hjultyp saknas |
-| Såld bil exkluderas | PASS – DATA | BMP08Z identifieras som såld kandidat och ska exkluderas |
-| Samma bil kan inte startas två gånger samma säsong | PASS – KONTRAKT | DB/API-idempotens från #514; 0 verkliga WINTER_2026-rader ännu |
-| Start snapshotar aktuell hjulförvaring | PASS – KONTRAKT / EJ VERKLIGT CASE | Kod och migration låser snapshot; verkligt säsongscase saknas |
-| Full kedja `hjultyp → förvaring → Starta → ärende → KLAR` | VÄNTAR | Kräver aktiv säsong och verkligt verksamhetscase |
+| Modern registrerad hjulförvaring | PASS | 56 REQUIRES_CHANGE använder Nybil-förvaring |
+| Legacy-fallback utan stationsinferens | PASS | 116 REQUIRES_CHANGE använder legacy-förvaring |
+| Saknad förvaring separeras | PASS | 87 REQUIRES_CHANGE saknar förvaring och går till worklist |
+| `Ange förvaring` går till rätt Status-bil | PASS | `/status?reg=<REGNR>` förladdar och hämtar bilen |
+| Manuell hjultyp kan lösa UNKNOWN | PASS | #521 precedence aktiv i Production |
+| UNKNOWN infereras inte | PASS | AZH62Z och ESN24G kvarstår korrekt UNKNOWN |
+| Såld bil exkluderas | PASS | BMP08Z identifieras som såld kandidat |
+| Start snapshotar aktuell hjulförvaring | PASS | Verifierat på FGD62S i rollback-test |
+| Checkpoint snapshot | PASS | Verifierat på FGD62S |
+| CREATED-event snapshot | PASS | Verifierat på FGD62S |
+| Journey-event snapshot | PASS | Verifierat på FGD62S |
+| `KRAVS → BOKAD → PAGAENDE → KLAR` | PASS | Full kedja verifierad på FGD62S |
+| `completed_at` vid KLAR | PASS | Verifierat |
+| Audit-eventkedja | PASS | 4 events verifierade |
+| Samma bil kan inte startas igen samma säsong | PASS | Dubblettförsök efter KLAR blockerades |
+| Säsongsstart före 1 oktober blockerad | PASS | API-grind + UI FÖRHANDSVY verifierad |
+| Ingen testdata kvar efter acceptanstest | PASS | 0/0/0/0 verifierat efter rollback |
 
-## 8. Medvetna blockerare
+## 10. Vad som återstår
 
-### 8.1 Verklig hjultyp krävs
+Det finns ingen känd teknisk blockerare kvar i Hjulskifteflödet.
 
-AZH62Z och ESN24G får inte korrigeras från antagande. Verklig monterad hjultyp måste verifieras manuellt innan Status-edit görs.
+Återstående aktiviteter är verksamhetsdata och drift:
 
-### 8.2 Säsongen är inte aktiv
+- verklig hjultyp måste anges när AZH62Z och ESN24G faktiskt verifierats
+- saknad hjulförvaring måste kompletteras manuellt där verksamheten känner den verkliga platsen
+- när kampanjen öppnar används det redan tekniskt verifierade flödet i skarp drift
 
-Den operativa vinterkampanjen startar 1 oktober. Före säsongsstart ska systemet vara i FÖRHANDSVY och inte erbjuda säsongsstart av Hjulskifte.
+Detta är inte väntande teknisk acceptans.
 
-Därför ska inget artificiellt Production-case skapas 2026-09-01 enbart för att testa Starta/KLAR.
+## 11. Slutsats
 
-## 9. Nästa verksamhetsacceptans
+Hjulskifte är tekniskt slutaccepterat i Production.
 
-När verklig hjultyp är känd för AZH62Z eller ESN24G:
+Kedjan `verifierad hjultyp → registrerad hjulförvaring → skapande → snapshot → BOKAD → PAGAENDE → KLAR → permanent same-season-spärr` är verifierad mot Production-schemat och Production-funktionerna utan att lämna testdata efter sig.
 
-1. öppna bilen via `Verifiera hjultyp`
-2. registrera verklig hjultyp i Status
-3. uppdatera Hjulskifte
-4. verifiera att bilen lämnar UNKNOWN och klassas enligt säsongsregeln
-
-När vinterkampanjen är aktiv och första riktiga bilen ska hanteras:
-
-1. verifiera hjultyp
-2. verifiera registrerad hjulförvaring
-3. Starta Hjulskifte
-4. kontrollera snapshot av förvaring i ärende och auditkedja
-5. genomför statusflödet
-6. markera KLAR
-7. verifiera att samma bil inte kan startas igen för WINTER_2026
-
-## 10. Slutsats
-
-Hjulskifte är tekniskt Production-grönt genom #521 och de identifierade osäkerheterna är nu uttryckligen synliga i stället för infererade.
-
-Kvarvarande acceptans är inte ett känt kodfel. Den är beroende av två verkliga verksamhetsfakta: faktisk hjultyp på UNKNOWN-bilarna och ett legitimt Hjulskifte efter att säsongen blivit aktiv.
+Grundprincipen är fortsatt låst: **saknad källa ska bli synligt arbete, aldrig infererad sanning.**
