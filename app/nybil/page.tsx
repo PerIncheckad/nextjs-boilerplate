@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
 import GarageNybilPrefillBridge from './garage-prefill-bridge';
+import GaragePicker from './garage-picker';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './nybil-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
 export default function NybilPage() {
   return (
     <main className={styles.shell}>
+      <GaragePicker />
       <GarageNybilPrefillBridge />
 
       <header className={styles.topbar}>
@@ -37,14 +39,14 @@ export default function NybilPage() {
           <span>INCHECKAD CORE / NY BIL</span>
           <h1>Etablera bilens baslinje.</h1>
           <p>
-            Dokumentera identitet, leverans, utrustning och avvikelser så att bilens fortsatta resa kan jämföras mot ett verifierat utgångsläge.
+            Hämta den ankomna bilen från Garaget och verifiera identitet, leverans, utrustning och avvikelser så att bilens fortsatta resa får ett bevisbart utgångsläge.
           </p>
         </div>
 
         <div className={styles.flow} aria-label="Arbetsgång för ny bil">
           <span className={styles.flowLabel}>ARBETSGÅNG</span>
           <ol>
-            <li><span>01</span>Identitet</li>
+            <li><span>01</span>Hämta från Garaget</li>
             <li><span>02</span>Leverans</li>
             <li><span>03</span>Utrustning</li>
             <li><span>04</span>Verifiera</li>
