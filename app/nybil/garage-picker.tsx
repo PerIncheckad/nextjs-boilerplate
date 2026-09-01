@@ -54,9 +54,11 @@ export default function GaragePicker() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('garage_item_id')) {
-      setHasSelectedGarageItem(true);
-      setLoading(false);
-      return;
+      const timer = window.setTimeout(() => {
+        setHasSelectedGarageItem(true);
+        setLoading(false);
+      }, 0);
+      return () => window.clearTimeout(timer);
     }
 
     let active = true;
