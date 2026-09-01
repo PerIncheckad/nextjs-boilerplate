@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
 
+const HOLDING_PERIODS = new Set([4, 6, 9, 12, 18, 24]);
+
 type ModelInput = {
   model_code?: unknown;
   display_name?: unknown;
@@ -9,6 +11,7 @@ type ModelInput = {
   is_electric?: unknown;
   is_automatic?: unknown;
   daily_rate?: unknown;
+  holding_period_months?: unknown;
   aliases?: unknown;
   sort_order?: unknown;
   is_active?: unknown;
@@ -37,6 +40,12 @@ function intOrNull(value: unknown): number | null | undefined {
   return Number.isInteger(numeric) && numeric >= 0 ? numeric : undefined;
 }
 
+function holdingPeriod(value: unknown): number | null | undefined {
+  if (value === null || value === '') return null;
+  const numeric = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(numeric) && HOLDING_PERIODS.has(numeric) ? numeric : undefined;
+}
+
 function aliases(value: unknown): string[] | null {
   if (!Array.isArray(value)) return null;
   return [...new Set(value.map((item) => text(item)).filter((item): item is string => Boolean(item)))];
@@ -55,12 +64,13 @@ export async function PUT(request: Request) {
   const electric = bool(body.is_electric);
   const automatic = bool(body.is_automatic);
   const dailyRate = intOrNull(body.daily_rate);
+  const holdingMonths = holdingPeriod(body.holding_period_months);
   const sortOrder = intOrNull(body.sort_order);
   const modelAliases = aliases(body.aliases);
   const active = typeof body.is_active === 'boolean' ? body.is_active : true;
 
-  if (!modelCode || !displayName || !brand || electric === null || automatic === null || dailyRate === undefined || sortOrder === undefined) {
-    return NextResponse.json({ error: 'Modellen kräver kod, namn, märke, EL/AUT och giltig dygnsdebitering' }, { status: 400 });
+  if (!modelCode || !displayName || !brand || electric === null || automatic === null || dailyRate === undefined || holdingMonths === undefined || sortOrder === undefined) {
+    return NextResponse.json({ error: 'Modellen kräver kod, namn, märke, EL/AUT samt giltig dygnsdebitering och hålltid' }, { status: 400 });
   }
 
   const admin = adminClient();
@@ -72,6 +82,7 @@ export async function PUT(request: Request) {
     is_electric: electric,
     is_automatic: automatic,
     daily_rate: dailyRate,
+    holding_period_months: holdingMonths,
     aliases: modelAliases ?? [],
     sort_order: sortOrder ?? 0,
     is_active: active,
@@ -82,7 +93,7 @@ export async function PUT(request: Request) {
 
   const { data, error } = await admin.from('planning_vehicle_models')
     .upsert(payload, { onConflict: 'model_code' })
-    .select('model_code,display_name,brand,is_electric,is_automatic,daily_rate,aliases,sort_order,is_active')
+    .select('model_code,display_name,brand,is_electric,is_automatic,daily_rate,holding_period_months,aliases,sort_order,is_active')
     .single();
 
   if (error) {
