@@ -18,8 +18,22 @@ function regKey(value: string | null): string {
   return (value ?? '').replace(/\s+/g, '').toUpperCase();
 }
 
+type ExistingNybil = {
+  id: string;
+  created_at: string | null;
+  source_garage_item_id: string | null;
+};
+
+type ExistingNybilTiming = 'BEFORE_GARAGE' | 'AFTER_GARAGE' | 'UNKNOWN' | null;
+
+function classifyExistingNybilTiming(garageCreatedAt: string | null, nybilCreatedAt: string | null): ExistingNybilTiming {
+  if (!nybilCreatedAt) return null;
+  if (!garageCreatedAt) return 'UNKNOWN';
+  return nybilCreatedAt < garageCreatedAt ? 'BEFORE_GARAGE' : 'AFTER_GARAGE';
+}
+
 async function loadExistingNybilByReg(admin: ReturnType<typeof adminClient>, regnrs: string[]) {
-  if (regnrs.length === 0) return new Map<string, { id: string; created_at: string | null; source_garage_item_id: string | null }>();
+  if (regnrs.length === 0) return new Map<string, ExistingNybil>();
 
   const { data, error } = await admin
     .from('nybil_inventering')
@@ -28,7 +42,7 @@ async function loadExistingNybilByReg(admin: ReturnType<typeof adminClient>, reg
 
   if (error) throw error;
 
-  const result = new Map<string, { id: string; created_at: string | null; source_garage_item_id: string | null }>();
+  const result = new Map<string, ExistingNybil>();
   for (const row of data ?? []) {
     const key = regKey(row.regnr);
     const current = result.get(key);
@@ -54,7 +68,7 @@ export async function GET(request: Request) {
   if (!garageItemId) {
     const { data, error } = await admin
       .from('garage_items')
-      .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,updated_at')
+      .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
       .eq('garage_direction', 'IN')
       .is('voided_at', null)
       .not('regnr', 'is', null)
@@ -65,7 +79,7 @@ export async function GET(request: Request) {
     }
 
     const rows = data ?? [];
-    let existingByReg = new Map<string, { id: string; created_at: string | null; source_garage_item_id: string | null }>();
+    let existingByReg = new Map<string, ExistingNybil>();
     try {
       existingByReg = await loadExistingNybilByReg(admin, [...new Set(rows.map((row) => row.regnr).filter((value): value is string => Boolean(value)))]);
     } catch (lookupError) {
@@ -81,6 +95,9 @@ export async function GET(request: Request) {
           existing_nybil_id: existing?.id ?? null,
           existing_nybil_created_at: existing?.created_at ?? null,
           existing_nybil_source_garage_item_id: existing?.source_garage_item_id ?? null,
+          existing_nybil_timing: existing
+            ? classifyExistingNybilTiming(row.created_at ?? null, existing.created_at)
+            : null,
         };
       }),
     });
@@ -88,7 +105,7 @@ export async function GET(request: Request) {
 
   const { data: item, error } = await admin
     .from('garage_items')
-    .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at')
+    .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,created_at')
     .eq('garage_item_id', garageItemId)
     .is('voided_at', null)
     .maybeSingle();
@@ -121,6 +138,7 @@ export async function GET(request: Request) {
         existing_nybil_id: existing.id,
         existing_nybil_created_at: existing.created_at,
         existing_nybil_source_garage_item_id: existing.source_garage_item_id,
+        existing_nybil_timing: classifyExistingNybilTiming(item.created_at ?? null, existing.created_at),
       }, { status: 409 });
     }
   } catch (lookupError) {
