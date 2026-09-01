@@ -1,7 +1,7 @@
 # INCHECKAD – Garage modellstandarder för Dygnsdeb och Hålltid
 
 Datum: 2026-09-01
-Status: LÅST VERKSAMHETS- OCH TEKNIKKONTRAKT
+Status: LÅST VERKSAMHETS- OCH TEKNIKKONTRAKT · PRODUCTION-VERIFIERAT
 
 ## 1. Grundregel
 
@@ -78,9 +78,38 @@ Hålltid är nu uttryckligen:
 
 **modellstandard + tillåten fordonsunik override**, på samma sätt som Dygnsdeb.
 
-## 9. Acceptans
+## 9. Production-acceptans 2026-09-01
 
-Före merge/Production ska följande verifieras:
+Före permanent migration fanns i Production:
+
+- 83 aktiva Planering-origin Garage-rader
+- 25 utan Dygnsdeb
+- 83 utan Hålltid
+
+Ett transaktionellt rollback-test genomfördes på sju verkliga Planering-origin-rader som delar stabil modellidentitet `MB:CLA`.
+
+Testet verifierade:
+
+1. första explicita Garage-värdet etablerade modellstandard för både Dygnsdeb och Hålltid
+2. samtliga sju tomma syskonrader fick samma standard
+3. en efterföljande ändring på en enskild bil blev en fordonsunik override
+4. den individuella overriden ändrade inte modellstandarden
+5. all testdata och tillfällig DDL rullades tillbaka
+
+Det första testförsöket upptäckte en verklig trigger-depth-lucka där endast startbilen fylldes. Implementationen rättades före Production-migration så att första Garage-värdet själv fyller tomma syskon direkt. Det korrigerade rollback-testet passerade.
+
+Efter permanent migration verifierades:
+
+- `planning_vehicle_models.holding_period_months` finns
+- modelltrigger för direkt ändring i Planering är aktiv
+- Garage-trigger för första modellstandard är aktiv
+- fortfarande 83 av 83 befintliga Planering-origin-rader saknade Hålltid
+- fortfarande 25 befintliga Planering-origin-rader saknade Dygnsdeb
+- `MB:CLA` hade fortsatt tom modellstandard
+
+Det visar att ingen osäker historisk backfill eller testdata lämnades i Production.
+
+## 10. Acceptanskrav
 
 1. Modellregistret kan lagra `daily_rate` och `holding_period_months`.
 2. Planering visar och kan spara båda modellstandarderna.
@@ -91,6 +120,8 @@ Före merge/Production ska följande verifieras:
 7. När modellstandard redan finns förblir senare enskild Garage-ändring en override.
 8. Hålltid accepterar endast 4/6/9/12/18/24 månader.
 
-## 10. Låst sammanfattning
+Samtliga tekniska kontrakt ovan är verifierade genom regressionstest, Production-schema och rollback-acceptans.
+
+## 11. Låst sammanfattning
 
 **Lika modell = samma standard för Dygnsdeb och Hålltid. Planering känner igen modellen och fyller automatiskt. En enskild bil får därefter ändras manuellt utan att den individuella avvikelsen skrivs över av automatik.**
