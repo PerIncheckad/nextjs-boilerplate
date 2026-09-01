@@ -25,6 +25,7 @@ type PlanningModel = {
   is_electric: boolean;
   is_automatic: boolean;
   daily_rate: number | null;
+  holding_period_months: number | null;
   aliases: string[] | null;
   sort_order: number;
 };
@@ -92,7 +93,7 @@ async function loadStations(admin: ReturnType<typeof adminClient>) {
 
 async function loadModels(admin: ReturnType<typeof adminClient>): Promise<PlanningModel[]> {
   const { data, error } = await admin.from('planning_vehicle_models')
-    .select('model_code,display_name,brand,is_electric,is_automatic,daily_rate,aliases,sort_order')
+    .select('model_code,display_name,brand,is_electric,is_automatic,daily_rate,holding_period_months,aliases,sort_order')
     .eq('is_active', true)
     .order('brand', { ascending: true })
     .order('sort_order', { ascending: true })

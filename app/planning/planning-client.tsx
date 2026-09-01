@@ -9,6 +9,7 @@ const DECISIONS = [
   ['minskning_count', 'MINSKNING'],
   ['ordered_count', 'BESTÄLLT'],
 ] as const;
+const HOLDING_PERIODS = [4, 6, 9, 12, 18, 24] as const;
 
 type DecisionMetric = typeof DECISIONS[number][0];
 type Metric = DecisionMetric | 'behov_count' | 'salu_count';
@@ -21,6 +22,7 @@ type PlanningModel = {
   is_electric: boolean;
   is_automatic: boolean;
   daily_rate: number | null;
+  holding_period_months: number | null;
   aliases: string[] | null;
   sort_order: number;
 };
@@ -41,6 +43,7 @@ type ModelRow = {
   isElectric: boolean;
   isAutomatic: boolean;
   dailyRate: number | null;
+  holdingPeriodMonths: number | null;
   aliases: string[];
   sortOrder: number;
   salu: number;
@@ -84,6 +87,7 @@ function pivot(cells: ApiCell[], stations: PlanningStation[], models: PlanningMo
         isElectric: model.is_electric,
         isAutomatic: model.is_automatic,
         dailyRate: model.daily_rate,
+        holdingPeriodMonths: model.holding_period_months,
         aliases: model.aliases ?? [],
         sortOrder: model.sort_order,
         salu: saluByModel.get(modelCode) ?? 0,
@@ -260,7 +264,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
     setRows((current) => current.map((row) => row.key === key ? { ...row, note: value, dirtyPlanning: true } : row));
   };
 
-  const updateModel = (key: string, patch: Partial<Pick<ModelRow, 'brand' | 'model' | 'isElectric' | 'dailyRate'>>) => {
+  const updateModel = (key: string, patch: Partial<Pick<ModelRow, 'brand' | 'model' | 'isElectric' | 'dailyRate' | 'holdingPeriodMonths'>>) => {
     if (locked) return;
     setStatus(null);
     setRows((current) => current.map((row) => row.key === key ? { ...row, ...patch, dirtyModel: true } : row));
@@ -277,6 +281,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
         is_electric: row.isElectric,
         is_automatic: row.isAutomatic,
         daily_rate: row.dailyRate,
+        holding_period_months: row.holdingPeriodMonths,
         aliases: row.aliases,
         sort_order: row.sortOrder,
         is_active: true,
@@ -350,7 +355,7 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
         const modelResponse = await fetch('/api/planning/models', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model_code: modelCode, display_name: name, brand, is_electric: false, is_automatic: false, daily_rate: null, aliases: [], sort_order: 9999, is_active: true }),
+          body: JSON.stringify({ model_code: modelCode, display_name: name, brand, is_electric: false, is_automatic: false, daily_rate: null, holding_period_months: null, aliases: [], sort_order: 9999, is_active: true }),
         });
         const modelBody = await modelResponse.json() as { data?: PlanningModel; error?: string };
         if (!modelResponse.ok) throw new Error(modelBody?.error ?? 'Kunde inte lägga till modellen');
@@ -432,18 +437,18 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
       {unmappedSalu.length ? <div className={styles.info}><strong>SALU utan modellkoppling:</strong> {unmappedSalu.map((item) => `${item.label} (${item.windowTotal ?? 0})`).join(' · ')}. Lägg till eller rätta märke/modell vid behov.</div> : null}
 
       <section className={styles.gridSection}>
-        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>MÄRKE · MODELL · EL · stationer · SUMMA · SALU · DYGNDEB</span></div><strong>{!locked && dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{visibleRows.length} rader</strong></div>
+        <div className={styles.gridHeading}><div><strong>{metricLabel} — {period}</strong><span>MÄRKE · MODELL · EL · stationer · SUMMA · SALU · DYGNDEB · HÅLLTID</span></div><strong>{!locked && dirtyRows.length ? `${dirtyRows.length} osparade · ` : ''}{visibleRows.length} rader</strong></div>
         {loading || periodChanging ? <div className={styles.empty}>Läser planering…</div> : stations.length === 0 ? <div className={styles.empty}>Inga aktiva planeringsstationer finns.</div> : (
           <div className={styles.tableWrap}><table className={styles.simplePlanningTable}>
             <thead><tr>
               <th className={styles.modelColumn}>Märke</th><th className={styles.modelColumn}>Modell</th><th className={styles.flagColumn}>EL</th>
               {stations.map((station) => <th key={station.station_code}>{station.station_code}<small>{station.display_name && station.display_name !== station.station_code ? station.display_name : ''}</small></th>)}
-              <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th>{!locked ? <th className={styles.actionColumn}>Spara</th> : null}<th className={styles.rateColumn}>Dygnsdeb</th>
+              <th>Summa</th><th className={styles.saluColumn}>SALU</th><th className={styles.noteColumn}>Kommentar</th>{!locked ? <th className={styles.actionColumn}>Spara</th> : null}<th className={styles.rateColumn}>Dygnsdeb</th><th className={styles.rateColumn}>Hålltid</th>
             </tr></thead>
             <tbody>
               {visibleRows.flatMap((row, index) => {
                 const brandHeader = index === 0 || visibleRows[index - 1]?.brand !== row.brand
-                  ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + (locked ? 7 : 8)}>{row.brand}</td></tr>
+                  ? <tr key={`brand-${row.brand}`} className={styles.brandRow}><td colSpan={stations.length + (locked ? 8 : 9)}>{row.brand}</td></tr>
                   : null;
                 const isDirty = row.dirtyModel || row.dirtyPlanning;
                 return [brandHeader, <tr key={row.key} className={!locked && isDirty ? styles.dirtyRow : undefined}>
@@ -456,9 +461,10 @@ export default function FleetPlanningClient({ selectedPeriod, onPeriodChange }: 
                   <td className={styles.noteColumn}><input value={row.note} disabled={locked} onChange={(event) => updateNote(row.key, event.target.value)} placeholder="Kommentar…" /></td>
                   {!locked ? <td className={styles.actionColumn}><button type="button" className={isDirty ? styles.saveButtonDirty : styles.saveButton} onClick={() => void saveRow(row)} disabled={savingKey === row.key || !isDirty}>{savingKey === row.key ? '…' : isDirty ? 'Spara*' : 'Sparad'}</button></td> : null}
                   <td className={styles.rateColumn}><input type="number" min={0} inputMode="numeric" value={row.dailyRate ?? ''} placeholder="–" disabled={locked} onChange={(event) => updateModel(row.key, { dailyRate: event.target.value === '' ? null : normalizedCount(event.target.value) })} aria-label={`${row.model} dygnsdeb`} /></td>
+                  <td className={styles.rateColumn}><select value={row.holdingPeriodMonths ?? ''} disabled={locked} onChange={(event) => updateModel(row.key, { holdingPeriodMonths: event.target.value === '' ? null : Number(event.target.value) })} aria-label={`${row.model} hålltid`}><option value="">–</option>{HOLDING_PERIODS.map((months) => <option key={months} value={months}>{months} mån</option>)}</select></td>
                 </tr>];
               })}
-              <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td><td /><td />{stations.map((station) => <td key={`total-${station.station_code}`}>{stationTotals[station.station_code] ?? 0}</td>)}<td className={styles.rowTotal}>{grandTotal}</td><td className={styles.saluColumn}>{saluTotal}</td><td />{!locked ? <td /> : null}<td /></tr>
+              <tr className={styles.totalRow}><td className={styles.modelColumn}>TOTALT</td><td /><td />{stations.map((station) => <td key={`total-${station.station_code}`}>{stationTotals[station.station_code] ?? 0}</td>)}<td className={styles.rowTotal}>{grandTotal}</td><td className={styles.saluColumn}>{saluTotal}</td><td />{!locked ? <td /> : null}<td /><td /></tr>
             </tbody>
           </table></div>
         )}
