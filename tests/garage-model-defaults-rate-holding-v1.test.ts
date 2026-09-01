@@ -41,5 +41,5 @@ test('contract locks equal-model defaults plus manual vehicle override', () => {
   assert.match(contract, /Samma stabila modellidentitet/);
   assert.match(contract, /modellstandard/);
   assert.match(contract, /fordonsunik override/);
-  assert.match(contract, /ingen befintlig individuell icke-tom rad skrivs över/);
+  assert.match(contract, /befintlig individuell icke-tom Garage-rad skrivs inte över automatiskt/i);
 });
