@@ -62,6 +62,8 @@ for each row
 execute function public.propagate_planning_model_defaults_to_blank_garage_rows();
 
 -- First explicit Garage value may establish a missing model default.
+-- It also fills blank siblings directly because the model update occurs inside this trigger and
+-- the model propagation trigger deliberately ignores nested trigger depth.
 -- Once a model default exists, later edits on one Garage row remain vehicle-specific overrides.
 create or replace function public.apply_first_garage_model_defaults()
 returns trigger
@@ -105,6 +107,17 @@ begin
         updated_at = clock_timestamp()
     where model_code = v_model_code
       and daily_rate is null;
+
+    update public.garage_items gi
+    set daily_rate = new.daily_rate,
+        updated_at = clock_timestamp()
+    from public.fleet_planning_cells fpc
+    where gi.source_kind = 'PLANERING'
+      and gi.voided_at is null
+      and gi.daily_rate is null
+      and gi.garage_item_id <> new.garage_item_id
+      and gi.source_planning_cell_id = fpc.planning_cell_id
+      and fpc.model_code = v_model_code;
   end if;
 
   if new.holding_period_months is not null
@@ -115,6 +128,17 @@ begin
         updated_at = clock_timestamp()
     where model_code = v_model_code
       and holding_period_months is null;
+
+    update public.garage_items gi
+    set holding_period_months = new.holding_period_months,
+        updated_at = clock_timestamp()
+    from public.fleet_planning_cells fpc
+    where gi.source_kind = 'PLANERING'
+      and gi.voided_at is null
+      and gi.holding_period_months is null
+      and gi.garage_item_id <> new.garage_item_id
+      and gi.source_planning_cell_id = fpc.planning_cell_id
+      and fpc.model_code = v_model_code;
   end if;
 
   return new;
