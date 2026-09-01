@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+type ExistingNybilTiming = 'BEFORE_GARAGE' | 'AFTER_GARAGE' | 'UNKNOWN' | null;
+
 type HandoffItem = {
   garage_item_id: string;
   regnr: string;
@@ -11,6 +13,7 @@ type HandoffItem = {
   handed_off_nybil_id: string | null;
   existing_nybil_id: string | null;
   existing_nybil_created_at: string | null;
+  existing_nybil_timing: ExistingNybilTiming;
 };
 
 const shell: React.CSSProperties = {
@@ -34,6 +37,12 @@ const row: React.CSSProperties = {
 const done: React.CSSProperties = { fontWeight: 800, color: '#176b33', fontSize: 13 };
 const known: React.CSSProperties = { fontWeight: 800, color: '#71510a', fontSize: 13, textAlign: 'right' };
 const waiting: React.CSSProperties = { fontWeight: 800, color: '#333', fontSize: 13, textAlign: 'right' };
+
+function knownLabel(item: HandoffItem): string {
+  if (item.existing_nybil_timing === 'BEFORE_GARAGE') return 'Historisk Ny bil före Garage';
+  if (item.existing_nybil_timing === 'AFTER_GARAGE') return 'Ny bil efter Garage · koppling saknas';
+  return 'Redan i Ny bil · tidsrelation okänd';
+}
 
 export default function GarageV2Panel() {
   const [handoffs, setHandoffs] = useState<HandoffItem[]>([]);
@@ -60,9 +69,10 @@ export default function GarageV2Panel() {
   }, []);
 
   const counts = useMemo(() => ({
-    total: handoffs.length,
     waiting: handoffs.filter((item) => !item.handed_off_nybil_id && !item.existing_nybil_id).length,
-    alreadyKnown: handoffs.filter((item) => !item.handed_off_nybil_id && Boolean(item.existing_nybil_id)).length,
+    historicalBefore: handoffs.filter((item) => !item.handed_off_nybil_id && item.existing_nybil_timing === 'BEFORE_GARAGE').length,
+    laterWithoutLink: handoffs.filter((item) => !item.handed_off_nybil_id && item.existing_nybil_timing === 'AFTER_GARAGE').length,
+    unknownOverlap: handoffs.filter((item) => !item.handed_off_nybil_id && Boolean(item.existing_nybil_id) && item.existing_nybil_timing === 'UNKNOWN').length,
     handedOff: handoffs.filter((item) => Boolean(item.handed_off_nybil_id)).length,
   }), [handoffs]);
 
@@ -70,15 +80,19 @@ export default function GarageV2Panel() {
     <section style={shell} aria-label="Garage till Ny bil">
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE → NY BIL</div>
-        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Väntar på mottagning i Ny bil</h2>
-        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>Garaget fyller bilen fram till ankomst. När bilen anländer hämtas den från Garaget inne i Ny bil. Lager 1 importeras inte här. Bilar som redan finns i Ny bil får inte registreras en gång till.</p>
-        {!loading ? <div style={{ marginTop: 7, fontSize: 13, color: '#555' }}>{counts.waiting} väntar på Ny bil · {counts.alreadyKnown} redan i Ny bil · {counts.handedOff} kvitterade</div> : null}
+        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Mottagning i Ny bil</h2>
+        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>Garaget fyller bilen fram till ankomst. När bilen anländer hämtas den från Garaget inne i Ny bil. Lager 1 importeras inte här. Befintlig Ny bil-historik klassificeras separat och skapar aldrig automatisk kvittens.</p>
+        {!loading ? (
+          <div style={{ marginTop: 7, fontSize: 13, color: '#555' }}>
+            {counts.waiting} väntar på Ny bil · {counts.historicalBefore} historiska före Garage · {counts.laterWithoutLink} Ny bil efter Garage utan koppling · {counts.unknownOverlap} tidsrelation okänd · {counts.handedOff} kvitterade
+          </div>
+        ) : null}
       </div>
 
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
       {handoffs.length === 0 ? (
-        <div style={{ color: '#666', padding: '8px 0', fontSize: 14 }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr väntar på Ny bil.'}</div>
+        <div style={{ color: '#666', padding: '8px 0', fontSize: 14 }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr finns i Ny bil-handslaget.'}</div>
       ) : handoffs.map((item) => (
         <div key={item.garage_item_id} style={row}>
           <div><strong style={{ fontSize: 15 }}>{item.regnr}</strong><div style={{ fontSize: 13, color: '#666' }}>{item.source_kind}</div></div>
@@ -86,7 +100,7 @@ export default function GarageV2Panel() {
           {item.handed_off_nybil_id ? (
             <div style={done}>Mottagen i Ny bil</div>
           ) : item.existing_nybil_id ? (
-            <div style={known}>Redan i Ny bil<br /><span style={{ fontWeight: 500 }}>{item.existing_nybil_created_at ? new Date(item.existing_nybil_created_at).toLocaleDateString('sv-SE') : 'Registrering finns'}</span></div>
+            <div style={known}>{knownLabel(item)}<br /><span style={{ fontWeight: 500 }}>{item.existing_nybil_created_at ? new Date(item.existing_nybil_created_at).toLocaleDateString('sv-SE') : 'Registrering finns'}</span></div>
           ) : (
             <div style={waiting}>Väntar på Ny bil</div>
           )}

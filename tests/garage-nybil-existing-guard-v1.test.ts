@@ -21,15 +21,22 @@ test('single handoff is blocked when regnr already exists in Ny bil', () => {
 
 test('Garage shows waiting, historically known and atomically received cars while Ny bil owns the fetch action', () => {
   assert.match(panel, /Väntar på Ny bil/);
-  assert.match(panel, /Redan i Ny bil/);
+  assert.match(panel, /Historisk Ny bil före Garage/);
+  assert.match(panel, /Ny bil efter Garage · koppling saknas/);
   assert.match(panel, /Mottagen i Ny bil/);
-  assert.match(panel, /alreadyKnown/);
-  assert.match(panel, /existing_nybil_id/);
   assert.doesNotMatch(panel, /Till Ny bil/);
   assert.doesNotMatch(panel, /\/nybil\?garage_item_id=/);
   assert.match(picker, /Hämta bilen från Garaget/);
   assert.match(picker, />Hämta</);
   assert.match(picker, /\/nybil\?garage_item_id=/);
+});
+
+test('existing Ny bil overlap is classified by chronology without claiming a handshake', () => {
+  assert.match(handoffApi, /classifyExistingNybilTiming/);
+  assert.match(handoffApi, /BEFORE_GARAGE/);
+  assert.match(handoffApi, /AFTER_GARAGE/);
+  assert.match(handoffApi, /existing_nybil_timing/);
+  assert.match(panel, /Befintlig Ny bil-historik klassificeras separat och skapar aldrig automatisk kvittens/);
 });
 
 test('guard does not backfill or rewrite historical Ny bil or Garage rows', () => {

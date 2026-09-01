@@ -110,6 +110,37 @@ Efter migrationen verifierades att ingen osäker backfill genomförts:
 
 Det låsta detaljkontraktet finns i `GARAGE_MODEL_DEFAULTS_RATE_HOLDING_2026-09-01.md`.
 
+## Registrerad punkt 2026-09-01 — Nybil hämtar från Garaget
+
+Det senare låsta flödet är:
+
+`Planering → Garaget → Nybil`
+
+Garaget fyller bilen fram till fysisk ankomst. Nybil initierar mottagningen genom **Hämta bilen från Garaget**. Valet bär exakt `garage_item_id`; först lyckad Nybil-sparning får databasen atomiskt kvittera Garage-raden. Garaget pushar inte bilen och befintlig Nybil-historik får inte dubbelregistreras.
+
+Detaljkontrakt: `NYBIL_FETCH_FROM_GARAGE_2026-09-01.md`.
+
+## Registrerad kontrollpunkt 2026-09-01 — historisk Garage/Nybil-överlapp
+
+Production-kontroll efter införandet av Nybil-hämtning visade att aktiva UTVECKLA / IN-rader med reg.nr måste delas i verkliga väntande bilar och äldre överlapp.
+
+Vid kontrolltillfället fanns:
+
+- 20 aktiva Planering-origin UTVECKLA / IN med reg.nr
+- 9 utan Nybil-rad, alltså verkliga kandidater för Nybil-hämtning
+- 11 med befintlig Nybil-rad men utan dagens exakta Garage-kvittens
+- av de 11 hade 8 Nybil skapad före Garage-objektets materialisering
+- 3 hade Nybil skapad efter Garage-objektets materialisering men saknade `source_garage_item_id`
+
+Låst teknisk kontrollregel:
+
+- tidsordning får klassificera överlapp som `BEFORE_GARAGE`, `AFTER_GARAGE` eller `UNKNOWN`
+- tidsordning får aldrig användas som bevis för ett handslag
+- ingen historisk `source_garage_item_id`, `handed_off_nybil_id` eller `handed_off_at` får backfillas automatiskt
+- Garage-panelen ska visa överlappen separat från verkliga väntande Nybil-bilar
+
+Detaljkontrakt: `GARAGE_NYBIL_HISTORICAL_OVERLAP_2026-09-01.md`.
+
 ## Fortsatt användning
 
 Nya beslut och förändringar för Planering + Garaget ska läggas till här som separata punkter när de fastställs eller verifieras.
