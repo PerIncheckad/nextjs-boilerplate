@@ -14,6 +14,35 @@ function text(value: string | null): string | null {
   return next || null;
 }
 
+function regKey(value: string | null): string {
+  return (value ?? '').replace(/\s+/g, '').toUpperCase();
+}
+
+async function loadExistingNybilByReg(admin: ReturnType<typeof adminClient>, regnrs: string[]) {
+  if (regnrs.length === 0) return new Map<string, { id: string; created_at: string | null; source_garage_item_id: string | null }>();
+
+  const { data, error } = await admin
+    .from('nybil_inventering')
+    .select('id,regnr,created_at,source_garage_item_id')
+    .in('regnr', regnrs);
+
+  if (error) throw error;
+
+  const result = new Map<string, { id: string; created_at: string | null; source_garage_item_id: string | null }>();
+  for (const row of data ?? []) {
+    const key = regKey(row.regnr);
+    const current = result.get(key);
+    if (!current || String(row.created_at ?? '') > String(current.created_at ?? '')) {
+      result.set(key, {
+        id: String(row.id),
+        created_at: row.created_at ?? null,
+        source_garage_item_id: row.source_garage_item_id ?? null,
+      });
+    }
+  }
+  return result;
+}
+
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -34,7 +63,27 @@ export async function GET(request: Request) {
       console.error('[garage/nybil-handoff] list failed', error);
       return NextResponse.json({ error: 'Kunde inte läsa Garage → Ny bil' }, { status: 500 });
     }
-    return NextResponse.json({ data: data ?? [] });
+
+    const rows = data ?? [];
+    let existingByReg = new Map<string, { id: string; created_at: string | null; source_garage_item_id: string | null }>();
+    try {
+      existingByReg = await loadExistingNybilByReg(admin, [...new Set(rows.map((row) => row.regnr).filter((value): value is string => Boolean(value)))]);
+    } catch (lookupError) {
+      console.error('[garage/nybil-handoff] Ny bil lookup failed', lookupError);
+      return NextResponse.json({ error: 'Kunde inte kontrollera befintliga Ny bil-registreringar' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      data: rows.map((row) => {
+        const existing = existingByReg.get(regKey(row.regnr));
+        return {
+          ...row,
+          existing_nybil_id: existing?.id ?? null,
+          existing_nybil_created_at: existing?.created_at ?? null,
+          existing_nybil_source_garage_item_id: existing?.source_garage_item_id ?? null,
+        };
+      }),
+    });
   }
 
   const { data: item, error } = await admin
@@ -61,6 +110,22 @@ export async function GET(request: Request) {
       handed_off_nybil_id: item.handed_off_nybil_id,
       handed_off_at: item.handed_off_at,
     }, { status: 409 });
+  }
+
+  try {
+    const existingByReg = await loadExistingNybilByReg(admin, [item.regnr]);
+    const existing = existingByReg.get(regKey(item.regnr));
+    if (existing) {
+      return NextResponse.json({
+        error: 'Registreringsnumret finns redan i Ny bil och ska inte registreras igen',
+        existing_nybil_id: existing.id,
+        existing_nybil_created_at: existing.created_at,
+        existing_nybil_source_garage_item_id: existing.source_garage_item_id,
+      }, { status: 409 });
+    }
+  } catch (lookupError) {
+    console.error('[garage/nybil-handoff] Ny bil lookup failed', lookupError);
+    return NextResponse.json({ error: 'Kunde inte kontrollera befintlig Ny bil-registrering' }, { status: 500 });
   }
 
   let stationDisplayName: string | null = null;
