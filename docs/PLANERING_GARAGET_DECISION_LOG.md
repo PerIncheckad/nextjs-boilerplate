@@ -57,11 +57,52 @@ Det betyder vid kontrolltillfället:
 
 Materialisering och källspårbarhet för Planering → Garaget är därmed Production-verifierade med riktig verksamhetsdata. Detta är inte samma sak som att alla efterföljande operativa steg i Garaget är verksamhetsaccepterade.
 
-### Dygnsdeb — aktuell observation
+### Dygnsdeb — historisk observation
 
-Av de 83 materialiserade Planering-objekten saknade 28 individuell dygnsdeb vid kontrollen. Samtliga dessa hör till modeller där `planning_vehicle_models.daily_rate` också saknade standardvärde. Det är alltså inte en bruten källkoppling i handslaget.
+Av de 83 materialiserade Planering-objekten saknade 28 individuell dygnsdeb vid kontrollen 2026-08-29. Samtliga dessa hörde till modeller där `planning_vehicle_models.daily_rate` också saknade standardvärde. Det var alltså inte en bruten källkoppling i handslaget.
 
-Nuvarande kontrakt tillåter att första explicita dygnsdeb som sätts på ett Planering-origin Garage-objekt etablerar modellens standardvärde om sådan saknas och fyller andra tomma Garage-rader för samma modell. Befintliga individuella icke-tomma värden ska inte skrivas över.
+## Registrerad punkt 2026-09-01 — modellstandard för Dygnsdeb och Hålltid
+
+Senare låst verksamhetsregel ersätter den äldre formuleringen att Hålltid enbart är ett fordonsnivåvärde.
+
+För både **Dygnsdeb** och **Hålltid** gäller nu:
+
+- samma stabila `model_code` har samma modellstandard
+- Planering känner igen modellen och visar modellstandarden automatiskt
+- modellstandarden sparas i `planning_vehicle_models`
+- Planering → Garaget materialiserar modellens aktuella Dygnsdeb och Hålltid
+- om modellstandard saknas kan första explicita värdet på en Planering-origin Garage-bil etablera standarden och fylla endast tomma syskonrader för samma `model_code`
+- när modellstandard redan finns är en senare ändring på en enskild Garage-bil en fordonsunik override
+- befintliga individuella icke-tomma värden skrivs aldrig över automatiskt
+
+Tillåtna Hålltid-värden är 4, 6, 9, 12, 18 och 24 månader.
+
+### Production-verifiering 2026-09-01
+
+Före permanent migration visade Production:
+
+- 83 aktiva Planering-origin Garage-rader
+- 25 saknade Dygnsdeb
+- 83 saknade Hålltid
+
+Ett rollback-baserat acceptanstest kördes på de sju Planering-origin Garage-rader som delar stabil modellidentitet `MB:CLA`.
+
+Testet verifierade:
+
+1. första explicita Dygnsdeb/Hålltid etablerade modellstandard
+2. alla sju tomma syskonrader fick samma standard
+3. en senare individuell ändring på en av de sju bilarna blev en override
+4. den individuella overriden ändrade inte modellstandarden
+5. all testdata och tillfällig DDL rullades tillbaka
+
+Efter den permanenta migrationen verifierades att ingen osäker backfill genomförts:
+
+- fortfarande 83 aktiva Planering-origin Garage-rader
+- fortfarande 25 utan Dygnsdeb
+- fortfarande 83 utan Hålltid
+- den nya modellkolumnen och båda propagationstrigger-kontrakten är aktiva
+
+Det låsta detaljkontraktet finns i `GARAGE_MODEL_DEFAULTS_RATE_HOLDING_2026-09-01.md`.
 
 ## Fortsatt användning
 
