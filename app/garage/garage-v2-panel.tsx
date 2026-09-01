@@ -31,21 +31,9 @@ const row: React.CSSProperties = {
   borderTop: '1px solid #e6e6e6',
   fontSize: 14,
 };
-const button: React.CSSProperties = {
-  border: 0,
-  borderRadius: 6,
-  padding: '8px 12px',
-  fontSize: 13,
-  fontWeight: 800,
-  cursor: 'pointer',
-  background: '#111',
-  color: '#fff',
-  textDecoration: 'none',
-  display: 'inline-block',
-  whiteSpace: 'nowrap',
-};
 const done: React.CSSProperties = { fontWeight: 800, color: '#176b33', fontSize: 13 };
 const known: React.CSSProperties = { fontWeight: 800, color: '#71510a', fontSize: 13, textAlign: 'right' };
+const waiting: React.CSSProperties = { fontWeight: 800, color: '#333', fontSize: 13, textAlign: 'right' };
 
 export default function GarageV2Panel() {
   const [handoffs, setHandoffs] = useState<HandoffItem[]>([]);
@@ -73,7 +61,7 @@ export default function GarageV2Panel() {
 
   const counts = useMemo(() => ({
     total: handoffs.length,
-    ready: handoffs.filter((item) => !item.handed_off_nybil_id && !item.existing_nybil_id).length,
+    waiting: handoffs.filter((item) => !item.handed_off_nybil_id && !item.existing_nybil_id).length,
     alreadyKnown: handoffs.filter((item) => !item.handed_off_nybil_id && Boolean(item.existing_nybil_id)).length,
     handedOff: handoffs.filter((item) => Boolean(item.handed_off_nybil_id)).length,
   }), [handoffs]);
@@ -82,25 +70,25 @@ export default function GarageV2Panel() {
     <section style={shell} aria-label="Garage till Ny bil">
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE → NY BIL</div>
-        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Överlämna fysisk bil</h2>
-        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>När en UTVECKLA-bil har fått registreringsnummer kan den lämnas vidare till Ny bil. Lager 1 importeras inte här. Bilar som redan finns i Ny bil får inte registreras en gång till.</p>
-        {!loading ? <div style={{ marginTop: 7, fontSize: 13, color: '#555' }}>{counts.ready} att överlämna · {counts.alreadyKnown} redan i Ny bil · {counts.handedOff} kvitterade</div> : null}
+        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Väntar på mottagning i Ny bil</h2>
+        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>Garaget fyller bilen fram till ankomst. När bilen anländer hämtas den från Garaget inne i Ny bil. Lager 1 importeras inte här. Bilar som redan finns i Ny bil får inte registreras en gång till.</p>
+        {!loading ? <div style={{ marginTop: 7, fontSize: 13, color: '#555' }}>{counts.waiting} väntar på Ny bil · {counts.alreadyKnown} redan i Ny bil · {counts.handedOff} kvitterade</div> : null}
       </div>
 
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
       {handoffs.length === 0 ? (
-        <div style={{ color: '#666', padding: '8px 0', fontSize: 14 }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr att överlämna.'}</div>
+        <div style={{ color: '#666', padding: '8px 0', fontSize: 14 }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr väntar på Ny bil.'}</div>
       ) : handoffs.map((item) => (
         <div key={item.garage_item_id} style={row}>
           <div><strong style={{ fontSize: 15 }}>{item.regnr}</strong><div style={{ fontSize: 13, color: '#666' }}>{item.source_kind}</div></div>
           <div><strong style={{ fontSize: 15 }}>{item.model}</strong><div style={{ fontSize: 13, color: '#666' }}>Stn {item.planned_station || '—'}</div></div>
           {item.handed_off_nybil_id ? (
-            <div style={done}>Överlämnad</div>
+            <div style={done}>Mottagen i Ny bil</div>
           ) : item.existing_nybil_id ? (
             <div style={known}>Redan i Ny bil<br /><span style={{ fontWeight: 500 }}>{item.existing_nybil_created_at ? new Date(item.existing_nybil_created_at).toLocaleDateString('sv-SE') : 'Registrering finns'}</span></div>
           ) : (
-            <a style={button} href={`/nybil?garage_item_id=${encodeURIComponent(item.garage_item_id)}`}>Till Ny bil</a>
+            <div style={waiting}>Väntar på Ny bil</div>
           )}
         </div>
       ))}
