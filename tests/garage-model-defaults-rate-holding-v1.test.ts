@@ -37,6 +37,13 @@ test('model defaults fill blanks without overwriting vehicle overrides', () => {
   assert.doesNotMatch(migration, /set daily_rate = new\.daily_rate,[\s\S]*where gi\.daily_rate is not null/);
 });
 
+test('first Garage default directly fills blank siblings instead of relying on nested model trigger', () => {
+  const firstDefaults = migration.match(/create or replace function public\.apply_first_garage_model_defaults\(\)[\s\S]*?\n\$\$;/)?.[0] ?? '';
+  assert.match(firstDefaults, /update public\.garage_items gi[\s\S]*gi\.daily_rate is null[\s\S]*fpc\.model_code = v_model_code/);
+  assert.match(firstDefaults, /update public\.garage_items gi[\s\S]*gi\.holding_period_months is null[\s\S]*fpc\.model_code = v_model_code/);
+  assert.match(firstDefaults, /gi\.garage_item_id <> new\.garage_item_id/);
+});
+
 test('contract locks equal-model defaults plus manual vehicle override', () => {
   assert.match(contract, /Samma stabila modellidentitet/);
   assert.match(contract, /modellstandard/);
