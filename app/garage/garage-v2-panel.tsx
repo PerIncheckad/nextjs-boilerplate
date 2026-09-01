@@ -83,7 +83,7 @@ export default function GarageV2Panel() {
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE → NY BIL</div>
         <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Överlämna fysisk bil</h2>
-        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>När en UTVECKLA-bil har fått registreringsnummer kan den lämnas vidare till Ny bil. Bilar som redan finns i Ny bil får inte registreras en gång till.</p>
+        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>När en UTVECKLA-bil har fått registreringsnummer kan den lämnas vidare till Ny bil. Lager 1 importeras inte här. Bilar som redan finns i Ny bil får inte registreras en gång till.</p>
         {!loading ? <div style={{ marginTop: 7, fontSize: 13, color: '#555' }}>{counts.ready} att överlämna · {counts.alreadyKnown} redan i Ny bil · {counts.handedOff} kvitterade</div> : null}
       </div>
 
