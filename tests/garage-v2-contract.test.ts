@@ -6,6 +6,7 @@ const migration = readFileSync('migrations/20260826014500_add_garage_v2_handoffs
 const lager1Api = readFileSync('app/api/garage/lager1-sources/route.ts', 'utf8');
 const handoffApi = readFileSync('app/api/garage/nybil-handoff/route.ts', 'utf8');
 const garagePanel = readFileSync('app/garage/garage-v2-panel.tsx', 'utf8');
+const nybilPicker = readFileSync('app/nybil/garage-picker.tsx', 'utf8');
 const nybilBridge = readFileSync('app/nybil/garage-prefill-bridge.tsx', 'utf8');
 const nybilPage = readFileSync('app/nybil/page.tsx', 'utf8');
 const nybilClient = readFileSync('lib/nybil-api-client.ts', 'utf8');
@@ -36,11 +37,16 @@ test('Lager 1 source is read-only provenance and is not an import step in Garage
   assert.match(garagePanel, /Lager 1 importeras inte här/);
 });
 
-test('Garage to Ny bil is allowed only for UTVECKLA IN with a real regnr', () => {
+test('Ny bil fetches an arrived UTVECKLA IN car from Garage instead of Garage pushing it', () => {
   assert.match(handoffApi, /garage_direction !== 'IN'/);
   assert.match(handoffApi, /Registreringsnummer krävs före överlämning till Ny bil/);
-  assert.match(garagePanel, /Till Ny bil/);
-  assert.match(garagePanel, /\/nybil\?garage_item_id=/);
+  assert.match(nybilPage, /GaragePicker/);
+  assert.match(nybilPicker, /Hämta bilen från Garaget/);
+  assert.match(nybilPicker, /\/api\/garage\/nybil-handoff/);
+  assert.match(nybilPicker, /\/nybil\?garage_item_id=/);
+  assert.match(nybilPicker, />Hämta</);
+  assert.doesNotMatch(garagePanel, /\/nybil\?garage_item_id=/);
+  assert.match(garagePanel, /Väntar på Ny bil/);
 });
 
 test('Ny bil carries the exact Garage source and database validates the handoff atomically', () => {
@@ -65,16 +71,18 @@ test('Ny bil prefill carries known planning facts but does not claim actual rece
   assert.match(nybilBridge, /t\.ex\. T-Cross/);
   assert.match(nybilBridge, /Planerad station/);
   assert.match(nybilBridge, /Faktisk mottagningsplats/);
+  assert.match(nybilBridge, /Hämtad från Garaget/);
+  assert.match(nybilBridge, /Garaget kvitteras först när Nybil-registreringen sparas/);
   assert.doesNotMatch(nybilBridge, /setOrt\(/);
   assert.doesNotMatch(nybilBridge, /setStation\(/);
   assert.doesNotMatch(nybilBridge, /Plats för mottagning av ny bil/);
 });
 
 test('Garage v2 does not invent ANKOMST or directly create Layer 1 truth', () => {
-  for (const source of [lager1Api, handoffApi, garagePanel, nybilBridge, nybilClient]) {
+  for (const source of [lager1Api, handoffApi, garagePanel, nybilPicker, nybilBridge, nybilClient]) {
     assert.doesNotMatch(source, /ANKOMMEN/);
     assert.doesNotMatch(source, /transition_vehicle_journey_state/);
   }
-  assert.match(garagePanel, /Överlämna fysisk bil/);
   assert.match(garagePanel, /Garage → Ny bil/);
+  assert.match(nybilPage, /Hämta från Garaget/);
 });
