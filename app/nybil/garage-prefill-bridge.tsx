@@ -104,7 +104,7 @@ export default function GarageNybilPrefillBridge() {
             {data?.vin ? <span> · <b>VIN:</b> {data.vin}</span> : null}
           </div>
           {(data?.supplier || data?.order_reference) ? <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>{data.supplier ? `Leverantör: ${data.supplier}` : ''}{data.supplier && data.order_reference ? ' · ' : ''}{data.order_reference ? `Order: ${data.order_reference}` : ''}</div> : null}
-          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, bilmärke, modell och planerad station förifylls i Nybils ordinarie fält och kan ändras där. Övrig Planering/Garage-information speglas i den redigerbara källbilden nedan. Garaget kvitteras först när Nybil-registreringen sparas.</div>
+          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, bilmärke, modell och planerad station förifylls i Nybils ordinarie fält och kan ändras där. Faktisk mottagningsplats och övriga kontrollpunkter verifieras fortfarande i Nybil och sätts inte av Garaget. Övrig Planering/Garage-information speglas i den redigerbara källbilden nedan. Garaget kvitteras först när Nybil-registreringen sparas.</div>
         </>
       )}
     </div>
