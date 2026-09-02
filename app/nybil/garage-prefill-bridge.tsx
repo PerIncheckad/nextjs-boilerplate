@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { loadGarageNybilHandoff } from '@/lib/garage-nybil-handoff-client';
+import { resolveBrandPrefill, resolvePlannedStationName } from '@/lib/nybil-garage-prefill';
 
 type GaragePrefill = {
   garage_item_id: string;
@@ -12,6 +14,7 @@ type GaragePrefill = {
   supplier: string | null;
   order_reference: string | null;
   source_kind: string;
+  brand: string | null;
 };
 
 function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
@@ -19,6 +22,18 @@ function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: st
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
   descriptor?.set?.call(element, value);
   element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
+}
+
+function findFieldSelect(labelText: string): HTMLSelectElement | null {
+  const labels = Array.from(document.querySelectorAll<HTMLLabelElement>('label'));
+  const field = labels.find((label) => label.textContent?.includes(labelText));
+  return field?.querySelector<HTMLSelectElement>('select') ?? null;
+}
+
+function findFieldInput(labelText: string): HTMLInputElement | null {
+  const labels = Array.from(document.querySelectorAll<HTMLLabelElement>('label'));
+  const field = labels.find((label) => label.textContent?.includes(labelText));
+  return field?.querySelector<HTMLInputElement>('input') ?? null;
 }
 
 function applyPrefill(data: GaragePrefill): boolean {
@@ -30,13 +45,30 @@ function applyPrefill(data: GaragePrefill): boolean {
   setNativeValue(regInputs[1], data.regnr);
   setNativeValue(modelInput, data.model || '');
 
+  if (data.brand) {
+    const brandSelect = findFieldSelect('Bilmärke');
+    if (!brandSelect) return false;
+    const resolution = resolveBrandPrefill(
+      data.brand,
+      Array.from(brandSelect.options).map((option) => ({ value: option.value, label: option.text })),
+    );
+    if (resolution.selectValue) setNativeValue(brandSelect, resolution.selectValue);
+    if (resolution.customValue) {
+      const customBrandInput = findFieldInput('Specificera bilmärke');
+      if (!customBrandInput) return false;
+      setNativeValue(customBrandInput, resolution.customValue);
+    }
+  }
+
   const cards = Array.from(document.querySelectorAll<HTMLElement>('.card'));
   const plannedStationCard = cards.find((card) => card.querySelector('.section-header h2')?.textContent?.trim() === 'Planerad station');
   const plannedStationSelect = plannedStationCard?.querySelector<HTMLSelectElement>('select');
-  if (plannedStationSelect && (data.station_display_name || data.planned_station)) {
-    const candidates = [data.station_display_name, data.planned_station].filter(Boolean) as string[];
-    const option = Array.from(plannedStationSelect.options).find((value) => candidates.includes(value.value) || candidates.includes(value.text));
-    if (option) setNativeValue(plannedStationSelect, option.value);
+  const plannedStationName = resolvePlannedStationName(data.planned_station, data.station_display_name);
+  if (plannedStationName) {
+    if (!plannedStationSelect) return false;
+    const option = Array.from(plannedStationSelect.options).find((candidate) => candidate.value === plannedStationName || candidate.text === plannedStationName);
+    if (!option) return false;
+    setNativeValue(plannedStationSelect, option.value);
   }
 
   return true;
@@ -51,20 +83,20 @@ export default function GarageNybilPrefillBridge() {
     if (!garageItemId) return;
 
     let cancelled = false;
-    void fetch(`/api/garage/nybil-handoff?garage_item_id=${encodeURIComponent(garageItemId)}`, { cache: 'no-store' })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garage-bilen');
+    void loadGarageNybilHandoff(garageItemId)
+      .then((payload) => {
         if (cancelled) return;
-        setData(payload.data);
+        const handoff = payload as GaragePrefill;
+        setData(handoff);
+        setError(null);
 
         let attempts = 0;
         const tryApply = () => {
           if (cancelled) return;
           attempts += 1;
-          if (applyPrefill(payload.data)) return;
+          if (applyPrefill(handoff)) return;
           if (attempts < 20) window.setTimeout(tryApply, 50);
-          else setError('Garage-data kunde läsas men formuläret kunde inte förifyllas.');
+          else setError('Garage-data kunde läsas men formuläret kunde inte förifyllas komplett.');
         };
         tryApply();
       })
@@ -84,11 +116,12 @@ export default function GarageNybilPrefillBridge() {
           <strong>Hämtad från Garaget · UTVECKLA / IN</strong>
           <div style={{ marginTop: 5, fontSize: 14 }}>
             <span><b>Reg.nr:</b> {data?.regnr}</span>
+            {data?.brand ? <span> · <b>Märke:</b> {data.brand}</span> : null}
             <span> · <b>Modell:</b> {data?.model}</span>
             {data?.vin ? <span> · <b>VIN:</b> {data.vin}</span> : null}
           </div>
           {(data?.supplier || data?.order_reference) ? <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>{data.supplier ? `Leverantör: ${data.supplier}` : ''}{data.supplier && data.order_reference ? ' · ' : ''}{data.order_reference ? `Order: ${data.order_reference}` : ''}</div> : null}
-          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, modell och planerad station förifylls. Faktisk mottagningsplats och övriga kontrollpunkter verifieras här i Ny bil. Garaget kvitteras först när Nybil-registreringen sparas.</div>
+          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, bilmärke, modell och planerad station förifylls i Nybils ordinarie fält och kan ändras där. Faktisk mottagningsplats och övriga kontrollpunkter verifieras fortfarande i Nybil och sätts inte av Garaget. Övrig Planering/Garage-information speglas i den redigerbara källbilden nedan. Garaget kvitteras först när Nybil-registreringen sparas.</div>
         </>
       )}
     </div>
