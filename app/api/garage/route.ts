@@ -20,6 +20,7 @@ function upper(value: unknown): string | null { const next = text(value); return
 function date(value: unknown): string | null { const next = text(value); return !next ? null : /^\d{4}-\d{2}-\d{2}$/.test(next) ? next : null; }
 function money(value: unknown): number | null { if (value === null || value === undefined || value === '') return null; const numeric = Number(value); return Number.isFinite(numeric) && numeric >= 0 ? numeric : null; }
 function holdingPeriod(value: unknown): number | null { if (value === null || value === undefined || value === '') return null; const numeric = Number(value); return Number.isInteger(numeric) && HOLDING_PERIODS.has(numeric) ? numeric : null; }
+function regKey(value: unknown): string | null { if (typeof value !== 'string') return null; const next = value.replace(/\s+/g, '').toUpperCase().trim(); return next || null; }
 
 async function loadStations(admin: ReturnType<typeof adminClient>) {
   const { data, error } = await admin.from('planning_stations').select('station_code,display_name,sort_order').eq('is_active', true).order('sort_order', { ascending: true }).order('station_code', { ascending: true });
@@ -30,6 +31,11 @@ async function loadModels(admin: ReturnType<typeof adminClient>) {
   const { data, error } = await admin.from('planning_vehicle_models').select('model_code,display_name,sort_order').eq('is_active', true).order('sort_order', { ascending: true }).order('display_name', { ascending: true });
   if (error) throw error;
   return data ?? [];
+}
+async function loadNybilRegKeys(admin: ReturnType<typeof adminClient>) {
+  const { data, error } = await admin.from('nybil_inventering').select('regnr').not('regnr', 'is', null);
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => regKey(row.regnr)).filter((value): value is string => Boolean(value)));
 }
 async function ensureModel(admin: ReturnType<typeof adminClient>, rawModel: unknown, userId: string) {
   const display = text(rawModel); const code = upper(rawModel); if (!display || !code) return null;
@@ -84,7 +90,21 @@ export async function GET(request: Request) {
   if (direction && DIRECTIONS.has(direction)) query = query.eq('garage_direction', direction);
   const { data, error } = await query;
   if (error) { console.error('[garage] GET failed', error); return NextResponse.json({ error: 'Kunde inte läsa Garaget' }, { status: 500 }); }
-  return NextResponse.json({ data: data ?? [], stations: stationRows, models: modelRows });
+
+  const rows = data ?? [];
+  let nybilRegKeys = new Set<string>();
+  if (rows.some((row) => row.garage_direction === 'IN' && Boolean(regKey(row.regnr)))) {
+    try { nybilRegKeys = await loadNybilRegKeys(admin); }
+    catch (lookupError) { console.error('[garage] Ny bil overlap lookup failed', lookupError); return NextResponse.json({ error: 'Kunde inte avgränsa historisk Ny bil-data från aktivt Garage' }, { status: 500 }); }
+  }
+
+  const activeRows = rows.filter((row) => {
+    if (row.garage_direction !== 'IN') return true;
+    const key = regKey(row.regnr);
+    return !key || !nybilRegKeys.has(key);
+  });
+
+  return NextResponse.json({ data: activeRows, stations: stationRows, models: modelRows });
 }
 
 export async function POST(request: Request) {
@@ -136,7 +156,7 @@ export async function PATCH(request: Request) {
     const nextDirection = upper(body.garage_direction);
     if (!nextDirection || !DIRECTIONS.has(nextDirection)) return NextResponse.json({ error: 'Välj IN eller UT' }, { status: 400 });
     const { data, error } = await admin.rpc('change_garage_direction', { p_garage_item_id: id, p_to_direction: nextDirection, p_reason: text(body.direction_change_reason), p_actor: verification.user.id });
-    if (error) { console.error('[garage] direction RPC failed', error); return NextResponse.json({ error: 'Kunde inte ändra riktning' }, { status: 500 }); }
+    if (error) { console.error('[garage] direction RPC failed', error); return NextResponse.json({ error: 'Kunde inte ändra riktning' }, { status: 500 });
     return NextResponse.json({ data });
   }
 
