@@ -62,14 +62,12 @@ function nullableNumber(value: string) {
 }
 
 export default function GarageUpstreamContext() {
-  const [garageItemId, setGarageItemId] = useState<string | null>(null);
   const [source, setSource] = useState<HandoffData | null>(null);
   const [value, setValue] = useState<UpstreamContext>(empty);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('garage_item_id')?.trim() || null;
-    setGarageItemId(id);
     if (!id) return;
 
     let cancelled = false;
@@ -108,9 +106,9 @@ export default function GarageUpstreamContext() {
   }, []);
 
   useEffect(() => {
-    if (!garageItemId || !source) return;
-    sessionStorage.setItem(storageKey(garageItemId), JSON.stringify(value));
-  }, [garageItemId, source, value]);
+    if (!source) return;
+    sessionStorage.setItem(storageKey(source.garage_item_id), JSON.stringify(value));
+  }, [source, value]);
 
   const changedCount = useMemo(() => {
     if (!source) return 0;
@@ -134,9 +132,8 @@ export default function GarageUpstreamContext() {
     return (Object.keys(value) as Array<keyof UpstreamContext>).filter((key) => value[key] !== sourceValue[key]).length;
   }, [source, value]);
 
-  if (!garageItemId) return null;
   if (error) return <section style={boxStyle}><strong>Garage-information kunde inte speglas:</strong> {error}</section>;
-  if (!source) return <section style={boxStyle}>Läser information från Planering / Garaget…</section>;
+  if (!source) return null;
 
   const set = <K extends keyof UpstreamContext>(key: K, next: UpstreamContext[K]) => setValue((current) => ({ ...current, [key]: next }));
 
