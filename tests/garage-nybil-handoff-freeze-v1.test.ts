@@ -12,7 +12,7 @@ test('active Garage excludes exactly Nybil-handed-off objects', () => {
 });
 
 test('Garage PATCH refuses an acknowledged Nybil handoff', () => {
-  assert.match(garageApi, /select\('garage_item_id,handed_off_nybil_id'\)/);
+  assert.match(garageApi, /select\('garage_item_id,handed_off_nybil_id,completed_at'\)/);
   assert.match(garageApi, /Garage-objektet är mottaget i Ny bil och är fryst/);
   assert.match(garageApi, /status: 409/);
 });
