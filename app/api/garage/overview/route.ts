@@ -56,13 +56,16 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [garageRes, wheelRes, downtimeRes] = await Promise.all([
+    const [garageRes, nybilRes, wheelRes, downtimeRes] = await Promise.all([
       admin.from('garage_items')
         .select('regnr,model,planned_station,garage_direction,updated_at')
         .is('voided_at', null)
         .is('handed_off_nybil_id', null)
         .not('regnr', 'is', null)
         .order('updated_at', { ascending: false }),
+      admin.from('nybil_inventering')
+        .select('regnr')
+        .not('regnr', 'is', null),
       admin.from('garage_wheel_changes')
         .select('regnr,status,updated_at')
         .neq('status', 'KLAR')
@@ -75,14 +78,22 @@ export async function GET(request: Request) {
     ]);
 
     if (garageRes.error) throw garageRes.error;
+    if (nybilRes.error) throw nybilRes.error;
     if (wheelRes.error) throw wheelRes.error;
     if (downtimeRes.error) throw downtimeRes.error;
+
+    const existingNybilRegnrs = new Set(
+      (nybilRes.data ?? [])
+        .map((row) => normalizeRegnr(row.regnr))
+        .filter((value): value is string => Boolean(value)),
+    );
 
     const vehicles = new Map<string, OverviewVehicle>();
 
     for (const item of garageRes.data ?? []) {
       const regnr = normalizeRegnr(item.regnr);
       if (!regnr) continue;
+      if (item.garage_direction === 'IN' && existingNybilRegnrs.has(regnr)) continue;
       const vehicle = ensureVehicle(vehicles, regnr);
       if (!vehicle.model && item.model) vehicle.model = String(item.model);
       if (!vehicle.station && item.planned_station) vehicle.station = String(item.planned_station);
