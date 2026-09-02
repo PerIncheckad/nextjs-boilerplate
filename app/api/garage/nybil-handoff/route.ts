@@ -105,7 +105,7 @@ export async function GET(request: Request) {
 
   const { data: item, error } = await admin
     .from('garage_items')
-    .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,created_at')
+    .select('garage_item_id,planning_period,model,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
     .eq('garage_item_id', garageItemId)
     .is('voided_at', null)
     .maybeSingle();
@@ -153,14 +153,52 @@ export async function GET(request: Request) {
       .select('display_name')
       .eq('station_code', item.planned_station)
       .maybeSingle();
-    if (stationError) console.error('[garage/nybil-handoff] station lookup failed', stationError);
+    if (stationError) {
+      console.error('[garage/nybil-handoff] station lookup failed', stationError);
+      return NextResponse.json({ error: 'Kunde inte läsa planerad station för Garage-objektet' }, { status: 500 });
+    }
     stationDisplayName = station?.display_name ?? null;
+  }
+
+  let modelCode: string | null = null;
+  let brand: string | null = null;
+  let isElectric: boolean | null = null;
+  let isAutomatic: boolean | null = null;
+  if (item.source_planning_cell_id) {
+    const { data: cell, error: cellError } = await admin
+      .from('fleet_planning_cells')
+      .select('model_code')
+      .eq('planning_cell_id', item.source_planning_cell_id)
+      .maybeSingle();
+    if (cellError) {
+      console.error('[garage/nybil-handoff] planning cell lookup failed', cellError);
+      return NextResponse.json({ error: 'Kunde inte läsa Planering-källan för Garage-objektet' }, { status: 500 });
+    }
+    if (cell?.model_code) {
+      modelCode = cell.model_code;
+      const { data: model, error: modelError } = await admin
+        .from('planning_vehicle_models')
+        .select('brand,is_electric,is_automatic')
+        .eq('model_code', cell.model_code)
+        .maybeSingle();
+      if (modelError) {
+        console.error('[garage/nybil-handoff] planning model lookup failed', modelError);
+        return NextResponse.json({ error: 'Kunde inte läsa modellinformationen från Planering' }, { status: 500 });
+      }
+      brand = model?.brand ?? null;
+      isElectric = typeof model?.is_electric === 'boolean' ? model.is_electric : null;
+      isAutomatic = typeof model?.is_automatic === 'boolean' ? model.is_automatic : null;
+    }
   }
 
   return NextResponse.json({
     data: {
       ...item,
       station_display_name: stationDisplayName,
+      model_code: modelCode,
+      brand,
+      is_electric: isElectric,
+      is_automatic: isAutomatic,
     },
   });
 }
