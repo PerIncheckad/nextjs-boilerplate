@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { loadGarageNybilHandoff } from '@/lib/garage-nybil-handoff-client';
 import { resolveBrandPrefill, resolvePlannedStationName } from '@/lib/nybil-garage-prefill';
 
 type GaragePrefill = {
@@ -82,19 +83,18 @@ export default function GarageNybilPrefillBridge() {
     if (!garageItemId) return;
 
     let cancelled = false;
-    void fetch(`/api/garage/nybil-handoff?garage_item_id=${encodeURIComponent(garageItemId)}`, { cache: 'no-store' })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garage-bilen');
+    void loadGarageNybilHandoff(garageItemId)
+      .then((payload) => {
         if (cancelled) return;
-        setData(payload.data);
+        const handoff = payload as GaragePrefill;
+        setData(handoff);
         setError(null);
 
         let attempts = 0;
         const tryApply = () => {
           if (cancelled) return;
           attempts += 1;
-          if (applyPrefill(payload.data)) return;
+          if (applyPrefill(handoff)) return;
           if (attempts < 20) window.setTimeout(tryApply, 50);
           else setError('Garage-data kunde läsas men formuläret kunde inte förifyllas komplett.');
         };

@@ -4,6 +4,7 @@ import test from 'node:test';
 import { resolveBrandPrefill, resolvePlannedStationName } from '../lib/nybil-garage-prefill';
 
 const handoffApi = readFileSync('app/api/garage/nybil-handoff/route.ts', 'utf8');
+const handoffClient = readFileSync('lib/garage-nybil-handoff-client.ts', 'utf8');
 const upstreamUi = readFileSync('app/nybil/garage-upstream-context.tsx', 'utf8');
 const prefillBridge = readFileSync('app/nybil/garage-prefill-bridge.tsx', 'utf8');
 const nybilClient = readFileSync('lib/nybil-api-client.ts', 'utf8');
@@ -63,6 +64,16 @@ test('unknown planning brand falls back to Nybil Annat plus exact source text', 
   ];
   assert.deepEqual(resolveBrandPrefill('MB', options), { selectValue: 'MB', customValue: null });
   assert.deepEqual(resolveBrandPrefill('NISSAN', options), { selectValue: 'Annat', customValue: 'NISSAN' });
+});
+
+test('prefill and editable upstream context share one exact Garage snapshot', () => {
+  assert.match(handoffClient, /handoffRequests = new Map/);
+  assert.match(handoffClient, /const existing = handoffRequests\.get\(garageItemId\)/);
+  assert.match(handoffClient, /handoffRequests\.set\(garageItemId, request\)/);
+  assert.match(prefillBridge, /loadGarageNybilHandoff\(garageItemId\)/);
+  assert.match(upstreamUi, /loadGarageNybilHandoff\(id\)/);
+  assert.doesNotMatch(prefillBridge, /fetch\(`\/api\/garage\/nybil-handoff/);
+  assert.doesNotMatch(upstreamUi, /fetch\(`\/api\/garage\/nybil-handoff/);
 });
 
 test('Garage-origin Nybil save fails closed if the carried context or version is missing', () => {

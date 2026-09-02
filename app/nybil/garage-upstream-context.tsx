@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { loadGarageNybilHandoff } from '@/lib/garage-nybil-handoff-client';
 
 type UpstreamContext = {
   planning_period: string | null;
@@ -82,12 +83,10 @@ export default function GarageUpstreamContext() {
     if (!id) return;
 
     let cancelled = false;
-    void fetch(`/api/garage/nybil-handoff?garage_item_id=${encodeURIComponent(id)}`, { cache: 'no-store' })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garage-informationen');
+    void loadGarageNybilHandoff(id)
+      .then((payload) => {
         if (cancelled) return;
-        const data = payload.data as HandoffData;
+        const data = payload as HandoffData;
         if (!data.updated_at) throw new Error('Garage-källan saknar versionsstämpel och kan inte användas för Ny bil');
         const next: UpstreamContext = {
           planning_period: data.planning_period ?? null,
