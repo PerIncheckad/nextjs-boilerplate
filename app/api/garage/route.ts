@@ -156,7 +156,7 @@ export async function PATCH(request: Request) {
     const nextDirection = upper(body.garage_direction);
     if (!nextDirection || !DIRECTIONS.has(nextDirection)) return NextResponse.json({ error: 'Välj IN eller UT' }, { status: 400 });
     const { data, error } = await admin.rpc('change_garage_direction', { p_garage_item_id: id, p_to_direction: nextDirection, p_reason: text(body.direction_change_reason), p_actor: verification.user.id });
-    if (error) { console.error('[garage] direction RPC failed', error); return NextResponse.json({ error: 'Kunde inte ändra riktning' }, { status: 500 });
+    if (error) { console.error('[garage] direction RPC failed', error); return NextResponse.json({ error: 'Kunde inte ändra riktning' }, { status: 500 }); }
     return NextResponse.json({ data });
   }
 
