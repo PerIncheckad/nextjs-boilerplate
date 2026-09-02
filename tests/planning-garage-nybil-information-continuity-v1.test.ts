@@ -47,6 +47,12 @@ test('ordinary Nybil fields remain editable and override carried defaults on sav
   assert.match(nybilClient, /\.\.\.garageContext\.values,[\s\S]*\.\.\.inventoryData,[\s\S]*source_garage_item_id/);
 });
 
+test('prefill resolves controls from the Nybil Field container, not as label children', () => {
+  assert.match(prefillBridge, /label\?\.closest\('\.field'\) \?\? label\?\.parentElement/);
+  assert.match(prefillBridge, /findFieldContainer\(labelText\)\?\.querySelector<HTMLSelectElement>\('select'\)/);
+  assert.match(prefillBridge, /findFieldContainer\(labelText\)\?\.querySelector<HTMLInputElement>\('input'\)/);
+});
+
 test('planned Garage station code maps to Nybil main-station name', () => {
   assert.equal(resolvePlannedStationName('166', '166'), 'Malmö');
   assert.equal(resolvePlannedStationName('170', '170'), 'Helsingborg');

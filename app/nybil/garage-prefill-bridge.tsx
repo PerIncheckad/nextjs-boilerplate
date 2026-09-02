@@ -24,16 +24,18 @@ function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: st
   element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
 }
 
-function findFieldSelect(labelText: string): HTMLSelectElement | null {
+function findFieldContainer(labelText: string): Element | null {
   const labels = Array.from(document.querySelectorAll<HTMLLabelElement>('label'));
-  const field = labels.find((label) => label.textContent?.includes(labelText));
-  return field?.querySelector<HTMLSelectElement>('select') ?? null;
+  const label = labels.find((candidate) => candidate.textContent?.includes(labelText));
+  return label?.closest('.field') ?? label?.parentElement ?? null;
+}
+
+function findFieldSelect(labelText: string): HTMLSelectElement | null {
+  return findFieldContainer(labelText)?.querySelector<HTMLSelectElement>('select') ?? null;
 }
 
 function findFieldInput(labelText: string): HTMLInputElement | null {
-  const labels = Array.from(document.querySelectorAll<HTMLLabelElement>('label'));
-  const field = labels.find((label) => label.textContent?.includes(labelText));
-  return field?.querySelector<HTMLInputElement>('input') ?? null;
+  return findFieldContainer(labelText)?.querySelector<HTMLInputElement>('input') ?? null;
 }
 
 function applyPrefill(data: GaragePrefill): boolean {
