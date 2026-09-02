@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
 import GarageNybilPrefillBridge from './garage-prefill-bridge';
+import GarageUpstreamContext from './garage-upstream-context';
 import GaragePicker from './garage-picker';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './nybil-shell.module.css';
@@ -53,6 +54,8 @@ export default function NybilPage() {
           </ol>
         </div>
       </section>
+
+      <GarageUpstreamContext />
 
       <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <FormClient />
