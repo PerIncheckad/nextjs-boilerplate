@@ -184,7 +184,7 @@ export default function GarageAvvecklaPanel() {
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE / AVVECKLA / ARBETSPROCESS</div>
         <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>AVVECKLA-punkter</h2>
-        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>AVVECKLA startas manuellt med orsak. Alla öppna punkter måste avslutas innan en verifierad verklig UT-händelse får avsluta bilen.</p>
+        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>AVVECKLA startas manuellt med orsak. Alla öppna punkter måste avslutas innan en senare verifierad UT-händelse får genomföras.</p>
       </div>
 
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
