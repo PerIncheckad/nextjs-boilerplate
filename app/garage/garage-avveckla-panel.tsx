@@ -67,11 +67,11 @@ export default function GarageAvvecklaPanel() {
   }, []);
 
   const loadDetail = useCallback(async (garageItemId: string) => {
-    if (!garageItemId) return setDetail({ case: null, points: [] });
-    setError(null);
+    if (!garageItemId) return;
     const response = await fetch(`/api/garage/avveckla?garage_item_id=${encodeURIComponent(garageItemId)}`, { cache: 'no-store' });
     const body = await response.json() as { data?: Detail; error?: string };
     if (!response.ok) return setError(body.error ?? 'Kunde inte läsa AVVECKLA-ärendet');
+    setError(null);
     setDetail(body.data ?? { case: null, points: [] });
   }, []);
 
@@ -126,7 +126,7 @@ export default function GarageAvvecklaPanel() {
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end', marginBottom: 12 }}>
-        <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>AVVECKLA-bil</span><select style={input} value={selectedId} onChange={(event) => setSelectedId(event.target.value)}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
+        <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>AVVECKLA-bil</span><select style={input} value={selectedId} onChange={(event) => { const nextId = event.target.value; setSelectedId(nextId); if (!nextId) setDetail({ case: null, points: [] }); }}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
       </div>
 
       {!selected ? <div style={{ color: '#666', fontSize: 14 }}>Ingen AVVECKLA / UT-bil vald.</div> : !detail.case ? (
