@@ -19,6 +19,8 @@ test('Garage overview keeps one vehicle identity with multiple simultaneous oper
 test('Garage overview reads only existing operational truth sources and excludes closed or voided work', () => {
   assert.match(api, /from\('garage_items'\)/);
   assert.match(api, /is\('voided_at', null\)/);
+  assert.match(api, /is\('handed_off_nybil_id', null\)/);
+  assert.match(api, /from\('nybil_inventering'\)/);
   assert.match(api, /from\('garage_wheel_changes'\)/);
   assert.match(api, /neq\('status', 'KLAR'\)/);
   assert.match(api, /from\('vehicle_journey_periods'\)/);
@@ -27,6 +29,13 @@ test('Garage overview reads only existing operational truth sources and excludes
   assert.doesNotMatch(api, /insert\(/);
   assert.doesNotMatch(api, /update\(/);
   assert.doesNotMatch(api, /delete\(/);
+});
+
+test('historical Nybil overlap is not counted as active UTVECKLA work', () => {
+  assert.match(api, /existingNybilRegnrs/);
+  assert.match(api, /item\.garage_direction === 'IN' && existingNybilRegnrs\.has\(regnr\)/);
+  assert.match(api, /continue;/);
+  assert.doesNotMatch(api, /handed_off_nybil_id\s*=/);
 });
 
 test('Garage overview exposes filter views over the same vehicle reality', () => {
