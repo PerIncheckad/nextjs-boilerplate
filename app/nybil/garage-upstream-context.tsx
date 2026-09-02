@@ -25,7 +25,13 @@ type HandoffData = UpstreamContext & {
   regnr: string;
   model: string;
   planned_station: string | null;
+  updated_at: string | null;
   note?: string | null;
+};
+
+type StoredGarageContext = {
+  source_garage_updated_at: string;
+  values: UpstreamContext;
 };
 
 const empty: UpstreamContext = {
@@ -61,6 +67,11 @@ function nullableNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function storeContext(garageItemId: string, sourceUpdatedAt: string, values: UpstreamContext) {
+  const stored: StoredGarageContext = { source_garage_updated_at: sourceUpdatedAt, values };
+  sessionStorage.setItem(storageKey(garageItemId), JSON.stringify(stored));
+}
+
 export default function GarageUpstreamContext() {
   const [source, setSource] = useState<HandoffData | null>(null);
   const [value, setValue] = useState<UpstreamContext>(empty);
@@ -77,6 +88,7 @@ export default function GarageUpstreamContext() {
         if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garage-informationen');
         if (cancelled) return;
         const data = payload.data as HandoffData;
+        if (!data.updated_at) throw new Error('Garage-källan saknar versionsstämpel och kan inte användas för Ny bil');
         const next: UpstreamContext = {
           planning_period: data.planning_period ?? null,
           planning_reason: data.planning_reason ?? null,
@@ -96,7 +108,8 @@ export default function GarageUpstreamContext() {
         };
         setSource(data);
         setValue(next);
-        sessionStorage.setItem(storageKey(id), JSON.stringify(next));
+        setError(null);
+        storeContext(id, data.updated_at, next);
       })
       .catch((loadError: unknown) => {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garage-informationen');
@@ -106,8 +119,8 @@ export default function GarageUpstreamContext() {
   }, []);
 
   useEffect(() => {
-    if (!source) return;
-    sessionStorage.setItem(storageKey(source.garage_item_id), JSON.stringify(value));
+    if (!source?.updated_at) return;
+    storeContext(source.garage_item_id, source.updated_at, value);
   }, [source, value]);
 
   const changedCount = useMemo(() => {

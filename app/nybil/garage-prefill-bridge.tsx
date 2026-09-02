@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { resolveBrandPrefill, resolvePlannedStationName } from '@/lib/nybil-garage-prefill';
 
 type GaragePrefill = {
   garage_item_id: string;
@@ -28,6 +29,12 @@ function findFieldSelect(labelText: string): HTMLSelectElement | null {
   return field?.querySelector<HTMLSelectElement>('select') ?? null;
 }
 
+function findFieldInput(labelText: string): HTMLInputElement | null {
+  const labels = Array.from(document.querySelectorAll<HTMLLabelElement>('label'));
+  const field = labels.find((label) => label.textContent?.includes(labelText));
+  return field?.querySelector<HTMLInputElement>('input') ?? null;
+}
+
 function applyPrefill(data: GaragePrefill): boolean {
   const regInputs = Array.from(document.querySelectorAll<HTMLInputElement>('input.reg-input'));
   const modelInput = document.querySelector<HTMLInputElement>('input[placeholder="t.ex. T-Cross"]');
@@ -39,19 +46,28 @@ function applyPrefill(data: GaragePrefill): boolean {
 
   if (data.brand) {
     const brandSelect = findFieldSelect('Bilmärke');
-    const brandOption = brandSelect
-      ? Array.from(brandSelect.options).find((option) => option.value.toLocaleLowerCase('sv-SE') === data.brand!.toLocaleLowerCase('sv-SE') || option.text.toLocaleLowerCase('sv-SE') === data.brand!.toLocaleLowerCase('sv-SE'))
-      : null;
-    if (brandSelect && brandOption) setNativeValue(brandSelect, brandOption.value);
+    if (!brandSelect) return false;
+    const resolution = resolveBrandPrefill(
+      data.brand,
+      Array.from(brandSelect.options).map((option) => ({ value: option.value, label: option.text })),
+    );
+    if (resolution.selectValue) setNativeValue(brandSelect, resolution.selectValue);
+    if (resolution.customValue) {
+      const customBrandInput = findFieldInput('Specificera bilmärke');
+      if (!customBrandInput) return false;
+      setNativeValue(customBrandInput, resolution.customValue);
+    }
   }
 
   const cards = Array.from(document.querySelectorAll<HTMLElement>('.card'));
   const plannedStationCard = cards.find((card) => card.querySelector('.section-header h2')?.textContent?.trim() === 'Planerad station');
   const plannedStationSelect = plannedStationCard?.querySelector<HTMLSelectElement>('select');
-  if (plannedStationSelect && (data.station_display_name || data.planned_station)) {
-    const candidates = [data.station_display_name, data.planned_station].filter(Boolean) as string[];
-    const option = Array.from(plannedStationSelect.options).find((value) => candidates.includes(value.value) || candidates.includes(value.text));
-    if (option) setNativeValue(plannedStationSelect, option.value);
+  const plannedStationName = resolvePlannedStationName(data.planned_station, data.station_display_name);
+  if (plannedStationName) {
+    if (!plannedStationSelect) return false;
+    const option = Array.from(plannedStationSelect.options).find((candidate) => candidate.value === plannedStationName || candidate.text === plannedStationName);
+    if (!option) return false;
+    setNativeValue(plannedStationSelect, option.value);
   }
 
   return true;
@@ -72,6 +88,7 @@ export default function GarageNybilPrefillBridge() {
         if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garage-bilen');
         if (cancelled) return;
         setData(payload.data);
+        setError(null);
 
         let attempts = 0;
         const tryApply = () => {
@@ -79,7 +96,7 @@ export default function GarageNybilPrefillBridge() {
           attempts += 1;
           if (applyPrefill(payload.data)) return;
           if (attempts < 20) window.setTimeout(tryApply, 50);
-          else setError('Garage-data kunde läsas men formuläret kunde inte förifyllas.');
+          else setError('Garage-data kunde läsas men formuläret kunde inte förifyllas komplett.');
         };
         tryApply();
       })

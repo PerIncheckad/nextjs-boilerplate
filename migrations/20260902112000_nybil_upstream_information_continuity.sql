@@ -21,7 +21,8 @@ alter table public.nybil_inventering
   add column if not exists confirmation_status text,
   add column if not exists transport_status text,
   add column if not exists planned_delivery_date date,
-  add column if not exists planning_note text;
+  add column if not exists planning_note text,
+  add column if not exists source_garage_updated_at timestamptz;
 
 alter table public.nybil_inventering
   drop constraint if exists nybil_inventering_planning_period_check,
@@ -45,6 +46,54 @@ alter table public.nybil_inventering
   add constraint nybil_inventering_transport_status_check
     check (transport_status is null or transport_status in ('EJ_BOKAD','TRANSPORTBOKAD','PA_VAG','ANKOMMEN'));
 
+create or replace function public.guard_nybil_garage_source_version()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+declare
+  v_updated_at timestamptz;
+  v_handed_off_nybil_id uuid;
+begin
+  if new.source_garage_item_id is null then
+    return new;
+  end if;
+
+  if new.source_garage_updated_at is null then
+    raise exception 'Garage-källans versionsstämpel saknas';
+  end if;
+
+  select updated_at, handed_off_nybil_id
+    into v_updated_at, v_handed_off_nybil_id
+    from public.garage_items
+   where garage_item_id = new.source_garage_item_id
+   for update;
+
+  if not found then
+    raise exception 'Garage item % does not exist', new.source_garage_item_id;
+  end if;
+
+  if v_handed_off_nybil_id is not null then
+    raise exception 'Garage item % is already handed off to Nybil %', new.source_garage_item_id, v_handed_off_nybil_id;
+  end if;
+
+  if v_updated_at is distinct from new.source_garage_updated_at then
+    raise exception 'Garage-källan har ändrats sedan Ny bil hämtade informationen';
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke all on function public.guard_nybil_garage_source_version() from public, anon, authenticated;
+
+drop trigger if exists nybil_garage_source_version_guard on public.nybil_inventering;
+create trigger nybil_garage_source_version_guard
+before insert on public.nybil_inventering
+for each row
+when (new.source_garage_item_id is not null)
+execute function public.guard_nybil_garage_source_version();
+
 comment on column public.nybil_inventering.planning_period is 'Current planning period carried from Garage at Nybil receipt; Garage source remains linked separately.';
 comment on column public.nybil_inventering.supplier is 'Current supplier value at Nybil receipt; may differ from frozen Garage source after operator correction.';
 comment on column public.nybil_inventering.order_reference is 'Current order reference at Nybil receipt; may differ from frozen Garage source after operator correction.';
@@ -52,5 +101,6 @@ comment on column public.nybil_inventering.vin is 'Current VIN value at Nybil re
 comment on column public.nybil_inventering.daily_rate is 'Current daily rate at Nybil receipt; upstream Garage source remains linked for provenance.';
 comment on column public.nybil_inventering.holding_period_months is 'Current holding period at Nybil receipt; upstream Garage source remains linked for provenance.';
 comment on column public.nybil_inventering.planning_note is 'Current carried planning/Garage note at Nybil receipt.';
+comment on column public.nybil_inventering.source_garage_updated_at is 'Garage updated_at observed when Nybil fetched the exact source row; inserts fail if Garage changed before save.';
 
 commit;

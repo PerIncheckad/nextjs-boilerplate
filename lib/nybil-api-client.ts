@@ -22,6 +22,11 @@ type ApiEnvelope<T> = {
   error?: string;
 };
 
+type StoredGarageContext = {
+  source_garage_updated_at: string;
+  values: Record<string, unknown>;
+};
+
 async function readJson<T>(response: Response, fallbackError: string): Promise<T> {
   const payload = await response.json() as ApiEnvelope<T>;
   if (!response.ok || payload.data === undefined) {
@@ -42,15 +47,19 @@ export async function countNybilDuplicatesForDate(regnr: string, registrationDat
   return typeof data.sameDayCount === 'number' ? data.sameDayCount : 0;
 }
 
-function loadGarageUpstreamContext(garageItemId: string): Record<string, unknown> | null {
+function loadGarageUpstreamContext(garageItemId: string): StoredGarageContext | null {
   if (typeof window === 'undefined') return null;
   try {
     const raw = window.sessionStorage.getItem(`nybil-upstream:${garageItemId}`);
     if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
+    const parsed = JSON.parse(raw) as Partial<StoredGarageContext>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    if (typeof parsed.source_garage_updated_at !== 'string' || !parsed.source_garage_updated_at.trim()) return null;
+    if (!parsed.values || typeof parsed.values !== 'object' || Array.isArray(parsed.values)) return null;
+    return {
+      source_garage_updated_at: parsed.source_garage_updated_at,
+      values: parsed.values as Record<string, unknown>,
+    };
   } catch {
     return null;
   }
@@ -62,13 +71,14 @@ export async function createNybilRegistration(inventoryData: Record<string, unkn
     : null;
   const garageContext = garageItemId ? loadGarageUpstreamContext(garageItemId) : null;
   if (garageItemId && !garageContext) {
-    throw new Error('Garage-informationen kunde inte läsas. Ladda om Ny bil och hämta bilen från Garaget igen.');
+    throw new Error('Garage-informationen kunde inte läsas eller saknar versionsstämpel. Ladda om Ny bil och hämta bilen från Garaget igen.');
   }
-  const payloadInventory = garageItemId
+  const payloadInventory = garageItemId && garageContext
     ? {
-        ...garageContext,
+        ...garageContext.values,
         ...inventoryData,
         source_garage_item_id: garageItemId,
+        source_garage_updated_at: garageContext.source_garage_updated_at,
       }
     : inventoryData;
 
