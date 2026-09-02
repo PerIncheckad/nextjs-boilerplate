@@ -42,17 +42,17 @@ export async function countNybilDuplicatesForDate(regnr: string, registrationDat
   return typeof data.sameDayCount === 'number' ? data.sameDayCount : 0;
 }
 
-function loadGarageUpstreamContext(garageItemId: string): Record<string, unknown> {
-  if (typeof window === 'undefined') return {};
+function loadGarageUpstreamContext(garageItemId: string): Record<string, unknown> | null {
+  if (typeof window === 'undefined') return null;
   try {
     const raw = window.sessionStorage.getItem(`nybil-upstream:${garageItemId}`);
-    if (!raw) return {};
+    if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
       ? parsed as Record<string, unknown>
-      : {};
+      : null;
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -60,9 +60,13 @@ export async function createNybilRegistration(inventoryData: Record<string, unkn
   const garageItemId = typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('garage_item_id')?.trim() || null
     : null;
+  const garageContext = garageItemId ? loadGarageUpstreamContext(garageItemId) : null;
+  if (garageItemId && !garageContext) {
+    throw new Error('Garage-informationen kunde inte läsas. Ladda om Ny bil och hämta bilen från Garaget igen.');
+  }
   const payloadInventory = garageItemId
     ? {
-        ...loadGarageUpstreamContext(garageItemId),
+        ...garageContext,
         ...inventoryData,
         source_garage_item_id: garageItemId,
       }
