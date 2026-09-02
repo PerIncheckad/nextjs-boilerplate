@@ -25,6 +25,7 @@ type HandoffData = UpstreamContext & {
   regnr: string;
   model: string;
   planned_station: string | null;
+  note?: string | null;
 };
 
 const empty: UpstreamContext = {
