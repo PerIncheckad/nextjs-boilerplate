@@ -53,8 +53,8 @@ test('successful UT freezes exact Garage episode and removes it from active Gara
   assert.match(garageApi, /Garage-objektet är verifierat UT och är fryst/);
 });
 
-test('server API maps each explicit method to its own terminal RPC', () => {
-  assert.match(completeApi, /EGEN_LEVERANS:\s*'verify_garage_avveckla_egen_leverans'/);
+test('server API preserves all three terminal routes while own delivery is extended by Step D', () => {
+  assert.match(completeApi, /verify_garage_avveckla_egen_leverans_with_billing/);
   assert.match(completeApi, /EXTERN_TRANSPORT:\s*'verify_garage_avveckla_extern_transport'/);
   assert.match(completeApi, /AVSTALLNING:\s*'verify_garage_avveckla_avstallning'/);
   assert.match(completeApi, /verifyApiUser/);
@@ -71,8 +71,7 @@ test('Garage UI only enables terminal verification when the A gate is visibly re
   assert.match(panel, /AVSTALLNING/);
 });
 
-test('Step B does not implement step C timers or step D billing', () => {
+test('Step B migration remains free of later Step C timer and Step D billing concerns', () => {
   assert.doesNotMatch(migration, /booked_at|5 dygn|five.day|checkpoint_action_timer_rules/i);
   assert.doesNotMatch(migration, /FAKTURERBAR_KÖRNING|billing_status|price_list|fakturaunderlag/i);
-  assert.doesNotMatch(completeApi, /billing|faktur|price_list/i);
 });
