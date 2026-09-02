@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type GarageItem = {
   garage_item_id: string;
@@ -62,20 +62,33 @@ export default function GarageAvvecklaPanel() {
         setItems(next);
         setSelectedId((current) => current || next[0]?.garage_item_id || '');
       })
-      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa AVVECKLA-bilar'); });
+      .catch((reasonValue: unknown) => { if (active) setError(reasonValue instanceof Error ? reasonValue.message : 'Kunde inte läsa AVVECKLA-bilar'); });
     return () => { active = false; };
   }, []);
 
-  const loadDetail = useCallback(async (garageItemId: string) => {
+  useEffect(() => {
+    if (!selectedId) return;
+    let active = true;
+    void fetch(`/api/garage/avveckla?garage_item_id=${encodeURIComponent(selectedId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const body = await response.json() as { data?: Detail; error?: string };
+        if (!response.ok) throw new Error(body.error ?? 'Kunde inte läsa AVVECKLA-ärendet');
+        if (!active) return;
+        setError(null);
+        setDetail(body.data ?? { case: null, points: [] });
+      })
+      .catch((reasonValue: unknown) => { if (active) setError(reasonValue instanceof Error ? reasonValue.message : 'Kunde inte läsa AVVECKLA-ärendet'); });
+    return () => { active = false; };
+  }, [selectedId]);
+
+  const loadDetail = async (garageItemId: string) => {
     if (!garageItemId) return;
     const response = await fetch(`/api/garage/avveckla?garage_item_id=${encodeURIComponent(garageItemId)}`, { cache: 'no-store' });
     const body = await response.json() as { data?: Detail; error?: string };
     if (!response.ok) return setError(body.error ?? 'Kunde inte läsa AVVECKLA-ärendet');
     setError(null);
     setDetail(body.data ?? { case: null, points: [] });
-  }, []);
-
-  useEffect(() => { void loadDetail(selectedId); }, [loadDetail, selectedId]);
+  };
 
   const selected = useMemo(() => items.find((item) => item.garage_item_id === selectedId) ?? null, [items, selectedId]);
   const openCount = detail.points.filter((point) => point.status === 'OPEN').length;
