@@ -42,12 +42,30 @@ export async function countNybilDuplicatesForDate(regnr: string, registrationDat
   return typeof data.sameDayCount === 'number' ? data.sameDayCount : 0;
 }
 
+function loadGarageUpstreamContext(garageItemId: string): Record<string, unknown> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.sessionStorage.getItem(`nybil-upstream:${garageItemId}`);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 export async function createNybilRegistration(inventoryData: Record<string, unknown>): Promise<string | number | null> {
   const garageItemId = typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('garage_item_id')?.trim() || null
     : null;
   const payloadInventory = garageItemId
-    ? { ...inventoryData, source_garage_item_id: garageItemId }
+    ? {
+        ...loadGarageUpstreamContext(garageItemId),
+        ...inventoryData,
+        source_garage_item_id: garageItemId,
+      }
     : inventoryData;
 
   const response = await fetch('/api/nybil', {
@@ -56,6 +74,9 @@ export async function createNybilRegistration(inventoryData: Record<string, unkn
     body: JSON.stringify({ inventoryData: payloadInventory }),
   });
   const data = await readJson<{ id: string | number | null }>(response, 'Kunde inte spara nybilsregistreringen');
+  if (garageItemId && typeof window !== 'undefined') {
+    window.sessionStorage.removeItem(`nybil-upstream:${garageItemId}`);
+  }
   return data.id;
 }
 
