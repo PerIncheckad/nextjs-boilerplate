@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { ET_PRICE_CLASSES, ET_PRICE_LOCATIONS, quoteEtPrice } from '@/lib/et-price-list-2026';
 
 type GarageItem = {
   garage_item_id: string;
@@ -33,6 +34,7 @@ type AvvecklaPoint = {
 
 type Detail = { case: AvvecklaCase | null; points: AvvecklaPoint[] };
 type UtMethod = 'EGEN_LEVERANS' | 'EXTERN_TRANSPORT' | 'AVSTALLNING';
+type BillableChoice = '' | 'YES' | 'NO';
 
 const shell: React.CSSProperties = { width: '100%', margin: 0, padding: '12px 14px', border: '1px solid #d7d7d7', borderRadius: 8, background: '#fff', boxSizing: 'border-box' };
 const input: React.CSSProperties = { padding: '7px 9px', border: '1px solid #cfcfcf', borderRadius: 6, fontSize: 13, minWidth: 180 };
@@ -58,6 +60,11 @@ export default function GarageAvvecklaPanel() {
   const [utMethod, setUtMethod] = useState<UtMethod>('EGEN_LEVERANS');
   const [utOccurredAt, setUtOccurredAt] = useState(localNowInput);
   const [evidenceReference, setEvidenceReference] = useState('');
+  const [billableChoice, setBillableChoice] = useState<BillableChoice>('');
+  const [fromLocation, setFromLocation] = useState('');
+  const [toLocation, setToLocation] = useState('');
+  const [priceClass, setPriceClass] = useState('1.0');
+  const [quotedPrice, setQuotedPrice] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,6 +117,14 @@ export default function GarageAvvecklaPanel() {
   const selected = useMemo(() => items.find((item) => item.garage_item_id === selectedId) ?? null, [items, selectedId]);
   const openCount = detail.points.filter((point) => point.status === 'OPEN').length;
   const allClosed = detail.case !== null && openCount === 0;
+  const billableQuote = useMemo(() => {
+    if (utMethod !== 'EGEN_LEVERANS' || billableChoice !== 'YES' || !fromLocation || !toLocation || !priceClass) return null;
+    try {
+      return quoteEtPrice({ fromLocation, toLocation, priceClass, quotedPrice: quotedPrice ? Number(quotedPrice) : null });
+    } catch {
+      return null;
+    }
+  }, [utMethod, billableChoice, fromLocation, toLocation, priceClass, quotedPrice]);
 
   const post = async (body: Record<string, unknown>) => {
     setBusy(true);
@@ -149,6 +164,8 @@ export default function GarageAvvecklaPanel() {
     if (!selectedId || !detail.case) return;
     if (!allClosed) return setError('Alla AVVECKLA-punkter måste vara KLAR / AVSLUTADE före UT.');
     if (!utOccurredAt || !evidenceReference.trim()) return setError('Verklig tidpunkt och evidensreferens krävs för verifierat UT.');
+    if (utMethod === 'EGEN_LEVERANS' && billableChoice === '') return setError('Ange Ja eller Nej på om egen leverans är fakturerbar.');
+    if (utMethod === 'EGEN_LEVERANS' && billableChoice === 'YES' && !billableQuote) return setError('Komplettera giltig FRÅN, TILL och bilplats/prisklass enligt ET Prislista 2026.');
 
     setBusy(true);
     setError(null);
@@ -161,6 +178,13 @@ export default function GarageAvvecklaPanel() {
           method: utMethod,
           occurred_at: utOccurredAt,
           evidence_reference: evidenceReference,
+          ...(utMethod === 'EGEN_LEVERANS' ? {
+            billable_driving: billableChoice === 'YES',
+            from_location: billableChoice === 'YES' ? fromLocation : null,
+            to_location: billableChoice === 'YES' ? toLocation : null,
+            price_class: billableChoice === 'YES' ? priceClass : null,
+            quoted_price: billableChoice === 'YES' && priceClass === 'OFFERT' ? Number(quotedPrice) : null,
+          } : {}),
         }),
       });
       const payload = await response.json() as { error?: string };
@@ -171,6 +195,11 @@ export default function GarageAvvecklaPanel() {
       setDetail({ case: null, points: [] });
       setEvidenceReference('');
       setUtOccurredAt(localNowInput());
+      setBillableChoice('');
+      setFromLocation('');
+      setToLocation('');
+      setPriceClass('1.0');
+      setQuotedPrice('');
       setSelectedId(nextItems[0]?.garage_item_id ?? '');
     } catch (reasonValue) {
       setError(reasonValue instanceof Error ? reasonValue.message : 'Kunde inte verifiera UT');
@@ -237,11 +266,27 @@ export default function GarageAvvecklaPanel() {
             <strong>Verifiera verkligt UT</strong>
             <div style={{ fontSize: 13, color: '#666', marginTop: 3 }}>Terminalen är låst tills den centrala AVVECKLA-gaten är passerad. UT-vägen är den verkliga händelse som avslutar MABISYD:s ansvar för denna fordonsresa.</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end', marginTop: 8 }}>
-              <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>UT-väg</span><select style={input} value={utMethod} onChange={(event) => setUtMethod(event.target.value as UtMethod)}><option value="EGEN_LEVERANS">Vi lämnar bilen · överlämning</option><option value="EXTERN_TRANSPORT">Extern transportör · faktisk hämtning</option><option value="AVSTALLNING">Avställning</option></select></label>
+              <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>UT-väg</span><select style={input} value={utMethod} onChange={(event) => { setUtMethod(event.target.value as UtMethod); setBillableChoice(''); }}><option value="EGEN_LEVERANS">Vi lämnar bilen · överlämning</option><option value="EXTERN_TRANSPORT">Extern transportör · faktisk hämtning</option><option value="AVSTALLNING">Avställning</option></select></label>
               <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>Verklig tidpunkt</span><input type="datetime-local" style={input} value={utOccurredAt} onChange={(event) => setUtOccurredAt(event.target.value)} /></label>
               <label style={{ flex: '1 1 280px' }}><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>Evidensreferens</span><input style={{ ...input, width: '100%', boxSizing: 'border-box' }} value={evidenceReference} onChange={(event) => setEvidenceReference(event.target.value)} placeholder="t.ex. kvittens, mejl eller avställningsbevis" /></label>
-              <button type="button" style={primaryButton} disabled={busy || !allClosed} onClick={() => void completeUt()}>Verifiera UT / AVSLUT</button>
             </div>
+
+            {utMethod === 'EGEN_LEVERANS' ? <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid #e4e4e4' }}>
+              <strong style={{ fontSize: 13 }}>Ekonomiskt handslag för egen leverans</strong>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>Den verifierade överlämningen skapar ekonomiposten endast när körningen uttryckligen markeras fakturerbar.</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end', marginTop: 8 }}>
+                <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>Fakturerbar körning?</span><select style={input} value={billableChoice} onChange={(event) => setBillableChoice(event.target.value as BillableChoice)}><option value="">Välj Ja / Nej</option><option value="YES">Ja</option><option value="NO">Nej</option></select></label>
+                {billableChoice === 'YES' ? <>
+                  <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>FRÅN</span><select style={input} value={fromLocation} onChange={(event) => setFromLocation(event.target.value)}><option value="">Välj ort</option>{ET_PRICE_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}</select></label>
+                  <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>TILL</span><select style={input} value={toLocation} onChange={(event) => setToLocation(event.target.value)}><option value="">Välj ort</option>{ET_PRICE_LOCATIONS.map((location) => <option key={location} value={location}>{location}</option>)}</select></label>
+                  <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>Bilplats / prisklass</span><select style={input} value={priceClass} onChange={(event) => setPriceClass(event.target.value)}>{ET_PRICE_CLASSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+                  {priceClass === 'OFFERT' ? <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>Offertpris exkl. moms</span><input type="number" min="0" step="0.01" style={input} value={quotedPrice} onChange={(event) => setQuotedPrice(event.target.value)} /></label> : null}
+                  <div style={{ fontSize: 13, minWidth: 180, paddingBottom: 7 }}><strong>PRIS:</strong> {billableQuote ? `${billableQuote.price.toLocaleString('sv-SE')} kr exkl. moms` : '—'}</div>
+                </> : null}
+              </div>
+            </div> : null}
+
+            <div style={{ marginTop: 10 }}><button type="button" style={primaryButton} disabled={busy || !allClosed} onClick={() => void completeUt()}>Verifiera UT / AVSLUT</button></div>
           </div> : null}
         </div>
       )}
