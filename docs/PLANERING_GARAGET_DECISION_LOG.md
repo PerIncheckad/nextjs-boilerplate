@@ -141,6 +141,21 @@ Låst teknisk kontrollregel:
 
 Detaljkontrakt: `GARAGE_NYBIL_HISTORICAL_OVERLAP_2026-09-01.md`.
 
+## Registrerad punkt 2026-09-02 — exakt Nybil-kvittens avslutar aktivt Garage-arbete
+
+När ett Garage-objekt har kvitterats genom dagens exakta atomiska Nybil-handslag gäller ansvarsväxlingen fullt ut.
+
+Låst regel:
+
+- `handed_off_nybil_id` + `handed_off_at` betyder att Garage-arbetet är avslutat
+- raden bevaras som historik men lämnar aktiv Garage-lista och aktiv `UTVECKLA`-översikt
+- raden får därefter inte redigeras, omplaneras eller byta riktning
+- modellstandarder för Dygnsdeb/Hålltid får inte längre fylla den kvitterade raden
+- första kvittensen får endast sättas av Nybils atomiska triggerflöde
+- historiska överlapp utan exakt kvittens påverkas inte
+
+Detaljkontrakt: `GARAGE_NYBIL_HANDOFF_FREEZE_2026-09-02.md`.
+
 ## Fortsatt användning
 
 Nya beslut och förändringar för Planering + Garaget ska läggas till här som separata punkter när de fastställs eller verifieras.

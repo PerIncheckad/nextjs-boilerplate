@@ -60,6 +60,7 @@ export async function GET(request: Request) {
       admin.from('garage_items')
         .select('regnr,model,planned_station,garage_direction,updated_at')
         .is('voided_at', null)
+        .is('handed_off_nybil_id', null)
         .not('regnr', 'is', null)
         .order('updated_at', { ascending: false }),
       admin.from('garage_wheel_changes')
