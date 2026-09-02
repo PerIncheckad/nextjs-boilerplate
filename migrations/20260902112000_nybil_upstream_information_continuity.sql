@@ -43,7 +43,7 @@ alter table public.nybil_inventering
   add constraint nybil_inventering_confirmation_status_check
     check (confirmation_status is null or confirmation_status in ('PLANERAD','BESTALLD','AVROPAD','AVVAKTAR_BEKRAFTELSE','BEKRAFTAD')),
   add constraint nybil_inventering_transport_status_check
-    check (transport_status is null or transport_status in ('EJ_BOKAD','TRANSPORTBOKAD','PA_VAG'));
+    check (transport_status is null or transport_status in ('EJ_BOKAD','TRANSPORTBOKAD','PA_VAG','ANKOMMEN'));
 
 comment on column public.nybil_inventering.planning_period is 'Current planning period carried from Garage at Nybil receipt; Garage source remains linked separately.';
 comment on column public.nybil_inventering.supplier is 'Current supplier value at Nybil receipt; may differ from frozen Garage source after operator correction.';
