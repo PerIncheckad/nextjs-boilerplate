@@ -3,11 +3,139 @@ begin;
 set local lock_timeout = '5s';
 set local statement_timeout = '30s';
 
--- Step B: three explicit, source-controlled terminal UT handoffs.
--- The readiness decision is owned exclusively by
--- assert_garage_avveckla_ready_for_completion(). This function must not be
--- duplicated or reimplemented here.
+-- Step B: source-aware Layer 1 closure for trusted system adapters.
+-- Legacy Vagnkort close semantics remain untouched. This adapter preserves the
+-- actual source event instead of falsely attributing an AVVECKLA terminal to VAGNKORT.
+create or replace function public.close_vehicle_journey_period_from_source(
+  p_period_id uuid,
+  p_regnr text,
+  p_ended_at timestamptz,
+  p_source_system text,
+  p_source_entity text,
+  p_source_record_id text,
+  p_actor_id uuid,
+  p_actor_source text,
+  p_actor_email text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_period public.vehicle_journey_periods%rowtype;
+  v_duration_hours numeric;
+  v_activity record;
+begin
+  if length(trim(coalesce(p_source_system, ''))) = 0 then
+    raise exception 'Source system is required' using errcode = '22023';
+  end if;
+  if p_actor_source not in ('SYSTEM', 'MANUELL', 'EXTERNAL') then
+    raise exception 'Invalid actor source' using errcode = '22023';
+  end if;
 
+  select * into v_period
+  from public.vehicle_journey_periods
+  where period_id = p_period_id
+    and regnr = p_regnr
+  for update;
+
+  if not found then
+    raise exception 'Period not found for vehicle' using errcode = 'P0002';
+  end if;
+  if v_period.ended_at is not null then
+    raise exception 'Period is already closed' using errcode = 'P0001';
+  end if;
+  if p_ended_at < v_period.started_at then
+    raise exception 'End time cannot be before start time' using errcode = '22007';
+  end if;
+
+  if v_period.period_type = 'DOWNTIME' then
+    for v_activity in
+      select activity_period_id
+      from public.vehicle_journey_activity_periods
+      where parent_period_id = v_period.period_id
+        and ended_at is null
+      order by started_at, activity_period_id
+      for update
+    loop
+      perform public.close_vehicle_journey_activity_period(
+        v_activity.activity_period_id,
+        p_regnr,
+        p_ended_at,
+        p_source_system,
+        p_source_entity,
+        p_source_record_id,
+        p_actor_id,
+        p_actor_source,
+        p_actor_email
+      );
+    end loop;
+  end if;
+
+  update public.vehicle_journey_periods
+  set ended_at = p_ended_at,
+      updated_at = pg_catalog.now()
+  where period_id = p_period_id
+  returning * into v_period;
+
+  v_duration_hours := pg_catalog.round(
+    (extract(epoch from (p_ended_at - v_period.started_at)) / 3600.0)::numeric,
+    1
+  );
+
+  insert into public.vehicle_journey_events (
+    regnr,
+    event_type,
+    event_key,
+    occurred_at,
+    source_system,
+    source_entity,
+    source_record_id,
+    actor_id,
+    actor_source,
+    actor_email,
+    payload
+  ) values (
+    p_regnr,
+    'PERIOD_ENDED',
+    'vehicle-period:' || p_period_id::text || ':PERIOD_ENDED',
+    p_ended_at,
+    trim(p_source_system),
+    nullif(trim(coalesce(p_source_entity, '')), ''),
+    nullif(trim(coalesce(p_source_record_id, '')), ''),
+    p_actor_id,
+    p_actor_source,
+    p_actor_email,
+    pg_catalog.jsonb_build_object(
+      'periodType', v_period.period_type,
+      'startedAt', v_period.started_at,
+      'endedAt', p_ended_at,
+      'durationHours', v_duration_hours,
+      'reasonCode', v_period.reason_code,
+      'reasonText', v_period.reason_text
+    )
+  );
+
+  return pg_catalog.jsonb_build_object(
+    'period_id', v_period.period_id,
+    'period_type', v_period.period_type,
+    'started_at', v_period.started_at,
+    'ended_at', v_period.ended_at,
+    'reason_code', v_period.reason_code,
+    'reason_text', v_period.reason_text,
+    'source_system', v_period.source_system,
+    'source_event_id', v_period.source_event_id,
+    'metadata', v_period.metadata,
+    'created_at', v_period.created_at,
+    'updated_at', v_period.updated_at,
+    'durationHours', v_duration_hours
+  );
+end;
+$$;
+
+-- Three explicit terminal handoffs. Readiness is owned exclusively by
+-- assert_garage_avveckla_ready_for_completion(). No parallel readiness logic.
 create or replace function public.complete_garage_avveckla_ut_internal(
   p_garage_item_id uuid,
   p_event_type text,
@@ -54,8 +182,6 @@ begin
     raise exception 'Ogiltig terminal UT-händelse' using errcode = '22023';
   end if;
 
-  -- Lock the exact Garage episode first. No terminal can race another terminal
-  -- or mutate a completed/voided/Nybil-handed-off episode.
   select * into v_item
   from public.garage_items
   where garage_item_id = p_garage_item_id
@@ -82,7 +208,7 @@ begin
 
   v_normalized_regnr := upper(regexp_replace(v_item.regnr, '\s+', '', 'g'));
 
-  -- LOCKED GATE. Do not replace this call with local OPEN-point logic.
+  -- LOCKED GATE. This is the only readiness gate between AVVECKLA work and UT.
   v_avveckla_case_id := public.assert_garage_avveckla_ready_for_completion(p_garage_item_id);
 
   select * into v_case
@@ -94,8 +220,8 @@ begin
     raise exception 'AVVECKLA/Garage regnr mismatch' using errcode = 'P0001';
   end if;
 
-  -- Layer 1 owns current operational truth. Resolve and lock the one current
-  -- open period from Layer 1 itself; never infer it from Garage timestamps.
+  -- Layer 1 owns current operational truth. Resolve the one current open period
+  -- from Layer 1 itself; never infer it from Garage dates or statuses.
   select count(*) into v_period_count
   from public.vehicle_journey_periods
   where upper(regexp_replace(regnr, '\s+', '', 'g')) = v_normalized_regnr
@@ -118,8 +244,6 @@ begin
     raise exception 'UT-händelsen kan inte inträffa före aktuell fordonsperiod' using errcode = '22007';
   end if;
 
-  -- Immutable operational proof first. Its id becomes the source reference for
-  -- the Layer 1 PERIOD_ENDED event and the Garage completion.
   insert into public.garage_avveckla_events (
     avveckla_case_id,
     garage_item_id,
@@ -153,9 +277,9 @@ begin
     )
   ) returning event_id into v_event_id;
 
-  -- Source-controlled write-through. Existing Layer 1 close function remains
-  -- owner of period closure, child-activity closure and PERIOD_ENDED creation.
-  perform public.close_vehicle_journey_period(
+  -- Source-controlled Layer 1 write-through. PERIOD_ENDED points back to the
+  -- immutable terminal AVVECKLA event rather than pretending this came from UI.
+  perform public.close_vehicle_journey_period_from_source(
     v_period.period_id,
     v_period.regnr,
     p_occurred_at,
@@ -261,17 +385,21 @@ as $$
   );
 $$;
 
+revoke all on function public.close_vehicle_journey_period_from_source(uuid,text,timestamptz,text,text,text,uuid,text,text) from public, anon, authenticated;
 revoke all on function public.complete_garage_avveckla_ut_internal(uuid,text,timestamptz,text,uuid,text) from public, anon, authenticated;
 revoke all on function public.verify_garage_avveckla_egen_leverans(uuid,timestamptz,text,uuid,text) from public, anon, authenticated;
 revoke all on function public.verify_garage_avveckla_extern_transport(uuid,timestamptz,text,uuid,text) from public, anon, authenticated;
 revoke all on function public.verify_garage_avveckla_avstallning(uuid,timestamptz,text,uuid,text) from public, anon, authenticated;
 
+grant execute on function public.close_vehicle_journey_period_from_source(uuid,text,timestamptz,text,text,text,uuid,text,text) to service_role;
 grant execute on function public.complete_garage_avveckla_ut_internal(uuid,text,timestamptz,text,uuid,text) to service_role;
 grant execute on function public.verify_garage_avveckla_egen_leverans(uuid,timestamptz,text,uuid,text) to service_role;
 grant execute on function public.verify_garage_avveckla_extern_transport(uuid,timestamptz,text,uuid,text) to service_role;
 grant execute on function public.verify_garage_avveckla_avstallning(uuid,timestamptz,text,uuid,text) to service_role;
 
+comment on function public.close_vehicle_journey_period_from_source(uuid,text,timestamptz,text,text,text,uuid,text,text) is
+  'Trusted source adapter for closing one exact Layer 1 period while preserving source provenance in PERIOD_ENDED.';
 comment on function public.complete_garage_avveckla_ut_internal(uuid,text,timestamptz,text,uuid,text) is
-  'Atomic terminal UT handoff. Must pass assert_garage_avveckla_ready_for_completion(), append immutable UT evidence, close the one current Layer 1 period through close_vehicle_journey_period(), and freeze the exact Garage episode.';
+  'Atomic terminal UT handoff. Must pass assert_garage_avveckla_ready_for_completion(), append immutable UT evidence, source-close the one current Layer 1 period, create PERIOD_ENDED, and freeze the exact Garage episode.';
 
 commit;
