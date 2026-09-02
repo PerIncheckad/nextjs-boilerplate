@@ -12,6 +12,7 @@ type GaragePrefill = {
   supplier: string | null;
   order_reference: string | null;
   source_kind: string;
+  brand: string | null;
 };
 
 function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
@@ -19,6 +20,12 @@ function setNativeValue(element: HTMLInputElement | HTMLSelectElement, value: st
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
   descriptor?.set?.call(element, value);
   element.dispatchEvent(new Event(element instanceof HTMLSelectElement ? 'change' : 'input', { bubbles: true }));
+}
+
+function findFieldSelect(labelText: string): HTMLSelectElement | null {
+  const labels = Array.from(document.querySelectorAll<HTMLLabelElement>('label'));
+  const field = labels.find((label) => label.textContent?.includes(labelText));
+  return field?.querySelector<HTMLSelectElement>('select') ?? null;
 }
 
 function applyPrefill(data: GaragePrefill): boolean {
@@ -29,6 +36,14 @@ function applyPrefill(data: GaragePrefill): boolean {
   setNativeValue(regInputs[0], data.regnr);
   setNativeValue(regInputs[1], data.regnr);
   setNativeValue(modelInput, data.model || '');
+
+  if (data.brand) {
+    const brandSelect = findFieldSelect('Bilmärke');
+    const brandOption = brandSelect
+      ? Array.from(brandSelect.options).find((option) => option.value.toLocaleLowerCase('sv-SE') === data.brand!.toLocaleLowerCase('sv-SE') || option.text.toLocaleLowerCase('sv-SE') === data.brand!.toLocaleLowerCase('sv-SE'))
+      : null;
+    if (brandSelect && brandOption) setNativeValue(brandSelect, brandOption.value);
+  }
 
   const cards = Array.from(document.querySelectorAll<HTMLElement>('.card'));
   const plannedStationCard = cards.find((card) => card.querySelector('.section-header h2')?.textContent?.trim() === 'Planerad station');
@@ -84,11 +99,12 @@ export default function GarageNybilPrefillBridge() {
           <strong>Hämtad från Garaget · UTVECKLA / IN</strong>
           <div style={{ marginTop: 5, fontSize: 14 }}>
             <span><b>Reg.nr:</b> {data?.regnr}</span>
+            {data?.brand ? <span> · <b>Märke:</b> {data.brand}</span> : null}
             <span> · <b>Modell:</b> {data?.model}</span>
             {data?.vin ? <span> · <b>VIN:</b> {data.vin}</span> : null}
           </div>
           {(data?.supplier || data?.order_reference) ? <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>{data.supplier ? `Leverantör: ${data.supplier}` : ''}{data.supplier && data.order_reference ? ' · ' : ''}{data.order_reference ? `Order: ${data.order_reference}` : ''}</div> : null}
-          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, modell och planerad station förifylls. Faktisk mottagningsplats och övriga kontrollpunkter verifieras här i Ny bil. Garaget kvitteras först när Nybil-registreringen sparas.</div>
+          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, bilmärke, modell och planerad station förifylls i Nybils ordinarie fält och kan ändras där. Övrig Planering/Garage-information speglas i den redigerbara källbilden nedan. Garaget kvitteras först när Nybil-registreringen sparas.</div>
         </>
       )}
     </div>
