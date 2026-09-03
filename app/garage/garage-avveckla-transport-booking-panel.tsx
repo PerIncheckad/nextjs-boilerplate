@@ -50,11 +50,7 @@ export default function GarageAvvecklaTransportBookingPanel() {
   const [error, setError] = useState<string | null>(null);
 
   const loadSelected = async (garageItemId: string) => {
-    if (!garageItemId) {
-      setHasOpenCase(false);
-      setBooking(null);
-      return;
-    }
+    if (!garageItemId) return;
 
     const [caseResponse, bookingResponse] = await Promise.all([
       fetch(`/api/garage/avveckla?garage_item_id=${encodeURIComponent(garageItemId)}`, { cache: 'no-store' }),
@@ -84,13 +80,20 @@ export default function GarageAvvecklaTransportBookingPanel() {
   }, []);
 
   useEffect(() => {
-    setError(null);
-    setBookedAt(localNowInput());
-    setBookingReference('');
+    if (!selectedId) return;
     void loadSelected(selectedId).catch((reasonValue: unknown) => {
       setError(reasonValue instanceof Error ? reasonValue.message : 'Kunde inte läsa transportbokningen');
     });
   }, [selectedId]);
+
+  const selectGarageItem = (garageItemId: string) => {
+    setError(null);
+    setHasOpenCase(false);
+    setBooking(null);
+    setBookedAt(localNowInput());
+    setBookingReference('');
+    setSelectedId(garageItemId);
+  };
 
   const registerBooking = async () => {
     if (!selectedId || !bookedAt) return;
@@ -120,7 +123,7 @@ export default function GarageAvvecklaTransportBookingPanel() {
 
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
-      <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>AVVECKLA-bil</span><select style={input} value={selectedId} onChange={(event) => setSelectedId(event.target.value)}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
+      <label><span style={{ display: 'block', fontSize: 12, fontWeight: 800, marginBottom: 2 }}>AVVECKLA-bil</span><select style={input} value={selectedId} onChange={(event) => selectGarageItem(event.target.value)}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
 
       {selectedId && !hasOpenCase ? <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>Starta AVVECKLA-ärendet för bilen innan transport bokas.</div> : null}
 
