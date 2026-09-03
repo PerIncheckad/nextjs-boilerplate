@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Operational state unavailable' }, { status: 503 });
   }
 
-  const [periodsResponse, eventsResponse] = await Promise.all([
+  const [periodsResponse, eventsResponse, legacyResponse] = await Promise.all([
     admin
       .from('vehicle_journey_periods')
       .select('period_id,period_type,started_at,ended_at,reason_code,reason_text,source_system,source_entity,source_record_id')
@@ -51,6 +51,11 @@ export async function GET(request: Request) {
       .eq('regnr', regnr)
       .in('event_type', ['DOWNTIME_CONFIRMED', 'VEHICLE_SOLD_RECORDED', 'VEHICLE_SOLD_CORRECTED'])
       .order('occurred_at', { ascending: false }),
+    admin
+      .from('vehicle_legacy_current_state_entries')
+      .select('entry_id,object_type,verified_at,verified_by_email,evidence_reference,verification_method,historical_backfill')
+      .eq('normalized_regnr', regnr)
+      .maybeSingle(),
   ]);
 
   if (periodsResponse.error) {
@@ -61,13 +66,28 @@ export async function GET(request: Request) {
     console.error('[operational-state] Event query failed:', eventsResponse.error);
     return NextResponse.json({ error: 'Failed to load operational evidence' }, { status: 500 });
   }
+  if (legacyResponse.error) {
+    console.error('[operational-state] LEGACY classification query failed:', legacyResponse.error);
+    return NextResponse.json({ error: 'Failed to load operational classification' }, { status: 500 });
+  }
 
   const model = buildOperationalReadModel(periodsResponse.data ?? [], eventsResponse.data ?? []);
+  const legacy = legacyResponse.data;
 
   return NextResponse.json({
     data: {
       regnr,
       ...model,
+      ...(legacy ? {
+        objectType: 'LEGACY_FLEET',
+        objectTypeSource: 'LEGACY_CURRENT_STATE_ENTRY',
+        objectTypeSourceRecordId: legacy.entry_id,
+        objectTypeVerifiedAt: legacy.verified_at,
+        objectTypeVerifiedByEmail: legacy.verified_by_email,
+        objectTypeEvidenceReference: legacy.evidence_reference,
+        objectTypeVerificationMethod: legacy.verification_method,
+        historicalBackfill: legacy.historical_backfill,
+      } : {}),
     },
   });
 }

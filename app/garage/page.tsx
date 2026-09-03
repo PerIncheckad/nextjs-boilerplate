@@ -3,6 +3,7 @@ import CoreProductShell from '@/components/CoreProductShell';
 import GarageOverviewPanel from './garage-overview-panel';
 import GarageClient from './garage-client';
 import GarageV2Panel from './garage-v2-panel';
+import GarageLegacyEntryPanel from './garage-legacy-entry-panel';
 import GarageWheelChangePanel from './garage-wheel-change-panel';
 import GarageVoidPanel from './garage-void-panel';
 import GarageAvvecklaPanel from './garage-avveckla-panel';
@@ -31,6 +32,7 @@ export default function GaragePage() {
           <a href="#oversikt">0. Översikt</a>
           <a href="#garageobjekt">1. Garage</a>
           <a href="#nybil">2. Ny bil</a>
+          <a href="#legacy">2B. Befintlig egen bil</a>
           <a href="#avveckla">3. Avveckla</a>
           <a href="#kontrollpunkter">4. Kontrollpunkter</a>
         </nav>
@@ -49,6 +51,11 @@ export default function GaragePage() {
         <section id="nybil" className={styles.section}>
           <div className={styles.sectionLabel}><strong>02 / NY BIL</strong><span>Överlämna UTVECKLA-bilen när fysisk identitet finns</span></div>
           <GarageV2Panel />
+        </section>
+
+        <section id="legacy" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>02B / BEFINTLIG EGEN BIL / LEGACY</strong><span>Explicit current-state entry utan historisk backfill</span></div>
+          <GarageLegacyEntryPanel />
         </section>
 
         <section id="avveckla" className={styles.section}>
