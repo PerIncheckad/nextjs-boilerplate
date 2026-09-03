@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const migration = readFileSync('migrations/20260903224000_add_rented_in_quick_intake_v1.sql', 'utf8');
 const serviceRead = readFileSync('migrations/20260903224500_grant_rented_in_quick_intake_service_read_v1.sql', 'utf8');
+const stationScopeMigration = readFileSync('migrations/20260904002500_add_employee_station_scope.sql', 'utf8');
 const api = readFileSync('app/api/vehicle-journey/rented-in-intake/route.ts', 'utf8');
 const operational = readFileSync('app/api/vehicle-journey/operational-state/route.ts', 'utf8');
 const page = readFileSync('app/garage/page.tsx', 'utf8');
@@ -28,16 +29,28 @@ test('quick intake requires the locked minimum object facts', () => {
   assert.match(panel, /Kända skador/);
 });
 
-test('station, intake time, actor and object type are server controlled', () => {
+test('station, intake time, actor and object type remain server controlled', () => {
   assert.match(api, /PROTECTED_FIELDS/);
   assert.match(api, /'station'/);
   assert.match(api, /'object_type'/);
   assert.match(api, /'registered_at'/);
-  assert.match(api, /resolveStation\(admin, verification\.user\.email\)/);
+  assert.match(api, /resolveStationAccess\(admin, verification\.user\.email\)/);
   assert.match(api, /p_actor_id: verification\.user\.id/);
   assert.match(api, /p_actor_email: verification\.user\.email/);
-  assert.match(api, /Active employee station is required for INHYRD quick intake/);
+  assert.match(api, /Active employee station access is required for INHYRD quick intake/);
   assert.doesNotMatch(api, /p_registered_at/);
+});
+
+test('ALL station scope allows only server-validated main-station selection', () => {
+  assert.match(stationScopeMigration, /station_scope text not null default 'SINGLE'/);
+  assert.match(stationScopeMigration, /station_scope in \('SINGLE', 'ALL'\)/);
+  assert.match(api, /HUVUDSTATIONER/);
+  assert.match(api, /stationAccess\.scope === 'ALL'/);
+  assert.match(api, /Intake station is required for ALL-station operators/);
+  assert.match(api, /Invalid intake station/);
+  assert.match(api, /Intake station is server-controlled for single-station operators/);
+  assert.match(panel, /Intagsstation/);
+  assert.match(panel, /Välj huvudort/);
 });
 
 test('server can read immutable intake provenance while browser roles remain revoked', () => {
