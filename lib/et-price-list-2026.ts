@@ -2,13 +2,15 @@ export const ET_PRICE_LIST_ID = 'ET_PRISLISTA';
 export const ET_PRICE_LIST_VERSION = '2026-01-29';
 export const ET_PRICE_LIST_NAME = 'ET Prislista 2026';
 
-export const ET_PRICE_LOCATIONS = [
+const ET_MATRIX_LOCATIONS = [
   'Borås','Eskilstuna','Falun','Gävle','Göteborg Norr','Hallstahammar','Halmstad','Helsingborg','Härnösand','Jönköping','Kalmar','Karlskrona','Karlstad','Kiruna','Landskrona','Lidköping','Linköping','Ludvika','Luleå','Malmö','Mora','Norrköping','Nyköping','Piteå','Stockholm City','Stockholm Norr','Stockholm Syd','Strömstad','Sundsvall','Södertälje','Trollhättan','Umeå','Uppsala','Vimmerby','Värnamo','Västervik','Västerås','Växjö','Ystad','Örebro','Örnsköldsvik','Östersund',
 ] as const;
 
+export const ET_PRICE_LOCATIONS = [...ET_MATRIX_LOCATIONS, 'Staffanstorp'] as const;
 export const ET_PRICE_CLASSES = ['1.0','1.3','1.7','2.0','2.6','3.0','OFFERT'] as const;
 
 export type EtPriceLocation = (typeof ET_PRICE_LOCATIONS)[number];
+type EtMatrixLocation = (typeof ET_MATRIX_LOCATIONS)[number];
 export type EtPriceClass = (typeof ET_PRICE_CLASSES)[number];
 
 const ET_BASE_PRICE_MATRIX: ReadonlyArray<ReadonlyArray<number>> = [
@@ -72,6 +74,10 @@ function canonicalLocation(value: string): EtPriceLocation | null {
   return ET_PRICE_LOCATIONS.find((location) => location.toLocaleLowerCase('sv-SE') === normalized) ?? null;
 }
 
+function matrixLocation(location: EtPriceLocation): EtMatrixLocation {
+  return location === 'Staffanstorp' ? 'Malmö' : location;
+}
+
 export function quoteEtPrice(input: {
   fromLocation: string;
   toLocation: string;
@@ -80,7 +86,7 @@ export function quoteEtPrice(input: {
 }): EtPriceQuote {
   const fromLocation = canonicalLocation(input.fromLocation);
   const toLocation = canonicalLocation(input.toLocation);
-  if (!fromLocation || !toLocation) throw new Error('FRÅN och TILL måste vara orter i ET Prislista 2026');
+  if (!fromLocation || !toLocation) throw new Error('FRÅN och TILL måste vara orter i ET Prislista 2026 eller Staffanstorp');
 
   if (input.priceClass === 'OFFERT') {
     const quotedPrice = input.quotedPrice;
@@ -103,8 +109,8 @@ export function quoteEtPrice(input: {
     throw new Error('Ogiltig bilplats/prisklass för ET Prislista 2026');
   }
 
-  const fromIndex = ET_PRICE_LOCATIONS.indexOf(fromLocation);
-  const toIndex = ET_PRICE_LOCATIONS.indexOf(toLocation);
+  const fromIndex = ET_MATRIX_LOCATIONS.indexOf(matrixLocation(fromLocation));
+  const toIndex = ET_MATRIX_LOCATIONS.indexOf(matrixLocation(toLocation));
   const basePrice = ET_BASE_PRICE_MATRIX[fromIndex]?.[toIndex];
   if (typeof basePrice !== 'number') throw new Error('Prisrad saknas i ET Prislista 2026');
 
@@ -125,8 +131,8 @@ export function quoteEtPrice(input: {
 }
 
 export function assertEtPriceListShape() {
-  if (ET_BASE_PRICE_MATRIX.length !== ET_PRICE_LOCATIONS.length) throw new Error('ET price matrix row count mismatch');
+  if (ET_BASE_PRICE_MATRIX.length !== ET_MATRIX_LOCATIONS.length) throw new Error('ET price matrix row count mismatch');
   for (const row of ET_BASE_PRICE_MATRIX) {
-    if (row.length !== ET_PRICE_LOCATIONS.length) throw new Error('ET price matrix column count mismatch');
+    if (row.length !== ET_MATRIX_LOCATIONS.length) throw new Error('ET price matrix column count mismatch');
   }
 }
