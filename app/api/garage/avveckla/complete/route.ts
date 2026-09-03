@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
 import { quoteEtPrice } from '@/lib/et-price-list-2026';
+import { parseOperationalDateTime } from '@/lib/server/swedish-local-datetime';
 
 function adminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -14,13 +15,6 @@ function text(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const next = value.trim();
   return next || null;
-}
-
-function occurredAt(value: unknown): string | null {
-  const candidate = text(value);
-  if (!candidate) return null;
-  const parsed = new Date(candidate);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
 function positiveNumber(value: unknown): number | null {
@@ -49,11 +43,15 @@ export async function POST(request: Request) {
 
   const garageItemId = text(body.garage_item_id);
   const method = text(body.method)?.toUpperCase() as Method | undefined;
-  const eventTime = occurredAt(body.occurred_at);
+  const eventTime = parseOperationalDateTime(body.occurred_at);
   const evidenceReference = text(body.evidence_reference);
 
   if (!garageItemId || !method || !['EGEN_LEVERANS', 'EXTERN_TRANSPORT', 'AVSTALLNING'].includes(method) || !eventTime || !evidenceReference) {
     return NextResponse.json({ error: 'Garage-objekt, UT-väg, verklig tidpunkt och evidensreferens krävs' }, { status: 400 });
+  }
+
+  if (new Date(eventTime).getTime() > Date.now() + 5 * 60_000) {
+    return NextResponse.json({ error: 'Verklig UT-tidpunkt kan inte ligga i framtiden' }, { status: 400 });
   }
 
   const admin = adminClient();
