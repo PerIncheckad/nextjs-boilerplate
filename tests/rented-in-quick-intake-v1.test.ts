@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const migration = readFileSync('migrations/20260903224000_add_rented_in_quick_intake_v1.sql', 'utf8');
+const serviceRead = readFileSync('migrations/20260903224500_grant_rented_in_quick_intake_service_read_v1.sql', 'utf8');
 const api = readFileSync('app/api/vehicle-journey/rented-in-intake/route.ts', 'utf8');
 const operational = readFileSync('app/api/vehicle-journey/operational-state/route.ts', 'utf8');
 const page = readFileSync('app/garage/page.tsx', 'utf8');
@@ -37,6 +38,12 @@ test('station, intake time, actor and object type are server controlled', () => 
   assert.match(api, /p_actor_email: verification\.user\.email/);
   assert.match(api, /Active employee station is required for INHYRD quick intake/);
   assert.doesNotMatch(api, /p_registered_at/);
+});
+
+test('server can read immutable intake provenance while browser roles remain revoked', () => {
+  assert.match(migration, /revoke all on public\.vehicle_rented_in_quick_intakes from public, anon, authenticated, service_role/);
+  assert.match(serviceRead, /grant select on public\.vehicle_rented_in_quick_intakes to service_role/);
+  assert.doesNotMatch(serviceRead, /to (anon|authenticated)/);
 });
 
 test('INHYRD intake cannot fabricate operational Layer 1 or RENTAL truth', () => {
