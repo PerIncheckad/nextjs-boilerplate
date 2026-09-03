@@ -73,7 +73,23 @@ export default function TowerInvistoV2() {
     }
   };
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    let active = true;
+    void loadReadModel()
+      .then((next) => {
+        if (!active) return;
+        setData(next);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : 'Tower kunde inte läsas');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const attentionTotal = data ? data.attention.capturedDowntime + data.attention.saluT10 + data.attention.saluPassed : 0;
 
