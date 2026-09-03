@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
 
 type Health = 'VERIFIED' | 'PARTIAL' | 'BLOCKED' | 'EXTERNAL';
-type PrimaryState = 'AVAILABLE' | 'RENTAL' | 'DOWNTIME' | 'PREPARATION' | 'OTHER' | 'UNKNOWN';
+type PrimaryState = 'AVAILABLE' | 'RENTAL' | 'DOWNTIME' | 'PREPARATION' | 'SALU' | 'OTHER' | 'UNKNOWN';
 type Row = Record<string, unknown>;
 
 function createAdminClient() {
@@ -113,6 +113,7 @@ export async function GET(request: Request) {
       RENTAL: 0,
       DOWNTIME: 0,
       PREPARATION: 0,
+      SALU: 0,
       OTHER: 0,
       UNKNOWN: 0,
     };
@@ -122,7 +123,7 @@ export async function GET(request: Request) {
       if (!vehicle) continue;
       capturedRegnrs.add(vehicle);
       const state = typeof row.period_type === 'string' ? row.period_type : 'OTHER';
-      if (state === 'AVAILABLE' || state === 'RENTAL' || state === 'DOWNTIME' || state === 'PREPARATION') {
+      if (state === 'AVAILABLE' || state === 'RENTAL' || state === 'DOWNTIME' || state === 'PREPARATION' || state === 'SALU') {
         primaryStateCounts[state] += 1;
       } else {
         primaryStateCounts.OTHER += 1;
