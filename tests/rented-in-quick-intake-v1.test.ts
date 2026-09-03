@@ -33,11 +33,22 @@ test('station, intake time, actor and object type are server controlled', () => 
   assert.match(api, /'station'/);
   assert.match(api, /'object_type'/);
   assert.match(api, /'registered_at'/);
-  assert.match(api, /resolveStation\(admin, verification\.user\.email\)/);
+  assert.match(api, /resolveStationScope\(admin, verification\.user\.email\)/);
   assert.match(api, /p_actor_id: verification\.user\.id/);
   assert.match(api, /p_actor_email: verification\.user\.email/);
-  assert.match(api, /Active employee station is required for INHYRD quick intake/);
+  assert.match(api, /Active employee station scope is required for INHYRD quick intake/);
   assert.doesNotMatch(api, /p_registered_at/);
+});
+
+test('ALLA scope requires an explicit real intake station validated by the server', () => {
+  assert.match(api, /stationScope === 'ALLA'/);
+  assert.match(api, /ALLOWED_STATIONS/);
+  assert.match(api, /Valid intake station is required for ALLA station scope/);
+  assert.match(api, /Intake station is server-controlled for single-station users/);
+  assert.match(panel, /Intagsstation/);
+  assert.match(panel, /Välj station/);
+  assert.match(panel, /intake_station: intakeStation/);
+  assert.doesNotMatch(api, /station = 'ALLA'/);
 });
 
 test('server can read immutable intake provenance while browser roles remain revoked', () => {

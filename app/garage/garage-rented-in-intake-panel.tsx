@@ -5,6 +5,8 @@ import { useState } from 'react';
 type Preflight = {
   regnr: string;
   station: string | null;
+  stationScope: string | null;
+  availableStations: string[];
   intake: { intake_id: string; registered_at: string; registered_by_email: string } | null;
   legacy: { entry_id: string; object_type: string } | null;
   currentPeriod: { period_id: string; period_type: string; started_at: string } | null;
@@ -41,6 +43,7 @@ export default function GarageRentedInIntakePanel() {
   const [model, setModel] = useState('');
   const [odometerKm, setOdometerKm] = useState('');
   const [knownDamages, setKnownDamages] = useState('');
+  const [intakeStation, setIntakeStation] = useState('');
   const [preflight, setPreflight] = useState<Preflight | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -48,7 +51,7 @@ export default function GarageRentedInIntakePanel() {
 
   async function load() {
     const normalized = cleanRegnr(regnr);
-    setRegnr(normalized); setBusy(true); setError(null); setResult(null);
+    setRegnr(normalized); setBusy(true); setError(null); setResult(null); setIntakeStation('');
     try {
       const response = await fetch(`/api/vehicle-journey/rented-in-intake?regnr=${encodeURIComponent(normalized)}`, { cache: 'no-store' });
       const body = await response.json() as { data?: Preflight; error?: string };
@@ -63,7 +66,8 @@ export default function GarageRentedInIntakePanel() {
     if (!preflight) return setError('Läs kontrollbilden först.');
     if (preflight.intake) return setError('INHYRD snabbintag finns redan för bilen.');
     if (preflight.legacy) return setError('Bilen är redan klassificerad som LEGACY_FLEET.');
-    if (!preflight.station) return setError('Din aktiva medarbetarprofil saknar station.');
+    if (!preflight.stationScope) return setError('Din aktiva medarbetarprofil saknar stationsscope.');
+    if (preflight.stationScope === 'ALLA' && !intakeStation) return setError('Välj den station där bilen tas in.');
     if (!brand.trim() || !model.trim()) return setError('Märke och modell krävs.');
     if (!odometerKm || !Number.isInteger(Number(odometerKm)) || Number(odometerKm) < 0) return setError('Kilometerställning krävs.');
     if (!knownDamages.trim()) return setError('Kända skador måste anges uttryckligen. Skriv INGA KÄNDA om inga finns.');
@@ -72,7 +76,14 @@ export default function GarageRentedInIntakePanel() {
     try {
       const response = await fetch('/api/vehicle-journey/rented-in-intake', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ regnr: preflight.regnr, brand, model, odometer_km: Number(odometerKm), known_damages: knownDamages }),
+        body: JSON.stringify({
+          regnr: preflight.regnr,
+          brand,
+          model,
+          odometer_km: Number(odometerKm),
+          known_damages: knownDamages,
+          ...(preflight.stationScope === 'ALLA' ? { intake_station: intakeStation } : {}),
+        }),
       });
       const body = await response.json() as { data?: Result; error?: string };
       if (!response.ok) throw new Error(body.error ?? 'INHYRD snabbintag misslyckades');
@@ -81,6 +92,8 @@ export default function GarageRentedInIntakePanel() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'INHYRD snabbintag misslyckades'); }
     finally { setBusy(false); }
   }
+
+  const stationReady = Boolean(preflight?.station || (preflight?.stationScope === 'ALLA' && intakeStation));
 
   return <section style={shell} aria-label="INHYRD snabbintag">
     <div>
@@ -95,18 +108,20 @@ export default function GarageRentedInIntakePanel() {
     </div>
     {preflight ? <div style={card}>
       <div><strong>{preflight.regnr}</strong></div>
-      <div>Station: <strong>{preflight.station ?? 'SAKNAS I MEDARBETARPROFIL'}</strong> · sätts av systemet</div>
+      <div>Stationsscope: <strong>{preflight.stationScope ?? 'SAKNAS I MEDARBETARPROFIL'}</strong></div>
+      <div>Intagsstation: <strong>{preflight.station ?? (preflight.stationScope === 'ALLA' ? 'VÄLJS VID INTAG' : 'SAKNAS')}</strong></div>
       <div>INHYRD: {preflight.intake ? 'Redan registrerad' : 'Ingen tidigare registrering'}</div>
       <div>LEGACY: {preflight.legacy ? 'Konflikt – redan egen LEGACY' : 'Ingen LEGACY-klassificering'}</div>
       <div>Aktuell Layer1: {preflight.currentPeriod ? `${preflight.currentPeriod.period_type} sedan ${new Date(preflight.currentPeriod.started_at).toLocaleString('sv-SE')}` : 'Ingen öppen period'}</div>
     </div> : null}
     {preflight && !preflight.intake && !preflight.legacy ? <div style={{ ...card, background: '#fff' }}>
       <div style={row}>
+        {preflight.stationScope === 'ALLA' ? <label><span style={{ display: 'block', fontWeight: 800 }}>Intagsstation</span><select style={input} value={intakeStation} onChange={(e) => setIntakeStation(e.target.value)}><option value="">Välj station</option>{preflight.availableStations.map((station) => <option key={station} value={station}>{station}</option>)}</select></label> : null}
         <label><span style={{ display: 'block', fontWeight: 800 }}>Märke</span><input style={input} value={brand} onChange={(e) => setBrand(e.target.value)} /></label>
         <label><span style={{ display: 'block', fontWeight: 800 }}>Modell</span><input style={input} value={model} onChange={(e) => setModel(e.target.value)} /></label>
         <label><span style={{ display: 'block', fontWeight: 800 }}>Km</span><input style={input} type="number" min="0" step="1" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} /></label>
         <label style={{ flex: '1 1 320px' }}><span style={{ display: 'block', fontWeight: 800 }}>Kända skador</span><input style={{ ...input, width: '100%', boxSizing: 'border-box' }} value={knownDamages} onChange={(e) => setKnownDamages(e.target.value)} placeholder="Beskriv eller skriv INGA KÄNDA" /></label>
-        <button type="button" style={primary} disabled={busy || !preflight.station} onClick={() => void submit()}>Registrera INHYRD</button>
+        <button type="button" style={primary} disabled={busy || !stationReady} onClick={() => void submit()}>Registrera INHYRD</button>
       </div>
     </div> : null}
     {result ? <div style={{ ...card, background: '#f6fff7' }}>

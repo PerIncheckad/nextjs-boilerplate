@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
+import { HUVUDSTATIONER } from '@/lib/constants';
 
 const REGNR_RE = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
+const ALLOWED_STATIONS = new Set(HUVUDSTATIONER.map((station) => station.name));
 const PROTECTED_FIELDS = new Set([
   'station', 'object_type', 'objectType', 'registered_at', 'registeredAt',
   'registered_by', 'registeredBy', 'registered_by_email', 'registeredByEmail',
@@ -20,7 +22,7 @@ function createAdminClient() {
   return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function resolveStation(admin: ReturnType<typeof createAdminClient>, email: string) {
+async function resolveStationScope(admin: ReturnType<typeof createAdminClient>, email: string) {
   const { data, error } = await admin
     .from('employees')
     .select('station,is_active')
@@ -50,7 +52,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const station = await resolveStation(admin, verification.user.email);
+    const stationScope = await resolveStationScope(admin, verification.user.email);
     const [intakeResponse, legacyResponse, periodResponse] = await Promise.all([
       admin.from('vehicle_rented_in_quick_intakes').select('*').eq('normalized_regnr', regnr).maybeSingle(),
       admin.from('vehicle_legacy_current_state_entries').select('entry_id,object_type').eq('normalized_regnr', regnr).maybeSingle(),
@@ -59,7 +61,16 @@ export async function GET(request: Request) {
     for (const response of [intakeResponse, legacyResponse, periodResponse]) {
       if (response.error) return NextResponse.json({ error: 'Failed to load INHYRD control data' }, { status: 500 });
     }
-    return NextResponse.json({ data: { regnr, station, intake: intakeResponse.data ?? null, legacy: legacyResponse.data ?? null, currentPeriod: periodResponse.data ?? null, historicalBackfill: false } });
+    return NextResponse.json({ data: {
+      regnr,
+      station: stationScope && stationScope !== 'ALLA' ? stationScope : null,
+      stationScope,
+      availableStations: stationScope === 'ALLA' ? HUVUDSTATIONER.map((station) => station.name) : [],
+      intake: intakeResponse.data ?? null,
+      legacy: legacyResponse.data ?? null,
+      currentPeriod: periodResponse.data ?? null,
+      historicalBackfill: false,
+    } });
   } catch (error) {
     console.error('[rented-in-intake] Preflight failed:', error);
     return NextResponse.json({ error: 'Failed to load INHYRD control data' }, { status: 500 });
@@ -83,6 +94,7 @@ export async function POST(request: Request) {
   const model = String(body.model ?? '').trim();
   const odometerKm = Number(body.odometer_km ?? body.odometerKm);
   const knownDamages = String(body.known_damages ?? body.knownDamages ?? '').trim();
+  const requestedIntakeStation = String(body.intake_station ?? body.intakeStation ?? '').trim();
 
   if (!REGNR_RE.test(regnr)) return NextResponse.json({ error: 'Invalid regnr' }, { status: 400 });
   if (!brand) return NextResponse.json({ error: 'Brand is required' }, { status: 400 });
@@ -95,12 +107,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'INHYRD quick intake unavailable' }, { status: 503 });
   }
 
-  let station: string | null;
-  try { station = await resolveStation(admin, verification.user.email); } catch (error) {
+  let stationScope: string | null;
+  try { stationScope = await resolveStationScope(admin, verification.user.email); } catch (error) {
     console.error('[rented-in-intake] Station lookup failed:', error);
     return NextResponse.json({ error: 'Failed to resolve station' }, { status: 500 });
   }
-  if (!station) return NextResponse.json({ error: 'Active employee station is required for INHYRD quick intake' }, { status: 409 });
+  if (!stationScope) return NextResponse.json({ error: 'Active employee station scope is required for INHYRD quick intake' }, { status: 409 });
+
+  let station: string;
+  if (stationScope === 'ALLA') {
+    if (!requestedIntakeStation || !ALLOWED_STATIONS.has(requestedIntakeStation)) {
+      return NextResponse.json({ error: 'Valid intake station is required for ALLA station scope' }, { status: 400 });
+    }
+    station = requestedIntakeStation;
+  } else {
+    if (requestedIntakeStation) return NextResponse.json({ error: 'Intake station is server-controlled for single-station users' }, { status: 400 });
+    if (!ALLOWED_STATIONS.has(stationScope)) return NextResponse.json({ error: 'Employee station is not a valid main station' }, { status: 409 });
+    station = stationScope;
+  }
 
   const { data, error } = await admin.rpc('register_rented_in_vehicle_quick_intake', {
     p_regnr: regnr,
