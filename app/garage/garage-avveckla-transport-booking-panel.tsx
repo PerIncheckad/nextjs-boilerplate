@@ -72,19 +72,14 @@ export default function GarageAvvecklaTransportBookingPanel() {
         if (!response.ok) throw new Error(body.error ?? 'Kunde inte läsa AVVECKLA-bilar');
         if (!active) return;
         const next = body.data ?? [];
+        const initialId = next[0]?.garage_item_id ?? '';
         setItems(next);
-        setSelectedId(next[0]?.garage_item_id ?? '');
+        setSelectedId(initialId);
+        if (initialId) await loadSelected(initialId);
       })
       .catch((reasonValue: unknown) => { if (active) setError(reasonValue instanceof Error ? reasonValue.message : 'Kunde inte läsa AVVECKLA-bilar'); });
     return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    void loadSelected(selectedId).catch((reasonValue: unknown) => {
-      setError(reasonValue instanceof Error ? reasonValue.message : 'Kunde inte läsa transportbokningen');
-    });
-  }, [selectedId]);
 
   const selectGarageItem = (garageItemId: string) => {
     setError(null);
@@ -93,6 +88,10 @@ export default function GarageAvvecklaTransportBookingPanel() {
     setBookedAt(localNowInput());
     setBookingReference('');
     setSelectedId(garageItemId);
+    if (!garageItemId) return;
+    void loadSelected(garageItemId).catch((reasonValue: unknown) => {
+      setError(reasonValue instanceof Error ? reasonValue.message : 'Kunde inte läsa transportbokningen');
+    });
   };
 
   const registerBooking = async () => {
