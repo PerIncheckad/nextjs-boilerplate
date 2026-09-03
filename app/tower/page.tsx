@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import CoreProductShell from '@/components/CoreProductShell';
-import TowerCockpitV2 from './tower-cockpit-v2';
+import TowerInvistoV2 from './tower-invisto-v2';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Tower | Incheckad',
-  description: 'Operativ helhetsbild av verksamheten med nedborrning till rätt process.',
+  description: 'Operativ helhetsbild av verksamheten just nu.',
 };
 
 export default function TowerPage() {
@@ -14,10 +14,10 @@ export default function TowerPage() {
     <CoreProductShell
       active="tower"
       title="Tower"
-      descriptor="HELHET / STATUS / PROCESS / UPPMÄRKSAMHET"
-      eyebrow="INCHECKAD / OPERATIONAL COCKPIT"
+      descriptor="VERKSAMHETEN JUST NU"
+      eyebrow="INCHECKAD / TOWER"
     >
-      <TowerCockpitV2 />
+      <TowerInvistoV2 />
     </CoreProductShell>
   );
 }
