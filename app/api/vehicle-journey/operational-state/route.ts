@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Operational state unavailable' }, { status: 503 });
   }
 
-  const [periodsResponse, eventsResponse, legacyResponse] = await Promise.all([
+  const [periodsResponse, eventsResponse, legacyResponse, rentedInResponse] = await Promise.all([
     admin
       .from('vehicle_journey_periods')
       .select('period_id,period_type,started_at,ended_at,reason_code,reason_text,source_system,source_entity,source_record_id')
@@ -56,6 +56,11 @@ export async function GET(request: Request) {
       .select('entry_id,object_type,verified_at,verified_by_email,evidence_reference,verification_method,historical_backfill')
       .eq('normalized_regnr', regnr)
       .maybeSingle(),
+    admin
+      .from('vehicle_rented_in_quick_intakes')
+      .select('intake_id,object_type,brand,model,odometer_km,known_damages,station,registered_at,registered_by_email,intake_method,historical_backfill')
+      .eq('normalized_regnr', regnr)
+      .maybeSingle(),
   ]);
 
   if (periodsResponse.error) {
@@ -66,13 +71,14 @@ export async function GET(request: Request) {
     console.error('[operational-state] Event query failed:', eventsResponse.error);
     return NextResponse.json({ error: 'Failed to load operational evidence' }, { status: 500 });
   }
-  if (legacyResponse.error) {
-    console.error('[operational-state] LEGACY classification query failed:', legacyResponse.error);
+  if (legacyResponse.error || rentedInResponse.error) {
+    console.error('[operational-state] Classification query failed:', legacyResponse.error ?? rentedInResponse.error);
     return NextResponse.json({ error: 'Failed to load operational classification' }, { status: 500 });
   }
 
   const model = buildOperationalReadModel(periodsResponse.data ?? [], eventsResponse.data ?? []);
   const legacy = legacyResponse.data;
+  const rentedIn = rentedInResponse.data;
 
   return NextResponse.json({
     data: {
@@ -87,6 +93,21 @@ export async function GET(request: Request) {
         objectTypeEvidenceReference: legacy.evidence_reference,
         objectTypeVerificationMethod: legacy.verification_method,
         historicalBackfill: legacy.historical_backfill,
+      } : rentedIn ? {
+        objectType: 'INHYRD',
+        objectTypeSource: 'RENTED_IN_QUICK_INTAKE',
+        objectTypeSourceRecordId: rentedIn.intake_id,
+        objectTypeRegisteredAt: rentedIn.registered_at,
+        objectTypeRegisteredByEmail: rentedIn.registered_by_email,
+        objectTypeStation: rentedIn.station,
+        objectTypeIntakeMethod: rentedIn.intake_method,
+        objectTypeIntakeSnapshot: {
+          brand: rentedIn.brand,
+          model: rentedIn.model,
+          odometerKm: rentedIn.odometer_km,
+          knownDamages: rentedIn.known_damages,
+        },
+        historicalBackfill: rentedIn.historical_backfill,
       } : {}),
     },
   });
