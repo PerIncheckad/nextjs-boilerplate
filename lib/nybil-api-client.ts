@@ -69,18 +69,20 @@ export async function createNybilRegistration(inventoryData: Record<string, unkn
   const garageItemId = typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('garage_item_id')?.trim() || null
     : null;
-  const garageContext = garageItemId ? loadGarageUpstreamContext(garageItemId) : null;
-  if (garageItemId && !garageContext) {
+  if (!garageItemId) {
+    throw new Error('Ny bil måste startas genom Hämta bilen från Garaget. Välj bilen i Garage-listan och försök igen.');
+  }
+
+  const garageContext = loadGarageUpstreamContext(garageItemId);
+  if (!garageContext) {
     throw new Error('Garage-informationen kunde inte läsas eller saknar versionsstämpel. Ladda om Ny bil och hämta bilen från Garaget igen.');
   }
-  const payloadInventory = garageItemId && garageContext
-    ? {
-        ...garageContext.values,
-        ...inventoryData,
-        source_garage_item_id: garageItemId,
-        source_garage_updated_at: garageContext.source_garage_updated_at,
-      }
-    : inventoryData;
+  const payloadInventory = {
+    ...garageContext.values,
+    ...inventoryData,
+    source_garage_item_id: garageItemId,
+    source_garage_updated_at: garageContext.source_garage_updated_at,
+  };
 
   const response = await fetch('/api/nybil', {
     method: 'POST',
@@ -88,7 +90,7 @@ export async function createNybilRegistration(inventoryData: Record<string, unkn
     body: JSON.stringify({ inventoryData: payloadInventory }),
   });
   const data = await readJson<{ id: string | number | null }>(response, 'Kunde inte spara nybilsregistreringen');
-  if (garageItemId && typeof window !== 'undefined') {
+  if (typeof window !== 'undefined') {
     window.sessionStorage.removeItem(`nybil-upstream:${garageItemId}`);
   }
   return data.id;
