@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
+import { HUVUDSTATIONER } from '@/lib/constants';
 
 const REGNR_RE = /^[A-Z]{3}[0-9]{2}[0-9A-Z]$/;
+const MAIN_STATIONS = HUVUDSTATIONER.map((station) => station.name);
 const PROTECTED_FIELDS = new Set([
   'station', 'object_type', 'objectType', 'registered_at', 'registeredAt',
   'registered_by', 'registeredBy', 'registered_by_email', 'registeredByEmail',
@@ -20,15 +22,24 @@ function createAdminClient() {
   return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-async function resolveStation(admin: ReturnType<typeof createAdminClient>, email: string) {
+type StationAccess = {
+  scope: 'SINGLE' | 'ALL';
+  station: string | null;
+};
+
+async function resolveStationAccess(admin: ReturnType<typeof createAdminClient>, email: string): Promise<StationAccess | null> {
   const { data, error } = await admin
     .from('employees')
-    .select('station,is_active')
+    .select('station,station_scope,is_active')
     .eq('email', email.toLowerCase())
     .maybeSingle();
   if (error) throw error;
-  if (!data?.is_active || !String(data.station ?? '').trim()) return null;
-  return String(data.station).trim();
+  if (!data?.is_active) return null;
+
+  const scope = data.station_scope === 'ALL' ? 'ALL' : 'SINGLE';
+  const station = String(data.station ?? '').trim() || null;
+  if (scope === 'SINGLE' && !station) return null;
+  return { scope, station };
 }
 
 function mapError(message: string) {
@@ -50,7 +61,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const station = await resolveStation(admin, verification.user.email);
+    const stationAccess = await resolveStationAccess(admin, verification.user.email);
     const [intakeResponse, legacyResponse, periodResponse] = await Promise.all([
       admin.from('vehicle_rented_in_quick_intakes').select('*').eq('normalized_regnr', regnr).maybeSingle(),
       admin.from('vehicle_legacy_current_state_entries').select('entry_id,object_type').eq('normalized_regnr', regnr).maybeSingle(),
@@ -59,7 +70,18 @@ export async function GET(request: Request) {
     for (const response of [intakeResponse, legacyResponse, periodResponse]) {
       if (response.error) return NextResponse.json({ error: 'Failed to load INHYRD control data' }, { status: 500 });
     }
-    return NextResponse.json({ data: { regnr, station, intake: intakeResponse.data ?? null, legacy: legacyResponse.data ?? null, currentPeriod: periodResponse.data ?? null, historicalBackfill: false } });
+    return NextResponse.json({
+      data: {
+        regnr,
+        station: stationAccess?.station ?? null,
+        stationScope: stationAccess?.scope ?? null,
+        allowedStations: stationAccess?.scope === 'ALL' ? MAIN_STATIONS : [],
+        intake: intakeResponse.data ?? null,
+        legacy: legacyResponse.data ?? null,
+        currentPeriod: periodResponse.data ?? null,
+        historicalBackfill: false,
+      },
+    });
   } catch (error) {
     console.error('[rented-in-intake] Preflight failed:', error);
     return NextResponse.json({ error: 'Failed to load INHYRD control data' }, { status: 500 });
@@ -83,6 +105,7 @@ export async function POST(request: Request) {
   const model = String(body.model ?? '').trim();
   const odometerKm = Number(body.odometer_km ?? body.odometerKm);
   const knownDamages = String(body.known_damages ?? body.knownDamages ?? '').trim();
+  const requestedIntakeStation = String(body.intake_station ?? body.intakeStation ?? '').trim();
 
   if (!REGNR_RE.test(regnr)) return NextResponse.json({ error: 'Invalid regnr' }, { status: 400 });
   if (!brand) return NextResponse.json({ error: 'Brand is required' }, { status: 400 });
@@ -95,12 +118,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'INHYRD quick intake unavailable' }, { status: 503 });
   }
 
-  let station: string | null;
-  try { station = await resolveStation(admin, verification.user.email); } catch (error) {
+  let stationAccess: StationAccess | null;
+  try { stationAccess = await resolveStationAccess(admin, verification.user.email); } catch (error) {
     console.error('[rented-in-intake] Station lookup failed:', error);
     return NextResponse.json({ error: 'Failed to resolve station' }, { status: 500 });
   }
-  if (!station) return NextResponse.json({ error: 'Active employee station is required for INHYRD quick intake' }, { status: 409 });
+  if (!stationAccess) return NextResponse.json({ error: 'Active employee station access is required for INHYRD quick intake' }, { status: 409 });
+
+  let station: string;
+  if (stationAccess.scope === 'ALL') {
+    if (!requestedIntakeStation) return NextResponse.json({ error: 'Intake station is required for ALL-station operators' }, { status: 400 });
+    if (!MAIN_STATIONS.includes(requestedIntakeStation as typeof MAIN_STATIONS[number])) {
+      return NextResponse.json({ error: 'Invalid intake station' }, { status: 400 });
+    }
+    station = requestedIntakeStation;
+  } else {
+    if (requestedIntakeStation) return NextResponse.json({ error: 'Intake station is server-controlled for single-station operators' }, { status: 400 });
+    station = stationAccess.station as string;
+  }
 
   const { data, error } = await admin.rpc('register_rented_in_vehicle_quick_intake', {
     p_regnr: regnr,
