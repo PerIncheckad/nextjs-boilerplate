@@ -49,7 +49,7 @@ test('existing closed Layer 1 history is preserved while current or future truth
 });
 
 test('normalized vehicle identity prevents parallel open states', () => {
-  assert.match(migration, /upper\(regexp_replace\(regnr, '\\\\s\+', '', 'g'\)\)/);
+  assert.ok(migration.includes("upper(regexp_replace(regnr, '\\s+', '', 'g'))"));
   assert.match(migration, /vehicle_journey_periods_one_open_normalized_state_uidx/);
   assert.match(migration, /Normalized duplicate open vehicle journey periods exist; migration will not rewrite history/);
   assert.match(migration, /pg_advisory_xact_lock\(hashtext\('vehicle-legacy-current-state:' \|\| v_regnr\)\)/);
