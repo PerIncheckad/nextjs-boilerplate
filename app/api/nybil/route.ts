@@ -88,6 +88,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing inventoryData' }, { status: 400 });
     }
 
+    const sourceGarageItemId = body.inventoryData.source_garage_item_id;
+    const sourceGarageUpdatedAt = body.inventoryData.source_garage_updated_at;
+    if (
+      typeof sourceGarageItemId !== 'string'
+      || !sourceGarageItemId.trim()
+      || typeof sourceGarageUpdatedAt !== 'string'
+      || !sourceGarageUpdatedAt.trim()
+    ) {
+      return NextResponse.json({
+        error: 'Ny bil måste startas genom Hämta bilen från Garaget. Välj bilen i Garage-listan och försök igen.',
+      }, { status: 409 });
+    }
+
     const admin = createAdminClient();
     const response = await admin
       .from('nybil_inventering')

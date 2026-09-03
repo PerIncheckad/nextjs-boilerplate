@@ -8,6 +8,9 @@ const handoffClient = readFileSync('lib/garage-nybil-handoff-client.ts', 'utf8')
 const upstreamUi = readFileSync('app/nybil/garage-upstream-context.tsx', 'utf8');
 const prefillBridge = readFileSync('app/nybil/garage-prefill-bridge.tsx', 'utf8');
 const nybilClient = readFileSync('lib/nybil-api-client.ts', 'utf8');
+const nybilApi = readFileSync('app/api/nybil/route.ts', 'utf8');
+const nybilPage = readFileSync('app/nybil/page.tsx', 'utf8');
+const nybilFormGate = readFileSync('app/nybil/form-gate.tsx', 'utf8');
 const migration = readFileSync('migrations/20260902112000_nybil_upstream_information_continuity.sql', 'utf8');
 
 const carriedFields = [
@@ -82,8 +85,21 @@ test('prefill and editable upstream context share one exact Garage snapshot', ()
   assert.doesNotMatch(upstreamUi, /fetch\(`\/api\/garage\/nybil-handoff/);
 });
 
+test('Nybil cannot be started outside an exact Garage handoff', () => {
+  assert.match(nybilClient, /if \(!garageItemId\)/);
+  assert.match(nybilClient, /Ny bil måste startas genom Hämta bilen från Garaget/);
+  assert.match(nybilApi, /source_garage_item_id/);
+  assert.match(nybilApi, /source_garage_updated_at/);
+  assert.match(nybilApi, /status: 409/);
+  assert.match(nybilPage, /<NybilFormGate \/>/);
+  assert.doesNotMatch(nybilPage, /<FormClient \/>/);
+  assert.match(nybilFormGate, /useSearchParams/);
+  assert.match(nybilFormGate, /garage_item_id/);
+  assert.match(nybilFormGate, /Ny bil kan inte startas manuellt/);
+});
+
 test('Garage-origin Nybil save fails closed if the carried context or version is missing', () => {
-  assert.match(nybilClient, /if \(garageItemId && !garageContext\)/);
+  assert.match(nybilClient, /if \(!garageContext\)/);
   assert.match(nybilClient, /versionsstämpel/);
   assert.match(upstreamUi, /source_garage_updated_at/);
 });

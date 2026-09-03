@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import FormClient from './form-client';
+import NybilFormGate from './form-gate';
 import GarageNybilPrefillBridge from './garage-prefill-bridge';
 import GarageUpstreamContext from './garage-upstream-context';
 import GaragePicker from './garage-picker';
@@ -58,7 +58,7 @@ export default function NybilPage() {
       <GarageUpstreamContext />
 
       <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
-        <FormClient />
+        <NybilFormGate />
       </section>
 
       <footer className={styles.footer}>
