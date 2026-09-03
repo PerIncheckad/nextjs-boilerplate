@@ -95,8 +95,16 @@ export default function GarageLegacyEntryPanel() {
       });
       const body = await response.json() as { data?: CreateResult; error?: string };
       if (!response.ok) throw new Error(body.error ?? 'LEGACY-verifiering misslyckades');
-      setResult(body.data ?? null);
-      await load();
+      const created = body.data ?? null;
+      setResult(created);
+      if (created) {
+        setPreflight((current) => current ? {
+          ...current,
+          currentPeriod: created.period,
+          legacyEntry: created.entry,
+        } : current);
+      }
+      setConfirmedOwned(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'LEGACY-verifiering misslyckades');
     } finally {
