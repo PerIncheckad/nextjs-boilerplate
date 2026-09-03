@@ -6,6 +6,7 @@ import GarageV2Panel from './garage-v2-panel';
 import GarageWheelChangePanel from './garage-wheel-change-panel';
 import GarageVoidPanel from './garage-void-panel';
 import GarageAvvecklaPanel from './garage-avveckla-panel';
+import GarageAvvecklaTransportBookingPanel from './garage-avveckla-transport-booking-panel';
 import OrderWorkflowPanel from './order-workflow-panel';
 import styles from './garage-workspace.module.css';
 
@@ -53,6 +54,7 @@ export default function GaragePage() {
         <section id="avveckla" className={styles.section}>
           <div className={styles.sectionLabel}><strong>03 / AVVECKLA / UT</strong><span>AVVECKLA-punkter måste vara KLAR / AVSLUTADE innan verklig UT-händelse kan verifieras</span></div>
           <GarageAvvecklaPanel />
+          <GarageAvvecklaTransportBookingPanel />
           <OrderWorkflowPanel />
         </section>
 
