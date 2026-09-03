@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import CoreProductShell from '@/components/CoreProductShell';
-import TowerCockpitV2 from './tower-cockpit-v2';
+import TowerInvistoV2 from './tower-invisto-v2';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export default function TowerPage() {
       descriptor="VERKSAMHETEN JUST NU"
       eyebrow="INCHECKAD / TOWER"
     >
-      <TowerCockpitV2 />
+      <TowerInvistoV2 />
     </CoreProductShell>
   );
 }
