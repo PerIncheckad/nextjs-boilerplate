@@ -8,16 +8,17 @@ const cockpit = readFileSync(join(process.cwd(), 'app/tower/tower-invisto-v2.tsx
 
 const compact = (value: string) => value.replace(/\s+/g, ' ');
 
-test('Tower entrypoint uses the Invisto UX v2 product layer', () => {
+test('Tower entrypoint uses the Invisto product layer', () => {
   const source = compact(page);
   assert.match(source, /TowerInvistoV2/);
   assert.match(source, /VERKSAMHETEN JUST NU/);
   assert.doesNotMatch(source, /OperatorCockpit/);
 });
 
-test('cockpit leads with the governing user question', () => {
+test('cockpit leads with the governing user question and Invisto operational intelligence frame', () => {
   assert.match(cockpit, /Hur ser min verksamhet ut just nu\?/);
-  assert.match(cockpit, /Helhet först\. Avvikelse därefter/);
+  assert.match(cockpit, /INVISTO \/ OPERATIONAL INTELLIGENCE/);
+  assert.match(cockpit, /Position\. Rörelse\. Friktion\./);
 });
 
 test('cockpit remains a read-only consumer of the canonical Tower read model', () => {
@@ -32,18 +33,26 @@ test('cockpit remains a read-only consumer of the canonical Tower read model', (
 test('fleet truth is not fabricated when the active baseline is unavailable', () => {
   assert.match(cockpit, /value == null \? '—'/);
   assert.match(cockpit, /Inväntar underlag/);
-  assert.match(cockpit, /Full flottsanning inväntar AKTIVA-baseline/);
+  assert.match(cockpit, /AKTIVA BILAR/);
 });
 
-test('processes and attention remain visually and semantically separated', () => {
-  assert.match(cockpit, /VERKSAMHETEN I RÖRELSE/);
-  assert.match(cockpit, /Processer kan överlappa flottan och ska inte summeras med AKTIVA/);
-  assert.match(cockpit, /KRÄVER UPPMÄRKSAMHET/);
-});
-
-test('agreed major domains remain present without creating new Tower truth', () => {
-  for (const label of ['SALU', 'Garaget', 'Hjulskifte', 'Planerade inköp', 'Avveckla']) {
-    assert.match(cockpit, new RegExp(label));
+test('all locked Layer 1 states remain visible including SALU primary state', () => {
+  for (const state of ['AVAILABLE', 'RENTAL', 'DOWNTIME', 'PREPARATION', 'SALU', 'OTHER', 'UNKNOWN']) {
+    assert.match(cockpit, new RegExp(`primaryStates\\.${state}`));
   }
+  assert.match(cockpit, /SALU · primärstatus/);
+  assert.match(cockpit, /SALU · process/);
+});
+
+test('position movement friction and evidence are distinct product layers', () => {
+  for (const label of ['POSITION', 'RÖRELSE', 'FRIKTION', 'EVIDENS']) assert.match(cockpit, new RegExp(label));
+  assert.match(cockpit, /Planerade inköp/);
+  assert.match(cockpit, /Garaget/);
+  assert.match(cockpit, /Hjulskifte/);
+  assert.match(cockpit, /Avveckla/);
+});
+
+test('owner-process intervention principle remains intact', () => {
   assert.match(cockpit, /Gå till ansvarig process/);
+  assert.doesNotMatch(cockpit, /method:\s*['"]POST['"]/i);
 });
