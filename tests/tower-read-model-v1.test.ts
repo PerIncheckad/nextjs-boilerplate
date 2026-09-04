@@ -23,15 +23,20 @@ test('AKTIVA cannot silently fall back to partial journey coverage', () => {
   assert.match(route, /capturedPrimaryStateVehicles/);
 });
 
-test('primary operational states are separated from process overlays', () => {
-  assert.match(route, /AVAILABLE/);
-  assert.match(route, /RENTAL/);
-  assert.match(route, /DOWNTIME/);
-  assert.match(route, /PREPARATION/);
+test('primary operational states are complete and separated from process overlays', () => {
+  for (const state of ['AVAILABLE', 'RENTAL', 'DOWNTIME', 'PREPARATION', 'SALU', 'OTHER', 'UNKNOWN']) {
+    assert.match(route, new RegExp(`${state}: 0`));
+  }
+  assert.match(route, /state === 'SALU'/);
   assert.match(route, /processes:/);
   assert.match(route, /salu:/);
   assert.match(route, /garage:/);
   assert.match(route, /wheelChange:/);
+});
+
+test('SALU primary state is not folded into OTHER', () => {
+  assert.match(route, /state === 'AVAILABLE'[\s\S]*state === 'SALU'[\s\S]*primaryStateCounts\[state\] \+= 1/);
+  assert.match(route, /else \{\s*primaryStateCounts\.OTHER \+= 1/);
 });
 
 test('SALU uses open process flags and Garage excludes completed or Nybil-handed-off objects', () => {
