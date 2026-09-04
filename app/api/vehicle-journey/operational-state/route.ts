@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Operational state unavailable' }, { status: 503 });
   }
 
-  const [periodsResponse, eventsResponse, legacyResponse, rentedInResponse] = await Promise.all([
+  const [periodsResponse, eventsResponse, legacyResponse, rentedInResponse, rentedInReturnResponse] = await Promise.all([
     admin
       .from('vehicle_journey_periods')
       .select('period_id,period_type,started_at,ended_at,reason_code,reason_text,source_system,source_entity,source_record_id')
@@ -61,6 +61,11 @@ export async function GET(request: Request) {
       .select('intake_id,object_type,brand,model,odometer_km,known_damages,station,registered_at,registered_by_email,intake_method,historical_backfill')
       .eq('normalized_regnr', regnr)
       .maybeSingle(),
+    admin
+      .from('vehicle_rented_in_returns')
+      .select('return_id,intake_id,return_station,returned_to,odometer_km,damages_at_return,energy_type,energy_level_percent,returned_at,returned_by_email,historical_backfill')
+      .eq('normalized_regnr', regnr)
+      .maybeSingle(),
   ]);
 
   if (periodsResponse.error) {
@@ -71,14 +76,15 @@ export async function GET(request: Request) {
     console.error('[operational-state] Event query failed:', eventsResponse.error);
     return NextResponse.json({ error: 'Failed to load operational evidence' }, { status: 500 });
   }
-  if (legacyResponse.error || rentedInResponse.error) {
-    console.error('[operational-state] Classification query failed:', legacyResponse.error ?? rentedInResponse.error);
+  if (legacyResponse.error || rentedInResponse.error || rentedInReturnResponse.error) {
+    console.error('[operational-state] Classification query failed:', legacyResponse.error ?? rentedInResponse.error ?? rentedInReturnResponse.error);
     return NextResponse.json({ error: 'Failed to load operational classification' }, { status: 500 });
   }
 
   const model = buildOperationalReadModel(periodsResponse.data ?? [], eventsResponse.data ?? []);
   const legacy = legacyResponse.data;
   const rentedIn = rentedInResponse.data;
+  const rentedInReturn = rentedInReturnResponse.data;
 
   return NextResponse.json({
     data: {
@@ -93,7 +99,7 @@ export async function GET(request: Request) {
         objectTypeEvidenceReference: legacy.evidence_reference,
         objectTypeVerificationMethod: legacy.verification_method,
         historicalBackfill: legacy.historical_backfill,
-      } : rentedIn ? {
+      } : rentedIn && !rentedInReturn ? {
         objectType: 'INHYRD',
         objectTypeSource: 'RENTED_IN_QUICK_INTAKE',
         objectTypeSourceRecordId: rentedIn.intake_id,
@@ -108,6 +114,22 @@ export async function GET(request: Request) {
           knownDamages: rentedIn.known_damages,
         },
         historicalBackfill: rentedIn.historical_backfill,
+      } : rentedIn && rentedInReturn ? {
+        objectType: 'INHYRD_RETURNED',
+        objectTypeSource: 'RENTED_IN_RETURN',
+        objectTypeSourceRecordId: rentedInReturn.return_id,
+        objectTypeRegisteredAt: rentedIn.registered_at,
+        objectTypeReturnedAt: rentedInReturn.returned_at,
+        objectTypeReturnedByEmail: rentedInReturn.returned_by_email,
+        objectTypeReturnStation: rentedInReturn.return_station,
+        objectTypeReturnedTo: rentedInReturn.returned_to,
+        objectTypeReturnSnapshot: {
+          odometerKm: rentedInReturn.odometer_km,
+          damagesAtReturn: rentedInReturn.damages_at_return,
+          energyType: rentedInReturn.energy_type,
+          energyLevelPercent: rentedInReturn.energy_level_percent,
+        },
+        historicalBackfill: rentedInReturn.historical_backfill,
       } : {}),
     },
   });
