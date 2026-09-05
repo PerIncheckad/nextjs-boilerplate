@@ -12,6 +12,8 @@ export type StatusReadModelSourceData = {
   vehicleEdits: StatusRow[];
   damageComments: StatusRow[];
   checkinDamages: StatusRow[];
+  saluState: StatusRow | null;
+  currentWheelFact: StatusRow | null;
 };
 
 function isStatusRow(value: unknown): value is StatusRow {
@@ -22,6 +24,12 @@ function requireRows(value: unknown[], field: string): StatusRow[] {
   if (!value.every(isStatusRow)) {
     throw new Error(`Ogiltig statusdata: ${field}`);
   }
+  return value;
+}
+
+function requireOptionalRow(value: unknown | null, field: string): StatusRow | null {
+  if (value === null) return null;
+  if (!isStatusRow(value)) throw new Error(`Ogiltig statusdata: ${field}`);
   return value;
 }
 
@@ -42,5 +50,7 @@ export async function fetchStatusReadModelSourceData(regnr: string): Promise<Sta
     vehicleEdits: requireRows(payload.vehicleEdits, 'vehicleEdits'),
     damageComments: requireRows(payload.damageComments, 'damageComments'),
     checkinDamages: requireRows(payload.checkinDamages, 'checkinDamages'),
+    saluState: requireOptionalRow(payload.saluState, 'saluState'),
+    currentWheelFact: requireOptionalRow(payload.currentWheelFact, 'currentWheelFact'),
   };
 }

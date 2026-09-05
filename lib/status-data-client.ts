@@ -8,6 +8,8 @@ export type StatusDataPayload = {
   vehicleEdits: unknown[];
   damageComments: unknown[];
   checkinDamages: unknown[];
+  saluState: unknown | null;
+  currentWheelFact: unknown | null;
 };
 
 type StatusDataResponse = {
