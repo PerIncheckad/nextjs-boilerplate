@@ -37,7 +37,6 @@ as $$
     select distinct on (upper(regexp_replace(n.regnr, '\s+', '', 'g')))
       upper(regexp_replace(n.regnr, '\s+', '', 'g')) as regnr,
       nullif(trim(n.hjultyp), '') as nybil_wheel_type,
-      n.created_at as verified_at,
       nullif(trim(n.plats_aktuell_ort), '') as current_city,
       nullif(trim(n.plats_aktuell_station), '') as current_station
     from public.nybil_inventering n
@@ -61,7 +60,7 @@ as $$
   select
     u.regnr,
     coalesce(e.edited_wheel_type, c.checkin_wheel_type, n.nybil_wheel_type) as current_wheel_type,
-    coalesce(c.verified_at, n.verified_at) as latest_checkin_at,
+    c.verified_at as latest_checkin_at,
     coalesce(c.current_city, n.current_city) as current_city,
     coalesce(c.current_station, n.current_station) as current_station,
     s.current_saludatum
