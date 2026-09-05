@@ -42,6 +42,7 @@ export async function GET(request: Request) {
       arrivalsResponse,
       vehicleEditsResponse,
       saluStateResponse,
+      currentWheelFactResponse,
     ] = await Promise.all([
       admin
         .from('nybil_inventering')
@@ -77,6 +78,7 @@ export async function GET(request: Request) {
         .select('regnr,current_saludatum,updated_at')
         .eq('regnr', regnr)
         .maybeSingle(),
+      admin.rpc('get_current_wheel_fact', { p_regnr: regnr }),
     ]);
 
     const responses = [
@@ -88,6 +90,7 @@ export async function GET(request: Request) {
       arrivalsResponse,
       vehicleEditsResponse,
       saluStateResponse,
+      currentWheelFactResponse,
     ];
     const failed = responses.find((response) => response.error);
     if (failed?.error) throw failed.error;
@@ -122,6 +125,7 @@ export async function GET(request: Request) {
     if (checkinDamagesResponse.error) throw checkinDamagesResponse.error;
 
     const saluState = saluStateResponse.data ?? null;
+    const currentWheelFact = currentWheelFactResponse.data?.[0] ?? null;
     const nybil = nybilResponse.data
       ? {
           ...nybilResponse.data,
@@ -142,6 +146,7 @@ export async function GET(request: Request) {
         damageComments: damageCommentsResponse.data ?? [],
         checkinDamages: checkinDamagesResponse.data ?? [],
         saluState,
+        currentWheelFact,
       },
     });
   } catch (error) {
