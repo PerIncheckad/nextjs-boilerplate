@@ -17,10 +17,10 @@ test('wheel change is an operational Garage workflow backed by an L2 checkpoint'
   assert.match(migration, /checkpoint_id uuid not null references public\.vehicle_checkpoints/);
   assert.match(migration, /garage_wheel_changes_one_open_per_item_uidx/);
   assert.match(garagePage, /GarageWheelChangePanel/);
-  assert.match(garagePanel, /Processmotorn håller kontrollpunkten/);
+  assert.match(garagePanel, /Systemet hittar behovet\. Du bokar och bekräftar när arbetet är klart\./);
 });
 
-test('wheel change operational states cover required booking and execution flow', () => {
+test('wheel change operational states cover booking, optional legacy execution, completion and deviation', () => {
   for (const status of ['KRAVS', 'BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE']) {
     assert.match(migration, new RegExp(`'${status}'`));
     assert.match(garagePanel, new RegExp(status));
