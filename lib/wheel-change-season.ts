@@ -21,7 +21,7 @@ export function winterSeason(startYear: number): WheelSeason {
     type: 'WINTER',
     key: `WINTER_${startYear}`,
     targetWheelType: 'Vinterdäck',
-    startDate: isoDate(startYear, 10, 1),
+    startDate: startYear === 2026 ? isoDate(2026, 9, 5) : isoDate(startYear, 10, 1),
     endDate: isoDate(startYear + 1, 4, 15),
     saluExemptStart: isoDate(startYear, 10, 1),
     saluExemptEnd: isoDate(startYear, 12, 5),
@@ -53,7 +53,10 @@ export function operationalWheelSeason(now: Date): { season: WheelSeason; active
   const today = stockholmDate(now);
   const year = Number(today.slice(0, 4));
   const currentSummer = summerSeason(year);
-  const currentWinter = today >= isoDate(year, 10, 1) ? winterSeason(year) : winterSeason(year - 1);
+  const upcomingOrCurrentWinter = winterSeason(year);
+  const currentWinter = today >= upcomingOrCurrentWinter.startDate
+    ? upcomingOrCurrentWinter
+    : winterSeason(year - 1);
 
   // Business windows overlap 31 Mar-15 Apr. The campaign that started most recently
   // is operationally current, so summer takes precedence from 31 March.
@@ -65,8 +68,8 @@ export function operationalWheelSeason(now: Date): { season: WheelSeason; active
   }
 
   if (today < currentSummer.startDate) return { season: currentSummer, active: false };
-  if (today < isoDate(year, 10, 1)) return { season: winterSeason(year), active: false };
-  return { season: winterSeason(year), active: true };
+  if (today < upcomingOrCurrentWinter.startDate) return { season: upcomingOrCurrentWinter, active: false };
+  return { season: upcomingOrCurrentWinter, active: true };
 }
 
 export function normalizeWheelType(value: string | null | undefined): WheelType | null {
