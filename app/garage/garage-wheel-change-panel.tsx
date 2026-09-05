@@ -54,18 +54,14 @@ type Season = {
 
 type Counts = Record<WheelEligibility, number>;
 
-type Draft = {
-  status: WheelStatus;
+type BookingDraft = {
   booked_for: string;
-  supplier: string;
-  location: string;
-  note: string;
 };
 
 const statusLabel = (status: WheelStatus) => ({
-  KRAVS: 'Krävs / ej bokad',
+  KRAVS: 'Behöver skifte',
   BOKAD: 'Bokad',
-  PAGAENDE: 'Pågående',
+  PAGAENDE: 'Pågående (äldre flöde)',
   KLAR: 'Klar / verifierad',
   AVVIKELSE: 'Avvikelse',
 })[status];
@@ -77,16 +73,6 @@ const eligibilityLabel = (eligibility: WheelEligibility) => ({
   UNKNOWN_WHEEL_STATUS: 'Hjulstatus saknas',
 })[eligibility];
 
-const ALLOWED_STATUSES: Record<WheelStatus, WheelStatus[]> = {
-  KRAVS: ['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'],
-  BOKAD: ['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'],
-  PAGAENDE: ['BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'],
-  AVVIKELSE: ['KRAVS', 'BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'],
-  KLAR: ['KLAR'],
-};
-
-const allowedStatuses = (status: WheelStatus): WheelStatus[] => ALLOWED_STATUSES[status];
-
 function localDateTime(value: string | null): string {
   if (!value) return '';
   const date = new Date(value);
@@ -95,14 +81,14 @@ function localDateTime(value: string | null): string {
   return shifted.toISOString().slice(0, 16);
 }
 
-function makeDraft(item: WheelChange): Draft {
-  return {
-    status: item.status,
-    booked_for: localDateTime(item.booked_for),
-    supplier: item.supplier ?? '',
-    location: item.location ?? '',
-    note: item.note ?? '',
-  };
+function displayDateTime(value: string | null): string {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('sv-SE', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
 }
 
 function wheelVerificationLabel(item: WheelCandidate): string {
@@ -115,7 +101,7 @@ export default function GarageWheelChangePanel() {
   const [storageByRegnr, setStorageByRegnr] = useState<Record<string, WheelStorageFact>>({});
   const [season, setSeason] = useState<Season | null>(null);
   const [counts, setCounts] = useState<Counts>({ REQUIRES_CHANGE: 0, ALREADY_CORRECT: 0, SALU_EXEMPT: 0, UNKNOWN_WHEEL_STATUS: 0 });
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [bookingDrafts, setBookingDrafts] = useState<Record<string, BookingDraft>>({});
   const [showCompleted, setShowCompleted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -127,7 +113,13 @@ export default function GarageWheelChangePanel() {
     setCandidates(payload.candidates ?? []);
     setSeason(payload.season ?? null);
     if (payload.counts) setCounts(payload.counts);
-    setDrafts(Object.fromEntries(nextChanges.map((item) => [item.wheel_change_id, makeDraft(item)])));
+    setBookingDrafts((current) => {
+      const next = { ...current };
+      for (const item of nextChanges) {
+        if (!next[item.wheel_change_id]) next[item.wheel_change_id] = { booked_for: localDateTime(item.booked_for) };
+      }
+      return next;
+    });
   }, []);
 
   const applyStoragePayload = useCallback((payload: { storage?: WheelStorageFact[] }) => {
@@ -155,26 +147,8 @@ export default function GarageWheelChangePanel() {
   }, [applyPayload, applyStoragePayload]);
 
   useEffect(() => {
-    let active = true;
-    void Promise.all([
-      fetch('/api/garage/wheel-changes', { cache: 'no-store' }),
-      fetch('/api/garage/wheel-storage', { cache: 'no-store' }),
-    ])
-      .then(async ([wheelResponse, storageResponse]) => {
-        const [wheelPayload, storagePayload] = await Promise.all([wheelResponse.json(), storageResponse.json()]);
-        if (!wheelResponse.ok) throw new Error(wheelPayload?.error ?? 'Kunde inte läsa hjulskiften');
-        if (!storageResponse.ok) throw new Error(storagePayload?.error ?? 'Kunde inte läsa hjulförvaring');
-        if (!active) return;
-        applyPayload(wheelPayload.data ?? {});
-        applyStoragePayload(storagePayload.data ?? {});
-        setError(null);
-      })
-      .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa hjulskiften');
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [applyPayload, applyStoragePayload]);
+    void load();
+  }, [load]);
 
   const openRegnrs = useMemo(
     () => new Set(wheelChanges.filter((item) => item.status !== 'KLAR').map((item) => item.regnr)),
@@ -206,33 +180,56 @@ export default function GarageWheelChangePanel() {
     [wheelChanges, showCompleted],
   );
 
-  const startWheelChange = async (regnr: string) => {
-    setSavingId(`NEW:${regnr}`);
+  const updateBookingDraft = (key: string, bookedFor: string) => {
+    setBookingDrafts((current) => ({ ...current, [key]: { booked_for: bookedFor } }));
+  };
+
+  const candidateAction = async (regnr: string, action: 'BOOK' | 'COMPLETE') => {
+    const draft = bookingDrafts[`NEW:${regnr}`]?.booked_for ?? '';
+    if (action === 'BOOK' && !draft) {
+      setError('Välj bokad tid innan du bokar.');
+      return;
+    }
+
+    setSavingId(`${action}:${regnr}`);
     setError(null);
     try {
-      const response = await fetch('/api/garage/wheel-changes', {
+      const response = await fetch('/api/garage/wheel-changes/simple', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ regnr }),
+        body: JSON.stringify({
+          action,
+          regnr,
+          booked_for: action === 'BOOK' ? draft : null,
+        }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte starta hjulskifte');
+      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte uppdatera hjulskiftet');
       await load();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Kunde inte starta hjulskifte');
+      setError(saveError instanceof Error ? saveError.message : 'Kunde inte uppdatera hjulskiftet');
     } finally {
       setSavingId(null);
     }
   };
 
-  const updateDraft = (id: string, patch: Partial<Draft>) => {
-    setDrafts((current) => ({ ...current, [id]: { ...current[id], ...patch } }));
-  };
+  const updateExisting = async (item: WheelChange, status: 'BOKAD' | 'KLAR' | 'AVVIKELSE') => {
+    const bookedFor = bookingDrafts[item.wheel_change_id]?.booked_for ?? localDateTime(item.booked_for);
+    if (status === 'BOKAD' && !bookedFor) {
+      setError('Välj bokad tid innan du bokar.');
+      return;
+    }
 
-  const saveWheelChange = async (item: WheelChange) => {
-    const draft = drafts[item.wheel_change_id] ?? makeDraft(item);
-    if (draft.status === 'BOKAD' && !draft.booked_for) return setError('Bokad tid krävs när status är Bokad.');
-    if (draft.status === 'AVVIKELSE' && !draft.note.trim()) return setError('Avvikelse kräver kommentar.');
+    let note = item.note ?? '';
+    if (status === 'AVVIKELSE') {
+      const entered = window.prompt('Beskriv avvikelsen. Historiken sparas.', note);
+      if (entered === null) return;
+      if (!entered.trim()) {
+        setError('Avvikelse kräver kommentar.');
+        return;
+      }
+      note = entered.trim();
+    }
 
     setSavingId(item.wheel_change_id);
     setError(null);
@@ -242,18 +239,18 @@ export default function GarageWheelChangePanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           wheel_change_id: item.wheel_change_id,
-          status: draft.status,
-          booked_for: draft.booked_for || null,
-          supplier: draft.supplier,
-          location: draft.location,
-          note: draft.note,
+          status,
+          booked_for: status === 'BOKAD' ? bookedFor : item.booked_for,
+          supplier: item.supplier,
+          location: item.location,
+          note,
         }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte uppdatera hjulskifte');
+      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte uppdatera hjulskiftet');
       await load();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Kunde inte uppdatera hjulskifte');
+      setError(saveError instanceof Error ? saveError.message : 'Kunde inte uppdatera hjulskiftet');
     } finally {
       setSavingId(null);
     }
@@ -266,7 +263,7 @@ export default function GarageWheelChangePanel() {
           <div className={styles.eyebrow}>INCHECKAD / GARAGET / HJULSKIFTE</div>
           <h2>Hjulskifte</h2>
           <p>{season ? `${season.type === 'WINTER' ? 'Vinter' : 'Sommar'} · ${season.startDate}–${season.endDate} · mål ${season.targetWheelType}${season.active ? '' : ' · FÖRHANDSVY'}` : 'Läser säsongsregel…'}</p>
-          <p>Garaget hanterar arbetet. Processmotorn håller kontrollpunkten och Tower visar läget.</p>
+          <p>Normalflöde: <strong>Boka → Klarmarkera.</strong> Systemet behåller kontrollpunkt och historik.</p>
         </div>
         <label className={styles.toggle}>
           <input type="checkbox" checked={showCompleted} onChange={(event) => setShowCompleted(event.target.checked)} />
@@ -305,17 +302,23 @@ export default function GarageWheelChangePanel() {
       {actionableCandidates.length > 0 ? (
         <div className={styles.tableWrap}>
           <table className={styles.candidateTable} aria-label="Bilar redo för hjulskifte">
-            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Hjulförvaring</th><th>Bedömning</th>{season?.active ? <th /> : null}</tr></thead>
-            <tbody>{actionableCandidates.map((item) => (
-              <tr key={item.regnr}>
-                <td><strong>{item.regnr}</strong><span className={styles.subtle}>{wheelVerificationLabel(item)}</span></td>
-                <td>{item.current_wheel_type ?? '—'}</td>
-                <td>{item.current_saludatum ?? '—'}</td>
-                <td><strong>{storageByRegnr[item.regnr]?.wheel_storage_location}</strong></td>
-                <td><strong>{eligibilityLabel(item.eligibility)}</strong></td>
-                {season?.active ? <td><button type="button" className={styles.primaryButton} disabled={savingId === `NEW:${item.regnr}`} onClick={() => void startWheelChange(item.regnr)}>{savingId === `NEW:${item.regnr}` ? 'Startar…' : 'Starta'}</button></td> : null}
-              </tr>
-            ))}</tbody>
+            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>Hjulförvaring</th><th>Bokad tid</th><th>Åtgärd</th></tr></thead>
+            <tbody>{actionableCandidates.map((item) => {
+              const key = `NEW:${item.regnr}`;
+              const bookedFor = bookingDrafts[key]?.booked_for ?? '';
+              return (
+                <tr key={item.regnr}>
+                  <td><strong>{item.regnr}</strong><span className={styles.subtle}>{wheelVerificationLabel(item)}</span></td>
+                  <td>{item.current_wheel_type ?? '—'}<span className={styles.subtle}>{eligibilityLabel(item.eligibility)}</span></td>
+                  <td><strong>{storageByRegnr[item.regnr]?.wheel_storage_location}</strong></td>
+                  <td><input aria-label={`Bokad tid ${item.regnr}`} type="datetime-local" value={bookedFor} onChange={(event) => updateBookingDraft(key, event.target.value)} /></td>
+                  <td className={styles.actionCell}>
+                    <button type="button" className={styles.primaryButton} disabled={!season?.active || !bookedFor || savingId !== null} onClick={() => void candidateAction(item.regnr, 'BOOK')}>{savingId === `BOOK:${item.regnr}` ? 'Bokar…' : 'Boka'}</button>
+                    <button type="button" className={styles.secondaryButton} disabled={!season?.active || savingId !== null} onClick={() => void candidateAction(item.regnr, 'COMPLETE')}>{savingId === `COMPLETE:${item.regnr}` ? 'Sparar…' : 'Redan utfört / Klar'}</button>
+                  </td>
+                </tr>
+              );
+            })}</tbody>
           </table>
         </div>
       ) : null}
@@ -338,27 +341,31 @@ export default function GarageWheelChangePanel() {
       ) : null}
 
       <div className={styles.tableWrap}>
-        <table className={styles.activeTable}>
+        <table className={styles.activeTable} aria-label="Aktiva och avslutade hjulskiften">
           <thead>
-            <tr><th>Bil</th><th>Säsong</th><th>Status</th><th>Bokad tid</th><th>Leverantör</th><th>Plats</th><th>Kommentar / avvikelse</th><th>Kontroll</th><th /></tr>
+            <tr><th>Bil</th><th>Status</th><th>Bokad tid</th><th>Plats</th><th>Kontroll</th><th>Åtgärd</th></tr>
           </thead>
           <tbody>
             {visibleChanges.length === 0 ? (
-              <tr><td colSpan={9} className={styles.empty}>Inga aktiva hjulskiften.</td></tr>
+              <tr><td colSpan={6} className={styles.empty}>Inga aktiva hjulskiften.</td></tr>
             ) : visibleChanges.map((item) => {
-              const draft = drafts[item.wheel_change_id] ?? makeDraft(item);
               const closed = item.status === 'KLAR';
+              const bookingKey = item.wheel_change_id;
+              const bookedFor = bookingDrafts[bookingKey]?.booked_for ?? localDateTime(item.booked_for);
+              const canBook = item.status === 'KRAVS' || item.status === 'AVVIKELSE';
+              const canComplete = item.status !== 'KLAR';
               return (
                 <tr key={item.wheel_change_id} className={item.status === 'AVVIKELSE' ? styles.deviationRow : undefined}>
-                  <td><strong>{item.regnr}</strong><span className={styles.subtle}>{item.target_wheel_type ?? 'Legacy'}</span></td>
-                  <td>{item.season_key ?? '—'}</td>
-                  <td><select value={draft.status} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { status: event.target.value as WheelStatus })}>{allowedStatuses(item.status).map((status) => <option key={status} value={status}>{statusLabel(status)}</option>)}</select></td>
-                  <td><input type="datetime-local" value={draft.booked_for} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { booked_for: event.target.value })} /></td>
-                  <td><input value={draft.supplier} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { supplier: event.target.value })} placeholder="Leverantör" /></td>
-                  <td><input value={draft.location} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { location: event.target.value })} placeholder="Plats" /></td>
-                  <td><input value={draft.note} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { note: event.target.value })} placeholder="Kommentar" /></td>
-                  <td><strong>{statusLabel(item.status)}</strong><span className={styles.subtle}>L2 · {item.checkpoint_id.slice(0, 8)}</span></td>
-                  <td>{closed ? <span className={styles.done}>Verifierad</span> : <button type="button" className={styles.primaryButton} disabled={savingId === item.wheel_change_id} onClick={() => void saveWheelChange(item)}>{savingId === item.wheel_change_id ? 'Sparar…' : 'Spara'}</button>}</td>
+                  <td><strong>{item.regnr}</strong><span className={styles.subtle}>{item.target_wheel_type ?? '—'} · {item.season_key ?? '—'}</span></td>
+                  <td><strong>{statusLabel(item.status)}</strong></td>
+                  <td>{canBook ? <input aria-label={`Bokad tid ${item.regnr}`} type="datetime-local" value={bookedFor} onChange={(event) => updateBookingDraft(bookingKey, event.target.value)} /> : displayDateTime(item.booked_for)}</td>
+                  <td>{item.location ?? '—'}</td>
+                  <td><span className={styles.subtle}>L2 · {item.checkpoint_id.slice(0, 8)}</span>{closed ? <span className={styles.done}>Verifierad</span> : null}</td>
+                  <td className={styles.actionCell}>
+                    {canBook ? <button type="button" className={styles.primaryButton} disabled={!bookedFor || savingId !== null} onClick={() => void updateExisting(item, 'BOKAD')}>{savingId === item.wheel_change_id ? 'Sparar…' : 'Boka'}</button> : null}
+                    {canComplete ? <button type="button" className={styles.primaryButton} disabled={savingId !== null} onClick={() => void updateExisting(item, 'KLAR')}>{savingId === item.wheel_change_id ? 'Sparar…' : 'Klarmarkera'}</button> : null}
+                    {!closed ? <button type="button" className={styles.secondaryButton} disabled={savingId !== null} onClick={() => void updateExisting(item, 'AVVIKELSE')}>Avvikelse</button> : null}
+                  </td>
                 </tr>
               );
             })}
