@@ -27,7 +27,7 @@ type WheelChange = {
 type WheelCandidate = {
   regnr: string;
   current_wheel_type: string | null;
-  latest_checkin_at: string;
+  latest_checkin_at: string | null;
   current_city: string | null;
   current_station: string | null;
   current_saludatum: string | null;
@@ -103,6 +103,10 @@ function makeDraft(item: WheelChange): Draft {
     location: item.location ?? '',
     note: item.note ?? '',
   };
+}
+
+function wheelVerificationLabel(item: WheelCandidate): string {
+  return item.latest_checkin_at ? `Check-in ${item.latest_checkin_at.slice(0, 10)}` : 'Nybil-baseline · före första Check-in';
 }
 
 export default function GarageWheelChangePanel() {
@@ -284,12 +288,12 @@ export default function GarageWheelChangePanel() {
       {missingStorageCandidates.length > 0 ? (
         <div className={styles.tableWrap}>
           <table className={styles.candidateTable} aria-label="Bilar som saknar hjulförvaring">
-            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>Senaste Check-in</th><th>Hjulförvaring</th><th>Åtgärd</th></tr></thead>
+            <thead><tr><th>Bil</th><th>Nu på bilen</th><th>Senaste hjulverifiering</th><th>Hjulförvaring</th><th>Åtgärd</th></tr></thead>
             <tbody>{missingStorageCandidates.map((item) => (
               <tr key={`MISSING-STORAGE:${item.regnr}`}>
                 <td><strong>{item.regnr}</strong></td>
                 <td>{item.current_wheel_type ?? '—'}</td>
-                <td>{item.latest_checkin_at.slice(0, 10)}</td>
+                <td>{wheelVerificationLabel(item)}</td>
                 <td><strong>Saknas</strong><span className={styles.subtle}>Ange registrerad förvaring i Status.</span></td>
                 <td><a className={styles.secondaryButton} href={`/status?reg=${encodeURIComponent(item.regnr)}`}>Ange förvaring</a></td>
               </tr>
@@ -304,7 +308,7 @@ export default function GarageWheelChangePanel() {
             <thead><tr><th>Bil</th><th>Nu på bilen</th><th>SALU-datum</th><th>Hjulförvaring</th><th>Bedömning</th>{season?.active ? <th /> : null}</tr></thead>
             <tbody>{actionableCandidates.map((item) => (
               <tr key={item.regnr}>
-                <td><strong>{item.regnr}</strong><span className={styles.subtle}>Check-in {item.latest_checkin_at.slice(0, 10)}</span></td>
+                <td><strong>{item.regnr}</strong><span className={styles.subtle}>{wheelVerificationLabel(item)}</span></td>
                 <td>{item.current_wheel_type ?? '—'}</td>
                 <td>{item.current_saludatum ?? '—'}</td>
                 <td><strong>{storageByRegnr[item.regnr]?.wheel_storage_location}</strong></td>
@@ -323,7 +327,7 @@ export default function GarageWheelChangePanel() {
             <tbody>{unknownCandidates.map((item) => (
               <tr key={`UNKNOWN:${item.regnr}`}>
                 <td><strong>{item.regnr}</strong></td>
-                <td>{item.latest_checkin_at.slice(0, 10)}</td>
+                <td>{item.latest_checkin_at ? item.latest_checkin_at.slice(0, 10) : 'Ingen ännu'}</td>
                 <td>{item.current_city ?? '—'}{item.current_station ? ` / ${item.current_station}` : ''}</td>
                 <td><strong>{eligibilityLabel(item.eligibility)}</strong><span className={styles.subtle}>Verifiera hjultyp innan Hjulskifte kan avgöras.</span></td>
                 <td><a className={styles.secondaryButton} href={`/status?reg=${encodeURIComponent(item.regnr)}`}>Verifiera hjultyp</a></td>
@@ -354,7 +358,7 @@ export default function GarageWheelChangePanel() {
                   <td><input value={draft.location} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { location: event.target.value })} placeholder="Plats" /></td>
                   <td><input value={draft.note} disabled={closed} onChange={(event) => updateDraft(item.wheel_change_id, { note: event.target.value })} placeholder="Kommentar" /></td>
                   <td><strong>{statusLabel(item.status)}</strong><span className={styles.subtle}>L2 · {item.checkpoint_id.slice(0, 8)}</span></td>
-                  <td>{closed ? <span className={styles.done}>Verifierad</span> : <button type="button" className={styles.primaryButton} disabled={savingId === item.wheel_change_id} onClick={() => void saveWheelChange(item)}>{savingId === item.wheel_change_id ? 'Sparar…' : 'Spara'}</button>}</td>
+                  <td>{closed ? <span className={styles.done}>Verifierad</span> : <button type="button" className={styles.primaryButton} disabled={savingId === item.wheel_change_id} onClick={() => void saveWheelChange(item)}>{savingId === item.wheel_change_id ? 'Sparar…' : 'Spara'}</button></td>
                 </tr>
               );
             })}
