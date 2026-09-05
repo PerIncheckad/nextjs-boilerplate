@@ -41,6 +41,7 @@ export async function GET(request: Request) {
       checkinsResponse,
       arrivalsResponse,
       vehicleEditsResponse,
+      saluStateResponse,
     ] = await Promise.all([
       admin
         .from('nybil_inventering')
@@ -71,6 +72,11 @@ export async function GET(request: Request) {
         .select('*')
         .eq('regnr', regnr)
         .order('edited_at', { ascending: false }),
+      admin
+        .from('salu_vehicle_state')
+        .select('regnr,current_saludatum,updated_at')
+        .eq('regnr', regnr)
+        .maybeSingle(),
     ]);
 
     const responses = [
@@ -81,6 +87,7 @@ export async function GET(request: Request) {
       checkinsResponse,
       arrivalsResponse,
       vehicleEditsResponse,
+      saluStateResponse,
     ];
     const failed = responses.find((response) => response.error);
     if (failed?.error) throw failed.error;
@@ -114,9 +121,18 @@ export async function GET(request: Request) {
     if (damageCommentsResponse.error) throw damageCommentsResponse.error;
     if (checkinDamagesResponse.error) throw checkinDamagesResponse.error;
 
+    const saluState = saluStateResponse.data ?? null;
+    const nybil = nybilResponse.data
+      ? {
+          ...nybilResponse.data,
+          saludatum: saluState?.current_saludatum ?? nybilResponse.data.saludatum,
+          saludatum_source: saluState?.current_saludatum ? 'SALU' : 'NYBIL',
+        }
+      : null;
+
     return NextResponse.json({
       data: {
-        nybil: nybilResponse.data ?? null,
+        nybil,
         vehicle: vehicleResponse.data ?? [],
         damages,
         legacyDamages: legacyDamagesResponse.data ?? [],
@@ -125,6 +141,7 @@ export async function GET(request: Request) {
         vehicleEdits: vehicleEditsResponse.data ?? [],
         damageComments: damageCommentsResponse.data ?? [],
         checkinDamages: checkinDamagesResponse.data ?? [],
+        saluState,
       },
     });
   } catch (error) {
