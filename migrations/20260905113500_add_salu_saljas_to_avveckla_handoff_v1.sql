@@ -52,6 +52,7 @@ declare
   v_handoff jsonb;
   v_handoff_id uuid;
   v_model text;
+  v_previous_direction text;
   v_now timestamptz := pg_catalog.clock_timestamp();
 begin
   if p_flag_id is null then
@@ -90,6 +91,8 @@ begin
     end if;
 
     if v_item.garage_direction is distinct from 'UT' then
+      v_previous_direction := v_item.garage_direction;
+
       update public.garage_items
       set garage_direction = 'UT',
           planning_reason = 'SALU',
@@ -107,7 +110,7 @@ begin
         changed_by
       ) values (
         v_item.garage_item_id,
-        null,
+        v_previous_direction,
         'UT',
         'SALU beslut SÄLJAS',
         v_now,
@@ -185,7 +188,7 @@ begin
     'SALU',
     'salu_flags',
     v_flag.flag_id::text,
-    'SALU_FLAG_CLOSED_MANUALLY:' || v_flag.flag_id::text,
+    'salu-manual-close:' || v_flag.flag_id::text,
     pg_catalog.jsonb_build_object(
       'flagId', v_flag.flag_id,
       'closureOutcome', v_flag.closure_outcome,
