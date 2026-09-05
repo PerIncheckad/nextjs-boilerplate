@@ -15,7 +15,7 @@ type WheelStatus = (typeof STATUSES)[number];
 type CandidateSource = {
   regnr: string;
   current_wheel_type: string | null;
-  latest_checkin_at: string;
+  latest_checkin_at: string | null;
   current_city: string | null;
   current_station: string | null;
   current_saludatum: string | null;
@@ -98,9 +98,7 @@ async function readSoldRegnrs(admin: ReturnType<typeof createAdminClient>): Prom
   const latestSoldEdits = new Map<string, string>();
   for (const edit of soldEditsResponse.data ?? []) {
     const regnr = cleanRegnr(edit.regnr);
-    if (regnr && !latestSoldEdits.has(regnr)) {
-      latestSoldEdits.set(regnr, edit.new_value ?? '');
-    }
+    if (regnr && !latestSoldEdits.has(regnr)) latestSoldEdits.set(regnr, edit.new_value ?? '');
   }
 
   const soldRegnrs = new Set<string>();
@@ -190,7 +188,7 @@ export async function GET(request: Request) {
         },
         candidates,
         counts,
-        semantics: 'LATEST_COMPLETED_CHECKIN_PLUS_CURRENT_SALU_EXCLUDING_SOLD',
+        semantics: 'STATUS_THEN_COMPLETED_CHECKIN_THEN_NYBIL_EXCLUDING_SOLD',
       },
     });
   } catch (error) {
@@ -213,6 +211,18 @@ export async function POST(request: Request) {
   const garageItemId = cleanUuid(body.garage_item_id ?? body.garageItemId);
   const regnr = cleanRegnr(body.regnr);
   const note = cleanText(body.note, 1000);
+  const requestedStatus = cleanStatus(body.status);
+  const rawBookedFor = body.booked_for ?? body.bookedFor;
+  const bookedFor = cleanTimestamp(rawBookedFor);
+  const supplier = cleanText(body.supplier, 200);
+  const location = cleanText(body.location, 200);
+
+  if (body.status !== null && body.status !== undefined && !requestedStatus) {
+    return NextResponse.json({ error: 'Ogiltig status' }, { status: 400 });
+  }
+  if (rawBookedFor !== null && rawBookedFor !== undefined && rawBookedFor !== '' && !bookedFor) {
+    return NextResponse.json({ error: 'Ogiltigt bokningsdatum' }, { status: 400 });
+  }
 
   let admin: ReturnType<typeof createAdminClient>;
   try {
@@ -227,6 +237,12 @@ export async function POST(request: Request) {
       const operational = operationalWheelSeason(new Date());
       if (!operational.active) {
         return NextResponse.json({ error: 'Hjulskiftesäsongen har inte startat ännu' }, { status: 409 });
+      }
+      if (requestedStatus && requestedStatus !== 'BOKAD' && requestedStatus !== 'KLAR') {
+        return NextResponse.json({ error: 'Snabbflödet stöder endast BOKAD eller KLAR' }, { status: 400 });
+      }
+      if (requestedStatus === 'BOKAD' && !bookedFor) {
+        return NextResponse.json({ error: 'Bokad tid krävs när hjulskiftet är BOKAD' }, { status: 400 });
       }
 
       const [existingSeasonalResponse, soldRegnrs, source] = await Promise.all([
@@ -248,7 +264,7 @@ export async function POST(request: Request) {
       }
 
       const candidate = source.find((item) => cleanRegnr(item.regnr) === regnr);
-      if (!candidate) return NextResponse.json({ error: 'Bilen saknar verifierad Check-in för hjulbedömning' }, { status: 409 });
+      if (!candidate) return NextResponse.json({ error: 'Bilen saknar verifierad hjulstatus för hjulbedömning' }, { status: 409 });
 
       const eligibility = classifyWheelEligibility(
         operational.season,
@@ -262,6 +278,27 @@ export async function POST(request: Request) {
             ? 'Bilen omfattas av SALU-undantaget'
             : 'Bilen saknar verifierad hjulstatus';
         return NextResponse.json({ error: message }, { status: 409 });
+      }
+
+      if (requestedStatus) {
+        const { data, error } = await admin.rpc('open_garage_wheel_change_for_vehicle', {
+          p_regnr: regnr,
+          p_season_key: operational.season.key,
+          p_target_wheel_type: operational.season.targetWheelType,
+          p_status: requestedStatus,
+          p_booked_for: bookedFor,
+          p_supplier: supplier,
+          p_location: location,
+          p_note: note,
+          p_actor_id: verification.user.id,
+          p_actor_email: verification.user.email,
+        });
+        if (error) {
+          const response = rpcErrorResponse(error);
+          if (response) return response;
+          throw error;
+        }
+        return NextResponse.json({ data }, { status: 201 });
       }
 
       const { data, error } = await admin.rpc('create_garage_wheel_change_for_vehicle', {

@@ -18,5 +18,5 @@ test('sold vehicles are filtered from seasonal candidates and rejected on direct
   assert.match(wheelRoute, /!soldRegnrs\.has\(regnr\)/);
   assert.match(wheelRoute, /if \(soldRegnrs\.has\(regnr\)\)/);
   assert.match(wheelRoute, /Bilen är markerad som såld/);
-  assert.match(wheelRoute, /LATEST_COMPLETED_CHECKIN_PLUS_CURRENT_SALU_EXCLUDING_SOLD/);
+  assert.match(wheelRoute, /STATUS_THEN_COMPLETED_CHECKIN_THEN_NYBIL_EXCLUDING_SOLD/);
 });

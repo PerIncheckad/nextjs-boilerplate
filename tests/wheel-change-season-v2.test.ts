@@ -61,19 +61,20 @@ test('outside a campaign the next campaign is read-only preview', () => {
   assert.equal(result.season.key, 'WINTER_2026');
 });
 
-test('season v2 keeps verified source data and direct regnr workflow inside Garage', () => {
+test('season v2 base plus current API keeps verified source data and direct regnr workflow inside Garage', () => {
   assert.match(migration, /get_wheel_change_candidate_source/);
   assert.match(migration, /c\.status = 'COMPLETED'/);
   assert.match(migration, /s\.current_saludatum/);
   assert.match(migration, /create_garage_wheel_change_for_vehicle/);
   assert.match(migration, /HJULSKIFTE_SEASON/);
-  assert.match(api, /LATEST_COMPLETED_CHECKIN_PLUS_CURRENT_SALU/);
+  assert.match(api, /STATUS_THEN_COMPLETED_CHECKIN_THEN_NYBIL_EXCLUDING_SOLD/);
   assert.match(api, /eligibility !== 'REQUIRES_CHANGE'/);
   assert.match(api, /Hjulskiftesäsongen har inte startat ännu/);
 });
 
-test('Garage UI does not offer backend-invalid status transitions', () => {
-  assert.match(panel, /KRAVS: \['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'\]/);
-  assert.match(panel, /BOKAD: \['KRAVS', 'BOKAD', 'PAGAENDE', 'AVVIKELSE'\]/);
-  assert.match(panel, /PAGAENDE: \['BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'\]/);
+test('Garage UI only offers valid simplified status transitions', () => {
+  assert.match(panel, /if \(item\.status === 'KRAVS'\) return \['KRAVS', 'BOKAD', 'KLAR', 'AVVIKELSE'\]/);
+  assert.match(panel, /if \(item\.status === 'BOKAD'\) return \['BOKAD', 'KLAR', 'AVVIKELSE'\]/);
+  assert.match(panel, /if \(item\.status === 'PAGAENDE'\) return \['PAGAENDE', 'BOKAD', 'KLAR', 'AVVIKELSE'\]/);
+  assert.doesNotMatch(panel, /return \['KRAVS', 'BOKAD', 'PAGAENDE'/);
 });
