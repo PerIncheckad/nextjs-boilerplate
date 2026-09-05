@@ -29,7 +29,7 @@ test('API only exposes explicit BOKAD or KLAR shortcuts', () => {
 });
 
 test('operator UI is reduced to Boka and verified Klar in the normal candidate flow', () => {
-  assert.match(panel, />Boka</);
+  assert.match(panel, /'Bokar…' : 'Boka'/);
   assert.match(panel, /Redan utfört \/ Klar/);
   assert.match(panel, /Systemet hittar behovet\. Du bokar och bekräftar när arbetet är klart\./);
   assert.doesNotMatch(panel, /Startar…/);
