@@ -12,15 +12,19 @@ const migration = readFileSync('migrations/20260831031500_add_wheel_change_seaso
 const api = readFileSync('app/api/garage/wheel-changes/route.ts', 'utf8');
 const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
 
-test('winter season and SALU exemption use the locked dates', () => {
+test('winter 2026 is opened for the actual high season while SALU cutoff stays locked', () => {
   const season = winterSeason(2026);
-  assert.equal(season.startDate, '2026-10-01');
+  assert.equal(season.startDate, '2026-09-05');
   assert.equal(season.endDate, '2027-04-15');
   assert.equal(season.saluExemptEnd, '2026-12-05');
   assert.equal(classifyWheelEligibility(season, 'Sommardäck', '2026-09-15'), 'SALU_EXEMPT');
   assert.equal(classifyWheelEligibility(season, 'Sommardäck', '2026-12-05'), 'SALU_EXEMPT');
   assert.equal(classifyWheelEligibility(season, 'Sommardäck', '2026-12-06'), 'REQUIRES_CHANGE');
   assert.equal(classifyWheelEligibility(season, 'Vinterdäck', '2026-11-20'), 'ALREADY_CORRECT');
+});
+
+test('later winter campaigns retain the ordinary October opening unless explicitly changed', () => {
+  assert.equal(winterSeason(2027).startDate, '2027-10-01');
 });
 
 test('summer season and SALU exemption use the locked dates', () => {
@@ -37,6 +41,12 @@ test('summer season and SALU exemption use the locked dates', () => {
 test('missing wheel evidence never infers a required change', () => {
   assert.equal(classifyWheelEligibility(winterSeason(2026), null, null), 'UNKNOWN_WHEEL_STATUS');
   assert.equal(classifyWheelEligibility(summerSeason(2027), '', '2027-05-01'), 'UNKNOWN_WHEEL_STATUS');
+});
+
+test('WINTER_2026 is operational on the emergency opening date', () => {
+  const result = operationalWheelSeason(new Date('2026-09-05T12:00:00Z'));
+  assert.equal(result.active, true);
+  assert.equal(result.season.key, 'WINTER_2026');
 });
 
 test('summer campaign takes operational precedence when business windows overlap', () => {
