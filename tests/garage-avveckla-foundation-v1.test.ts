@@ -4,8 +4,10 @@ import test from 'node:test';
 
 const migration = readFileSync('migrations/20260902230000_add_garage_avveckla_foundation_v1.sql', 'utf8');
 const api = readFileSync('app/api/garage/avveckla/route.ts', 'utf8');
-const panel = readFileSync('app/garage/garage-avveckla-panel.tsx', 'utf8');
-const page = readFileSync('app/garage/page.tsx', 'utf8');
+const panel = readFileSync('app/avveckla/avveckla-panel.tsx', 'utf8');
+const avvecklaPage = readFileSync('app/avveckla/page.tsx', 'utf8');
+const garagePage = readFileSync('app/garage/page.tsx', 'utf8');
+const handoff = readFileSync('app/garage/garage-avveckla-handoff-panel.tsx', 'utf8');
 
 test('AVVECKLA has a dedicated case, point and append-only event contract', () => {
   assert.match(migration, /create table public\.garage_avveckla_cases/i);
@@ -20,8 +22,9 @@ test('AVVECKLA starts manually on an exact UT Garage episode with a reason', () 
   assert.match(migration, /garage_direction <> 'UT'/i);
   assert.match(migration, /Orsak krävs/i);
   assert.match(api, /action === 'START_CASE'/);
-  assert.match(panel, /Starta AVVECKLA/);
-  assert.match(panel, /Orsak/);
+  assert.match(handoff, /Starta AVVECKLA/);
+  assert.match(handoff, /Orsak/);
+  assert.match(handoff, /avveckla_case_id/);
 });
 
 test('AVVECKLA points are explicit OPEN to CLOSED work with structured outcome', () => {
@@ -58,7 +61,10 @@ test('A reserves exact terminal event identities without implementing B terminal
   assert.doesNotMatch(api, /VERIFY_UT|COMPLETE_CASE|OVERLAMNING_VERIFIERAD|TRANSPORTOR_HAMTAT_VERIFIERAD|AVSTALLNING_VERIFIERAD/);
 });
 
-test('Garage page exposes the AVVECKLA work process before existing order workflow', () => {
-  assert.match(page, /import GarageAvvecklaPanel/);
-  assert.match(page, /<GarageAvvecklaPanel \/>[\s\S]*<OrderWorkflowPanel \/>/);
+test('AVVECKLA work surface is owned by /avveckla while Garage keeps only verified handoff', () => {
+  assert.match(avvecklaPage, /<AvvecklaPanel \/>/);
+  assert.match(avvecklaPage, /<AvvecklaTransportBookingPanel \/>/);
+  assert.match(garagePage, /<GarageAvvecklaHandoffPanel \/>/);
+  assert.doesNotMatch(garagePage, /<AvvecklaPanel \/>/);
+  assert.doesNotMatch(garagePage, /GarageAvvecklaTransportBookingPanel/);
 });
