@@ -4,6 +4,7 @@ import {
   type VehicleStatusResult,
 } from './vehicle-status';
 import { getLatestStatusReadModelSourceData } from './status-read-model-source';
+import { resolveCurrentOdometer, type CurrentOdometerSource } from './status-current-odometer';
 
 export * from './vehicle-status';
 
@@ -22,6 +23,19 @@ function actorName(checkin: Record<string, unknown>): string {
     || asText(checkin.checker_email)
     || asText(checkin.user_email)
     || 'Okänd';
+}
+
+function odometerSourceLabel(source: CurrentOdometerSource): string {
+  switch (source) {
+    case 'nybil':
+      return 'nybil';
+    case 'incheckning':
+      return 'incheckning';
+    case 'ankomst':
+      return 'ankomst';
+    case 'status':
+      return 'Status';
+  }
 }
 
 /**
@@ -48,6 +62,12 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
   const currentSaludatum = asText(sourceData.saluState?.current_saludatum);
   if (currentSaludatum) {
     vehicle.saludatum = dateOnly(currentSaludatum);
+  }
+
+  const currentOdometer = resolveCurrentOdometer(sourceData);
+  if (currentOdometer) {
+    vehicle.matarstallning = `${currentOdometer.value} km`;
+    vehicle.matarstallningKalla = `${odometerSourceLabel(currentOdometer.source)} ${formatDateTime(currentOdometer.timestamp)} av ${currentOdometer.actor}`;
   }
 
   const latestCheckin = sourceData.checkins[0];
