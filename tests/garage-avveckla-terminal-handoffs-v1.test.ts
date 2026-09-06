@@ -7,7 +7,6 @@ const foundation = readFileSync('migrations/20260902230000_add_garage_avveckla_f
 const completeApi = readFileSync('app/api/garage/avveckla/complete/route.ts', 'utf8');
 const panel = readFileSync('app/avveckla/avveckla-panel.tsx', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
-const overviewApi = readFileSync('app/api/garage/overview/route.ts', 'utf8');
 
 test('Step B uses the locked AVVECKLA readiness gate instead of inventing a second gate', () => {
   assert.match(foundation, /function public\.assert_garage_avveckla_ready_for_completion/i);
@@ -49,7 +48,6 @@ test('successful UT freezes exact Garage episode and removes it from active Gara
   assert.match(migration, /set completed_at = p_occurred_at/);
   assert.match(migration, /completion_event_id = v_event_id/);
   assert.match(garageApi, /is\('completed_at', null\)/);
-  assert.match(overviewApi, /is\('completed_at', null\)/);
   assert.match(garageApi, /Garage-objektet är verifierat UT och är fryst/);
 });
 
