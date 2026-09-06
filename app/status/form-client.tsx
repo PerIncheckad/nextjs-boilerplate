@@ -1313,7 +1313,7 @@ export default function StatusForm() {
           <Card>
            <SectionHeader title="Salu" />
             <div className="info-grid">
-              <EditableInfoRow label="Saludatum" fieldName="saludatum" displayValue={vehicleStatus.vehicle.saludatum} rawValue={vehicleStatus.vehicle.saludatum === '---' ? '' : vehicleStatus.vehicle.saludatum} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} inputType="date" />
+              <InfoRow label="Saludatum" value={vehicleStatus.vehicle.saludatum || '---'} />
               <EditableOrtStationRow label="Station" fieldName="salu_station" displayValue={vehicleStatus.vehicle.saluStation} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />
               {(vehicleStatus.vehicle.saluKopare !== '---' || isEditing) && <EditableInfoRow label="Köpare (företag)" fieldName="salu_kopare" displayValue={vehicleStatus.vehicle.saluKopare} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}
               {(vehicleStatus.vehicle.saluReturadress !== '---' || isEditing) && <EditableInfoRow label="Returadress" fieldName="salu_returadress" displayValue={vehicleStatus.vehicle.saluReturadress} isEditing={isEditing} pendingEdits={pendingEdits} onEdit={(f,v) => setPendingEdits(p => ({...p, [f]: v}))} />}

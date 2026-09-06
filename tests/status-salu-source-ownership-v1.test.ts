@@ -5,6 +5,7 @@ import test from 'node:test';
 const statusDataRoute = readFileSync('app/api/status-data/route.ts', 'utf8');
 const vehicleEditsRoute = readFileSync('app/api/vehicle-edits/route.ts', 'utf8');
 const vehicleStatus = readFileSync('lib/vehicle-status.ts', 'utf8');
+const statusForm = readFileSync('app/status/form-client.tsx', 'utf8');
 const originalMigration = readFileSync(
   'migrations/20260906000500_lock_status_salu_source_ownership_v1.sql',
   'utf8',
@@ -59,6 +60,15 @@ test('current contract facts resolve Status edit first and Nybil baseline second
   assert.match(vehicleStatus, /saluReturadress: latestEdits\.get\('salu_returadress'\)\?\.value \|\| nybilData\?\.returadress \|\| '---'/);
   assert.match(vehicleStatus, /saluAttention: latestEdits\.get\('salu_attention'\)\?\.value \|\| nybilData\?\.attention \|\| '---'/);
   assert.match(vehicleStatus, /saluNotering: latestEdits\.get\('salu_notering'\)\?\.value \|\| nybilData\?\.notering_forsaljning \|\| '---'/);
+});
+
+
+test('Status UI keeps Saludatum read-only while the six contract facts remain editable', () => {
+  assert.doesNotMatch(statusForm, /fieldName=["']saludatum["']/);
+  assert.match(statusForm, /<InfoRow label=["']Saludatum["']/);
+  for (const field of statusOwnedContractFields) {
+    assert.match(statusForm, new RegExp(`fieldName=["']${field}["']`));
+  }
 });
 
 test('SÅLD remains separate and is not blocked by the SALU ownership gate', () => {
