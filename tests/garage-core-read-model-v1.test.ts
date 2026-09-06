@@ -5,7 +5,6 @@ import test from 'node:test';
 const api = readFileSync('app/api/garage/core/route.ts', 'utf8');
 const panel = readFileSync('app/garage/garage-core-panel.tsx', 'utf8');
 const page = readFileSync('app/garage/page.tsx', 'utf8');
-const orderWorkflow = readFileSync('app/garage/order-workflow-panel.tsx', 'utf8');
 
 test('Garage Core reads only Garage episodes plus verified receiving state', () => {
   assert.match(api, /from\('garage_items'\)/);
@@ -60,11 +59,9 @@ test('Nybil stays read-only in Garage and AVVECKLA work stays outside Garage aft
   assert.doesNotMatch(panel, /method:\s*['\"]POST['\"]/);
 });
 
-test('OrderWorkflow remains separate and untouched by Garage Core', () => {
-  assert.match(page, /04 \/ BESTÄLLNING \/ LEVERANS/);
-  assert.match(page, /<OrderWorkflowPanel/);
-  assert.match(orderWorkflow, /confirmation_status/);
-  assert.match(orderWorkflow, /transport_status/);
+test('legacy OrderWorkflow is not part of Garage Core or operative Garage after H', () => {
+  assert.doesNotMatch(page, /OrderWorkflowPanel/);
+  assert.doesNotMatch(page, /04 \/ BESTÄLLNING \/ LEVERANS/);
   assert.doesNotMatch(api, /confirmation_status/);
   assert.doesNotMatch(api, /transport_status/);
   assert.doesNotMatch(api, /supplier/);
