@@ -7,8 +7,9 @@ const serviceRead = readFileSync('migrations/20260903224500_grant_rented_in_quic
 const stationScopeMigration = readFileSync('migrations/20260904002500_add_employee_station_scope.sql', 'utf8');
 const api = readFileSync('app/api/vehicle-journey/rented-in-intake/route.ts', 'utf8');
 const operational = readFileSync('app/api/vehicle-journey/operational-state/route.ts', 'utf8');
-const page = readFileSync('app/garage/page.tsx', 'utf8');
-const panel = readFileSync('app/garage/garage-rented-in-intake-panel.tsx', 'utf8');
+const inhyrdPage = readFileSync('app/inhyrd/page.tsx', 'utf8');
+const garagePage = readFileSync('app/garage/page.tsx', 'utf8');
+const panel = readFileSync('app/inhyrd/rented-in-intake-panel.tsx', 'utf8');
 
 test('INHYRD intake provenance is immutable and starts at DB intake time only', () => {
   assert.match(migration, /vehicle_rented_in_quick_intakes/);
@@ -92,11 +93,12 @@ test('operational read model exposes INHYRD classification from immutable intake
   assert.match(operational, /objectTypeStation: rentedIn\.station/);
 });
 
-test('Garage exposes INHYRD as a separate surface from Nybil and LEGACY', () => {
-  assert.match(page, /GarageRentedInIntakePanel/);
-  assert.match(page, /02C \/ INHYRD \/ SNABBINTAG/);
+test('INHYRD intake is exposed only on its own operational module address', () => {
+  assert.match(inhyrdPage, /RentedInIntakePanel/);
+  assert.match(inhyrdPage, /01 \/ INHYRD IN/);
   assert.match(panel, /INHYRD \/ SNABBINTAG/);
   assert.match(panel, /Ingen historik bakåt eller operativ status skapas/);
-  assert.doesNotMatch(panel, /GarageLegacyEntryPanel/);
-  assert.doesNotMatch(panel, /GarageV2Panel/);
+  assert.doesNotMatch(garagePage, /RentedInIntakePanel/);
+  assert.doesNotMatch(garagePage, /INHYRD \/ SNABBINTAG/);
+  assert.doesNotMatch(garagePage, /#inhyrd/);
 });
