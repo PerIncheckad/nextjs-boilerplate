@@ -3,27 +3,44 @@
 import { useState } from 'react';
 
 type CurrentState = 'AVAILABLE' | 'PREPARATION' | 'DOWNTIME';
+type LegacyEntry = { entry_id: string; object_type: string; current_state: string; verified_at: string; verified_by_email: string; evidence_reference: string };
+type Period = { period_id: string; period_type: string; started_at: string };
 type Preflight = {
   regnr: string;
   vehicle: { regnr: string; brand: string | null; model: string | null } | null;
-  currentPeriod: { period_id: string; period_type: string; started_at: string } | null;
-  legacyEntry: { entry_id: string; object_type: string; current_state: string; verified_at: string; verified_by_email: string; evidence_reference: string } | null;
+  currentPeriod: Period | null;
+  legacyEntry: LegacyEntry | null;
   vehicleCatalogIsOwnershipProof: false;
   historicalBackfill: false;
 };
-
 type CreateResult = {
-  entry: {
-    entry_id: string;
-    regnr: string;
-    object_type: 'LEGACY_FLEET';
-    current_state: CurrentState;
-    verified_at: string;
-    verified_by_email: string;
-    evidence_reference: string;
-    historical_backfill: false;
-  };
-  period: { period_id: string; period_type: string; started_at: string };
+  entry: LegacyEntry & { regnr: string; object_type: 'LEGACY_FLEET'; current_state: CurrentState; historical_backfill: false };
+  period: Period;
+};
+type Station = { station_code: string; display_name: string | null; sort_order: number };
+type ExistingHandoff = {
+  handoff_id: string;
+  garage_item_id: string;
+  planned_station: string;
+  model_description: string;
+  model_source: 'LEGACY_SNAPSHOT' | 'MANUELL';
+  occurred_at: string;
+  historical_backfill: false;
+};
+type HandoffPreflight = {
+  legacyEntry: LegacyEntry;
+  currentPeriod: Period | null;
+  existingHandoff: ExistingHandoff | null;
+  stations: Station[];
+  snapshotModel: string | null;
+  historicalBackfill: false;
+  avvecklaStarted: false;
+};
+type HandoffResult = {
+  garageItem: { garage_item_id: string; regnr: string; model: string; planned_station: string; garage_direction: 'UT'; source_kind: 'LAGER1'; source_legacy_entry_id: string };
+  handoff: ExistingHandoff;
+  avvecklaStarted: false;
+  historicalBackfill: false;
 };
 
 const shell: React.CSSProperties = { width: '100%', margin: 0, padding: '14px', border: '1px solid #d7d7d7', borderRadius: 8, background: '#fff', boxSizing: 'border-box' };
@@ -47,8 +64,22 @@ export default function GarageLegacyEntryPanel() {
   const [evidenceReference, setEvidenceReference] = useState('');
   const [confirmedOwned, setConfirmedOwned] = useState(false);
   const [result, setResult] = useState<CreateResult | null>(null);
+  const [handoffPreflight, setHandoffPreflight] = useState<HandoffPreflight | null>(null);
+  const [handoffStation, setHandoffStation] = useState('');
+  const [modelDescription, setModelDescription] = useState('');
+  const [handoffResult, setHandoffResult] = useState<HandoffResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const loadHandoff = async (entryId: string) => {
+    const response = await fetch(`/api/garage/legacy-ut-handoff?legacy_entry_id=${encodeURIComponent(entryId)}`, { cache: 'no-store' });
+    const body = await response.json() as { data?: HandoffPreflight; error?: string };
+    if (!response.ok) throw new Error(body.error ?? 'Kunde inte läsa LEGACY → Garage-kontrollbild');
+    const next = body.data ?? null;
+    setHandoffPreflight(next);
+    setHandoffStation(next?.existingHandoff?.planned_station ?? '');
+    setModelDescription(next?.snapshotModel ?? next?.existingHandoff?.model_description ?? '');
+  };
 
   const load = async () => {
     const normalized = cleanRegnr(regnr);
@@ -56,14 +87,21 @@ export default function GarageLegacyEntryPanel() {
     setBusy(true);
     setError(null);
     setResult(null);
+    setHandoffResult(null);
+    setHandoffPreflight(null);
+    setHandoffStation('');
+    setModelDescription('');
     setConfirmedOwned(false);
     try {
       const response = await fetch(`/api/vehicle-journey/legacy-entry?reg=${encodeURIComponent(normalized)}`, { cache: 'no-store' });
       const body = await response.json() as { data?: Preflight; error?: string };
       if (!response.ok) throw new Error(body.error ?? 'Kunde inte läsa kontrollbild');
-      setPreflight(body.data ?? null);
+      const next = body.data ?? null;
+      setPreflight(next);
+      if (next?.legacyEntry) await loadHandoff(next.legacyEntry.entry_id);
     } catch (reason) {
       setPreflight(null);
+      setHandoffPreflight(null);
       setError(reason instanceof Error ? reason.message : 'Kunde inte läsa kontrollbild');
     } finally {
       setBusy(false);
@@ -98,15 +136,41 @@ export default function GarageLegacyEntryPanel() {
       const created = body.data ?? null;
       setResult(created);
       if (created) {
-        setPreflight((current) => current ? {
-          ...current,
-          currentPeriod: created.period,
-          legacyEntry: created.entry,
-        } : current);
+        setPreflight((current) => current ? { ...current, currentPeriod: created.period, legacyEntry: created.entry } : current);
+        await loadHandoff(created.entry.entry_id);
       }
       setConfirmedOwned(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'LEGACY-verifiering misslyckades');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handoffToGarage = async () => {
+    const entryId = preflight?.legacyEntry?.entry_id;
+    if (!entryId) return setError('Verifierad LEGACY-entry saknas.');
+    if (!handoffStation) return setError('Välj Garage-station för avvecklingsarbetet.');
+    if (!handoffPreflight?.snapshotModel && !modelDescription.trim()) return setError('Modell/beskrivning krävs när LEGACY-snapshot saknar modell.');
+
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/garage/legacy-ut-handoff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          legacy_entry_id: entryId,
+          planned_station: handoffStation,
+          model_description: handoffPreflight?.snapshotModel ? null : modelDescription.trim(),
+        }),
+      });
+      const body = await response.json() as { data?: HandoffResult; error?: string };
+      if (!response.ok) throw new Error(body.error ?? 'LEGACY → Garage-handslag misslyckades');
+      setHandoffResult(body.data ?? null);
+      await loadHandoff(entryId);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'LEGACY → Garage-handslag misslyckades');
     } finally {
       setBusy(false);
     }
@@ -150,6 +214,27 @@ export default function GarageLegacyEntryPanel() {
         <div>Verifierad: {new Date(result.entry.verified_at).toLocaleString('sv-SE')} · {result.entry.verified_by_email}</div>
         <div>State: {result.entry.current_state} · Layer 1-period: {result.period.period_id}</div>
         <div>Evidens: {result.entry.evidence_reference}</div>
+        <div>historicalBackfill: false</div>
+      </div> : null}
+
+      {preflight?.legacyEntry && handoffPreflight ? <div style={{ ...card, background: '#fff' }}>
+        <strong>LEGACY_FLEET → GARAGE UT</strong>
+        <div style={{ marginTop: 4 }}>Separat, explicit överlämning till Garaget. Den ändrar inte bilens current physical location, skapar ingen SALU/Nybil-historik och startar inte AVVECKLA.</div>
+        {handoffPreflight.existingHandoff ? <div style={{ marginTop: 8, color: '#176b33', fontWeight: 800 }}>
+          Redan överlämnad till Garage · station {handoffPreflight.existingHandoff.planned_station} · {new Date(handoffPreflight.existingHandoff.occurred_at).toLocaleString('sv-SE')} · AVVECKLA är inte startad av handslaget
+        </div> : <div style={{ ...row, marginTop: 8 }}>
+          <label><span style={{ display: 'block', fontWeight: 800, marginBottom: 2 }}>Garage-station för avvecklingsarbetet</span><select style={input} value={handoffStation} onChange={(event) => setHandoffStation(event.target.value)}><option value="">Välj station</option>{handoffPreflight.stations.map((station) => <option key={station.station_code} value={station.station_code}>{station.display_name || station.station_code}</option>)}</select></label>
+          {handoffPreflight.snapshotModel ? <div style={{ minWidth: 180, paddingBottom: 8 }}><strong>Modell:</strong> {handoffPreflight.snapshotModel}<br /><span style={{ color: '#666' }}>från LEGACY-snapshot</span></div> : <label style={{ flex: '1 1 260px' }}><span style={{ display: 'block', fontWeight: 800, marginBottom: 2 }}>Modell / beskrivning</span><input style={{ ...input, width: '100%', boxSizing: 'border-box' }} value={modelDescription} onChange={(event) => setModelDescription(event.target.value)} placeholder="Krävs endast för Garage-arbetsobjektet" /></label>}
+          <button type="button" style={primary} disabled={busy || !handoffStation || (!handoffPreflight.snapshotModel && !modelDescription.trim())} onClick={() => void handoffToGarage()}>Överlämna till Garage UT</button>
+        </div>}
+      </div> : null}
+
+      {handoffResult ? <div style={{ ...card, background: '#f6fff7' }}>
+        <strong>Garage UT-arbetsobjekt skapat</strong>
+        <div>{handoffResult.garageItem.regnr} · {handoffResult.garageItem.model} · station {handoffResult.garageItem.planned_station}</div>
+        <div>Garage item: {handoffResult.garageItem.garage_item_id}</div>
+        <div>LEGACY provenance: {handoffResult.garageItem.source_legacy_entry_id}</div>
+        <div>AVVECKLA: inte startad av handslaget</div>
         <div>historicalBackfill: false</div>
       </div> : null}
     </section>
