@@ -5,6 +5,7 @@ import {
 } from './vehicle-status';
 import { getLatestStatusReadModelSourceData } from './status-read-model-source';
 import { resolveCurrentOdometer, type CurrentOdometerSource } from './status-current-odometer';
+import { resolveCurrentLocation, type CurrentLocationSource } from './status-current-location';
 
 export * from './vehicle-status';
 
@@ -18,14 +19,20 @@ function dateOnly(value: string): string {
   return parsed.toISOString().split('T')[0];
 }
 
-function actorName(checkin: Record<string, unknown>): string {
-  return asText(checkin.checker_name)
-    || asText(checkin.checker_email)
-    || asText(checkin.user_email)
-    || 'Okänd';
+function odometerSourceLabel(source: CurrentOdometerSource): string {
+  switch (source) {
+    case 'nybil':
+      return 'nybil';
+    case 'incheckning':
+      return 'incheckning';
+    case 'ankomst':
+      return 'ankomst';
+    case 'status':
+      return 'Status';
+  }
 }
 
-function odometerSourceLabel(source: CurrentOdometerSource): string {
+function locationSourceLabel(source: CurrentLocationSource): string {
   switch (source) {
     case 'nybil':
       return 'nybil';
@@ -70,15 +77,9 @@ export async function getVehicleStatus(regnr: string): Promise<VehicleStatusResu
     vehicle.matarstallningKalla = `${odometerSourceLabel(currentOdometer.source)} ${formatDateTime(currentOdometer.timestamp)} av ${currentOdometer.actor}`;
   }
 
-  const latestCheckin = sourceData.checkins[0];
-  if (latestCheckin) {
-    const timestamp = asText(latestCheckin.completed_at) || asText(latestCheckin.created_at);
-    const city = asText(latestCheckin.current_city) || asText(latestCheckin.current_ort);
-    const station = asText(latestCheckin.current_station);
-
-    if (timestamp && city && station) {
-      vehicle.bilenStarNu = `${city} / ${station} (${formatDateTime(timestamp)} av ${actorName(latestCheckin)})`;
-    }
+  const currentLocation = resolveCurrentLocation(sourceData);
+  if (currentLocation) {
+    vehicle.bilenStarNu = `${currentLocation.city} / ${currentLocation.station} (${locationSourceLabel(currentLocation.source)} ${formatDateTime(currentLocation.timestamp)} av ${currentLocation.actor})`;
   }
 
   return { ...result, vehicle };
