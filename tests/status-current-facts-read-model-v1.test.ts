@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 const wrapper = readFileSync(join(process.cwd(), 'lib/vehicle-status-current.ts'), 'utf8');
+const locationResolver = readFileSync(join(process.cwd(), 'lib/status-current-location.ts'), 'utf8');
 const source = readFileSync(join(process.cwd(), 'lib/status-read-model-source.ts'), 'utf8');
 const tsconfig = readFileSync(join(process.cwd(), 'tsconfig.json'), 'utf8');
 const legacyHandler = readFileSync(join(process.cwd(), 'app/api/vehicle-edits/legacy-handler.ts'), 'utf8');
@@ -21,10 +22,13 @@ test('Status current vehicle image consumes SALU-owned current Saludatum', () =>
   assert.match(wrapper, /vehicle\.saludatum = dateOnly\(currentSaludatum\)/);
 });
 
-test('Status current location uses real Check-in current_city and preserves legacy fallback only for reading', () => {
-  assert.match(wrapper, /latestCheckin\.current_city/);
-  assert.match(wrapper, /latestCheckin\.current_ort/);
-  assert.match(wrapper, /vehicle\.bilenStarNu = `\$\{city\} \/ \$\{station\}/);
+test('Status current location resolves through the canonical location overlay and preserves legacy current_ort as read fallback only', () => {
+  assert.match(wrapper, /resolveCurrentLocation\(sourceData\)/);
+  assert.match(wrapper, /currentLocation\.city/);
+  assert.match(wrapper, /currentLocation\.station/);
+  assert.match(locationResolver, /checkin\.current_city/);
+  assert.match(locationResolver, /checkin\.current_ort/);
+  assert.match(locationResolver, /asText\(checkin\.status\) !== 'COMPLETED'/);
   assert.doesNotMatch(legacyHandler, /select\('current_city, current_ort, current_station'\)/);
   assert.match(legacyHandler, /select\('current_city, current_station'\)/);
 });
