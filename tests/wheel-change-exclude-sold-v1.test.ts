@@ -14,9 +14,9 @@ test('seasonal Hjulskifte reuses the operational sold sources from allowed plate
   assert.match(wheelRoute, /readSoldRegnrs/);
 });
 
-test('sold vehicles are filtered from seasonal candidates and rejected on direct POST', () => {
-  assert.match(wheelRoute, /!soldRegnrs\.has\(regnr\)/);
+test('sold vehicles remain filtered from seasonal candidates and rejected on direct POST', () => {
+  assert.match(wheelRoute, /!soldRegnrs\.has\(candidateRegnr\)/);
   assert.match(wheelRoute, /if \(soldRegnrs\.has\(regnr\)\)/);
   assert.match(wheelRoute, /Bilen är markerad som såld/);
-  assert.match(wheelRoute, /STATUS_THEN_COMPLETED_CHECKIN_THEN_NYBIL_EXCLUDING_SOLD/);
+  assert.match(wheelRoute, /LATEST_VERIFIED_WHEEL_FACT_EXCLUDING_SOLD_TERMINAL_UT_AND_HANDLED_SEASON/);
 });
