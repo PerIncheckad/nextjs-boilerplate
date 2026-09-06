@@ -2,13 +2,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const page = readFileSync('app/garage/page.tsx', 'utf8');
-const panel = readFileSync('app/garage/garage-avveckla-transport-booking-panel.tsx', 'utf8');
+const avvecklaPage = readFileSync('app/avveckla/page.tsx', 'utf8');
+const garagePage = readFileSync('app/garage/page.tsx', 'utf8');
+const panel = readFileSync('app/avveckla/avveckla-transport-booking-panel.tsx', 'utf8');
 const hardening = readFileSync('migrations/20260903011000_harden_garage_avveckla_terminal_entrypoints_v1.sql', 'utf8');
 
-test('Garage exposes an operator path for real TRANSPORT_BOKAD before the legacy order workflow', () => {
-  assert.match(page, /GarageAvvecklaTransportBookingPanel/);
-  assert.match(page, /<GarageAvvecklaPanel \/>[\s\S]*<GarageAvvecklaTransportBookingPanel \/>[\s\S]*<OrderWorkflowPanel \/>/);
+test('/avveckla owns the real TRANSPORT_BOKAD operator path while Garage no longer mounts it', () => {
+  assert.match(avvecklaPage, /AvvecklaTransportBookingPanel/);
+  assert.match(avvecklaPage, /<AvvecklaPanel \/>[\s\S]*<AvvecklaTransportBookingPanel \/>/);
+  assert.doesNotMatch(garagePage, /GarageAvvecklaTransportBookingPanel/);
+  assert.match(garagePage, /GarageAvvecklaHandoffPanel/);
 });
 
 test('transport booking UI reads frozen booking state and registers through authenticated API contract', () => {
