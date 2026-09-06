@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
+const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 const docs = readFileSync('docs/HJULSKIFTE_OPERATIVT_KONTRAKT_2026-09-01.md', 'utf8');
 
 test('Hjulskifte separates missing wheel storage from startable work', () => {
