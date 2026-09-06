@@ -5,19 +5,20 @@ import test from 'node:test';
 const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 const docs = readFileSync('docs/HJULSKIFTE_OPERATIVT_KONTRAKT_2026-09-01.md', 'utf8');
 
-test('Hjulskifte separates missing wheel storage from startable work', () => {
+test('Hjulskifte separates missing or unclear wheel storage from bookable work', () => {
   assert.match(panel, /const missingStorageCandidates = useMemo/);
-  assert.match(panel, /!storageByRegnr\[item\.regnr\]\?\.wheel_storage_location/);
+  assert.match(panel, /!isActionableWheelStorage\(storageByRegnr\[item\.regnr\]\?\.wheel_storage_location\)/);
   assert.match(panel, /const actionableCandidates = useMemo/);
-  assert.match(panel, /Boolean\(storageByRegnr\[item\.regnr\]\?\.wheel_storage_location\)/);
-  assert.match(panel, /aria-label="Bilar som saknar hjulförvaring"/);
+  assert.match(panel, /isActionableWheelStorage\(storageByRegnr\[item\.regnr\]\?\.wheel_storage_location\)/);
+  assert.match(panel, /aria-label="Bilar som saknar eller har oklar hjulförvaring"/);
   assert.match(panel, /aria-label="Bilar redo för hjulskifte"/);
 });
 
-test('missing storage worklist opens the exact vehicle in Status', () => {
+test('missing or unclear storage worklist opens the exact vehicle in Status and preserves verified Klar', () => {
   assert.match(panel, /href={`\/status\?reg=\$\{encodeURIComponent\(item\.regnr\)\}`}/);
   assert.match(panel, />Ange förvaring<\/a>/);
-  assert.match(panel, /Ange registrerad förvaring i Status\./);
+  assert.match(panel, /Inte bokningsbar förvaring\. Verifiera korrekt uppgift i Status\./);
+  assert.match(panel, /createShortcut\(item, 'KLAR'\)/);
 });
 
 test('missing storage remains an explicit fact gap instead of station inference', () => {
