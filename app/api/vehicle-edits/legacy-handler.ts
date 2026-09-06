@@ -192,7 +192,7 @@ export async function POST(request: Request) {
         // Hämta senaste checkin för ort och station
         const { data: checkinData } = await supabaseAdmin
           .from('checkins')
-          .select('current_city, current_ort, current_station')
+          .select('current_city, current_station')
           .eq('regnr', uthyrningsbarEdit.regnr)
           .eq('status', 'COMPLETED')
           .order('completed_at', { ascending: false })
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
           }
         }
 
-        const ort = checkinData?.current_city || checkinData?.current_ort || '';
+        const ort = checkinData?.current_city || '';
         const station = checkinData?.current_station || '---';
         const stationDisplay = ort && station !== '---' ? `${ort} / ${station}` : station;
 
