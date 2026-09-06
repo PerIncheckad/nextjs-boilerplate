@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verifyApiUser } from '@/lib/server-auth';
 import { POST as legacyPOST } from './legacy-handler';
+import { parseStoredCurrentLocation, serializeCurrentLocation } from '@/lib/status-current-location';
 
 const SALU_OWNED_FIELDS = new Set([
   'saludatum',
@@ -34,11 +35,24 @@ export async function POST(request: Request) {
 
   const rawEdits = parsedBody.edits;
   const edits = Array.isArray(rawEdits)
-    ? rawEdits.map((edit) => (
-        isJsonRecord(edit)
-          ? { ...edit, edited_by: verification.user.email }
-          : edit
-      ))
+    ? rawEdits.map((edit) => {
+        if (!isJsonRecord(edit)) return edit;
+
+        if (edit.field_name === 'current_location') {
+          const parsedLocation = parseStoredCurrentLocation(edit.new_value);
+          if (!parsedLocation) {
+            return { ...edit, edited_by: verification.user.email, invalid_current_location: true };
+          }
+
+          return {
+            ...edit,
+            new_value: serializeCurrentLocation(parsedLocation.city, parsedLocation.station),
+            edited_by: verification.user.email,
+          };
+        }
+
+        return { ...edit, edited_by: verification.user.email };
+      })
     : rawEdits;
 
   if (Array.isArray(edits)) {
@@ -54,6 +68,32 @@ export async function POST(request: Request) {
           field: blockedEdit.field_name,
         },
         { status: 409 },
+      );
+    }
+
+    const invalidLocationEdit = edits.find(
+      (edit) => isJsonRecord(edit) && edit.invalid_current_location === true,
+    );
+    if (invalidLocationEdit) {
+      return NextResponse.json(
+        {
+          error: 'Current location must contain both city and station',
+          field: 'current_location',
+        },
+        { status: 400 },
+      );
+    }
+
+    const currentLocationEdits = edits.filter(
+      (edit) => isJsonRecord(edit) && edit.field_name === 'current_location',
+    );
+    if (currentLocationEdits.length > 1) {
+      return NextResponse.json(
+        {
+          error: 'Current location must be saved as one atomic observation',
+          field: 'current_location',
+        },
+        { status: 400 },
       );
     }
   }
