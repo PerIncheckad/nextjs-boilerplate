@@ -5,8 +5,9 @@ import test from 'node:test';
 const migration = readFileSync('migrations/20260903210000_add_legacy_current_state_entry_v1.sql', 'utf8');
 const api = readFileSync('app/api/vehicle-journey/legacy-entry/route.ts', 'utf8');
 const operational = readFileSync('app/api/vehicle-journey/operational-state/route.ts', 'utf8');
+const legacyPage = readFileSync('app/legacy/page.tsx', 'utf8');
+const legacyPanel = readFileSync('app/legacy/legacy-current-state-panel.tsx', 'utf8');
 const garagePage = readFileSync('app/garage/page.tsx', 'utf8');
-const garagePanel = readFileSync('app/garage/garage-legacy-entry-panel.tsx', 'utf8');
 const reconciliation = readFileSync('migrations/20260903104500_add_current_state_reconciliation_v1.sql', 'utf8');
 const avveckla = readFileSync('migrations/20260902230000_add_garage_avveckla_foundation_v1.sql', 'utf8');
 
@@ -29,16 +30,16 @@ test('DB generates verification time and starts Layer 1 exactly there', () => {
 
 test('LEGACY v1 cannot manufacture RENTAL, SALU or OTHER', () => {
   assert.match(migration, /v_current_state not in \('AVAILABLE', 'PREPARATION', 'DOWNTIME'\)/);
-  assert.doesNotMatch(garagePanel, /option value="RENTAL"/);
-  assert.doesNotMatch(garagePanel, /option value="SALU"/);
-  assert.doesNotMatch(garagePanel, /option value="OTHER">OTHER<\/option>/);
+  assert.doesNotMatch(legacyPanel, /option value="RENTAL"/);
+  assert.doesNotMatch(legacyPanel, /option value="SALU"/);
+  assert.doesNotMatch(legacyPanel, /option value="OTHER">OTHER<\/option>/);
 });
 
 test('DOWNTIME requires a structured reason and OTHER requires comment', () => {
   assert.match(migration, /DOWNTIME requires a valid reason/);
   assert.match(migration, /Other downtime requires a comment/);
-  assert.match(garagePanel, /DOWNTIME kräver orsak/);
-  assert.match(garagePanel, /Övrig DOWNTIME kräver kommentar/);
+  assert.match(legacyPanel, /DOWNTIME kräver orsak/);
+  assert.match(legacyPanel, /Övrig DOWNTIME kräver kommentar/);
 });
 
 test('existing closed Layer 1 history is preserved while current or future truth blocks entry', () => {
@@ -90,14 +91,17 @@ test('operational state reads object type from immutable LEGACY source', () => {
   assert.match(operational, /objectTypeSourceRecordId: legacy\.entry_id/);
 });
 
-test('Garage exposes explicit LEGACY current-state surface and a separate later Garage UT handoff', () => {
-  assert.match(garagePage, /GarageLegacyEntryPanel/);
-  assert.match(garagePage, /02B \/ BEFINTLIG EGEN BIL \/ LEGACY/);
-  assert.match(garagePanel, /Jag verifierar att detta är en befintlig egen flottabil/);
-  assert.match(garagePanel, /Ingen historik bakåt skapas/);
-  assert.match(garagePanel, /LEGACY_FLEET → GARAGE UT/);
-  assert.match(garagePanel, /\/api\/garage\/legacy-ut-handoff/);
-  assert.match(garagePanel, /AVVECKLA: inte startad av handslaget/);
+test('LEGACY current-state and later Garage UT handoff are exposed only from the LEGACY module', () => {
+  assert.match(legacyPage, /01 \/ VERIFIERA CURRENT-STATE/);
+  assert.match(legacyPage, /02 \/ ÖVERLÄMNA TILL GARAGE UT/);
+  assert.match(legacyPanel, /Jag verifierar att detta är en befintlig egen flottabil/);
+  assert.match(legacyPanel, /Ingen historik bakåt skapas/);
+  assert.match(legacyPanel, /LEGACY_FLEET → GARAGE UT/);
+  assert.match(legacyPanel, /\/api\/garage\/legacy-ut-handoff/);
+  assert.match(legacyPanel, /AVVECKLA: inte startad av handslaget/);
+  assert.doesNotMatch(garagePage, /GarageLegacyEntryPanel/);
+  assert.doesNotMatch(garagePage, /BEFINTLIG EGEN BIL \/ LEGACY/);
+  assert.doesNotMatch(garagePage, /#legacy/);
   assert.doesNotMatch(api, /legacy-ut-handoff/);
 });
 
