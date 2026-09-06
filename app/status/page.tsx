@@ -24,6 +24,7 @@ export default function StatusPage() {
         </div>
 
         <OperationalTopbarMeta mode="STATUS">
+          <Link className={styles.nextLink} href="/status/location">Korrigera fysisk plats</Link>
           <Link className={styles.nextLink} href="/vagnkort">Vagnkort</Link>
         </OperationalTopbarMeta>
       </header>
