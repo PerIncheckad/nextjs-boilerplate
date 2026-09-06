@@ -16,6 +16,12 @@ export type StatusReadModelSourceData = {
   currentWheelFact: StatusRow | null;
 };
 
+const latestByRegnr = new Map<string, StatusReadModelSourceData>();
+
+function normalizeRegnr(value: string): string {
+  return value.toUpperCase().trim().replace(/\s/g, '');
+}
+
 function isStatusRow(value: unknown): value is StatusRow {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -33,6 +39,10 @@ function requireOptionalRow(value: unknown | null, field: string): StatusRow | n
   return value;
 }
 
+export function getLatestStatusReadModelSourceData(regnr: string): StatusReadModelSourceData | null {
+  return latestByRegnr.get(normalizeRegnr(regnr)) ?? null;
+}
+
 export async function fetchStatusReadModelSourceData(regnr: string): Promise<StatusReadModelSourceData> {
   const payload = await fetchStatusData(regnr);
 
@@ -40,7 +50,7 @@ export async function fetchStatusReadModelSourceData(regnr: string): Promise<Sta
     throw new Error('Ogiltig statusdata: nybil');
   }
 
-  return {
+  const data: StatusReadModelSourceData = {
     nybil: payload.nybil,
     vehicle: requireRows(payload.vehicle, 'vehicle'),
     damages: requireRows(payload.damages, 'damages'),
@@ -53,4 +63,7 @@ export async function fetchStatusReadModelSourceData(regnr: string): Promise<Sta
     saluState: requireOptionalRow(payload.saluState, 'saluState'),
     currentWheelFact: requireOptionalRow(payload.currentWheelFact, 'currentWheelFact'),
   };
+
+  latestByRegnr.set(normalizeRegnr(regnr), data);
+  return data;
 }
