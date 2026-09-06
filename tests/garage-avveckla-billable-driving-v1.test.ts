@@ -6,7 +6,7 @@ import { ET_PRICE_LIST_VERSION, assertEtPriceListShape, quoteEtPrice } from '../
 const migration = readFileSync('migrations/20260903004000_add_garage_avveckla_billable_driving_v1.sql', 'utf8');
 const completeApi = readFileSync('app/api/garage/avveckla/complete/route.ts', 'utf8');
 const billingApi = readFileSync('app/api/billing/driving/route.ts', 'utf8');
-const panel = readFileSync('app/garage/garage-avveckla-panel.tsx', 'utf8');
+const panel = readFileSync('app/avveckla/avveckla-panel.tsx', 'utf8');
 
 test('ET Prislista 2026 is structurally complete and frozen to exported version', () => {
   assert.doesNotThrow(() => assertEtPriceListShape());
@@ -45,7 +45,7 @@ test('operational API requires explicit billable yes/no only for own delivery an
   assert.doesNotMatch(completeApi, /p_is_billable[\s\S]*EXTERN_TRANSPORT/);
 });
 
-test('Garage UI never silently assumes whether own delivery is billable', () => {
+test('AVVECKLA UI never silently assumes whether own delivery is billable', () => {
   assert.match(panel, /type BillableChoice = '' \| 'YES' \| 'NO'/);
   assert.match(panel, /Fakturerbar körning\?/);
   assert.match(panel, /Välj Ja \/ Nej/);
