@@ -68,7 +68,7 @@ export async function GET(request: Request) {
   if (!garageItemId) {
     const { data, error } = await admin
       .from('garage_items')
-      .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
+      .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,returadress,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
       .eq('garage_direction', 'IN')
       .is('voided_at', null)
       .not('regnr', 'is', null)
@@ -105,7 +105,7 @@ export async function GET(request: Request) {
 
   const { data: item, error } = await admin
     .from('garage_items')
-    .select('garage_item_id,planning_period,model,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
+    .select('garage_item_id,planning_period,model,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,returadress,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
     .eq('garage_item_id', garageItemId)
     .is('voided_at', null)
     .maybeSingle();
