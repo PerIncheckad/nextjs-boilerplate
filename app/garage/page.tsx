@@ -4,8 +4,7 @@ import GarageOverviewPanel from './garage-overview-panel';
 import GarageClient from './garage-client';
 import GarageV2Panel from './garage-v2-panel';
 import GarageVoidPanel from './garage-void-panel';
-import GarageAvvecklaPanel from './garage-avveckla-panel';
-import GarageAvvecklaTransportBookingPanel from './garage-avveckla-transport-booking-panel';
+import GarageAvvecklaHandoffPanel from './garage-avveckla-handoff-panel';
 import OrderWorkflowPanel from './order-workflow-panel';
 import styles from './garage-workspace.module.css';
 
@@ -21,7 +20,7 @@ export default function GaragePage() {
     <CoreProductShell
       active="garage"
       title="Garaget"
-      descriptor="DISPOSITION / IN / UT / OPERATIV HANTERING"
+      descriptor="STAGING / ROUTING / HANDOFF"
       eyebrow="INVISTO CORE / GARAGE CONTROL"
     >
       <div className={styles.workspace}>
@@ -30,7 +29,8 @@ export default function GaragePage() {
           <a href="#oversikt">0. Översikt</a>
           <a href="#garageobjekt">1. Garage</a>
           <a href="#nybil">2. Ny bil</a>
-          <a href="#avveckla">3. Avveckla</a>
+          <a href="#avveckla-handoff">3. Avveckla handoff</a>
+          <a href="#bestallning-leverans">4. Beställning / leverans</a>
         </nav>
 
         <section id="oversikt" className={styles.section}>
@@ -49,10 +49,13 @@ export default function GaragePage() {
           <GarageV2Panel />
         </section>
 
-        <section id="avveckla" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>03 / AVVECKLA / UT</strong><span>AVVECKLA-punkter måste vara KLAR / AVSLUTADE innan verklig UT-händelse kan verifieras</span></div>
-          <GarageAvvecklaPanel />
-          <GarageAvvecklaTransportBookingPanel />
+        <section id="avveckla-handoff" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>03 / AVVECKLA HANDOFF</strong><span>Garage startar manuellt och verifierar att AVVECKLA-case skapats; fortsatt arbete sker i /avveckla</span></div>
+          <GarageAvvecklaHandoffPanel />
+        </section>
+
+        <section id="bestallning-leverans" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>04 / BESTÄLLNING / LEVERANS</strong><span>Transitional yta · slutligt modulägarskap är inte beslutat i PR E</span></div>
           <OrderWorkflowPanel />
         </section>
       </div>
