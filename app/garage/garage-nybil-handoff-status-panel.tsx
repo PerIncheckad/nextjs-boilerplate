@@ -39,12 +39,12 @@ const known: React.CSSProperties = { fontWeight: 800, color: '#71510a', fontSize
 const waiting: React.CSSProperties = { fontWeight: 800, color: '#333', fontSize: 13, textAlign: 'right' };
 
 function knownLabel(item: HandoffItem): string {
-  if (item.existing_nybil_timing === 'BEFORE_GARAGE') return 'Historisk Ny bil före Garage';
-  if (item.existing_nybil_timing === 'AFTER_GARAGE') return 'Ny bil efter Garage · koppling saknas';
-  return 'Redan i Ny bil · tidsrelation okänd';
+  if (item.existing_nybil_timing === 'BEFORE_GARAGE') return 'Historisk Nybil före Garage';
+  if (item.existing_nybil_timing === 'AFTER_GARAGE') return 'Nybil efter Garage · koppling saknas';
+  return 'Redan i Nybil · tidsrelation okänd';
 }
 
-export default function GarageV2Panel() {
+export default function GarageNybilHandoffStatusPanel() {
   const [handoffs, setHandoffs] = useState<HandoffItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,13 +54,13 @@ export default function GarageV2Panel() {
     void fetch('/api/garage/nybil-handoff', { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garage → Ny bil');
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garage → Nybil');
         if (!active) return;
         setHandoffs(payload.data ?? []);
         setError(null);
       })
       .catch((loadError: unknown) => {
-        if (active) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garage → Ny bil');
+        if (active) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garage → Nybil');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -77,14 +77,14 @@ export default function GarageV2Panel() {
   }), [handoffs]);
 
   return (
-    <section style={shell} aria-label="Garage till Ny bil">
+    <section style={shell} aria-label="Garage till Nybil handoff-status">
       <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE → NY BIL</div>
-        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Mottagning i Ny bil</h2>
-        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>Garaget fyller bilen fram till ankomst. När bilen anländer hämtas den från Garaget inne i Ny bil. Lager 1 importeras inte här. Befintlig Ny bil-historik klassificeras separat och skapar aldrig automatisk kvittens.</p>
+        <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE → NYBIL</div>
+        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Handoff-status</h2>
+        <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>Read-only. Nybil hämtar bilen från Garaget och verifierar faktisk mottagning i /nybil. Ingen Nybil-exekvering sker här.</p>
         {!loading ? (
           <div style={{ marginTop: 7, fontSize: 13, color: '#555' }}>
-            {counts.waiting} väntar på Ny bil · {counts.historicalBefore} historiska före Garage · {counts.laterWithoutLink} Ny bil efter Garage utan koppling · {counts.unknownOverlap} tidsrelation okänd · {counts.handedOff} kvitterade
+            {counts.waiting} väntar på Nybil · {counts.historicalBefore} historiska före Garage · {counts.laterWithoutLink} Nybil efter Garage utan koppling · {counts.unknownOverlap} tidsrelation okänd · {counts.handedOff} mottagna i Nybil
           </div>
         ) : null}
       </div>
@@ -92,17 +92,17 @@ export default function GarageV2Panel() {
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
       {handoffs.length === 0 ? (
-        <div style={{ color: '#666', padding: '8px 0', fontSize: 14 }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr finns i Ny bil-handslaget.'}</div>
+        <div style={{ color: '#666', padding: '8px 0', fontSize: 14 }}>{loading ? 'Läser Garaget…' : 'Inga UTVECKLA-bilar med regnr finns i Nybil-handslaget.'}</div>
       ) : handoffs.map((item) => (
         <div key={item.garage_item_id} style={row}>
           <div><strong style={{ fontSize: 15 }}>{item.regnr}</strong><div style={{ fontSize: 13, color: '#666' }}>{item.source_kind}</div></div>
           <div><strong style={{ fontSize: 15 }}>{item.model}</strong><div style={{ fontSize: 13, color: '#666' }}>Stn {item.planned_station || '—'}</div></div>
           {item.handed_off_nybil_id ? (
-            <div style={done}>Mottagen i Ny bil</div>
+            <div style={done}>MOTTAGEN I NYBIL</div>
           ) : item.existing_nybil_id ? (
             <div style={known}>{knownLabel(item)}<br /><span style={{ fontWeight: 500 }}>{item.existing_nybil_created_at ? new Date(item.existing_nybil_created_at).toLocaleDateString('sv-SE') : 'Registrering finns'}</span></div>
           ) : (
-            <div style={waiting}>Väntar på Ny bil</div>
+            <div style={waiting}>VÄNTAR PÅ NYBIL</div>
           )}
         </div>
       ))}

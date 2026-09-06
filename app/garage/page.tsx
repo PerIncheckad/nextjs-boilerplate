@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import CoreProductShell from '@/components/CoreProductShell';
 import GarageOverviewPanel from './garage-overview-panel';
 import GarageClient from './garage-client';
-import GarageV2Panel from './garage-v2-panel';
+import GarageNybilHandoffStatusPanel from './garage-nybil-handoff-status-panel';
 import GarageVoidPanel from './garage-void-panel';
 import GarageAvvecklaHandoffPanel from './garage-avveckla-handoff-panel';
 import OrderWorkflowPanel from './order-workflow-panel';
@@ -28,7 +28,7 @@ export default function GaragePage() {
           <span>ARBETSFLÖDE</span>
           <a href="#oversikt">0. Översikt</a>
           <a href="#garageobjekt">1. Garage</a>
-          <a href="#nybil">2. Ny bil</a>
+          <a href="#nybil-handoff">2. Nybil handoff</a>
           <a href="#avveckla-handoff">3. Avveckla handoff</a>
           <a href="#bestallning-leverans">4. Beställning / leverans</a>
         </nav>
@@ -44,9 +44,9 @@ export default function GaragePage() {
           <GarageVoidPanel />
         </section>
 
-        <section id="nybil" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>02 / NY BIL</strong><span>Överlämna UTVECKLA-bilen när fysisk identitet finns</span></div>
-          <GarageV2Panel />
+        <section id="nybil-handoff" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>02 / NYBIL HANDOFF</strong><span>Read-only status för Garage → Nybil. Allt Nybil-arbete sker i /nybil.</span></div>
+          <GarageNybilHandoffStatusPanel />
         </section>
 
         <section id="avveckla-handoff" className={styles.section}>
