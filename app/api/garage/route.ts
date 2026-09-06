@@ -50,7 +50,7 @@ async function ensureModel(admin: ReturnType<typeof adminClient>, rawModel: unkn
 
 function normalizeBody(body: Record<string, unknown>, stations: Set<string>, partial = false) {
   const out: Record<string, unknown> = {};
-  const fields = ['planning_period', 'model', 'supplier', 'order_reference', 'saluort', 'note'] as const;
+  const fields = ['planning_period', 'model', 'supplier', 'order_reference', 'saluort', 'returadress', 'note'] as const;
   for (const field of fields) if (!partial || Object.hasOwn(body, field)) out[field] = text(body[field]);
   if (!partial && !out.model) return null;
   if (Object.hasOwn(body, 'model') && !out.model) return null;
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
   const period = params.get('period')?.trim() || null;
   const station = params.get('station')?.trim() || null;
   const direction = upper(params.get('direction'));
-  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,garage_direction,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,source_planning_unit_no,source_salu_flag_id,created_at,updated_at').is('voided_at', null).is('handed_off_nybil_id', null).is('completed_at', null).order('updated_at', { ascending: false });
+  let query = admin.from('garage_items').select('garage_item_id,planning_period,model,garage_direction,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,returadress,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,source_planning_unit_no,source_salu_flag_id,created_at,updated_at').is('voided_at', null).is('handed_off_nybil_id', null).is('completed_at', null).order('updated_at', { ascending: false });
   if (period) query = query.eq('planning_period', period);
   if (station && stations.has(station)) query = query.eq('planned_station', station);
   if (direction && DIRECTIONS.has(direction)) query = query.eq('garage_direction', direction);
