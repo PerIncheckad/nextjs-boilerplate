@@ -4,7 +4,9 @@ import test from 'node:test';
 
 const migration = readFileSync('migrations/20260906031500_add_legacy_garage_ut_handoff_current_v1.sql', 'utf8');
 const api = readFileSync('app/api/garage/legacy-ut-handoff/route.ts', 'utf8');
-const panel = readFileSync('app/garage/garage-legacy-entry-panel.tsx', 'utf8');
+const panel = readFileSync('app/legacy/legacy-current-state-panel.tsx', 'utf8');
+const legacyPage = readFileSync('app/legacy/page.tsx', 'utf8');
+const garagePage = readFileSync('app/garage/page.tsx', 'utf8');
 const avvecklaFoundation = readFileSync('migrations/20260902230000_add_garage_avveckla_foundation_v1.sql', 'utf8');
 
 test('exact immutable LEGACY provenance authorizes one Garage UT work object', () => {
@@ -69,12 +71,16 @@ test('handoff provenance is append-only and actor is authenticated server-side',
   assert.match(api, /p_actor_email: verification\.user\.email/);
 });
 
-test('Garage UT handoff does not start AVVECKLA or bypass terminal readiness', () => {
+test('Garage UT handoff remains on #575 but can only be initiated from LEGACY module UI', () => {
+  assert.match(legacyPage, /02 \/ ÖVERLÄMNA TILL GARAGE UT/);
+  assert.match(panel, /\/api\/garage\/legacy-ut-handoff/);
   assert.match(migration, /'avvecklaStarted', false/);
   assert.match(api, /avvecklaStarted: false/);
   assert.match(panel, /startar inte AVVECKLA/);
   assert.match(panel, /AVVECKLA: inte startad av handslaget/);
   assert.match(avvecklaFoundation, /assert_garage_avveckla_ready_for_completion/);
+  assert.doesNotMatch(garagePage, /legacy-ut-handoff/);
+  assert.doesNotMatch(garagePage, /LEGACY_FLEET/);
   for (const source of [migration, api, panel]) {
     assert.doesNotMatch(source, /start_garage_avveckla_case\s*\(/);
     assert.doesNotMatch(source, /complete_garage_avveckla_ut_internal\s*\(/);
