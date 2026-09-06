@@ -60,7 +60,29 @@ export default function SaluDecisionClient() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch('/api/salu/decision', { cache: 'no-store', signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Kunde inte läsa SALU');
+        return payload.data ?? [];
+      })
+      .then((data) => {
+        setRows(data);
+        setError(null);
+      })
+      .catch((nextError) => {
+        if (nextError instanceof DOMException && nextError.name === 'AbortError') return;
+        setError(nextError instanceof Error ? nextError.message : 'Kunde inte läsa SALU');
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const selectedReady = selected?.blockers.ready ?? false;
   const canSave = useMemo(() => {
