@@ -13,7 +13,7 @@ export default function HjulskiftePage() {
   return (
     <CoreProductShell
       active="hjulskifte"
-      title="Hjulskifte"
+      title="HJULSKIFTE"
       descriptor="BEHÖVER SKIFTE / BOKAD / KLAR"
       eyebrow="INVISTO CORE / HJULSKIFTE CONTROL"
     >
