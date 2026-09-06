@@ -67,7 +67,7 @@ test('season v2 base plus current API keeps verified source data and direct regn
   assert.match(migration, /s\.current_saludatum/);
   assert.match(migration, /create_garage_wheel_change_for_vehicle/);
   assert.match(migration, /HJULSKIFTE_SEASON/);
-  assert.match(api, /STATUS_THEN_COMPLETED_CHECKIN_THEN_NYBIL_EXCLUDING_SOLD/);
+  assert.match(api, /LATEST_VERIFIED_WHEEL_FACT_EXCLUDING_SOLD_TERMINAL_UT_AND_HANDLED_SEASON/);
   assert.match(api, /eligibility !== 'REQUIRES_CHANGE'/);
   assert.match(api, /Hjulskiftesäsongen har inte startat ännu/);
 });

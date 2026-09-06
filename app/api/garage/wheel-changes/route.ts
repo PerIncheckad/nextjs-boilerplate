@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
+import { isActionableWheelStorage } from '@/lib/wheel-storage-actionability';
 import {
   classifyWheelEligibility,
   operationalWheelSeason,
@@ -113,6 +114,82 @@ async function readSoldRegnrs(admin: ReturnType<typeof createAdminClient>): Prom
   return soldRegnrs;
 }
 
+async function readTerminalUtRegnrs(admin: ReturnType<typeof createAdminClient>): Promise<Set<string>> {
+  const { data, error } = await admin
+    .from('garage_avveckla_events')
+    .select('garage_avveckla_cases!inner(regnr)')
+    .eq('event_type', 'UT_OVERLAMNING_VERIFIERAD');
+  if (error) throw error;
+
+  const terminalUtRegnrs = new Set<string>();
+  for (const row of data ?? []) {
+    const joined = row.garage_avveckla_cases as unknown;
+    const cases = Array.isArray(joined) ? joined : [joined];
+    for (const item of cases) {
+      if (!item || typeof item !== 'object') continue;
+      const regnr = cleanRegnr((item as { regnr?: unknown }).regnr);
+      if (regnr) terminalUtRegnrs.add(regnr);
+    }
+  }
+  return terminalUtRegnrs;
+}
+
+async function readRegisteredWheelStorage(
+  admin: ReturnType<typeof createAdminClient>,
+  regnr: string,
+): Promise<string | null> {
+  const [nybilResponse, editsResponse, vehiclesResponse] = await Promise.all([
+    admin
+      .from('nybil_inventering')
+      .select('regnr,hjul_forvaring_ort,hjul_forvaring_spec,hjul_forvaring,created_at')
+      .not('regnr', 'is', null)
+      .order('created_at', { ascending: false }),
+    admin
+      .from('vehicle_edits')
+      .select('regnr,field_name,new_value,edited_at')
+      .in('field_name', ['hjul_forvaring_ort', 'hjul_forvaring_spec'])
+      .order('edited_at', { ascending: false }),
+    admin
+      .from('vehicles')
+      .select('regnr,wheel_storage_location')
+      .not('regnr', 'is', null),
+  ]);
+
+  if (nybilResponse.error) throw nybilResponse.error;
+  if (editsResponse.error) throw editsResponse.error;
+  if (vehiclesResponse.error) throw vehiclesResponse.error;
+
+  let nybilOrt: string | null = null;
+  let nybilSpec: string | null = null;
+  for (const row of nybilResponse.data ?? []) {
+    if (cleanRegnr(row.regnr) !== regnr) continue;
+    nybilOrt = cleanText(row.hjul_forvaring_ort, 200);
+    nybilSpec = cleanText(row.hjul_forvaring_spec, 200) ?? cleanText(row.hjul_forvaring, 200);
+    break;
+  }
+
+  let editOrt: string | null | undefined;
+  let editSpec: string | null | undefined;
+  for (const row of editsResponse.data ?? []) {
+    if (cleanRegnr(row.regnr) !== regnr || typeof row.field_name !== 'string') continue;
+    if (row.field_name === 'hjul_forvaring_ort' && editOrt === undefined) editOrt = cleanText(row.new_value, 200);
+    if (row.field_name === 'hjul_forvaring_spec' && editSpec === undefined) editSpec = cleanText(row.new_value, 200);
+    if (editOrt !== undefined && editSpec !== undefined) break;
+  }
+
+  const ort = editOrt !== undefined ? editOrt : nybilOrt;
+  const spec = editSpec !== undefined ? editSpec : nybilSpec;
+  const currentStorage = [ort, spec].filter((value): value is string => Boolean(value)).join(' - ');
+  if (currentStorage) return currentStorage;
+
+  for (const row of vehiclesResponse.data ?? []) {
+    if (cleanRegnr(row.regnr) !== regnr) continue;
+    const legacyStorage = cleanText(row.wheel_storage_location, 200);
+    if (legacyStorage) return legacyStorage;
+  }
+  return null;
+}
+
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -128,7 +205,7 @@ export async function GET(request: Request) {
   try {
     const now = new Date();
     const operational = operationalWheelSeason(now);
-    const [itemsRes, wheelRes, candidateSource, soldRegnrs] = await Promise.all([
+    const [itemsRes, wheelRes, candidateSource, soldRegnrs, terminalUtRegnrs] = await Promise.all([
       admin.from('garage_items')
         .select('garage_item_id,regnr,model,planned_station,garage_direction,source_kind,updated_at')
         .not('regnr', 'is', null)
@@ -139,6 +216,7 @@ export async function GET(request: Request) {
         .order('updated_at', { ascending: false }),
       readCandidateSource(admin),
       readSoldRegnrs(admin),
+      readTerminalUtRegnrs(admin),
     ]);
 
     if (itemsRes.error) throw itemsRes.error;
@@ -158,13 +236,15 @@ export async function GET(request: Request) {
       wheelChanges
         .filter((item) => item.season_key === operational.season.key)
         .map((item) => cleanRegnr(item.regnr))
-        .filter((regnr): regnr is string => Boolean(regnr)),
+        .filter((candidateRegnr): candidateRegnr is string => Boolean(candidateRegnr)),
     );
 
     const candidates = buildCandidates(candidateSource, operational.season)
       .filter((item) => {
-        const regnr = cleanRegnr(item.regnr) ?? '';
-        return !soldRegnrs.has(regnr) && !handledThisSeason.has(regnr);
+        const candidateRegnr = cleanRegnr(item.regnr) ?? '';
+        return !soldRegnrs.has(candidateRegnr)
+          && !terminalUtRegnrs.has(candidateRegnr)
+          && !handledThisSeason.has(candidateRegnr);
       });
 
     const counts = candidates.reduce<Record<WheelEligibility, number>>((acc, item) => {
@@ -188,7 +268,7 @@ export async function GET(request: Request) {
         },
         candidates,
         counts,
-        semantics: 'STATUS_THEN_COMPLETED_CHECKIN_THEN_NYBIL_EXCLUDING_SOLD',
+        semantics: 'LATEST_VERIFIED_WHEEL_FACT_EXCLUDING_SOLD_TERMINAL_UT_AND_HANDLED_SEASON',
       },
     });
   } catch (error) {
@@ -245,7 +325,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Bokad tid krävs när hjulskiftet är BOKAD' }, { status: 400 });
       }
 
-      const [existingSeasonalResponse, soldRegnrs, source] = await Promise.all([
+      const registeredStoragePromise = requestedStatus === 'BOKAD'
+        ? readRegisteredWheelStorage(admin, regnr)
+        : Promise.resolve<string | null>(null);
+      const [existingSeasonalResponse, soldRegnrs, terminalUtRegnrs, source, registeredStorage] = await Promise.all([
         admin
           .from('garage_wheel_changes')
           .select('wheel_change_id')
@@ -253,7 +336,9 @@ export async function POST(request: Request) {
           .eq('season_key', operational.season.key)
           .limit(1),
         readSoldRegnrs(admin),
+        readTerminalUtRegnrs(admin),
         readCandidateSource(admin),
+        registeredStoragePromise,
       ]);
       if (existingSeasonalResponse.error) throw existingSeasonalResponse.error;
       if ((existingSeasonalResponse.data ?? []).length > 0) {
@@ -261,6 +346,12 @@ export async function POST(request: Request) {
       }
       if (soldRegnrs.has(regnr)) {
         return NextResponse.json({ error: 'Bilen är markerad som såld och kan inte starta säsongsbundet hjulskifte' }, { status: 409 });
+      }
+      if (terminalUtRegnrs.has(regnr)) {
+        return NextResponse.json({ error: 'Bilen har verifierat lämnat verksamheten och kan inte starta hjulskifte' }, { status: 409 });
+      }
+      if (requestedStatus === 'BOKAD' && !isActionableWheelStorage(registeredStorage)) {
+        return NextResponse.json({ error: 'Verifierad hjulförvaring krävs innan hjulskiftet kan bokas' }, { status: 409 });
       }
 
       const candidate = source.find((item) => cleanRegnr(item.regnr) === regnr);
@@ -288,7 +379,7 @@ export async function POST(request: Request) {
           p_status: requestedStatus,
           p_booked_for: bookedFor,
           p_supplier: supplier,
-          p_location: location,
+          p_location: requestedStatus === 'BOKAD' ? registeredStorage : location,
           p_note: note,
           p_actor_id: verification.user.id,
           p_actor_email: verification.user.email,
@@ -371,12 +462,29 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    let effectiveLocation = location;
+    if (status === 'BOKAD') {
+      const { data: change, error: changeError } = await admin
+        .from('garage_wheel_changes')
+        .select('regnr')
+        .eq('wheel_change_id', wheelChangeId)
+        .maybeSingle();
+      if (changeError) throw changeError;
+      const changeRegnr = cleanRegnr(change?.regnr);
+      if (!changeRegnr) return NextResponse.json({ error: 'Hjulskifte saknar registreringsnummer' }, { status: 409 });
+      const registeredStorage = await readRegisteredWheelStorage(admin, changeRegnr);
+      if (!isActionableWheelStorage(registeredStorage)) {
+        return NextResponse.json({ error: 'Verifierad hjulförvaring krävs innan hjulskiftet kan bokas' }, { status: 409 });
+      }
+      effectiveLocation = registeredStorage;
+    }
+
     const { data, error } = await admin.rpc('update_garage_wheel_change', {
       p_wheel_change_id: wheelChangeId,
       p_status: status,
       p_booked_for: bookedFor,
       p_supplier: supplier,
-      p_location: location,
+      p_location: effectiveLocation,
       p_note: note,
       p_actor_id: verification.user.id,
       p_actor_email: verification.user.email,
