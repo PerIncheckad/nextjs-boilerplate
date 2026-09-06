@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import CoreProductShell from '@/components/CoreProductShell';
-import GarageOverviewPanel from './garage-overview-panel';
+import GarageCorePanel from './garage-core-panel';
 import GarageClient from './garage-client';
 import GarageNybilHandoffStatusPanel from './garage-nybil-handoff-status-panel';
 import GarageVoidPanel from './garage-void-panel';
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Garaget | Incheckad',
-  description: 'BK:s arbetsyta för planerade, beställda och omplanerade bilar',
+  description: 'Garage staging, routing och verifierade handoff',
 };
 
 export default function GaragePage() {
@@ -25,21 +25,21 @@ export default function GaragePage() {
     >
       <div className={styles.workspace}>
         <nav className={styles.flowNav} aria-label="Garaget arbetsflöde">
-          <span>ARBETSFLÖDE</span>
-          <a href="#oversikt">0. Översikt</a>
-          <a href="#garageobjekt">1. Garage</a>
+          <span>GARAGE CORE</span>
+          <a href="#core">0. Core</a>
+          <a href="#garageobjekt">1. Garage-episoder</a>
           <a href="#nybil-handoff">2. Nybil handoff</a>
           <a href="#avveckla-handoff">3. Avveckla handoff</a>
           <a href="#bestallning-leverans">4. Beställning / leverans</a>
         </nav>
 
-        <section id="oversikt" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>00 / OPERATIV ÖVERSIKT</strong><span>En bil kan bära flera samtidiga signaler och visas i flera arbetsvyer</span></div>
-          <GarageOverviewPanel />
+        <section id="core" className={styles.section}>
+          <div className={styles.sectionLabel}><strong>00 / GARAGE CORE</strong><span>Vad ligger här, varför, vad väntar det på och vem tar över?</span></div>
+          <GarageCorePanel />
         </section>
 
         <section id="garageobjekt" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>01 / GARAGE</strong><span>UTVECKLA / IN börjar här · Planering KLAR skapar objekten automatiskt</span></div>
+          <div className={styles.sectionLabel}><strong>01 / GARAGE-EPISODER</strong><span>Garage-ägda staging- och routingkontroller. Inte andra modulers arbete.</span></div>
           <GarageClient />
           <GarageVoidPanel />
         </section>
@@ -55,7 +55,7 @@ export default function GaragePage() {
         </section>
 
         <section id="bestallning-leverans" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>04 / BESTÄLLNING / LEVERANS</strong><span>Transitional yta · slutligt modulägarskap är inte beslutat i PR E</span></div>
+          <div className={styles.sectionLabel}><strong>04 / BESTÄLLNING / LEVERANS</strong><span>Transitional yta · slutligt modulägarskap är inte beslutat</span></div>
           <OrderWorkflowPanel />
         </section>
       </div>
