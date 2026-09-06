@@ -36,7 +36,7 @@ test('D2 keeps explicit verified Klar available when storage is missing or uncle
   assert.match(panel, /createShortcut\(item, 'KLAR'\)/);
   assert.match(panel, /Redan utfört \/ Klar/);
   assert.doesNotMatch(api, /requestedStatus === 'KLAR' && !isActionableWheelStorage/);
-  assert.doesNotMatch(api, /status === 'KLAR'.*!isActionableWheelStorage/s);
+  assert.doesNotMatch(api, /status === 'KLAR' && !isActionableWheelStorage/);
 });
 
 test('D2 preserves raw storage text and routes correction to Status', () => {
