@@ -201,8 +201,8 @@ export default function GarageClient() {
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>Garaget</h1><p>UTVECKLA / IN · AVVECKLA / UT.</p></div>
-        <div className={styles.headerActions}><Link href="/planning" className={styles.primaryButton}>Planering</Link><Link href="/tower" className={styles.secondaryButton}>Tower</Link><button className={styles.secondaryButton} type="button" onClick={() => window.print()}>Skriv ut</button><button className={styles.secondaryButton} type="button" onClick={() => window.print()} title="Välj Spara som PDF i utskriftsdialogen">PDF</button></div>
+        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>GARAGET</h1><p>UTVECKLA / IN · AVVECKLA / UT.</p></div>
+        <div className={styles.headerActions}><Link href="/planning" className={styles.primaryButton}>PLANERING</Link><Link href="/tower" className={styles.secondaryButton}>TOWER</Link><button aria-label="Skriv ut" className={styles.secondaryButton} type="button" onClick={() => window.print()}>SKRIV UT</button><button className={styles.secondaryButton} type="button" onClick={() => window.print()} title="Välj Spara som PDF i utskriftsdialogen">PDF</button></div>
       </header>
 
       <datalist id="garage-models">{models.map((model) => <option key={model.model_code} value={model.display_name} />)}</datalist>
@@ -210,12 +210,12 @@ export default function GarageClient() {
 
       <section className={styles.sourceGrid}>
         <div className={styles.sourcePanel}>
-          <div className={styles.panelTitle}><h2>Planering → Garaget</h2><span>Planering släpper bilen som redan beställd, avropad och bekräftad. Garaget kompletterar endast aktuell staginginformation.</span></div>
+          <div className={styles.panelTitle}><h2>PLANERING → GARAGET</h2><span>Planering släpper bilen som redan beställd, avropad och bekräftad. Garaget kompletterar endast aktuell staginginformation.</span></div>
         </div>
       </section>
 
       <section className={styles.createPanel}>
-        <div className={styles.panelTitle}><h2>Lägg bil manuellt</h2><span>Manuell väg för staging-undantag som inte kommer från Planering.</span></div>
+        <div className={styles.panelTitle}><h2>LÄGG BIL MANUELLT</h2><span>Manuell väg för staging-undantag som inte kommer från Planering.</span></div>
         <div className={styles.formGrid}>
           <Field label="Riktning"><select value={draft.garage_direction ?? ''} onChange={(e) => setDraft({ ...draft, garage_direction: (e.target.value || null) as GarageDirection | null })}><option value="">Välj riktning</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></Field>
           <Field label="Månad"><input type="month" value={draft.planning_period ?? ''} onChange={(e) => setDraft({ ...draft, planning_period: e.target.value })} /></Field>
@@ -236,22 +236,22 @@ export default function GarageClient() {
           </> : null}
           <Field label="Kommentar"><input value={draft.note} onChange={(e) => setDraft({ ...draft, note: e.target.value })} /></Field>
         </div>
-        <button className={styles.primaryButton} type="button" onClick={() => void create()} disabled={saving || stations.length === 0}>{saving ? 'Sparar…' : 'Lägg i Garaget'}</button>
+        <button className={styles.primaryButton} type="button" onClick={() => void create()} disabled={saving || stations.length === 0}>{saving ? 'SPARAR…' : 'LÄGG I GARAGET'}</button>
       </section>
 
       <section className={styles.controls}>
-        <label><span>Riktning</span><select value={direction} onChange={(e) => setDirection(e.target.value as 'ALLA' | GarageDirection)}><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option><option value="ALLA">Alla</option></select></label>
-        <label><span>Station</span><select value={station} onChange={(e) => setStation(e.target.value)}><option value="ALLA">Alla</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></label>
-        <label><span>Månad</span><input type="month" value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value)} /></label>
-        <button className={styles.secondaryButton} type="button" onClick={() => setPeriodFilter('')}>Alla månader</button>
-        <label><span>Sortera</span><select value={sortField} onChange={(e) => setSortField(e.target.value as SortField)}><option value="UPDATED">Senast ändrad</option><option value="MODEL">Modell</option><option value="REGNR">Reg.nr</option><option value="STATION">Station</option><option value="DIRECTION">Riktning</option><option value="PERIOD">Månad</option></select></label>
+        <label><span>RIKTNING</span><select aria-label="Riktning" value={direction} onChange={(e) => setDirection(e.target.value as 'ALLA' | GarageDirection)}><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option><option value="ALLA">ALLA</option></select></label>
+        <label><span>STATION</span><select aria-label="Station" value={station} onChange={(e) => setStation(e.target.value)}><option value="ALLA">ALLA</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></label>
+        <label><span>MÅNAD</span><input aria-label="Månad" type="month" value={periodFilter} onChange={(e) => setPeriodFilter(e.target.value)} /></label>
+        <button className={styles.secondaryButton} type="button" onClick={() => setPeriodFilter('')}>ALLA MÅNADER</button>
+        <label><span>SORTERA</span><select aria-label="Sortera" value={sortField} onChange={(e) => setSortField(e.target.value as SortField)}><option value="UPDATED">SENAST ÄNDRAD</option><option value="MODEL">MODELL</option><option value="REGNR">REG.NR</option><option value="STATION">STATION</option><option value="DIRECTION">RIKTNING</option><option value="PERIOD">MÅNAD</option></select></label>
         <button className={styles.secondaryButton} type="button" onClick={() => setSortDesc((value) => !value)}>{sortDesc ? '↓' : '↑'}</button>
-        <label className={styles.search}><span>Sök</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Modell, reg.nr, saluort, returadress…" /></label>
-        <strong>{visible.length} objekt</strong>
+        <label className={styles.search}><span>SÖK</span><input aria-label="Sök" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Modell, reg.nr, saluort, returadress…" /></label>
+        <strong>{visible.length} OBJEKT</strong>
       </section>
 
       <section className={styles.tableSection}>{loading ? <div className={styles.empty}>Läser Garaget…</div> : direction === 'IN' ? (
-        <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Månad</th><th>Modell</th><th className={styles.regnrColumn}>Reg.nr</th><th>Station</th><th>Returadress</th><th>Förväntad ankomst</th><th>Dygnsdeb</th><th>Hålltid</th><th>Kommentar</th></tr></thead>
+        <div className={styles.tableWrap}><table><thead><tr><th>KÄLLA</th><th>MÅNAD</th><th>MODELL</th><th className={styles.regnrColumn}>REG.NR</th><th>STATION</th><th>RETURADRESS</th><th>FÖRVÄNTAD ANKOMST</th><th>DYGNSDEB</th><th>HÅLLTID</th><th>KOMMENTAR</th></tr></thead>
           <tbody>{visible.map((item) => <tr key={item.garage_item_id}>
             <td>{sourceLabel(item)}</td>
             <td>{item.planning_period ?? '—'}</td>
@@ -265,7 +265,7 @@ export default function GarageClient() {
             <td><input defaultValue={item.note ?? ''} onBlur={(e) => blurPatch(item, 'note', item.note, e.target.value || null)} /></td>
           </tr>)}</tbody></table></div>
       ) : (
-        <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Riktning</th><th>Månad</th><th>Modell</th><th>Reg.nr</th><th>VIN</th><th>Källreg</th><th>Orsak</th><th>Station</th><th>Saluort</th><th>Kommentar</th></tr></thead>
+        <div className={styles.tableWrap}><table><thead><tr><th>KÄLLA</th><th>RIKTNING</th><th>MÅNAD</th><th>MODELL</th><th>REG.NR</th><th>VIN</th><th>KÄLLREG</th><th>ORSAK</th><th>STATION</th><th>SALUORT</th><th>KOMMENTAR</th></tr></thead>
           <tbody>{visible.map((item) => <tr key={item.garage_item_id}>
             <td>{sourceLabel(item)}</td>
             <td><select value={item.garage_direction ?? ''} onChange={(e) => { const next = e.target.value as GarageDirection; if (next) void patch(item, { garage_direction: next, direction_change_reason: `Ändrad i Garaget till ${directionLabel(next)}` }); }}><option value="" disabled>Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></td>
@@ -285,5 +285,5 @@ export default function GarageClient() {
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className={styles.field}><span>{label}</span>{children}</label>;
+  return <label className={styles.field}><span>{label.toLocaleUpperCase('sv-SE')}</span>{children}</label>;
 }
