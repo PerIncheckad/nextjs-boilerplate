@@ -68,10 +68,10 @@ export async function GET(request: Request) {
   if (!garageItemId) {
     const { data, error } = await admin
       .from('garage_items')
-      .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,returadress,source_kind,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
+      .select('garage_item_id,regnr,vin,model,planned_station,supplier,order_reference,returadress,planned_delivery_date,source_kind,source_planning_cell_id,source_planning_unit_no,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
       .eq('garage_direction', 'IN')
       .is('voided_at', null)
-      .not('regnr', 'is', null)
+      .is('handed_off_nybil_id', null)
       .order('updated_at', { ascending: false });
     if (error) {
       console.error('[garage/nybil-handoff] list failed', error);
@@ -79,9 +79,10 @@ export async function GET(request: Request) {
     }
 
     const rows = data ?? [];
+    const knownRegnrs = [...new Set(rows.map((row) => row.regnr).filter((value): value is string => Boolean(value)))];
     let existingByReg = new Map<string, ExistingNybil>();
     try {
-      existingByReg = await loadExistingNybilByReg(admin, [...new Set(rows.map((row) => row.regnr).filter((value): value is string => Boolean(value)))]);
+      existingByReg = await loadExistingNybilByReg(admin, knownRegnrs);
     } catch (lookupError) {
       console.error('[garage/nybil-handoff] Ny bil lookup failed', lookupError);
       return NextResponse.json({ error: 'Kunde inte kontrollera befintliga Ny bil-registreringar' }, { status: 500 });
@@ -89,7 +90,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       data: rows.map((row) => {
-        const existing = existingByReg.get(regKey(row.regnr));
+        const existing = row.regnr ? existingByReg.get(regKey(row.regnr)) : undefined;
         return {
           ...row,
           existing_nybil_id: existing?.id ?? null,
@@ -105,7 +106,7 @@ export async function GET(request: Request) {
 
   const { data: item, error } = await admin
     .from('garage_items')
-    .select('garage_item_id,planning_period,model,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,returadress,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
+    .select('garage_item_id,planning_period,model,planning_reason,supplier,order_reference,regnr,vin,source_regnr,planned_station,saluort,returadress,daily_rate,holding_period_months,ordered_at,calloff_at,confirmation_status,transport_status,planned_delivery_date,note,source_kind,source_planning_cell_id,source_planning_unit_no,garage_direction,handed_off_nybil_id,handed_off_at,created_at,updated_at')
     .eq('garage_item_id', garageItemId)
     .is('voided_at', null)
     .maybeSingle();
@@ -118,9 +119,6 @@ export async function GET(request: Request) {
   if (item.garage_direction !== 'IN') {
     return NextResponse.json({ error: 'Endast UTVECKLA / IN kan överlämnas till Ny bil' }, { status: 409 });
   }
-  if (!item.regnr) {
-    return NextResponse.json({ error: 'Registreringsnummer krävs före överlämning till Ny bil' }, { status: 409 });
-  }
   if (item.handed_off_nybil_id) {
     return NextResponse.json({
       error: 'Garage-objektet är redan överlämnat till Ny bil',
@@ -129,21 +127,23 @@ export async function GET(request: Request) {
     }, { status: 409 });
   }
 
-  try {
-    const existingByReg = await loadExistingNybilByReg(admin, [item.regnr]);
-    const existing = existingByReg.get(regKey(item.regnr));
-    if (existing) {
-      return NextResponse.json({
-        error: 'Registreringsnumret finns redan i Ny bil och ska inte registreras igen',
-        existing_nybil_id: existing.id,
-        existing_nybil_created_at: existing.created_at,
-        existing_nybil_source_garage_item_id: existing.source_garage_item_id,
-        existing_nybil_timing: classifyExistingNybilTiming(item.created_at ?? null, existing.created_at),
-      }, { status: 409 });
+  if (item.regnr) {
+    try {
+      const existingByReg = await loadExistingNybilByReg(admin, [item.regnr]);
+      const existing = existingByReg.get(regKey(item.regnr));
+      if (existing) {
+        return NextResponse.json({
+          error: 'Registreringsnumret finns redan i Ny bil och ska inte registreras igen',
+          existing_nybil_id: existing.id,
+          existing_nybil_created_at: existing.created_at,
+          existing_nybil_source_garage_item_id: existing.source_garage_item_id,
+          existing_nybil_timing: classifyExistingNybilTiming(item.created_at ?? null, existing.created_at),
+        }, { status: 409 });
+      }
+    } catch (lookupError) {
+      console.error('[garage/nybil-handoff] Ny bil lookup failed', lookupError);
+      return NextResponse.json({ error: 'Kunde inte kontrollera befintlig Ny bil-registrering' }, { status: 500 });
     }
-  } catch (lookupError) {
-    console.error('[garage/nybil-handoff] Ny bil lookup failed', lookupError);
-    return NextResponse.json({ error: 'Kunde inte kontrollera befintlig Ny bil-registrering' }, { status: 500 });
   }
 
   let stationDisplayName: string | null = null;
