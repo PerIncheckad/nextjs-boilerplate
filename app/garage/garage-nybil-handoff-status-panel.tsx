@@ -39,9 +39,9 @@ const known: React.CSSProperties = { fontWeight: 800, color: '#71510a', fontSize
 const waiting: React.CSSProperties = { fontWeight: 800, color: '#333', fontSize: 13, textAlign: 'right' };
 
 function knownLabel(item: HandoffItem): string {
-  if (item.existing_nybil_timing === 'BEFORE_GARAGE') return 'Historisk Nybil före Garage';
-  if (item.existing_nybil_timing === 'AFTER_GARAGE') return 'Nybil efter Garage · koppling saknas';
-  return 'Redan i Nybil · tidsrelation okänd';
+  if (item.existing_nybil_timing === 'BEFORE_GARAGE') return 'HISTORISK NYBIL FÖRE GARAGE';
+  if (item.existing_nybil_timing === 'AFTER_GARAGE') return 'NYBIL EFTER GARAGE · KOPPLING SAKNAS';
+  return 'REDAN I NYBIL · TIDSRELATION OKÄND';
 }
 
 export default function GarageNybilHandoffStatusPanel() {
@@ -80,7 +80,7 @@ export default function GarageNybilHandoffStatusPanel() {
     <section style={shell} aria-label="Garage till Nybil handoff-status">
       <div style={{ marginBottom: 10 }}>
         <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE → NYBIL</div>
-        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Handoff-status</h2>
+        <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>HANDOFF-STATUS</h2>
         <p style={{ margin: '3px 0 0', color: '#50565a', fontSize: 14 }}>Read-only. Nybil hämtar bilen från Garaget och verifierar faktisk mottagning i /nybil. Ingen Nybil-exekvering sker här.</p>
         {!loading ? (
           <div style={{ marginTop: 7, fontSize: 13, color: '#555' }}>
@@ -96,7 +96,7 @@ export default function GarageNybilHandoffStatusPanel() {
       ) : handoffs.map((item) => (
         <div key={item.garage_item_id} style={row}>
           <div><strong style={{ fontSize: 15 }}>{item.regnr}</strong><div style={{ fontSize: 13, color: '#666' }}>{item.source_kind}</div></div>
-          <div><strong style={{ fontSize: 15 }}>{item.model}</strong><div style={{ fontSize: 13, color: '#666' }}>Stn {item.planned_station || '—'}</div></div>
+          <div><strong style={{ fontSize: 15 }}>{item.model}</strong><div style={{ fontSize: 13, color: '#666' }}>STN {item.planned_station || '—'}</div></div>
           {item.handed_off_nybil_id ? (
             <div style={done}>MOTTAGEN I NYBIL</div>
           ) : item.existing_nybil_id ? (
