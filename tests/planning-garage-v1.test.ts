@@ -8,6 +8,7 @@ const directionMigration = readFileSync('migrations/20260825211000_add_garage_di
 const finalMigration = readFileSync('migrations/20260825213500_finalize_planning_garage_v1.sql', 'utf8');
 const atomicHandoffMigration = readFileSync('migrations/20260830010000_atomic_planning_garage_handoff.sql', 'utf8');
 const atomicSaluMigration = readFileSync('migrations/20260830015500_atomic_salu_garage_handoff.sql', 'utf8');
+const saluSaljasMigration = readFileSync('migrations/20260906023000_add_salu_saljas_to_garage_ut_handoff_v1.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const planningModelApi = readFileSync('app/api/planning/models/route.ts', 'utf8');
 const planningStatusApi = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
@@ -112,20 +113,20 @@ test('KLAR materializes BESTALLT automatically without duplicate units and stamp
   assert.match(garageUi, /markeras KLAR skapas BESTÄLLT automatiskt/);
 });
 
-test('Garage imports one exact SALU cycle atomically without rewriting Layer 1', () => {
+test('legacy manual SALU ingress is fenced and only STÄNGD + SÄLJAS may create future Garage UT', () => {
   assert.match(finalMigration, /source_salu_flag_id/);
   assert.match(finalMigration, /garage_items_salu_source_uidx/);
-  assert.match(saluSourceApi, /from\('salu_flags'\)/);
-  assert.match(saluSourceApi, /admin\.rpc\('materialize_salu_to_garage'/);
-  assert.doesNotMatch(saluSourceApi, /from\('garage_items'\)\.insert/);
   assert.match(atomicSaluMigration, /create or replace function public\.materialize_salu_to_garage/);
-  assert.match(atomicSaluMigration, /pg_advisory_xact_lock/);
-  assert.match(atomicSaluMigration, /source_kind = 'SALU'/);
-  assert.match(atomicSaluMigration, /insert into public\.garage_items/);
-  assert.match(atomicSaluMigration, /insert into public\.garage_direction_events/);
-  assert.match(atomicSaluMigration, /grant execute on function public\.materialize_salu_to_garage.*service_role/s);
-  assert.match(garageUi, /Hämta från SALU/);
-  assert.match(garageUi, /Exakt SALU-cykel kan bara hämtas en gång/);
+  assert.match(saluSourceApi, /export async function POST/);
+  assert.match(saluSourceApi, /status: 410/);
+  assert.match(saluSourceApi, /gamla manuella SALU → Garage-ingången är stängd/);
+  assert.doesNotMatch(saluSourceApi, /admin\.rpc\('materialize_salu_to_garage'/);
+  assert.doesNotMatch(garageUi, /Hämta från SALU/);
+  assert.doesNotMatch(garageUi, /\/api\/garage\/salu-sources/);
+  assert.match(saluSaljasMigration, /v_flag\.status <> 'STÄNGD' or v_flag\.closure_outcome <> 'SÄLJAS'/i);
+  assert.match(saluSaljasMigration, /materialize_salu_saljas_to_garage_ut_v1/i);
+  assert.match(saluSaljasMigration, /'UT'/);
+  assert.match(saluSaljasMigration, /avvecklaStarted', false/);
 });
 
 test('Garage supports operational editing, sorting, print and PDF', () => {
