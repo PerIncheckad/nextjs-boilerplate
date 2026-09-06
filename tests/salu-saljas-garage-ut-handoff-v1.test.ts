@@ -11,7 +11,7 @@ const avvecklaFoundation = readFileSync(
   'utf8',
 );
 const avvecklaApi = readFileSync('app/api/garage/avveckla/route.ts', 'utf8');
-const avvecklaPanel = readFileSync('app/garage/garage-avveckla-panel.tsx', 'utf8');
+const handoffPanel = readFileSync('app/garage/garage-avveckla-handoff-panel.tsx', 'utf8');
 
 test('only closed SALU with SÄLJAS can materialize the future Garage UT handoff', () => {
   assert.match(migration, /new\.status = 'STÄNGD'/);
@@ -54,8 +54,9 @@ test('existing AVVECKLA manual entrypoint remains the only start contract', () =
   assert.match(avvecklaFoundation, /start_garage_avveckla_case/);
   assert.match(avvecklaFoundation, /Orsak krävs/);
   assert.match(avvecklaApi, /action === 'START_CASE'/);
-  assert.match(avvecklaPanel, /Starta AVVECKLA/);
-  assert.match(avvecklaPanel, /Orsak/);
+  assert.match(handoffPanel, /Starta AVVECKLA/);
+  assert.match(handoffPanel, /Orsak/);
+  assert.match(handoffPanel, /avveckla_case_id/);
 });
 
 test('no Layer 1, RENTAL, terminal UT or historical backfill is introduced', () => {

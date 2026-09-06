@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 const migration = readFileSync('migrations/20260902233000_add_garage_avveckla_terminal_handoffs_v1.sql', 'utf8');
 const foundation = readFileSync('migrations/20260902230000_add_garage_avveckla_foundation_v1.sql', 'utf8');
 const completeApi = readFileSync('app/api/garage/avveckla/complete/route.ts', 'utf8');
-const panel = readFileSync('app/garage/garage-avveckla-panel.tsx', 'utf8');
+const panel = readFileSync('app/avveckla/avveckla-panel.tsx', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const overviewApi = readFileSync('app/api/garage/overview/route.ts', 'utf8');
 
@@ -62,7 +62,7 @@ test('server API preserves all three terminal routes while own delivery is exten
   assert.match(completeApi, /occurred_at/);
 });
 
-test('Garage UI only enables terminal verification when the A gate is visibly ready', () => {
+test('AVVECKLA UI only enables terminal verification when the locked gate is visibly ready', () => {
   assert.match(panel, /Alla AVVECKLA-punkter är KLAR\/AVSLUTADE/);
   assert.match(panel, /disabled=\{busy \|\| !allClosed\}/);
   assert.match(panel, /Verifiera UT \/ AVSLUT/);
