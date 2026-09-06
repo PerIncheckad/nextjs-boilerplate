@@ -4,11 +4,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 type GarageCandidate = {
   garage_item_id: string;
-  regnr: string;
+  regnr: string | null;
   model: string;
   planned_station: string | null;
   supplier: string | null;
   order_reference: string | null;
+  planned_delivery_date: string | null;
+  source_kind: string;
+  source_planning_unit_no: number | null;
   handed_off_nybil_id: string | null;
   existing_nybil_id: string | null;
 };
@@ -23,32 +26,30 @@ const shell: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-const row: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: 'minmax(110px,150px) minmax(180px,1fr) minmax(100px,140px) auto',
-  gap: 12,
-  alignItems: 'center',
-  padding: '9px 0',
-  borderTop: '1px solid #e7e7e7',
-  fontSize: 14,
-};
+function formatDate(value: string | null) {
+  if (!value) return null;
+  const [year, month, day] = value.split('-');
+  return year && month && day ? `${day}/${month}` : value;
+}
 
-const button: React.CSSProperties = {
-  borderRadius: 6,
-  padding: '8px 12px',
-  background: '#111',
-  color: '#fff',
-  fontWeight: 800,
-  fontSize: 13,
-  textDecoration: 'none',
-  whiteSpace: 'nowrap',
-};
+function candidateLabel(item: GarageCandidate) {
+  const parts = [item.regnr || 'SAKNAR REGNR', item.model];
+  if (item.source_kind === 'PLANERING' && item.source_planning_unit_no) {
+    parts.push(`Planering enhet ${item.source_planning_unit_no}`);
+  } else if (item.source_kind) {
+    parts.push(item.source_kind);
+  }
+  const arrival = formatDate(item.planned_delivery_date);
+  if (arrival) parts.push(`Förväntad ankomst ${arrival}`);
+  if (item.planned_station) parts.push(`Stn ${item.planned_station}`);
+  return parts.join(' — ');
+}
 
 export default function GaragePicker() {
   const [items, setItems] = useState<GarageCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
+  const [selectedGarageItemId, setSelectedGarageItemId] = useState('');
   const [hasSelectedGarageItem, setHasSelectedGarageItem] = useState(false);
 
   useEffect(() => {
@@ -80,45 +81,64 @@ export default function GaragePicker() {
     return () => { active = false; };
   }, []);
 
-  const visible = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase('sv-SE');
-    if (!needle) return items;
-    return items.filter((item) => [item.regnr, item.model, item.planned_station, item.supplier, item.order_reference]
-      .filter(Boolean)
-      .some((value) => String(value).toLocaleLowerCase('sv-SE').includes(needle)));
-  }, [items, query]);
+  const selected = useMemo(
+    () => items.find((item) => item.garage_item_id === selectedGarageItemId) ?? null,
+    [items, selectedGarageItemId],
+  );
 
   if (hasSelectedGarageItem) return null;
 
+  const openSelected = () => {
+    if (!selectedGarageItemId) return;
+    window.location.href = `/nybil?garage_item_id=${encodeURIComponent(selectedGarageItemId)}`;
+  };
+
   return (
     <section style={shell} aria-label="Hämta bil från Garaget">
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'end', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.06em' }}>NY BIL / GARAGET</div>
-          <h2 style={{ margin: '2px 0 0', fontSize: 22 }}>Hämta bilen från Garaget</h2>
-          <p style={{ margin: '4px 0 0', color: '#555', fontSize: 13 }}>Välj den bil som har anlänt. Kända Garage-uppgifter följer med som förifyllnad; faktisk mottagning verifieras i Ny bil.</p>
-        </div>
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Sök reg.nr, modell, station…"
-          aria-label="Sök bil i Garaget"
-          style={{ minWidth: 245, padding: '8px 10px', border: '1px solid #bbb', borderRadius: 6, fontSize: 14 }}
-        />
+      <div>
+        <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.06em' }}>NY BIL / GARAGET</div>
+        <h2 style={{ margin: '2px 0 0', fontSize: 22 }}>Hämta bilen från Garaget</h2>
+        <p style={{ margin: '4px 0 12px', color: '#555', fontSize: 13 }}>
+          Välj exakt Garage-objekt. Reg.nr visas när det finns; saknas det används fortfarande Garage-objektets ID som källa.
+        </p>
       </div>
 
-      {error ? <div style={{ marginTop: 10, color: '#a40000', fontWeight: 700 }}>{error}</div> : null}
+      {error ? <div style={{ marginBottom: 10, color: '#a40000', fontWeight: 700 }}>{error}</div> : null}
       {loading ? <div style={{ padding: '10px 0', color: '#666' }}>Läser Garaget…</div> : null}
-      {!loading && !error && visible.length === 0 ? <div style={{ padding: '10px 0', color: '#666' }}>Inga ankommande UTVECKLA-bilar med reg.nr väntar på Ny bil.</div> : null}
+      {!loading && !error && items.length === 0 ? <div style={{ padding: '10px 0', color: '#666' }}>Inga Garage IN-objekt väntar på Ny bil.</div> : null}
 
-      {!loading && !error ? visible.map((item) => (
-        <div key={item.garage_item_id} style={row}>
-          <strong>{item.regnr}</strong>
-          <div><strong>{item.model}</strong><div style={{ color: '#666', fontSize: 12 }}>{item.supplier || 'Leverantör ej angiven'}{item.order_reference ? ` · ${item.order_reference}` : ''}</div></div>
-          <div>Stn {item.planned_station || '—'}</div>
-          <a style={button} href={`/nybil?garage_item_id=${encodeURIComponent(item.garage_item_id)}`}>Hämta</a>
+      {!loading && !error && items.length > 0 ? (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
+          <label style={{ display: 'grid', gap: 5, flex: '1 1 520px' }}>
+            <span style={{ fontSize: 12, fontWeight: 800 }}>Garage IN → väntar på Nybil</span>
+            <select
+              value={selectedGarageItemId}
+              onChange={(event) => setSelectedGarageItemId(event.target.value)}
+              aria-label="Välj Garage-objekt"
+              style={{ width: '100%', padding: '9px 10px', border: '1px solid #bbb', borderRadius: 6, fontSize: 14 }}
+            >
+              <option value="">Välj bil…</option>
+              {items.map((item) => (
+                <option key={item.garage_item_id} value={item.garage_item_id}>{candidateLabel(item)}</option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={openSelected}
+            disabled={!selectedGarageItemId}
+            style={{ borderRadius: 6, padding: '9px 14px', background: '#111', color: '#fff', fontWeight: 800, border: 0, opacity: selectedGarageItemId ? 1 : 0.45 }}
+          >
+            Hämta
+          </button>
         </div>
-      )) : null}
+      ) : null}
+
+      {selected ? (
+        <div style={{ marginTop: 8, color: '#666', fontSize: 12 }}>
+          Vald källa: {selected.regnr || 'SAKNAR REGNR'} · {selected.model} · Garage-ID {selected.garage_item_id}
+        </div>
+      ) : null}
     </section>
   );
 }
