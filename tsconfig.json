@@ -19,6 +19,9 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
+      "@/lib/vehicle-status": [
+        "./lib/vehicle-status-current"
+      ],
       "@/*": [
         "./*"
       ]
