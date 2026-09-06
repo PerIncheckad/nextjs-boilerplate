@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import styles from './garage-wheel-change.module.css';
+import styles from './hjulskifte.module.css';
 
 type WheelStatus = 'KRAVS' | 'BOKAD' | 'PAGAENDE' | 'KLAR' | 'AVVIKELSE';
 type WheelEligibility = 'REQUIRES_CHANGE' | 'ALREADY_CORRECT' | 'SALU_EXEMPT' | 'UNKNOWN_WHEEL_STATUS';
@@ -107,7 +107,7 @@ function activeStatusOptions(item: WheelChange): WheelStatus[] {
   return ['KLAR'];
 }
 
-export default function GarageWheelChangePanel() {
+export default function HjulskiftePanel() {
   const [wheelChanges, setWheelChanges] = useState<WheelChange[]>([]);
   const [candidates, setCandidates] = useState<WheelCandidate[]>([]);
   const [storageByRegnr, setStorageByRegnr] = useState<Record<string, WheelStorageFact>>({});
@@ -276,10 +276,10 @@ export default function GarageWheelChangePanel() {
   };
 
   return (
-    <section className={styles.shell} aria-label="Hjulskifte i Garaget">
+    <section className={styles.shell} aria-label="Hjulskifte">
       <div className={styles.heading}>
         <div>
-          <div className={styles.eyebrow}>INCHECKAD / GARAGET / HJULSKIFTE</div>
+          <div className={styles.eyebrow}>INCHECKAD / HJULSKIFTE</div>
           <h2>Hjulskifte</h2>
           <p>{season ? `${season.type === 'WINTER' ? 'Vinter' : 'Sommar'} · ${season.startDate}–${season.endDate} · mål ${season.targetWheelType}${season.active ? '' : ' · FÖRHANDSVY'}` : 'Läser säsongsregel…'}</p>
           <p>Systemet hittar behovet. Du bokar och bekräftar när arbetet är klart.</p>

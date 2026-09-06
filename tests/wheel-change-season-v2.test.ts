@@ -10,7 +10,7 @@ import {
 
 const migration = readFileSync('migrations/20260831031500_add_wheel_change_season_v2.sql', 'utf8');
 const api = readFileSync('app/api/garage/wheel-changes/route.ts', 'utf8');
-const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
+const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 
 test('winter 2026 is opened for the actual high season while SALU cutoff stays locked', () => {
   const season = winterSeason(2026);
@@ -61,7 +61,7 @@ test('outside a campaign the next campaign is read-only preview', () => {
   assert.equal(result.season.key, 'WINTER_2026');
 });
 
-test('season v2 base plus current API keeps verified source data and direct regnr workflow inside Garage', () => {
+test('season v2 base plus current API keeps verified source data and direct regnr workflow in Hjulskifte', () => {
   assert.match(migration, /get_wheel_change_candidate_source/);
   assert.match(migration, /c\.status = 'COMPLETED'/);
   assert.match(migration, /s\.current_saludatum/);
@@ -72,7 +72,7 @@ test('season v2 base plus current API keeps verified source data and direct regn
   assert.match(api, /Hjulskiftesäsongen har inte startat ännu/);
 });
 
-test('Garage UI only offers valid simplified status transitions', () => {
+test('Hjulskifte UI only offers valid simplified status transitions', () => {
   assert.match(panel, /if \(item\.status === 'KRAVS'\) return \['KRAVS', 'BOKAD', 'KLAR', 'AVVIKELSE'\]/);
   assert.match(panel, /if \(item\.status === 'BOKAD'\) return \['BOKAD', 'KLAR', 'AVVIKELSE'\]/);
   assert.match(panel, /if \(item\.status === 'PAGAENDE'\) return \['PAGAENDE', 'BOKAD', 'KLAR', 'AVVIKELSE'\]/);

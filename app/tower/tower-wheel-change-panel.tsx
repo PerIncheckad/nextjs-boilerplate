@@ -63,13 +63,13 @@ export default function TowerWheelChangePanel() {
         <div>
           <div className={styles.eyebrow}>TOWER / HJULSKIFTE</div>
           <h2>Hjulskifte</h2>
-          <p>Read-only kontrollvy. Operativ hantering sker i Garaget.</p>
+          <p>Read-only kontrollvy. Operativ hantering sker i Hjulskifte.</p>
         </div>
         <div className={styles.metrics}>
           <span><strong>{open.length}</strong> öppna</span>
           <span><strong>{deviations}</strong> avvikelser</span>
           <span><strong>{overdue}</strong> passerad bokning</span>
-          <Link href="/garage" className={styles.link}>Öppna Garaget →</Link>
+          <Link href="/hjulskifte" className={styles.link}>Öppna Hjulskifte →</Link>
         </div>
       </div>
 

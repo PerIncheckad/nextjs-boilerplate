@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
+const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 const migration = readFileSync('migrations/20260901021000_wheel_change_hjultyp_edit_precedence.sql', 'utf8');
 
-test('Garage identifies every vehicle that needs wheel status verification', () => {
+test('Hjulskifte identifies every vehicle that needs wheel status verification', () => {
   assert.match(panel, /unknownCandidates\.map/);
   assert.match(panel, /Bilar med okänd hjulstatus/);
   assert.match(panel, /item\.regnr/);

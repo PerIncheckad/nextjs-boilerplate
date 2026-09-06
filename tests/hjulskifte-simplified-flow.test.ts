@@ -7,7 +7,7 @@ const migration = readFileSync(
   'utf8',
 );
 const api = readFileSync('app/api/garage/wheel-changes/route.ts', 'utf8');
-const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
+const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 
 test('verified KLAR no longer requires PAGAENDE as an operator step', () => {
   assert.match(migration, /status = 'KRAVS' and v_next_status in \('KRAVS', 'BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'\)/i);
