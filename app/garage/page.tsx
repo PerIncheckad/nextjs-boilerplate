@@ -10,7 +10,7 @@ import styles from './garage-workspace.module.css';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Garaget | Incheckad',
+  title: 'GARAGET | Incheckad',
   description: 'Garage staging, routing och verifierade handoff',
 };
 
@@ -18,17 +18,17 @@ export default function GaragePage() {
   return (
     <CoreProductShell
       active="garage"
-      title="Garaget"
+      title="GARAGET"
       descriptor="STAGING / ROUTING / HANDOFF"
       eyebrow="INVISTO CORE / GARAGE CONTROL"
     >
       <div className={styles.workspace}>
         <nav className={styles.flowNav} aria-label="Garaget arbetsflöde">
           <span>GARAGE CORE</span>
-          <a href="#core">0. Core</a>
-          <a href="#garageobjekt">1. Garage-episoder</a>
-          <a href="#nybil-handoff">2. Nybil handoff</a>
-          <a href="#avveckla-handoff">3. Avveckla handoff</a>
+          <a href="#core">0. CORE</a>
+          <a href="#garageobjekt">1. GARAGE-EPISODER</a>
+          <a href="#nybil-handoff">2. NYBIL HANDOFF</a>
+          <a href="#avveckla-handoff">3. AVVECKLA HANDOFF</a>
         </nav>
 
         <section id="core" className={styles.section}>
