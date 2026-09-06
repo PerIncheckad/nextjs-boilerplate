@@ -4,8 +4,9 @@ import test from 'node:test';
 
 const migration = readFileSync('migrations/20260904011000_add_rented_in_return_v1.sql','utf8');
 const api = readFileSync('app/api/vehicle-journey/rented-in-return/route.ts','utf8');
-const panel = readFileSync('app/garage/garage-rented-in-return-panel.tsx','utf8');
-const page = readFileSync('app/garage/page.tsx','utf8');
+const panel = readFileSync('app/inhyrd/rented-in-return-panel.tsx','utf8');
+const inhyrdPage = readFileSync('app/inhyrd/page.tsx','utf8');
+const garagePage = readFileSync('app/garage/page.tsx','utf8');
 const operational = readFileSync('app/api/vehicle-journey/operational-state/route.ts','utf8');
 
 test('INHYRD return provenance is immutable and DB-timed', () => {
@@ -30,6 +31,8 @@ test('return cannot terminate source-owned operational state', () => {
   assert.doesNotMatch(migration,/update public\.rental_operational_facts/i);
   assert.doesNotMatch(api,/rental_operational_facts.*\.(insert|update|delete)/s);
   assert.match(panel,/RENTAL och AVVECKLA ägs av sina egna flöden/);
+  assert.match(panel,/Öppen Layer1-period måste först stängas av sin ägande källa/);
+  assert.match(panel,/disabled=\{busy \|\| blockedByOpenPeriod\}/);
 });
 
 test('return does not use ordinary AVVECKLA readiness or mutate other modules', () => {
@@ -50,14 +53,17 @@ test('station remains authorization scoped and return station is server validate
   assert.doesNotMatch(api,/p_returned_at/);
 });
 
-test('Garage exposes INHYRD return separately from ordinary AVVECKLA', () => {
-  assert.match(page,/GarageRentedInReturnPanel/);
-  assert.match(page,/02D \/ INHYRD \/ ÅTERLÄMNING/);
+test('INHYRD return is exposed only on its own operational module address', () => {
+  assert.match(inhyrdPage,/RentedInReturnPanel/);
+  assert.match(inhyrdPage,/02 \/ INHYRD UT/);
   assert.match(panel,/INHYRD \/ ÅTERLÄMNING/);
   assert.doesNotMatch(panel,/GarageAvvecklaPanel/);
+  assert.doesNotMatch(garagePage,/RentedInReturnPanel/);
+  assert.doesNotMatch(garagePage,/INHYRD \/ ÅTERLÄMNING/);
+  assert.doesNotMatch(garagePage,/#inhyrd-ut/);
 });
 
-test('operational read model marks returned INHYRD as historical returned object', () => {
+test('operational read model keeps terminal classification INHYRD_RETURNED unchanged', () => {
   assert.match(operational,/vehicle_rented_in_returns/);
   assert.match(operational,/objectType: 'INHYRD_RETURNED'/);
   assert.match(operational,/objectTypeSource: 'RENTED_IN_RETURN'/);

@@ -37,7 +37,7 @@ const card: React.CSSProperties = { marginTop: 10, padding: 10, border: '1px sol
 
 function cleanRegnr(value: string) { return value.toUpperCase().replace(/\s+/g, '').slice(0, 6); }
 
-export default function GarageRentedInIntakePanel() {
+export default function RentedInIntakePanel() {
   const [regnr, setRegnr] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
@@ -98,7 +98,7 @@ export default function GarageRentedInIntakePanel() {
 
   return <section style={shell} aria-label="INHYRD snabbintag">
     <div>
-      <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE / EXTERNT FORDON</div>
+      <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>INHYRD / EXTERNT FORDON</div>
       <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>INHYRD / SNABBINTAG</h2>
       <p style={{ margin: '4px 0 0', color: '#50565a', fontSize: 14 }}><strong>Objektet registreras från intagstidpunkten. Ingen historik bakåt eller operativ status skapas.</strong></p>
     </div>

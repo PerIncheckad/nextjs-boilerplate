@@ -2,13 +2,14 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import styles from './core-product-shell.module.css';
 
-type ActiveModule = 'tower' | 'planning' | 'garage';
+type ActiveModule = 'tower' | 'planning' | 'garage' | 'inhyrd';
 
 const modules = [
   ['/', 'Startsida', 'home'],
   ['/tower', 'Tower', 'tower'],
   ['/planning', 'Planering', 'planning'],
   ['/garage', 'Garaget', 'garage'],
+  ['/inhyrd', 'INHYRD', 'inhyrd'],
   ['/ankomst', 'Ankomst', 'ankomst'],
   ['/check', 'Incheckning', 'check'],
   ['/nybil', 'Ny bil', 'nybil'],

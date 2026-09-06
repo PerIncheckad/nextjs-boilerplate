@@ -36,7 +36,7 @@ const card: React.CSSProperties = { marginTop:10, padding:10, border:'1px solid 
 
 function cleanRegnr(value: string) { return value.toUpperCase().replace(/\s+/g, '').slice(0,6); }
 
-export default function GarageRentedInReturnPanel() {
+export default function RentedInReturnPanel() {
   const [regnr,setRegnr] = useState('');
   const [preflight,setPreflight] = useState<Preflight|null>(null);
   const [returnStation,setReturnStation] = useState('');
@@ -89,7 +89,7 @@ export default function GarageRentedInReturnPanel() {
 
   const blockedByOpenPeriod = Boolean(preflight?.openPeriods.length);
   return <section style={shell} aria-label="INHYRD återlämning">
-    <div style={{ fontSize:13, fontWeight:900, letterSpacing:'.06em' }}>GARAGE / EXTERNT FORDON / UT</div>
+    <div style={{ fontSize:13, fontWeight:900, letterSpacing:'.06em' }}>INHYRD / EXTERNT FORDON / UT</div>
     <h2 style={{ margin:'2px 0 0', fontSize:24 }}>INHYRD / ÅTERLÄMNING</h2>
     <p style={{ margin:'4px 0 0', color:'#50565a', fontSize:14 }}><strong>Återlämningen avslutar endast INHYRD-objektets aktiva närvaro. RENTAL och AVVECKLA ägs av sina egna flöden.</strong></p>
     {error ? <div style={{ marginTop:10, padding:9, borderRadius:6, background:'#fff1f1', color:'#a40000', fontWeight:700, fontSize:13 }}>{error}</div> : null}

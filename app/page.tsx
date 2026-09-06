@@ -18,6 +18,7 @@ const operationModules = [
   { href: '/ankomst', label: 'Ankomst' },
   { href: '/check', label: 'Incheckning' },
   { href: '/nybil', label: 'Ny bil' },
+  { href: '/inhyrd', label: 'INHYRD' },
   { href: '/status', label: 'Status' },
   { href: '/salu', label: 'SALU' },
   { href: '/vagnkort', label: 'Vagnkort' },
