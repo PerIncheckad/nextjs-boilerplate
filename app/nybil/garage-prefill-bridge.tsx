@@ -13,6 +13,7 @@ type GaragePrefill = {
   station_display_name: string | null;
   supplier: string | null;
   order_reference: string | null;
+  returadress: string | null;
   source_kind: string;
   brand: string | null;
 };
@@ -73,6 +74,12 @@ function applyPrefill(data: GaragePrefill): boolean {
     setNativeValue(plannedStationSelect, option.value);
   }
 
+  if (data.returadress) {
+    const returnAddressInput = findFieldInput('Returadress');
+    if (!returnAddressInput) return false;
+    setNativeValue(returnAddressInput, data.returadress);
+  }
+
   return true;
 }
 
@@ -102,9 +109,7 @@ export default function GarageNybilPrefillBridge() {
         };
         tryApply();
       })
-      .catch((loadError: unknown) => {
-        if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garage-bilen');
-      });
+      .catch((loadError: unknown) => { if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa Garage-bilen'); });
 
     return () => { cancelled = true; };
   }, []);
@@ -122,8 +127,8 @@ export default function GarageNybilPrefillBridge() {
             <span> · <b>Modell:</b> {data?.model}</span>
             {data?.vin ? <span> · <b>VIN:</b> {data.vin}</span> : null}
           </div>
-          {(data?.supplier || data?.order_reference) ? <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>{data.supplier ? `Leverantör: ${data.supplier}` : ''}{data.supplier && data.order_reference ? ' · ' : ''}{data.order_reference ? `Order: ${data.order_reference}` : ''}</div> : null}
-          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, bilmärke, modell och planerad station förifylls i Nybils ordinarie fält och kan ändras där. Faktisk mottagningsplats och övriga kontrollpunkter verifieras fortfarande i Nybil och sätts inte av Garaget. Övrig Planering/Garage-information speglas i den redigerbara källbilden nedan. Garaget kvitteras först när Nybil-registreringen sparas.</div>
+          {data?.returadress ? <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>Returadress: {data.returadress}</div> : null}
+          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, returadress, bilmärke, modell och planerad station förifylls i Nybils ordinarie mottagningsbild och kan verifieras där. Faktisk mottagningsplats verifieras fortfarande i Nybil. Garaget kvitteras först när Nybil-registreringen sparas.</div>
         </>
       )}
     </div>
