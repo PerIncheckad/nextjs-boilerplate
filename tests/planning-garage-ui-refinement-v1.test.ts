@@ -20,10 +20,12 @@ test('Planning exposes a visible three-step operating flow without changing busi
   assert.match(planning, /<PlanningGarageHandoff/);
 });
 
-test('Garage exposes routing and handoff only for Nybil and AVVECKLA', () => {
-  assert.match(garage, /1\. Garage/);
-  assert.match(garage, /2\. Nybil handoff/);
-  assert.match(garage, /3\. Avveckla handoff/);
+test('Garage exposes uppercase routing and handoff navigation only for Nybil and AVVECKLA', () => {
+  assert.match(garage, /title="GARAGET"/);
+  assert.match(garage, /0\. CORE/);
+  assert.match(garage, /1\. GARAGE-EPISODER/);
+  assert.match(garage, /2\. NYBIL HANDOFF/);
+  assert.match(garage, /3\. AVVECKLA HANDOFF/);
   const garagePosition = garage.indexOf('<GarageClient');
   const nybilPosition = garage.indexOf('<GarageNybilHandoffStatusPanel');
   const avvecklaPosition = garage.indexOf('<GarageAvvecklaHandoffPanel');
