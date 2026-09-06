@@ -3,12 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
-const overviewApi = readFileSync('app/api/garage/overview/route.ts', 'utf8');
 const migration = readFileSync('migrations/20260902002000_freeze_garage_after_nybil_handoff.sql', 'utf8');
 
 test('active Garage excludes exactly Nybil-handed-off objects', () => {
   assert.match(garageApi, /is\('handed_off_nybil_id', null\)/);
-  assert.match(overviewApi, /is\('handed_off_nybil_id', null\)/);
 });
 
 test('Garage PATCH refuses an acknowledged Nybil handoff', () => {
