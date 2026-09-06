@@ -5,7 +5,6 @@ import GarageClient from './garage-client';
 import GarageNybilHandoffStatusPanel from './garage-nybil-handoff-status-panel';
 import GarageVoidPanel from './garage-void-panel';
 import GarageAvvecklaHandoffPanel from './garage-avveckla-handoff-panel';
-import OrderWorkflowPanel from './order-workflow-panel';
 import styles from './garage-workspace.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +29,6 @@ export default function GaragePage() {
           <a href="#garageobjekt">1. Garage-episoder</a>
           <a href="#nybil-handoff">2. Nybil handoff</a>
           <a href="#avveckla-handoff">3. Avveckla handoff</a>
-          <a href="#bestallning-leverans">4. Beställning / leverans</a>
         </nav>
 
         <section id="core" className={styles.section}>
@@ -39,7 +37,7 @@ export default function GaragePage() {
         </section>
 
         <section id="garageobjekt" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>01 / GARAGE-EPISODER</strong><span>Garage-ägda staging- och routingkontroller. Inte andra modulers arbete.</span></div>
+          <div className={styles.sectionLabel}><strong>01 / GARAGE-EPISODER</strong><span>Garage-ägda staging-, routing- och verifierade informationskompletteringar. Inte andra modulers arbete.</span></div>
           <GarageClient />
           <GarageVoidPanel />
         </section>
@@ -52,11 +50,6 @@ export default function GaragePage() {
         <section id="avveckla-handoff" className={styles.section}>
           <div className={styles.sectionLabel}><strong>03 / AVVECKLA HANDOFF</strong><span>Garage startar manuellt och verifierar att AVVECKLA-case skapats; fortsatt arbete sker i /avveckla</span></div>
           <GarageAvvecklaHandoffPanel />
-        </section>
-
-        <section id="bestallning-leverans" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>04 / BESTÄLLNING / LEVERANS</strong><span>Transitional yta · slutligt modulägarskap är inte beslutat</span></div>
-          <OrderWorkflowPanel />
         </section>
       </div>
     </CoreProductShell>
