@@ -37,7 +37,6 @@ type GarageItem = {
   updated_at: string;
 };
 type Draft = Omit<GarageItem, 'garage_item_id' | 'updated_at' | 'source_kind' | 'source_planning_cell_id' | 'source_planning_unit_no' | 'source_salu_flag_id'>;
-type SaluSource = { flag_id: string; regnr: string; current_saludatum: string; status: string; imported: boolean; brand: string | null; model: string | null };
 type SortField = 'UPDATED' | 'MODEL' | 'REGNR' | 'STATION' | 'DIRECTION' | 'PERIOD';
 
 const HOLDING_PERIODS = [4, 6, 9, 12, 18, 24] as const;
@@ -64,9 +63,6 @@ export default function GarageClient() {
   const [query, setQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('UPDATED');
   const [sortDesc, setSortDesc] = useState(true);
-  const [saluSources, setSaluSources] = useState<SaluSource[]>([]);
-  const [saluDirection, setSaluDirection] = useState<GarageDirection | ''>('');
-  const [saluStation, setSaluStation] = useState('');
   const [supplierDrafts, setSupplierDrafts] = useState<Record<string, string>>({});
   const [savingSupplierId, setSavingSupplierId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,8 +77,7 @@ export default function GarageClient() {
     setItems(nextItems);
     setSupplierDrafts(Object.fromEntries(nextItems.map((item) => [item.garage_item_id, item.supplier ?? ''])));
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
-    setSaluStation((current) => current || nextStations[0]?.station_code || '');
-  }, [setStations, setModels, setItems, setSupplierDrafts, setDraft, setSaluStation]);
+  }, [setStations, setModels, setItems, setSupplierDrafts, setDraft]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -158,22 +153,6 @@ export default function GarageClient() {
     }
   };
 
-  const loadSaluSources = async () => {
-    setError(null);
-    const response = await fetch('/api/garage/salu-sources', { cache: 'no-store' });
-    const payload = await response.json();
-    if (!response.ok) return setError(payload?.error ?? 'Kunde inte läsa SALU');
-    setSaluSources(payload.data ?? []);
-  };
-
-  const importSalu = async (source: SaluSource) => {
-    if (!saluDirection || !saluStation) return setError('Välj riktning och station för SALU-bilen.');
-    const response = await fetch('/api/garage/salu-sources', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ salu_flag_id: source.flag_id, garage_direction: saluDirection, planned_station: saluStation }) });
-    const payload = await response.json();
-    if (!response.ok) return setError(payload?.error ?? 'Kunde inte hämta SALU-bilen');
-    await Promise.all([load(), loadSaluSources()]);
-  };
-
   const visible = useMemo(() => {
     const needle = query.trim().toUpperCase();
     const filtered = items.filter((item) => {
@@ -221,16 +200,6 @@ export default function GarageClient() {
       <section className={styles.sourceGrid}>
         <div className={styles.sourcePanel}>
           <div className={styles.panelTitle}><h2>Planering → Garaget</h2><span>När Planering markeras KLAR skapas BESTÄLLT automatiskt som individuella UTVECKLA-objekt.</span></div>
-        </div>
-
-        <div className={styles.sourcePanel}>
-          <div className={styles.panelTitle}><h2>Hämta från SALU</h2><span>Exakt SALU-cykel kan bara hämtas en gång.</span></div>
-          <div className={styles.inlineControls}>
-            <label><span>Riktning</span><select value={saluDirection} onChange={(e) => setSaluDirection(e.target.value as GarageDirection | '')}><option value="">Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></label>
-            <label><span>Station</span><select value={saluStation} onChange={(e) => setSaluStation(e.target.value)}><option value="">Välj</option>{stations.map((value) => <option key={value.station_code} value={value.station_code}>{value.display_name || value.station_code}</option>)}</select></label>
-            <button className={styles.secondaryButton} type="button" onClick={() => void loadSaluSources()}>Läs SALU</button>
-          </div>
-          <div className={styles.sourceList}>{saluSources.map((row) => <div className={styles.sourceRow} key={row.flag_id}><strong>{row.regnr}</strong><span>{[row.brand, row.model].filter(Boolean).join(' ') || 'Modell saknas'}</span><span>{row.status}</span><span>{row.current_saludatum}</span><button className={styles.primaryButton} type="button" disabled={row.imported} onClick={() => void importSalu(row)}>{row.imported ? 'Redan hämtad' : 'Hämta'}</button></div>)}</div>
         </div>
       </section>
 
