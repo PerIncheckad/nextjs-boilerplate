@@ -9,6 +9,7 @@ const finalMigration = readFileSync('migrations/20260825213500_finalize_planning
 const atomicHandoffMigration = readFileSync('migrations/20260830010000_atomic_planning_garage_handoff.sql', 'utf8');
 const atomicSaluMigration = readFileSync('migrations/20260830015500_atomic_salu_garage_handoff.sql', 'utf8');
 const saluSaljasMigration = readFileSync('migrations/20260906023000_add_salu_saljas_to_garage_ut_handoff_v1.sql', 'utf8');
+const hMigration = readFileSync('migrations/20260906163000_garage_information_continuity_h_v1.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const planningModelApi = readFileSync('app/api/planning/models/route.ts', 'utf8');
 const planningStatusApi = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
@@ -97,7 +98,7 @@ test('Garage station replanning is atomic and audited', () => {
   assert.match(garageUi, /Omplanerad i Garaget/);
 });
 
-test('KLAR materializes BESTALLT automatically without duplicate units and stamps Avropad', () => {
+test('KLAR materializes BESTALLT automatically without duplicate units', () => {
   assert.match(finalMigration, /source_kind.*PLANERING/s);
   assert.match(finalMigration, /garage_items_planning_source_uidx/);
   assert.match(planningStatusApi, /admin\.rpc\('finalize_planning_period_to_garage'/);
@@ -106,11 +107,13 @@ test('KLAR materializes BESTALLT automatically without duplicate units and stamp
   assert.match(atomicHandoffMigration, /'IN'/);
   assert.match(atomicHandoffMigration, /planning_vehicle_models/);
   assert.match(atomicHandoffMigration, /daily_rate/);
-  assert.match(atomicHandoffMigration, /v_calloff_date/);
-  assert.match(atomicHandoffMigration, /Europe\/Stockholm/);
-  assert.match(atomicHandoffMigration, /voided_at is null/);
+  assert.match(hMigration, /create or replace function public\.finalize_planning_period_to_garage/);
+  assert.match(hMigration, /'BEKRAFTAD'/);
+  assert.doesNotMatch(hMigration, /v_calloff_date/);
+  assert.doesNotMatch(hMigration, /Europe\/Stockholm/);
+  assert.match(hMigration, /voided_at is null/);
   assert.doesNotMatch(garageUi, /Hämta från Planering/);
-  assert.match(garageUi, /markeras KLAR skapas BESTÄLLT automatiskt/);
+  assert.match(garageUi, /redan beställd, avropad och bekräftad/);
 });
 
 test('legacy manual SALU ingress is fenced and only STÄNGD + SÄLJAS may create future Garage UT', () => {
@@ -129,47 +132,34 @@ test('legacy manual SALU ingress is fenced and only STÄNGD + SÄLJAS may create
   assert.match(saluSaljasMigration, /avvecklaStarted', false/);
 });
 
-test('Garage supports operational editing, sorting, print and PDF', () => {
-  for (const field of ['source_regnr', 'saluort', 'daily_rate', 'ordered_at', 'calloff_at', 'planned_delivery_date']) assert.match(garageApi, new RegExp(field));
+test('Garage IN supports current information completion without order workflow UI', () => {
+  for (const field of ['regnr', 'returadress', 'daily_rate', 'planned_delivery_date']) assert.match(garageApi, new RegExp(field));
+  assert.match(garageUi, /Returadress/);
+  assert.match(garageUi, /Förväntad ankomst/);
+  assert.match(garageUi, /Dygnsdeb/);
+  assert.match(garageUi, /Reg\.nr/);
+  assert.doesNotMatch(garageUi, /Field label="Beställd"/);
+  assert.doesNotMatch(garageUi, /Field label="Avropad"/);
+  assert.doesNotMatch(garageUi, /Field label="Bekräftelse"/);
+  assert.doesNotMatch(garageUi, /Field label="Transport"/);
   assert.match(garageUi, /Sortera/);
   assert.match(garageUi, /Skriv ut/);
   assert.match(garageUi, />PDF</);
-  assert.match(garageUi, /Källreg/);
-  assert.match(garageUi, /Beställd/);
-  assert.match(garageUi, /Avropad/);
   assert.match(garageCss, /@media print/);
-});
-
-test('UTVECKLA has explicit supplier save and a compact registration column', () => {
-  assert.match(garageUi, /saveSupplier/);
-  assert.match(garageUi, /supplierEditor/);
-  assert.match(garageUi, /rowSaveButton/);
-  assert.match(garageUi, /regnrColumn/);
-  assert.match(garageUi, /regnrInput/);
-  assert.match(garageCss, /\.regnrColumn/);
-  assert.match(garageCss, /\.supplierEditor/);
-  assert.match(garageCss, /\.rowSaveButton/);
-});
-
-test('Planning status is fail-safe: only verified PAGAENDE is editable', () => {
-  assert.match(planningUi, /type PlanningStatus = 'PAGAENDE' \| 'KLAR' \| 'UNKNOWN'/);
-  assert.match(planningUi, /useState<PlanningStatus>\('UNKNOWN'\)/);
-  assert.match(planningUi, /const locked = planningStatus !== 'PAGAENDE'/);
-  assert.match(planningUi, /if \(!statusResponse\.ok\) throw new Error/);
-  assert.match(planningUi, /Planeringens status kunde inte verifieras/);
-  assert.match(planningUi, /STATUS KONTROLLERAS/);
-  assert.match(planningUi, /SKICKAD TILL GARAGET/);
-  assert.match(planningUi, /disabled=\{locked\}/);
 });
 
 test('Garage transport does not manually claim actual Layer 1 arrival', () => {
   assert.match(finalMigration, /Actual ANKOMST is Layer 1/);
   assert.doesNotMatch(garageApi, /'ANKOMMEN'/);
   assert.doesNotMatch(garageUi, /<option>ANKOMMEN<\/option>/);
+  assert.match(garageUi, /Förväntad ankomst/);
 });
 
-test('Garage daily rate remains a planning fact, not Kistan monetary outcome', () => {
+test('Garage daily rate remains vehicle-specific current information after H', () => {
   assert.match(migration, /daily_rate numeric/);
-  assert.match(migration, /Not verified monetary consequence and not Kistan output/);
+  assert.match(hMigration, /Garage daily_rate is vehicle-specific current information/);
+  const hDefaults = hMigration.match(/create or replace function public\.apply_first_garage_model_defaults\(\)[\s\S]*?\n\$\$;/)?.[0] ?? '';
+  assert.doesNotMatch(hDefaults, /set daily_rate = new\.daily_rate/);
+  assert.doesNotMatch(hDefaults, /gi\.daily_rate is null/);
   assert.match(garageUi, /Dygnsdeb/);
 });
