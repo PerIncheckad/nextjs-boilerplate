@@ -70,7 +70,7 @@ test('API derives actor and identity snapshot server-side and rejects protected 
   assert.doesNotMatch(api, /p_verified_at/);
 });
 
-test('LEGACY path does not write vehicle catalog, Nybil, Garage or SALU', () => {
+test('LEGACY current-state creation itself does not write vehicle catalog, Nybil, Garage or SALU', () => {
   for (const source of [api, migration]) {
     assert.doesNotMatch(source, /from\('nybil_inventering'\).*\.(insert|update|delete)/s);
     assert.doesNotMatch(source, /from\('garage_items'\).*\.(insert|update|delete)/s);
@@ -90,16 +90,18 @@ test('operational state reads object type from immutable LEGACY source', () => {
   assert.match(operational, /objectTypeSourceRecordId: legacy\.entry_id/);
 });
 
-test('Garage exposes separate explicit LEGACY surface without creating Garage object', () => {
+test('Garage exposes explicit LEGACY current-state surface and a separate later Garage UT handoff', () => {
   assert.match(garagePage, /GarageLegacyEntryPanel/);
   assert.match(garagePage, /02B \/ BEFINTLIG EGEN BIL \/ LEGACY/);
   assert.match(garagePanel, /Jag verifierar att detta är en befintlig egen flottabil/);
   assert.match(garagePanel, /Ingen historik bakåt skapas/);
-  assert.doesNotMatch(garagePanel, /\/api\/garage\?/);
-  assert.doesNotMatch(garagePanel, /garage_item_id/);
+  assert.match(garagePanel, /LEGACY_FLEET → GARAGE UT/);
+  assert.match(garagePanel, /\/api\/garage\/legacy-ut-handoff/);
+  assert.match(garagePanel, /AVVECKLA: inte startad av handslaget/);
+  assert.doesNotMatch(api, /legacy-ut-handoff/);
 });
 
-test('#542 Nybil reconciliation and AVVECKLA foundation remain untouched by LEGACY migration', () => {
+test('#542 Nybil reconciliation and AVVECKLA foundation remain untouched by LEGACY bootstrap migration', () => {
   assert.match(reconciliation, /reconcile_missing_vehicle_journey_state_from_nybil/);
   assert.match(avveckla, /assert_garage_avveckla_ready_for_completion/);
   assert.doesNotMatch(migration, /reconcile_missing_vehicle_journey_state_from_nybil/);
