@@ -6,7 +6,7 @@ const migration = readFileSync(
   'migrations/20260905193000_hjulskifte_high_season_2026_nybil_fallback.sql',
   'utf8',
 );
-const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
+const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 
 test('candidate wheel truth precedence is STATUS then CHECK-IN then NYBIL', () => {
   assert.match(migration, /latest_hjultyp_edit/i);
@@ -30,7 +30,7 @@ test('Nybil wheel source remains verified source data, not inferred station trut
   assert.doesNotMatch(migration, /planerad_station/i);
 });
 
-test('Garage labels pre-Check-in candidates truthfully', () => {
+test('Hjulskifte labels pre-Check-in candidates truthfully', () => {
   assert.match(panel, /latest_checkin_at: string \| null/);
   assert.match(panel, /Nybil-baseline · före första Check-in/);
   assert.match(panel, /Senaste hjulverifiering/);
