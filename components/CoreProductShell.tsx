@@ -5,19 +5,19 @@ import styles from './core-product-shell.module.css';
 type ActiveModule = 'tower' | 'planning' | 'garage' | 'inhyrd' | 'legacy' | 'hjulskifte' | 'avveckla';
 
 const modules = [
-  ['/', 'Startsida', 'home'],
-  ['/tower', 'Tower', 'tower'],
-  ['/planning', 'Planering', 'planning'],
-  ['/garage', 'Garaget', 'garage'],
+  ['/', 'STARTSIDA', 'home'],
+  ['/tower', 'TOWER', 'tower'],
+  ['/planning', 'PLANERING', 'planning'],
+  ['/garage', 'GARAGET', 'garage'],
   ['/inhyrd', 'INHYRD', 'inhyrd'],
   ['/legacy', 'LEGACY', 'legacy'],
-  ['/hjulskifte', 'Hjulskifte', 'hjulskifte'],
+  ['/hjulskifte', 'HJULSKIFTE', 'hjulskifte'],
   ['/avveckla', 'AVVECKLA', 'avveckla'],
-  ['/ankomst', 'Ankomst', 'ankomst'],
-  ['/check', 'Incheckning', 'check'],
-  ['/nybil', 'Ny bil', 'nybil'],
-  ['/status', 'Status', 'status'],
-  ['/vagnkort', 'Vagnkort', 'vagnkort'],
+  ['/ankomst', 'ANKOMST', 'ankomst'],
+  ['/check', 'INCHECKNING', 'check'],
+  ['/nybil', 'NY BIL', 'nybil'],
+  ['/status', 'STATUS', 'status'],
+  ['/vagnkort', 'VAGNKORT', 'vagnkort'],
 ] as const;
 
 export default function CoreProductShell({
