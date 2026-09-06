@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { isActionableWheelStorage } from '@/lib/wheel-storage-actionability';
 import styles from './hjulskifte.module.css';
 
 type WheelStatus = 'KRAVS' | 'BOKAD' | 'PAGAENDE' | 'KLAR' | 'AVVIKELSE';
@@ -186,12 +187,12 @@ export default function HjulskiftePanel() {
   );
 
   const missingStorageCandidates = useMemo(
-    () => requiresChangeCandidates.filter((item) => !storageByRegnr[item.regnr]?.wheel_storage_location),
+    () => requiresChangeCandidates.filter((item) => !isActionableWheelStorage(storageByRegnr[item.regnr]?.wheel_storage_location)),
     [requiresChangeCandidates, storageByRegnr],
   );
 
   const actionableCandidates = useMemo(
-    () => requiresChangeCandidates.filter((item) => Boolean(storageByRegnr[item.regnr]?.wheel_storage_location)),
+    () => requiresChangeCandidates.filter((item) => isActionableWheelStorage(storageByRegnr[item.regnr]?.wheel_storage_location)),
     [requiresChangeCandidates, storageByRegnr],
   );
 
@@ -294,7 +295,7 @@ export default function HjulskiftePanel() {
 
       <div className={styles.startRow}>
         <strong>{counts.REQUIRES_CHANGE} behöver skifte</strong>
-        <span>{missingStorageCandidates.length} saknar hjulförvaring</span>
+        <span>{missingStorageCandidates.length} saknar/har oklar hjulförvaring</span>
         <span>{counts.ALREADY_CORRECT} redan rätt</span>
         <span>{counts.SALU_EXEMPT} SALU-undantagna</span>
         <span>{counts.UNKNOWN_WHEEL_STATUS} saknar hjulstatus</span>
@@ -303,17 +304,25 @@ export default function HjulskiftePanel() {
 
       {missingStorageCandidates.length > 0 ? (
         <div className={styles.tableWrap}>
-          <table className={styles.candidateTable} aria-label="Bilar som saknar hjulförvaring">
+          <table className={styles.candidateTable} aria-label="Bilar som saknar eller har oklar hjulförvaring">
             <thead><tr><th>Bil</th><th>Nu på bilen</th><th>Senaste hjulverifiering</th><th>Hjulförvaring</th><th>Åtgärd</th></tr></thead>
-            <tbody>{missingStorageCandidates.map((item) => (
-              <tr key={`MISSING-STORAGE:${item.regnr}`}>
-                <td><strong>{item.regnr}</strong></td>
-                <td>{item.current_wheel_type ?? '—'}</td>
-                <td>{wheelVerificationLabel(item)}</td>
-                <td><strong>Saknas</strong><span className={styles.subtle}>Ange registrerad förvaring i Status.</span></td>
-                <td><a className={styles.secondaryButton} href={`/status?reg=${encodeURIComponent(item.regnr)}`}>Ange förvaring</a></td>
-              </tr>
-            ))}</tbody>
+            <tbody>{missingStorageCandidates.map((item) => {
+              const rawStorage = storageByRegnr[item.regnr]?.wheel_storage_location ?? null;
+              return (
+                <tr key={`MISSING-STORAGE:${item.regnr}`}>
+                  <td><strong>{item.regnr}</strong></td>
+                  <td>{item.current_wheel_type ?? '—'}</td>
+                  <td>{wheelVerificationLabel(item)}</td>
+                  <td><strong>{rawStorage ?? 'Saknas'}</strong><span className={styles.subtle}>Inte bokningsbar förvaring. Verifiera korrekt uppgift i Status.</span></td>
+                  <td>
+                    <div className={styles.actionButtons}>
+                      <a className={styles.secondaryButton} href={`/status?reg=${encodeURIComponent(item.regnr)}`}>Ange förvaring</a>
+                      <button type="button" className={styles.secondaryButton} disabled={!season?.active || savingId === `KLAR:${item.regnr}`} onClick={() => void createShortcut(item, 'KLAR')}>{savingId === `KLAR:${item.regnr}` ? 'Sparar…' : 'Redan utfört / Klar'}</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}</tbody>
           </table>
         </div>
       ) : null}
