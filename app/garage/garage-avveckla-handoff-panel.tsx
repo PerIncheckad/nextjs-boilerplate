@@ -50,10 +50,7 @@ export default function GarageAvvecklaHandoffPanel() {
   }, []);
 
   useEffect(() => {
-    if (!selectedId) {
-      setDetail({ case: null, points: [] });
-      return;
-    }
+    if (!selectedId) return;
     let active = true;
     void fetch(`/api/garage/avveckla?garage_item_id=${encodeURIComponent(selectedId)}`, { cache: 'no-store' })
       .then(async (response) => {
@@ -67,6 +64,12 @@ export default function GarageAvvecklaHandoffPanel() {
 
   const selected = useMemo(() => items.find((item) => item.garage_item_id === selectedId) ?? null, [items, selectedId]);
   const openCount = detail.points.filter((point) => point.status === 'OPEN').length;
+
+  const selectGarageItem = (garageItemId: string) => {
+    setSelectedId(garageItemId);
+    setError(null);
+    if (!garageItemId) setDetail({ case: null, points: [] });
+  };
 
   const startCase = async () => {
     if (!selectedId || !reason.trim()) return setError('Ange orsak för att starta AVVECKLA.');
@@ -100,7 +103,7 @@ export default function GarageAvvecklaHandoffPanel() {
 
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
-      <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>Garage UT-objekt</span><select style={input} value={selectedId} onChange={(event) => setSelectedId(event.target.value)}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
+      <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>Garage UT-objekt</span><select style={input} value={selectedId} onChange={(event) => selectGarageItem(event.target.value)}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
 
       {!selected ? <div style={{ marginTop: 9, color: '#666', fontSize: 13 }}>Ingen Garage UT-bil vald.</div> : detail.case ? (
         <div style={{ marginTop: 10, border: '1px solid #e1e1e1', borderRadius: 7, padding: '9px 10px' }}>
