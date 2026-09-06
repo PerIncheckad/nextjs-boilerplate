@@ -101,7 +101,7 @@ export default function GarageClient() {
     setModels(payload.models ?? []);
     setItems(payload.data ?? []);
     setDraft((current) => current.planned_station ? current : { ...current, planned_station: nextStations[0]?.station_code ?? null });
-  }, []);
+  }, [setStations, setModels, setItems, setDraft]);
 
   const load = useCallback(async () => {
     setLoading(true);
