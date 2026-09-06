@@ -98,24 +98,24 @@ export default function GarageAvvecklaHandoffPanel() {
   return (
     <section style={shell} aria-label="Garage till AVVECKLA handoff">
       <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE / UT / HANDOFF</div>
-      <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>Starta AVVECKLA</h2>
+      <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>STARTA AVVECKLA</h2>
       <p style={{ margin: '3px 0 10px', color: '#50565a', fontSize: 14 }}>Garage initierar AVVECKLA manuellt. När ett verkligt avveckla_case_id finns är handslaget verifierat och fortsatt arbete sker i AVVECKLA-modulen.</p>
 
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
 
-      <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>Garage UT-objekt</span><select style={input} value={selectedId} onChange={(event) => selectGarageItem(event.target.value)}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
+      <label><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>GARAGE UT-OBJEKT</span><select aria-label="Garage UT-objekt" style={input} value={selectedId} onChange={(event) => selectGarageItem(event.target.value)}><option value="">Välj bil</option>{items.map((item) => <option key={item.garage_item_id} value={item.garage_item_id}>{item.regnr || 'Regnr saknas'} · {item.model} · {item.planned_station || '—'}</option>)}</select></label>
 
       {!selected ? <div style={{ marginTop: 9, color: '#666', fontSize: 13 }}>Ingen Garage UT-bil vald.</div> : detail.case ? (
         <div style={{ marginTop: 10, border: '1px solid #e1e1e1', borderRadius: 7, padding: '9px 10px' }}>
           <strong>{detail.case.regnr} · AVVECKLA {detail.case.status}</strong>
           <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>Verifierat handoff: <code>{detail.case.avveckla_case_id}</code></div>
           <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>Read-only status i Garage: {openCount} öppen punkt(er).</div>
-          <div style={{ marginTop: 8 }}><Link href={`/avveckla?garage_item_id=${encodeURIComponent(selectedId)}`} style={button}>Öppna AVVECKLA →</Link></div>
+          <div style={{ marginTop: 8 }}><Link aria-label="Öppna AVVECKLA" href={`/avveckla?garage_item_id=${encodeURIComponent(selectedId)}`} style={button}>ÖPPNA AVVECKLA →</Link></div>
         </div>
       ) : (
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end' }}>
-          <label style={{ flex: '1 1 320px' }}><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>Orsak</span><input style={{ ...input, width: '100%', boxSizing: 'border-box' }} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Varför AVVECKLA startas" /></label>
-          <button type="button" style={button} disabled={busy} onClick={() => void startCase()}>{busy ? 'Startar…' : 'Starta AVVECKLA'}</button>
+          <label style={{ flex: '1 1 320px' }}><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>ORSAK</span><input aria-label="Orsak" style={{ ...input, width: '100%', boxSizing: 'border-box' }} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Varför AVVECKLA startas" /></label>
+          <button type="button" style={button} disabled={busy} onClick={() => void startCase()}>{busy ? 'STARTAR…' : 'STARTA AVVECKLA'}</button>
         </div>
       )}
     </section>
