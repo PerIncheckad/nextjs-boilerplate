@@ -19,6 +19,7 @@ const operationModules = [
   { href: '/check', label: 'Incheckning' },
   { href: '/nybil', label: 'Ny bil' },
   { href: '/status', label: 'Status' },
+  { href: '/salu', label: 'SALU' },
   { href: '/vagnkort', label: 'Vagnkort' },
 ];
 
