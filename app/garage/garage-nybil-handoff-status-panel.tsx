@@ -44,6 +44,12 @@ function knownLabel(item: HandoffItem): string {
   return 'REDAN I NYBIL · TIDSRELATION OKÄND';
 }
 
+function knownAriaLabel(item: HandoffItem): string {
+  if (item.existing_nybil_timing === 'BEFORE_GARAGE') return 'Historisk Nybil före Garage';
+  if (item.existing_nybil_timing === 'AFTER_GARAGE') return 'Nybil efter Garage · koppling saknas';
+  return 'Redan i Nybil · tidsrelation okänd';
+}
+
 export default function GarageNybilHandoffStatusPanel() {
   const [handoffs, setHandoffs] = useState<HandoffItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +106,7 @@ export default function GarageNybilHandoffStatusPanel() {
           {item.handed_off_nybil_id ? (
             <div style={done}>MOTTAGEN I NYBIL</div>
           ) : item.existing_nybil_id ? (
-            <div style={known}>{knownLabel(item)}<br /><span style={{ fontWeight: 500 }}>{item.existing_nybil_created_at ? new Date(item.existing_nybil_created_at).toLocaleDateString('sv-SE') : 'Registrering finns'}</span></div>
+            <div aria-label={knownAriaLabel(item)} style={known}>{knownLabel(item)}<br /><span style={{ fontWeight: 500 }}>{item.existing_nybil_created_at ? new Date(item.existing_nybil_created_at).toLocaleDateString('sv-SE') : 'Registrering finns'}</span></div>
           ) : (
             <div style={waiting}>VÄNTAR PÅ NYBIL</div>
           )}
