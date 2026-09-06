@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const panel = readFileSync('app/garage/garage-wheel-change-panel.tsx', 'utf8');
+const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 const storageApi = readFileSync('app/api/garage/wheel-storage/route.ts', 'utf8');
 const migration = readFileSync('migrations/20260901003500_wheel_change_uses_registered_storage.sql', 'utf8');
 
