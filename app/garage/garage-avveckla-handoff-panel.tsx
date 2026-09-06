@@ -98,7 +98,7 @@ export default function GarageAvvecklaHandoffPanel() {
   return (
     <section style={shell} aria-label="Garage till AVVECKLA handoff">
       <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>GARAGE / UT / HANDOFF</div>
-      <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>STARTA AVVECKLA</h2>
+      <h2 aria-label="Starta AVVECKLA" style={{ margin: '2px 0 0', fontSize: 24 }}>STARTA AVVECKLA</h2>
       <p style={{ margin: '3px 0 10px', color: '#50565a', fontSize: 14 }}>Garage initierar AVVECKLA manuellt. När ett verkligt avveckla_case_id finns är handslaget verifierat och fortsatt arbete sker i AVVECKLA-modulen.</p>
 
       {error ? <div style={{ marginBottom: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
@@ -115,7 +115,7 @@ export default function GarageAvvecklaHandoffPanel() {
       ) : (
         <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end' }}>
           <label style={{ flex: '1 1 320px' }}><span style={{ display: 'block', fontSize: 13, fontWeight: 800, marginBottom: 2 }}>ORSAK</span><input aria-label="Orsak" style={{ ...input, width: '100%', boxSizing: 'border-box' }} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Varför AVVECKLA startas" /></label>
-          <button type="button" style={button} disabled={busy} onClick={() => void startCase()}>{busy ? 'STARTAR…' : 'STARTA AVVECKLA'}</button>
+          <button aria-label="Starta AVVECKLA" type="button" style={button} disabled={busy} onClick={() => void startCase()}>{busy ? 'STARTAR…' : 'STARTA AVVECKLA'}</button>
         </div>
       )}
     </section>
