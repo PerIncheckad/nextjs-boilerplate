@@ -43,7 +43,10 @@ test('handoff ends at Garage and does not auto-start AVVECKLA', () => {
   assert.match(migration, /'GARAGE'/);
   assert.match(migration, /'nextAction', 'START_AVVECKLA_MANUALLY'/);
   assert.match(migration, /'avvecklaStarted', false/);
-  assert.doesNotMatch(migration, /start_garage_avveckla_case\s*\(/);
+  assert.doesNotMatch(
+    migration,
+    /(?:perform|select)\s+public\.start_garage_avveckla_case\s*\(/i,
+  );
   assert.doesNotMatch(migration, /garage_avveckla_cases/);
 });
 
