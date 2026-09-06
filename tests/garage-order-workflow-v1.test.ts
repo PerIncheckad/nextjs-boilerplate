@@ -6,39 +6,20 @@ const panel = readFileSync('app/garage/order-workflow-panel.tsx', 'utf8');
 const page = readFileSync('app/garage/page.tsx', 'utf8');
 const api = readFileSync('app/api/garage/route.ts', 'utf8');
 
-test('Garage AVVECKLA workflow is mounted and uses existing authenticated Garage API', () => {
-  assert.match(page, /OrderWorkflowPanel/);
-  assert.match(panel, /fetch\('\/api\/garage\?direction=UT'/);
-  assert.match(panel, /method:\s*'PATCH'/);
+test('legacy OrderWorkflow is no longer mounted in operative Garage', () => {
+  assert.doesNotMatch(page, /OrderWorkflowPanel/);
+  assert.doesNotMatch(page, /BESTÄLLNING \/ LEVERANS/);
+  assert.match(panel, /confirmation_status/);
+  assert.match(panel, /transport_status/);
+});
+
+test('legacy order fields remain API-compatible for historical data until later cleanup', () => {
+  for (const status of ['PLANERAD', 'BESTALLD', 'AVROPAD', 'AVVAKTAR_BEKRAFTELSE', 'BEKRAFTAD']) assert.match(api, new RegExp(status));
+  for (const status of ['EJ_BOKAD', 'TRANSPORTBOKAD', 'PA_VAG']) assert.match(api, new RegExp(status));
   assert.match(api, /verifyApiUser/);
-  assert.match(api, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
-test('confirmation workflow exposes only existing explicit statuses', () => {
-  for (const status of ['PLANERAD', 'BESTALLD', 'AVROPAD', 'AVVAKTAR_BEKRAFTELSE', 'BEKRAFTAD']) {
-    assert.match(panel, new RegExp(status));
-    assert.match(api, new RegExp(status));
-  }
-});
-
-test('transport workflow exposes only existing explicit statuses', () => {
-  for (const status of ['EJ_BOKAD', 'TRANSPORTBOKAD', 'PA_VAG']) {
-    assert.match(panel, new RegExp(status));
-    assert.match(api, new RegExp(status));
-  }
-});
-
-test('AVVECKLA workflow does not invent automatic transitions or dates', () => {
-  assert.match(panel, /AVVECKLA \/ UT/);
-  assert.doesNotMatch(panel, /setTimeout|setInterval/);
-  assert.doesNotMatch(panel, /ordered_at:\s*new Date/);
-  assert.doesNotMatch(panel, /calloff_at:\s*new Date/);
-  assert.doesNotMatch(panel, /planned_delivery_date:\s*new Date/);
-});
-
-test('AVVECKLA workflow provides scoped control totals and filters without schema changes', () => {
-  for (const label of ['AVVECKLA', 'AVVAKTAR BEKRÄFTELSE', 'BEKRÄFTADE', 'PÅ VÄG']) assert.match(panel, new RegExp(label));
-  assert.match(panel, /confirmationFilter/);
-  assert.match(panel, /transportFilter/);
-  assert.doesNotMatch(panel, />TOTALT</);
+test('Garage operator surface no longer treats legacy confirmation and transport states as workflow', () => {
+  assert.doesNotMatch(page, /<OrderWorkflowPanel/);
+  assert.doesNotMatch(page, /bestallning-leverans/);
 });

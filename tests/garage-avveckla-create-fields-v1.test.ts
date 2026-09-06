@@ -4,21 +4,15 @@ import test from 'node:test';
 
 const source = readFileSync('app/garage/garage-client.tsx', 'utf8');
 
-test('manual create shows detailed AVVECKLA fields only for UT', () => {
+test('manual UT create keeps only Garage staging fields', () => {
   assert.match(source, /draft\.garage_direction === 'UT' \? <>/);
-  for (const label of ['VIN', 'Källreg', 'Orsak', 'Order', 'Beställd', 'Bekräftelse', 'Transport']) {
-    assert.match(source, new RegExp(`Field label="${label}"`));
-  }
+  for (const label of ['VIN', 'Källreg', 'Orsak', 'Saluort']) assert.match(source, new RegExp(`Field label="${label}"`));
+  for (const label of ['Order', 'Beställd', 'Avropad', 'Bekräftelse', 'Transport']) assert.doesNotMatch(source, new RegExp(`Field label="${label}"`));
 });
 
-test('switching manual create to IN clears hidden AVVECKLA values', () => {
-  assert.match(source, /const changeDraftDirection = \(next: GarageDirection \| null\) =>/);
-  assert.match(source, /next === 'IN'/);
-  assert.match(source, /vin: ''/);
-  assert.match(source, /source_regnr: ''/);
-  assert.match(source, /planning_reason: 'ANNAT'/);
-  assert.match(source, /order_reference: ''/);
-  assert.match(source, /ordered_at: ''/);
-  assert.match(source, /confirmation_status: 'PLANERAD'/);
-  assert.match(source, /transport_status: 'EJ_BOKAD'/);
+test('manual IN create exposes only current information complements', () => {
+  assert.match(source, /draft\.garage_direction === 'IN' \? <>/);
+  for (const label of ['Returadress', 'Förväntad ankomst', 'Hålltid']) assert.match(source, new RegExp(`Field label="${label}"`));
+  assert.match(source, /Field label="Reg\.nr"/);
+  assert.match(source, /Field label="Dygnsdeb"/);
 });

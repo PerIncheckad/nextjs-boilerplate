@@ -12,6 +12,7 @@ const nybilApi = readFileSync('app/api/nybil/route.ts', 'utf8');
 const nybilPage = readFileSync('app/nybil/page.tsx', 'utf8');
 const nybilFormGate = readFileSync('app/nybil/form-gate.tsx', 'utf8');
 const migration = readFileSync('migrations/20260902112000_nybil_upstream_information_continuity.sql', 'utf8');
+const hMigration = readFileSync('migrations/20260906163000_garage_information_continuity_h_v1.sql', 'utf8');
 
 const carriedFields = [
   'planning_period',
@@ -21,6 +22,7 @@ const carriedFields = [
   'vin',
   'source_regnr',
   'saluort',
+  'returadress',
   'daily_rate',
   'holding_period_months',
   'ordered_at',
@@ -46,8 +48,16 @@ test('Nybil renders upstream facts as editable receipt context', () => {
 
 test('ordinary Nybil fields remain editable and override carried defaults on save', () => {
   assert.match(prefillBridge, /Bilmärke/);
-  assert.match(prefillBridge, /Reg\.nr, bilmärke, modell och planerad station förifylls/);
+  assert.match(prefillBridge, /Returadress/);
+  assert.match(prefillBridge, /Reg\.nr, returadress, bilmärke, modell och planerad station/);
   assert.match(nybilClient, /\.\.\.garageContext\.values,[\s\S]*\.\.\.inventoryData,[\s\S]*source_garage_item_id/);
+});
+
+test('Garage returadress prefills Nybil ordinary receipt field from the exact snapshot', () => {
+  assert.match(prefillBridge, /findFieldInput\('Returadress'\)/);
+  assert.match(prefillBridge, /setNativeValue\(returnAddressInput, data\.returadress\)/);
+  assert.match(upstreamUi, /returadress: data\.returadress \?\? null/);
+  assert.match(hMigration, /add column if not exists returadress text/);
 });
 
 test('prefill resolves controls from the Nybil Field container, not as label children', () => {
@@ -114,7 +124,8 @@ test('database version-fences the exact Garage source row before Nybil insert', 
 });
 
 test('Nybil stores a receipt-side copy while source_garage_item_id preserves provenance', () => {
-  for (const field of carriedFields) assert.match(migration, new RegExp(`add column if not exists ${field}`));
+  for (const field of carriedFields.filter((field) => field !== 'returadress')) assert.match(migration, new RegExp(`add column if not exists ${field}`));
+  assert.match(hMigration, /add column if not exists returadress text/);
   assert.match(nybilClient, /source_garage_item_id: garageItemId/);
   assert.doesNotMatch(handoffApi, /\.update\(/);
   assert.doesNotMatch(handoffApi, /\.insert\(/);

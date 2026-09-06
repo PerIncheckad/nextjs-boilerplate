@@ -11,6 +11,7 @@ type UpstreamContext = {
   vin: string | null;
   source_regnr: string | null;
   saluort: string | null;
+  returadress: string | null;
   daily_rate: number | null;
   holding_period_months: number | null;
   ordered_at: string | null;
@@ -43,6 +44,7 @@ const empty: UpstreamContext = {
   vin: null,
   source_regnr: null,
   saluort: null,
+  returadress: null,
   daily_rate: null,
   holding_period_months: null,
   ordered_at: null,
@@ -96,6 +98,7 @@ export default function GarageUpstreamContext() {
           vin: data.vin ?? null,
           source_regnr: data.source_regnr ?? null,
           saluort: data.saluort ?? null,
+          returadress: data.returadress ?? null,
           daily_rate: data.daily_rate === null || data.daily_rate === undefined ? null : Number(data.daily_rate),
           holding_period_months: data.holding_period_months === null || data.holding_period_months === undefined ? null : Number(data.holding_period_months),
           ordered_at: data.ordered_at ?? null,
@@ -132,6 +135,7 @@ export default function GarageUpstreamContext() {
       vin: source.vin ?? null,
       source_regnr: source.source_regnr ?? null,
       saluort: source.saluort ?? null,
+      returadress: source.returadress ?? null,
       daily_rate: source.daily_rate === null || source.daily_rate === undefined ? null : Number(source.daily_rate),
       holding_period_months: source.holding_period_months === null || source.holding_period_months === undefined ? null : Number(source.holding_period_months),
       ordered_at: source.ordered_at ?? null,
@@ -169,6 +173,7 @@ export default function GarageUpstreamContext() {
         <Field label="VIN"><input value={value.vin ?? ''} onChange={(e) => set('vin', nullableText(e.target.value))} /></Field>
         <Field label="Käll-reg.nr"><input value={value.source_regnr ?? ''} onChange={(e) => set('source_regnr', nullableText(e.target.value))} /></Field>
         <Field label="Saluort"><input value={value.saluort ?? ''} onChange={(e) => set('saluort', nullableText(e.target.value))} /></Field>
+        <Field label="Returadress"><input value={value.returadress ?? ''} onChange={(e) => set('returadress', nullableText(e.target.value))} /></Field>
         <Field label="Dygnsdeb"><input type="number" min="0" value={value.daily_rate ?? ''} onChange={(e) => set('daily_rate', nullableNumber(e.target.value))} /></Field>
         <Field label="Hålltid"><select value={value.holding_period_months ?? ''} onChange={(e) => set('holding_period_months', e.target.value ? Number(e.target.value) : null)}><option value="">–</option>{[4,6,9,12,18,24].map((n) => <option key={n} value={n}>{n} mån</option>)}</select></Field>
         <Field label="Beställd"><input type="date" value={value.ordered_at ?? ''} onChange={(e) => set('ordered_at', nullableText(e.target.value))} /></Field>
@@ -178,7 +183,7 @@ export default function GarageUpstreamContext() {
         <Field label="Planerad leverans"><input type="date" value={value.planned_delivery_date ?? ''} onChange={(e) => set('planned_delivery_date', nullableText(e.target.value))} /></Field>
       </div>
       <Field label="Notering"><textarea rows={3} value={value.planning_note ?? ''} onChange={(e) => set('planning_note', nullableText(e.target.value))} /></Field>
-      <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>Reg.nr, modell, bilmärke och planerad station speglas direkt i Nybils ordinarie fält och kan ändras där.</div>
+      <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>Reg.nr, returadress, modell, bilmärke och planerad station speglas in i Nybils mottagningsbild och kan verifieras där.</div>
     </section>
   );
 }
