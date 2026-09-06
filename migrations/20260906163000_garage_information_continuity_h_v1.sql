@@ -159,6 +159,12 @@ begin
 end;
 $$;
 
+-- Daily-rate Garage edits must not even invoke the Planning-default trigger.
+drop trigger if exists garage_items_first_model_defaults on public.garage_items;
+create trigger garage_items_first_model_defaults
+after update of holding_period_months on public.garage_items
+for each row execute function public.apply_first_garage_model_defaults();
+
 -- Future Planering-origin Garage rows represent cars already ordered, called off and confirmed.
 -- Do not fabricate an individual calloff date. Historical calloff_at values are untouched.
 create or replace function public.finalize_planning_period_to_garage(
