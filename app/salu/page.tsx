@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import SaluDecisionClient from './salu-decision-client';
 import styles from './salu.module.css';
 
@@ -16,7 +17,7 @@ export default function SaluPage() {
           <h1>En bil. Ett beslut.</h1>
           <p>Öppna bilen, se verkliga blockerare och fatta slutbeslut. Processövergångarna hanteras av systemet.</p>
         </div>
-        <a href="/" className={styles.back}>Till startsidan</a>
+        <Link href="/" className={styles.back}>Till startsidan</Link>
       </header>
       <SaluDecisionClient />
     </main>
