@@ -4,12 +4,6 @@ import { POST as legacyPOST } from './legacy-handler';
 
 const SALU_OWNED_FIELDS = new Set([
   'saludatum',
-  'salu_station',
-  'salu_kopare',
-  'salu_returadress',
-  'salu_retur',
-  'salu_attention',
-  'salu_notering',
 ]);
 
 type JsonRecord = Record<string, unknown>;
