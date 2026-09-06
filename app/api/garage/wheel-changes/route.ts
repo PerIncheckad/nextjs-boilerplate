@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
+import { isActionableWheelStorage } from '@/lib/wheel-storage-actionability';
 import {
   classifyWheelEligibility,
   operationalWheelSeason,
@@ -113,6 +114,26 @@ async function readSoldRegnrs(admin: ReturnType<typeof createAdminClient>): Prom
   return soldRegnrs;
 }
 
+async function readTerminalUtRegnrs(admin: ReturnType<typeof createAdminClient>): Promise<Set<string>> {
+  const { data, error } = await admin
+    .from('garage_avveckla_events')
+    .select('garage_avveckla_cases!inner(regnr)')
+    .eq('event_type', 'UT_OVERLAMNING_VERIFIERAD');
+  if (error) throw error;
+
+  const terminalUtRegnrs = new Set<string>();
+  for (const row of data ?? []) {
+    const joined = row.garage_avveckla_cases as unknown;
+    const cases = Array.isArray(joined) ? joined : [joined];
+    for (const item of cases) {
+      if (!item || typeof item !== 'object') continue;
+      const regnr = cleanRegnr((item as { regnr?: unknown }).regnr);
+      if (regnr) terminalUtRegnrs.add(regnr);
+    }
+  }
+  return terminalUtRegnrs;
+}
+
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -128,7 +149,7 @@ export async function GET(request: Request) {
   try {
     const now = new Date();
     const operational = operationalWheelSeason(now);
-    const [itemsRes, wheelRes, candidateSource, soldRegnrs] = await Promise.all([
+    const [itemsRes, wheelRes, candidateSource, soldRegnrs, terminalUtRegnrs] = await Promise.all([
       admin.from('garage_items')
         .select('garage_item_id,regnr,model,planned_station,garage_direction,source_kind,updated_at')
         .not('regnr', 'is', null)
@@ -139,6 +160,7 @@ export async function GET(request: Request) {
         .order('updated_at', { ascending: false }),
       readCandidateSource(admin),
       readSoldRegnrs(admin),
+      readTerminalUtRegnrs(admin),
     ]);
 
     if (itemsRes.error) throw itemsRes.error;
@@ -164,7 +186,7 @@ export async function GET(request: Request) {
     const candidates = buildCandidates(candidateSource, operational.season)
       .filter((item) => {
         const regnr = cleanRegnr(item.regnr) ?? '';
-        return !soldRegnrs.has(regnr) && !handledThisSeason.has(regnr);
+        return !soldRegnrs.has(regnr) && !terminalUtRegnrs.has(regnr) && !handledThisSeason.has(regnr);
       });
 
     const counts = candidates.reduce<Record<WheelEligibility, number>>((acc, item) => {
@@ -188,7 +210,7 @@ export async function GET(request: Request) {
         },
         candidates,
         counts,
-        semantics: 'STATUS_THEN_COMPLETED_CHECKIN_THEN_NYBIL_EXCLUDING_SOLD',
+        semantics: 'LATEST_VERIFIED_WHEEL_FACT_EXCLUDING_SOLD_TERMINAL_UT_AND_HANDLED_SEASON',
       },
     });
   } catch (error) {
@@ -244,8 +266,11 @@ export async function POST(request: Request) {
       if (requestedStatus === 'BOKAD' && !bookedFor) {
         return NextResponse.json({ error: 'Bokad tid krävs när hjulskiftet är BOKAD' }, { status: 400 });
       }
+      if (requestedStatus === 'BOKAD' && !isActionableWheelStorage(location)) {
+        return NextResponse.json({ error: 'Verifierad hjulförvaring krävs innan hjulskiftet kan bokas' }, { status: 409 });
+      }
 
-      const [existingSeasonalResponse, soldRegnrs, source] = await Promise.all([
+      const [existingSeasonalResponse, soldRegnrs, terminalUtRegnrs, source] = await Promise.all([
         admin
           .from('garage_wheel_changes')
           .select('wheel_change_id')
@@ -253,6 +278,7 @@ export async function POST(request: Request) {
           .eq('season_key', operational.season.key)
           .limit(1),
         readSoldRegnrs(admin),
+        readTerminalUtRegnrs(admin),
         readCandidateSource(admin),
       ]);
       if (existingSeasonalResponse.error) throw existingSeasonalResponse.error;
@@ -261,6 +287,9 @@ export async function POST(request: Request) {
       }
       if (soldRegnrs.has(regnr)) {
         return NextResponse.json({ error: 'Bilen är markerad som såld och kan inte starta säsongsbundet hjulskifte' }, { status: 409 });
+      }
+      if (terminalUtRegnrs.has(regnr)) {
+        return NextResponse.json({ error: 'Bilen har verifierat lämnat verksamheten och kan inte starta hjulskifte' }, { status: 409 });
       }
 
       const candidate = source.find((item) => cleanRegnr(item.regnr) === regnr);
