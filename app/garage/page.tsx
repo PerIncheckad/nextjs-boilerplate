@@ -4,8 +4,6 @@ import GarageOverviewPanel from './garage-overview-panel';
 import GarageClient from './garage-client';
 import GarageV2Panel from './garage-v2-panel';
 import GarageLegacyEntryPanel from './garage-legacy-entry-panel';
-import GarageRentedInIntakePanel from './garage-rented-in-intake-panel';
-import GarageRentedInReturnPanel from './garage-rented-in-return-panel';
 import GarageWheelChangePanel from './garage-wheel-change-panel';
 import GarageVoidPanel from './garage-void-panel';
 import GarageAvvecklaPanel from './garage-avveckla-panel';
@@ -35,8 +33,6 @@ export default function GaragePage() {
           <a href="#garageobjekt">1. Garage</a>
           <a href="#nybil">2. Ny bil</a>
           <a href="#legacy">2B. Befintlig egen bil</a>
-          <a href="#inhyrd">2C. Inhyrd</a>
-          <a href="#inhyrd-ut">2D. Inhyrd UT</a>
           <a href="#avveckla">3. Avveckla</a>
           <a href="#kontrollpunkter">4. Kontrollpunkter</a>
         </nav>
@@ -60,16 +56,6 @@ export default function GaragePage() {
         <section id="legacy" className={styles.section}>
           <div className={styles.sectionLabel}><strong>02B / BEFINTLIG EGEN BIL / LEGACY</strong><span>Explicit current-state entry utan historisk backfill</span></div>
           <GarageLegacyEntryPanel />
-        </section>
-
-        <section id="inhyrd" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>02C / INHYRD / SNABBINTAG</strong><span>Externt fordon registreras från intagstidpunkten utan historik bakåt</span></div>
-          <GarageRentedInIntakePanel />
-        </section>
-
-        <section id="inhyrd-ut" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>02D / INHYRD / ÅTERLÄMNING</strong><span>Extern bil lämnar verksamheten utan att använda ordinarie AVVECKLA eller skriva över RENTAL-källan</span></div>
-          <GarageRentedInReturnPanel />
         </section>
 
         <section id="avveckla" className={styles.section}>
