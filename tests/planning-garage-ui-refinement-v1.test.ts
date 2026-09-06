@@ -20,15 +20,16 @@ test('Planning exposes a visible three-step operating flow without changing busi
   assert.match(planning, /<PlanningGarageHandoff/);
 });
 
-test('Garage exposes its reduced operating sequence without Hjulskifte execution', () => {
+test('Garage exposes routing and handoff only for Nybil and AVVECKLA', () => {
   assert.match(garage, /1\. Garage/);
-  assert.match(garage, /2\. Ny bil/);
-  assert.match(garage, /3\. Avveckla/);
+  assert.match(garage, /2\. Nybil handoff/);
+  assert.match(garage, /3\. Avveckla handoff/);
   const garagePosition = garage.indexOf('<GarageClient');
-  const nybilPosition = garage.indexOf('<GarageV2Panel');
-  const avvecklaPosition = garage.indexOf('<OrderWorkflowPanel');
+  const nybilPosition = garage.indexOf('<GarageNybilHandoffStatusPanel');
+  const avvecklaPosition = garage.indexOf('<GarageAvvecklaHandoffPanel');
   assert.ok(garagePosition >= 0 && garagePosition < nybilPosition);
   assert.ok(nybilPosition < avvecklaPosition);
+  assert.doesNotMatch(garage, /GarageV2Panel/);
   assert.doesNotMatch(garage, /GarageWheelChangePanel/);
   assert.doesNotMatch(garage, /KONTROLLPUNKTER/);
   assert.match(hjulskifte, /<HjulskiftePanel/);
