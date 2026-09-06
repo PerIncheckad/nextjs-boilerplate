@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 const coreModules = [
   { href: '/tower', label: 'Tower', detail: 'Operativ uppmärksamhet och kontroll', index: '01' },
   { href: '/planning', label: 'Planering', detail: 'Beslut, behov och handslag', index: '02' },
-  { href: '/garage', label: 'Garaget', detail: 'Orderflöde och kontrollpunkter', index: '03' },
+  { href: '/garage', label: 'GARAGET', detail: 'Orderflöde och kontrollpunkter', index: '03' },
 ];
 
 const operationModules = [
