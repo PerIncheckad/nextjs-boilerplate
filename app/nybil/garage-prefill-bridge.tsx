@@ -6,7 +6,7 @@ import { resolveBrandPrefill, resolvePlannedStationName } from '@/lib/nybil-gara
 
 type GaragePrefill = {
   garage_item_id: string;
-  regnr: string;
+  regnr: string | null;
   vin: string | null;
   model: string;
   planned_station: string | null;
@@ -44,8 +44,10 @@ function applyPrefill(data: GaragePrefill): boolean {
   const modelInput = document.querySelector<HTMLInputElement>('input[placeholder="t.ex. T-Cross"]');
   if (regInputs.length < 2 || !modelInput) return false;
 
-  setNativeValue(regInputs[0], data.regnr);
-  setNativeValue(regInputs[1], data.regnr);
+  if (data.regnr) {
+    setNativeValue(regInputs[0], data.regnr);
+    setNativeValue(regInputs[1], data.regnr);
+  }
   setNativeValue(modelInput, data.model || '');
 
   if (data.brand) {
@@ -122,13 +124,15 @@ export default function GarageNybilPrefillBridge() {
         <>
           <strong>Hämtad från Garaget · UTVECKLA / IN</strong>
           <div style={{ marginTop: 5, fontSize: 14 }}>
-            <span><b>Reg.nr:</b> {data?.regnr}</span>
+            <span><b>Reg.nr:</b> {data?.regnr || 'SAKNAR REGNR'}</span>
             {data?.brand ? <span> · <b>Märke:</b> {data.brand}</span> : null}
             <span> · <b>Modell:</b> {data?.model}</span>
             {data?.vin ? <span> · <b>VIN:</b> {data.vin}</span> : null}
           </div>
           {data?.returadress ? <div style={{ marginTop: 3, fontSize: 13, color: '#555' }}>Returadress: {data.returadress}</div> : null}
-          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>Reg.nr, returadress, bilmärke, modell och planerad station förifylls i Nybils ordinarie mottagningsbild och kan verifieras där. Faktisk mottagningsplats verifieras fortfarande i Nybil. Garaget kvitteras först när Nybil-registreringen sparas.</div>
+          <div style={{ marginTop: 5, fontSize: 12, color: '#666' }}>
+            Garage-objektet är valt via exakt Garage-ID. Kända värden förifylls när de finns och kan verifieras i Nybil. Faktisk mottagningsplats verifieras fortfarande i Nybil. Garaget kvitteras först när Nybil-registreringen sparas.
+          </div>
         </>
       )}
     </div>

@@ -49,7 +49,9 @@ test('Nybil renders upstream facts as editable receipt context', () => {
 test('ordinary Nybil fields remain editable and override carried defaults on save', () => {
   assert.match(prefillBridge, /Bilmärke/);
   assert.match(prefillBridge, /Returadress/);
-  assert.match(prefillBridge, /Reg\.nr, returadress, bilmärke, modell och planerad station/);
+  assert.match(prefillBridge, /Garage-objektet är valt via exakt Garage-ID/);
+  assert.match(prefillBridge, /if \(data\.regnr\)/);
+  assert.match(prefillBridge, /setNativeValue\(modelInput, data\.model/);
   assert.match(nybilClient, /\.\.\.garageContext\.values,[\s\S]*\.\.\.inventoryData,[\s\S]*source_garage_item_id/);
 });
 

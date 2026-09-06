@@ -28,14 +28,18 @@ test('Lager 1 source remains read-only provenance', () => {
   assert.doesNotMatch(lager1Api, /from\('vehicle_journey_events'\)\s*\.insert/s);
 });
 
-test('Nybil fetches an arrived UTVECKLA IN car from Garage and Garage stays read-only', () => {
+test('Nybil selects exact UTVECKLA IN Garage item even before regnr is known', () => {
   assert.match(handoffApi, /garage_direction !== 'IN'/);
-  assert.match(handoffApi, /Registreringsnummer krävs före överlämning till Ny bil/);
+  assert.doesNotMatch(handoffApi, /Registreringsnummer krävs före överlämning till Ny bil/);
+  assert.doesNotMatch(handoffApi, /\.not\('regnr',\s*'is',\s*null\)/);
+  assert.match(handoffApi, /source_planning_unit_no/);
+  assert.match(handoffApi, /planned_delivery_date/);
   assert.match(nybilPage, /GaragePicker/);
   assert.match(nybilPicker, /Hämta bilen från Garaget/);
-  assert.match(nybilPicker, /\/api\/garage\/nybil-handoff/);
-  assert.match(nybilPicker, /\/nybil\?garage_item_id=/);
-  assert.match(nybilPicker, />Hämta</);
+  assert.match(nybilPicker, /SAKNAR REGNR/);
+  assert.match(nybilPicker, /value=\{item\.garage_item_id\}/);
+  assert.match(nybilPicker, /garage_item_id=\$\{encodeURIComponent\(selectedGarageItemId\)\}/);
+  assert.match(nybilBridge, /Garage-objektet är valt via exakt Garage-ID/);
   assert.match(garageStatus, /VÄNTAR PÅ NYBIL/);
   assert.match(garageStatus, /MOTTAGEN I NYBIL/);
   assert.match(garageStatus, /Read-only/);
@@ -63,6 +67,8 @@ test('Garage handoff trigger is not exposed as a callable public API', () => {
 test('Nybil prefill carries known planning facts but does not claim actual receipt location', () => {
   assert.match(nybilPage, /GarageNybilPrefillBridge/);
   assert.match(nybilBridge, /input\.reg-input/);
+  assert.match(nybilBridge, /if \(data\.regnr\)/);
+  assert.match(nybilBridge, /SAKNAR REGNR/);
   assert.match(nybilBridge, /Planerad station/);
   assert.match(nybilBridge, /Faktisk mottagningsplats/);
   assert.match(nybilBridge, /Hämtad från Garaget/);
