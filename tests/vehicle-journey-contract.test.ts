@@ -50,6 +50,13 @@ test('Vagnkort composes existing Nybil, Check, damage, receipt and SALU sources'
   }
 });
 
+test('Vagnkort mounted wheels uses only canonical current wheel fact', () => {
+  assert.match(route, /admin\.rpc\('get_current_wheel_fact', \{ p_regnr: regnr \}\)/);
+  assert.match(route, /mountedWheels: currentWheelFact\?\.wheel_type \?\? null/);
+  assert.doesNotMatch(route, /mountedWheels: vehicle\?\.hjul_pa_bilen \?\? nybil\?\.hjultyp/);
+  assert.match(route, /if \(change\.field === 'mountedWheels'\) continue;/);
+});
+
 test('legacy receipts remain visible through the unified Vagnkort document list', () => {
   assert.match(route, /sourceKind: 'legacy_receipt'/);
   assert.match(route, /storage_bucket: 'receipts'/);
