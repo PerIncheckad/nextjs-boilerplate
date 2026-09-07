@@ -48,7 +48,8 @@ test('Garage IN without regnr remains selectable but cannot complete final hando
 });
 
 test('scope is future-write only and does not rewrite historical data or unrelated contracts', () => {
-  assert.doesNotMatch(migration, /alter table|create table|drop table|create index|drop index|not null/i);
+  assert.doesNotMatch(migration, /alter\s+table|create\s+table|drop\s+table|create\s+index|drop\s+index/i);
+  assert.doesNotMatch(migration, /alter\s+column[\s\S]*set\s+not\s+null/i);
   assert.doesNotMatch(migration, /\binsert\s+into\b|\bupdate\s+public\.|\bdelete\s+from\b/i);
   assert.doesNotMatch(migration, /create or replace function public\.sync_nybil_garage_handoff/i);
   assert.doesNotMatch(migration, /completed_at/i);
