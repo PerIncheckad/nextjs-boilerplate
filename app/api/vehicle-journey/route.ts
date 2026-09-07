@@ -111,6 +111,7 @@ export async function GET(request: Request) {
     receiptsResponse,
     saluStateResponse,
     saluFlagsResponse,
+    currentWheelResponse,
   ] = await Promise.all([
     admin
       .from('nybil_inventering')
@@ -167,6 +168,7 @@ export async function GET(request: Request) {
       .eq('regnr', regnr)
       .order('created_at', { ascending: false })
       .limit(1),
+    admin.rpc('get_current_wheel_fact', { p_regnr: regnr }),
   ]);
 
   const failedSource = firstError([
@@ -180,6 +182,7 @@ export async function GET(request: Request) {
     ['legacy receipts', receiptsResponse.error],
     ['SALU state', saluStateResponse.error],
     ['SALU flags', saluFlagsResponse.error],
+    ['current wheel fact', currentWheelResponse.error],
   ]);
 
   if (failedSource) {
@@ -191,6 +194,7 @@ export async function GET(request: Request) {
   const latestCheckin = checkinResponse.data?.[0] ?? null;
   const saluState = saluStateResponse.data?.[0] ?? null;
   const latestSaluFlag = saluFlagsResponse.data?.[0] ?? null;
+  const currentWheelFact = currentWheelResponse.data?.[0] ?? null;
 
   const [checkpointResponse, childProcessesResponse] = latestSaluFlag
     ? await Promise.all([
@@ -253,7 +257,7 @@ export async function GET(request: Request) {
     towbar: nybil?.dragkrok ?? null,
     rubberMats: vehicle?.har_gummimattor ?? nybil?.gummimattor ?? null,
     tireCompressor: vehicle?.har_kompressor ?? nybil?.dackkompressor ?? null,
-    mountedWheels: vehicle?.hjul_pa_bilen ?? nybil?.hjultyp ?? null,
+    mountedWheels: currentWheelFact?.wheel_type ?? null,
     looseWheels: nybil?.hjul_ej_monterade ?? null,
   };
 
@@ -264,6 +268,7 @@ export async function GET(request: Request) {
 
   const fieldsOverlaid = new Set<EquipmentField>();
   for (const change of equipmentChanges) {
+    if (change.field === 'mountedWheels') continue;
     if (fieldsOverlaid.has(change.field)) continue;
     equipmentCurrent[change.field] = change.value;
     fieldsOverlaid.add(change.field);
