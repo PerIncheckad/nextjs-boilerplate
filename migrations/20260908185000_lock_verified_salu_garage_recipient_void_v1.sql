@@ -60,6 +60,11 @@ begin
 end;
 $$;
 
+drop trigger if exists garage_items_void_state_guard on public.garage_items;
+create trigger garage_items_void_state_guard
+before update on public.garage_items
+for each row execute function public.guard_garage_item_void_state();
+
 create or replace function public.void_garage_item(
   p_garage_item_id uuid,
   p_reason text,
