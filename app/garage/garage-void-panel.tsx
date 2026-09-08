@@ -11,6 +11,8 @@ type GarageItem = {
   planned_station: string | null;
   source_kind: 'MANUELL' | 'PLANERING' | 'SALU' | 'LAGER1';
   source_planning_unit_no: number | null;
+  void_allowed?: boolean;
+  void_block_reason?: string | null;
 };
 
 function sourceLabel(item: GarageItem) {
@@ -18,6 +20,29 @@ function sourceLabel(item: GarageItem) {
   if (item.source_kind === 'SALU') return 'SALU';
   if (item.source_kind === 'LAGER1') return 'Lager 1';
   return 'Manuell';
+}
+
+async function loadItems(): Promise<GarageItem[]> {
+  const response = await fetch('/api/garage', { cache: 'no-store' });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
+
+  const items = (payload.data ?? []) as GarageItem[];
+  return Promise.all(items.map(async (item) => {
+    const capabilityResponse = await fetch(
+      `/api/garage/void?garage_item_id=${encodeURIComponent(item.garage_item_id)}`,
+      { cache: 'no-store' },
+    );
+    const capabilityPayload = await capabilityResponse.json();
+    if (!capabilityResponse.ok) {
+      throw new Error(capabilityPayload?.error ?? 'Kunde inte verifiera makuleringsrätt');
+    }
+    return {
+      ...item,
+      void_allowed: capabilityPayload?.data?.void_allowed === true,
+      void_block_reason: capabilityPayload?.data?.void_block_reason ?? null,
+    };
+  }));
 }
 
 export default function GarageVoidPanel() {
@@ -28,12 +53,10 @@ export default function GarageVoidPanel() {
 
   useEffect(() => {
     let active = true;
-    void fetch('/api/garage', { cache: 'no-store' })
-      .then(async (response) => {
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
+    void loadItems()
+      .then((nextItems) => {
         if (active) {
-          setItems(payload.data ?? []);
+          setItems(nextItems);
           setError(null);
         }
       })
@@ -45,13 +68,15 @@ export default function GarageVoidPanel() {
   }, []);
 
   const refresh = async () => {
-    const response = await fetch('/api/garage', { cache: 'no-store' });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
-    setItems(payload.data ?? []);
+    setItems(await loadItems());
   };
 
   const voidItem = async (item: GarageItem) => {
+    if (item.void_allowed !== true) {
+      setError(item.void_block_reason ?? 'Garage-objektet kan inte makuleras');
+      return;
+    }
+
     const label = item.regnr || item.model;
     const reason = window.prompt(`Varför ska ${label} tas bort från aktiva Garaget?`);
     if (!reason?.trim()) return;
@@ -90,14 +115,18 @@ export default function GarageVoidPanel() {
               <span>{item.model}</span>
               <span>{item.planned_station ?? '—'}</span>
               <span>{sourceLabel(item)}</span>
-              <button
-                className={styles.secondaryButton}
-                type="button"
-                disabled={busyId === item.garage_item_id}
-                onClick={() => void voidItem(item)}
-              >
-                {busyId === item.garage_item_id ? 'Makulering…' : 'Ta bort'}
-              </button>
+              {item.void_allowed === true ? (
+                <button
+                  className={styles.secondaryButton}
+                  type="button"
+                  disabled={busyId === item.garage_item_id}
+                  onClick={() => void voidItem(item)}
+                >
+                  {busyId === item.garage_item_id ? 'Makulering…' : 'Ta bort'}
+                </button>
+              ) : (
+                <span title={item.void_block_reason ?? undefined}>Låst</span>
+              )}
             </div>
           ))}
         </div>
