@@ -25,6 +25,10 @@ function block(pattern: RegExp) {
   return match[0];
 }
 
+function withoutFunctionBodies(sql: string) {
+  return sql.replace(/\bas\s+\$\$[\s\S]*?\$\$;/gi, 'as $$<function body>$$;');
+}
+
 test('runtime loses direct DML and truncate authority on generic handoff history', () => {
   assert.match(
     migration,
@@ -120,12 +124,13 @@ test('exact retry can return without an audit mutation while create writes one R
 });
 
 test('migration is schema/function only and does not rewrite historical handoff data', () => {
-  assert.doesNotMatch(migration, /\bupdate\s+public\.handoffs\b/i);
-  assert.doesNotMatch(migration, /\bdelete\s+from\s+public\.handoffs\b/i);
-  assert.doesNotMatch(migration, /\btruncate\s+(?:table\s+)?public\.handoffs\b/i);
-  assert.doesNotMatch(migration, /insert\s+into\s+public\.handoffs[\s\S]*?select\s+/i);
-  assert.doesNotMatch(migration, /update\s+public\.handoff_events/i);
-  assert.doesNotMatch(migration, /delete\s+from\s+public\.handoff_events/i);
+  const topLevelMigration = withoutFunctionBodies(migration);
+  assert.doesNotMatch(topLevelMigration, /\bupdate\s+public\.handoffs\b/i);
+  assert.doesNotMatch(topLevelMigration, /\bdelete\s+from\s+public\.handoffs\b/i);
+  assert.doesNotMatch(topLevelMigration, /\btruncate\s+(?:table\s+)?public\.handoffs\b/i);
+  assert.doesNotMatch(topLevelMigration, /insert\s+into\s+public\.handoffs[\s\S]*?select\s+/i);
+  assert.doesNotMatch(topLevelMigration, /update\s+public\.handoff_events/i);
+  assert.doesNotMatch(topLevelMigration, /delete\s+from\s+public\.handoff_events/i);
 });
 
 test('SALU remains a regression only: canonical exact source, #600 and #601 stay intact', () => {
