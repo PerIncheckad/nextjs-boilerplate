@@ -136,7 +136,7 @@ export async function PATCH(request: Request) {
   if (!id) return NextResponse.json({ error: 'garage_item_id saknas' }, { status: 400 });
   const admin = adminClient();
 
-  const { data: activeItem, error: activeError } = await admin.from('garage_items').select('garage_item_id,handed_off_nybil_id,completed_at').eq('garage_item_id', id).is('voided_at', null).maybeSingle();
+  const { data: activeItem, error: activeError } = await admin.from('garage_items').select('garage_item_id,handed_off_nybil_id,completed_at,source_kind,source_salu_flag_id').eq('garage_item_id', id).is('voided_at', null).maybeSingle();
   if (activeError) return NextResponse.json({ error: 'Kunde inte läsa Garage-objektet' }, { status: 500 });
   if (!activeItem) return NextResponse.json({ error: 'Garage-objektet finns inte eller är makulerat' }, { status: 404 });
   if (activeItem.handed_off_nybil_id) return NextResponse.json({ error: 'Garage-objektet är mottaget i Ny bil och är fryst' }, { status: 409 });
@@ -156,6 +156,9 @@ export async function PATCH(request: Request) {
   if (Object.hasOwn(body, 'garage_direction')) {
     const nextDirection = upper(body.garage_direction);
     if (!nextDirection || !DIRECTIONS.has(nextDirection)) return NextResponse.json({ error: 'Välj IN eller UT' }, { status: 400 });
+    if (activeItem.source_kind === 'SALU' && activeItem.source_salu_flag_id && nextDirection !== 'UT') {
+      return NextResponse.json({ error: 'SALU-källat Garage-objekt är låst till AVVECKLA / UT av det verifierade SALU-handoffet.' }, { status: 409 });
+    }
     const { data, error } = await admin.rpc('change_garage_direction', { p_garage_item_id: id, p_to_direction: nextDirection, p_reason: text(body.direction_change_reason), p_actor: verification.user.id });
     if (error) { console.error('[garage] direction RPC failed', error); return NextResponse.json({ error: 'Kunde inte ändra riktning' }, { status: 500 }); }
     return NextResponse.json({ data });
