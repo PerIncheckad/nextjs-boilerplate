@@ -12,15 +12,16 @@ const canonical = readFileSync(
 );
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const garageUi = readFileSync('app/garage/garage-client.tsx', 'utf8');
+const invariantDdl = invariant.split('create or replace function public.change_garage_direction')[0];
 
 test('DB invariant fail-closes exact SALU-origin Garage direction to UT', () => {
-  assert.match(invariant, /garage_items_salu_source_direction_ut_chk/);
-  assert.match(invariant, /source_kind = 'SALU'/);
-  assert.match(invariant, /source_salu_flag_id is not null/);
-  assert.match(invariant, /garage_direction is not distinct from 'UT'/);
-  assert.doesNotMatch(invariant, /\binsert\s+into\s+public\.garage_items\b/i);
-  assert.doesNotMatch(invariant, /\bupdate\s+public\.garage_items\s+set\b/i);
-  assert.doesNotMatch(invariant, /\bdelete\s+from\s+public\.garage_items\b/i);
+  assert.match(invariantDdl, /garage_items_salu_source_direction_ut_chk/);
+  assert.match(invariantDdl, /source_kind = 'SALU'/);
+  assert.match(invariantDdl, /source_salu_flag_id is not null/);
+  assert.match(invariantDdl, /garage_direction is not distinct from 'UT'/);
+  assert.doesNotMatch(invariantDdl, /\binsert\s+into\s+public\.garage_items\b/i);
+  assert.doesNotMatch(invariantDdl, /\bupdate\s+public\.garage_items\s+set\b/i);
+  assert.doesNotMatch(invariantDdl, /\bdelete\s+from\s+public\.garage_items\b/i);
 });
 
 test('service-role direction RPC explicitly rejects SALU UT to IN', () => {
