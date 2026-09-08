@@ -15,6 +15,36 @@ function text(value: unknown): string | null {
   return next || null;
 }
 
+const VERIFIED_SALU_VOID_BLOCK_REASON = 'Verifierad SALU → Garage-mottagare kan inte makuleras genom generell Garage-makulering';
+
+export async function GET(request: Request) {
+  const verification = await verifyApiUser(request);
+  if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
+
+  const garageItemId = text(new URL(request.url).searchParams.get('garage_item_id'));
+  if (!garageItemId) {
+    return NextResponse.json({ error: 'Garage-objekt krävs' }, { status: 400 });
+  }
+
+  const admin = adminClient();
+  const { data, error } = await admin.rpc('is_verified_salu_garage_recipient_v1', {
+    p_garage_item_id: garageItemId,
+  });
+
+  if (error) {
+    console.error('[garage/void] capability failed', error);
+    return NextResponse.json({ error: 'Kunde inte verifiera makuleringsrätt' }, { status: 500 });
+  }
+
+  const protectedRecipient = data === true;
+  return NextResponse.json({
+    data: {
+      void_allowed: !protectedRecipient,
+      void_block_reason: protectedRecipient ? VERIFIED_SALU_VOID_BLOCK_REASON : null,
+    },
+  });
+}
+
 export async function POST(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -39,7 +69,7 @@ export async function POST(request: Request) {
   if (error) {
     console.error('[garage/void] failed', error);
     const message = error.message || 'Kunde inte makulera Garage-objektet';
-    const blocked = /Ny bil|hjulskifteshistorik|permanent/i.test(message);
+    const blocked = /Ny bil|hjulskifteshistorik|permanent|Verifierad SALU|kan inte makuleras/i.test(message);
     return NextResponse.json({ error: message }, { status: blocked ? 409 : 500 });
   }
 
