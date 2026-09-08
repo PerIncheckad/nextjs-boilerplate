@@ -268,7 +268,7 @@ export default function GarageClient() {
         <div className={styles.tableWrap}><table><thead><tr><th>Källa</th><th>Riktning</th><th>Månad</th><th>Modell</th><th>Reg.nr</th><th>VIN</th><th>Källreg</th><th>Orsak</th><th>Station</th><th>Saluort</th><th>Kommentar</th></tr></thead>
           <tbody>{visible.map((item) => <tr key={item.garage_item_id}>
             <td>{sourceLabel(item)}</td>
-            <td><select value={item.garage_direction ?? ''} onChange={(e) => { const next = e.target.value as GarageDirection; if (next) void patch(item, { garage_direction: next, direction_change_reason: `Ändrad i Garaget till ${directionLabel(next)}` }); }}><option value="" disabled>Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select></td>
+            <td>{item.source_kind === 'SALU' && item.source_salu_flag_id ? <span>AVVECKLA / UT</span> : <select value={item.garage_direction ?? ''} onChange={(e) => { const next = e.target.value as GarageDirection; if (next) void patch(item, { garage_direction: next, direction_change_reason: `Ändrad i Garaget till ${directionLabel(next)}` }); }}><option value="" disabled>Välj</option><option value="IN">UTVECKLA / IN</option><option value="UT">AVVECKLA / UT</option></select>}</td>
             <td><input type="month" defaultValue={item.planning_period ?? ''} onBlur={(e) => blurPatch(item, 'planning_period', item.planning_period, e.target.value || null)} /></td>
             <td><input list="garage-models" defaultValue={item.model} onBlur={(e) => blurPatch(item, 'model', item.model, e.target.value)} /></td>
             <td><input defaultValue={item.regnr ?? ''} onBlur={(e) => blurPatch(item, 'regnr', item.regnr, e.target.value.toUpperCase() || null)} /></td>
