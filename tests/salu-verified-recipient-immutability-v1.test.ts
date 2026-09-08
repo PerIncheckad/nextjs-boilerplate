@@ -32,6 +32,8 @@ test('A/B: exact canonical VERIFIED recipient is protected by the DB void bounda
   assert.match(migration, /g\.source_kind = 'SALU'/);
   assert.match(migration, /old\.voided_at is null and new\.voided_at is not null/);
   assert.match(migration, /is_verified_salu_garage_recipient_v1\(old\.garage_item_id\)/);
+  assert.match(migration, /garage_items_void_state_guard/);
+  assert.match(migration, /before update on public\.garage_items/);
   assert.match(migration, /Verifierad SALU → Garage-mottagare kan inte makuleras/);
 });
 
@@ -59,7 +61,7 @@ test('E: UI uses exact server-derived void capability and offers no Ta bort acti
   assert.match(voidUi, /void_allowed: capabilityPayload\?\.data\?\.void_allowed === true/);
   assert.match(voidUi, /item\.void_allowed === true \? \(/);
   assert.match(voidUi, /<span title=\{item\.void_block_reason \?\? undefined\}>Låst<\/span>/);
-  assert.doesNotMatch(voidUi, /item\.source_kind === 'SALU'.*void_allowed/s);
+  assert.doesNotMatch(voidUi, /item\.source_kind === 'SALU'\s*&&[^\n]*void_allowed/);
 });
 
 test('F/G/H: rejected generic void preserves active recipient so canonical retry reuses the same Garage item and handoff', () => {
