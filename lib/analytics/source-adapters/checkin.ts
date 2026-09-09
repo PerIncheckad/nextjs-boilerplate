@@ -13,6 +13,7 @@ export type CompletedCheckinObservation = {
 
 export type CheckinSourceAdapter = {
   readCompleted(period: CheckinMetricPeriod): Promise<readonly CompletedCheckinObservation[]>;
+  readCanonicalById(id: string): Promise<CompletedCheckinObservation | null>;
 };
 
 export type CheckinSourceReadErrorCode =
@@ -158,6 +159,19 @@ export function createSupabaseCheckinSourceAdapter(client: SupabaseClient, optio
   return {
     readCompleted(period) {
       return readCompletedCheckinsExhaustively(pageSource, period, options);
+    },
+
+    async readCanonicalById(id) {
+      if (!id) throw new CheckinSourceReadError('SOURCE_ROW_INVALID', 'Traceback requires exact checkins.id');
+      const { data, error } = await client
+        .from('checkins')
+        .select(SOURCE_FIELDS)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', `Failed to read canonical Check-in ${id}`, { cause: error });
+      if (data == null) return null;
+      return normalizeRow(data);
     },
   };
 }
