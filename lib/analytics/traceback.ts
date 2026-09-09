@@ -1,5 +1,5 @@
 import type { ContributorIdentity, MetricResultV1 } from './contracts';
-import type { CheckinSourceAdapter, CompletedCheckinObservation } from './source-adapters/checkin';
+import type { CheckinTracebackSourceAdapter, CompletedCheckinObservation } from './source-adapters/checkin';
 
 export type CheckinTracebackResultV1 = {
   contract: 'CHECKIN_TRACEBACK_V1';
@@ -70,7 +70,7 @@ function assertCanonicalSourceMatches(contributor: ContributorIdentity, source: 
 export async function tracebackCheckinContributor(input: {
   result: MetricResultV1;
   contributorId: string;
-  source: CheckinSourceAdapter;
+  source: CheckinTracebackSourceAdapter;
 }): Promise<CheckinTracebackResultV1> {
   assertSupportedResult(input.result);
   const contributor = findContributor(input.result, input.contributorId);
