@@ -4,6 +4,7 @@ import NybilFormGate from './form-gate';
 import GarageNybilPrefillBridge from './garage-prefill-bridge';
 import GarageUpstreamContext from './garage-upstream-context';
 import GaragePicker from './garage-picker';
+import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './nybil-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
@@ -34,6 +35,8 @@ export default function NybilPage() {
           <Link className={styles.homeLink} href="/">Startsida</Link>
         </OperationalTopbarMeta>
       </header>
+
+      <OperationalNavigation active="/nybil" />
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>

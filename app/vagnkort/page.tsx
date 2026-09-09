@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import OperationalNavigation from '@/components/OperationalNavigation';
 import VagnkortClient from './vagnkort-client-loader';
 import OperationalStateBanner from './operational-state-banner';
 import styles from './vagnkort-shell.module.css';
@@ -27,6 +28,8 @@ export default function VagnkortPage() {
           <span className={styles.mode}>VAGNKORT</span>
         </div>
       </header>
+
+      <OperationalNavigation active="/vagnkort" />
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>

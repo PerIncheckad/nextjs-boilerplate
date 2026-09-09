@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import OperationalNavigation from '@/components/OperationalNavigation';
 import SaluDecisionClient from './salu-decision-client';
 import styles from './salu.module.css';
 
@@ -19,6 +20,9 @@ export default function SaluPage() {
         </div>
         <Link href="/" className={styles.back}>Till startsidan</Link>
       </header>
+
+      <OperationalNavigation active="/salu" />
+
       <SaluDecisionClient />
     </main>
   );
