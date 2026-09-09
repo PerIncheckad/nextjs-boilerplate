@@ -10,4 +10,3 @@ export * from './evaluators/checkin-completed-count';
 export * from './platform-service';
 export * from './evaluation-integrity';
 export * from './traceback';
-export * from './server-consumer';
