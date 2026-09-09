@@ -2,6 +2,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import {
+  latestCompletedDayInput,
+  latestCompletedMonthInput,
+  resolveCheckinReportPeriod,
+} from '../lib/reporting/checkin-report-period';
 
 const reportPagePath = path.join(process.cwd(), 'app', 'rapport', 'page.tsx');
 const periodHelperPath = path.join(process.cwd(), 'lib', 'reporting', 'checkin-report-period.ts');
@@ -35,6 +40,24 @@ test('RPT-04 period resolution delegates to canonical Stockholm day/month resolv
   for (const forbidden of ['All tid', 'Rullande 7 dagar', 'Rullande 30 dagar', 'Rullande år', 'YTD (2025)', 'Oktober 2025']) {
     assert.equal(reportSource.includes(forbidden), false, `Legacy period option must be removed: ${forbidden}`);
   }
+});
+
+test('RPT-04 defaults resolve the latest actually completed Stockholm period', () => {
+  assert.equal(latestCompletedDayInput(new Date('2026-09-09T21:30:00Z')), '2026-09-08');
+  assert.equal(latestCompletedDayInput(new Date('2026-09-09T22:30:00Z')), '2026-09-09');
+  assert.equal(latestCompletedMonthInput(new Date('2026-08-31T21:30:00Z')), '2026-07');
+  assert.equal(latestCompletedMonthInput(new Date('2026-08-31T22:30:00Z')), '2026-08');
+
+  const day = resolveCheckinReportPeriod('day', '2026-09-08');
+  assert.deepEqual(
+    { start: day.start, end: day.end, timezone: day.timezone, intervalSemantics: day.intervalSemantics },
+    {
+      start: '2026-09-07T22:00:00.000Z',
+      end: '2026-09-08T22:00:00.000Z',
+      timezone: 'Europe/Stockholm',
+      intervalSemantics: '[start,end)',
+    },
+  );
 });
 
 test('RPT-04 Check-in request is TOTAL and sends no dimension or location filters', () => {
