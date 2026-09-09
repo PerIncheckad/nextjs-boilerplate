@@ -25,22 +25,46 @@ export function isCompletedCheckinReportPeriod(period: CheckinReportPeriod, nowM
   return Date.parse(period.end) <= nowMs;
 }
 
-function localDateInput(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function dayInput(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function monthInput(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`;
 }
 
 export function latestCompletedDayInput(now = new Date()): string {
-  const date = new Date(now);
-  date.setDate(date.getDate() - 1);
-  return localDateInput(date);
+  const nowMs = now.getTime();
+
+  // Enumerate nearby calendar-date candidates only. The canonical Stockholm
+  // resolver decides which candidate period has actually closed, including DST.
+  for (let offsetDays = 0; offsetDays < 4; offsetDays += 1) {
+    const candidate = new Date(nowMs - offsetDays * 86_400_000);
+    const year = candidate.getUTCFullYear();
+    const month = candidate.getUTCMonth() + 1;
+    const day = candidate.getUTCDate();
+    const period = resolveStockholmDay(year, month, day);
+    if (isCompletedCheckinReportPeriod(period, nowMs)) return dayInput(year, month, day);
+  }
+
+  throw new Error('Kunde inte bestämma senaste avslutade Stockholm-dag');
 }
 
 export function latestCompletedMonthInput(now = new Date()): string {
-  const date = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
+  const nowMs = now.getTime();
+  const candidate = new Date(now);
+  candidate.setUTCDate(1);
+  candidate.setUTCHours(12, 0, 0, 0);
+
+  // As above, candidate enumeration is timezone-neutral. Completion is decided
+  // exclusively by resolveStockholmMonth(...).
+  for (let offsetMonths = 0; offsetMonths < 3; offsetMonths += 1) {
+    const year = candidate.getUTCFullYear();
+    const month = candidate.getUTCMonth() + 1;
+    const period = resolveStockholmMonth(year, month);
+    if (isCompletedCheckinReportPeriod(period, nowMs)) return monthInput(year, month);
+    candidate.setUTCMonth(candidate.getUTCMonth() - 1);
+  }
+
+  throw new Error('Kunde inte bestämma senaste avslutade Stockholm-månad');
 }
