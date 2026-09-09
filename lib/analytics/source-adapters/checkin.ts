@@ -13,6 +13,9 @@ export type CompletedCheckinObservation = {
 
 export type CheckinSourceAdapter = {
   readCompleted(period: CheckinMetricPeriod): Promise<readonly CompletedCheckinObservation[]>;
+};
+
+export type CheckinTracebackSourceAdapter = CheckinSourceAdapter & {
   readCanonicalById(id: string): Promise<CompletedCheckinObservation | null>;
 };
 
@@ -154,7 +157,7 @@ function createSupabaseCheckinPageSource(client: SupabaseClient): CheckinPageSou
   };
 }
 
-export function createSupabaseCheckinSourceAdapter(client: SupabaseClient, options: { pageSize?: number } = {}): CheckinSourceAdapter {
+export function createSupabaseCheckinSourceAdapter(client: SupabaseClient, options: { pageSize?: number } = {}): CheckinTracebackSourceAdapter {
   const pageSource = createSupabaseCheckinPageSource(client);
   return {
     readCompleted(period) {
