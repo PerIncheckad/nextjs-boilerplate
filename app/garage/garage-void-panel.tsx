@@ -103,7 +103,7 @@ export default function GarageVoidPanel() {
   return (
     <section className={styles.createPanel} aria-label="Makulera Garage-objekt">
       <div className={styles.panelTitle}>
-        <h2>Ta bort från aktiva Garaget</h2>
+        <h2 aria-label="Ta bort från aktiva Garaget">TA BORT FRÅN AKTIVA GARAGET</h2>
         <span>Makulering tar bort objektet ur den aktiva arbetsytan men lämnar källan och audit-historiken intakta.</span>
       </div>
       {error ? <div className={styles.error}>{error}</div> : null}
@@ -122,7 +122,7 @@ export default function GarageVoidPanel() {
                   disabled={busyId === item.garage_item_id}
                   onClick={() => void voidItem(item)}
                 >
-                  {busyId === item.garage_item_id ? 'Makulering…' : 'Ta bort'}
+                  {busyId === item.garage_item_id ? 'MAKULERAR…' : 'TA BORT'}
                 </button>
               ) : (
                 <span title={item.void_block_reason ?? undefined}>Låst</span>
