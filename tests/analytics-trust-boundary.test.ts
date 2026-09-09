@@ -142,10 +142,10 @@ test('traceback resolves exact contributor to exact canonical checkins.id', asyn
 
 test('traceback denies contributor without exact canonical source identity', async () => {
   const result = structuredClone(await metricResult());
-  result.evaluation.contributors[0] = {
-    ...result.evaluation.contributors[0],
-    sourceRecordId: '',
-  };
+  result.evaluation.contributors = [
+    { ...result.evaluation.contributors[0], sourceRecordId: '' },
+    ...result.evaluation.contributors.slice(1),
+  ];
   await assert.rejects(
     () => tracebackCheckinContributor({ result, contributorId: 'checkin-1', source: tracebackSource() }),
     (error: unknown) => error instanceof TracebackDeniedError && error.code === 'INVALID_SOURCE_IDENTITY',
@@ -164,7 +164,14 @@ test('traceback denies canonical source row whose completion provenance changed'
   );
 });
 
-test('unknown metric/version is denied by traceback boundary', async () => {
+test('unknown metric/version is denied by metric execution and traceback boundaries', async () => {
+  await assert.rejects(
+    () => evaluateMetric({
+      metricId: 'UNKNOWN_METRIC', metricVersion: 99, period, engineBuildSha: 'engine-sha-rpt03',
+    } as never, { checkin: metricSource() }),
+    /Unsupported metric execution/,
+  );
+
   const result = structuredClone(await metricResult());
   result.metricVersion = 99;
   await assert.rejects(
