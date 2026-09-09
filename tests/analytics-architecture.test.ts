@@ -43,10 +43,13 @@ test('Supabase dependency is confined to source adapter and authenticated server
 });
 
 test('runtime source query calls are confined to source adapters', () => {
-  const sourceAccess = [/\.from\s*\(/, /\.rpc\s*\(/];
+  const fromAccess = /\.from\s*\(/;
+  const rpcAccess = /\.rpc\s*\(/;
   for (const file of files(root).filter((candidate) => !isSourceAdapter(candidate))) {
     const source = fs.readFileSync(file, 'utf8');
-    for (const pattern of sourceAccess) assert.equal(pattern.test(source), false, `${path.relative(process.cwd(), file)} must not contain source/runtime query code`);
+    const sourceWithoutBufferFrom = source.replace(/\bBuffer\.from\s*\(/g, '');
+    assert.equal(fromAccess.test(sourceWithoutBufferFrom), false, `${path.relative(process.cwd(), file)} must not contain source/runtime query code`);
+    assert.equal(rpcAccess.test(source), false, `${path.relative(process.cwd(), file)} must not contain source/runtime query code`);
   }
 });
 
