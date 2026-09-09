@@ -59,6 +59,7 @@ export async function evaluateCheckinCompletedCount(
         sourceEntity: 'checkins',
         sourceRecordId: observation.id,
         sourceEventId: null,
+        sourceBusinessTimestamp: observation.completedAt,
       })),
     },
     value: n,
