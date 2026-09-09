@@ -54,7 +54,7 @@ test('Garage Core is the primary Garage image and does not reintroduce moved mod
 test('Nybil stays read-only in Garage and AVVECKLA work stays outside Garage after verified start', () => {
   assert.match(page, /Read-only status för Garage → Nybil/);
   assert.match(page, /fortsatt arbete sker i \/avveckla/);
-  assert.match(panel, /Öppna \{item\.next_owner\}/);
+  assert.match(panel, /ÖPPNA \{item\.next_owner\}/);
   assert.doesNotMatch(panel, /START_CASE/);
   assert.doesNotMatch(panel, /method:\s*['\"]POST['\"]/);
 });
