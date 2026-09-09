@@ -15,6 +15,10 @@ export type CheckinSourceAdapter = {
   readCompleted(period: CheckinMetricPeriod): Promise<readonly CompletedCheckinObservation[]>;
 };
 
+export type CheckinTracebackSourceAdapter = CheckinSourceAdapter & {
+  readCanonicalById(id: string): Promise<CompletedCheckinObservation | null>;
+};
+
 export type CheckinSourceReadErrorCode =
   | 'INVALID_PERIOD'
   | 'SOURCE_QUERY_FAILED'
@@ -153,11 +157,24 @@ function createSupabaseCheckinPageSource(client: SupabaseClient): CheckinPageSou
   };
 }
 
-export function createSupabaseCheckinSourceAdapter(client: SupabaseClient, options: { pageSize?: number } = {}): CheckinSourceAdapter {
+export function createSupabaseCheckinSourceAdapter(client: SupabaseClient, options: { pageSize?: number } = {}): CheckinTracebackSourceAdapter {
   const pageSource = createSupabaseCheckinPageSource(client);
   return {
     readCompleted(period) {
       return readCompletedCheckinsExhaustively(pageSource, period, options);
+    },
+
+    async readCanonicalById(id) {
+      if (!id) throw new CheckinSourceReadError('SOURCE_ROW_INVALID', 'Traceback requires exact checkins.id');
+      const { data, error } = await client
+        .from('checkins')
+        .select(SOURCE_FIELDS)
+        .eq('id', id)
+        .maybeSingle();
+
+      if (error) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', `Failed to read canonical Check-in ${id}`, { cause: error });
+      if (data == null) return null;
+      return normalizeRow(data);
     },
   };
 }
