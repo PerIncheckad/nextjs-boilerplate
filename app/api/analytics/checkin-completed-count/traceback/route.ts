@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
-  authorizeAnalyticsServerRequest,
   createSupabaseCheckinSourceAdapter,
   TracebackDeniedError,
   tracebackCheckinContributor,
   verifyMetricEvaluation,
   type SignedMetricEvaluationV1,
 } from '@/lib/analytics';
+import { authorizeAnalyticsServerRequest } from '@/lib/analytics/server-consumer';
 
 export const dynamic = 'force-dynamic';
 
