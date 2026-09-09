@@ -33,6 +33,11 @@ export class CheckinSourceReadError extends Error {
   }
 }
 
+export type CheckinPageSource = {
+  readExactCount(period: CheckinMetricPeriod): Promise<number>;
+  readPage(period: CheckinMetricPeriod, from: number, to: number): Promise<readonly unknown[]>;
+};
+
 const DEFAULT_PAGE_SIZE = 500;
 const SOURCE_FIELDS = 'id,status,completed_at';
 
@@ -63,94 +68,96 @@ function normalizeRow(row: unknown): CompletedCheckinObservation {
   return { id: String(raw.id), status: 'COMPLETED', completedAt: raw.completed_at };
 }
 
-async function readExactCount(client: SupabaseClient, period: CheckinMetricPeriod): Promise<number> {
-  const { count, error } = await client
-    .from('checkins')
-    .select('id', { count: 'exact', head: true })
-    .eq('status', 'COMPLETED')
-    .gte('completed_at', period.start)
-    .lt('completed_at', period.end);
-
-  if (error) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', 'Failed to count completed Check-ins', { cause: error });
-  if (count == null) throw new CheckinSourceReadError('SOURCE_COUNT_UNAVAILABLE', 'Exact Check-in source count is unavailable');
-  return count;
-}
-
-async function readPage(client: SupabaseClient, period: CheckinMetricPeriod, from: number, to: number, includeExactCount: boolean) {
-  const base = client.from('checkins');
-  const selected = includeExactCount
-    ? base.select(SOURCE_FIELDS, { count: 'exact' })
-    : base.select(SOURCE_FIELDS);
-
-  const { data, error, count } = await selected
-    .eq('status', 'COMPLETED')
-    .gte('completed_at', period.start)
-    .lt('completed_at', period.end)
-    .order('completed_at', { ascending: true })
-    .order('id', { ascending: true })
-    .range(from, to);
-
-  if (error) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', `Failed to read completed Check-ins range ${from}-${to}`, { cause: error });
-  if (!Array.isArray(data)) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', 'Check-in source returned no row array');
-  return { data, exactCount: count ?? null };
-}
-
-export function createSupabaseCheckinSourceAdapter(client: SupabaseClient, options: { pageSize?: number } = {}): CheckinSourceAdapter {
+export async function readCompletedCheckinsExhaustively(
+  source: CheckinPageSource,
+  period: CheckinMetricPeriod,
+  options: { pageSize?: number } = {},
+): Promise<readonly CompletedCheckinObservation[]> {
+  validatePeriod(period);
   const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
   if (!Number.isInteger(pageSize) || pageSize <= 0) throw new Error('Check-in source pageSize must be a positive integer');
 
+  const expectedCount = await source.readExactCount(period);
+  if (!Number.isSafeInteger(expectedCount) || expectedCount < 0) {
+    throw new CheckinSourceReadError('SOURCE_COUNT_UNAVAILABLE', 'Exact Check-in source count is unavailable');
+  }
+
+  const observations: CompletedCheckinObservation[] = [];
+  const seenIds = new Set<string>();
+
+  for (let offset = 0; offset < expectedCount; offset += pageSize) {
+    const expectedPageLength = Math.min(pageSize, expectedCount - offset);
+    const rows = await source.readPage(period, offset, offset + expectedPageLength - 1);
+    if (rows.length !== expectedPageLength) {
+      throw new CheckinSourceReadError(
+        'SOURCE_TRUNCATED_OR_CHANGED',
+        `Expected ${expectedPageLength} Check-in rows at offset ${offset}, received ${rows.length}`,
+      );
+    }
+
+    for (const raw of rows) {
+      const observation = normalizeRow(raw);
+      if (seenIds.has(observation.id)) {
+        throw new CheckinSourceReadError('DUPLICATE_OBSERVATION_ID', `Duplicate checkins.id in exhaustive source read: ${observation.id}`);
+      }
+      seenIds.add(observation.id);
+      observations.push(observation);
+    }
+  }
+
+  if (observations.length !== expectedCount) {
+    throw new CheckinSourceReadError('SOURCE_TRUNCATED_OR_CHANGED', `Expected ${expectedCount} Check-ins, assembled ${observations.length}`);
+  }
+
+  const finalCount = await source.readExactCount(period);
+  if (finalCount !== expectedCount) {
+    throw new CheckinSourceReadError(
+      'SOURCE_TRUNCATED_OR_CHANGED',
+      `Check-in population changed during exhaustive read: initial ${expectedCount}, final ${finalCount}`,
+    );
+  }
+
+  return observations;
+}
+
+function createSupabaseCheckinPageSource(client: SupabaseClient): CheckinPageSource {
   return {
-    async readCompleted(period) {
-      validatePeriod(period);
+    async readExactCount(period) {
+      const { count, error } = await client
+        .from('checkins')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'COMPLETED')
+        .gte('completed_at', period.start)
+        .lt('completed_at', period.end);
 
-      const first = await readPage(client, period, 0, pageSize - 1, true);
-      if (first.exactCount == null) {
-        throw new CheckinSourceReadError('SOURCE_COUNT_UNAVAILABLE', 'Exact Check-in source count is unavailable');
-      }
+      if (error) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', 'Failed to count completed Check-ins', { cause: error });
+      if (count == null) throw new CheckinSourceReadError('SOURCE_COUNT_UNAVAILABLE', 'Exact Check-in source count is unavailable');
+      return count;
+    },
 
-      const expectedCount = first.exactCount;
-      const observations: CompletedCheckinObservation[] = [];
-      const seenIds = new Set<string>();
+    async readPage(period, from, to) {
+      const { data, error } = await client
+        .from('checkins')
+        .select(SOURCE_FIELDS)
+        .eq('status', 'COMPLETED')
+        .gte('completed_at', period.start)
+        .lt('completed_at', period.end)
+        .order('completed_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to);
 
-      let offset = 0;
-      let page = first;
-      while (offset < expectedCount) {
-        const expectedPageLength = Math.min(pageSize, expectedCount - offset);
-        if (page.data.length !== expectedPageLength) {
-          throw new CheckinSourceReadError(
-            'SOURCE_TRUNCATED_OR_CHANGED',
-            `Expected ${expectedPageLength} Check-in rows at offset ${offset}, received ${page.data.length}`,
-          );
-        }
+      if (error) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', `Failed to read completed Check-ins range ${from}-${to}`, { cause: error });
+      if (!Array.isArray(data)) throw new CheckinSourceReadError('SOURCE_QUERY_FAILED', 'Check-in source returned no row array');
+      return data;
+    },
+  };
+}
 
-        for (const raw of page.data) {
-          const observation = normalizeRow(raw);
-          if (seenIds.has(observation.id)) {
-            throw new CheckinSourceReadError('DUPLICATE_OBSERVATION_ID', `Duplicate checkins.id in exhaustive source read: ${observation.id}`);
-          }
-          seenIds.add(observation.id);
-          observations.push(observation);
-        }
-
-        offset += page.data.length;
-        if (offset < expectedCount) {
-          page = await readPage(client, period, offset, offset + pageSize - 1, false);
-        }
-      }
-
-      if (observations.length !== expectedCount) {
-        throw new CheckinSourceReadError('SOURCE_TRUNCATED_OR_CHANGED', `Expected ${expectedCount} Check-ins, assembled ${observations.length}`);
-      }
-
-      const finalCount = await readExactCount(client, period);
-      if (finalCount !== expectedCount) {
-        throw new CheckinSourceReadError(
-          'SOURCE_TRUNCATED_OR_CHANGED',
-          `Check-in population changed during exhaustive read: initial ${expectedCount}, final ${finalCount}`,
-        );
-      }
-
-      return observations;
+export function createSupabaseCheckinSourceAdapter(client: SupabaseClient, options: { pageSize?: number } = {}): CheckinSourceAdapter {
+  const pageSource = createSupabaseCheckinPageSource(client);
+  return {
+    readCompleted(period) {
+      return readCompletedCheckinsExhaustively(pageSource, period, options);
     },
   };
 }
