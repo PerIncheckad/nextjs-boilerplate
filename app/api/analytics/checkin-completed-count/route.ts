@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import {
-  authorizeAnalyticsServerRequest,
   createSupabaseCheckinSourceAdapter,
   evaluateMetric,
   signMetricEvaluation,
 } from '@/lib/analytics';
+import { authorizeAnalyticsServerRequest } from '@/lib/analytics/server-consumer';
 
 export const dynamic = 'force-dynamic';
 
