@@ -1,7 +1,16 @@
 import { createHash } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { verifyApiUser } from '@/lib/server-auth';
+import { verifyApiUser, type VerifyApiUserResult } from '@/lib/server-auth';
 import type { AnalyticsPrincipal } from './evaluation-integrity';
+
+export type AnalyticsAccessDecision =
+  | { allowed: true; principal: AnalyticsPrincipal }
+  | {
+      allowed: false;
+      status: 401 | 403;
+      code: 'AUTHENTICATION_REQUIRED' | 'ACCESS_DENIED';
+      error: string;
+    };
 
 export type AnalyticsServerAccess =
   | {
@@ -18,6 +27,21 @@ export type AnalyticsServerAccess =
       error: string;
     };
 
+export function classifyAnalyticsVerification(verification: VerifyApiUserResult): AnalyticsAccessDecision {
+  if (!verification.ok) {
+    return {
+      allowed: false,
+      status: verification.status,
+      code: verification.status === 401 ? 'AUTHENTICATION_REQUIRED' : 'ACCESS_DENIED',
+      error: verification.error,
+    };
+  }
+  return {
+    allowed: true,
+    principal: { id: verification.user.id, email: verification.user.email.toLowerCase() },
+  };
+}
+
 function bearerToken(request: Request): string | null {
   const authorization = request.headers.get('authorization') || '';
   const match = authorization.match(/^Bearer\s+(.+)$/i);
@@ -32,13 +56,13 @@ function deriveEvaluationSecret(serviceRoleKey: string): string {
 }
 
 export async function authorizeAnalyticsServerRequest(request: Request): Promise<AnalyticsServerAccess> {
-  const verification = await verifyApiUser(request);
-  if (!verification.ok) {
+  const decision = classifyAnalyticsVerification(await verifyApiUser(request));
+  if (!decision.allowed) {
     return {
       ok: false,
-      status: verification.status,
-      code: verification.status === 401 ? 'AUTHENTICATION_REQUIRED' : 'ACCESS_DENIED',
-      error: verification.error,
+      status: decision.status,
+      code: decision.code,
+      error: decision.error,
     };
   }
 
@@ -67,7 +91,7 @@ export async function authorizeAnalyticsServerRequest(request: Request): Promise
 
   return {
     ok: true,
-    principal: { id: verification.user.id, email: verification.user.email },
+    principal: decision.principal,
     sourceClient,
     evaluationSecret: deriveEvaluationSecret(serviceRoleKey),
     engineBuildSha,
