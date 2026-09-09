@@ -122,7 +122,7 @@ revoke all on function public.guard_pending_legacy_manual_garage_ut_v1()
 
 drop trigger if exists garage_items_pending_legacy_manual_ut_guard_v1 on public.garage_items;
 create trigger garage_items_pending_legacy_manual_ut_guard_v1
-before insert on public.garage_items
+before insert or update of source_kind, garage_direction, regnr, source_regnr on public.garage_items
 for each row execute function public.guard_pending_legacy_manual_garage_ut_v1();
 
 -- The dedicated handoff table is a runtime read model plus canonical-writer
@@ -300,8 +300,6 @@ begin
       using errcode = 'P0001';
   end if;
 
-  -- Recheck exact source chronology under the canonical writer lock. The shared
-  -- helper above is the ownership definition; these row checks protect races.
   if not exists (
     select 1
     from public.vehicle_journey_periods p
@@ -550,7 +548,6 @@ begin
 end;
 $$;
 
--- Preserve existing function exposure while keeping DB authority in the RPC.
 revoke all on function public.void_garage_item(uuid,text,uuid) from public, anon, authenticated;
 grant execute on function public.void_garage_item(uuid,text,uuid) to service_role;
 
