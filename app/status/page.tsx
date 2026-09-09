@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
+import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './status-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
@@ -28,6 +29,8 @@ export default function StatusPage() {
           <Link className={styles.nextLink} href="/vagnkort">Vagnkort</Link>
         </OperationalTopbarMeta>
       </header>
+
+      <OperationalNavigation active="/status" />
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>

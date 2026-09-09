@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
+import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './ankomst-shell.module.css';
 import modalStyles from './ankomst-modal-cleanup.module.css';
@@ -29,6 +30,8 @@ export default function AnkomstPage() {
           <Link className={styles.nextLink} href="/check">Incheckning</Link>
         </OperationalTopbarMeta>
       </header>
+
+      <OperationalNavigation active="/ankomst" />
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>

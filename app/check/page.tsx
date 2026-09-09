@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import FormClient from './form-client';
+import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './check-shell.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
@@ -25,6 +26,8 @@ export default function CheckPage() {
         </div>
         <OperationalTopbarMeta mode="OPERATIV KONTROLL" />
       </header>
+
+      <OperationalNavigation active="/check" />
 
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
