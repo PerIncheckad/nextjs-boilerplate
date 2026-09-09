@@ -85,6 +85,7 @@ export type ContributorIdentity = {
   sourceEntity: string;
   sourceRecordId: string;
   sourceEventId?: string | null;
+  sourceBusinessTimestamp?: string | null;
 };
 
 export type EvaluationContract = {
