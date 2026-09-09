@@ -18,7 +18,7 @@ import {
   resolveStockholmDay,
   resolveStockholmMonth,
   type MetricResultV1,
-} from '../lib/analytics';
+} from '../lib/analytics/index';
 
 function result(overrides: Partial<MetricResultV1> = {}): MetricResultV1 {
   return {
