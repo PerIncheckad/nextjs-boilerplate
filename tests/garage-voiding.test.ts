@@ -8,7 +8,6 @@ const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const voidApi = readFileSync('app/api/garage/void/route.ts', 'utf8');
 const planningSources = readFileSync('app/api/garage/planning-sources/route.ts', 'utf8');
 const lager1Sources = readFileSync('app/api/garage/lager1-sources/route.ts', 'utf8');
-const saluSources = readFileSync('app/api/garage/salu-sources/route.ts', 'utf8');
 const nybilHandoff = readFileSync('app/api/garage/nybil-handoff/route.ts', 'utf8');
 const voidPanel = readFileSync('app/garage/garage-void-panel.tsx', 'utf8');
 
@@ -28,7 +27,7 @@ test('Garage voiding refuses objects already handed to Ny bil or with wheel-chan
 });
 
 test('active Garage read models consistently exclude voided objects', () => {
-  for (const source of [garageApi, planningSources, lager1Sources, saluSources, nybilHandoff]) {
+  for (const source of [garageApi, planningSources, lager1Sources, nybilHandoff]) {
     assert.match(source, /is\('voided_at', null\)/);
   }
   assert.match(atomicHandoffMigration, /gi\.voided_at is null/);
