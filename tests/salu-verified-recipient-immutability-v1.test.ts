@@ -52,7 +52,9 @@ test('D: void API exposes DB-derived capability and returns conflict for the DB 
   assert.match(voidApi, /void_allowed: !protectedRecipient/);
   assert.match(voidApi, /void_block_reason:/);
   assert.match(voidApi, /admin\.rpc\('void_garage_item'/);
-  assert.match(voidApi, /Verifierad SALU\|kan inte makuleras/);
+  assert.match(voidApi, /const VERIFIED_SALU_VOID_BLOCK_REASON = 'Verifierad SALU → Garage-mottagare kan inte makuleras genom generell Garage-makulering'/);
+  assert.match(voidApi, /const blocked = \/[^\n]*Verifierad SALU[^\n]*\/i\.test\(message\)/);
+  assert.match(voidApi, /const blocked = \/[^\n]*kan inte makuleras[^\n]*\/i\.test\(message\)/);
   assert.match(voidApi, /status: blocked \? 409 : 500/);
 });
 

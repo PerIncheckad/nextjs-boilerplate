@@ -16,6 +16,7 @@ function text(value: unknown): string | null {
 }
 
 const VERIFIED_SALU_VOID_BLOCK_REASON = 'Verifierad SALU → Garage-mottagare kan inte makuleras genom generell Garage-makulering';
+const VERIFIED_LEGACY_VOID_BLOCK_REASON = 'Verifierad LEGACY → Garage-mottagare kan inte makuleras genom generell Garage-makulering';
 
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
@@ -27,20 +28,29 @@ export async function GET(request: Request) {
   }
 
   const admin = adminClient();
-  const { data, error } = await admin.rpc('is_verified_salu_garage_recipient_v1', {
-    p_garage_item_id: garageItemId,
-  });
+  const [saluCapability, legacyCapability] = await Promise.all([
+    admin.rpc('is_verified_salu_garage_recipient_v1', { p_garage_item_id: garageItemId }),
+    admin.rpc('is_canonical_legacy_garage_recipient_v1', { p_garage_item_id: garageItemId }),
+  ]);
 
-  if (error) {
-    console.error('[garage/void] capability failed', error);
+  if (saluCapability.error || legacyCapability.error) {
+    console.error('[garage/void] capability failed', saluCapability.error ?? legacyCapability.error);
     return NextResponse.json({ error: 'Kunde inte verifiera makuleringsrätt' }, { status: 500 });
   }
 
-  const protectedRecipient = data === true;
+  const protectedSaluRecipient = saluCapability.data === true;
+  const protectedLegacyRecipient = legacyCapability.data === true;
+  const protectedRecipient = protectedSaluRecipient || protectedLegacyRecipient;
+  const blockReason = protectedSaluRecipient
+    ? VERIFIED_SALU_VOID_BLOCK_REASON
+    : protectedLegacyRecipient
+      ? VERIFIED_LEGACY_VOID_BLOCK_REASON
+      : null;
+
   return NextResponse.json({
     data: {
       void_allowed: !protectedRecipient,
-      void_block_reason: protectedRecipient ? VERIFIED_SALU_VOID_BLOCK_REASON : null,
+      void_block_reason: blockReason,
     },
   });
 }
@@ -69,7 +79,7 @@ export async function POST(request: Request) {
   if (error) {
     console.error('[garage/void] failed', error);
     const message = error.message || 'Kunde inte makulera Garage-objektet';
-    const blocked = /Ny bil|hjulskifteshistorik|permanent|Verifierad SALU|kan inte makuleras/i.test(message);
+    const blocked = /Ny bil|hjulskifteshistorik|permanent|Verifierad SALU|Verifierad LEGACY|kan inte makuleras/i.test(message);
     return NextResponse.json({ error: message }, { status: blocked ? 409 : 500 });
   }
 
