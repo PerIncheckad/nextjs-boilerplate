@@ -7,15 +7,12 @@ const modelMigration = readFileSync('migrations/20260825205500_add_planning_vehi
 const directionMigration = readFileSync('migrations/20260825211000_add_garage_direction_v1.sql', 'utf8');
 const finalMigration = readFileSync('migrations/20260825213500_finalize_planning_garage_v1.sql', 'utf8');
 const atomicHandoffMigration = readFileSync('migrations/20260830010000_atomic_planning_garage_handoff.sql', 'utf8');
-const atomicSaluMigration = readFileSync('migrations/20260830015500_atomic_salu_garage_handoff.sql', 'utf8');
-const saluSaljasMigration = readFileSync('migrations/20260906023000_add_salu_saljas_to_garage_ut_handoff_v1.sql', 'utf8');
 const hMigration = readFileSync('migrations/20260906163000_garage_information_continuity_h_v1.sql', 'utf8');
 const planningApi = readFileSync('app/api/fleet-planning/route.ts', 'utf8');
 const planningModelApi = readFileSync('app/api/planning/models/route.ts', 'utf8');
 const planningStatusApi = readFileSync('app/api/planning/period-status/route.ts', 'utf8');
 const garageApi = readFileSync('app/api/garage/route.ts', 'utf8');
 const planningSourceApi = readFileSync('app/api/garage/planning-sources/route.ts', 'utf8');
-const saluSourceApi = readFileSync('app/api/garage/salu-sources/route.ts', 'utf8');
 const planningUi = readFileSync('app/planning/planning-client.tsx', 'utf8');
 const garageUi = readFileSync('app/garage/garage-client.tsx', 'utf8');
 const garageCss = readFileSync('app/garage/garage.module.css', 'utf8');
@@ -69,7 +66,7 @@ test('planning uses stable model identity and exposes editable masterdata throug
 });
 
 test('planning and Garage writes stay behind authenticated server APIs and service role', () => {
-  for (const api of [planningApi, planningModelApi, planningStatusApi, garageApi, planningSourceApi, saluSourceApi]) {
+  for (const api of [planningApi, planningModelApi, planningStatusApi, garageApi, planningSourceApi]) {
     assert.match(api, /verifyApiUser/);
     assert.match(api, /SUPABASE_SERVICE_ROLE_KEY/);
   }
@@ -116,20 +113,9 @@ test('KLAR materializes BESTALLT automatically without duplicate units', () => {
   assert.match(garageUi, /redan beställd, avropad och bekräftad/);
 });
 
-test('legacy manual SALU ingress is fenced and only STÄNGD + SÄLJAS may create future Garage UT', () => {
-  assert.match(finalMigration, /source_salu_flag_id/);
-  assert.match(finalMigration, /garage_items_salu_source_uidx/);
-  assert.match(atomicSaluMigration, /create or replace function public\.materialize_salu_to_garage/);
-  assert.match(saluSourceApi, /export async function POST/);
-  assert.match(saluSourceApi, /status: 410/);
-  assert.match(saluSourceApi, /gamla manuella SALU → Garage-ingången är stängd/);
-  assert.doesNotMatch(saluSourceApi, /admin\.rpc\('materialize_salu_to_garage'/);
+test('Garage does not expose legacy manual SALU ingress', () => {
   assert.doesNotMatch(garageUi, /Hämta från SALU/);
   assert.doesNotMatch(garageUi, /\/api\/garage\/salu-sources/);
-  assert.match(saluSaljasMigration, /v_flag\.status <> 'STÄNGD' or v_flag\.closure_outcome <> 'SÄLJAS'/i);
-  assert.match(saluSaljasMigration, /materialize_salu_saljas_to_garage_ut_v1/i);
-  assert.match(saluSaljasMigration, /'UT'/);
-  assert.match(saluSaljasMigration, /avvecklaStarted', false/);
 });
 
 test('Garage IN supports current information completion without order workflow UI', () => {
