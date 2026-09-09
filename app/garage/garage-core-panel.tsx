@@ -97,18 +97,18 @@ export default function GarageCorePanel() {
           <p>Read-model för aktiva Garage-episoder. Visar staging, provenance och verifierade handslag — inte andra modulers arbetsinnehåll.</p>
         </div>
         <label className={styles.search}>
-          <span>Sök</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Reg.nr, källa, nästa ägare…" />
+          <span>SÖK</span>
+          <input aria-label="Sök" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Reg.nr, källa, nästa ägare…" />
         </label>
       </header>
 
       <div className={styles.summary}>
-        <button type="button" className={filter === 'ALLA' ? styles.activeFilter : ''} onClick={() => setFilter('ALLA')}><span>Aktiva</span><strong>{counts.active}</strong></button>
+        <button type="button" className={filter === 'ALLA' ? styles.activeFilter : ''} onClick={() => setFilter('ALLA')}><span>AKTIVA</span><strong>{counts.active}</strong></button>
         <button type="button" className={filter === 'IN' ? styles.activeFilter : ''} onClick={() => setFilter('IN')}><span>IN</span><strong>{counts.in}</strong></button>
         <button type="button" className={filter === 'UT' ? styles.activeFilter : ''} onClick={() => setFilter('UT')}><span>UT</span><strong>{counts.ut}</strong></button>
-        <div><span>Väntar / ej startad</span><strong>{counts.waiting}</strong></div>
-        <div><span>Pågår</span><strong>{counts.inProgress}</strong></div>
-        <div><span>Verifierade</span><strong>{counts.verified}</strong></div>
+        <div><span>VÄNTAR / EJ STARTAD</span><strong>{counts.waiting}</strong></div>
+        <div><span>PÅGÅR</span><strong>{counts.inProgress}</strong></div>
+        <div><span>VERIFIERADE</span><strong>{counts.verified}</strong></div>
       </div>
 
       {error ? <div className={styles.error}>{error}</div> : null}
@@ -147,7 +147,7 @@ export default function GarageCorePanel() {
                   {item.blockers.length > 0 ? item.blockers.map((blocker) => <strong key={blocker} className={styles.blocker}>{blocker}</strong>) : <strong>INGA VERIFIERADE BLOCKERARE</strong>}
                 </div>
                 <div className={styles.actions}>
-                  {item.module_href ? <Link href={item.module_href}>Öppna {item.next_owner} →</Link> : item.direction === 'UT' ? <a href="#avveckla-handoff">Starta handoff ↓</a> : null}
+                  {item.module_href ? <Link href={item.module_href} aria-label={`Öppna ${item.next_owner}`}>ÖPPNA {item.next_owner} →</Link> : item.direction === 'UT' ? <a href="#avveckla-handoff" aria-label="Starta handoff">STARTA HANDOFF ↓</a> : null}
                 </div>
               </div>
 
