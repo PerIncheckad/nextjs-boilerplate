@@ -5,3 +5,6 @@ export * from './comparison';
 export * from './time';
 export * from './authorization';
 export * from './fingerprint';
+export * from './source-adapters/checkin';
+export * from './evaluators/checkin-completed-count';
+export * from './platform-service';
