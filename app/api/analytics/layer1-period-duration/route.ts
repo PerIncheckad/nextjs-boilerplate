@@ -40,11 +40,6 @@ export async function POST(request: Request) {
       period: { start: period.start, end: period.end },
       engineBuildSha: access.engineBuildSha,
     }, {
-      checkin: {
-        readCompleted: async () => {
-          throw new Error('Check-in source is not available in Layer 1 consumer');
-        },
-      },
       layer1Period: createSupabaseLayer1PeriodSourceAdapter(access.sourceClient),
     });
 
