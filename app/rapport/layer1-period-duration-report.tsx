@@ -161,7 +161,7 @@ export default function Layer1PeriodDurationReport() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(240px, 2fr)', gap: 16, marginTop: 16, fontSize: 12, lineHeight: 1.55 }}>
         <div>
           Status: <strong>{result?.quality.maturity ?? (loading ? 'HÄMTAR' : 'EJ TILLGÄNGLIG')}</strong><br />
-          Coverage: <strong>{result?.quality.coverage == null ? 'saknar känd denominator' : result.quality.coverage}</strong>
+          Coverage: <strong>{result == null ? '—' : result.quality.coverage == null ? 'saknar känd denominator' : result.quality.coverage}</strong>
         </div>
         <div style={{ opacity: 0.68 }}>
           {resolvedPeriod ? <div>Vald period: {formatPeriodLabel(resolvedPeriod.start, periodType)}</div> : null}
