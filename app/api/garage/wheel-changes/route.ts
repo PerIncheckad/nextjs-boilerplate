@@ -117,7 +117,7 @@ async function readSoldRegnrs(admin: ReturnType<typeof createAdminClient>): Prom
 async function readTerminalUtRegnrs(admin: ReturnType<typeof createAdminClient>): Promise<Set<string>> {
   const { data, error } = await admin
     .from('garage_avveckla_events')
-    .select('garage_avveckla_cases!inner(regnr)')
+    .select('garage_avveckla_cases!garage_avveckla_events_avveckla_case_id_fkey!inner(regnr)')
     .eq('event_type', 'UT_OVERLAMNING_VERIFIERAD');
   if (error) throw error;
 
