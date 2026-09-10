@@ -185,9 +185,9 @@ export default function OperatorMetrics() {
           reliable={data?.interpretation.downtimeLeadTimeReliable ?? false}
         />
         <MeasureCard
-          title="Stängda perioder"
+          title="Perioder startade i driftfönstret"
           primary={formatHours(data?.leadTimes.closedPeriodAvgHours ?? null)}
-          secondary={`Median: ${formatHours(data?.leadTimes.closedPeriodMedianHours ?? null)}`}
+          secondary={`Operativ observation · urval via started_at · ej officiell Layer 1 completion-cohort metric · median ${formatHours(data?.leadTimes.closedPeriodMedianHours ?? null)}`}
           sample={`Stängda ${data?.sample.closedPeriods ?? 0} av ${data?.sample.periods ?? 0}`}
           reliable={(data?.sample.closedPeriods ?? 0) >= (data?.interpretation.minimumReliableSample ?? 10)}
         />
