@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import stationer from '../../data/stationer.json';
 import MediaModal from '@/components/MediaModal';
 import type { MetricResultV1 } from '@/lib/analytics/contracts';
+import Layer1PeriodDurationReport from './layer1-period-duration-report';
 import {
   isCompletedCheckinReportPeriod,
   latestCompletedDayInput,
@@ -354,6 +355,8 @@ export default function RapportPage() {
             </div>
           </div>
         </section>
+
+        <Layer1PeriodDurationReport />
 
         <section aria-labelledby="damage-journal-title">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', gap: 16, flexWrap: 'wrap', marginBottom: 12 }}>
