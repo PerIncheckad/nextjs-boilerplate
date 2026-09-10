@@ -33,7 +33,7 @@ export type Layer1DurationMetricEvaluationRequest = {
 export type MetricEvaluationRequest = CheckinMetricEvaluationRequest | Layer1DurationMetricEvaluationRequest;
 
 export type MetricPlatformSources = {
-  checkin: CheckinSourceAdapter;
+  checkin?: CheckinSourceAdapter;
   layer1Period?: Layer1PeriodSourceAdapter;
 };
 
@@ -43,6 +43,7 @@ export async function evaluateMetric(
   sources: MetricPlatformSources,
 ): Promise<MetricResultV1> {
   if (request.metricId === CHECKIN_COMPLETED_COUNT_METRIC_ID && request.metricVersion === CHECKIN_COMPLETED_COUNT_VERSION) {
+    if (!sources.checkin) throw new Error('Check-in source is required for CHECKIN_COMPLETED_COUNT v1');
     return evaluateCheckinCompletedCount({
       source: sources.checkin,
       period: request.period,
