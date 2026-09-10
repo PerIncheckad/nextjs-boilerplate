@@ -41,10 +41,21 @@ test('RPT-06 report consumes signed METRIC_RESULT_V1 without local KPI math', ()
   assert.match(reportSource, /result\?\.statistics\.p90/);
   assert.match(reportSource, /result\?\.statistics\.n/);
   assert.match(reportSource, /result\?\.quality\.maturity/);
-  assert.match(reportSource, /result\?\.quality\.coverage/);
+  assert.match(reportSource, /result\.quality\.coverage/);
   for (const forbidden of [/Math\.round/, /reduce\s*\(/, /mean\s*=/, /median\s*=/, /p90\s*=/, /payload\.durationHours/]) {
     assert.equal(forbidden.test(reportSource), false, `Report must not implement metric math: ${forbidden}`);
   }
+});
+
+test('RPT-06 coverage distinguishes no result from unknown denominator', () => {
+  assert.match(
+    reportSource,
+    /result == null \? '—' : result\.quality\.coverage == null \? 'saknar känd denominator' : result\.quality\.coverage/,
+  );
+  assert.doesNotMatch(
+    reportSource,
+    /result\?\.quality\.coverage == null \? 'saknar känd denominator'/,
+  );
 });
 
 test('RPT-06 report uses approved completed DAY/MONTH Stockholm period contract and TOTAL only', () => {
