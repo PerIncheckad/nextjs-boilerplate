@@ -34,7 +34,7 @@ export type MetricEvaluationRequest = CheckinMetricEvaluationRequest | Layer1Dur
 
 export type MetricPlatformSources = {
   checkin: CheckinSourceAdapter;
-  layer1Period: Layer1PeriodSourceAdapter;
+  layer1Period?: Layer1PeriodSourceAdapter;
 };
 
 /** Server-side platform boundary for explicitly approved metric execution only. */
@@ -53,6 +53,7 @@ export async function evaluateMetric(
   }
 
   if (request.metricId === LAYER1_PERIOD_DURATION_HOURS_METRIC_ID && request.metricVersion === LAYER1_PERIOD_DURATION_HOURS_VERSION) {
+    if (!sources.layer1Period) throw new Error('Layer 1 period source is required for LAYER1_PERIOD_DURATION_HOURS v1');
     return evaluateLayer1PeriodDurationHours({
       source: sources.layer1Period,
       period: request.period,
