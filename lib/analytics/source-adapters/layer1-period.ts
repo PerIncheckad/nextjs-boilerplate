@@ -49,10 +49,12 @@ const DEFAULT_PAGE_SIZE = 500;
 const SOURCE_FIELDS = 'period_id,period_type,started_at,ended_at,reason_code,source_system,source_entity,source_record_id,source_event_id';
 
 function validatePeriod(period: Layer1MetricPeriod) {
-  const startMs = Date.parse(period.start);
-  const endMs = Date.parse(period.end);
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || startMs >= endMs) {
-    throw new Layer1PeriodReadError('INVALID_PERIOD', 'Layer 1 metric period must have valid start < end');
+  try {
+    if (parseTimestampMicros(period.start) >= parseTimestampMicros(period.end)) {
+      throw new Error('start must be before end');
+    }
+  } catch (error) {
+    throw new Layer1PeriodReadError('INVALID_PERIOD', 'Layer 1 metric period must have valid microsecond-precise start < end', { cause: error });
   }
 }
 
