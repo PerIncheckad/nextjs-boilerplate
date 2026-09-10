@@ -1,0 +1,42 @@
+name: SEC-HF-02 lockfile regeneration
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate-lockfile:
+    if: github.head_ref == 'security/sec-hf-02-next-critical-patch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout hotfix branch
+        uses: actions/checkout@v4
+        with:
+          ref: security/sec-hf-02-next-critical-patch
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Regenerate package lock only
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Commit regenerated lockfile when changed
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "SEC-HF-02: regenerate package lock for Next.js 16.3.3"
+          git push origin HEAD:security/sec-hf-02-next-critical-patch
