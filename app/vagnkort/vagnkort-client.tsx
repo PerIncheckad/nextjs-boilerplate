@@ -6,6 +6,7 @@ import DocumentUpload from './document-upload';
 import EquipmentChangeControls from './equipment-change-controls';
 import JourneyMetricsPanel from './journey-metrics-panel';
 import JourneyPeriodControls from './journey-period-controls';
+import NybilBaselinePanel from './nybil-baseline-panel';
 import SaluJourneyPanel from './salu-journey-panel';
 
 type JourneyPeriod = {
@@ -101,6 +102,7 @@ type JourneyResponse = {
   found: boolean;
   regnr: string;
   identity: { brand: string | null; model: string | null };
+  baseline: Record<string, unknown> | null;
   equipment: { baseline: EquipmentState | null; current: EquipmentState | null; changes: EquipmentChange[] };
   damages: Damage[];
   journey: {
@@ -348,15 +350,17 @@ export default function VagnkortClient() {
               </section>
             </div>
 
+            <NybilBaselinePanel baseline={data.baseline} />
+
             <section style={card}>
-              <h2 style={{ marginTop: 0 }}>Utrustning – Nybil mot nu</h2>
-              {!equipmentDiffs.length ? <p>Jämförelseunderlag saknas.</p> : <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><th style={{ textAlign: 'left', padding: '.5rem' }}>Attribut</th><th style={{ textAlign: 'left', padding: '.5rem' }}>Nybil</th><th style={{ textAlign: 'left', padding: '.5rem' }}>Nu</th><th style={{ textAlign: 'left', padding: '.5rem' }}>Status</th></tr></thead><tbody>{equipmentDiffs.map((row) => <tr key={String(row.key)} style={{ background: row.changed ? '#fff2db' : undefined }}><td style={{ padding: '.55rem', borderTop: '1px solid #eee' }}>{row.label}</td><td style={{ padding: '.55rem', borderTop: '1px solid #eee' }}>{present(row.baseline)}</td><td style={{ padding: '.55rem', borderTop: '1px solid #eee' }}>{present(row.current)}</td><td style={{ padding: '.55rem', borderTop: '1px solid #eee', fontWeight: row.changed ? 700 : 400 }}>{row.changed ? 'Förändrat' : 'Oförändrat'}</td></tr>)}</tbody></table></div>}
+              <h2 style={{ marginTop: 0 }}>NU – SENAST VERIFIERADE LÄGE / UTRUSTNING</h2>
+              {!equipmentDiffs.length ? <p>Jämförelseunderlag saknas.</p> : <div style={{ overflowX: 'auto' }}><table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr><th style={{ textAlign: 'left', padding: '.5rem' }}>Attribut</th><th style={{ textAlign: 'left', padding: '.5rem' }}>Nybil-original</th><th style={{ textAlign: 'left', padding: '.5rem' }}>Nu</th><th style={{ textAlign: 'left', padding: '.5rem' }}>Status</th></tr></thead><tbody>{equipmentDiffs.map((row) => <tr key={String(row.key)} style={{ background: row.changed ? '#fff2db' : undefined }}><td style={{ padding: '.55rem', borderTop: '1px solid #eee' }}>{row.label}</td><td style={{ padding: '.55rem', borderTop: '1px solid #eee' }}>{present(row.baseline)}</td><td style={{ padding: '.55rem', borderTop: '1px solid #eee' }}>{present(row.current)}</td><td style={{ padding: '.55rem', borderTop: '1px solid #eee', fontWeight: row.changed ? 700 : 400 }}>{row.changed ? 'Förändrat' : 'Oförändrat'}</td></tr>)}</tbody></table></div>}
 
               <EquipmentChangeControls regnr={data.regnr} current={data.equipment.current} onChanged={() => setRefreshNonce((value) => value + 1)} />
 
               {data.equipment.changes.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
-                  <div style={{ fontWeight: 700, marginBottom: '.35rem' }}>Senaste dokumenterade förändringar</div>
+                  <div style={{ fontWeight: 700, marginBottom: '.35rem' }}>FÖRÄNDRINGAR – SENASTE VERIFIERADE HÄNDELSER</div>
                   {data.equipment.changes.slice(0, 8).map((change) => (
                     <div key={change.eventId} style={{ padding: '.5rem 0', borderTop: '1px solid #eee' }}>
                       <strong>{equipmentLabel(change.field)} → {present(change.value)}</strong>
