@@ -34,9 +34,39 @@ test('client roles cannot directly create or mutate membership facts', () => {
   assert.doesNotMatch(migration, /grant insert on public\.fleet_membership_facts/i);
 });
 
-test('source-event boundary is exactly-once and causal', () => {
+test('identity create is serialized on normalized keys with deterministic lock ordering', () => {
+  assert.match(migration, /create or replace function public\.lock_fleet_identity_keys/);
+  assert.match(migration, /pg_advisory_xact_lock\(hashtextextended\('FLEET_IDENTITY:' \|\| v_key, 0\)\)/);
+  assert.match(migration, /order by k\.identity_key/);
+  assert.match(migration, /perform public\.lock_fleet_identity_keys\(v_regnr, v_vin\)/);
+});
+
+test('ordinary identity create cannot implicitly bind an existing REGNR identity to a new VIN', () => {
+  assert.match(migration, /IDENTITY_BINDING_REQUIRED: existing canonical identity requires explicit verified alias binding/);
+  assert.match(migration, /IDENTITY_CONFLICT: VIN and registration number belong to different canonical identities/);
+  assert.match(migration, /create or replace function public\.bind_fleet_vehicle_identity_alias/);
+  assert.match(migration, /verified identity binding requires evidence or source-record provenance/);
+  assert.match(migration, /IDENTITY_CONFLICT: VIN is already bound to another canonical identity/);
+});
+
+test('source-event exactly-once retries require identical canonical payload', () => {
   assert.match(migration, /fleet_membership_facts_source_event_uidx/);
-  assert.match(migration, /source_system, source_entity, source_event_id/);
+  assert.match(migration, /FLEET_SOURCE_EVENT:/);
+  assert.match(migration, /SOURCE_EVENT_CONFLICT: source event id already exists with a different canonical payload/);
+  for (const field of [
+    'identity_id',
+    'membership_state',
+    'basis',
+    'effective_at',
+    'correction_of_fact_id',
+    'source_record_id',
+  ]) {
+    assert.match(migration, new RegExp(`v_existing_fact\\.${field} is not distinct from p_${field.replace('identity_id', 'identity_id').replace('membership_state', 'membership_state').replace('basis', 'basis').replace('effective_at', 'effective_at').replace('correction_of_fact_id', 'correction_of_fact_id').replace('source_record_id', 'source_record_id')}`));
+  }
+  assert.match(migration, /v_existing_predecessor_ids = v_supplied_ids/);
+});
+
+test('source-event boundary remains causal', () => {
   assert.match(migration, /ENTRY predecessor is not current canonical head/);
   assert.match(migration, /EXIT predecessor is not current canonical head/);
   assert.match(migration, /ENTRY effective_at predates current canonical head/);
@@ -65,7 +95,9 @@ test('correction is append-only and supersedes all current heads', () => {
   assert.match(migration, /fleet_membership_fact_predecessors/);
 });
 
-test('foundation exposes service-role read contract but no consumer integration', () => {
+test('foundation exposes controlled service-role boundaries but no consumer integration', () => {
+  assert.match(migration, /grant execute on function public\.create_fleet_vehicle_identity[\s\S]*to service_role/);
+  assert.match(migration, /grant execute on function public\.bind_fleet_vehicle_identity_alias[\s\S]*to service_role/);
   assert.match(migration, /create or replace function public\.get_fleet_membership/);
   assert.match(migration, /grant execute on function public\.get_fleet_membership\(text,text\) to service_role/);
   assert.doesNotMatch(migration, /tower|wheel.change|hjulskifte/i);
