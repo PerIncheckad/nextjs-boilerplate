@@ -12,81 +12,71 @@ This foundation implements the locked platform contract for canonical `OWN_FLEET
 - canonical vehicle identity with VIN and registration aliases
 - deterministic causal predecessor chain
 - unresolved `UNKNOWN` with explicit `resolution_reason`
-- source-event idempotency boundary
+- source-event exactly-once boundary
 - service-role controlled write/read boundary.
 
-It does **not** implement:
-
-- manual T0 bootstrap
-- completeness attestation
-- bootstrap data
-- Nybil membership write-through
-- AVVECKLA membership write-through
-- Tower consumption
-- Hjulskifte consumption
-- changes to operational-state semantics.
+It does **not** implement manual T0 bootstrap, completeness attestation, bootstrap data, Nybil/AVVECKLA membership write-through, Tower/Hjulskifte consumption or changes to operational-state semantics.
 
 ## Physical schema
 
 ### `fleet_vehicle_identities`
-
 Canonical identity anchor for `OWN_FLEET` vehicles.
 
 ### `fleet_vehicle_identity_aliases`
-
-Append-only identity evidence:
-
-- `VIN` is globally unique when verified.
-- `REGNR` is not globally unique because registration numbers may change or later be reused.
+Append-only identity evidence. `VIN` is globally unique when verified. `REGNR` is intentionally not globally unique because registration numbers may change or later be reused.
 
 ### `fleet_membership_facts`
+Append-only membership facts with state, basis, effective/verified time, source identity, actor/evidence and optional correction target.
 
-Append-only membership facts with:
+### `fleet_membership_fact_predecessors`
+Explicit causal edges between canonical facts. Normal transitions supersede one canonical head; `CORRECTION` may supersede all heads when resolving a real branch/conflict.
 
+## Integrity lock 1 — identity binding + conflict
+
+`create_fleet_vehicle_identity(...)` is create/resolve only. It may reuse an already matching VIN-only or REGNR-only identity, and it may create a brand-new identity when the supplied verified keys are both new. It must never silently merge an existing REGNR identity with a later VIN or an existing VIN identity with a later REGNR.
+
+If both supplied aliases already resolve and point to different identities, the operation rejects with `IDENTITY_CONFLICT`. If one supplied alias resolves and the other is new, ordinary create/resolve rejects with `IDENTITY_BINDING_REQUIRED`.
+
+Explicit later binding is a separate operation:
+
+`bind_fleet_vehicle_identity_alias(...)`
+
+It requires source/evidence provenance and appends new alias evidence without rewriting prior REGNR-only provenance. A VIN already bound to another canonical identity rejects with `IDENTITY_CONFLICT`. REGNR remains reusable over time by design.
+
+## Integrity lock 2 — source-event payload exactly-once
+
+`(source_system, source_entity, source_event_id)` identifies one canonical event payload, not merely one database row.
+
+`append_fleet_membership_fact(...)` serializes retries on the source-event key. An exact retry returns the existing `fact_id` only when the canonical payload still matches, including:
+
+- `identity_id`
 - `membership_state`
 - `basis`
 - `effective_at`
-- `verified_at`
-- source identity
-- actor/evidence
-- optional `correction_of_fact_id`.
+- `correction_of_fact_id`
+- `source_record_id`
+- predecessor set.
 
-### `fleet_membership_fact_predecessors`
+A reused source-event ID with a different canonical payload rejects with explicit `SOURCE_EVENT_CONFLICT`.
 
-Explicit causal edges between canonical facts. A normal transition supersedes one canonical head. A `CORRECTION` may supersede all heads when resolving a real branch/conflict.
+## Integrity lock 3 — identity creation serialization
 
-## Write boundary
+Identity resolution/creation uses transaction-scoped PostgreSQL advisory locks derived from normalized keys:
 
-`create_fleet_vehicle_identity(...)`
+- `REGNR:<normalized-regnr>`
+- `VIN:<normalized-vin>`.
 
-Creates/resolves an identity from verified VIN and/or registration evidence.
+When both keys are present they are acquired in deterministic lexical order. This serializes the decision to reuse or create even when no identity row exists yet, preventing first-create forks and avoiding inconsistent VIN/REGNR cross-binding races.
 
-`append_fleet_membership_fact(...)`
-
-Serializes on the identity row, validates the supplied predecessor against the current canonical head(s), enforces transition semantics and rejects older effective events that would overwrite a later canonical state.
-
-Source-driven facts use `(source_system, source_entity, source_event_id)` as exactly-once idempotency anchor.
-
-No `anon` or `authenticated` role can call these writers or directly insert canonical facts. `service_role` can execute the controlled functions but has no direct INSERT/UPDATE/DELETE grant on the canonical relations.
+VIN also retains its unique index as a final invariant.
 
 ## Append-only enforcement
 
-DB triggers reject direct `UPDATE` and `DELETE` on:
-
-- identities
-- aliases
-- membership facts
-- predecessor edges.
-
-Canonical history can only advance by additional facts.
+DB triggers reject direct `UPDATE` and `DELETE` on identities, aliases, membership facts and predecessor edges. Canonical history can only advance by new append-only evidence/facts.
 
 ## Read contract
 
-`get_fleet_membership(regnr, vin)` returns one canonical answer.
-
-Resolved identity with one canonical head returns the fact-backed state and provenance.
-
-Unresolved conditions return `UNKNOWN` without fabricating a fact:
+`get_fleet_membership(regnr, vin)` returns one canonical answer. Resolved identity with one canonical head returns the fact-backed state and provenance. Unresolved conditions return `UNKNOWN` without fabricating a fact:
 
 - `NO_FACT`
 - `IDENTITY_CONFLICT`
@@ -96,37 +86,18 @@ For unresolved results, `membership_fact_id`, source and evidence may be null.
 
 ## Causal ordering
 
-`verified_at` is audit metadata only and never defines precedence.
+`verified_at` is audit metadata only and never defines precedence. Current state is determined by the causal predecessor graph. An older late-arriving event is rejected when its `effective_at` predates the current canonical head. Legitimate `ENTRY → EXIT → ENTRY` requires explicit predecessor chaining.
 
-The current state is determined by the causal predecessor graph.
+## Security boundary
 
-An older late-arriving event is rejected when its `effective_at` predates the current canonical head. Legitimate `ENTRY → EXIT → ENTRY` requires explicit predecessor chaining.
+No `anon` or `authenticated` role can call the canonical writers or directly insert canonical facts. `service_role` can execute the controlled create/bind/fact/read functions but has no direct INSERT/UPDATE/DELETE grant on canonical relations. The low-level advisory-lock helper is not executable by client roles or `service_role` directly.
 
-## PostgreSQL rollback acceptance
+## Acceptance requirement
 
-The migration contract was executed transactionally against the real Production PostgreSQL database with functional assertions and an explicit final `ROLLBACK`.
+Before merge the complete migration must be executed transactionally against real PostgreSQL with a final `ROLLBACK`. Acceptance must cover the full original foundation suite plus the three integrity hardening locks, including real concurrent first-create calls for REGNR and VIN and concurrent mixed VIN+REGNR resolution.
 
-Verified in that rollback transaction:
-
-- no fact → `UNKNOWN / NO_FACT`
-- registration-only identity
-- baseline `ACTIVE`
-- `ACTIVE → EXIT → INACTIVE`
-- late older `ENTRY` rejected
-- `INACTIVE → explicit ENTRY → ACTIVE`
-- duplicate source event returns the same fact
-- no membership triggers on ordinary Check-in/Status/Rental sources
-- direct UPDATE rejected
-- direct DELETE rejected
-- real branch → `UNKNOWN / FACT_CONFLICT`
-- `CORRECTION` resolves the branch without mutating original facts
-- VIN/registration conflict → `UNKNOWN / IDENTITY_CONFLICT`
-- `anon`, `authenticated` and `service_role` have no direct INSERT grant on facts.
-
-After rollback, all four foundation relations were verified absent from Production.
+Production must remain unchanged after rollback.
 
 ## Consumer boundary
 
-This foundation is not a fleet denominator and must not be consumed fleet-wide yet.
-
-Tower and Hjulskifte remain unchanged until later locked rollout steps.
+This foundation is not a fleet denominator and must not be consumed fleet-wide yet. Tower and Hjulskifte remain unchanged until later locked rollout steps.
