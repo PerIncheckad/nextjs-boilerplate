@@ -62,6 +62,15 @@ jobs:
           PGDATABASE: postgres
         run: bash scripts/test-canonical-fleet-membership-postgres.sh
 
+      - name: Canonical fleet bootstrap PostgreSQL acceptance
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-canonical-fleet-bootstrap-postgres.sh
+
       - name: Production build
         run: npm run build
 
