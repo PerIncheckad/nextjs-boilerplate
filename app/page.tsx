@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { CORE_NAVIGATION_ITEMS } from '@/components/product-navigation-contract';
+import { OPERATIONAL_NAVIGATION_ITEMS } from '@/components/operational-navigation-contract';
 import styles from './home.module.css';
 
 export const metadata: Metadata = {
@@ -8,21 +10,11 @@ export const metadata: Metadata = {
   description: 'Operativ plattform',
 };
 
-const coreModules = [
-  { href: '/tower', label: 'Tower', detail: 'Operativ uppmärksamhet och kontroll', index: '01' },
-  { href: '/planning', label: 'Planering', detail: 'Beslut, behov och handslag', index: '02' },
-  { href: '/garage', label: 'GARAGET', detail: 'Orderflöde och kontrollpunkter', index: '03' },
-];
-
-const operationModules = [
-  { href: '/ankomst', label: 'Ankomst' },
-  { href: '/check', label: 'Incheckning' },
-  { href: '/nybil', label: 'Ny bil' },
-  { href: '/inhyrd', label: 'INHYRD' },
-  { href: '/status', label: 'Status' },
-  { href: '/salu', label: 'SALU' },
-  { href: '/vagnkort', label: 'Vagnkort' },
-];
+const coreDetails = {
+  '/tower': { detail: 'Operativ uppmärksamhet och kontroll', index: '01' },
+  '/planning': { detail: 'Beslut, behov och handslag', index: '02' },
+  '/garage': { detail: 'Orderflöde och kontrollpunkter', index: '03' },
+} as const;
 
 export default function HomePage() {
   return (
@@ -57,29 +49,36 @@ export default function HomePage() {
             <p>Välj var arbetet börjar.</p>
           </div>
 
-          <nav className={styles.coreNav}>
-            {coreModules.map((item) => (
-              <Link href={item.href} key={item.href} className={styles.coreLink}>
-                <span className={styles.index}>{item.index}</span>
-                <span className={styles.coreCopy}>
-                  <strong>{item.label}</strong>
-                  <small>{item.detail}</small>
-                </span>
-                <span className={styles.arrow} aria-hidden="true">↗</span>
-              </Link>
+          <nav className={styles.coreNav} aria-label="CORE">
+            {CORE_NAVIGATION_ITEMS.map((item) => {
+              const meta = coreDetails[item.href];
+              return (
+                <Link href={item.href} key={item.href} className={styles.coreLink}>
+                  <span className={styles.index}>{meta.index}</span>
+                  <span className={styles.coreCopy}>
+                    <strong>{item.label}</strong>
+                    <small>{meta.detail}</small>
+                  </span>
+                  <span className={styles.arrow} aria-hidden="true">↗</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </section>
+
+        <section className={styles.operational} aria-label="OPERATIVT">
+          <div className={styles.sectionIntro}>
+            <span>OPERATIVT</span>
+            <p>Arbetsytor för bilen här och nu.</p>
+          </div>
+          <nav className={styles.operationNav} aria-label="Operativa arbetsytor">
+            {OPERATIONAL_NAVIGATION_ITEMS.map((item) => (
+              <Link href={item.href} key={item.href}>{item.label}</Link>
             ))}
           </nav>
         </section>
 
         <footer className={styles.footer}>
-          <div className={styles.operationLabel}>
-            <span>OPERATIVT</span>
-          </div>
-          <nav className={styles.operationNav} aria-label="Operativa arbetsytor">
-            {operationModules.map((item) => (
-              <Link href={item.href} key={item.href}>{item.label}</Link>
-            ))}
-          </nav>
           <span className={styles.footerMark}>MABISYD MOBILITY / ALBARONE</span>
         </footer>
       </section>

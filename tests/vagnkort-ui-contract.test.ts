@@ -22,6 +22,9 @@ const equipmentControls = read('app/vagnkort/equipment-change-controls.tsx');
 const equipmentApi = read('app/api/vehicle-journey/equipment/route.ts');
 const journeyApi = read('app/api/vehicle-journey/route.ts');
 const home = read('app/page.tsx');
+const operationalNavigationContract = read(
+  'components/operational-navigation-contract.ts'
+);
 
 function matches(source: string, patterns: RegExp[]) {
   for (const pattern of patterns) assert.match(source, pattern);
@@ -107,5 +110,10 @@ test('vehicle journey read model overlays latest equipment event without overwri
 });
 
 test('start page exposes Vagnkort and Status through the operational module registry', () => {
-  matches(home, [/href:\s*'\/vagnkort'/, /label:\s*'Vagnkort'/, /href:\s*'\/status'/, /label:\s*'Status'/]);
+  assert.match(home, /OPERATIONAL_NAVIGATION_ITEMS\.map/);
+
+  matches(operationalNavigationContract, [
+    /\{\s*href:\s*'\/vagnkort',\s*label:\s*'VAGNKORT'\s*\}/,
+    /\{\s*href:\s*'\/status',\s*label:\s*'STATUS'\s*\}/,
+  ]);
 });

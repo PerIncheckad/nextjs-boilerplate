@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import ui from '@/components/inner-ui-contract.module.css';
 
 type Preflight = {
   regnr: string;
@@ -27,13 +28,6 @@ type Result = {
   registered_by_email: string;
   historical_backfill: false;
 };
-
-const shell: React.CSSProperties = { width: '100%', margin: 0, padding: 14, border: '1px solid #d7d7d7', borderRadius: 8, background: '#fff', boxSizing: 'border-box' };
-const row: React.CSSProperties = { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end' };
-const input: React.CSSProperties = { padding: '8px 9px', border: '1px solid #cfcfcf', borderRadius: 6, fontSize: 13, minWidth: 180 };
-const button: React.CSSProperties = { padding: '8px 11px', border: '1px solid #b8b8b8', borderRadius: 6, background: '#fff', cursor: 'pointer', fontWeight: 800 };
-const primary: React.CSSProperties = { ...button, background: '#111', color: '#fff', borderColor: '#111' };
-const card: React.CSSProperties = { marginTop: 10, padding: 10, border: '1px solid #e3e3e3', borderRadius: 7, background: '#fafafa', fontSize: 13 };
 
 function cleanRegnr(value: string) { return value.toUpperCase().replace(/\s+/g, '').slice(0, 6); }
 
@@ -96,43 +90,67 @@ export default function RentedInIntakePanel() {
 
   const stationReady = preflight?.stationScope === 'ALL' ? Boolean(intakeStation) : Boolean(preflight?.station);
 
-  return <section style={shell} aria-label="INHYRD snabbintag">
-    <div>
-      <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '.06em' }}>INHYRD / EXTERNT FORDON</div>
-      <h2 style={{ margin: '2px 0 0', fontSize: 24 }}>INHYRD / SNABBINTAG</h2>
-      <p style={{ margin: '4px 0 0', color: '#50565a', fontSize: 14 }}><strong>Objektet registreras från intagstidpunkten. Ingen historik bakåt eller operativ status skapas.</strong></p>
-    </div>
-    {error ? <div style={{ marginTop: 10, padding: 9, borderRadius: 6, background: '#fff1f1', color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
-    <div style={{ ...row, marginTop: 10 }}>
-      <label><span style={{ display: 'block', fontWeight: 800 }}>Registreringsnummer</span><input style={input} value={regnr} onChange={(e) => setRegnr(cleanRegnr(e.target.value))} placeholder="ABC123" /></label>
-      <button type="button" style={button} disabled={busy || regnr.length !== 6} onClick={() => void load()}>Läs kontrollbild</button>
-    </div>
-    {preflight ? <div style={card}>
-      <div><strong>{preflight.regnr}</strong></div>
-      <div>Stationsbehörighet: <strong>{preflight.stationScope ?? 'SAKNAS I MEDARBETARPROFIL'}</strong></div>
-      {preflight.stationScope === 'SINGLE' ? <div>Station: <strong>{preflight.station ?? 'SAKNAS'}</strong> · sätts av systemet</div> : null}
-      {preflight.stationScope === 'ALL' ? <div>Station: <strong>väljs per intag från godkända huvudorter</strong> · valideras av servern</div> : null}
-      <div>INHYRD: {preflight.intake ? 'Redan registrerad' : 'Ingen tidigare registrering'}</div>
-      <div>LEGACY: {preflight.legacy ? 'Konflikt – redan egen LEGACY' : 'Ingen LEGACY-klassificering'}</div>
-      <div>Aktuell Layer1: {preflight.currentPeriod ? `${preflight.currentPeriod.period_type} sedan ${new Date(preflight.currentPeriod.started_at).toLocaleString('sv-SE')}` : 'Ingen öppen period'}</div>
-    </div> : null}
-    {preflight && !preflight.intake && !preflight.legacy ? <div style={{ ...card, background: '#fff' }}>
-      <div style={row}>
-        {preflight.stationScope === 'ALL' ? <label><span style={{ display: 'block', fontWeight: 800 }}>Intagsstation</span><select style={input} value={intakeStation} onChange={(e) => setIntakeStation(e.target.value)}><option value="">Välj huvudort</option>{preflight.allowedStations.map((station) => <option key={station} value={station}>{station}</option>)}</select></label> : null}
-        <label><span style={{ display: 'block', fontWeight: 800 }}>Märke</span><input style={input} value={brand} onChange={(e) => setBrand(e.target.value)} /></label>
-        <label><span style={{ display: 'block', fontWeight: 800 }}>Modell</span><input style={input} value={model} onChange={(e) => setModel(e.target.value)} /></label>
-        <label><span style={{ display: 'block', fontWeight: 800 }}>Km</span><input style={input} type="number" min="0" step="1" value={odometerKm} onChange={(e) => setOdometerKm(e.target.value)} /></label>
-        <label style={{ flex: '1 1 320px' }}><span style={{ display: 'block', fontWeight: 800 }}>Kända skador</span><input style={{ ...input, width: '100%', boxSizing: 'border-box' }} value={knownDamages} onChange={(e) => setKnownDamages(e.target.value)} placeholder="Beskriv eller skriv INGA KÄNDA" /></label>
-        <button type="button" style={primary} disabled={busy || !stationReady} onClick={() => void submit()}>Registrera INHYRD</button>
+  return (
+    <section className={ui.panel} aria-label="INHYRD snabbintag">
+      <div className={ui.panelHeader}>
+        <span className={ui.eyebrow}>INHYRD / EXTERNT FORDON</span>
+        <h2 className={ui.title}>INHYRD / SNABBINTAG</h2>
+        <p className={ui.description}><strong>Objektet registreras från intagstidpunkten. Ingen historik bakåt eller operativ status skapas.</strong></p>
       </div>
-    </div> : null}
-    {result ? <div style={{ ...card, background: '#f6fff7' }}>
-      <strong>INHYRD registrerad</strong>
-      <div>{result.regnr} · {result.brand} {result.model} · {result.odometer_km} km</div>
-      <div>Station: {result.station}</div>
-      <div>Registrerad: {new Date(result.registered_at).toLocaleString('sv-SE')} · {result.registered_by_email}</div>
-      <div>Kända skador: {result.known_damages}</div>
-      <div>historicalBackfill: false · ingen Layer1-status skapad</div>
-    </div> : null}
-  </section>;
+
+      {error ? <div className={ui.statusError}>{error}</div> : null}
+
+      <div className={ui.formRow}>
+        <label className={ui.field}>
+          <span className={ui.fieldLabel}>Registreringsnummer</span>
+          <input className={ui.input} value={regnr} onChange={(event) => setRegnr(cleanRegnr(event.target.value))} placeholder="ABC123" />
+        </label>
+        <button type="button" className={ui.button} disabled={busy || regnr.length !== 6} onClick={() => void load()}>Läs kontrollbild</button>
+      </div>
+
+      {preflight ? (
+        <div className={ui.card}>
+          <div><strong>{preflight.regnr}</strong></div>
+          <div>Stationsbehörighet: <strong>{preflight.stationScope ?? 'SAKNAS I MEDARBETARPROFIL'}</strong></div>
+          {preflight.stationScope === 'SINGLE' ? <div>Station: <strong>{preflight.station ?? 'SAKNAS'}</strong> · sätts av systemet</div> : null}
+          {preflight.stationScope === 'ALL' ? <div>Station: <strong>väljs per intag från godkända huvudorter</strong> · valideras av servern</div> : null}
+          <div>INHYRD: {preflight.intake ? 'Redan registrerad' : 'Ingen tidigare registrering'}</div>
+          <div>LEGACY: {preflight.legacy ? 'Konflikt – redan egen LEGACY' : 'Ingen LEGACY-klassificering'}</div>
+          <div>Aktuell Layer1: {preflight.currentPeriod ? `${preflight.currentPeriod.period_type} sedan ${new Date(preflight.currentPeriod.started_at).toLocaleString('sv-SE')}` : 'Ingen öppen period'}</div>
+        </div>
+      ) : null}
+
+      {preflight && !preflight.intake && !preflight.legacy ? (
+        <div className={`${ui.card} ${ui.cardForm}`}>
+          <div className={ui.formRow}>
+            {preflight.stationScope === 'ALL' ? (
+              <label className={ui.field}>
+                <span className={ui.fieldLabel}>Intagsstation</span>
+                <select className={ui.select} value={intakeStation} onChange={(event) => setIntakeStation(event.target.value)}>
+                  <option value="">Välj huvudort</option>
+                  {preflight.allowedStations.map((station) => <option key={station} value={station}>{station}</option>)}
+                </select>
+              </label>
+            ) : null}
+            <label className={ui.field}><span className={ui.fieldLabel}>Märke</span><input className={ui.input} value={brand} onChange={(event) => setBrand(event.target.value)} /></label>
+            <label className={ui.field}><span className={ui.fieldLabel}>Modell</span><input className={ui.input} value={model} onChange={(event) => setModel(event.target.value)} /></label>
+            <label className={ui.field}><span className={ui.fieldLabel}>Km</span><input className={ui.input} type="number" min="0" step="1" value={odometerKm} onChange={(event) => setOdometerKm(event.target.value)} /></label>
+            <label className={`${ui.field} ${ui.fieldGrow}`}><span className={ui.fieldLabel}>Kända skador</span><input className={ui.input} value={knownDamages} onChange={(event) => setKnownDamages(event.target.value)} placeholder="Beskriv eller skriv INGA KÄNDA" /></label>
+            <button type="button" className={ui.primaryButton} disabled={busy || !stationReady} onClick={() => void submit()}>Registrera INHYRD</button>
+          </div>
+        </div>
+      ) : null}
+
+      {result ? (
+        <div className={`${ui.card} ${ui.statusSuccess}`}>
+          <strong>INHYRD registrerad</strong>
+          <div>{result.regnr} · {result.brand} {result.model} · {result.odometer_km} km</div>
+          <div>Station: {result.station}</div>
+          <div>Registrerad: {new Date(result.registered_at).toLocaleString('sv-SE')} · {result.registered_by_email}</div>
+          <div>Kända skador: {result.known_damages}</div>
+          <div>historicalBackfill: false · ingen Layer1-status skapad</div>
+        </div>
+      ) : null}
+    </section>
+  );
 }
