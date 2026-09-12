@@ -46,9 +46,9 @@
 
 .compact .desktopNavigation {
   min-height: 42px;
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 clamp(16px, 3vw, 40px);
+  padding: 0 clamp(18px, 3vw, 40px);
 }
 
 .compact .links a {
@@ -152,7 +152,7 @@
 
   .compact .mobileNavigation {
     display: block;
-    max-width: 1180px;
+    max-width: 1440px;
     margin: 0 auto;
     padding: 0 clamp(12px, 3vw, 24px);
   }
