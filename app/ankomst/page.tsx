@@ -4,6 +4,7 @@ import FormClient from './form-client';
 import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './ankomst-shell.module.css';
+import contractStyles from '../operational-ui-contract-v1.module.css';
 import modalStyles from './ankomst-modal-cleanup.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 import actionStyles from '../operational-action-contract.module.css';
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function AnkomstPage() {
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} ${contractStyles.shell}`}>
       <header className={styles.topbar}>
         <Link className={styles.backLink} href="/">← Startsida</Link>
 
@@ -33,7 +34,7 @@ export default function AnkomstPage() {
 
       <OperationalNavigation active="/ankomst" />
 
-      <section className={styles.hero}>
+      <section className={`${styles.hero} ${contractStyles.hero}`}>
         <div className={styles.heroCopy}>
           <span>INCHECKAD CORE / ANKOMST</span>
           <h1>Verifiera bilens ankomst.</h1>
@@ -42,7 +43,7 @@ export default function AnkomstPage() {
           </p>
         </div>
 
-        <div className={styles.flow} aria-label="Arbetsgång för ankomst">
+        <div className={`${styles.flow} ${contractStyles.flow}`} aria-label="Arbetsgång för ankomst">
           <span className={styles.flowLabel}>ARBETSGÅNG</span>
           <ol>
             <li><span>01</span>Fordon</li>
@@ -53,7 +54,7 @@ export default function AnkomstPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${modalStyles.surface} ${cleanupStyles.arrivalSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
+      <section className={`${styles.formSurface} ${contractStyles.surface} ${modalStyles.surface} ${cleanupStyles.arrivalSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <FormClient />
       </section>
 
