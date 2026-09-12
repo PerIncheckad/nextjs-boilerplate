@@ -61,6 +61,24 @@ create or replace function public.close_vehicle_journey_period_from_source(
 begin
   raise exception 'FORCED_DOWNSTREAM_TERMINAL_FAILURE';
 end $$;
+
+-- Mirror the previously hardened Production-facing terminal privilege contract.
+create or replace function public.verify_garage_avveckla_egen_leverans_with_billing(
+  uuid,timestamptz,text,boolean,text,text,text,numeric,numeric,text,text,text,uuid,text
+) returns jsonb language sql security definer set search_path=pg_catalog as $$ select '{}'::jsonb $$;
+create or replace function public.verify_garage_avveckla_extern_transport(
+  uuid,timestamptz,text,uuid,text
+) returns jsonb language sql security definer set search_path=pg_catalog as $$ select '{}'::jsonb $$;
+create or replace function public.verify_garage_avveckla_avstallning(
+  uuid,timestamptz,text,uuid,text
+) returns jsonb language sql security definer set search_path=pg_catalog as $$ select '{}'::jsonb $$;
+revoke all on function public.verify_garage_avveckla_egen_leverans_with_billing(uuid,timestamptz,text,boolean,text,text,text,numeric,numeric,text,text,text,uuid,text) from public, anon, authenticated;
+revoke all on function public.verify_garage_avveckla_extern_transport(uuid,timestamptz,text,uuid,text) from public, anon, authenticated;
+revoke all on function public.verify_garage_avveckla_avstallning(uuid,timestamptz,text,uuid,text) from public, anon, authenticated;
+grant execute on function public.verify_garage_avveckla_egen_leverans_with_billing(uuid,timestamptz,text,boolean,text,text,text,numeric,numeric,text,text,text,uuid,text) to service_role;
+grant execute on function public.verify_garage_avveckla_extern_transport(uuid,timestamptz,text,uuid,text) to service_role;
+grant execute on function public.verify_garage_avveckla_avstallning(uuid,timestamptz,text,uuid,text) to service_role;
+
 create or replace function public.sync_nybil_garage_handoff()
 returns trigger language plpgsql set search_path=public as $$ begin return new; end $$;
 create trigger nybil_garage_handoff_sync after insert on public.nybil_inventering
@@ -68,6 +86,24 @@ for each row when (new.source_garage_item_id is not null) execute function publi
 SQL
 
 "${P[@]}" -f migrations/20260912030000_add_canonical_fleet_membership_write_through_v1.sql >/dev/null
+
+# Effective final DB privileges after the full Step 1 -> Step 2 -> Step 3 chain.
+"${P[@]}" <<'SQL'
+do $$ begin
+  if has_function_privilege('service_role','public.complete_garage_avveckla_ut_internal(uuid,text,timestamptz,text,uuid,text)','EXECUTE') then
+    raise exception 'generic AVVECKLA terminal internal function is exposed to service_role';
+  end if;
+  if not has_function_privilege('service_role','public.verify_garage_avveckla_egen_leverans_with_billing(uuid,timestamptz,text,boolean,text,text,text,numeric,numeric,text,text,text,uuid,text)','EXECUTE') then
+    raise exception 'own-delivery billing wrapper lost service_role grant';
+  end if;
+  if not has_function_privilege('service_role','public.verify_garage_avveckla_extern_transport(uuid,timestamptz,text,uuid,text)','EXECUTE') then
+    raise exception 'external-transport wrapper lost service_role grant';
+  end if;
+  if not has_function_privilege('service_role','public.verify_garage_avveckla_avstallning(uuid,timestamptz,text,uuid,text)','EXECUTE') then
+    raise exception 'avstallning wrapper lost service_role grant';
+  end if;
+end $$;
+SQL
 
 "${P[@]}" <<'SQL'
 begin;
@@ -103,4 +139,4 @@ if [[ "$("${P[@]}" -Atc "select count(*) from public.fleet_membership_facts")" !
   echo "atomicity rollback left membership data" >&2; exit 1
 fi
 
-echo "Canonical Fleet Membership V1 Step 3 downstream atomicity: PASS"
+echo "Canonical Fleet Membership V1 Step 3 downstream atomicity + privilege boundary: PASS"
