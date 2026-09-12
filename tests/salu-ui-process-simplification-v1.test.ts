@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { OPERATIONAL_NAVIGATION_ITEMS } from '../components/operational-navigation-contract';
 
 const migration = readFileSync('migrations/20260906043000_simplify_salu_decision_ui_v1.sql', 'utf8');
 const api = readFileSync('app/api/salu/decision/route.ts', 'utf8');
 const ui = readFileSync('app/salu/salu-decision-client.tsx', 'utf8');
-const home = readFileSync('app/page.tsx', 'utf8');
 
 const saluGarage = readFileSync('migrations/20260906023000_add_salu_saljas_to_garage_ut_handoff_v1.sql', 'utf8');
 
@@ -48,7 +48,10 @@ test('UI shows blockers and the five locked final decisions without workflow but
 });
 
 test('SALU is exposed as an operational workspace and SÄLJAS handoff remains unchanged', () => {
-  assert.match(home, /href: '\/salu', label: 'SALU'/);
+  assert.deepEqual(
+    OPERATIONAL_NAVIGATION_ITEMS.find(({ href }) => href === '/salu'),
+    { href: '/salu', label: 'SALU' },
+  );
   assert.match(saluGarage, /nextAction', 'START_AVVECKLA_MANUALLY'/);
   assert.match(saluGarage, /avvecklaStarted', false/);
   assert.doesNotMatch(saluGarage, /(?:perform|select)\s+public\.start_garage_avveckla_case\s*\(/i);
