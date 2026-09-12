@@ -7,6 +7,7 @@ import GaragePicker from './garage-picker';
 import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './nybil-shell.module.css';
+import contractStyles from '../operational-ui-contract-v1.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 import actionStyles from '../operational-action-contract.module.css';
 
@@ -19,10 +20,7 @@ export const metadata: Metadata = {
 
 export default function NybilPage() {
   return (
-    <main className={styles.shell}>
-      <GaragePicker />
-      <GarageNybilPrefillBridge />
-
+    <main className={`${styles.shell} ${contractStyles.shell}`}>
       <header className={styles.topbar}>
         <Link className={styles.backLink} href="/garage">← Garaget</Link>
 
@@ -38,7 +36,7 @@ export default function NybilPage() {
 
       <OperationalNavigation active="/nybil" />
 
-      <section className={styles.hero}>
+      <section className={`${styles.hero} ${contractStyles.hero}`}>
         <div className={styles.heroCopy}>
           <span>INCHECKAD CORE / NY BIL</span>
           <h1>Etablera bilens baslinje.</h1>
@@ -47,7 +45,7 @@ export default function NybilPage() {
           </p>
         </div>
 
-        <div className={styles.flow} aria-label="Arbetsgång för ny bil">
+        <div className={`${styles.flow} ${contractStyles.flow}`} aria-label="Arbetsgång för ny bil">
           <span className={styles.flowLabel}>ARBETSGÅNG</span>
           <ol>
             <li><span>01</span>Hämta från Garaget</li>
@@ -58,9 +56,13 @@ export default function NybilPage() {
         </div>
       </section>
 
-      <GarageUpstreamContext />
+      <section className={contractStyles.surface}>
+        <GaragePicker />
+        <GarageNybilPrefillBridge />
+        <GarageUpstreamContext />
+      </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.newVehicleSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
+      <section className={`${styles.formSurface} ${contractStyles.surface} ${cleanupStyles.newVehicleSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <NybilFormGate />
       </section>
 
