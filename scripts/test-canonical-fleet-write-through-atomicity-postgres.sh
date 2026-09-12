@@ -74,10 +74,10 @@ begin;
 do $$
 declare
   actor uuid:=gen_random_uuid(); g uuid:=gen_random_uuid(); c uuid:=gen_random_uuid(); p uuid:=gen_random_uuid();
-  identity_id uuid; active_fact uuid;
+  v_identity_id uuid; active_fact uuid;
 begin
-  identity_id:=public.create_fleet_vehicle_identity('ATM001','VIN-ATM-001','2026-09-12 06:00+00','TEST','IDENTITY','atm',null,'{}');
-  active_fact:=public.append_fleet_membership_fact(identity_id,'ACTIVE','ENTRY','2026-09-12 06:00+00','TEST','ENTRY','atm','atm-entry',null,'SYSTEM',null,null,'{}','{}',null);
+  v_identity_id:=public.create_fleet_vehicle_identity('ATM001','VIN-ATM-001','2026-09-12 06:00+00','TEST','IDENTITY','atm',null,'{}');
+  active_fact:=public.append_fleet_membership_fact(v_identity_id,'ACTIVE','ENTRY','2026-09-12 06:00+00','TEST','ENTRY','atm','atm-entry',null,'SYSTEM',null,null,'{}','{}',null);
   insert into public.garage_items(garage_item_id,regnr,vin,garage_direction) values(g,'ATM001','VIN-ATM-001','UT');
   insert into public.garage_avveckla_cases(avveckla_case_id,garage_item_id,regnr) values(c,g,'ATM001');
   insert into public.vehicle_journey_periods(period_id,regnr,started_at) values(p,'ATM001','2026-09-12 06:05+00');
@@ -90,8 +90,8 @@ begin
   end;
 
   if exists(select 1 from public.garage_avveckla_events where garage_item_id=g) then raise exception 'terminal event survived downstream rollback'; end if;
-  if exists(select 1 from public.fleet_membership_facts where identity_id=identity_id and basis='EXIT') then raise exception 'membership EXIT survived downstream rollback'; end if;
-  if (select count(*) from public.fleet_membership_facts where identity_id=identity_id)<>1 then raise exception 'canonical history changed after downstream rollback'; end if;
+  if exists(select 1 from public.fleet_membership_facts f where f.identity_id=v_identity_id and f.basis='EXIT') then raise exception 'membership EXIT survived downstream rollback'; end if;
+  if (select count(*) from public.fleet_membership_facts f where f.identity_id=v_identity_id)<>1 then raise exception 'canonical history changed after downstream rollback'; end if;
   if (select status from public.garage_avveckla_cases where avveckla_case_id=c)<>'OPEN' then raise exception 'case completed despite rollback'; end if;
   if (select completed_at from public.garage_items where garage_item_id=g) is not null then raise exception 'Garage completed despite rollback'; end if;
   if (select ended_at from public.vehicle_journey_periods where period_id=p) is not null then raise exception 'Layer 1 period closed despite rollback'; end if;
