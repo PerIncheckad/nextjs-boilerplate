@@ -71,6 +71,24 @@ jobs:
           PGDATABASE: postgres
         run: bash scripts/test-canonical-fleet-bootstrap-postgres.sh
 
+      - name: Canonical fleet write-through PostgreSQL acceptance
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-canonical-fleet-write-through-postgres.sh
+
+      - name: Canonical fleet write-through downstream atomicity
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-canonical-fleet-write-through-atomicity-postgres.sh
+
       - name: Production build
         run: npm run build
 
