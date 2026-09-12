@@ -1,21 +1,13 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import OperationalNavigation from './OperationalNavigation';
+import {
+  CORE_NAVIGATION_ITEMS,
+  SUPPORTING_NAVIGATION_ITEMS,
+} from './product-navigation-contract';
 import styles from './core-product-shell.module.css';
 
 type ActiveModule = 'tower' | 'planning' | 'garage' | 'inhyrd' | 'legacy' | 'hjulskifte' | 'avveckla';
-
-const coreModules = [
-  ['/tower', 'TOWER', 'tower'],
-  ['/planning', 'PLANERING', 'planning'],
-  ['/garage', 'GARAGET', 'garage'],
-] as const;
-
-const supportingModules = [
-  ['/hjulskifte', 'HJULSKIFTE', 'hjulskifte'],
-  ['/avveckla', 'AVVECKLA', 'avveckla'],
-  ['/legacy', 'LEGACY', 'legacy'],
-] as const;
 
 export default function CoreProductShell({
   active,
@@ -49,17 +41,17 @@ export default function CoreProductShell({
       <nav className={styles.coreNavigation} aria-label="INCHECKAD Core">
         <span className={styles.navigationLabel}>CORE</span>
         <div className={styles.navigationLinks}>
-          {coreModules.map(([href, label, key]) => (
-            <Link key={href} className={key === active ? styles.active : undefined} href={href}>
-              {label}
+          {CORE_NAVIGATION_ITEMS.map((item) => (
+            <Link key={item.href} className={item.key === active ? styles.active : undefined} href={item.href}>
+              {item.label}
             </Link>
           ))}
         </div>
 
         <div className={styles.supportingLinks} aria-label="Stödytor">
-          {supportingModules.map(([href, label, key]) => (
-            <Link key={href} className={key === active ? styles.active : undefined} href={href}>
-              {label}
+          {SUPPORTING_NAVIGATION_ITEMS.map((item) => (
+            <Link key={item.href} className={item.key === active ? styles.active : undefined} href={item.href}>
+              {item.label}
             </Link>
           ))}
         </div>
