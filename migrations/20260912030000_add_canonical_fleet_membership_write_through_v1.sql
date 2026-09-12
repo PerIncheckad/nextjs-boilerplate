@@ -811,7 +811,7 @@ revoke all on function public.append_fleet_membership_exit_from_avveckla(uuid) f
 revoke all on function public.sync_nybil_garage_handoff() from public, anon, authenticated, service_role;
 
 grant execute on function public.apply_fleet_membership_bootstrap_batch(uuid,text,text,timestamptz,text) to service_role;
-grant execute on function public.complete_garage_avveckla_ut_internal(uuid,text,timestamptz,text,uuid,text) to service_role;
+revoke execute on function public.complete_garage_avveckla_ut_internal(uuid,text,timestamptz,text,uuid,text) from public, anon, authenticated, service_role;
 
 comment on function public.lock_fleet_membership_cutover() is
   'Serializes final T0 application against modern Nybil ENTRY and AVVECKLA EXIT membership write-through.';
