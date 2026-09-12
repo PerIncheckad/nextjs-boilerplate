@@ -5,17 +5,16 @@ import styles from './core-product-shell.module.css';
 
 type ActiveModule = 'tower' | 'planning' | 'garage' | 'inhyrd' | 'legacy' | 'hjulskifte' | 'avveckla';
 
-const primaryModules = [
-  ['/', 'STARTSIDA', 'home'],
+const coreModules = [
   ['/tower', 'TOWER', 'tower'],
   ['/planning', 'PLANERING', 'planning'],
   ['/garage', 'GARAGET', 'garage'],
 ] as const;
 
-const trailingModules = [
-  ['/legacy', 'LEGACY', 'legacy'],
+const supportingModules = [
   ['/hjulskifte', 'HJULSKIFTE', 'hjulskifte'],
   ['/avveckla', 'AVVECKLA', 'avveckla'],
+  ['/legacy', 'LEGACY', 'legacy'],
 ] as const;
 
 export default function CoreProductShell({
@@ -31,58 +30,52 @@ export default function CoreProductShell({
   eyebrow: string;
   children: ReactNode;
 }) {
+  const operationalActive = active === 'inhyrd' ? '/inhyrd' : undefined;
+
   return (
     <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <strong>INCHECKAD</strong>
-          <span>BY INVISTO / IT</span>
-          <i />
-        </div>
+      <header className={styles.globalHeader}>
+        <Link className={styles.homeLink} href="/" aria-label="INCHECKAD startsida">
+          <span className={styles.brandName}>INCHECKAD</span>
+          <span className={styles.brandByline}>BY INVISTO / IT</span>
+        </Link>
 
-        <nav className={styles.nav} aria-label={`${title} navigation`}>
-          {primaryModules.map(([href, label, key]) => (
+        <div className={styles.headerContext}>
+          <strong>{title}</strong>
+          <span>{descriptor}</span>
+        </div>
+      </header>
+
+      <nav className={styles.coreNavigation} aria-label="INCHECKAD Core">
+        <span className={styles.navigationLabel}>CORE</span>
+        <div className={styles.navigationLinks}>
+          {coreModules.map(([href, label, key]) => (
             <Link key={href} className={key === active ? styles.active : undefined} href={href}>
               {label}
             </Link>
           ))}
+        </div>
 
-          <OperationalNavigation
-            variant="sidebar"
-            active={active === 'inhyrd' ? '/inhyrd' : undefined}
-          />
-
-          {trailingModules.map(([href, label, key]) => (
+        <div className={styles.supportingLinks} aria-label="Stödytor">
+          {supportingModules.map(([href, label, key]) => (
             <Link key={href} className={key === active ? styles.active : undefined} href={href}>
               {label}
             </Link>
           ))}
-        </nav>
-
-        <div className={styles.sidebarFoot}>
-          <span>INVISTO</span>
-          <small>CORE / OPERATIONS</small>
         </div>
-      </aside>
+      </nav>
 
-      <section className={styles.surface}>
-        <header className={styles.topbar}>
-          <div className={styles.topbarTitle}>
-            <strong>{title}</strong>
-            <span>{descriptor}</span>
-          </div>
-          <div className={styles.topbarSpacer} />
-          <span className={styles.mode}>INVISTO CORE</span>
-        </header>
+      <OperationalNavigation active={operationalActive} />
 
+      <main className={styles.surface}>
         <section className={styles.hero}>
           <span>{eyebrow}</span>
           <h1>{title}</h1>
-          <i />
+          <p>{descriptor}</p>
         </section>
 
         <div className={styles.content}>{children}</div>
-      </section>
+      </main>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import FormClient from './form-client';
 import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './status-shell.module.css';
+import contractStyles from '../operational-ui-contract-v1.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function StatusPage() {
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} ${contractStyles.shell}`}>
       <header className={styles.topbar}>
         <Link className={styles.backLink} href="/">← Startsida</Link>
 
@@ -32,7 +33,7 @@ export default function StatusPage() {
 
       <OperationalNavigation active="/status" />
 
-      <section className={styles.hero}>
+      <section className={`${styles.hero} ${contractStyles.hero}`}>
         <div className={styles.heroCopy}>
           <span>INCHECKAD CORE / STATUS</span>
           <h1>Läs bilens verifierade läge.</h1>
@@ -41,7 +42,7 @@ export default function StatusPage() {
           </p>
         </div>
 
-        <div className={styles.flow} aria-label="Läsordning för status">
+        <div className={`${styles.flow} ${contractStyles.flow}`} aria-label="Läsordning för status">
           <span className={styles.flowLabel}>LÄSORDNING</span>
           <ol>
             <li><span>01</span>Sök</li>
@@ -52,7 +53,7 @@ export default function StatusPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.legacyHeaderHidden}`}>
+      <section className={`${styles.formSurface} ${contractStyles.surface} ${cleanupStyles.legacyHeaderHidden}`}>
         <FormClient />
       </section>
 

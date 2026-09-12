@@ -34,9 +34,9 @@ test('OPERATIVT has exactly seven locked routes, labels and order', () => {
   assert.equal(OPERATIONAL_NAVIGATION_ITEMS.some(({ href }) => String(href) === '/operativt'), false);
 });
 
-test('CoreProductShell groups OPERATIVT without duplicating INHYRD as a root link', () => {
-  assert.match(shell, /<OperationalNavigation[\s\S]*variant="sidebar"/);
-  assert.match(shell, /active=\{active === 'inhyrd' \? '\/inhyrd' : undefined\}/);
+test('CoreProductShell uses the shared horizontal OPERATIVT contract without duplicate root links', () => {
+  assert.match(shell, /<OperationalNavigation active=\{operationalActive\} \/>/);
+  assert.match(shell, /active === 'inhyrd' \? '\/inhyrd' : undefined/);
   assert.doesNotMatch(shell, /\['\/inhyrd',\s*'INHYRD'/);
   assert.doesNotMatch(shell, /\['\/salu',\s*'SALU'/);
 });

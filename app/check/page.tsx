@@ -5,6 +5,7 @@ import FormClient from './form-client';
 import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './check-shell.module.css';
+import contractStyles from '../operational-ui-contract-v1.module.css';
 import cleanupStyles from '../operational-form-copy-cleanup.module.css';
 import actionStyles from '../operational-action-contract.module.css';
 
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function CheckPage() {
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} ${contractStyles.shell}`}>
       <header className={styles.topbar}>
         <Link href="/" className={styles.backLink}>← Startsida</Link>
         <div className={styles.identity}>
@@ -29,14 +30,14 @@ export default function CheckPage() {
 
       <OperationalNavigation active="/check" />
 
-      <section className={styles.hero}>
+      <section className={`${styles.hero} ${contractStyles.hero}`}>
         <div className={styles.heroCopy}>
           <span>INCHECKAD CORE / CHECK-IN</span>
           <h1>Incheckning</h1>
           <p>Kontrollera bilen, dokumentera avvikelser och verifiera verkligt utfall.</p>
         </div>
 
-        <div className={styles.flow} aria-label="Arbetsgång för incheckning">
+        <div className={`${styles.flow} ${contractStyles.flow}`} aria-label="Arbetsgång för incheckning">
           <span className={styles.flowLabel}>ARBETSGÅNG</span>
           <ol>
             <li><span>01</span>Fordon</li>
@@ -47,7 +48,7 @@ export default function CheckPage() {
         </div>
       </section>
 
-      <section className={`${styles.formSurface} ${cleanupStyles.checkSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
+      <section className={`${styles.formSurface} ${contractStyles.surface} ${cleanupStyles.checkSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
         <FormClient />
       </section>
     </main>

@@ -1,0 +1,83 @@
+.shell {
+  min-width: 0;
+  overflow-x: clip;
+  background: #f5f4f0;
+}
+
+.hero {
+  width: min(100%, 1440px) !important;
+  max-width: 1440px !important;
+  margin-inline: auto !important;
+  padding-inline: clamp(18px, 3vw, 40px) !important;
+  box-sizing: border-box;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 360px) !important;
+  gap: clamp(18px, 3vw, 36px) !important;
+}
+
+.flow {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.surface {
+  width: min(100%, 1440px) !important;
+  max-width: 1440px !important;
+  margin-inline: auto !important;
+  padding-inline: clamp(18px, 3vw, 40px) !important;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.surface :global(.checkin-form),
+.surface :global(.nybil-form) {
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box;
+}
+
+.surface :global(.card),
+.surface :global(.field),
+.surface :global(.grid-2-col),
+.surface :global(.grid-3-col),
+.surface :global(.grid-4-col),
+.surface :global(.grid-5-col),
+.surface :global(.grid-fuel-5) {
+  min-width: 0;
+}
+
+.surface input,
+.surface select,
+.surface textarea,
+.surface button {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1120px) {
+  .hero {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+  }
+
+  .flow {
+    padding: 10px 0 0 !important;
+    border-left: 0 !important;
+    border-top: 1px solid #b7b3ae !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero,
+  .surface {
+    padding-inline: 12px !important;
+  }
+
+  .surface :global(.grid-2-col),
+  .surface :global(.grid-3-col),
+  .surface :global(.grid-4-col),
+  .surface :global(.grid-5-col),
+  .surface :global(.grid-fuel-5) {
+    grid-template-columns: 1fr !important;
+  }
+}
