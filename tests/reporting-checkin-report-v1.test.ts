@@ -14,7 +14,7 @@ const reportSource = fs.readFileSync(reportPagePath, 'utf8');
 const periodSource = fs.readFileSync(periodHelperPath, 'utf8');
 
 test('RPT-04 /rapport consumes the fixed Check-in metric endpoint and v1 contract', () => {
-  assert.match(reportSource, /fetch\('\/api\/analytics\/checkin-completed-count'/);
+  assert.match(reportSource, /authenticatedApiFetch\('\/api\/analytics\/checkin-completed-count'/);
   assert.match(reportSource, /metricId:\s*'CHECKIN_COMPLETED_COUNT'/);
   assert.match(reportSource, /metricVersion:\s*1/);
   assert.match(reportSource, /result\.resultContract\s*!==\s*'METRIC_RESULT_V1'/);
@@ -61,9 +61,10 @@ test('RPT-04 defaults resolve the latest actually completed Stockholm period', (
 });
 
 test('RPT-04 Check-in request is TOTAL and sends no dimension or location filters', () => {
+  const requestStart = reportSource.indexOf("authenticatedApiFetch('/api/analytics/checkin-completed-count'");
   const requestBlock = reportSource.slice(
-    reportSource.indexOf("fetch('/api/analytics/checkin-completed-count'"),
-    reportSource.indexOf('const body = await response.json()', reportSource.indexOf("fetch('/api/analytics/checkin-completed-count'")),
+    requestStart,
+    reportSource.indexOf('const body = await response.json()', requestStart),
   );
   assert.doesNotMatch(requestBlock, /station|city|region|plats|regnr|dimension|filter/i);
   assert.match(reportSource, /result\.scope\.dimensions\.length\s*!==\s*0/);

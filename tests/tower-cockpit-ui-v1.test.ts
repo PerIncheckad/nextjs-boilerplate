@@ -22,7 +22,8 @@ test('cockpit leads with the governing user question and Invisto operational int
 });
 
 test('cockpit remains a read-only consumer of the canonical Tower read model', () => {
-  assert.match(cockpit, /fetch\('\/api\/tower\/read-model'/);
+  assert.match(cockpit, /import \{ authenticatedApiFetch \} from '@\/lib\/api-auth-client';/);
+  assert.match(cockpit, /authenticatedApiFetch\('\/api\/tower\/read-model'/);
   assert.doesNotMatch(cockpit, /\/api\/operator-cockpit/);
   assert.doesNotMatch(cockpit, /\.insert\(/);
   assert.doesNotMatch(cockpit, /\.update\(/);

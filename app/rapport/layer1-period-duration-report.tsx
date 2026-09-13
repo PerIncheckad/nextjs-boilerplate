@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { authenticatedApiFetch } from '@/lib/api-auth-client';
 import type { MetricResultV1 } from '@/lib/analytics/contracts';
 import {
   isCompletedCheckinReportPeriod,
@@ -28,7 +29,7 @@ function formatPeriodLabel(start: string, type: CheckinReportPeriodType): string
 }
 
 async function readLayer1Metric(period: { start: string; end: string }): Promise<MetricResultV1> {
-  const response = await fetch('/api/analytics/layer1-period-duration', {
+  const response = await authenticatedApiFetch('/api/analytics/layer1-period-duration', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

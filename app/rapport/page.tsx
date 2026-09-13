@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import stationer from '../../data/stationer.json';
 import MediaModal from '@/components/MediaModal';
+import { authenticatedApiFetch } from '@/lib/api-auth-client';
 import type { MetricResultV1 } from '@/lib/analytics/contracts';
 import Layer1PeriodDurationReport from './layer1-period-duration-report';
 import {
@@ -76,14 +77,14 @@ function formatCheckinTime(row: DamageWithVehicle): string {
 }
 
 async function readReportApi<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+  const response = await authenticatedApiFetch(url);
   const body = await response.json() as ReportResponse<T>;
   if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
   return body.data ?? ([] as T);
 }
 
 async function readCheckinMetric(period: { start: string; end: string }): Promise<MetricResultV1> {
-  const response = await fetch('/api/analytics/checkin-completed-count', {
+  const response = await authenticatedApiFetch('/api/analytics/checkin-completed-count', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

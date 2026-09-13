@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { authenticatedApiFetch } from '@/lib/api-auth-client';
 import styles from './garage.module.css';
 
 type PlanningStation = { station_code: string; display_name: string | null; sort_order: number };
@@ -107,7 +108,7 @@ export default function GarageClient() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/garage', { cache: 'no-store' });
+      const response = await authenticatedApiFetch('/api/garage', { cache: 'no-store' });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');
       applyPayload(payload);
@@ -120,7 +121,7 @@ export default function GarageClient() {
 
   useEffect(() => {
     let active = true;
-    void fetch('/api/garage', { cache: 'no-store' })
+    void authenticatedApiFetch('/api/garage', { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa Garaget');

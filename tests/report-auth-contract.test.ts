@@ -21,7 +21,8 @@ test('report page does not read Supabase tables directly from the browser', () =
   assert.doesNotMatch(page, /\.from\(['\"]damages['\"]\)/);
   assert.doesNotMatch(page, /\.from\(['\"]vehicles['\"]\)/);
   assert.doesNotMatch(page, /\.from\(['\"]damage_media['\"]\)/);
-  assert.match(page, /fetch\(url\)/);
+  assert.match(page, /import\s+\{\s*authenticatedApiFetch\s*\}\s+from ['\"]@\/lib\/api-auth-client['\"]/);
+  assert.match(page, /authenticatedApiFetch\(url\)/);
   assert.match(page, /\/api\/report-damages/);
 });
 

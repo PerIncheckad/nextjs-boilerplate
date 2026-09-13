@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import { authenticatedApiFetch } from '@/lib/api-auth-client';
 import styles from './tower-invisto-v2.module.css';
 
 type Health = 'VERIFIED' | 'PARTIAL' | 'BLOCKED' | 'EXTERNAL';
@@ -35,7 +36,7 @@ const healthLabel = (health: Health) => health === 'VERIFIED' ? 'Verifierad' : h
 const timeLabel = (value: string) => new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 
 async function loadReadModel(): Promise<ReadModel> {
-  const response = await fetch('/api/tower/read-model', { cache: 'no-store' });
+  const response = await authenticatedApiFetch('/api/tower/read-model', { cache: 'no-store' });
   const payload = await response.json();
   if (!response.ok) throw new Error(payload?.error ?? 'Tower kunde inte läsas');
   return payload.data as ReadModel;
@@ -82,7 +83,7 @@ export default function TowerInvistoV2() {
       SALU: { title: 'SALU · process', value: data.processes.salu.open, text: 'Öppna SALU-processer. Processen kan överlappa andra primärstatusar.', health: data.sources.salu.health, href: '/planning', details: Object.entries(data.processes.salu.byEscalation) },
       GARAGE: { title: 'Garaget', value: data.processes.garage.owned, text: 'Inbound-objekt som fortfarande ägs av Garaget och inte är avslutade eller överlämnade.', health: data.sources.garage.health, href: '/garage', details: [['Med reg.nr', data.processes.garage.withRegnr], ['Utan reg.nr', data.processes.garage.withoutRegnr]] },
       PLANNED: { title: 'Planerade inköp', value: data.processes.plannedPurchases.remaining, text: 'BESTÄLLT som fortfarande återstår upstream före materialisering till Garaget.', health: data.sources.plannedPurchases.health, href: '/planning' },
-      WHEEL: { title: 'Hjulskifte', value: data.processes.wheelChange.canonicalCandidateCount, text: 'Fleet-wide kandidatantal visas först när hjuldata kan korsas mot kanoniska AKTIVA.', health: data.sources.wheelChange.health, href: '/garage', details: [['Öppna processrader', data.processes.wheelChange.openProcessRows]] },
+      WHEEL: { title: 'Hjulskifte · öppna processer', value: data.processes.wheelChange.openProcessRows, text: 'Verifierade öppna processrader. Fleet-wide kandidatantal visas först när hjuldata kan korsas mot kanoniska AKTIVA.', health: data.sources.wheelChange.health, href: '/garage' },
       AVVECKLA: { title: 'Avveckla', value: data.processes.avveckla.count, text: 'Tower väntar på färdigt read-kontrakt från den separata AVVECKLA-processen.', health: data.sources.avveckla.health },
     };
     return map[focus];
@@ -148,7 +149,7 @@ export default function TowerInvistoV2() {
           <ProcessNode label="Avveckla" value={data?.processes.avveckla.count} onClick={() => setFocus('AVVECKLA')} selected={focus === 'AVVECKLA'} />
         </div>
         <button type="button" className={styles.wheelNode} onClick={() => setFocus('WHEEL')}>
-          <span>HJULSKIFTE</span><strong>{sv(data?.processes.wheelChange.canonicalCandidateCount)}</strong><small>tvärgående process</small>
+          <span>HJULSKIFTE</span><strong>{sv(data?.processes.wheelChange.openProcessRows)}</strong><small>öppna processrader</small>
         </button>
       </section>
 
