@@ -7,6 +7,7 @@ const api = readFileSync('app/api/garage/wheel-changes/route.ts', 'utf8');
 const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 const page = readFileSync('app/hjulskifte/page.tsx', 'utf8');
 const shell = readFileSync('components/CoreProductShell.tsx', 'utf8');
+const productNavigationContract = readFileSync('components/product-navigation-contract.ts', 'utf8');
 const css = readFileSync('app/hjulskifte/hjulskifte.module.css', 'utf8');
 
 test('D1 excludes only verified terminal UT from candidate and create gates', () => {
@@ -47,7 +48,8 @@ test('D2 preserves raw storage text and routes correction to Status', () => {
 
 test('uppercase presentation changes labels only, not technical status values', () => {
   assert.match(page, /title="HJULSKIFTE"/);
-  assert.match(shell, /'\/hjulskifte', 'HJULSKIFTE'/);
+  assert.match(shell, /SUPPORTING_NAVIGATION_ITEMS\.map/);
+  assert.match(productNavigationContract, /\{\s*href:\s*'\/hjulskifte',\s*label:\s*'HJULSKIFTE',\s*key:\s*'hjulskifte'\s*\}/);
   assert.match(css, /text-transform:uppercase/);
   assert.match(api, /const STATUSES = \['KRAVS', 'BOKAD', 'PAGAENDE', 'KLAR', 'AVVIKELSE'\]/);
 });
