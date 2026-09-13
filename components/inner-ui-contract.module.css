@@ -1,0 +1,204 @@
+.panel {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #d2cec8;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .9);
+  box-sizing: border-box;
+}
+
+.panelHeader {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 10px;
+}
+
+.eyebrow {
+  color: #74685f;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .09em;
+}
+
+.title {
+  margin: 0;
+  color: #111315;
+  font-size: clamp(19px, 2vw, 24px);
+  line-height: 1.05;
+  letter-spacing: -.02em;
+}
+
+.description {
+  margin: 0;
+  color: #50565a;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.formRow {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.field {
+  display: grid;
+  gap: 3px;
+  min-width: 160px;
+  flex: 0 1 auto;
+}
+
+.fieldGrow {
+  flex: 1 1 280px;
+  min-width: min(240px, 100%);
+}
+
+.fieldLabel {
+  color: #303438;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.input,
+.select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #bdb7b0;
+  border-radius: 6px;
+  background: #fff;
+  color: #111315;
+  font: inherit;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+
+.input:focus,
+.select:focus {
+  border-color: #111315;
+  outline: 2px solid rgba(17, 19, 21, .12);
+  outline-offset: 1px;
+}
+
+.button,
+.primaryButton {
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.button {
+  border: 1px solid #b7b3ae;
+  background: #fff;
+  color: #303438;
+}
+
+.primaryButton {
+  border: 1px solid #111315;
+  background: #111315;
+  color: #fff;
+}
+
+.button:hover:not(:disabled),
+.button:focus-visible:not(:disabled) {
+  border-color: #111315;
+  outline: none;
+}
+
+.primaryButton:hover:not(:disabled),
+.primaryButton:focus-visible:not(:disabled) {
+  background: #2b2d2f;
+  outline: none;
+}
+
+.button:disabled,
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.card {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin-top: 10px;
+  padding: 10px 11px;
+  border: 1px solid #dedad4;
+  border-radius: 8px;
+  background: #faf9f6;
+  color: #303438;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.cardForm {
+  background: #fff;
+}
+
+.statusSuccess {
+  border-color: #bfd0c1;
+  background: #f5faf5;
+}
+
+.statusError {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border: 1px solid #e4b9b5;
+  border-radius: 7px;
+  background: #fff4f3;
+  color: #8d2f24;
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.statusBlocked {
+  margin-bottom: 8px;
+  padding: 8px 9px;
+  border-left: 3px solid #8d2f24;
+  background: #fff4f3;
+  color: #8d2f24;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.inlineFact {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid #dedad4;
+  border-radius: 6px;
+  background: #faf9f6;
+  color: #50565a;
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .panel {
+    padding: 11px;
+  }
+
+  .formRow {
+    align-items: stretch;
+  }
+
+  .field,
+  .fieldGrow {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .button,
+  .primaryButton {
+    width: 100%;
+  }
+}
