@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { authenticatedApiFetch } from '@/lib/api-auth-client';
 import { isActionableWheelStorage } from '@/lib/wheel-storage-actionability';
 import styles from './hjulskifte.module.css';
 
@@ -139,8 +140,8 @@ export default function HjulskiftePanel() {
     setError(null);
     try {
       const [wheelResponse, storageResponse] = await Promise.all([
-        fetch('/api/garage/wheel-changes', { cache: 'no-store' }),
-        fetch('/api/garage/wheel-storage', { cache: 'no-store' }),
+        authenticatedApiFetch('/api/garage/wheel-changes', { cache: 'no-store' }),
+        authenticatedApiFetch('/api/garage/wheel-storage', { cache: 'no-store' }),
       ]);
       const [wheelPayload, storagePayload] = await Promise.all([wheelResponse.json(), storageResponse.json()]);
       if (!wheelResponse.ok) throw new Error(wheelPayload?.error ?? 'Kunde inte läsa hjulskiften');
@@ -157,8 +158,8 @@ export default function HjulskiftePanel() {
   useEffect(() => {
     let active = true;
     void Promise.all([
-      fetch('/api/garage/wheel-changes', { cache: 'no-store' }),
-      fetch('/api/garage/wheel-storage', { cache: 'no-store' }),
+      authenticatedApiFetch('/api/garage/wheel-changes', { cache: 'no-store' }),
+      authenticatedApiFetch('/api/garage/wheel-storage', { cache: 'no-store' }),
     ])
       .then(async ([wheelResponse, storageResponse]) => {
         const [wheelPayload, storagePayload] = await Promise.all([wheelResponse.json(), storageResponse.json()]);
