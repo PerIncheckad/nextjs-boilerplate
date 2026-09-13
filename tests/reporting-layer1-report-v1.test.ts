@@ -30,7 +30,7 @@ test('RPT-06 platform service requires only the source for the selected metric p
 });
 
 test('RPT-06 report consumes signed METRIC_RESULT_V1 without local KPI math', () => {
-  assert.match(reportSource, /fetch\('\/api\/analytics\/layer1-period-duration'/);
+  assert.match(reportSource, /authenticatedApiFetch\('\/api\/analytics\/layer1-period-duration'/);
   assert.match(reportSource, /metricId:\s*'LAYER1_PERIOD_DURATION_HOURS'/);
   assert.match(reportSource, /metricVersion:\s*1/);
   assert.match(reportSource, /evaluation\.contract !== 'SIGNED_METRIC_EVALUATION_V1'/);
@@ -74,7 +74,7 @@ test('RPT-06 is mounted on /rapport while RPT-04 Check-in and SKADEJOURNAL remai
   assert.match(rapportPageSource, /CHECK-IN – VOLYM/);
   assert.match(rapportPageSource, /SKADEJOURNAL/);
   assert.match(rapportPageSource, /Platsfilter – endast skadejournal/);
-  assert.match(rapportPageSource, /fetch\('\/api\/analytics\/checkin-completed-count'/);
+  assert.match(rapportPageSource, /authenticatedApiFetch\('\/api\/analytics\/checkin-completed-count'/);
   assert.match(rapportPageSource, /'\/api\/report-damages'/);
 });
 
