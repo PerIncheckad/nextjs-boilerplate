@@ -41,8 +41,8 @@ test('Hjulskifte canonical candidate population remains blocked in Tower cutover
   assert.match(cockpit, /separat Hjulskifte consumer cutover/);
 });
 
-test('Tower presentation no longer claims the canonical baseline is missing', () => {
-  assert.doesNotMatch(cockpit, /Verifierad baseline', 'Saknas'/);
+test('Tower presentation reflects canonical fleet membership', () => {
+  assert.match(cockpit, /\['Canonical membership', healthLabel\(data\.fleet\.health\)\]/);
   assert.doesNotMatch(cockpit, /innan AKTIVA-baseline finns/);
-  assert.match(cockpit, /Canonical membership/);
+  assert.match(cockpit, /Fordon i canonical ACTIVE/);
 });
