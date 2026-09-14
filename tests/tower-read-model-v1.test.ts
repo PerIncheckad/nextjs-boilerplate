@@ -17,7 +17,10 @@ test('Tower read model authenticates and remains read-only', () => {
 });
 
 test('AKTIVA cannot silently fall back to partial journey coverage', () => {
-  assert.match(route, /active: null/);
+  assert.match(route, /fleet_membership_current_by_identity/);
+  assert.match(route, /\.eq\('membership_state', 'ACTIVE'\)/);
+  assert.match(route, /\.eq\('resolution_reason', 'RESOLVED'\)/);
+  assert.match(route, /active: fleetMembershipVerified \? canonicalActiveCount : null/);
   assert.match(route, /fleetMembership:[\s\S]*health: 'BLOCKED'/);
   assert.match(route, /noHeuristicFleetTruth: true/);
   assert.match(route, /capturedPrimaryStateVehicles/);
@@ -56,7 +59,7 @@ test('Rental and Hjulskifte stay blocked or partial until their complete populat
   assert.match(route, /rental_operational_facts/);
   assert.match(route, /RENTAL must not be inferred from another source/);
   assert.match(route, /canonicalCandidateCount: null/);
-  assert.match(route, /intersected with canonical AKTIVA/);
+  assert.match(route, /separate Hjulskifte consumer cutover/);
 });
 
 test('AVVECKLA remains an external read contract', () => {
