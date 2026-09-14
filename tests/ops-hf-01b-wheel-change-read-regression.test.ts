@@ -3,19 +3,20 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const route = readFileSync('app/api/garage/wheel-changes/route.ts', 'utf8');
+const canonicalMigration = readFileSync('migrations/20260914193000_hjulskifte_canonical_fleet_consumer.sql', 'utf8');
 
-test('terminal UT wheel read uses the event -> owning AVVECKLA case relation explicitly', () => {
-  assert.match(
-    route,
-    /garage_avveckla_cases!garage_avveckla_events_avveckla_case_id_fkey!inner\(regnr\)/,
-  );
-  assert.doesNotMatch(route, /garage_avveckla_cases!inner\(regnr\)/);
-  assert.doesNotMatch(route, /garage_avveckla_cases_completion_event_fkey!inner\(regnr\)/);
+test('terminal EXIT is not redefined by the Hjulskifte membership consumer', () => {
+  assert.match(canonicalMigration, /fleet_membership_current_by_identity/);
+  assert.match(canonicalMigration, /membership_state = 'ACTIVE'/);
+  assert.match(canonicalMigration, /resolution_reason = 'RESOLVED'/);
+  assert.match(canonicalMigration, /identity_scope = 'OWN_FLEET'/);
+  assert.doesNotMatch(route, /readTerminalUtRegnrs/);
+  assert.doesNotMatch(route, /garage_avveckla_events/);
+  assert.doesNotMatch(route, /UT_OVERLAMNING_VERIFIERAD/);
 });
 
-test('terminal UT lookup remains read-only', () => {
-  const functionBody = route.match(/async function readTerminalUtRegnrs[\s\S]*?\n}\n\nasync function readRegisteredWheelStorage/)?.[0] ?? '';
-  assert.match(functionBody, /\.from\('garage_avveckla_events'\)/);
-  assert.match(functionBody, /\.eq\('event_type', 'UT_OVERLAMNING_VERIFIERAD'\)/);
-  assert.doesNotMatch(functionBody, /\.insert\(|\.update\(|\.delete\(|\.rpc\(/);
+test('Hjulskifte reads canonical candidates instead of a parallel AVVECKLA membership path', () => {
+  assert.match(route, /admin\.rpc\('get_wheel_change_candidate_source'\)/);
+  assert.doesNotMatch(route, /garage_avveckla_cases!garage_avveckla_events_avveckla_case_id_fkey/);
+  assert.doesNotMatch(route, /garage_avveckla_cases_completion_event_fkey/);
 });

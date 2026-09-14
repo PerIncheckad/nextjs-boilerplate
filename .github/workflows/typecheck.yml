@@ -89,6 +89,15 @@ jobs:
           PGDATABASE: postgres
         run: bash scripts/test-canonical-fleet-write-through-atomicity-postgres.sh
 
+      - name: Hjulskifte canonical fleet consumer PostgreSQL acceptance
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-hjulskifte-canonical-consumer-postgres.sh
+
       - name: Production build
         run: npm run build
 
