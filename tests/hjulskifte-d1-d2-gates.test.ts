@@ -4,18 +4,23 @@ import test from 'node:test';
 import { isActionableWheelStorage } from '../lib/wheel-storage-actionability';
 
 const api = readFileSync('app/api/garage/wheel-changes/route.ts', 'utf8');
+const canonicalMigration = readFileSync('migrations/20260914193000_hjulskifte_canonical_fleet_consumer.sql', 'utf8');
 const panel = readFileSync('app/hjulskifte/hjulskifte-panel.tsx', 'utf8');
 const page = readFileSync('app/hjulskifte/page.tsx', 'utf8');
 const shell = readFileSync('components/CoreProductShell.tsx', 'utf8');
 const productNavigationContract = readFileSync('components/product-navigation-contract.ts', 'utf8');
 const css = readFileSync('app/hjulskifte/hjulskifte.module.css', 'utf8');
 
-test('D1 excludes only verified terminal UT from candidate and create gates', () => {
-  assert.match(api, /garage_avveckla_events/);
-  assert.match(api, /UT_OVERLAMNING_VERIFIERAD/);
-  assert.match(api, /!terminalUtRegnrs\.has\(candidateRegnr\)/);
-  assert.match(api, /terminalUtRegnrs\.has\(regnr\)/);
-  assert.match(api, /verifierat lämnat verksamheten/);
+test('D1 consumes canonical fleet candidates without a parallel terminal-UT membership gate', () => {
+  assert.match(api, /readCandidateSource/);
+  assert.match(api, /get_wheel_change_candidate_source/);
+  assert.match(canonicalMigration, /fleet_membership_current_by_identity/);
+  assert.match(canonicalMigration, /membership_state = 'ACTIVE'/);
+  assert.match(canonicalMigration, /resolution_reason = 'RESOLVED'/);
+  assert.match(canonicalMigration, /identity_scope = 'OWN_FLEET'/);
+  assert.doesNotMatch(api, /garage_avveckla_events/);
+  assert.doesNotMatch(api, /UT_OVERLAMNING_VERIFIERAD/);
+  assert.doesNotMatch(api, /terminalUtRegnrs/);
 });
 
 test('D2 rejects explicit missing or unclear storage for booking', () => {
