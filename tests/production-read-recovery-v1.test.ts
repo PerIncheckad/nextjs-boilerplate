@@ -46,7 +46,7 @@ test('Rapport Check-in and Layer 1 reads use authenticated API fetch and retain 
 
 test('Tower recovery authenticates the read while preserving blocked canonical fleet truths', () => {
   assert.match(tower, /authenticatedApiFetch\('\/api\/tower\/read-model'/);
-  assert.match(towerReadModel, /active:\s*null/);
+  assert.match(towerReadModel, /active:\s*fleetMembershipVerified\s*\?\s*canonicalActiveCount\s*:\s*null/);
   assert.match(towerReadModel, /canonicalCandidateCount:\s*null/);
   assert.match(tower, /wheelChange\.openProcessRows/);
   assert.match(tower, /öppna processrader/);
