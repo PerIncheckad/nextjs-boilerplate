@@ -49,6 +49,8 @@ export async function GET(request: Request) {
       materializedRes,
       rentalRes,
       wheelRes,
+      canonicalActiveRes,
+      fleetBootstrapRes,
     ] = await Promise.all([
       admin.from('vehicle_journey_periods')
         .select('regnr,period_type,started_at,reason_code,reason_text,source_system,source_entity,source_record_id')
@@ -73,9 +75,35 @@ export async function GET(request: Request) {
       admin.from('rental_operational_facts').select('regnr').limit(1),
       admin.from('garage_wheel_changes')
         .select('wheel_change_id,regnr,status,season_key,booked_for,updated_at'),
+      admin.from('fleet_membership_current_by_identity')
+        .select('identity_id', { count: 'exact', head: true })
+        .eq('membership_state', 'ACTIVE')
+        .eq('resolution_reason', 'RESOLVED'),
+      admin.from('fleet_membership_bootstrap_batch_status')
+        .select('batch_id,t0,scope,coverage_mode,verified,complete_active_population_attested,application_id,bootstrap_denominator_eligible,unresolved_count')
+        .eq('scope', 'OWN_FLEET')
+        .eq('coverage_mode', 'COMPLETE_ACTIVE_POPULATION')
+        .eq('verified', true)
+        .eq('complete_active_population_attested', true)
+        .eq('bootstrap_denominator_eligible', true)
+        .eq('unresolved_count', 0)
+        .not('application_id', 'is', null)
+        .order('t0', { ascending: false })
+        .limit(1),
     ]);
 
-    const responses = [periodsRes, activitiesRes, saluRes, garageRes, planningRes, materializedRes, rentalRes, wheelRes];
+    const responses = [
+      periodsRes,
+      activitiesRes,
+      saluRes,
+      garageRes,
+      planningRes,
+      materializedRes,
+      rentalRes,
+      wheelRes,
+      canonicalActiveRes,
+      fleetBootstrapRes,
+    ];
     const failed = responses.find((response) => response.error);
     if (failed?.error) throw failed.error;
 
@@ -87,6 +115,9 @@ export async function GET(request: Request) {
     const materialized = (materializedRes.data ?? []) as Row[];
     const rentalFactsPresent = (rentalRes.data ?? []).length > 0;
     const wheelChanges = (wheelRes.data ?? []) as Row[];
+    const canonicalActiveCount = canonicalActiveRes.count;
+    const fleetBootstrap = (fleetBootstrapRes.data ?? [])[0] as Row | undefined;
+    const fleetMembershipVerified = canonicalActiveCount != null && Boolean(fleetBootstrap?.application_id);
 
     const garageOwned = garageAll.filter((row) =>
       row.garage_direction === 'IN'
@@ -141,13 +172,18 @@ export async function GET(request: Request) {
     const saluEscalation = countBy(salu, 'escalation_status');
 
     const sources: Record<string, { health: Health; reason: string }> = {
-      fleetMembership: {
-        health: 'BLOCKED',
-        reason: 'Verified active-fleet bootstrap baseline is not loaded yet; no heuristic fallback is allowed.',
-      },
+      fleetMembership: fleetMembershipVerified
+        ? {
+          health: 'VERIFIED',
+          reason: 'ACTIVE OWN_FLEET is read only from fleet_membership_current_by_identity; completeness is backed by an applied COMPLETE_ACTIVE_POPULATION bootstrap.',
+        }
+        : {
+          health: 'BLOCKED',
+          reason: 'Canonical ACTIVE OWN_FLEET membership is not currently backed by an applied COMPLETE_ACTIVE_POPULATION bootstrap.',
+        },
       primaryOperationalState: {
         health: 'PARTIAL',
-        reason: 'Layer 1 is authoritative where present but does not yet cover the complete historical active fleet.',
+        reason: 'Layer 1 is authoritative where present but does not define canonical fleet membership.',
       },
       rental: rentalFactsPresent
         ? { health: 'PARTIAL', reason: 'Rental source has facts; completeness must be verified before fleet-wide RENTAL is promoted.' }
@@ -166,7 +202,7 @@ export async function GET(request: Request) {
       },
       wheelChange: {
         health: 'PARTIAL',
-        reason: 'Existing wheel-change process rows are readable, but candidate population must be intersected with canonical AKTIVA before becoming a fleet-wide metric.',
+        reason: 'Existing wheel-change process rows are readable, but canonicalCandidateCount remains blocked until the separate Hjulskifte consumer cutover.',
       },
       avveckla: {
         health: 'EXTERNAL',
@@ -184,7 +220,7 @@ export async function GET(request: Request) {
           noHeuristicFleetTruth: true,
         },
         fleet: {
-          active: null,
+          active: fleetMembershipVerified ? canonicalActiveCount : null,
           health: sources.fleetMembership.health,
           capturedPrimaryStateVehicles: capturedRegnrs.size,
           primaryStates: primaryStateCounts,
