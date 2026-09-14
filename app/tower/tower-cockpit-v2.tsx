@@ -164,7 +164,7 @@ export default function TowerCockpitV2() {
         sourceReason: source.fleetMembership.reason,
         rows: [
           ['Fångade primärstatusar', data.fleet.capturedPrimaryStateVehicles],
-          ['Verifierad baseline', 'Saknas'],
+          ['Canonical membership', healthLabel(data.fleet.health)],
         ],
       };
     }
@@ -185,7 +185,7 @@ export default function TowerCockpitV2() {
         title: PRIMARY_LABELS[state],
         value: data.fleet.primaryStates[state],
         health: state === 'RENTAL' ? source.rental.health : source.primaryOperationalState.health,
-        subtitle: 'Fångad primärstatus. Detta är inte full flottsanning innan AKTIVA-baseline finns.',
+        subtitle: 'Fångad primärstatus från operativ state. Den definierar inte canonical fleet membership.',
         sourceReason: state === 'RENTAL' ? source.rental.reason : source.primaryOperationalState.reason,
       };
     }
@@ -235,7 +235,7 @@ export default function TowerCockpitV2() {
         title: 'Hjulskifte',
         value: data.processes.wheelChange.canonicalCandidateCount,
         health: source.wheelChange.health,
-        subtitle: 'Kanoniskt kandidatantal väntar på korsning mot AKTIVA. Befintliga processrader kan läsas separat.',
+        subtitle: 'Kanoniskt kandidatantal väntar på separat Hjulskifte consumer cutover. Befintliga processrader kan läsas separat.',
         sourceReason: source.wheelChange.reason,
         rows: [
           ['Öppna processrader', data.processes.wheelChange.openProcessRows],
@@ -307,7 +307,7 @@ export default function TowerCockpitV2() {
           <span>AKTIVA</span>
           <strong>{valueLabel(data?.fleet.active ?? null)}</strong>
           <em className={styles[data?.fleet.health.toLowerCase() ?? 'blocked']}>{data ? healthLabel(data.fleet.health) : 'LÄSER'}</em>
-          <small>{data?.fleet.active == null ? 'Väntar verifierad fleet-baseline' : 'Fordon i verksamheten'}</small>
+          <small>{data?.fleet.active == null ? 'Väntar verifierad canonical membership' : 'Fordon i canonical ACTIVE'}</small>
         </button>
 
         <div className={styles.primaryGrid}>
