@@ -61,12 +61,71 @@ create table public.garage_items (
   updated_by uuid
 );
 
+-- Reproduce the current-main Garage source contract before applying Step 1.
 alter table public.garage_items
   add constraint garage_items_source_kind_check
-  check (source_kind in ('MANUELL','PLANERING','SALU','LAGER1'));
+  check (source_kind = any (array['MANUELL'::text,'PLANERING'::text,'SALU'::text,'LAGER1'::text]));
+
 alter table public.garage_items
   add constraint garage_items_source_consistency_check
-  check (true);
+  check (
+    (
+      source_kind = 'MANUELL'
+      and source_planning_cell_id is null
+      and source_planning_unit_no is null
+      and source_salu_flag_id is null
+      and source_journey_period_id is null
+      and source_journey_event_id is null
+    )
+    or (
+      source_kind = 'PLANERING'
+      and source_planning_cell_id is not null
+      and source_planning_unit_no is not null
+      and source_salu_flag_id is null
+      and source_journey_period_id is null
+      and source_journey_event_id is null
+    )
+    or (
+      source_kind = 'SALU'
+      and source_planning_cell_id is null
+      and source_planning_unit_no is null
+      and source_salu_flag_id is not null
+      and source_journey_period_id is null
+      and source_journey_event_id is null
+    )
+    or (
+      source_kind = 'LAGER1'
+      and regnr is not null
+      and source_planning_cell_id is null
+      and source_planning_unit_no is null
+      and source_salu_flag_id is null
+      and source_journey_period_id is not null
+    )
+  );
+
+alter table public.garage_items
+  add constraint garage_items_salu_source_direction_ut_chk
+  check (
+    not (source_kind = 'SALU' and source_salu_flag_id is not null)
+    or garage_direction is not distinct from 'UT'
+  );
+
+create unique index garage_items_salu_source_uidx
+  on public.garage_items(source_salu_flag_id)
+  where source_kind = 'SALU' and voided_at is null;
+
+-- Representative current-main rows must remain valid after Step 1 expands the source contract.
+insert into public.garage_items(model,garage_direction,planning_reason,regnr,source_kind)
+values ('Manual','IN','ANNAT','MAN11A','MANUELL');
+
+insert into public.garage_items(model,garage_direction,planning_reason,regnr,source_kind,source_planning_cell_id,source_planning_unit_no)
+values ('Planning','IN','ANNAT','PLA22B','PLANERING','33333333-3333-4333-8333-333333333333',1);
+
+insert into public.garage_items(model,garage_direction,planning_reason,regnr,source_kind,source_salu_flag_id)
+values ('Historical SALU','UT','SALU','SAL33C','SALU','44444444-4444-4444-8444-444444444444');
+
+insert into public.garage_items(model,garage_direction,planning_reason,regnr,source_kind,source_journey_period_id)
+values ('Lager 1','IN','ANNAT','LAG44D','LAGER1','55555555-5555-4555-8555-555555555555');
 
 create table public.handoff_definitions (
   handoff_code text not null,
@@ -151,6 +210,38 @@ SQL
 "${PSQL[@]}" -f "$MIGRATION"
 
 "${PSQL[@]}" <<'SQL'
+-- Existing source kinds survive the Step 1 constraint replacement unchanged.
+do $$
+declare
+  v_count integer;
+begin
+  select count(*) into v_count
+  from public.garage_items
+  where source_kind in ('MANUELL','PLANERING','SALU','LAGER1');
+  if v_count <> 4 then raise exception 'current-main Garage source rows were not preserved: %', v_count; end if;
+
+  if not exists (
+    select 1 from public.garage_items
+    where source_kind='SALU' and garage_direction='UT' and source_salu_flag_id='44444444-4444-4444-8444-444444444444'
+  ) then
+    raise exception 'historical terminal SALU -> Garage UT row changed';
+  end if;
+end;
+$$;
+
+-- The independent current-main SALU => UT constraint must still reject non-UT legacy SALU rows.
+do $$
+begin
+  begin
+    insert into public.garage_items(model,garage_direction,planning_reason,regnr,source_kind,source_salu_flag_id)
+    values ('Invalid legacy SALU','IN','SALU','BAD55E','SALU','66666666-6666-4666-8666-666666666666');
+    raise exception 'legacy SALU direction lock unexpectedly accepted IN';
+  exception
+    when check_violation then null;
+  end;
+end;
+$$;
+
 insert into public.vehicles(regnr,brand,model) values ('ABC12D','Mercedes-Benz','C 300 e');
 
 insert into public.salu_flags(
@@ -211,8 +302,9 @@ begin
 
   select count(*), max(garage_direction), max(source_kind)
     into v_garage_count, v_direction, v_source_kind
-  from public.garage_items;
-  if v_garage_count <> 1 then raise exception 'expected 1 Garage item, got %', v_garage_count; end if;
+  from public.garage_items
+  where source_salu_flag_id='11111111-1111-4111-8111-111111111111';
+  if v_garage_count <> 1 then raise exception 'expected 1 planned SALU Garage item, got %', v_garage_count; end if;
   if v_direction is not null then raise exception 'planned SALU must not assert Garage direction, got %', v_direction; end if;
   if v_source_kind <> 'SALU_PLANERING' then raise exception 'wrong Garage source kind: %', v_source_kind; end if;
 
@@ -267,7 +359,7 @@ select public.plan_salu_for_garage_v2(
 );
 
 do $$
-declare v public.salu_plans%rowtype; v_status text;
+declare v public.salu_plans%rowtype; v_status text; v_direction text;
 begin
   select * into v from public.salu_plans where flag_id='22222222-2222-4222-8222-222222222222';
   if v.planning_mode <> 'INDIVIDUAL' or v.planned_saludatum <> date '2026-11-08'
@@ -278,6 +370,8 @@ begin
   end if;
   select status into v_status from public.salu_flags where flag_id=v.flag_id;
   if v_status <> 'HANDLÄGGS' then raise exception 'individual planning rewrote SALU status: %', v_status; end if;
+  select garage_direction into v_direction from public.garage_items where source_kind='SALU_PLANERING' and source_salu_flag_id=v.flag_id;
+  if v_direction is not null then raise exception 'individual planning fabricated physical Garage direction: %', v_direction; end if;
 end;
 $$;
 
