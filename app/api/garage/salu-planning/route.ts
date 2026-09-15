@@ -24,18 +24,13 @@ function timestamp(value: unknown): string | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
-async function resolveActiveEmployee(admin: ReturnType<typeof adminClient>, email: string) {
-  const { data, error } = await admin
-    .from('employees')
-    .select('id,email,is_active,active')
-    .ilike('email', email.trim())
-    .eq('is_active', true)
-    .eq('active', true)
-    .limit(2);
-
-  if (error) throw error;
-  if (!data || data.length !== 1) return null;
-  return data[0] as { id: string; email: string | null; is_active: boolean; active: boolean | null };
+async function resolveActiveEmployeeId(admin: ReturnType<typeof adminClient>, email: string): Promise<string | null> {
+  const { data, error } = await admin.rpc('resolve_active_employee_identity_v1', { p_email: email });
+  if (error) {
+    if (error.code === '42501') return null;
+    throw error;
+  }
+  return typeof data === 'string' ? data : null;
 }
 
 async function canDecideSistaHyran(admin: ReturnType<typeof adminClient>, employeeId: string) {
@@ -93,9 +88,8 @@ export async function GET(request: Request) {
   let employeeId: string | null = null;
   let canDecide = false;
   try {
-    const employee = await resolveActiveEmployee(admin, verification.user.email);
-    employeeId = employee?.id ?? null;
-    canDecide = employee ? await canDecideSistaHyran(admin, employee.id) : false;
+    employeeId = await resolveActiveEmployeeId(admin, verification.user.email);
+    canDecide = employeeId ? await canDecideSistaHyran(admin, employeeId) : false;
   } catch (error) {
     console.error('[garage-salu-planning] mandate read failed', error);
   }
