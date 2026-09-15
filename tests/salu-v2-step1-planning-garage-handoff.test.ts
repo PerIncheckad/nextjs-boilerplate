@@ -8,6 +8,9 @@ const legacyDecisionApi = readFileSync('app/api/salu/decision/route.ts', 'utf8')
 const saluUi = readFileSync('app/salu/salu-decision-client.tsx', 'utf8');
 const saluPage = readFileSync('app/salu/page.tsx', 'utf8');
 const historicalSaluGarage = readFileSync('migrations/20260906023000_add_salu_saljas_to_garage_ut_handoff_v1.sql', 'utf8');
+const currentGarageSources = readFileSync('migrations/20260826014500_add_garage_v2_handoffs.sql', 'utf8');
+const saluDirectionLock = readFileSync('migrations/20260908100500_lock_salu_garage_direction_ut_v1.sql', 'utf8');
+const garageVoiding = readFileSync('migrations/20260829123500_add_garage_voiding_v1.sql', 'utf8');
 
 test('PLANERAD SALU is a separate non-terminal planning fact', () => {
   assert.match(migration, /create table public\.salu_plans/i);
@@ -37,6 +40,31 @@ test('planning write is idempotent per exact SALU cycle', () => {
   assert.match(migration, /ensure_handoff_from_source/);
 });
 
+test('Garage source-kind expansion preserves every current-main source kind and isolates SALU_PLANERING', () => {
+  assert.match(currentGarageSources, /'MANUELL'::text, 'PLANERING'::text, 'SALU'::text, 'LAGER1'::text/);
+  for (const sourceKind of ['MANUELL', 'PLANERING', 'SALU', 'LAGER1', 'SALU_PLANERING']) {
+    assert.match(migration, new RegExp(`'${sourceKind}'`));
+  }
+  assert.match(migration, /source_kind in \('SALU','SALU_PLANERING'\)[\s\S]*source_salu_flag_id is not null/);
+  assert.match(migration, /where source_kind = 'SALU_PLANERING' and voided_at is null/);
+  assert.doesNotMatch(migration, /drop constraint if exists garage_items_salu_source_direction_ut_chk/i);
+});
+
+test('historical terminal SALU source keeps its independent UT lock and uniqueness semantics', () => {
+  assert.match(saluDirectionLock, /source_kind = 'SALU'[\s\S]*garage_direction is not distinct from 'UT'/i);
+  assert.match(garageVoiding, /garage_items_salu_source_uidx/);
+  assert.match(garageVoiding, /where source_kind = 'SALU' and voided_at is null/);
+  assert.match(historicalSaluGarage, /garage_direction = 'UT'/);
+  assert.match(historicalSaluGarage, /'SALU_TO_GARAGE_SALJAS'/);
+});
+
+test('Garage to Nybil handoff remains IN-only so planned SALU cannot fabricate Nybil or physical Garage state', () => {
+  assert.match(currentGarageSources, /if v_item\.garage_direction <> 'IN' then/);
+  assert.match(currentGarageSources, /source_garage_item_id/);
+  assert.match(currentGarageSources, /nybil_garage_handoff_sync/);
+  assert.match(migration, /v_model,\s*null,\s*'SALU'/s);
+});
+
 test('historical STÄNGD + SÄLJAS bridge remains historical while future SÄLJAS closure is blocked', () => {
   assert.match(historicalSaluGarage, /status <> 'STÄNGD' or v_flag\.closure_outcome <> 'SÄLJAS'/i);
   assert.match(historicalSaluGarage, /source_kind,\s*source_salu_flag_id/s);
@@ -47,7 +75,7 @@ test('historical STÄNGD + SÄLJAS bridge remains historical while future SÄLJA
 
 test('SALU UI exposes both quick and individual planning without redefining source-owned vehicle truth', () => {
   assert.match(saluUi, /type="checkbox"/);
-  assert.match(saluUi, />PLANERAD SALU</);
+  assert.match(saluUi, /PLANERAD SALU/);
   assert.match(saluUi, /planning_mode: 'QUICK'/);
   assert.match(saluUi, /planning_mode: 'INDIVIDUAL'/);
   assert.match(saluUi, /authenticatedApiFetch\(`\/api\/vehicle-journey\?reg=/);
