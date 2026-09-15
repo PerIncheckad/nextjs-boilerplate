@@ -143,6 +143,15 @@ jobs:
           PGDATABASE: postgres
         run: bash scripts/test-salu-v2-step3-postgres.sh
 
+      - name: SALU V2 Step 4 PostgreSQL acceptance
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-salu-v2-step4-postgres.sh
+
       - name: Production build
         run: npm run build
 
