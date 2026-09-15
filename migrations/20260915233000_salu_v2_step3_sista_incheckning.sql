@@ -334,7 +334,7 @@ begin
     return new;
   end if;
 
-  select i, d into v_intent, v_decision
+  select i.* into v_intent
   from public.garage_sista_incheckning_intents i
   join public.garage_sista_hyran_decisions d on d.decision_id = i.decision_id
   join public.garage_items g on g.garage_item_id = i.garage_item_id
