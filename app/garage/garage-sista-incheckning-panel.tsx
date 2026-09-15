@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { authenticatedApiFetch } from '@/lib/api-auth-client';
 import styles from './garage-sista-incheckning-panel.module.css';
 
@@ -56,22 +56,27 @@ export default function GarageSistaIncheckningPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await authenticatedApiFetch('/api/garage/sista-incheckning', { cache: 'no-store' });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa SISTA INCHECKNING');
-      setRows((payload.data ?? []) as Row[]);
-      setError(null);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa SISTA INCHECKNING');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    let active = true;
 
-  useEffect(() => { void load(); }, [load]);
+    void (async () => {
+      try {
+        const response = await authenticatedApiFetch('/api/garage/sista-incheckning', { cache: 'no-store' });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa SISTA INCHECKNING');
+        if (!active) return;
+        setRows((payload.data ?? []) as Row[]);
+        setError(null);
+      } catch (loadError) {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : 'Kunde inte läsa SISTA INCHECKNING');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+
+    return () => { active = false; };
+  }, []);
 
   if (loading && rows.length === 0) return <div className={styles.state}>Läser SISTA INCHECKNING…</div>;
   if (error && rows.length === 0) return <div className={styles.error}>{error}</div>;
