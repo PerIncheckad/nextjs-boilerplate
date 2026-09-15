@@ -150,7 +150,7 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: postgres
-        run: bash scripts/test-salu-v2-step4-postgres.sh
+        run: bash scripts/test-salu-v2-step4-final-postgres.sh
 
       - name: Production build
         run: npm run build
