@@ -55,7 +55,16 @@ export default function GarageSaluStep4Panel() {
   useEffect(() => {
     if (!selectedId) return;
     let active = true;
-    void load(selectedId).catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa Step 4'); });
+    void authenticatedApiFetch(`/api/garage/salu-step4?garage_item_id=${encodeURIComponent(selectedId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const body = await response.json();
+        if (!response.ok) throw new Error(body?.error ?? 'Kunde inte läsa Step 4');
+        if (!active) return;
+        const next = body.data as Step4;
+        setData(next);
+        setChecked(Object.fromEntries((next.currentBuhsIds ?? []).map((id) => [id, next.verificationCurrent])));
+      })
+      .catch((reason: unknown) => { if (active) setError(reason instanceof Error ? reason.message : 'Kunde inte läsa Step 4'); });
     return () => { active = false; };
   }, [selectedId]);
 
