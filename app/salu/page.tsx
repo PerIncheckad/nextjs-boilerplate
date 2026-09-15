@@ -8,7 +8,7 @@ import contractStyles from '../operational-ui-contract-v1.module.css';
 
 export const metadata: Metadata = {
   title: 'SALU | INCHECKAD',
-  description: 'Samlad beslutsvy för SALU',
+  description: 'Planering och överlämning inför SALU',
 };
 
 export default function SaluPage() {
@@ -30,17 +30,17 @@ export default function SaluPage() {
       <section className={`${styles.hero} ${contractStyles.hero}`}>
         <div className={styles.heroCopy}>
           <span>INCHECKAD CORE / SALU</span>
-          <h1>En bil. Ett beslut.</h1>
-          <p>Öppna bilen, se verkliga blockerare och fatta slutbeslut. Processövergångarna hanteras av systemet.</p>
+          <h1>Planera först. Genomför sedan.</h1>
+          <p>Systemet flaggar bilen inför SALU. Planera enkelt direkt eller öppna hela beslutsunderlaget och lämna sedan över arbetsansvaret till Garaget.</p>
         </div>
 
-        <div className={`${styles.flow} ${contractStyles.flow}`} aria-label="Arbetsgång för SALU">
+        <div className={`${styles.flow} ${contractStyles.flow}`} aria-label="Arbetsgång för SALU-planering">
           <span className={styles.flowLabel}>ARBETSGÅNG</span>
           <ol>
-            <li><span>01</span>Välj bil</li>
-            <li><span>02</span>Läs blockerare</li>
-            <li><span>03</span>Fatta beslut</li>
-            <li><span>04</span>Verifiera</li>
+            <li><span>01</span>Systemet flaggar</li>
+            <li><span>02</span>Planera SALU</li>
+            <li><span>03</span>Lämna över</li>
+            <li><span>04</span>Garage genomför</li>
           </ol>
         </div>
       </section>
