@@ -51,6 +51,7 @@ type SaluGarageItem = {
   updated_at: string;
   source_plan: SaluPlan | null;
   sista_hyran: SistaHyran | null;
+  can_decide_sista_hyran: boolean;
 };
 
 type JourneyData = {
@@ -69,22 +70,41 @@ type JourneyData = {
   };
 };
 
-type Authorization = {
-  employee_resolved: boolean;
-  can_decide_sista_hyran: boolean;
-};
+type Authorization = { employee_resolved: boolean };
 
-function dateTimeLocal(value: string | null): string {
+const STOCKHOLM_TIME_ZONE = 'Europe/Stockholm';
+
+function stockholmDateTimeLocal(value: string | null): string {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
+  const parts = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: STOCKHOLM_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? '';
+  const year = part('year');
+  const month = part('month');
+  const day = part('day');
+  const hour = part('hour');
+  const minute = part('minute');
+  return year && month && day && hour && minute ? `${year}-${month}-${day}T${hour}:${minute}` : '';
+}
+
+function stockholmDisplay(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString('sv-SE', { timeZone: STOCKHOLM_TIME_ZONE });
 }
 
 export default function GarageSaluPlanning({ stations }: { stations: PlanningStation[] }) {
   const [items, setItems] = useState<SaluGarageItem[]>([]);
-  const [authorization, setAuthorization] = useState<Authorization>({ employee_resolved: false, can_decide_sista_hyran: false });
+  const [authorization, setAuthorization] = useState<Authorization>({ employee_resolved: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [journey, setJourney] = useState<JourneyData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,7 +125,7 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
       if (!response.ok) throw new Error(payload?.error ?? 'Kunde inte läsa SALU PLANERING');
       const nextItems = (payload.data ?? []) as SaluGarageItem[];
       setItems(nextItems);
-      setAuthorization(payload.authorization ?? { employee_resolved: false, can_decide_sista_hyran: false });
+      setAuthorization(payload.authorization ?? { employee_resolved: false });
       setSelectedId((current) => current && nextItems.some((item) => item.garage_item_id === current) ? current : nextItems[0]?.garage_item_id ?? null);
       setError(null);
     } catch (loadError) {
@@ -136,7 +156,7 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
   useEffect(() => {
     if (!selected) return;
     const timer = window.setTimeout(() => {
-      setDecisionTiming(dateTimeLocal(selected.sista_hyran?.last_rental_at ?? selected.salu_final_timing_at));
+      setDecisionTiming(stockholmDateTimeLocal(selected.sista_hyran?.last_rental_at ?? selected.salu_final_timing_at));
       setDecisionNote(selected.sista_hyran?.decision_note ?? '');
       setDecisionKey(crypto.randomUUID());
     }, 0);
@@ -242,7 +262,7 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
             <div className={styles.saluOperationalGrid}>
               <label><span>STATION / PLATS</span><select value={selected.planned_station ?? ''} disabled={saving} onChange={(event) => void patch(selected, { planned_station: event.target.value || null, station_change_reason: 'SALU operativ planering' })}><option value="">Ej fastställd</option>{stations.map((station) => <option key={station.station_code} value={station.station_code}>{station.display_name || station.station_code}</option>)}</select></label>
               <label><span>TRANSPORTSTATUS</span><select value={selected.transport_status} disabled={saving} onChange={(event) => void patch(selected, { transport_status: event.target.value })}><option value="EJ_BOKAD">Ej bokad</option><option value="TRANSPORTBOKAD">Transport bokad</option><option value="PA_VAG">På väg</option></select></label>
-              <label><span>DEFINITIV TIMING</span><input type="datetime-local" defaultValue={dateTimeLocal(selected.salu_final_timing_at)} disabled={saving} onBlur={(event) => void patch(selected, { salu_final_timing_at: event.target.value || null })} /></label>
+              <label><span>DEFINITIV TIMING</span><input type="datetime-local" defaultValue={stockholmDateTimeLocal(selected.salu_final_timing_at)} disabled={saving} onBlur={(event) => void patch(selected, { salu_final_timing_at: event.target.value || null })} /></label>
               <label><span>TRANSPORTINFORMATION</span><input defaultValue={selected.salu_transport_details ?? ''} disabled={saving} onBlur={(event) => void patch(selected, { salu_transport_details: event.target.value || null })} /></label>
               <label><span>VERKSTAD / REPARATION</span><input defaultValue={selected.salu_repair_destination ?? ''} disabled={saving} onBlur={(event) => void patch(selected, { salu_repair_destination: event.target.value || null })} /></label>
               <label className={styles.saluOperationalWide}><span>OPERATIV KOMMENTAR</span><textarea rows={2} defaultValue={selected.salu_operational_note ?? ''} disabled={saving} onBlur={(event) => void patch(selected, { salu_operational_note: event.target.value || null })} /></label>
@@ -254,11 +274,11 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
                 <strong>SISTA HYRAN</strong>
                 <small>Ett datum är endast beslutsunderlag. Beslutet finns först när denna handling genomförs med giltigt mandat.</small>
               </div>
-              {selected.sista_hyran ? <div className={styles.sistaHyranCurrent}><span>AKTUELL VERSION {selected.sista_hyran.decision_version}</span><strong>{selected.sista_hyran.last_rental_at ? new Date(selected.sista_hyran.last_rental_at).toLocaleString('sv-SE') : 'Timing ej angiven'}</strong><small>Beslutad {new Date(selected.sista_hyran.decided_at).toLocaleString('sv-SE')}</small></div> : null}
+              {selected.sista_hyran ? <div className={styles.sistaHyranCurrent}><span>AKTUELL VERSION {selected.sista_hyran.decision_version}</span><strong>{selected.sista_hyran.last_rental_at ? stockholmDisplay(selected.sista_hyran.last_rental_at) : 'Timing ej angiven'}</strong><small>Beslutad {stockholmDisplay(selected.sista_hyran.decided_at)}</small></div> : null}
               <label><span>SLUTLIG TIMING (VALFRI)</span><input type="datetime-local" value={decisionTiming} onChange={(event) => setDecisionTiming(event.target.value)} /></label>
               <label><span>BESLUTSKOMMENTAR</span><input value={decisionNote} onChange={(event) => setDecisionNote(event.target.value)} /></label>
-              <button className={styles.primaryButton} type="button" disabled={saving || !authorization.can_decide_sista_hyran || !selected.source_plan} onClick={() => void decide(selected)}>{saving ? 'SPARAR…' : selected.sista_hyran ? 'ÄNDRA SISTA HYRAN' : 'BESLUTA SISTA HYRAN'}</button>
-              {!authorization.employee_resolved ? <small>Ingen exakt aktiv employee-identitet kunde verifieras.</small> : !authorization.can_decide_sista_hyran ? <small>Inloggad employee saknar mandat BILKONTROLLCHEF / GARAGE_SISTA_HYRAN_DECIDE / PROCESS SALU.</small> : null}
+              <button className={styles.primaryButton} type="button" disabled={saving || !selected.can_decide_sista_hyran || !selected.source_plan} onClick={() => void decide(selected)}>{saving ? 'SPARAR…' : selected.sista_hyran ? 'ÄNDRA SISTA HYRAN' : 'BESLUTA SISTA HYRAN'}</button>
+              {!authorization.employee_resolved ? <small>Ingen exakt aktiv employee-identitet kunde verifieras.</small> : !selected.can_decide_sista_hyran ? <small>Mandat kräver BILKONTROLLCHEF, VD eller STATIONSCHEF för egen aktuell station samt GARAGE_SISTA_HYRAN_DECIDE / PROCESS SALU.</small> : null}
             </div>
           </div>
         ) : null}
