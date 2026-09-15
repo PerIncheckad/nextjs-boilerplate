@@ -18,12 +18,16 @@ const avvecklaApi = readFileSync('app/api/garage/avveckla/route.ts', 'utf8');
 const handoffPanel = readFileSync('app/garage/garage-avveckla-handoff-panel.tsx', 'utf8');
 const garageUi = readFileSync('app/garage/garage-client.tsx', 'utf8');
 const saluUi = readFileSync('app/salu/salu-decision-client.tsx', 'utf8');
+const legacyDecisionApi = readFileSync('app/api/salu/decision/route.ts', 'utf8');
 
-test('legacy manual SALU Garage route stays physically removed and operative SALU uses decision API', () => {
+test('legacy manual SALU Garage route stays physically removed and operative SALU uses V2 planning API', () => {
   assert.equal(existsSync('app/api/garage/salu-sources/route.ts'), false);
   assert.doesNotMatch(garageUi, /Hämta från SALU/);
   assert.doesNotMatch(garageUi, /\/api\/garage\/salu-sources/);
-  assert.match(saluUi, /\/api\/salu\/decision/);
+  assert.match(saluUi, /\/api\/salu\/planning/);
+  assert.doesNotMatch(saluUi, /\/api\/salu\/decision/);
+  assert.match(legacyDecisionApi, /if \(outcome === 'SÄLJAS'\)/);
+  assert.match(legacyDecisionApi, /SÄLJAS planeras via SALU PLANERING/);
 });
 
 test('only closed SALU with SÄLJAS can materialize the future Garage UT handoff', () => {
