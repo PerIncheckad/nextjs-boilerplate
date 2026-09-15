@@ -44,11 +44,8 @@ export async function POST(request: Request) {
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
 
   let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 });
-  }
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 }); }
 
   const garageItemId = text(body.garage_item_id);
   const bookedAt = parseOperationalDateTime(body.booked_at);
@@ -57,13 +54,20 @@ export async function POST(request: Request) {
   if (!garageItemId || !bookedAt) {
     return NextResponse.json({ error: 'Garage-objekt och verklig bokningstid krävs' }, { status: 400 });
   }
-
   if (new Date(bookedAt).getTime() > Date.now() + 5 * 60_000) {
     return NextResponse.json({ error: 'Verklig bokningstid kan inte ligga i framtiden' }, { status: 400 });
   }
 
   const admin = adminClient();
-  const { data, error } = await admin.rpc('book_garage_avveckla_transport', {
+  const { data: saluHandoff, error: handoffError } = await admin
+    .from('garage_salu_v2_avveckla_handoffs')
+    .select('salu_v2_handoff_id')
+    .eq('garage_item_id', garageItemId)
+    .maybeSingle();
+  if (handoffError) return NextResponse.json({ error: 'Kunde inte verifiera transportens terminalkälla' }, { status: 500 });
+
+  const rpc = saluHandoff?.salu_v2_handoff_id ? 'book_salu_v2_avveckla_transport_v1' : 'book_garage_avveckla_transport';
+  const { data, error } = await admin.rpc(rpc, {
     p_garage_item_id: garageItemId,
     p_booked_at: bookedAt,
     p_booking_reference: bookingReference,
@@ -74,8 +78,8 @@ export async function POST(request: Request) {
   if (error) {
     console.error('[garage/avveckla/transport] booking failed', error);
     const message = error.message || 'Kunde inte registrera transportbokningen';
-    const conflict = /endast|krävs före|mismatch|fryst|redan/i.test(message);
-    const notFound = /finns inte/i.test(message);
+    const conflict = /endast|krävs|mismatch|fryst|redan|HANDOFF|STALE|SOURCE/i.test(message);
+    const notFound = /finns inte|NOT_FOUND/i.test(message);
     return NextResponse.json({ error: message }, { status: notFound ? 404 : conflict ? 409 : 500 });
   }
 
