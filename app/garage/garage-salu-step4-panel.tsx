@@ -10,7 +10,8 @@ type Step4 = {
   buhsSource: BuhsRow[];
   currentBuhsIds: string[];
   verification: null | { buhs_verification_id: string; revision_no: number; source_row_count: number; source_set_hash: string; total_result: 'PASS'; verified_business_function: 'VD' | 'BILKONTROLLCHEF' };
-  handoff: null | { salu_v2_handoff_id: string; avveckla_case_id: string };
+  verificationCurrent: boolean;
+  handoff: null | { salu_v2_handoff_id: string; avveckla_case_id: string; buhs_verification_id: string; handoff_revision: number };
   archived: null | { terminal_completed_at: string; canonical_exit_fact_id: string; membership_state: 'INACTIVE' };
 };
 
@@ -48,7 +49,7 @@ export default function GarageSaluStep4Panel() {
     if (!response.ok) throw new Error(body?.error ?? 'Kunde inte läsa Step 4');
     const next = body.data as Step4;
     setData(next);
-    setChecked(Object.fromEntries((next.currentBuhsIds ?? []).map((id) => [id, true])));
+    setChecked(Object.fromEntries((next.currentBuhsIds ?? []).map((id) => [id, next.verificationCurrent])));
   };
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function GarageSaluStep4Panel() {
   }, [selectedId]);
 
   const verifyBuhs = async () => {
-    if (!data?.final) return;
+    if (!data?.final || data.archived) return;
     const ids = data.currentBuhsIds ?? [];
     if (ids.some((id) => checked[id] !== true)) return setError('Varje aktuell BUHS-rad måste uttryckligen vara PASS.');
     setBusy(true); setError(null);
@@ -76,7 +77,7 @@ export default function GarageSaluStep4Panel() {
   };
 
   const startAvveckla = async () => {
-    if (!data?.final || !data.verification) return;
+    if (!data?.final || !data.verification || !data.verificationCurrent || data.archived) return;
     setBusy(true); setError(null);
     try {
       const response = await authenticatedApiFetch('/api/garage/salu-step4', {
@@ -92,6 +93,8 @@ export default function GarageSaluStep4Panel() {
 
   if (!finals.length) return null;
 
+  const handoffNeedsRevision = Boolean(data?.verificationCurrent && data.verification && data.handoff && data.handoff.buhs_verification_id !== data.verification.buhs_verification_id);
+
   return (
     <section style={panel} aria-label="SALU V2 Step 4">
       <div><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: '.08em' }}>SALU V2 / STEP 4</div><h3 style={{ margin: '2px 0' }}>BUHS → AVVECKLA</h3><p style={{ margin: 0, fontSize: 13, color: '#555' }}>Explicit BUHS PASS på exakt SISTA INCHECKNING. SALU_PLANERING förblir riktningslös.</p></div>
@@ -102,12 +105,14 @@ export default function GarageSaluStep4Panel() {
         <div><strong>{data.final.regnr}</strong> · Step 3 final <code>{data.final.sista_incheckning_id}</code></div>
         <div style={{ fontSize: 13 }}><strong>BUHS source rows:</strong> {data.buhsSource.length}</div>
         {data.buhsSource.length ? data.buhsSource.map((row) => <label key={row.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
-          <input type="checkbox" checked={checked[row.id] === true} disabled={Boolean(data.verification || data.handoff)} onChange={(e) => setChecked((current) => ({ ...current, [row.id]: e.target.checked }))} />
+          <input type="checkbox" checked={checked[row.id] === true} disabled={Boolean(data.verificationCurrent || data.archived)} onChange={(e) => setChecked((current) => ({ ...current, [row.id]: e.target.checked }))} />
           <span><strong>PASS</strong> · <code>{row.id}</code> · {row.damage_date || 'datum saknas'} · {[row.damage_type_raw,row.note_customer,row.note_internal,row.vehiclenote].filter(Boolean).join(' · ') || 'BUHS-rad'}</span>
         </label>) : <div style={{ fontSize: 13 }}><strong>0 BUHS-rader.</strong> Ett explicit verifierat 0-resultat krävs.</div>}
-        {!data.verification ? <button type="button" style={button} disabled={busy} onClick={() => void verifyBuhs()}>VERIFIERA BUHS · ALLA PASS</button> : <div style={{ fontSize: 13 }}><strong>BUHS PASS</strong> · revision {data.verification.revision_no} · {data.verification.verified_business_function}</div>}
-        {data.verification && !data.handoff ? <button type="button" style={button} disabled={busy} onClick={() => void startAvveckla()}>STARTA EXAKT AVVECKLA-HANDOFF</button> : null}
-        {data.handoff ? <div style={{ fontSize: 13 }}><strong>AVVECKLA HANDOFF VERIFIERAD</strong> · <code>{data.handoff.avveckla_case_id}</code></div> : null}
+        {data.verification && data.verificationCurrent ? <div style={{ fontSize: 13 }}><strong>BUHS PASS</strong> · revision {data.verification.revision_no} · {data.verification.verified_business_function}</div> : null}
+        {data.verification && !data.verificationCurrent && !data.archived ? <div style={{ fontSize: 13, fontWeight: 800 }}>BUHS-source-setet har ändrats. Tidigare revision är terminalt ogiltig tills ny explicit PASS-verifiering görs.</div> : null}
+        {!data.verificationCurrent && !data.archived ? <button type="button" style={button} disabled={busy} onClick={() => void verifyBuhs()}>{data.verification ? 'VERIFIERA NY BUHS-REVISION · ALLA PASS' : 'VERIFIERA BUHS · ALLA PASS'}</button> : null}
+        {data.verificationCurrent && (!data.handoff || handoffNeedsRevision) && !data.archived ? <button type="button" style={button} disabled={busy} onClick={() => void startAvveckla()}>{handoffNeedsRevision ? 'UPPDATERA EXAKT AVVECKLA-HANDOFF' : 'STARTA EXAKT AVVECKLA-HANDOFF'}</button> : null}
+        {data.handoff ? <div style={{ fontSize: 13 }}><strong>AVVECKLA HANDOFF</strong> · revision {data.handoff.handoff_revision} · <code>{data.handoff.avveckla_case_id}</code></div> : null}
         {data.archived ? <div style={{ fontSize: 13 }}><strong>AVVECKLAD / ARKIV</strong> · canonical EXIT <code>{data.archived.canonical_exit_fact_id}</code></div> : null}
       </div> : null}
       {error ? <div style={{ color: '#a40000', fontWeight: 700, fontSize: 13 }}>{error}</div> : null}
