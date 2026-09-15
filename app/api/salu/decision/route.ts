@@ -103,6 +103,13 @@ export async function POST(request: Request) {
   if (!flagId) return NextResponse.json({ error: 'flag_id saknas' }, { status: 400 });
   if (!outcome) return NextResponse.json({ error: 'Slutbeslut saknas' }, { status: 400 });
 
+  // SALU V2: SÄLJAS is no longer a terminal closure action. Future sale planning
+  // must use /api/salu/planning so the active SALU cycle remains open while
+  // Garage receives operational work responsibility.
+  if (outcome === 'SÄLJAS') {
+    return NextResponse.json({ error: 'SÄLJAS planeras via SALU PLANERING och får inte stänga SALU-cykeln.' }, { status: 409 });
+  }
+
   const admin = adminClient();
   const { data, error } = await admin.rpc('decide_salu_flag_v1', {
     p_flag_id: flagId,
