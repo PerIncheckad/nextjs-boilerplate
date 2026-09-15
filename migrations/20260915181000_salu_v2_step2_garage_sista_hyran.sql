@@ -8,6 +8,24 @@ set local statement_timeout = '30s';
 -- The original SALU-owned plan remains in salu_plans and is never rewritten here.
 -- SISTA HYRAN is an explicit, mandate-gated business decision. No date or Garage field
 -- can infer or create that decision implicitly.
+--
+-- Final authorization contract from first install:
+--   BILKONTROLLCHEF OR VD OR STATIONSCHEF (own current Garage station only)
+--   + GARAGE_SISTA_HYRAN_DECIDE + PROCESS/SALU.
+-- Auth UUID is provenance only. employees.id is resolved from verified auth email.
+-- No employee mandate assignment is seeded by Step 2.
+
+insert into public.business_function_definitions (function_code, title, description)
+values (
+  'VD',
+  'VD',
+  'Övergripande verksamhetsansvar med explicit processmandat när sådant tilldelats.'
+)
+on conflict (function_code) do update
+set title = excluded.title,
+    description = excluded.description,
+    active = true,
+    changed_at = now();
 
 insert into public.mandate_capability_definitions (capability_code, title, description)
 values (
@@ -21,8 +39,77 @@ set title = excluded.title,
     active = true,
     changed_at = now();
 
--- No employee_mandates are seeded by Step 2. Production assignment is a separate
--- organisational MASTER decision.
+-- Identity boundary: verified auth email must resolve to exactly one active employee.
+create or replace function public.resolve_active_employee_identity_v1(p_email text)
+returns uuid
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_employee_id uuid;
+  v_count integer;
+  v_email text := pg_catalog.lower(pg_catalog.btrim(coalesce(p_email, '')));
+begin
+  if v_email = '' then
+    raise exception 'Verifierad auth-email krävs' using errcode = '42501';
+  end if;
+
+  select count(*), (pg_catalog.array_agg(e.id order by e.id::text))[1]
+    into v_count, v_employee_id
+  from public.employees e
+  where pg_catalog.lower(pg_catalog.btrim(coalesce(e.email, ''))) = v_email
+    and coalesce(e.is_active, false)
+    and coalesce(e.active, true);
+
+  if v_count <> 1 or v_employee_id is null then
+    raise exception 'Exakt en aktiv employee-identitet krävs' using errcode = '42501';
+  end if;
+
+  return v_employee_id;
+end;
+$$;
+
+-- datetime-local is interpreted only as Swedish business local time. Server/browser
+-- runtime timezone must never decide the instant. Non-existent and ambiguous DST wall
+-- times are rejected because they do not identify exactly one instant.
+create or replace function public.swedish_local_datetime_to_timestamptz_v1(p_local_datetime text)
+returns timestamptz
+language plpgsql
+immutable
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_text text := pg_catalog.btrim(coalesce(p_local_datetime, ''));
+  v_local timestamp without time zone;
+  v_instant timestamptz;
+begin
+  if v_text !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$' then
+    raise exception 'Svensk lokal tid måste anges som YYYY-MM-DDTHH:MM' using errcode = '22023';
+  end if;
+
+  begin
+    v_local := v_text::timestamp;
+  exception when others then
+    raise exception 'Ogiltig svensk lokal tid' using errcode = '22023';
+  end;
+
+  v_instant := v_local at time zone 'Europe/Stockholm';
+
+  if (v_instant at time zone 'Europe/Stockholm') is distinct from v_local then
+    raise exception 'Lokal tid finns inte i Europe/Stockholm på grund av DST' using errcode = '22023';
+  end if;
+
+  if ((v_instant - interval '1 hour') at time zone 'Europe/Stockholm') = v_local
+     or ((v_instant + interval '1 hour') at time zone 'Europe/Stockholm') = v_local then
+    raise exception 'Lokal tid är tvetydig i Europe/Stockholm på grund av DST' using errcode = '22023';
+  end if;
+
+  return v_instant;
+end;
+$$;
 
 alter table public.garage_items
   add column if not exists salu_final_timing_at timestamptz,
@@ -31,7 +118,7 @@ alter table public.garage_items
   add column if not exists salu_operational_note text;
 
 comment on column public.garage_items.salu_final_timing_at is
-  'Garage-owned operational timing for a SALU_PLANERING object. Decision support only; it never means SISTA HYRAN by itself.';
+  'Garage-owned operational timing for a SALU_PLANERING object. Stored as an unambiguous instant from Europe/Stockholm local input. Decision support only; it never means SISTA HYRAN by itself.';
 comment on column public.garage_items.salu_transport_details is
   'Garage-owned operational transport information for a SALU_PLANERING object.';
 comment on column public.garage_items.salu_repair_destination is
@@ -78,7 +165,7 @@ create table public.garage_salu_operational_events (
 );
 
 comment on table public.garage_salu_operational_events is
-  'Append-only audit of Garage-owned SALU_PLANERING complements. Original salu_plans facts are referenced, never rewritten.';
+  'Append-only audit of Garage-owned SALU_PLANERING complements. Rows are created by the audit trigger, not by application direct INSERT. Original salu_plans facts are referenced, never rewritten.';
 
 create index garage_salu_operational_events_item_time_idx
   on public.garage_salu_operational_events(garage_item_id, changed_at desc);
@@ -216,7 +303,7 @@ create table public.garage_sista_hyran_decisions (
 );
 
 comment on table public.garage_sista_hyran_decisions is
-  'Append-only explicit SISTA HYRAN decisions. Existence of a row is the decision; dates elsewhere never infer one. New decisions supersede by version without overwriting history.';
+  'Append-only explicit SISTA HYRAN decisions. Rows may only be created by the mandate-controlled decision function. Existence of a row is the decision; dates elsewhere never infer one.';
 
 create index garage_sista_hyran_decisions_item_time_idx
   on public.garage_sista_hyran_decisions(garage_item_id, decision_version desc, decided_at desc);
@@ -260,11 +347,92 @@ order by d.garage_item_id, d.decision_version desc, d.decided_at desc;
 comment on view public.garage_sista_hyran_current is
   'Step 3 read contract: a row means SISTA HYRAN=true from an explicit Garage decision. No row means no decision.';
 
+-- One canonical decision-authorization function is shared by read/UI authorization and
+-- the write RPC. Stationschef is deliberately station-bound even when employee.station_scope
+-- is ALL: SISTA HYRAN requires exact current Garage planned_station = employees.station.
+create or replace function public.actor_can_decide_garage_sista_hyran_v1(
+  p_employee_id uuid,
+  p_garage_item_id uuid,
+  p_at timestamptz default now()
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog
+as $$
+declare
+  v_item_station text;
+  v_employee_station text;
+begin
+  if p_employee_id is null or p_garage_item_id is null then
+    return false;
+  end if;
+
+  select g.planned_station into v_item_station
+  from public.garage_items g
+  where g.garage_item_id = p_garage_item_id
+    and g.source_kind = 'SALU_PLANERING'
+    and g.voided_at is null
+    and g.handed_off_nybil_id is null
+    and g.completed_at is null;
+
+  if not found then
+    return false;
+  end if;
+
+  if public.actor_has_process_mandate(
+    p_employee_id,
+    'GARAGE_SISTA_HYRAN_DECIDE',
+    'BILKONTROLLCHEF',
+    'PROCESS',
+    'SALU',
+    p_at
+  ) then
+    return true;
+  end if;
+
+  if public.actor_has_process_mandate(
+    p_employee_id,
+    'GARAGE_SISTA_HYRAN_DECIDE',
+    'VD',
+    'PROCESS',
+    'SALU',
+    p_at
+  ) then
+    return true;
+  end if;
+
+  if not public.actor_has_process_mandate(
+    p_employee_id,
+    'GARAGE_SISTA_HYRAN_DECIDE',
+    'STATIONSCHEF',
+    'PROCESS',
+    'SALU',
+    p_at
+  ) then
+    return false;
+  end if;
+
+  select e.station into v_employee_station
+  from public.employees e
+  where e.id = p_employee_id
+    and coalesce(e.is_active, false)
+    and coalesce(e.active, true);
+
+  if v_employee_station is null or v_item_station is null then
+    return false;
+  end if;
+
+  return pg_catalog.btrim(v_employee_station) = pg_catalog.btrim(v_item_station);
+end;
+$$;
+
 create or replace function public.decide_garage_sista_hyran_v1(
   p_garage_item_id uuid,
-  p_employee_id uuid,
+  p_actor_email text,
   p_auth_user_id uuid,
-  p_last_rental_at timestamptz,
+  p_last_rental_local text,
   p_decision_note text,
   p_idempotency_key text
 )
@@ -279,17 +447,25 @@ declare
   v_existing public.garage_sista_hyran_decisions%rowtype;
   v_previous public.garage_sista_hyran_decisions%rowtype;
   v_decision public.garage_sista_hyran_decisions%rowtype;
+  v_employee_id uuid;
+  v_last_rental_at timestamptz;
   v_key text := pg_catalog.btrim(coalesce(p_idempotency_key, ''));
   v_now timestamptz := pg_catalog.clock_timestamp();
 begin
   if p_garage_item_id is null then
     raise exception 'Garage item krävs' using errcode = '22023';
   end if;
-  if p_employee_id is null or p_auth_user_id is null then
-    raise exception 'Verifierad employee och auth-identitet krävs' using errcode = '42501';
+  if p_auth_user_id is null then
+    raise exception 'Verifierad auth-identitet krävs' using errcode = '42501';
   end if;
   if v_key = '' then
     raise exception 'Idempotency key krävs' using errcode = '22023';
+  end if;
+
+  v_employee_id := public.resolve_active_employee_identity_v1(p_actor_email);
+
+  if pg_catalog.btrim(coalesce(p_last_rental_local, '')) <> '' then
+    v_last_rental_at := public.swedish_local_datetime_to_timestamptz_v1(p_last_rental_local);
   end if;
 
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('garage-sista-hyran:' || p_garage_item_id::text));
@@ -323,13 +499,13 @@ begin
     raise exception 'Exakt ursprunglig SALU-plan saknas' using errcode = 'P0002';
   end if;
 
-  perform public.assert_actor_process_mandate(
-    p_employee_id,
-    'GARAGE_SISTA_HYRAN_DECIDE',
-    'BILKONTROLLCHEF',
-    'PROCESS',
-    'SALU'
-  );
+  if not public.actor_can_decide_garage_sista_hyran_v1(
+    v_employee_id,
+    p_garage_item_id,
+    v_now
+  ) then
+    raise exception 'Mandat saknas för SISTA HYRAN på aktuellt Garage-objekt' using errcode = '42501';
+  end if;
 
   select * into v_existing
   from public.garage_sista_hyran_decisions
@@ -376,10 +552,10 @@ begin
     v_plan.regnr,
     'SISTA HYRAN',
     coalesce(v_previous.decision_version, 0) + 1,
-    p_last_rental_at,
+    v_last_rental_at,
     nullif(pg_catalog.btrim(coalesce(p_decision_note, '')), ''),
     v_now,
-    p_employee_id,
+    v_employee_id,
     p_auth_user_id,
     v_key,
     v_previous.decision_id
@@ -401,21 +577,35 @@ $$;
 alter table public.garage_salu_operational_events enable row level security;
 alter table public.garage_sista_hyran_decisions enable row level security;
 
-revoke all on public.garage_salu_operational_events from public, anon, authenticated;
-revoke all on public.garage_sista_hyran_decisions from public, anon, authenticated;
-revoke all on public.garage_sista_hyran_current from public, anon, authenticated;
+revoke all on public.garage_salu_operational_events from public, anon, authenticated, service_role;
+revoke all on public.garage_sista_hyran_decisions from public, anon, authenticated, service_role;
+revoke all on public.garage_sista_hyran_current from public, anon, authenticated, service_role;
 
-grant select, insert on public.garage_salu_operational_events to service_role;
-grant select, insert on public.garage_sista_hyran_decisions to service_role;
+grant select on public.garage_salu_operational_events to service_role;
+grant select on public.garage_sista_hyran_decisions to service_role;
 grant select on public.garage_sista_hyran_current to service_role;
 
+revoke all on function public.resolve_active_employee_identity_v1(text) from public, anon, authenticated;
+revoke all on function public.swedish_local_datetime_to_timestamptz_v1(text) from public, anon, authenticated;
+revoke all on function public.actor_can_decide_garage_sista_hyran_v1(uuid,uuid,timestamptz) from public, anon, authenticated;
 revoke all on function public.reject_garage_salu_operational_event_mutation_v1() from public, anon, authenticated;
 revoke all on function public.audit_garage_salu_operational_changes_v1() from public, anon, authenticated;
 revoke all on function public.reject_garage_sista_hyran_mutation_v1() from public, anon, authenticated;
-revoke all on function public.decide_garage_sista_hyran_v1(uuid,uuid,uuid,timestamptz,text,text) from public, anon, authenticated;
-grant execute on function public.decide_garage_sista_hyran_v1(uuid,uuid,uuid,timestamptz,text,text) to service_role;
+revoke all on function public.decide_garage_sista_hyran_v1(uuid,text,uuid,text,text,text) from public, anon, authenticated;
 
-comment on function public.decide_garage_sista_hyran_v1(uuid,uuid,uuid,timestamptz,text,text) is
-  'SALU V2 Step 2 explicit SISTA HYRAN decision. Requires BILKONTROLLCHEF + GARAGE_SISTA_HYRAN_DECIDE + PROCESS/SALU mandate. Never closes SALU, starts AVVECKLA, creates canonical fleet EXIT, writes Check-in or fabricates Garage IN/UT.';
+grant execute on function public.resolve_active_employee_identity_v1(text) to service_role;
+grant execute on function public.swedish_local_datetime_to_timestamptz_v1(text) to service_role;
+grant execute on function public.actor_can_decide_garage_sista_hyran_v1(uuid,uuid,timestamptz) to service_role;
+grant execute on function public.decide_garage_sista_hyran_v1(uuid,text,uuid,text,text,text) to service_role;
 
+comment on function public.resolve_active_employee_identity_v1(text) is
+  'Resolves verified auth email to exactly one active employees.id. Missing or ambiguous identity denies authorization.';
+comment on function public.swedish_local_datetime_to_timestamptz_v1(text) is
+  'Converts an unambiguous Swedish Europe/Stockholm datetime-local value to timestamptz and rejects DST gaps/overlaps.';
+comment on function public.actor_can_decide_garage_sista_hyran_v1(uuid,uuid,timestamptz) is
+  'Canonical SISTA HYRAN authorization: BILKONTROLLCHEF or VD, or STATIONSCHEF only when employees.station equals current garage_items.planned_station; all require GARAGE_SISTA_HYRAN_DECIDE + PROCESS/SALU.';
+comment on function public.decide_garage_sista_hyran_v1(uuid,text,uuid,text,text,text) is
+  'SALU V2 Step 2 explicit SISTA HYRAN decision. Employee identity is resolved from verified auth email. Decision requires canonical BILKONTROLLCHEF/VD/STATIONSCHEF authorization. Never closes SALU, starts AVVECKLA, creates canonical fleet EXIT, writes Check-in or fabricates Garage IN/UT.';
+
+-- No employee_mandates are seeded. Production assignment is a separate organisational MASTER decision.
 commit;
