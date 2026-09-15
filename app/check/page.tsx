@@ -1,7 +1,7 @@
 // app/check/page.tsx
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import FormClient from './form-client';
+import CheckStep3Shell from './check-step3-shell';
 import OperationalNavigation from '@/components/OperationalNavigation';
 import OperationalTopbarMeta from '@/components/OperationalTopbarMeta';
 import styles from './check-shell.module.css';
@@ -49,7 +49,7 @@ export default function CheckPage() {
       </section>
 
       <section className={`${styles.formSurface} ${contractStyles.surface} ${cleanupStyles.checkSurface} ${cleanupStyles.legacyHeaderHidden} ${actionStyles.actionSurface}`}>
-        <FormClient />
+        <CheckStep3Shell />
       </section>
     </main>
   );

@@ -116,6 +116,33 @@ jobs:
           PGDATABASE: postgres
         run: bash scripts/test-salu-v2-step2-postgres.sh
 
+      - name: SALU V2 Step 3 base schema migration acceptance
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-salu-v2-step3-base-schema-postgres.sh
+
+      - name: SALU V2 Step 3 exact-binding hardening migration acceptance
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-salu-v2-step3-hardening-schema-postgres.sh
+
+      - name: SALU V2 Step 3 PostgreSQL acceptance
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/test-salu-v2-step3-postgres.sh
+
       - name: Production build
         run: npm run build
 
