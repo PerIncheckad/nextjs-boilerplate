@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { authenticatedApiFetch } from '@/lib/api-auth-client';
+import GarageSaluPlanning from './garage-salu-planning';
 import styles from './garage.module.css';
 
 type PlanningStation = { station_code: string; display_name: string | null; sort_order: number };
@@ -32,7 +33,7 @@ type GarageItem = {
   transport_status: string;
   planned_delivery_date: string | null;
   note: string | null;
-  source_kind: 'MANUELL' | 'PLANERING' | 'SALU' | 'LAGER1';
+  source_kind: 'MANUELL' | 'PLANERING' | 'SALU' | 'SALU_PLANERING' | 'LAGER1';
   source_planning_cell_id: string | null;
   source_planning_unit_no: number | null;
   source_salu_flag_id: string | null;
@@ -75,7 +76,7 @@ const emptyDraft = (station: string | null = null): Draft => ({
   note: '',
 });
 const directionLabel = (value: GarageDirection | null) => value === 'IN' ? 'UTVECKLA / IN' : value === 'UT' ? 'AVVECKLA / UT' : 'Ej satt';
-const sourceLabel = (item: GarageItem) => item.source_kind === 'PLANERING' ? `Planering #${item.source_planning_unit_no ?? '—'}` : item.source_kind === 'SALU' ? 'SALU' : item.source_kind === 'LAGER1' ? 'Lager 1' : 'Manuell';
+const sourceLabel = (item: GarageItem) => item.source_kind === 'PLANERING' ? `Planering #${item.source_planning_unit_no ?? '—'}` : item.source_kind === 'SALU_PLANERING' ? 'SALU PLANERING' : item.source_kind === 'SALU' ? 'SALU' : item.source_kind === 'LAGER1' ? 'Lager 1' : 'Manuell';
 const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export default function GarageClient() {
@@ -182,6 +183,7 @@ export default function GarageClient() {
   const visible = useMemo(() => {
     const needle = query.trim().toUpperCase();
     const filtered = items.filter((item) => {
+      if (item.source_kind === 'SALU_PLANERING') return false;
       if (station !== 'ALLA' && item.planned_station !== station) return false;
       if (direction !== 'ALLA' && item.garage_direction !== direction) return false;
       if (periodFilter && item.planning_period !== periodFilter) return false;
@@ -202,7 +204,7 @@ export default function GarageClient() {
   return (
     <main className={styles.shell}>
       <header className={styles.header}>
-        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>GARAGET</h1><p>UTVECKLA / IN · AVVECKLA / UT.</p></div>
+        <div><div className={styles.eyebrow}>INCHECKAD / BK</div><h1>GARAGET</h1><p>UTVECKLA / IN · AVVECKLA / UT · SALU PLANERING.</p></div>
         <div className={styles.headerActions}><Link href="/planning" className={styles.primaryButton}>PLANERING</Link><Link href="/tower" className={styles.secondaryButton}>TOWER</Link><button aria-label="Skriv ut" className={styles.secondaryButton} type="button" onClick={() => window.print()}>SKRIV UT</button><button className={styles.secondaryButton} type="button" onClick={() => window.print()} title="Välj Spara som PDF i utskriftsdialogen">PDF</button></div>
       </header>
 
@@ -214,6 +216,8 @@ export default function GarageClient() {
           <div className={styles.panelTitle}><h2>PLANERING → GARAGET</h2><span>Planering släpper bilen som redan beställd, avropad och bekräftad. Garaget kompletterar endast aktuell staginginformation.</span></div>
         </div>
       </section>
+
+      <GarageSaluPlanning stations={stations} />
 
       <section className={styles.createPanel}>
         <div className={styles.panelTitle}><h2>LÄGG BIL MANUELLT</h2><span>Manuell väg för staging-undantag som inte kommer från Planering.</span></div>
