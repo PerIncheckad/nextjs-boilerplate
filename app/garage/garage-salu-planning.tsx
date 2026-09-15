@@ -115,7 +115,10 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
 
   useEffect(() => {
     if (!selected?.regnr) return;
