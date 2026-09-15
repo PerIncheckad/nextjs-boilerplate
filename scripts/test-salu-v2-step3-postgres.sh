@@ -54,7 +54,7 @@ end $$;
 do $$
 declare
   v_item uuid;
-  v_decision public.garage_sista_hyran_decisions%rowtype;
+  v_decision record;
 begin
   select garage_item_id into v_item
   from public.garage_items
@@ -128,7 +128,7 @@ do $$
 declare
   v_item uuid;
   v_final public.garage_sista_incheckningar%rowtype;
-  v_current public.garage_sista_hyran_decisions%rowtype;
+  v_current record;
   v_count integer;
 begin
   select garage_item_id into v_item from public.garage_items
