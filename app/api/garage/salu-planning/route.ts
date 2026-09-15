@@ -17,13 +17,6 @@ function text(value: unknown): string | null {
   return next || null;
 }
 
-function timestamp(value: unknown): string | null {
-  const next = text(value);
-  if (!next) return null;
-  const parsed = new Date(next);
-  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
-}
-
 async function resolveActiveEmployeeId(admin: ReturnType<typeof adminClient>, email: string): Promise<string | null> {
   const { data, error } = await admin.rpc('resolve_active_employee_identity_v1', { p_email: email });
   if (error) {
@@ -33,16 +26,30 @@ async function resolveActiveEmployeeId(admin: ReturnType<typeof adminClient>, em
   return typeof data === 'string' ? data : null;
 }
 
-async function canDecideSistaHyran(admin: ReturnType<typeof adminClient>, employeeId: string) {
-  const { data, error } = await admin.rpc('actor_has_process_mandate', {
+async function canDecideSistaHyran(
+  admin: ReturnType<typeof adminClient>,
+  employeeId: string,
+  garageItemId: string,
+): Promise<boolean> {
+  const { data, error } = await admin.rpc('actor_can_decide_garage_sista_hyran_v1', {
     p_employee_id: employeeId,
-    p_capability_code: 'GARAGE_SISTA_HYRAN_DECIDE',
-    p_required_function: 'BILKONTROLLCHEF',
-    p_scope_type: 'PROCESS',
-    p_scope_code: 'SALU',
+    p_garage_item_id: garageItemId,
   });
   if (error) throw error;
   return data === true;
+}
+
+async function swedishLocalTimestamp(
+  admin: ReturnType<typeof adminClient>,
+  value: unknown,
+): Promise<string | null> {
+  const local = text(value);
+  if (!local) return null;
+  const { data, error } = await admin.rpc('swedish_local_datetime_to_timestamptz_v1', {
+    p_local_datetime: local,
+  });
+  if (error) throw error;
+  return typeof data === 'string' ? data : null;
 }
 
 export async function GET(request: Request) {
@@ -86,10 +93,16 @@ export async function GET(request: Request) {
   const decisionByItem = new Map((decisionsResult.data ?? []).map((decision) => [decision.garage_item_id, decision]));
 
   let employeeId: string | null = null;
-  let canDecide = false;
+  const decisionAuthorization = new Map<string, boolean>();
   try {
     employeeId = await resolveActiveEmployeeId(admin, verification.user.email);
-    canDecide = employeeId ? await canDecideSistaHyran(admin, employeeId) : false;
+    if (employeeId) {
+      const decisions = await Promise.all(rows.map(async (item) => [
+        item.garage_item_id,
+        await canDecideSistaHyran(admin, employeeId as string, item.garage_item_id),
+      ] as const));
+      for (const [garageItemId, allowed] of decisions) decisionAuthorization.set(garageItemId, allowed);
+    }
   } catch (error) {
     console.error('[garage-salu-planning] mandate read failed', error);
   }
@@ -99,10 +112,10 @@ export async function GET(request: Request) {
       ...item,
       source_plan: item.source_salu_flag_id ? planByFlag.get(item.source_salu_flag_id) ?? null : null,
       sista_hyran: decisionByItem.get(item.garage_item_id) ?? null,
+      can_decide_sista_hyran: decisionAuthorization.get(item.garage_item_id) === true,
     })),
     authorization: {
       employee_resolved: Boolean(employeeId),
-      can_decide_sista_hyran: canDecide,
     },
   });
 }
@@ -162,9 +175,18 @@ export async function PATCH(request: Request) {
     changes.transport_status = transportStatus;
   }
   if (Object.hasOwn(body, 'salu_final_timing_at')) {
-    const value = body.salu_final_timing_at === null || body.salu_final_timing_at === '' ? null : timestamp(body.salu_final_timing_at);
-    if (body.salu_final_timing_at && !value) return NextResponse.json({ error: 'Ogiltig definitiv timing' }, { status: 400 });
-    changes.salu_final_timing_at = value;
+    if (body.salu_final_timing_at === null || body.salu_final_timing_at === '') {
+      changes.salu_final_timing_at = null;
+    } else {
+      try {
+        const value = await swedishLocalTimestamp(admin, body.salu_final_timing_at);
+        if (!value) return NextResponse.json({ error: 'Ogiltig definitiv timing' }, { status: 400 });
+        changes.salu_final_timing_at = value;
+      } catch (error) {
+        console.error('[garage-salu-planning] Swedish timing conversion failed', error);
+        return NextResponse.json({ error: 'Ogiltig eller tvetydig svensk lokal tid' }, { status: 400 });
+      }
+    }
   }
   for (const field of ['salu_transport_details', 'salu_repair_destination', 'salu_operational_note'] as const) {
     if (Object.hasOwn(body, field)) changes[field] = text(body[field]);
@@ -208,23 +230,23 @@ export async function POST(request: Request) {
   const idempotencyKey = text(body.idempotency_key);
   if (!garageItemId || !idempotencyKey) return NextResponse.json({ error: 'garage_item_id och idempotency_key krävs' }, { status: 400 });
 
-  const lastRentalAt = body.last_rental_at === null || body.last_rental_at === '' ? null : timestamp(body.last_rental_at);
-  if (body.last_rental_at && !lastRentalAt) return NextResponse.json({ error: 'Ogiltig SISTA HYRAN-timing' }, { status: 400 });
-
+  const lastRentalLocal = text(body.last_rental_at);
   const admin = adminClient();
   const { data, error } = await admin.rpc('decide_garage_sista_hyran_v1', {
     p_garage_item_id: garageItemId,
     p_actor_email: verification.user.email,
     p_auth_user_id: verification.user.id,
-    p_last_rental_at: lastRentalAt,
+    p_last_rental_local: lastRentalLocal,
     p_decision_note: text(body.decision_note),
     p_idempotency_key: idempotencyKey,
   });
 
   if (error) {
     const forbidden = error.code === '42501';
+    const invalidTiming = error.code === '22023';
     console.error('[garage-salu-planning] SISTA HYRAN decision failed', error);
-    return NextResponse.json({ error: forbidden ? 'Employee-identitet eller mandat saknas för SISTA HYRAN' : 'SISTA HYRAN kunde inte sparas' }, { status: forbidden ? 403 : 409 });
+    if (invalidTiming) return NextResponse.json({ error: 'Ogiltig eller tvetydig svensk lokal tid för SISTA HYRAN' }, { status: 400 });
+    return NextResponse.json({ error: forbidden ? 'Employee-identitet, mandat eller stationsbehörighet saknas för SISTA HYRAN' : 'SISTA HYRAN kunde inte sparas' }, { status: forbidden ? 403 : 409 });
   }
 
   return NextResponse.json({ data });
