@@ -29,25 +29,26 @@ test('wrapper remains server-only and does not own downstream modules', () => {
   assert.doesNotMatch(migration, /vehicle_edits/i);
 });
 
-test('authenticated API exposes one decision call', () => {
+test('authenticated API keeps legacy decisions but routes SÄLJAS to non-terminal planning', () => {
   assert.match(api, /verifyApiUser\(request\)/);
   assert.match(api, /rpc\('decide_salu_flag_v1'/);
   assert.match(api, /closure_outcome/);
   assert.match(api, /new_saludatum/);
+  assert.match(api, /if \(outcome === 'SÄLJAS'\)/);
+  assert.match(api, /SÄLJAS planeras via SALU PLANERING/);
 });
 
-test('UI shows blockers and the five locked final decisions without workflow buttons', () => {
-  for (const decision of ['SÄLJAS', 'FÖRLÄNGA', 'PLANERA VERKSTAD', 'LÅNGTID PLANERA SKIFTE', 'ANNAT']) {
-    assert.match(ui, new RegExp(decision));
-  }
-  assert.match(ui, /Kan inte avslutas ännu/);
-  assert.match(ui, /Fatta beslut/);
+test('UI keeps non-SÄLJAS legacy decisions out of the new planning workspace and exposes SALU planning instead', () => {
+  assert.match(ui, /\/api\/salu\/planning/);
+  assert.match(ui, /PLANERAD SALU/);
+  assert.doesNotMatch(ui, /\/api\/salu\/decision/);
   assert.doesNotMatch(ui, />Kvittera</);
   assert.doesNotMatch(ui, />HANDLÄGGS</);
   assert.doesNotMatch(ui, /Gå till slutbedömning/);
+  assert.doesNotMatch(ui, /Fatta beslut/);
 });
 
-test('SALU is exposed as an operational workspace and SÄLJAS handoff remains unchanged', () => {
+test('SALU is exposed as an operational workspace and historical SÄLJAS Garage UT handoff remains unchanged', () => {
   assert.match(operationalNavigationContract, /\{\s*href:\s*'\/salu',\s*label:\s*'SALU'\s*\}/);
   assert.match(saluGarage, /nextAction', 'START_AVVECKLA_MANUALLY'/);
   assert.match(saluGarage, /avvecklaStarted', false/);
