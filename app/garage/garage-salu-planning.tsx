@@ -97,6 +97,7 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
   const selected = useMemo(() => items.find((item) => item.garage_item_id === selectedId) ?? null, [items, selectedId]);
 
   const load = useCallback(async () => {
+    await Promise.resolve();
     setLoading(true);
     try {
       const response = await authenticatedApiFetch('/api/garage/salu-planning', { cache: 'no-store' });
@@ -117,10 +118,7 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (!selected?.regnr) {
-      setJourney(null);
-      return;
-    }
+    if (!selected?.regnr) return;
     let active = true;
     void authenticatedApiFetch(`/api/vehicle-journey?reg=${encodeURIComponent(selected.regnr)}`, { cache: 'no-store' })
       .then(async (response) => {
@@ -134,10 +132,13 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
 
   useEffect(() => {
     if (!selected) return;
-    setDecisionTiming(dateTimeLocal(selected.sista_hyran?.last_rental_at ?? selected.salu_final_timing_at));
-    setDecisionNote(selected.sista_hyran?.decision_note ?? '');
-    setDecisionKey(crypto.randomUUID());
-  }, [selected?.garage_item_id, selected?.sista_hyran?.decision_id]);
+    const timer = window.setTimeout(() => {
+      setDecisionTiming(dateTimeLocal(selected.sista_hyran?.last_rental_at ?? selected.salu_final_timing_at));
+      setDecisionNote(selected.sista_hyran?.decision_note ?? '');
+      setDecisionKey(crypto.randomUUID());
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [selected]);
 
   async function patch(item: SaluGarageItem, changes: Record<string, unknown>) {
     setSaving(true);
@@ -198,7 +199,7 @@ export default function GarageSaluPlanning({ stations }: { stations: PlanningSta
       <div className={styles.saluPlanningLayout}>
         <div className={styles.saluPlanningList}>
           {items.map((item) => (
-            <button key={item.garage_item_id} type="button" className={`${styles.saluPlanningRow} ${selectedId === item.garage_item_id ? styles.saluPlanningRowActive : ''}`} onClick={() => setSelectedId(item.garage_item_id)}>
+            <button key={item.garage_item_id} type="button" className={`${styles.saluPlanningRow} ${selectedId === item.garage_item_id ? styles.saluPlanningRowActive : ''}`} onClick={() => { setJourney(null); setSelectedId(item.garage_item_id); }}>
               <strong>{item.regnr || 'REG SAKNAS'}</strong>
               <span>{item.model}</span>
               <span>{item.source_plan?.planned_saludatum ? `SALU ${item.source_plan.planned_saludatum}` : 'Källplan saknas'}</span>
