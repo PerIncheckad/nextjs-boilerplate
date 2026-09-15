@@ -55,15 +55,14 @@ export default function CheckStep3Shell() {
 
   useEffect(() => {
     const fromUrl = normalizeReg(new URLSearchParams(window.location.search).get('reg') ?? '');
-    if (fromUrl) setReg(fromUrl);
+    if (!fromUrl) return;
+    const timer = window.setTimeout(() => setReg(fromUrl), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    const currentSequence = ++sequence.current;
-    setContext(null);
-    setArmReady(false);
-    setError(null);
     if (reg.length < 6) return;
+    const currentSequence = ++sequence.current;
 
     const timer = window.setTimeout(() => {
       void (async () => {
@@ -104,6 +103,11 @@ export default function CheckStep3Shell() {
   function handleInputCapture(event: React.FormEvent<HTMLDivElement>) {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || !target.classList.contains('reg-input')) return;
+    sequence.current += 1;
+    setContext(null);
+    setArmReady(false);
+    setArming(false);
+    setError(null);
     setReg(normalizeReg(target.value));
   }
 
