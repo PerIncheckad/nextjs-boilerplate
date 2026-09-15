@@ -18,7 +18,7 @@ test('SALU_PLANERING is a dedicated directionless Garage work responsibility', (
   assert.match(garageUi, /item\.source_kind === 'SALU_PLANERING'\) return false/);
   assert.match(saluGarageUi, /INGEN FYSISK IN\/UT/);
   assert.match(step2, /garage_items_salu_planning_directionless_chk/);
-  assert.match(step2, /source_kind <> 'SALU_PLANERING' or garage_direction is null/);
+  assert.match(step2, /source_kind <> 'SALU_PLANERING'\s+or garage_direction is null/);
 });
 
 test('generic Garage PATCH cannot mutate SALU_PLANERING or fabricate IN UT', () => {
