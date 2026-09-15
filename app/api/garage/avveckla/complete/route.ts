@@ -23,23 +23,25 @@ function positiveNumber(value: unknown): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-const RPC_BY_METHOD = {
+const LEGACY_RPC_BY_METHOD = {
   EXTERN_TRANSPORT: 'verify_garage_avveckla_extern_transport',
   AVSTALLNING: 'verify_garage_avveckla_avstallning',
 } as const;
 
-type Method = 'EGEN_LEVERANS' | keyof typeof RPC_BY_METHOD;
+const SALU_RPC_BY_METHOD = {
+  EXTERN_TRANSPORT: 'verify_salu_v2_avveckla_extern_transport_v1',
+  AVSTALLNING: 'verify_salu_v2_avveckla_avstallning_v1',
+} as const;
+
+type Method = 'EGEN_LEVERANS' | keyof typeof LEGACY_RPC_BY_METHOD;
 
 export async function POST(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
 
   let body: Record<string, unknown>;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 });
-  }
+  try { body = await request.json(); }
+  catch { return NextResponse.json({ error: 'Ogiltig JSON' }, { status: 400 }); }
 
   const garageItemId = text(body.garage_item_id);
   const method = text(body.method)?.toUpperCase() as Method | undefined;
@@ -49,21 +51,25 @@ export async function POST(request: Request) {
   if (!garageItemId || !method || !['EGEN_LEVERANS', 'EXTERN_TRANSPORT', 'AVSTALLNING'].includes(method) || !eventTime || !evidenceReference) {
     return NextResponse.json({ error: 'Garage-objekt, UT-väg, verklig tidpunkt och evidensreferens krävs' }, { status: 400 });
   }
-
   if (new Date(eventTime).getTime() > Date.now() + 5 * 60_000) {
     return NextResponse.json({ error: 'Verklig UT-tidpunkt kan inte ligga i framtiden' }, { status: 400 });
   }
 
   const admin = adminClient();
+  const { data: saluHandoff, error: handoffError } = await admin
+    .from('garage_salu_v2_avveckla_handoffs')
+    .select('salu_v2_handoff_id')
+    .eq('garage_item_id', garageItemId)
+    .maybeSingle();
+  if (handoffError) return NextResponse.json({ error: 'Kunde inte verifiera terminal källa' }, { status: 500 });
+  const isSaluV2 = Boolean(saluHandoff?.salu_v2_handoff_id);
 
   if (method === 'EGEN_LEVERANS') {
     if (typeof body.billable_driving !== 'boolean') {
       return NextResponse.json({ error: 'Ange uttryckligen om egen leverans är fakturerbar: Ja eller Nej' }, { status: 400 });
     }
-
     const isBillable = body.billable_driving;
     let quote: ReturnType<typeof quoteEtPrice> | null = null;
-
     if (isBillable) {
       const fromLocation = text(body.from_location);
       const toLocation = text(body.to_location);
@@ -71,20 +77,15 @@ export async function POST(request: Request) {
       if (!fromLocation || !toLocation || !priceClass) {
         return NextResponse.json({ error: 'FRÅN, TILL och bilplats/prisklass krävs för fakturerbar egen leverans' }, { status: 400 });
       }
-
       try {
-        quote = quoteEtPrice({
-          fromLocation,
-          toLocation,
-          priceClass,
-          quotedPrice: positiveNumber(body.quoted_price),
-        });
+        quote = quoteEtPrice({ fromLocation, toLocation, priceClass, quotedPrice: positiveNumber(body.quoted_price) });
       } catch (reasonValue) {
         return NextResponse.json({ error: reasonValue instanceof Error ? reasonValue.message : 'Ogiltig ET-prissättning' }, { status: 400 });
       }
     }
 
-    const { data, error } = await admin.rpc('verify_garage_avveckla_egen_leverans_with_billing', {
+    const rpc = isSaluV2 ? 'verify_salu_v2_avveckla_egen_leverans_with_billing_v1' : 'verify_garage_avveckla_egen_leverans_with_billing';
+    const { data, error } = await admin.rpc(rpc, {
       p_garage_item_id: garageItemId,
       p_occurred_at: eventTime,
       p_evidence_reference: evidenceReference,
@@ -100,19 +101,11 @@ export async function POST(request: Request) {
       p_actor: verification.user.id,
       p_actor_email: verification.user.email ?? null,
     });
-
-    if (error) {
-      console.error('[garage/avveckla/complete] failed', { method, error });
-      const message = error.message || 'Kunde inte verifiera UT';
-      const conflict = /ÖPPEN|redan|mismatch|Flera öppna|före aktuell|Makulerat|Ny bil|riktning UT/i.test(message);
-      const notFound = /saknas|finns inte/i.test(message);
-      return NextResponse.json({ error: message }, { status: notFound ? 404 : conflict ? 409 : 500 });
-    }
-
+    if (error) return rpcFailure(method, error.message);
     return NextResponse.json({ data });
   }
 
-  const rpc = RPC_BY_METHOD[method];
+  const rpc = isSaluV2 ? SALU_RPC_BY_METHOD[method] : LEGACY_RPC_BY_METHOD[method];
   const { data, error } = await admin.rpc(rpc, {
     p_garage_item_id: garageItemId,
     p_occurred_at: eventTime,
@@ -120,14 +113,14 @@ export async function POST(request: Request) {
     p_actor: verification.user.id,
     p_actor_email: verification.user.email ?? null,
   });
-
-  if (error) {
-    console.error('[garage/avveckla/complete] failed', { method, error });
-    const message = error.message || 'Kunde inte verifiera UT';
-    const conflict = /ÖPPEN|redan|mismatch|Flera öppna|före aktuell|Makulerat|Ny bil|riktning UT/i.test(message);
-    const notFound = /saknas|finns inte/i.test(message);
-    return NextResponse.json({ error: message }, { status: notFound ? 404 : conflict ? 409 : 500 });
-  }
-
+  if (error) return rpcFailure(method, error.message);
   return NextResponse.json({ data });
+}
+
+function rpcFailure(method: Method, raw?: string) {
+  console.error('[garage/avveckla/complete] failed', { method, error: raw });
+  const message = raw || 'Kunde inte verifiera UT';
+  const conflict = /ÖPPEN|redan|mismatch|Flera öppna|före aktuell|Makulerat|Ny bil|riktning UT|HANDOFF|STALE|REQUIRED|CONFLICT|SOURCE/i.test(message);
+  const notFound = /saknas|finns inte|NOT_FOUND/i.test(message);
+  return NextResponse.json({ error: message }, { status: notFound ? 404 : conflict ? 409 : 500 });
 }
