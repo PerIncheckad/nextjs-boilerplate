@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import CoreProductShell from '@/components/CoreProductShell';
 import GarageCorePanel from './garage-core-panel';
 import GarageClient from './garage-client';
+import GarageSistaIncheckningPanel from './garage-sista-incheckning-panel';
 import GarageNybilHandoffStatusPanel from './garage-nybil-handoff-status-panel';
 import GarageVoidPanel from './garage-void-panel';
 import GarageAvvecklaHandoffPanel from './garage-avveckla-handoff-panel';
@@ -39,6 +40,7 @@ export default function GaragePage() {
         <section id="garageobjekt" className={styles.section}>
           <div className={styles.sectionLabel}><strong>01 / GARAGE-EPISODER</strong><span>Garage-ägda staging-, routing- och verifierade informationskompletteringar. Inte andra modulers arbete.</span></div>
           <GarageClient />
+          <GarageSistaIncheckningPanel />
           <GarageVoidPanel />
         </section>
 
