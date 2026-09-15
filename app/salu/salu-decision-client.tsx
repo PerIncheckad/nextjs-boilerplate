@@ -121,8 +121,23 @@ export default function SaluDecisionClient() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+    void authenticatedApiFetch('/api/salu/planning', { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || 'Kunde inte läsa SALU-planering');
+        if (!active) return;
+        setRows((payload.data ?? []) as SaluRow[]);
+        setError(null);
+      })
+      .catch((nextError: unknown) => {
+        if (active) setError(nextError instanceof Error ? nextError.message : 'Kunde inte läsa SALU-planering');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const plannedCount = useMemo(() => rows.filter((row) => Boolean(row.plan)).length, [rows]);
   const pendingCount = rows.length - plannedCount;
