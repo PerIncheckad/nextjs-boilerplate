@@ -141,6 +141,9 @@ export async function PATCH(request: Request) {
   if (!activeItem) return NextResponse.json({ error: 'Garage-objektet finns inte eller är makulerat' }, { status: 404 });
   if (activeItem.handed_off_nybil_id) return NextResponse.json({ error: 'Garage-objektet är mottaget i Ny bil och är fryst' }, { status: 409 });
   if (activeItem.completed_at) return NextResponse.json({ error: 'Garage-objektet är verifierat UT och är fryst' }, { status: 409 });
+  if (activeItem.source_kind === 'SALU_PLANERING') {
+    return NextResponse.json({ error: 'SALU PLANERING uppdateras endast via dess riktningslösa operativa kontrakt; generic Garage-PATCH får inte ändra objektet.' }, { status: 409 });
+  }
 
   let stationRows: Array<{ station_code: string }>;
   try { stationRows = await loadStations(admin) as Array<{ station_code: string }>; } catch (error) { console.error('[garage] station lookup failed', error); return NextResponse.json({ error: 'Kunde inte läsa planeringsstationer' }, { status: 500 }); }
