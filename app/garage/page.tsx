@@ -3,6 +3,7 @@ import CoreProductShell from '@/components/CoreProductShell';
 import GarageCorePanel from './garage-core-panel';
 import GarageClient from './garage-client';
 import GarageSistaIncheckningPanel from './garage-sista-incheckning-panel';
+import GarageSaluStep4Panel from './garage-salu-step4-panel';
 import GarageNybilHandoffStatusPanel from './garage-nybil-handoff-status-panel';
 import GarageVoidPanel from './garage-void-panel';
 import GarageAvvecklaHandoffPanel from './garage-avveckla-handoff-panel';
@@ -41,6 +42,7 @@ export default function GaragePage() {
           <div className={styles.sectionLabel}><strong>01 / GARAGE-EPISODER</strong><span>Garage-ägda staging-, routing- och verifierade informationskompletteringar. Inte andra modulers arbete.</span></div>
           <GarageClient />
           <GarageSistaIncheckningPanel />
+          <GarageSaluStep4Panel />
           <GarageVoidPanel />
         </section>
 
@@ -50,7 +52,7 @@ export default function GaragePage() {
         </section>
 
         <section id="avveckla-handoff" className={styles.section}>
-          <div className={styles.sectionLabel}><strong>03 / AVVECKLA HANDOFF</strong><span>Garage startar manuellt och verifierar att AVVECKLA-case skapats; fortsatt arbete sker i /avveckla</span></div>
+          <div className={styles.sectionLabel}><strong>03 / AVVECKLA HANDOFF</strong><span>Legacy/generisk Garage UT startas här. SALU V2 använder exakt Step 4-handoff utan fysisk UT-fabricering.</span></div>
           <GarageAvvecklaHandoffPanel />
         </section>
       </div>
