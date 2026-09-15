@@ -21,6 +21,13 @@ function uuidArray(value: unknown): string[] | null {
   return rows.length === value.length ? rows : null;
 }
 
+function sameIds(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.every((value, index) => value === b[index]);
+}
+
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -34,12 +41,12 @@ export async function GET(request: Request) {
     .eq('garage_item_id', garageItemId)
     .maybeSingle();
   if (finalError) return NextResponse.json({ error: 'Kunde inte läsa SISTA INCHECKNING' }, { status: 500 });
-  if (!final) return NextResponse.json({ data: { final: null, buhsSource: [], verification: null, handoff: null, archived: null } });
+  if (!final) return NextResponse.json({ data: { final: null, buhsSource: [], verification: null, verificationCurrent: false, handoff: null, archived: null } });
 
   const [sourceIds, verificationResult, handoffResult, archivedResult] = await Promise.all([
     admin.rpc('current_salu_buhs_source_ids_v1', { p_sista_incheckning_id: final.sista_incheckning_id }),
     admin.from('salu_v2_buhs_verifications').select('*').eq('sista_incheckning_id', final.sista_incheckning_id).order('revision_no', { ascending: false }).limit(1).maybeSingle(),
-    admin.from('garage_salu_v2_avveckla_handoffs').select('*').eq('sista_incheckning_id', final.sista_incheckning_id).maybeSingle(),
+    admin.from('garage_salu_v2_avveckla_handoffs').select('*').eq('sista_incheckning_id', final.sista_incheckning_id).order('handoff_revision', { ascending: false }).limit(1).maybeSingle(),
     admin.from('salu_v2_avvecklad_current').select('*').eq('sista_incheckning_id', final.sista_incheckning_id).maybeSingle(),
   ]);
   if (sourceIds.error || verificationResult.error || handoffResult.error || archivedResult.error) {
@@ -53,12 +60,19 @@ export async function GET(request: Request) {
     : { data: [], error: null };
   if (damageError) return NextResponse.json({ error: 'Kunde inte läsa BUHS-källrader' }, { status: 500 });
 
-  let rows: unknown[] = [];
+  let rows: Array<{ damage_id: string; disposition: string }> = [];
   if (verificationResult.data?.buhs_verification_id) {
     const { data, error } = await admin.from('salu_v2_buhs_verification_rows').select('damage_id,disposition').eq('buhs_verification_id', verificationResult.data.buhs_verification_id);
     if (error) return NextResponse.json({ error: 'Kunde inte läsa BUHS-verifieringsrader' }, { status: 500 });
-    rows = data ?? [];
+    rows = (data ?? []) as Array<{ damage_id: string; disposition: string }>;
   }
+
+  const verifiedIds = rows.filter((row) => row.disposition === 'PASS').map((row) => row.damage_id);
+  const verificationCurrent = Boolean(
+    verificationResult.data?.total_result === 'PASS'
+    && verificationResult.data.source_row_count === ids.length
+    && sameIds(verifiedIds, ids),
+  );
 
   return NextResponse.json({
     data: {
@@ -66,6 +80,7 @@ export async function GET(request: Request) {
       buhsSource: damages ?? [],
       currentBuhsIds: ids,
       verification: verificationResult.data ? { ...verificationResult.data, rows } : null,
+      verificationCurrent,
       handoff: handoffResult.data ?? null,
       archived: archivedResult.data ?? null,
     },
