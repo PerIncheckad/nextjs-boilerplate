@@ -218,20 +218,9 @@ export async function POST(request: Request) {
   if (body.last_rental_at && !lastRentalAt) return NextResponse.json({ error: 'Ogiltig SISTA HYRAN-timing' }, { status: 400 });
 
   const admin = adminClient();
-  let employee: Awaited<ReturnType<typeof resolveActiveEmployee>>;
-  try { employee = await resolveActiveEmployee(admin, verification.user.email); }
-  catch (error) {
-    console.error('[garage-salu-planning] employee resolution failed', error);
-    return NextResponse.json({ error: 'Kunde inte verifiera employee-identitet' }, { status: 403 });
-  }
-
-  if (!employee) {
-    return NextResponse.json({ error: 'SISTA HYRAN kräver exakt en aktiv employee-identitet' }, { status: 403 });
-  }
-
   const { data, error } = await admin.rpc('decide_garage_sista_hyran_v1', {
     p_garage_item_id: garageItemId,
-    p_employee_id: employee.id,
+    p_actor_email: verification.user.email,
     p_auth_user_id: verification.user.id,
     p_last_rental_at: lastRentalAt,
     p_decision_note: text(body.decision_note),
@@ -241,7 +230,7 @@ export async function POST(request: Request) {
   if (error) {
     const forbidden = error.code === '42501';
     console.error('[garage-salu-planning] SISTA HYRAN decision failed', error);
-    return NextResponse.json({ error: forbidden ? 'Mandat saknas för SISTA HYRAN' : 'SISTA HYRAN kunde inte sparas' }, { status: forbidden ? 403 : 409 });
+    return NextResponse.json({ error: forbidden ? 'Employee-identitet eller mandat saknas för SISTA HYRAN' : 'SISTA HYRAN kunde inte sparas' }, { status: forbidden ? 403 : 409 });
   }
 
   return NextResponse.json({ data });
