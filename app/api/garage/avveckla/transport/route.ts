@@ -61,8 +61,10 @@ export async function POST(request: Request) {
   const admin = adminClient();
   const { data: saluHandoff, error: handoffError } = await admin
     .from('garage_salu_v2_avveckla_handoffs')
-    .select('salu_v2_handoff_id')
+    .select('salu_v2_handoff_id,handoff_revision')
     .eq('garage_item_id', garageItemId)
+    .order('handoff_revision', { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (handoffError) return NextResponse.json({ error: 'Kunde inte verifiera transportens terminalkälla' }, { status: 500 });
 
