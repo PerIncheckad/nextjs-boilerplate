@@ -170,8 +170,8 @@ declare
   v_item public.garage_items%rowtype;
   v_vehicle public.vehicles%rowtype;
   v_model text;
-  v_mode text := upper(pg_catalog.btrim(pg_catalog.coalesce(p_planning_mode, '')));
-  v_transport text := upper(pg_catalog.btrim(pg_catalog.coalesce(p_transport_mode, 'EJ_BESLUTAD')));
+  v_mode text := upper(pg_catalog.btrim(coalesce(p_planning_mode, '')));
+  v_transport text := upper(pg_catalog.btrim(coalesce(p_transport_mode, 'EJ_BESLUTAD')));
   v_planned_saludatum date;
   v_now timestamptz := pg_catalog.clock_timestamp();
   v_handoff jsonb;
@@ -234,7 +234,7 @@ begin
     );
   end if;
 
-  v_planned_saludatum := pg_catalog.coalesce(p_planned_saludatum, v_flag.current_saludatum);
+  v_planned_saludatum := coalesce(p_planned_saludatum, v_flag.current_saludatum);
   if v_mode = 'QUICK' then
     v_planned_saludatum := v_flag.current_saludatum;
   end if;
@@ -256,11 +256,11 @@ begin
     v_flag.current_saludatum,
     v_planned_saludatum,
     p_proposed_end_date,
-    nullif(pg_catalog.btrim(pg_catalog.coalesce(p_salu_destination, '')), ''),
+    nullif(pg_catalog.btrim(coalesce(p_salu_destination, '')), ''),
     v_transport,
-    nullif(pg_catalog.btrim(pg_catalog.coalesce(p_repair_destination, '')), ''),
+    nullif(pg_catalog.btrim(coalesce(p_repair_destination, '')), ''),
     p_transport_book_by,
-    nullif(pg_catalog.btrim(pg_catalog.coalesce(p_note, '')), ''),
+    nullif(pg_catalog.btrim(coalesce(p_note, '')), ''),
     'PLANERAD',
     v_now,
     p_actor_id,
