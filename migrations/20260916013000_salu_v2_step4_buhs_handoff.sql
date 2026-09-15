@@ -151,7 +151,8 @@ begin
   v_function:=public.actor_can_verify_salu_buhs_v1(v_employee_id,clock_timestamp());
   if v_function is null then raise exception 'BUHS_VERIFY_FORBIDDEN' using errcode='42501'; end if;
 
-  select coalesce(array_agg(distinct x order by x::text),'{}'::uuid[]) into v_expected_ids from unnest(coalesce(p_expected_damage_ids,'{}'::uuid[])) x;
+  select coalesce(array_agg(s.x order by s.x::text),'{}'::uuid[]) into v_expected_ids
+  from (select distinct x from unnest(coalesce(p_expected_damage_ids,'{}'::uuid[])) x) s;
   v_current_ids:=public.current_salu_buhs_source_ids_v1(v_final.sista_incheckning_id);
   if cardinality(v_expected_ids)<>cardinality(coalesce(p_expected_damage_ids,'{}'::uuid[])) or v_expected_ids is distinct from v_current_ids then
     raise exception 'BUHS_SOURCE_SET_MISMATCH' using errcode='P0001';
