@@ -21,7 +21,7 @@ begin
     raise exception 'Verifierad auth-email krävs' using errcode = '42501';
   end if;
 
-  select count(*), min(e.id)
+  select count(*), (pg_catalog.array_agg(e.id order by e.id::text))[1]
     into v_count, v_employee_id
   from public.employees e
   where pg_catalog.lower(pg_catalog.btrim(coalesce(e.email, ''))) = v_email
