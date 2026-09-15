@@ -71,9 +71,11 @@ test('auth UUID is provenance only and employee identity is resolved deny-by-def
   assert.match(identity, /v_employee_id := public\.resolve_active_employee_identity_v1\(p_actor_email\)/);
   assert.match(identity, /assert_actor_process_mandate\(\s*v_employee_id/s);
   assert.match(saluGarageApi, /resolve_active_employee_identity_v1/);
+  assert.match(saluGarageApi, /p_employee_id: employeeId/);
   assert.match(saluGarageApi, /p_actor_email: verification\.user\.email/);
   assert.match(saluGarageApi, /p_auth_user_id: verification\.user\.id/);
-  assert.doesNotMatch(saluGarageApi, /p_employee_id:/);
+  assert.doesNotMatch(saluGarageApi, /p_employee_id:\s*verification\.user\.id/);
+  assert.doesNotMatch(saluGarageApi, /p_employee_id:\s*body\./);
 });
 
 test('Step 2 does not enter Step 3 or terminal decommissioning semantics', () => {
