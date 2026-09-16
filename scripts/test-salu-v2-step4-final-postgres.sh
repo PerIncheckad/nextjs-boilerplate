@@ -56,6 +56,22 @@ awk '
     print "select \047revision supersession behavioral PASS\047 as result;"
   }
   { print }
+  /bash scripts\/test-salu-v2-step3-postgres.sh/ {
+    print "\"${PSQL[@]}\" <<\047SQL\047"
+    print "alter table public.garage_items"
+    print "  add column if not exists completed_at timestamptz,"
+    print "  add column if not exists completed_by uuid,"
+    print "  add column if not exists completion_event_id uuid;"
+    print "alter table public.garage_items drop constraint if exists garage_items_completion_state_check;"
+    print "alter table public.garage_items add constraint garage_items_completion_state_check check ("
+    print "  (completed_at is null and completed_by is null and completion_event_id is null)"
+    print "  or (completed_at is not null and completed_by is not null and completion_event_id is not null)"
+    print ");"
+    print "SQL"
+  }
+  /alter table public\.garage_avveckla_cases add constraint garage_avveckla_cases_completion_event_fk/ {
+    print "alter table public.garage_items add constraint garage_items_completion_event_id_fkey foreign key(completion_event_id) references public.garage_avveckla_events(event_id);"
+  }
   /20260916013100_salu_v2_step4_terminal_bridge.sql/ {
     print "\"${PSQL[@]}\" -f migrations/20260916013200_salu_v2_step4_revision_hardening.sql"
     print "\"${PSQL[@]}\" -f migrations/20260916013300_salu_v2_step4_transport_revision_hardening.sql"
