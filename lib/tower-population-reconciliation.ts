@@ -80,8 +80,8 @@ export function reconcileTowerPopulation({
       continue;
     }
 
-    const [alias] = aliases;
-    if ((activeIdentityIdsByRegnr.get(alias)?.size ?? 0) !== 1) {
+    const alias = aliases.values().next().value as string | undefined;
+    if (!alias || (activeIdentityIdsByRegnr.get(alias)?.size ?? 0) !== 1) {
       activeIdentityAliasIssues += 1;
       continue;
     }
