@@ -3,9 +3,8 @@ set -euo pipefail
 
 PSQL=(psql -v ON_ERROR_STOP=1 -X)
 
+# Build the isolated acceptance schema. Migration files own their own transactions.
 "${PSQL[@]}" <<'SQL'
-begin;
-
 create extension if not exists pgcrypto;
 create schema if not exists public;
 
@@ -38,6 +37,11 @@ begin
   end if;
 end;
 $$;
+SQL
+
+# Authorization fixtures and all mandate assertions are transactional and must disappear.
+"${PSQL[@]}" <<'SQL'
+begin;
 
 insert into public.employees(id,email,is_active,active) values
   ('10000000-0000-4000-8000-000000000101','global@example.com',true,true),
@@ -124,4 +128,25 @@ $$;
 rollback;
 SQL
 
-echo "INSIGHT ACCESS PostgreSQL acceptance PASS (transaction rolled back)"
+"${PSQL[@]}" <<'SQL'
+do $$
+declare
+  v_employee_count integer;
+  v_mandate_count integer;
+begin
+  select count(*) into v_employee_count
+  from public.employees
+  where id::text like '10000000-0000-4000-8000-00000000010%';
+
+  select count(*) into v_mandate_count
+  from public.employee_mandates
+  where mandate_id::text like '20000000-0000-4000-8000-00000000010%';
+
+  if v_employee_count <> 0 or v_mandate_count <> 0 then
+    raise exception 'INSIGHT acceptance fixtures survived rollback: employees %, mandates %', v_employee_count, v_mandate_count;
+  end if;
+end;
+$$;
+SQL
+
+echo "INSIGHT ACCESS PostgreSQL acceptance PASS (fixtures rolled back)"
