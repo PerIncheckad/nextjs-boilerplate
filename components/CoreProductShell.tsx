@@ -7,7 +7,7 @@ import {
 } from './product-navigation-contract';
 import styles from './core-product-shell.module.css';
 
-type ActiveModule = 'tower' | 'planning' | 'garage' | 'inhyrd' | 'legacy' | 'hjulskifte' | 'avveckla';
+type ActiveModule = 'tower' | 'planning' | 'garage' | 'inhyrd' | 'legacy' | 'hjulskifte' | 'avveckla' | 'help';
 
 export default function CoreProductShell({
   active,

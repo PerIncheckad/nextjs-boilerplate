@@ -8,6 +8,7 @@ export const SUPPORTING_NAVIGATION_ITEMS = [
   { href: '/hjulskifte', label: 'HJULSKIFTE', key: 'hjulskifte' },
   { href: '/avveckla', label: 'AVVECKLA', key: 'avveckla' },
   { href: '/legacy', label: 'LEGACY', key: 'legacy' },
+  { href: '/help', label: 'HJÄLP', key: 'help' },
 ] as const;
 
 export type CoreNavigationKey = (typeof CORE_NAVIGATION_ITEMS)[number]['key'];

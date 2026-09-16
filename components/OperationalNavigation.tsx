@@ -37,6 +37,10 @@ function NavigationContent({ active }: { active?: OperationalRoute }) {
         <div className={styles.links}>
           <NavigationLinks active={active} />
         </div>
+        <span className={styles.groupLabel}>STÖD</span>
+        <div className={styles.links} aria-label="Stöd">
+          <Link href="/help">HJÄLP</Link>
+        </div>
       </div>
 
       <details className={styles.mobileNavigation}>
@@ -46,6 +50,10 @@ function NavigationContent({ active }: { active?: OperationalRoute }) {
         </summary>
         <div className={styles.mobileLinks}>
           <NavigationLinks active={active} />
+        </div>
+        <span className={styles.groupLabel}>STÖD</span>
+        <div className={styles.mobileLinks} aria-label="Stöd">
+          <Link href="/help">HJÄLP</Link>
         </div>
       </details>
     </>
