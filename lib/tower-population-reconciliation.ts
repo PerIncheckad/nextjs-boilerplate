@@ -89,6 +89,15 @@ export function reconcileTowerPopulation({
     strictActiveRegnrToIdentity.set(alias, identityId);
   }
 
+  const periodsByRegnr = new Map<string, Row[]>();
+  for (const row of openPrimaryPeriods) {
+    const vehicle = normalizeTowerRegnr(row.regnr);
+    if (!vehicle) continue;
+    const rows = periodsByRegnr.get(vehicle) ?? [];
+    rows.push(row);
+    periodsByRegnr.set(vehicle, rows);
+  }
+
   const primaryStates = emptyPrimaryStateCounts();
   const outsideActivePrimaryStates = emptyPrimaryStateCounts();
   const positionedIdentityIds = new Set<string>();
@@ -96,19 +105,14 @@ export function reconcileTowerPopulation({
   const outsideActiveRegnrs = new Set<string>();
   const ambiguousActiveLayer1Regnrs = new Set<string>();
   const duplicateOpenLayer1Regnrs = new Set<string>();
-  const seenOpenLayer1Regnrs = new Set<string>();
 
-  for (const row of openPrimaryPeriods) {
-    const vehicle = normalizeTowerRegnr(row.regnr);
-    if (!vehicle) continue;
-
-    if (seenOpenLayer1Regnrs.has(vehicle)) {
+  for (const [vehicle, rows] of periodsByRegnr) {
+    if (rows.length !== 1) {
       duplicateOpenLayer1Regnrs.add(vehicle);
       continue;
     }
-    seenOpenLayer1Regnrs.add(vehicle);
 
-    const state = primaryState(row.period_type);
+    const state = primaryState(rows[0]?.period_type);
     const activeIdentityId = strictActiveRegnrToIdentity.get(vehicle);
 
     if (activeIdentityId) {
