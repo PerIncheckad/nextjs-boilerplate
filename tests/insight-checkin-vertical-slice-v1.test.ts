@@ -139,5 +139,5 @@ test('transactional PostgreSQL ACCESS_INSIGHT acceptance passes in CI', { skip: 
     },
   });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stdout, /PASS \(transaction rolled back\)/);
+  assert.match(result.stdout, /PASS \(fixtures rolled back\)/);
 });
