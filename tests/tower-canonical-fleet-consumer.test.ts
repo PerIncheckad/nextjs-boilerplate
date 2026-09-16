@@ -9,7 +9,15 @@ test('Tower fleet.active consumes only canonical membership current state', () =
   assert.match(route, /from\('fleet_membership_current_by_identity'\)/);
   assert.match(route, /eq\('membership_state', 'ACTIVE'\)/);
   assert.match(route, /eq\('resolution_reason', 'RESOLVED'\)/);
-  assert.match(route, /active: fleetMembershipVerified \? canonicalActiveCount : null/);
+  assert.match(route, /reconcileTowerPopulation/);
+  assert.match(
+    route,
+    /active: fleetMembershipVerified \? population\.active : null/
+  );
+  assert.doesNotMatch(
+    route,
+    /active: fleetMembershipVerified \? canonicalActiveCount/
+  );
   assert.doesNotMatch(route, /from\('vehicles'\)/);
   assert.doesNotMatch(route, /from\('checkins'\)/);
   assert.doesNotMatch(route, /from\('nybil_inventering'\)/);

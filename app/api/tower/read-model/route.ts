@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyApiUser } from '@/lib/server-auth';
+import { normalizeTowerRegnr, reconcileTowerPopulation } from '@/lib/tower-population-reconciliation';
 
 type Health = 'VERIFIED' | 'PARTIAL' | 'BLOCKED' | 'EXTERNAL';
-type PrimaryState = 'AVAILABLE' | 'RENTAL' | 'DOWNTIME' | 'PREPARATION' | 'SALU' | 'OTHER' | 'UNKNOWN';
 type Row = Record<string, unknown>;
 
 function createAdminClient() {
@@ -11,12 +11,6 @@ function createAdminClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('Missing Supabase server configuration');
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-}
-
-function regnr(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.toUpperCase().replace(/\s+/g, '').trim();
-  return normalized || null;
 }
 
 function countBy(rows: Row[], key: string): Record<string, number> {
@@ -50,6 +44,7 @@ export async function GET(request: Request) {
       rentalRes,
       wheelRes,
       canonicalActiveRes,
+      canonicalRegnrAliasesRes,
       fleetBootstrapRes,
     ] = await Promise.all([
       admin.from('vehicle_journey_periods')
@@ -76,9 +71,12 @@ export async function GET(request: Request) {
       admin.from('garage_wheel_changes')
         .select('wheel_change_id,regnr,status,season_key,booked_for,updated_at'),
       admin.from('fleet_membership_current_by_identity')
-        .select('identity_id', { count: 'exact', head: true })
+        .select('identity_id')
         .eq('membership_state', 'ACTIVE')
         .eq('resolution_reason', 'RESOLVED'),
+      admin.from('fleet_vehicle_identity_aliases')
+        .select('identity_id,alias_value')
+        .eq('alias_type', 'REGNR'),
       admin.from('fleet_membership_bootstrap_batch_status')
         .select('batch_id,t0,scope,coverage_mode,verified,complete_active_population_attested,application_id,bootstrap_denominator_eligible,unresolved_count')
         .eq('scope', 'OWN_FLEET')
@@ -102,6 +100,7 @@ export async function GET(request: Request) {
       rentalRes,
       wheelRes,
       canonicalActiveRes,
+      canonicalRegnrAliasesRes,
       fleetBootstrapRes,
     ];
     const failed = responses.find((response) => response.error);
@@ -115,9 +114,17 @@ export async function GET(request: Request) {
     const materialized = (materializedRes.data ?? []) as Row[];
     const rentalFactsPresent = (rentalRes.data ?? []).length > 0;
     const wheelChanges = (wheelRes.data ?? []) as Row[];
-    const canonicalActiveCount = canonicalActiveRes.count;
+    const canonicalActiveRows = (canonicalActiveRes.data ?? []) as Row[];
+    const canonicalRegnrAliases = (canonicalRegnrAliasesRes.data ?? []) as Row[];
     const fleetBootstrap = (fleetBootstrapRes.data ?? [])[0] as Row | undefined;
-    const fleetMembershipVerified = canonicalActiveCount != null && Boolean(fleetBootstrap?.application_id);
+    const fleetMembershipVerified = Boolean(fleetBootstrap?.application_id);
+
+    const population = reconcileTowerPopulation({
+      activeMembershipRows: canonicalActiveRows,
+      regnrAliasRows: canonicalRegnrAliases,
+      openPrimaryPeriods: periods,
+      openActivities: activities,
+    });
 
     const garageOwned = garageAll.filter((row) =>
       row.garage_direction === 'IN'
@@ -139,35 +146,6 @@ export async function GET(request: Request) {
       plannedPurchasesRemaining += Math.max(ordered - (materializedByCell.get(cellId) ?? 0), 0);
     }
 
-    const primaryStateCounts: Record<PrimaryState, number> = {
-      AVAILABLE: 0,
-      RENTAL: 0,
-      DOWNTIME: 0,
-      PREPARATION: 0,
-      SALU: 0,
-      OTHER: 0,
-      UNKNOWN: 0,
-    };
-    const capturedRegnrs = new Set<string>();
-    for (const row of periods) {
-      const vehicle = regnr(row.regnr);
-      if (!vehicle) continue;
-      capturedRegnrs.add(vehicle);
-      const state = typeof row.period_type === 'string' ? row.period_type : 'OTHER';
-      if (state === 'AVAILABLE' || state === 'RENTAL' || state === 'DOWNTIME' || state === 'PREPARATION' || state === 'SALU') {
-        primaryStateCounts[state] += 1;
-      } else {
-        primaryStateCounts.OTHER += 1;
-      }
-    }
-
-    const workshopCaptured = new Set(
-      activities
-        .filter((row) => row.activity_type === 'WORKSHOP')
-        .map((row) => regnr(row.regnr))
-        .filter((value): value is string => Boolean(value)),
-    ).size;
-
     const openWheelChanges = wheelChanges.filter((row) => row.status !== 'KLAR');
     const saluEscalation = countBy(salu, 'escalation_status');
 
@@ -183,7 +161,7 @@ export async function GET(request: Request) {
         },
       primaryOperationalState: {
         health: 'PARTIAL',
-        reason: 'Layer 1 is authoritative where present but does not define canonical fleet membership.',
+        reason: 'Layer 1 counts are reconciled against canonical ACTIVE identities. Missing operational position is coverage, not a Layer 1 state.',
       },
       rental: rentalFactsPresent
         ? { health: 'PARTIAL', reason: 'Rental source has facts; completeness must be verified before fleet-wide RENTAL is promoted.' }
@@ -218,13 +196,17 @@ export async function GET(request: Request) {
           purpose: 'OPERATIVE_BUSINESS_COCKPIT',
           rule: 'READ_BROADLY_INTERVENE_THROUGH_OWNER',
           noHeuristicFleetTruth: true,
+          missingOperationalPositionIsCoverageNotState: true,
         },
         fleet: {
-          active: fleetMembershipVerified ? canonicalActiveCount : null,
+          active: fleetMembershipVerified ? population.active : null,
           health: sources.fleetMembership.health,
-          capturedPrimaryStateVehicles: capturedRegnrs.size,
-          primaryStates: primaryStateCounts,
-          workshopCaptured,
+          capturedPrimaryStateVehicles: fleetMembershipVerified ? population.positionedActive : 0,
+          positionedActive: fleetMembershipVerified ? population.positionedActive : null,
+          missingOperationalPosition: fleetMembershipVerified ? population.missingOperationalPosition : null,
+          primaryStates: population.primaryStates,
+          workshopCaptured: population.workshopCaptured,
+          reconciliation: population.reconciliation,
         },
         processes: {
           salu: {
@@ -236,8 +218,8 @@ export async function GET(request: Request) {
             owned: garageOwned.length,
             byConfirmationStatus: countBy(garageOwned, 'confirmation_status'),
             byTransportStatus: countBy(garageOwned, 'transport_status'),
-            withRegnr: garageOwned.filter((row) => regnr(row.regnr)).length,
-            withoutRegnr: garageOwned.filter((row) => !regnr(row.regnr)).length,
+            withRegnr: garageOwned.filter((row) => normalizeTowerRegnr(row.regnr)).length,
+            withoutRegnr: garageOwned.filter((row) => !normalizeTowerRegnr(row.regnr)).length,
           },
           plannedPurchases: {
             remaining: plannedPurchasesRemaining,
@@ -254,7 +236,7 @@ export async function GET(request: Request) {
         },
         attention: {
           health: 'PARTIAL' as Health,
-          capturedDowntime: primaryStateCounts.DOWNTIME,
+          capturedDowntime: population.primaryStates.DOWNTIME,
           saluT10: saluEscalation.T10 ?? 0,
           saluPassed: saluEscalation.PASSERAD ?? 0,
           note: 'This layer is an overlay, not the Tower master population.',

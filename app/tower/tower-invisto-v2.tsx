@@ -15,8 +15,17 @@ type ReadModel = {
     active: number | null;
     health: Health;
     capturedPrimaryStateVehicles: number;
+    positionedActive: number | null;
+    missingOperationalPosition: number | null;
     primaryStates: Record<PrimaryState, number>;
     workshopCaptured: number;
+    reconciliation: {
+      outsideActivePrimaryStateVehicles: number;
+      outsideActivePrimaryStates: Record<PrimaryState, number>;
+      activeIdentityAliasIssues: number;
+      ambiguousActiveLayer1Vehicles: number;
+      duplicateOpenLayer1Vehicles: number;
+    };
   };
   processes: {
     salu: { open: number; byStatus: Record<string, number>; byEscalation: Record<string, number> };
@@ -71,19 +80,29 @@ export default function TowerInvistoV2() {
     if (!data) return null;
     const primaryHealth = data.sources.primaryOperationalState.health;
     const map: Record<Focus, { title: string; value: number | null; text: string; health: Health; href?: string; details?: Array<[string, number]> }> = {
-      ACTIVE: { title: 'Aktiva bilar', value: data.fleet.active, text: 'Hela den operativa flottan som fortfarande befinner sig i verksamheten.', health: data.fleet.health },
-      AVAILABLE: { title: 'Lediga', value: data.fleet.primaryStates.AVAILABLE, text: 'Verifierad Layer 1-status AVAILABLE inom nuvarande täckning.', health: primaryHealth, href: '/status' },
+      ACTIVE: {
+        title: 'Aktiva bilar',
+        value: data.fleet.active,
+        text: 'Kanonisk ACTIVE-population. Operativ position redovisas endast när Layer 1 faktiskt matchar denna population.',
+        health: data.fleet.health,
+        details: [
+          ['Verifierad operativ position', data.fleet.positionedActive ?? 0],
+          ['Saknar verifierad operativ position', data.fleet.missingOperationalPosition ?? 0],
+          ['Layer 1 utanför AKTIVA', data.fleet.reconciliation.outsideActivePrimaryStateVehicles],
+        ],
+      },
+      AVAILABLE: { title: 'Lediga', value: data.fleet.primaryStates.AVAILABLE, text: 'Verifierad Layer 1-status AVAILABLE inom canonical ACTIVE.', health: primaryHealth, href: '/status' },
       RENTAL: { title: 'Uthyrda', value: data.fleet.primaryStates.RENTAL, text: 'Visas endast från verifierad rental-källa. Ingen annan signal får skapa UTHYRD.', health: data.sources.rental.health },
-      DOWNTIME: { title: 'Stillestånd', value: data.fleet.primaryStates.DOWNTIME, text: 'Verifierad primärstatus DOWNTIME inom nuvarande datatäckning.', health: primaryHealth, href: '/status' },
-      PREPARATION: { title: 'Förberedelse', value: data.fleet.primaryStates.PREPARATION, text: 'Verifierad primärstatus PREPARATION inom nuvarande datatäckning.', health: primaryHealth },
-      SALU_PRIMARY: { title: 'SALU · primärstatus', value: data.fleet.primaryStates.SALU, text: 'Layer 1 SALU. Detta är en primär fordonsstatus och är separat från den öppna SALU-processen.', health: primaryHealth },
-      OTHER: { title: 'Övrig status', value: data.fleet.primaryStates.OTHER, text: 'Verifierade Layer 1-perioder som inte tillhör de namngivna huvudstatusarna.', health: primaryHealth },
-      UNKNOWN: { title: 'Okänd status', value: data.fleet.primaryStates.UNKNOWN, text: 'Aktivt medlemskap med saknad aktuell verifierad Layer 1-status när AKTIVA-baseline finns.', health: primaryHealth },
-      WORKSHOP: { title: 'Verkstad', value: data.fleet.workshopCaptured, text: 'WORKSHOP är aktivitet inom stillestånd, aldrig en konkurrerande primärstatus.', health: primaryHealth, href: '/vagnkort' },
+      DOWNTIME: { title: 'Stillestånd', value: data.fleet.primaryStates.DOWNTIME, text: 'Verifierad primärstatus DOWNTIME inom canonical ACTIVE.', health: primaryHealth, href: '/status' },
+      PREPARATION: { title: 'Förberedelse', value: data.fleet.primaryStates.PREPARATION, text: 'Verifierad primärstatus PREPARATION inom canonical ACTIVE.', health: primaryHealth },
+      SALU_PRIMARY: { title: 'SALU · primärstatus', value: data.fleet.primaryStates.SALU, text: 'Layer 1 SALU inom canonical ACTIVE. Detta är separat från den öppna SALU-processen.', health: primaryHealth },
+      OTHER: { title: 'Övrig status', value: data.fleet.primaryStates.OTHER, text: 'Verifierade Layer 1-perioder inom canonical ACTIVE som inte tillhör de namngivna huvudstatusarna.', health: primaryHealth },
+      UNKNOWN: { title: 'Okänd status', value: data.fleet.primaryStates.UNKNOWN, text: 'Endast explicit verifierad Layer 1-status UNKNOWN. Saknad operativ position räknas inte här.', health: primaryHealth },
+      WORKSHOP: { title: 'Verkstad', value: data.fleet.workshopCaptured, text: 'WORKSHOP räknas endast som aktivitet inom canonical ACTIVE DOWNTIME.', health: primaryHealth, href: '/vagnkort' },
       SALU: { title: 'SALU · process', value: data.processes.salu.open, text: 'Öppna SALU-processer. Processen kan överlappa andra primärstatusar.', health: data.sources.salu.health, href: '/planning', details: Object.entries(data.processes.salu.byEscalation) },
       GARAGE: { title: 'Garaget', value: data.processes.garage.owned, text: 'Inbound-objekt som fortfarande ägs av Garaget och inte är avslutade eller överlämnade.', health: data.sources.garage.health, href: '/garage', details: [['Med reg.nr', data.processes.garage.withRegnr], ['Utan reg.nr', data.processes.garage.withoutRegnr]] },
       PLANNED: { title: 'Planerade inköp', value: data.processes.plannedPurchases.remaining, text: 'BESTÄLLT som fortfarande återstår upstream före materialisering till Garaget.', health: data.sources.plannedPurchases.health, href: '/planning' },
-      WHEEL: { title: 'Hjulskifte · öppna processer', value: data.processes.wheelChange.openProcessRows, text: 'Verifierade öppna processrader. Fleet-wide kandidatantal visas först när hjuldata kan korsas mot kanoniska AKTIVA.', health: data.sources.wheelChange.health, href: '/garage' },
+      WHEEL: { title: 'Hjulskifte · öppna processer', value: data.processes.wheelChange.openProcessRows, text: 'Verifierade öppna processrader. Fleet-wide kandidatantal visas först när hjuldata kan korsas mot kanoniska AKTIVA.', health: data.sources.wheelChange.health, href: '/hjulskifte' },
       AVVECKLA: { title: 'Avveckla', value: data.processes.avveckla.count, text: 'Tower väntar på färdigt read-kontrakt från den separata AVVECKLA-processen.', health: data.sources.avveckla.health },
     };
     return map[focus];
@@ -114,9 +133,9 @@ export default function TowerInvistoV2() {
             <small>{data ? healthLabel(data.fleet.health) : 'Läser'}</small>
           </button>
           <div className={styles.coverage}>
-            <span>Verifierad statusbild</span>
-            <strong>{sv(data?.fleet.capturedPrimaryStateVehicles)}</strong>
-            <small>fordon med fångad Layer 1-status</small>
+            <span>Verifierad operativ position</span>
+            <strong>{sv(data?.fleet.positionedActive)}</strong>
+            <small>{sv(data?.fleet.missingOperationalPosition)} saknar verifierad operativ position · {sv(data?.fleet.reconciliation.outsideActivePrimaryStateVehicles)} Layer 1 utanför AKTIVA</small>
           </div>
         </div>
 
@@ -127,8 +146,8 @@ export default function TowerInvistoV2() {
           <StatusCell label="Förberedelse" value={data?.fleet.primaryStates.PREPARATION} selected={focus === 'PREPARATION'} onClick={() => setFocus('PREPARATION')} />
           <StatusCell label="SALU · status" value={data?.fleet.primaryStates.SALU} selected={focus === 'SALU_PRIMARY'} onClick={() => setFocus('SALU_PRIMARY')} />
           <StatusCell label="Övrig" value={data?.fleet.primaryStates.OTHER} selected={focus === 'OTHER'} onClick={() => setFocus('OTHER')} />
-          <StatusCell label="Okänd" value={data?.fleet.primaryStates.UNKNOWN} selected={focus === 'UNKNOWN'} onClick={() => setFocus('UNKNOWN')} />
-          <StatusCell label="Verkstad" value={data?.fleet.workshopCaptured} selected={focus === 'WORKSHOP'} onClick={() => setFocus('WORKSHOP')} sublabel="inom stillestånd" />
+          <StatusCell label="Okänd" value={data?.fleet.primaryStates.UNKNOWN} selected={focus === 'UNKNOWN'} onClick={() => setFocus('UNKNOWN')} sublabel="endast explicit Layer 1" />
+          <StatusCell label="Verkstad" value={data?.fleet.workshopCaptured} selected={focus === 'WORKSHOP'} onClick={() => setFocus('WORKSHOP')} sublabel="inom aktivt stillestånd" />
         </div>
       </section>
 

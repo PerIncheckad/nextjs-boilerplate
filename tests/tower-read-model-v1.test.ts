@@ -20,26 +20,34 @@ test('AKTIVA cannot silently fall back to partial journey coverage', () => {
   assert.match(route, /fleet_membership_current_by_identity/);
   assert.match(route, /\.eq\('membership_state', 'ACTIVE'\)/);
   assert.match(route, /\.eq\('resolution_reason', 'RESOLVED'\)/);
-  assert.match(route, /active: fleetMembershipVerified \? canonicalActiveCount : null/);
+  assert.match(route, /active: fleetMembershipVerified \? population\.active : null/);
   assert.match(route, /fleetMembership:[\s\S]*health: 'BLOCKED'/);
   assert.match(route, /noHeuristicFleetTruth: true/);
-  assert.match(route, /capturedPrimaryStateVehicles/);
 });
 
-test('primary operational states are complete and separated from process overlays', () => {
-  for (const state of ['AVAILABLE', 'RENTAL', 'DOWNTIME', 'PREPARATION', 'SALU', 'OTHER', 'UNKNOWN']) {
-    assert.match(route, new RegExp(`${state}: 0`));
-  }
-  assert.match(route, /state === 'SALU'/);
+test('Tower reconciles Layer 1 through canonical identity aliases before counting primary states', () => {
+  assert.match(route, /fleet_vehicle_identity_aliases/);
+  assert.match(route, /\.eq\('alias_type', 'REGNR'\)/);
+  assert.match(route, /reconcileTowerPopulation/);
+  assert.match(route, /openPrimaryPeriods: periods/);
+  assert.match(route, /regnrAliasRows: canonicalRegnrAliases/);
+  assert.match(route, /positionedActive/);
+  assert.match(route, /missingOperationalPosition/);
+  assert.match(route, /reconciliation: population\.reconciliation/);
+});
+
+test('missing operational position is explicitly coverage, not a Layer 1 state', () => {
+  assert.match(route, /missingOperationalPositionIsCoverageNotState: true/);
+  assert.match(route, /Missing operational position is coverage, not a Layer 1 state/);
+  assert.doesNotMatch(route, /primaryStates\.UNKNOWN\s*=\s*population\.missingOperationalPosition/);
+});
+
+test('primary operational states stay separated from process overlays', () => {
+  assert.match(route, /primaryStates: population\.primaryStates/);
   assert.match(route, /processes:/);
   assert.match(route, /salu:/);
   assert.match(route, /garage:/);
   assert.match(route, /wheelChange:/);
-});
-
-test('SALU primary state is not folded into OTHER', () => {
-  assert.match(route, /state === 'AVAILABLE'[\s\S]*state === 'SALU'[\s\S]*primaryStateCounts\[state\] \+= 1/);
-  assert.match(route, /else \{\s*primaryStateCounts\.OTHER \+= 1/);
 });
 
 test('SALU uses open process flags and Garage excludes completed or Nybil-handed-off objects', () => {

@@ -43,6 +43,10 @@ test('Garage Core owns Garage staging, handoff state and provenance without cros
 test('cross-domain reads remain with their canonical owners after Overview removal', () => {
   assert.match(wheelApi, /from\('garage_wheel_changes'\)/);
   assert.match(towerReadModel, /from\('vehicle_journey_periods'\)/);
-  assert.match(towerReadModel, /state === 'DOWNTIME'/);
+  assert.match(towerReadModel, /reconcileTowerPopulation/);
+  assert.match(
+    towerReadModel,
+    /capturedDowntime: population\.primaryStates\.DOWNTIME/,
+  );
   assert.match(towerReadModel, /from\('garage_wheel_changes'\)/);
 });
