@@ -100,7 +100,7 @@ test('ambiguous canonical registration aliases fail closed from the active parti
   assert.equal(result.reconciliation.ambiguousActiveLayer1Vehicles, 1);
 });
 
-test('duplicate open Layer 1 rows never double-count an active vehicle', () => {
+test('duplicate open Layer 1 rows fail closed and never position the active vehicle', () => {
   const result = reconcileTowerPopulation({
     activeMembershipRows: [{ identity_id: 'i1' }],
     regnrAliasRows: [{ identity_id: 'i1', alias_value: 'AAA111' }],
@@ -111,8 +111,9 @@ test('duplicate open Layer 1 rows never double-count an active vehicle', () => {
     openActivities: [],
   });
 
-  assert.equal(result.positionedActive, 1);
-  assert.equal(result.primaryStates.AVAILABLE, 1);
+  assert.equal(result.positionedActive, 0);
+  assert.equal(result.missingOperationalPosition, 1);
+  assert.equal(result.primaryStates.AVAILABLE, 0);
   assert.equal(result.primaryStates.DOWNTIME, 0);
   assert.equal(result.reconciliation.duplicateOpenLayer1Vehicles, 1);
 });
