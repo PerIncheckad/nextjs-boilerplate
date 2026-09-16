@@ -36,9 +36,16 @@ test('timer follows existing hourly database-owned scheduler pattern', () => {
   assert.match(cron, /run_garage_avveckla_transport_timers\(now\(\), true\)/i);
 });
 
-test('transport booking API uses authenticated actor and RPC, not direct client writes', () => {
+test('transport booking API uses authenticated actor and only the two approved RPC boundaries', () => {
   assert.match(api, /verifyApiUser/i);
-  assert.match(api, /rpc\('book_garage_avveckla_transport'/i);
+  assert.match(api, /book_salu_v2_avveckla_transport_v1/i);
+  assert.match(api, /book_garage_avveckla_transport/i);
+  assert.match(
+    api,
+    /saluHandoff\?\.salu_v2_handoff_id\s*\?\s*'book_salu_v2_avveckla_transport_v1'\s*:\s*'book_garage_avveckla_transport'/i,
+  );
   assert.match(api, /verification\.user\.id/i);
   assert.doesNotMatch(api, /\.insert\(/i);
+  assert.doesNotMatch(api, /\.update\(/i);
+  assert.doesNotMatch(api, /\.delete\(/i);
 });
