@@ -45,6 +45,14 @@ test('all locked Layer 1 states remain visible including SALU primary state', ()
   assert.match(cockpit, /SALU · process/);
 });
 
+test('coverage gap is visible but never presented as UNKNOWN', () => {
+  assert.match(cockpit, /missingOperationalPosition/);
+  assert.match(cockpit, /saknar verifierad operativ position/);
+  assert.match(cockpit, /Layer 1 utanför AKTIVA/);
+  assert.match(cockpit, /Endast explicit verifierad Layer 1-status UNKNOWN/);
+  assert.match(cockpit, /Saknad operativ position räknas inte här/);
+});
+
 test('position movement friction and evidence are distinct product layers', () => {
   for (const label of ['POSITION', 'RÖRELSE', 'FRIKTION', 'EVIDENS']) assert.match(cockpit, new RegExp(label));
   assert.match(cockpit, /Planerade inköp/);
