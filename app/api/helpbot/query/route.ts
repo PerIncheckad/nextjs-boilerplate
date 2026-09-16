@@ -4,7 +4,7 @@ import { answerHelpbotQuestion } from '@/lib/helpbot/runtime';
 import type { HelpbotRoutingContext } from '@/lib/helpbot/matcher';
 
 const MAX_QUESTION_LENGTH = 600;
-const ALLOWED_CONTEXT_KEYS = new Set(['knowledgeId', 'processType', 'flow']);
+const ALLOWED_CONTEXT_KEYS = new Set(['processType', 'flow']);
 
 function parseRoutingContext(value: unknown): HelpbotRoutingContext | undefined {
   if (value === undefined) return undefined;
@@ -17,8 +17,8 @@ function parseRoutingContext(value: unknown): HelpbotRoutingContext | undefined 
     if (!ALLOWED_CONTEXT_KEYS.has(key)) throw new Error(`Unsupported routingContext key: ${key}`);
   }
 
-  const result: { knowledgeId?: string; processType?: string; flow?: string } = {};
-  for (const key of ['knowledgeId', 'processType', 'flow'] as const) {
+  const result: { processType?: string; flow?: string } = {};
+  for (const key of ['processType', 'flow'] as const) {
     const raw = record[key];
     if (raw === undefined) continue;
     if (typeof raw !== 'string') throw new Error(`${key} must be a string`);

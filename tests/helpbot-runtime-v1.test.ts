@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { answerHelpbotQuestion } from '../lib/helpbot/runtime';
 import { currentnessFor } from '../lib/helpbot/currentness';
+import type { HelpbotRoutingContext } from '../lib/helpbot/matcher';
 import {
   KNOWLEDGE_REGISTRY_V1,
   KNOWLEDGE_REGISTRY_V1_ID_SET,
@@ -132,6 +133,18 @@ test('unknown question and ambiguous multi-match both fail closed', () => {
   assert.equal(ambiguous.outcome, 'NO_VERIFIED_MATCH');
   assert.equal(ambiguous.reasonCode, 'AMBIGUOUS_MULTI_MATCH');
   assert.equal(ambiguous.knowledgeIds.length, 2);
+});
+
+test('caller-controlled knowledgeId cannot bypass deterministic question matching', () => {
+  const injectedContext = { knowledgeId: 'KR-GAR-001' } as unknown as HelpbotRoutingContext;
+  const result = answerHelpbotQuestion('Hur fungerar månens faser?', injectedContext);
+  assert.equal(result.outcome, 'NO_VERIFIED_MATCH');
+  assert.deepEqual(result.knowledgeIds, []);
+
+  const route = read('app/api/helpbot/query/route.ts');
+  const matcher = read('lib/helpbot/matcher.ts');
+  assert.doesNotMatch(route, /['"]knowledgeId['"]/);
+  assert.doesNotMatch(matcher, /context\?\.knowledgeId|explicitId|registryItemById/);
 });
 
 test('HelpBot API requires existing auth and contains no knowledge DB or AI fallback', async () => {

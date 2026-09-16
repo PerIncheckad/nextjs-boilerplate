@@ -1,7 +1,6 @@
-import { registryItemById, type KnowledgeId } from './registry-v1';
+import type { KnowledgeId } from './registry-v1';
 
 export type HelpbotRoutingContext = Readonly<{
-  knowledgeId?: string;
   processType?: string;
   flow?: string;
 }>;
@@ -39,13 +38,7 @@ export function normalizeHelpbotText(value: string): string {
     .trim();
 }
 
-export function matchKnowledgeIds(question: string, context?: HelpbotRoutingContext): readonly KnowledgeId[] {
-  const explicitId = context?.knowledgeId?.trim();
-  if (explicitId) {
-    const exact = registryItemById(explicitId);
-    return exact ? [exact.knowledgeId as KnowledgeId] : [];
-  }
-
+export function matchKnowledgeIds(question: string): readonly KnowledgeId[] {
   const normalized = normalizeHelpbotText(question);
   if (!normalized) return [];
 

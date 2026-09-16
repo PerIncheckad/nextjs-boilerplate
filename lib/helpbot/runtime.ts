@@ -59,7 +59,7 @@ function contextRequirementSatisfied(item: HelpbotRegistryItem, context?: Helpbo
 }
 
 export function answerHelpbotQuestion(question: string, context?: HelpbotRoutingContext): HelpbotResponse {
-  const candidateIds = matchKnowledgeIds(question, context);
+  const candidateIds = matchKnowledgeIds(question);
 
   if (candidateIds.length === 0) {
     return {
