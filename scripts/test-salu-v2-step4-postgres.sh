@@ -222,13 +222,22 @@ end $$;
 create or replace function public.step4_force_layer1_failure() returns trigger language plpgsql as $$ begin raise exception 'forced downstream layer1 failure'; end $$;
 create trigger step4_force_layer1_failure before update of ended_at on public.vehicle_journey_periods for each row execute function public.step4_force_layer1_failure();
 
-do $$ declare v_item uuid; begin
-  select garage_item_id into v_item from public.garage_salu_v2_avveckla_handoffs limit 1;
+do $$ declare v_item uuid; v_terminal_at timestamptz; begin
+  select h.garage_item_id,
+         greatest(clock_timestamp(),p.started_at,f.final_checkin_completed_at) + interval '1 second'
+    into v_item,v_terminal_at
+  from public.garage_salu_v2_avveckla_handoffs h
+  join public.garage_sista_incheckningar f on f.sista_incheckning_id=h.sista_incheckning_id
+  join public.vehicle_journey_periods p on p.period_id=h.journey_period_id
+  limit 1;
   begin
-    perform public.verify_salu_v2_avveckla_avstallning_v1(v_item,clock_timestamp(),'CI terminal evidence','91000000-0000-4000-8000-000000000001','chief@example.com');
+    perform public.verify_salu_v2_avveckla_avstallning_v1(v_item,v_terminal_at,'CI terminal evidence','91000000-0000-4000-8000-000000000001','chief@example.com');
     raise exception 'forced downstream failure unexpectedly committed';
   exception when raise_exception then
     if sqlerrm='forced downstream failure unexpectedly committed' then raise; end if;
+    if sqlerrm<>'forced downstream layer1 failure' then
+      raise exception 'forced downstream failure did not reach Layer1 trigger: %',sqlerrm;
+    end if;
   end;
 end $$;
 
@@ -242,9 +251,15 @@ drop trigger step4_force_layer1_failure on public.vehicle_journey_periods;
 drop function public.step4_force_layer1_failure();
 
 -- Successful SALU V2 terminal: exact bound Layer1 close without durationHours + exactly one existing canonical EXIT path.
-do $$ declare v_item uuid; v_result jsonb; v_retry jsonb; begin
-  select garage_item_id into v_item from public.garage_salu_v2_avveckla_handoffs limit 1;
-  v_result:=public.verify_salu_v2_avveckla_avstallning_v1(v_item,clock_timestamp(),'CI terminal evidence','91000000-0000-4000-8000-000000000001','chief@example.com');
+do $$ declare v_item uuid; v_terminal_at timestamptz; v_result jsonb; v_retry jsonb; begin
+  select h.garage_item_id,
+         greatest(clock_timestamp(),p.started_at,f.final_checkin_completed_at) + interval '1 second'
+    into v_item,v_terminal_at
+  from public.garage_salu_v2_avveckla_handoffs h
+  join public.garage_sista_incheckningar f on f.sista_incheckning_id=h.sista_incheckning_id
+  join public.vehicle_journey_periods p on p.period_id=h.journey_period_id
+  limit 1;
+  v_result:=public.verify_salu_v2_avveckla_avstallning_v1(v_item,v_terminal_at,'CI terminal evidence','91000000-0000-4000-8000-000000000001','chief@example.com');
   v_retry:=public.verify_salu_v2_avveckla_avstallning_v1(v_item,(v_result->>'completed_at')::timestamptz,'CI terminal evidence','91000000-0000-4000-8000-000000000001','chief@example.com');
   if (v_result->>'completion_event_id') is distinct from (v_retry->>'completion_event_id') then raise exception 'terminal retry duplicated event'; end if;
 end $$;
