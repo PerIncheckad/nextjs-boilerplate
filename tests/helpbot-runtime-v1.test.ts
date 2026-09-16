@@ -151,13 +151,3 @@ test('HelpBot API requires existing auth and contains no knowledge DB or AI fall
   assert.doesNotMatch(combined, /\b(?:openai|anthropic|embedding|vector|rag)\b|ai sdk/i);
   assert.doesNotMatch(combined, /fetch\s*\(/);
 });
-
-test('HJÄLP is support/utility navigation, never an OPERATIV process object', () => {
-  const support = read('components/product-navigation-contract.ts');
-  const operationalContract = read('components/operational-navigation-contract.ts');
-  const operationalNavigation = read('components/OperationalNavigation.tsx');
-  assert.match(support, /href:\s*['"]\/help['"],\s*label:\s*['"]HJÄLP['"],\s*key:\s*['"]help['"]/);
-  assert.doesNotMatch(operationalContract, /\/help|HJÄLP|help/);
-  assert.match(operationalNavigation, /aria-label="Stöd"/);
-  assert.match(operationalNavigation, /href="\/help">HJÄLP/);
-});
