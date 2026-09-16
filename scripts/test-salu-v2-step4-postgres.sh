@@ -8,6 +8,20 @@ bash scripts/test-salu-v2-step3-postgres.sh
 
 # Add only the pre-existing terminal/fleet contracts Step 4 depends on.
 "${PSQL[@]}" <<'SQL'
+alter table public.garage_items
+  add column vin text;
+
+do $$
+declare v_count integer;
+begin
+  update public.garage_items
+  set vin='WVWZZZ1JZXW000001'
+  where source_kind='SALU_PLANERING'
+    and source_salu_flag_id='11111111-1111-4111-8111-111111111111';
+  get diagnostics v_count = row_count;
+  if v_count<>1 then raise exception 'expected exactly one Step 4 SALU_PLANERING VIN fixture row, got %',v_count; end if;
+end $$;
+
 create table if not exists public.damages (
   id uuid primary key default gen_random_uuid(), regnr text not null, source text,
   damage_date date, damage_type_raw text, note_customer text, note_internal text, vehiclenote text
