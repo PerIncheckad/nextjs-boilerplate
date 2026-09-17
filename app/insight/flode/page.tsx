@@ -166,7 +166,7 @@ export default function InsightFlowPage() {
                           <button
                             type="button"
                             aria-pressed={selected}
-                            disabled={traceLoading && selected}
+                            disabled={traceLoading}
                             onClick={() => openContributor(item.observationIdentity)}
                           >
                             {traceLoading && selected ? 'Läser…' : selected ? 'Vald källa' : 'Källa'}

@@ -116,6 +116,16 @@ test('traceback UI exposes immediate loading, selected contributor and visible s
   assert.match(page, /\/api\/insight\/checkin-completed-count\/traceback/);
 });
 
+test('traceback UI serializes contributor requests so selected source identity cannot be mislabeled by a stale response', () => {
+  const page = fs.readFileSync('app/insight/flode/page.tsx', 'utf8');
+  assert.match(page, /disabled=\{traceLoading\}/);
+  assert.doesNotMatch(page, /disabled=\{traceLoading && selected\}/);
+  assert.match(page, /setSelectedContributorId\(contributorId\)/);
+  assert.match(page, /setTraceLoading\(true\)/);
+  assert.match(page, /finally \{\s*setTraceLoading\(false\);\s*\}/);
+  assert.match(page, /\/api\/insight\/checkin-completed-count\/traceback/);
+});
+
 test('migration defines ACCESS_INSIGHT and never seeds employee mandates', () => {
   const migration = fs.readFileSync('migrations/20260917001500_add_access_insight_capability_v1.sql', 'utf8');
   assert.match(migration, /'ACCESS_INSIGHT'/);
