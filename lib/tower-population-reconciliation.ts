@@ -2,6 +2,32 @@ export type TowerPrimaryState = 'AVAILABLE' | 'RENTAL' | 'DOWNTIME' | 'PREPARATI
 
 type Row = Record<string, unknown>;
 
+export type TowerFleetDrilldownRow = Readonly<{
+  identityId: string;
+  regnr: string | null;
+  operationalPosition: 'VERIFIED' | 'MISSING';
+  primaryState: TowerPrimaryState | null;
+  startedAt: string | null;
+  reasonCode: string | null;
+  reasonText: string | null;
+  sourceSystem: string | null;
+  sourceEntity: string | null;
+  sourceRecordId: string | null;
+  activityType: string | null;
+  activityStartedAt: string | null;
+}>;
+
+export type TowerExternalLayer1DrilldownRow = Readonly<{
+  regnr: string;
+  primaryState: TowerPrimaryState;
+  startedAt: string | null;
+  reasonCode: string | null;
+  reasonText: string | null;
+  sourceSystem: string | null;
+  sourceEntity: string | null;
+  sourceRecordId: string | null;
+}>;
+
 const PRIMARY_STATES: TowerPrimaryState[] = [
   'AVAILABLE',
   'RENTAL',
@@ -22,6 +48,10 @@ function emptyPrimaryStateCounts(): Record<TowerPrimaryState, number> {
     OTHER: 0,
     UNKNOWN: 0,
   };
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 export function normalizeTowerRegnr(value: unknown): string | null {
@@ -71,6 +101,7 @@ export function reconcileTowerPopulation({
   }
 
   const strictActiveRegnrToIdentity = new Map<string, string>();
+  const strictRegnrByIdentity = new Map<string, string>();
   let activeIdentityAliasIssues = 0;
 
   for (const identityId of activeIdentityIds) {
@@ -87,6 +118,7 @@ export function reconcileTowerPopulation({
     }
 
     strictActiveRegnrToIdentity.set(alias, identityId);
+    strictRegnrByIdentity.set(identityId, alias);
   }
 
   const periodsByRegnr = new Map<string, Row[]>();
@@ -105,6 +137,8 @@ export function reconcileTowerPopulation({
   const outsideActiveRegnrs = new Set<string>();
   const ambiguousActiveLayer1Regnrs = new Set<string>();
   const duplicateOpenLayer1Regnrs = new Set<string>();
+  const periodByPositionedIdentity = new Map<string, Row>();
+  const externalRows: TowerExternalLayer1DrilldownRow[] = [];
 
   for (const [vehicle, rows] of periodsByRegnr) {
     if (rows.length !== 1) {
@@ -112,11 +146,13 @@ export function reconcileTowerPopulation({
       continue;
     }
 
-    const state = primaryState(rows[0]?.period_type);
+    const period = rows[0];
+    const state = primaryState(period?.period_type);
     const activeIdentityId = strictActiveRegnrToIdentity.get(vehicle);
 
     if (activeIdentityId) {
       positionedIdentityIds.add(activeIdentityId);
+      periodByPositionedIdentity.set(activeIdentityId, period);
       primaryStates[state] += 1;
       if (state === 'DOWNTIME') activeDowntimeRegnrs.add(vehicle);
       continue;
@@ -129,29 +165,86 @@ export function reconcileTowerPopulation({
 
     outsideActiveRegnrs.add(vehicle);
     outsideActivePrimaryStates[state] += 1;
+    externalRows.push({
+      regnr: vehicle,
+      primaryState: state,
+      startedAt: stringValue(period.started_at),
+      reasonCode: stringValue(period.reason_code),
+      reasonText: stringValue(period.reason_text),
+      sourceSystem: stringValue(period.source_system),
+      sourceEntity: stringValue(period.source_entity),
+      sourceRecordId: stringValue(period.source_record_id),
+    });
   }
 
-  const workshopRegnrs = new Set<string>();
+  const workshopActivityByRegnr = new Map<string, Row>();
   for (const row of openActivities) {
     if (row.activity_type !== 'WORKSHOP') continue;
     const vehicle = normalizeTowerRegnr(row.regnr);
-    if (vehicle && activeDowntimeRegnrs.has(vehicle)) workshopRegnrs.add(vehicle);
+    if (vehicle && activeDowntimeRegnrs.has(vehicle)) workshopActivityByRegnr.set(vehicle, row);
   }
 
-  const positionedActive = positionedIdentityIds.size;
+  const activeRows: TowerFleetDrilldownRow[] = [...activeIdentityIds]
+    .sort((a, b) => a.localeCompare(b))
+    .map((identityId) => {
+      const regnr = strictRegnrByIdentity.get(identityId) ?? null;
+      const period = periodByPositionedIdentity.get(identityId);
+      const state = period ? primaryState(period.period_type) : null;
+      const activity = regnr && state === 'DOWNTIME' ? workshopActivityByRegnr.get(regnr) : undefined;
+      return {
+        identityId,
+        regnr,
+        operationalPosition: period ? 'VERIFIED' : 'MISSING',
+        primaryState: state,
+        startedAt: period ? stringValue(period.started_at) : null,
+        reasonCode: period ? stringValue(period.reason_code) : null,
+        reasonText: period ? stringValue(period.reason_text) : null,
+        sourceSystem: period ? stringValue(period.source_system) : null,
+        sourceEntity: period ? stringValue(period.source_entity) : null,
+        sourceRecordId: period ? stringValue(period.source_record_id) : null,
+        activityType: activity ? stringValue(activity.activity_type) : null,
+        activityStartedAt: activity ? stringValue(activity.started_at) : null,
+      };
+    });
+
+  const positionedRows = activeRows.filter((row) => row.operationalPosition === 'VERIFIED');
+  const missingRows = activeRows.filter((row) => row.operationalPosition === 'MISSING');
+  const primaryStateRows = PRIMARY_STATES.reduce<Record<TowerPrimaryState, TowerFleetDrilldownRow[]>>((acc, state) => {
+    acc[state] = positionedRows.filter((row) => row.primaryState === state);
+    return acc;
+  }, {
+    AVAILABLE: [],
+    RENTAL: [],
+    DOWNTIME: [],
+    PREPARATION: [],
+    SALU: [],
+    OTHER: [],
+    UNKNOWN: [],
+  });
+
+  externalRows.sort((a, b) => a.regnr.localeCompare(b.regnr));
+
+  const positionedActive = positionedRows.length;
 
   return {
-    active: activeIdentityIds.size,
+    active: activeRows.length,
     positionedActive,
-    missingOperationalPosition: Math.max(activeIdentityIds.size - positionedActive, 0),
+    missingOperationalPosition: missingRows.length,
     primaryStates,
-    workshopCaptured: workshopRegnrs.size,
+    workshopCaptured: workshopActivityByRegnr.size,
     reconciliation: {
       outsideActivePrimaryStateVehicles: outsideActiveRegnrs.size,
       outsideActivePrimaryStates,
       activeIdentityAliasIssues,
       ambiguousActiveLayer1Vehicles: ambiguousActiveLayer1Regnrs.size,
       duplicateOpenLayer1Vehicles: duplicateOpenLayer1Regnrs.size,
+    },
+    populations: {
+      active: activeRows,
+      positioned: positionedRows,
+      missingOperationalPosition: missingRows,
+      primaryStates: primaryStateRows,
+      externalLayer1: externalRows,
     },
   };
 }

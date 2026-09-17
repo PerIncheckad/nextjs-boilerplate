@@ -21,6 +21,10 @@ function countBy(rows: Row[], key: string): Record<string, number> {
   }, {});
 }
 
+function stringValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
 export async function GET(request: Request) {
   const verification = await verifyApiUser(request);
   if (!verification.ok) return NextResponse.json({ error: verification.error }, { status: verification.status });
@@ -133,6 +137,30 @@ export async function GET(request: Request) {
       && !row.handed_off_at,
     );
 
+    const garageDrilldown = garageOwned
+      .map((row) => ({
+        garageItemId: stringValue(row.garage_item_id),
+        regnr: normalizeTowerRegnr(row.regnr),
+        model: stringValue(row.model),
+        plannedStation: stringValue(row.planned_station),
+        confirmationStatus: stringValue(row.confirmation_status),
+        transportStatus: stringValue(row.transport_status),
+        sourceKind: stringValue(row.source_kind),
+      }))
+      .sort((a, b) => (a.regnr ?? a.garageItemId ?? '').localeCompare(b.regnr ?? b.garageItemId ?? ''));
+
+    const saluDrilldown = salu
+      .map((row) => ({
+        flagId: stringValue(row.flag_id),
+        regnr: normalizeTowerRegnr(row.regnr),
+        status: stringValue(row.status),
+        escalationStatus: stringValue(row.escalation_status),
+        ownerFunction: stringValue(row.owner_function),
+        currentSaludatum: stringValue(row.current_saludatum),
+        createdAt: stringValue(row.created_at),
+      }))
+      .sort((a, b) => (a.regnr ?? a.flagId ?? '').localeCompare(b.regnr ?? b.flagId ?? ''));
+
     const materializedByCell = new Map<string, number>();
     for (const row of materialized) {
       const cellId = typeof row.source_planning_cell_id === 'string' ? row.source_planning_cell_id : null;
@@ -207,19 +235,30 @@ export async function GET(request: Request) {
           primaryStates: population.primaryStates,
           workshopCaptured: population.workshopCaptured,
           reconciliation: population.reconciliation,
+          drilldown: fleetMembershipVerified ? population.populations : {
+            active: [],
+            positioned: [],
+            missingOperationalPosition: [],
+            primaryStates: {
+              AVAILABLE: [], RENTAL: [], DOWNTIME: [], PREPARATION: [], SALU: [], OTHER: [], UNKNOWN: [],
+            },
+            externalLayer1: population.populations.externalLayer1,
+          },
         },
         processes: {
           salu: {
-            open: salu.length,
+            open: saluDrilldown.length,
             byStatus: countBy(salu, 'status'),
             byEscalation: saluEscalation,
+            drilldown: saluDrilldown,
           },
           garage: {
-            owned: garageOwned.length,
+            owned: garageDrilldown.length,
             byConfirmationStatus: countBy(garageOwned, 'confirmation_status'),
             byTransportStatus: countBy(garageOwned, 'transport_status'),
-            withRegnr: garageOwned.filter((row) => normalizeTowerRegnr(row.regnr)).length,
-            withoutRegnr: garageOwned.filter((row) => !normalizeTowerRegnr(row.regnr)).length,
+            withRegnr: garageDrilldown.filter((row) => row.regnr).length,
+            withoutRegnr: garageDrilldown.filter((row) => !row.regnr).length,
+            drilldown: garageDrilldown,
           },
           plannedPurchases: {
             remaining: plannedPurchasesRemaining,
