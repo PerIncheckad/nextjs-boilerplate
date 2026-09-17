@@ -1,0 +1,136 @@
+.coverageButton,
+.coverageWide {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.coverageButton {
+  display: grid;
+  gap: 2px;
+}
+
+.coverageButton strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.coverageWide {
+  grid-column: 1 / -1;
+  padding-top: 4px;
+}
+
+.coverageButton:hover span,
+.coverageWide:hover small {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.panel {
+  margin-top: 14px;
+  border-top: 1px solid rgba(183, 179, 174, .46);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0 7px;
+  color: #60666a;
+  font-size: 8px;
+  font-weight: 760;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.toolbar input {
+  width: min(280px, 48vw);
+  padding: 6px 8px;
+  border: 1px solid rgba(183, 179, 174, .66);
+  border-radius: 7px;
+  background: #fbfaf7;
+  color: #111315;
+  font: inherit;
+  font-size: 9px;
+  letter-spacing: 0;
+  text-transform: none;
+  outline: none;
+}
+
+.toolbar input:focus {
+  border-color: #a69485;
+  box-shadow: 0 0 0 1px rgba(166, 148, 133, .2);
+}
+
+.tableWrap {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid rgba(183, 179, 174, .35);
+  border-radius: 9px;
+  background: #fbfaf7;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 8px;
+}
+
+.table th,
+.table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(183, 179, 174, .22);
+  white-space: nowrap;
+  vertical-align: top;
+  text-align: left;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f5f4f0;
+  color: #60666a;
+  font-size: 7px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.table tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover {
+  background: rgba(166, 148, 133, .08);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 7px;
+}
+
+.empty {
+  padding: 18px 12px;
+  color: #60666a;
+  font-size: 9px;
+}
+
+@media (max-width: 760px) {
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar input {
+    width: 100%;
+  }
+
+  .tableWrap {
+    max-height: 420px;
+  }
+}
