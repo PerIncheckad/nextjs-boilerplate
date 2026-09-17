@@ -8,6 +8,14 @@ trap 'rm -f "$TMP"' EXIT
 cat > "$TMP" <<'SQL'
 begin;
 
+-- Minimal fixture-only prerequisites required by the existing mandate foundation
+-- when it is executed against a clean PostgreSQL test database. These objects
+-- reproduce only the schema surface referenced while defining the real mandate
+-- migration; no Handoff business flow is exercised by this INSIGHT acceptance.
+do $$ begin create role anon; exception when duplicate_object then null; end $$;
+do $$ begin create role authenticated; exception when duplicate_object then null; end $$;
+do $$ begin create role service_role; exception when duplicate_object then null; end $$;
+
 create table public.employees (
   id uuid primary key,
   full_name text not null,
@@ -15,6 +23,37 @@ create table public.employees (
   active boolean,
   is_active boolean not null default true
 );
+
+create table public.handoff_definitions (
+  handoff_code text not null,
+  handoff_version integer not null,
+  from_function text not null,
+  to_function text not null,
+  primary key (handoff_code, handoff_version)
+);
+
+create table public.handoffs (
+  handoff_id uuid primary key default gen_random_uuid(),
+  handoff_code text not null,
+  handoff_version integer not null
+);
+
+create or replace function public.transition_handoff(
+  p_handoff_id uuid,
+  p_next_status text,
+  p_comment text,
+  p_evidence_refs jsonb,
+  p_actor_id uuid,
+  p_actor_email text,
+  p_actor_source text
+)
+returns jsonb
+language plpgsql
+as $$
+begin
+  raise exception 'fixture transition_handoff must not execute in INSIGHT authorization acceptance';
+end;
+$$;
 SQL
 
 # Execute the existing mandate foundation and module definitions inside the same
