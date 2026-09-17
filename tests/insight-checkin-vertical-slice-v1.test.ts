@@ -102,6 +102,20 @@ test('traceback requires signed evaluation and fixed Check-in metric identity', 
   assert.match(route, /createSupabaseCheckinSourceAdapter\(access\.sourceClient\)/);
 });
 
+test('traceback UI exposes immediate loading, selected contributor and visible source panel without changing backend contract', () => {
+  const page = fs.readFileSync('app/insight/flode/page.tsx', 'utf8');
+  assert.match(page, /traceLoading/);
+  assert.match(page, /selectedContributorId/);
+  assert.match(page, /Exact source traceback/);
+  assert.match(page, /Läser källa…/);
+  assert.match(page, /aria-pressed=\{selected\}/);
+  assert.match(page, /aria-selected=\{selected\}/);
+  assert.match(page, /tracePanelRef\.current\?\.scrollIntoView/);
+  assert.match(page, /tracePanelRef\.current\?\.focus/);
+  assert.match(page, /Vald contributor:/);
+  assert.match(page, /\/api\/insight\/checkin-completed-count\/traceback/);
+});
+
 test('migration defines ACCESS_INSIGHT and never seeds employee mandates', () => {
   const migration = fs.readFileSync('migrations/20260917001500_add_access_insight_capability_v1.sql', 'utf8');
   assert.match(migration, /'ACCESS_INSIGHT'/);
