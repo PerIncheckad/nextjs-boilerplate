@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useRef, useState } from 'react';
 import { authenticatedApiFetch } from '@/lib/api-auth-client';
 
 type Contributor = {
@@ -36,13 +36,19 @@ export default function InsightFlowPage() {
   const [data, setData] = useState<SliceResponse | null>(null);
   const [error, setError] = useState('');
   const [trace, setTrace] = useState<Record<string, unknown> | null>(null);
+  const [traceError, setTraceError] = useState('');
+  const [selectedContributorId, setSelectedContributorId] = useState<string | null>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
   const [loading, setLoading] = useState(false);
+  const tracePanelRef = useRef<HTMLElement | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError('');
     setTrace(null);
+    setTraceError('');
+    setSelectedContributorId(null);
     try {
       const response = await authenticatedApiFetch('/api/insight/checkin-completed-count', {
         method: 'POST',
@@ -63,21 +69,42 @@ export default function InsightFlowPage() {
   async function openContributor(contributorId: string) {
     if (!data) return;
     setError('');
+    setTraceError('');
     setTrace(null);
-    const response = await authenticatedApiFetch('/api/insight/checkin-completed-count/traceback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ evaluation: data.selectedEvaluation, contributorId }),
+    setSelectedContributorId(contributorId);
+    setTraceLoading(true);
+
+    requestAnimationFrame(() => {
+      tracePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload?.error ?? 'Traceback nekades.');
-      return;
+
+    try {
+      const response = await authenticatedApiFetch('/api/insight/checkin-completed-count/traceback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evaluation: data.selectedEvaluation, contributorId }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setTraceError(payload?.error ?? 'Traceback nekades.');
+        return;
+      }
+      setTrace(payload.data);
+      requestAnimationFrame(() => {
+        tracePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        tracePanelRef.current?.focus({ preventScroll: true });
+      });
+    } catch (cause) {
+      setTraceError(cause instanceof Error ? cause.message : 'Traceback kunde inte läsas.');
+    } finally {
+      setTraceLoading(false);
     }
-    setTrace(payload.data);
   }
 
   const result = data?.selectedEvaluation.result;
+  const selectedContributor = result?.evaluation.contributors.find(
+    (item) => item.observationIdentity === selectedContributorId,
+  );
 
   return (
     <main style={{ maxWidth: 1120, margin: '0 auto', padding: '40px 24px 80px', fontFamily: 'system-ui, sans-serif' }}>
@@ -104,6 +131,24 @@ export default function InsightFlowPage() {
             <p>Relativ förändring: {data.comparison.relativeChangePct == null ? 'Ej beräkningsbar' : `${data.comparison.relativeChangePct.toFixed(1)} %`}</p>
           </section>
 
+          {selectedContributorId && (
+            <section
+              ref={tracePanelRef}
+              tabIndex={-1}
+              aria-live="polite"
+              aria-busy={traceLoading}
+              style={{ marginTop: 36, borderTop: '1px solid currentColor', borderBottom: '1px solid currentColor', padding: '20px 0' }}
+            >
+              <h3>Exact source traceback</h3>
+              <p>
+                Vald contributor: <code>{selectedContributor?.sourceRecordId ?? selectedContributorId}</code>
+              </p>
+              {traceLoading && <p><strong>Läser källa…</strong></p>}
+              {traceError && <p role="alert">{traceError}</p>}
+              {trace && <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(trace, null, 2)}</pre>}
+            </section>
+          )}
+
           <section style={{ marginTop: 36 }}>
             <h3>Contributors</h3>
             <p>Exakt evaluation-bundet contributor-set.</p>
@@ -111,13 +156,25 @@ export default function InsightFlowPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead><tr><th align="left">Completed at</th><th align="left">Source record</th><th /></tr></thead>
                 <tbody>
-                  {result.evaluation.contributors.map((item) => (
-                    <tr key={item.observationIdentity}>
-                      <td>{item.sourceBusinessTimestamp ?? '—'}</td>
-                      <td><code>{item.sourceRecordId}</code></td>
-                      <td><button type="button" onClick={() => openContributor(item.observationIdentity)}>Källa</button></td>
-                    </tr>
-                  ))}
+                  {result.evaluation.contributors.map((item) => {
+                    const selected = item.observationIdentity === selectedContributorId;
+                    return (
+                      <tr key={item.observationIdentity} aria-selected={selected} style={selected ? { fontWeight: 600, outline: '1px solid currentColor', outlineOffset: -1 } : undefined}>
+                        <td>{item.sourceBusinessTimestamp ?? '—'}</td>
+                        <td><code>{item.sourceRecordId}</code></td>
+                        <td>
+                          <button
+                            type="button"
+                            aria-pressed={selected}
+                            disabled={traceLoading}
+                            onClick={() => openContributor(item.observationIdentity)}
+                          >
+                            {traceLoading && selected ? 'Läser…' : selected ? 'Vald källa' : 'Källa'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -132,13 +189,6 @@ export default function InsightFlowPage() {
             <p>Calculated at: {result.evaluation.calculatedAt}</p>
           </section>
         </>
-      )}
-
-      {trace && (
-        <section style={{ marginTop: 36, borderTop: '1px solid currentColor', paddingTop: 24 }}>
-          <h3>Exact source traceback</h3>
-          <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(trace, null, 2)}</pre>
-        </section>
       )}
     </main>
   );
